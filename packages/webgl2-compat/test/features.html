@@ -118,6 +118,16 @@ struct O { @location(0) a: vec4f, @location(1) b: vec4f }
   return Promise.all(targets.map(async (t) => [...(await read(device, t, { bytes: 4 }))].slice(0, 4)));
 }
 
+/** A 16x16 rgba8unorm texture of 5 levels whose bytes all differ (10, 60, 110, 160, 210): nearest-mip LOD sweeps. */
+function sweepLevels(device) {
+  const texture = device.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
+  for (let m = 0; m < 5; m++) {
+    const n = 16 >> m;
+    device.queue.writeTexture({ texture, mipLevel: m }, new Uint8Array(n * n * 4).fill(10 + 50 * m), { bytesPerRow: n * 4 }, [n, n]);
+  }
+  return texture;
+}
+
 const cases = {
   /** Sampling evaluates each argument once, including functions that change invocation-private state. */
   async mipArguments(device) {
@@ -152,12 +162,21 @@ const cases = {
     return results;
   },
   /** Implicit footprints belong to the hardware sampler, including oblique, non-axis-aligned derivatives. */
-  async implicitFootprint(device) {
+  /**
+   * `options.lodScale` (layer only) scales every footprint coordinate: the self-test's deliberately wrong LOD.
+   * The sweep keys sample a texture whose levels all differ with a nearest-mip sampler and a per-pixel bias of
+   * i/256 - 1 (pixel i of 512, a window of two LODs, so it always crosses a half): the level flips where the
+   * quantized LOD crosses a half, so equal sweeps prove the same hardware LOD to 1/256 even where a driver's
+   * compressed mip blend hides it (docs/known-bugs.md, "AMD D3D11 compressed mip blend").
+   */
+  async implicitFootprint(device, options = {}) {
+    const scale = device.gl && options.lodScale ? `*${options.lodScale.toFixed(6)}` : '';
     const texture = device.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
     for (let m = 0; m < 5; m++) {
       const n = 16 >> m;
       device.queue.writeTexture({ texture, mipLevel: m }, new Uint8Array(n * n * 4).fill([0, 255, 64, 0, 255][m]), { bytesPerRow: n * 4 }, [n, n]);
     }
+    const levels = sweepLevels(device);
     const results = {};
     try {
       for (const filter of ['nearest', 'linear']) for (const bias of [undefined, 0, -1.25, 0.375, 1.25]) for (const offset of [false, true]) {
@@ -165,7 +184,7 @@ const cases = {
       const values = await shade(device, { w: 4, h: 4,
         code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
           @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {
-            let uv=vec2f(0.173,0.124)*p.x+vec2f(-0.063,0.186)*p.y;
+            let uv=(vec2f(0.173,0.124)*p.x+vec2f(-0.063,0.186)*p.y)${scale};
             return ${bias === undefined ? 'textureSample' : 'textureSampleBias'}(t,s,uv${bias === undefined ? '' : `,${bias.toFixed(3)}`}${offset ? ',vec2i(1,-1)' : ''});
           }`,
         entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }],
@@ -181,15 +200,29 @@ const cases = {
       const values = await shade(device, { w: 4, h: 4,
         code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
           @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {
-            let uv=${uv};
+            let uv=(${uv})${scale};
             return ${call === 'grad' ? `textureSampleGrad(t,s,uv,dpdx(uv),dpdy(uv)${shift})` : `textureSample(t,s,uv${shift})`};
           }`,
         entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }],
       });
       results[`${filter}/${map}-${call}/${offset}`] = [...new Uint32Array(new Float32Array(values).buffer)];
       }
+      // q is the same in every 2x2 quad, so every quad has the same derivatives and the same LOD.
+      const nearestMip = device.createSampler({ minFilter: 'linear', magFilter: 'linear', mipmapFilter: 'nearest' });
+      for (const [map, uv] of [['oblique', 'vec2f(0.173,0.124)*q.x+vec2f(-0.063,0.186)*q.y'], ['near', 'q*0.24996']]) {
+        const values = await shade(device, { w: 16, h: 32,
+          code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+            @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {
+              let q=p.xy-2.0*floor(p.xy*0.5);
+              let uv=(${uv})${scale};
+              return textureSampleBias(t,s,uv,(floor(p.x)+16.0*floor(p.y))/256.0-1.0);
+            }`,
+          entries: [{ binding: 0, resource: levels.createView() }, { binding: 1, resource: nearestMip }],
+        });
+        results[`sweep/${map}`] = [...new Uint32Array(new Float32Array(values).buffer)];
+      }
       return results;
-    } finally { texture.destroy(); }
+    } finally { texture.destroy(); levels.destroy(); }
   },
   /** Explicit level weights use an unfiltered oracle; every footprint request uses the native hardware sampler. */
   async mipFiltering(device) {
@@ -230,6 +263,21 @@ const cases = {
       }
     }
     texture.destroy();
+    // Nearest-mip LOD sweeps of the bias and gradient rows (row j adds j/256 - 1 to each column's LOD), as in
+    // implicitFootprint: equal sweeps prove both sides pick the same hardware LOD to 1/256.
+    const levels = sweepLevels(device);
+    const nearestMip = device.createSampler({ minFilter: 'linear', magFilter: 'linear', mipmapFilter: 'nearest' });
+    const shift = '2.0 + floor(p.x) * 0.125 + floor(p.y) / 256.0 - 1.0';
+    for (const [mode, sample] of [
+      ['bias', 'textureSampleBias(t,s,p.xy*0.25,floor(p.x)*0.125+floor(p.y)/256.0-1.0)'],
+      ['grad', `textureSampleGrad(t,s,vec2f(0.5),vec2f(exp2(${shift})/16.0,0),vec2f(0))`],
+    ])
+      results[`sweep/${mode}`] = await shade(device, { w: 9, h: 512,
+        code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+          @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return ${sample};}`,
+        entries: [{ binding: 0, resource: levels.createView() }, { binding: 1, resource: nearestMip }],
+      });
+    levels.destroy();
     return results;
   },
   /**
@@ -932,13 +980,13 @@ struct V { @builtin(position) p: vec4f, @location(0) @interpolate(flat) i: u32 }
   },
 };
 
-async function run(device, name) {
+async function run(device, name, options) {
   const errors = [];
   device.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
   device.pushErrorScope('validation');
   let result, thrown = null;
   try {
-    result = await cases[name](device);
+    result = await cases[name](device, options);
   } catch (e) {
     thrown = `${e.name}: ${e.message}`;
   }
@@ -963,15 +1011,89 @@ window.check = {
     }
   },
   names: () => Object.keys(cases),
-  async runCompat(name) {
+  async runCompat(name, options) {
     if (!compat) {
       const adapter = await createCompatGPU().requestAdapter();
       const extra = adapter.features.has('texture-compression-bc') ? ['texture-compression-bc'] : [];
       compat = await adapter.requestDevice({ requiredFeatures: ['depth32float-stencil8', ...extra] });
     }
-    return run(compat, name);
+    return run(compat, name, options);
   },
-  async run(name) {
+  /**
+   * The blend probe (docs/known-bugs.md, "AMD D3D11 compressed mip blend"): textureLod / textureSampleLevel at every
+   * LOD k/256 for k = 0..1024 on a 16x16 texture whose 5 levels hold `bytes`, through raw WebGL2 (no layer: the
+   * driver's own mip blend) and native WebGPU (when `withNative`), with the given min/mag filter and a linear mip
+   * filter. Returns f32 bits, 4 per LOD.
+   */
+  async blendProbe(bytes, filter, withNative = true) {
+    const count = 1025, w = 64, h = 17;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const gl = canvas.getContext('webgl2');
+    if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('blend probe needs EXT_color_buffer_float');
+    const linear = filter === 'linear';
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texStorage2D(gl.TEXTURE_2D, 5, gl.RGBA8, 16, 16);
+    for (let m = 0; m < 5; m++) {
+      const n = 16 >> m;
+      gl.texSubImage2D(gl.TEXTURE_2D, m, 0, 0, n, n, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(n * n * 4).fill(bytes[m]));
+    }
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, linear ? gl.LINEAR_MIPMAP_LINEAR : gl.NEAREST_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, linear ? gl.LINEAR : gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const target = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, target);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, w, h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gl.createFramebuffer());
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    const shader = (type, source) => {
+      const o = gl.createShader(type);
+      gl.shaderSource(o, source);
+      gl.compileShader(o);
+      if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o));
+      return o;
+    };
+    const program = gl.createProgram();
+    gl.attachShader(program, shader(gl.VERTEX_SHADER, `#version 300 es
+      void main(){gl_Position=vec4(float(gl_VertexID&1)*4.0-1.0,float(gl_VertexID>>1)*4.0-1.0,0,1);}`));
+    gl.attachShader(program, shader(gl.FRAGMENT_SHADER, `#version 300 es
+      precision highp float; uniform highp sampler2D t; out vec4 o;
+      void main(){o=textureLod(t,vec2(0.5),float(int(gl_FragCoord.x)+${w}*int(gl_FragCoord.y))/256.0);}`));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+    gl.viewport(0, 0, w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const pixels = new Float32Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, pixels);
+    const error = gl.getError();
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    if (error) throw new Error(`blend probe GL error ${error}`);
+    const result = { gl: [...new Uint32Array(pixels.buffer, 0, count * 4)], native: null };
+    if (withNative) {
+      if (!native) await this.devices();
+      const texture = native.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
+      for (let m = 0; m < 5; m++) {
+        const n = 16 >> m;
+        native.queue.writeTexture({ texture, mipLevel: m }, new Uint8Array(n * n * 4).fill(bytes[m]), { bytesPerRow: n * 4 }, [n, n]);
+      }
+      const sampler = native.createSampler({ minFilter: filter, magFilter: filter, mipmapFilter: 'linear' });
+      const values = await shade(native, { w, h,
+        code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+          @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {
+            return textureSampleLevel(t,s,vec2f(0.5),(floor(p.x)+${w}.0*floor(p.y))/256.0);
+          }`,
+        entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }],
+      });
+      texture.destroy();
+      result.native = [...new Uint32Array(new Float32Array(values).buffer, 0, count * 4)];
+    }
+    return result;
+  },
+  async devices() {
     if (!native) {
       // The BC formats where both adapters have them (the layer: s3tc, its sRGB twin, RGTC and BPTC).
       const a = await navigator.gpu.requestAdapter(),
@@ -980,7 +1102,10 @@ window.check = {
       native = await a.requestDevice({ requiredFeatures: ['depth32float-stencil8', ...extra] });
       compat = await b.requestDevice({ requiredFeatures: ['depth32float-stencil8', ...extra] });
     }
-    return { native: await run(native, name), compat: await run(compat, name) };
+  },
+  async run(name, options) {
+    await this.devices();
+    return { native: await run(native, name, options), compat: await run(compat, name, options) };
   },
 };
 window.ready = true;

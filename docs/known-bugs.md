@@ -6019,3 +6019,32 @@ devices, and the features test passes 2 of 2 on 000a11e1d. Regression: packages/
 (in test:gpu; 30 fresh devices must each show their frame) fails at device 1 with compat source at 450015cb1^ on the
 Beelink and passes on main. Diagnostics kept outside the repository in lane M1's `.lane/diag` (raw-launch.mjs, wrap.js
 GL wrappers, feat.html, min.html).
+
+### Accepted: AMD D3D11 compressed mip blend makes implicitFootprint differ from native (2026-11-10, Beelink)
+
+Repro (Radeon 680M, Windows 11, AMD driver 32.0.21030.2001): `node packages/webgl2-compat/test/features-browser.mjs`
+on main 50b7ceddc stopped at `implicitFootprint: compat differs from native`, `.linear/implicit/false[0..7]: native
+1051063284, compat 1048608897`. Decoded: native 0x3ea5f3f4 = 0.32413 = level 2 (64/255) plus 25/256 of level 1, so
+LOD 487/256 (1.90234); compat 0x3e808081 = 64/255, level 2 alone. Every one of the 20 linear-mip rows fits that one
+LOD on both sides (bias -1.25, 0.375 and 1.25 give LOD fractions 0.652, 0.277, 0.152; native blends by the fraction,
+compat by 0.6875, 0.21875, 0.0625); nearest-mip rows and the near-integer map are bit-identical. Cause, below Margo:
+the layer emits a plain GLSL `texture()` for these footprints and the AMD driver under ANGLE D3D11 blends two mip
+levels with weight clamp((frac - 0.1) / 0.8, 0, 1) on a 1/64 grid. Raw WebGL2 without the layer
+("ANGLE (AMD Radeon(TM) Graphics 0x1681 Direct3D11)") at LOD fractions 0, .0625, .125, .1875, .25, .3125, .375, .5,
+.625, .75, .875, .9375 between a white and a black level returns 1, 1, .96875, .89063, .8125, .73438, .65625, .5,
+.34375, .1875, .03125, 0, through `textureLod` and through `texture()` with a bias alike; native WebGPU (Dawn D3D12)
+on the same GPU in the same page returns 1 - frac exactly, and so does ANGLE Vulkan. The LOD itself is the same.
+Spec: WebGPU 7.1.1 (GPUSamplerDescriptor), "The precise filtering behavior is implementation-dependent."; OpenGL ES
+3.0 section 3.8.10.4 gives tau = [1 - frac(lambda)] tau1 + frac(lambda) tau2 for LINEAR_MIPMAP_LINEAR, which the
+D3D11 driver does not follow. Exact layer-equals-native bits for hardware-blended footprints is therefore not a spec
+requirement; it held on NVIDIA, Intel and ANGLE Vulkan only because their blends are linear.
+Scott ruled 2026-11-10: a spec-scoped test. test/blend-check.mjs classifies the backend with a raw WebGL2 probe
+(textureLod at every LOD k/256). Linear-blend backends keep the exact bit equality unchanged. On a compressed-blend
+backend the linear-mip rows of implicitFootprint and the footprint rows of mipFiltering must pick native's LOD
+(nearest-mip sweeps of 512 biases i/256 - 1, compared bit for bit) and each blended texel must equal, bit for bit,
+native's own textureSampleLevel and raw WebGL2 textureLod at one shared LOD k/256; every other row stays exact. A
+self-test scales the layer's footprint coordinates by 1.01 (LOD 3.7/256 high, inside the clamp, so the blend alone
+cannot see it) and must fail through the sweeps. bias-browser.mjs (test:gpu:bias) uses the same scheme: D3D11
+compressed, Vulkan linear and exact. Regression: blend-check.test.js (classification and the comparison on synthetic
+probes); on the Beelink features-browser.mjs passes with the self-test failing as required. No system or driver
+setting was changed (the AMD "Texture Filtering Quality" setting may control the compression; not tried).

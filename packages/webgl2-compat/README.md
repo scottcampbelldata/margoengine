@@ -402,7 +402,11 @@ weights that some WebGL drivers compress away. It covers explicit-LOD sampling o
 1D, 2D, array, 3D and cube textures. Every footprint request (implicit, bias and
 explicit-gradient sampling) and other sampler states retain hardware filtering and
 footprint selection, so `textureSampleGrad(t, s, uv, dpdx(uv), dpdy(uv))` returns
-the same bits as `textureSample(t, s, uv)`, as it does on native WebGPU. The translated texture's optional `mipFilter`
+the same bits as `textureSample(t, s, uv)`, as it does on native WebGPU. Such requests therefore also keep the
+driver's blend between the two levels: the AMD driver under ANGLE D3D11 compresses it (weight
+clamp((frac - 0.1) / 0.8, 0, 1) on a Radeon 680M, where native WebGPU uses frac), so there the layer picks native's
+LOD but blends as WebGL2 does (WebGPU leaves precise filtering implementation-dependent; see docs/known-bugs.md, "AMD
+D3D11 compressed mip blend"). The translated texture's optional `mipFilter`
 uniform is a `vec3` containing the enable flag and the sampler's minimum/maximum
 LOD; the compatibility device supplies it automatically, along with `levels` and
 `size`. No additional texture unit is used.
