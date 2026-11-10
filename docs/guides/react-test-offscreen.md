@@ -32,6 +32,26 @@ to primary pointer 1; a click is a pointerdown followed by pointerup. Await each
 helper before starting another. Pointer handler failures reject the helper.
 Unmount flushes effects and releases the cache, event listeners and owned stage.
 
+A test helper that mounts any element (for example `createElement(Mesh, null, createElement(BoxGeometry))`),
+advances two frames, clicks the first mesh and counts the meshes, then releases the owned null stage:
+
+```ts
+import { createTestRenderer } from '@margoengine/react/test';
+
+export async function clickAndCount(element: Parameters<typeof createTestRenderer>[0]): Promise<number> {
+  const renderer = await createTestRenderer(element, { width: 64, height: 64 });
+  try {
+    await renderer.advanceFrames(2, 1 / 60);
+    const [first] = renderer.findAll();
+    await renderer.fireEvent(first ?? null, 'pointerdown');
+    await renderer.fireEvent(first ?? null, 'pointerup');
+    return renderer.findAll().length;
+  } finally {
+    await renderer.unmount();
+  }
+}
+```
+
 `@margoengine/react/offscreen` exports `OffscreenCanvas`. React and its DOM
 children stay on the main thread. The required `scene` URL names a module that
 exports `createScene(context)`, following `@margoengine/worker/auto`. The module
