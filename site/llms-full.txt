@@ -8827,6 +8827,9 @@ GrassScatter(options) from @margoengine/scatter/grass is a Scatter with no mesh 
 
 Rivers options: substeps integer 1..64 (default 8); maxFroude 0.1..20 (default 4); at most 16 sources, each a finite [x, z], discharge 0..100000 m^3/s and radius 0..10000 m (square footprint, cells whose centres lie inside it). One Rivers per Water; it needs a Water with a terrain coast. Pipe speed is capped at maxFroude * sqrt(g a) and at half a cell per substep, so a fall of any height stays bounded, but the reconstruction drives flow by the depth above the brink only: on beds steeper than the depth per cell a chute front runs slower than the slope's gravity component (about 2 m/s on a 0.5 slope in the float64 oracle). No bed friction term beyond the shared 0.12 /s flux decay.
 
+### Rain ripples (batch 67 job 3)
+water/rain WaterRain draws rain rings on one Water: rain 0 to 1 (or a weather's, read every frame from `rain` or a WeatherMachine's `state.rain`), cell 0.05 to 5 m (default 0.4), lifetime 0.1 to 10 s (default 0.8), strength 0 to 1 (default 0.35). At most one ring per cell in each of three grids at a time; a ring spreads to a quarter of its cell. Rings fade out where a pixel covers more than 0.2 of a cell. Rings shade only (normals); optional splashes put real drops into a Ripples field: rate 0 to 1000 per second at full rain (default 20), at most 32 a frame, inside a square of side area (default 16 m) around the camera, radius default 0.5 m and depth default 0.02 m. The splash radius must cover one cell of the field, or Ripples rejects the drop when the frame renders. One rain per Water. Optional entry, so the water root entry does not grow.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

@@ -348,3 +348,11 @@ lights, as sunlight does through a breaking wave. `WaterScatter.attach(engine, {
 (linear RGB), `strength`, `power` (how tightly the glow gathers around the light) and `distortion` (how much the wave
 normal bends it); `set` changes them later. Attach it after `WaterBodies` so each body's level is used. It changes
 shading only.
+
+## Rain ripples
+
+`@margoengine/water/rain` puts rain drop rings on a `Water`. `WaterRain.attach(engine, { surface, weather })` follows a
+`WeatherMachine`'s `state.rain` (or any object with a numeric `rain`); without a weather, `rain` sets the intensity.
+`cell`, `lifetime` and `strength` shape the rings, which fade out with distance. With `splashes: { field }` heavier
+drops also fall into a `Ripples` field around the camera, so the simulated surface moves too. It composes with
+`WaterFlow` in either attach order.

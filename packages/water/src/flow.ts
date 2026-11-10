@@ -141,13 +141,19 @@ export class WaterFlow implements EnginePlugin {
       key: 'flow',
       vertex: false,
       count: 4,
-      shader: (code, binding) =>
-        code
-          .replace('struct Result', flowShader(binding) + '\nstruct Result')
-          .replace(
-            'let n=normalize(i.normal+ripple);',
-            'ripple=flowingNormal(i.world.xz,footprint)*(1.0-foam);let n=normalize(i.normal+ripple);',
-          ),
+      shader: (code, binding) => {
+        if (code.split('let n=normalize(i.normal+ripple').length !== 2)
+          throw fault('failed', 'Flow cannot find the Water surface shader; use matching water package versions');
+        return (
+          code
+            .replace('struct Result', flowShader(binding) + '\nstruct Result')
+            // The prefix without the closing bracket still matches after WaterRain adds its rings, in either order.
+            .replace(
+              'let n=normalize(i.normal+ripple',
+              'ripple=flowingNormal(i.world.xz,footprint)*(1.0-foam);let n=normalize(i.normal+ripple',
+            )
+        );
+      },
       prepare: (c) => this.prepare(c),
     });
     this.removeDispose = this.options.surface.onDispose(() => this.dispose());

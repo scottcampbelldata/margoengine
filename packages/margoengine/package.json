@@ -4919,6 +4919,10 @@
       "types": "./dist/water/scatter.d.ts",
       "import": "./dist/water/scatter.js"
     },
+    "./water/rain": {
+      "types": "./dist/water/rain.d.ts",
+      "import": "./dist/water/rain.js"
+    },
     "./water/reflector": {
       "types": "./dist/water/reflector.d.ts",
       "import": "./dist/water/reflector.js"

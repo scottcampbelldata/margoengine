@@ -54,6 +54,10 @@
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"
     },
+    "./rain": {
+      "types": "./dist/rain.d.ts",
+      "import": "./dist/rain.js"
+    },
     "./reflector": {
       "types": "./dist/reflector.d.ts",
       "import": "./dist/reflector.js"
@@ -85,7 +89,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js water",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "npm run build && node test/rivers.browser.mjs && node test/bodies.browser.mjs && node test/scatter.browser.mjs && node test/underwater.browser.mjs && node test/reflector.browser.mjs && node test/flow-map.browser.mjs && node test/ripples.browser.mjs && node test/caustics-project.browser.mjs && node test/caustics-energy.browser.mjs && node test/caustics.browser.mjs && node test/query.browser.mjs && node test/fft.browser.mjs && node test/flow.browser.mjs && node test/surface.browser.mjs && node test/coast.browser.mjs && node test/stack.browser.mjs && node test/horizon.browser.mjs && node test/still.browser.mjs",
+    "test:gpu": "npm run build && node test/rivers.browser.mjs && node test/bodies.browser.mjs && node test/scatter.browser.mjs && node test/rain.browser.mjs && node test/underwater.browser.mjs && node test/reflector.browser.mjs && node test/flow-map.browser.mjs && node test/ripples.browser.mjs && node test/caustics-project.browser.mjs && node test/caustics-energy.browser.mjs && node test/caustics.browser.mjs && node test/query.browser.mjs && node test/fft.browser.mjs && node test/flow.browser.mjs && node test/surface.browser.mjs && node test/coast.browser.mjs && node test/stack.browser.mjs && node test/horizon.browser.mjs && node test/still.browser.mjs",
     "prepack": "npm run build",
     "test:gpu:preview": "node test/caustics-preview.browser.mjs"
   }

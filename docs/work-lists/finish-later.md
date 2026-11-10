@@ -68,3 +68,5 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 66.8 | @margoengine/water | rivers: Manning bed friction; only the shared 0.12 /s flux decay today |
 | 66.8 | @margoengine/water | rivers: cost measured only on a 256 x 256 map on the M6 Mac mini; measure 1024 x 1024 and substep scaling |
 | 66.8 | @margoengine/water | rivers: drive water/flow surface shading from the solver's pipe flux instead of a separate flow field |
+| 67.3 | @margoengine/water | Rain: splash radius is not checked against the Ripples cell until the frame renders (Ripples keeps its cell private); rings on WaterBodies do not follow body wave shares; no rain in the SSR capture or the reflector; GPU time not measured. |
+| 67.3 | @margoengine/water | rain.browser.mjs first ran on the M6 Mac mini (Metal): with cell 0.4 the 2 cm rings were faded out by the footprint at the test view, so the frame test uses cell 2; its change floors were first-run guesses (rings 0.5, splashes 0.2) and are set from that run (measured 0.279 and 0.077, floors 0.1 and 0.03). Light the test scene so rings and splashes show above the original floors, and recheck on the dev PC. |

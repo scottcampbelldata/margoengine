@@ -4816,3 +4816,19 @@ Eight requested jobs for @margoengine/water. Jobs 1, 2, 3, 4, 6 and 7 were built
 | 8. Flowing rivers on steep beds | DONE | this commit | water/rivers; GPU against float64 model within 9.2e-6 m, 0.168 ms against 0.155 ms per frame on 256 x 256 (M6 Mac mini, loaded) |
 
 Job 5 landed with push-anyway (Scott, 2026-11-10) after its gates had passed except the then known-red webgl2-compat isolation step. Job 8 landed by the fast landing flow: water package tests (55 pass) and the rivers, coast, still, flow and bodies GPU checks on Metal WebGPU, rivers also with --compat. README examples are owed (readme-owed.md); leftovers are in finish-later.md (66.5, 66.8). No test, tolerance or budget was loosened. This commit sets row 66 done.
+
+## Batch 67: water bodies, wave scattering and rain (2026-11-10)
+
+Three water jobs, started on the Beelink and finished on the M6 Mac mini (lane N). Each is an optional water entry, so the water root entry and core plus stage do not grow.
+
+| Job | Feature | Status | Commit | Result |
+| --- | --- | --- | --- | --- |
+| 1 | Water bodies from outlines and river splines | DONE | 78be0912b | Optional water/bodies: lakes, pools and rivers on one Water with their own levels, wave shares and colours; WaveQuery follows the same body map. |
+| 2 | Wave subsurface scattering | DONE | c2c75fccb | Optional water/scatter: backlit crests glow with a tint from Water's directional lights (Barre-Brisebois and Bouchard, GDC 2011), thickness from height over wave amplitude, following body levels. |
+| 3 | Rain ripples | DONE | this commit | Optional water/rain: hashed drop rings that follow a WeatherMachine's rain, fade with the pixel footprint, and optional splashes into a Ripples field. |
+
+Bug fixed: WaterFlow replaced the exact ripple line, so attaching WaterRain first made flow vanish silently. Flow now matches the line by prefix and throws when it is missing; rain.browser.mjs checks both attach orders keep both normals.
+
+Proof: each job has CPU tests (validation, copies, dispose) and a GPU test run by land.sh on this Mac (Metal): bodies against exact signed distances and levels; scatter's WGSL term against an independent JavaScript evaluation within 1e-5; rain's WGSL ring slope against a JavaScript evaluation with the same PCG hash within 2e-4 over 578 points. Each GPU test also checks the effect off matches the plain frame and disposing restores it exactly.
+
+Limits and unmeasured: bodies have no holes or islands and no per-body foam or flow; scatter uses a thickness proxy and directional lights only; rain splash radius is checked by Ripples only when the frame renders. GPU time is not measured for any of the three. Details are in docs/limits.md and docs/work-lists/finish-later.md.
