@@ -16,7 +16,19 @@ function readsLaterUV(value: unknown): boolean {
 export function usesLaterUV(doc: GLTFDocument, p: GLTFPrimitive): boolean {
   const variants = p.extensions?.KHR_materials_variants as { mappings?: { material?: number }[] } | undefined,
     ids = [p.material, ...(variants?.mappings ?? []).map((mapping) => mapping?.material)];
-  return ids.some((id) => id !== undefined && readsLaterUV(doc.materials?.[id]));
+  const seen = new Set<number>();
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (id === undefined || seen.has(id)) continue;
+    seen.add(id);
+    const material = doc.materials?.[id];
+    if (readsLaterUV(material)) return true;
+    const levels = (material?.extensions as { MSFT_lod?: { ids?: unknown } } | undefined)?.MSFT_lod?.ids;
+    if (Array.isArray(levels))
+      for (const level of levels)
+        if (Number.isInteger(level) && level >= 0 && level < (doc.materials?.length ?? 0)) ids.push(level);
+  }
+  return false;
 }
 /** Geometry already packed by a parse worker, keyed by primitive definition; PBRModel then skips decoding it. */
 export const packed = new WeakMap<object, PreparedGeometry>();

@@ -3868,4 +3868,5 @@ The optional points/clip entry selects closed box and polygon volumes and extrac
 ### Batch 217 job 2: viewport keying
 
 The optional viewport entry closes the scene-pick, gizmo-manipulate and playhead-key row. Evidence: viewport.test.js covers insertion, replacement, creation, validation and undo; viewport-browser.mjs performs real canvas picking and translation/rotation/scale mouse drags, then checks keys and cleanup. The feature reuses the engine inspector, with no renderer or core additions. No performance or whole-editor superiority claim.
->>>>>>> 09e20fc48 (feat(cutscene): key viewport gizmo transforms at the playhead)
+### MSFT_lod material levels (batch 222 job 2)
+Optional lod/msft reads ordered material ids and coverage hints and selects per-primitive materials with hysteresis. gltf-pro's additive setPrimitiveMaterials validates edits and refreshes texture bindings, including lower-level TEXCOORD_2/3, retaining geometry/deformation storage. Proof: lod/test/msft.test.js and msft-check.mjs on CC0 FlightHelmet. No streaming, speed or visual-equivalence claim across different materials.

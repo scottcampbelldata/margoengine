@@ -3047,9 +3047,11 @@ export class PBRModel implements EnginePlugin {
   image(index: number, optional: true): GLTFImage;
   image(index: number, optional = false): GLTFImage {
     if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
-    if (typeof optional !== 'boolean') throw typeError('Optional image lookup must be boolean; pass true or omit it', 'material');
+    if (typeof optional !== 'boolean')
+      throw typeError('Optional image lookup must be boolean; pass true or omit it', 'material');
     const image = this.images[integer(index, 'image')];
-    if (!image && !optional) throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
+    if (!image && !optional)
+      throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
     return image;
   }
   /** Upload a retained image; the caller owns and destroys the returned texture. */
@@ -3206,6 +3208,63 @@ export class PBRModel implements EnginePlugin {
         );
     }
     this.selectedVariant = variant === undefined ? undefined : index;
+  }
+  /**
+   * Changes authored material indices on this model's primitives and refreshes their texture bindings. All references
+   * and UV requirements are validated before any primitive changes. `undefined` restores the primitive's initial
+   * material. Geometry, skinning and morph buffers are retained. Call after a progressive load completes.
+   * @throws MargoError when disposed; RangeError for a foreign primitive, repeated primitive or invalid material index.
+   */
+  setPrimitiveMaterials(changes: readonly { primitive: PBRPrimitive; material: number | undefined }[]): void {
+    if (this.disposed)
+      throw margoError('disposed', 'The model is disposed; load a new model before changing materials.');
+    const seen = new Set<PBRPrimitive>(),
+      owned = new Set([...this.primitives, ...this.pointsAndLines]);
+    const resolved = changes.map(({ primitive: p, material: index }) => {
+      if (
+        !owned.has(p) ||
+        seen.has(p) ||
+        (index !== undefined && (!Number.isInteger(index) || index < 0 || index >= this.materials.length))
+      )
+        throw new RangeError(
+          'Material changes need unique primitives from this model and valid material indices; check the model material count.',
+        );
+      seen.add(p);
+      const m =
+        index === undefined
+          ? (this.defaults.get(p) ?? p.material)
+          : fit(this.asset, p.definition, this.materials[index], !!p.topology);
+      const uvs =
+        !p.uvs && m.maps.some((map) => map && (map.texCoord ?? 0) > 1)
+          ? packPrimitive(this.asset, { ...p.definition, material: index }).uvs
+          : undefined;
+      return [p, m, uvs] as const;
+    });
+    const resources = new Map(this.resources.map((r) => [r.primitive, r])),
+      device = this.engine.gpu;
+    let sampler: GPUSampler | undefined;
+    for (const [p, m, uvs] of resolved) {
+      if (m === p.material) continue;
+      if (!this.defaults.has(p)) this.defaults.set(p, p.material);
+      p.material = m;
+      const resource = resources.get(p);
+      if (uvs) {
+        p.uvs = uvs;
+        if (resource && device) {
+          resource.uvs = device.createBuffer({
+            size: uvs.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+          });
+          device.queue.writeBuffer(resource.uvs, 0, uvs);
+        }
+      }
+      if (resource && device)
+        this.bindMaterial(
+          resource,
+          device,
+          (sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
+        );
+    }
   }
   /**
    * Every mesh this model made and will dispose: `root`, `nodes` and the meshes of its baked batches. A mesh you

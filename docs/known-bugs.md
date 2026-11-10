@@ -4623,4 +4623,6 @@ No open defect found in the new volume/profile computations; boundary, transform
 ### Fixed: batch 217 inherited API summary merge boundaries
 
 Concurrent main contained nested conflict markers in docs/api-surface.md. Scoped api:update refused it, and api:check failed its generated-summary comparison. A full api:update regenerates the summary from the built exports; no unrelated API implementation changed. scripts/api-report-scope.mjs already rejects marked summaries, and the normal api:check remains the regression gate.
->>>>>>> 09e20fc48 (feat(cutscene): key viewport gizmo transforms at the playhead)
+Batch 222 job 2: authored material-chain checks found no remaining defect. External KHR_materials_variants and a material LOD controller both selecting a primitive require caller coordination; a unified selection policy is a fix-phase quality follow-up.
+
+Batch 222 job 2 scope receipt: msft-check passes native and compatibility, including later UV2, retained vertex buffers and original material restoration. Shader-review and extension checks pass both backends. The broader compatibility materials permutation reproduces the already-recorded batch-273 16-fragment-sampler overflow (test-results/batch222-msft-gpu.log); its shader builders are unchanged by material-index/UV preparation work. Keep that separate owning-lane defect open under lane rules 16/21, with no altered assertion or accepted difference.

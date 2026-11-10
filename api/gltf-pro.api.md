@@ -400,6 +400,10 @@ export class PBRModel implements EnginePlugin {
     setCapture(hook: PBRCapture): () => void;
     setTransmission(hook: PBRTransmission): () => void;
     selectVariant(variant?: string | number): void;
+    setPrimitiveMaterials(changes: readonly {
+        primitive: PBRPrimitive;
+        material: number | undefined;
+    }[]): void;
     get ownedMeshes(): readonly Mesh[];
     get shadowPrimitives(): ShadowCasterRecord[];
     get tintPrimitives(): (ShadowCasterRecord & {

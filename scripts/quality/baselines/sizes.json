@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13411786,
+  "total": 13414052,
   "history": [
     {
       "date": "2026-10-24",
@@ -6894,6 +6894,12 @@
       "commit": "batch-217-job-2",
       "reason": "New optional cutscene/viewport authoring feature and validated editing support, leaving core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "399c77254",
+      "reason": "Batch 222 material LOD adds optional lod/msft, 0 to 2010 B gzip, and keeps atomic live material edits and later UV preparation in gltf-pro. The owner must retain texture resources and geometry identity; splitting its small edit method would duplicate that lifecycle.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8146,6 +8152,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/lod/msft": 2266
   }
 }

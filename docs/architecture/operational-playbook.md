@@ -6261,3 +6261,5 @@ The optional points/clip entry transforms local records into world space for cen
 ### Section 5 evidence: batch 217 viewport keying
 
 Viewport keying reads the existing transform store through core/extension and reuses InspectorGizmo for scene manipulation. Real browser proofs exercise selection plus all three transform modes on WebGPU and the WebGL2 compatibility layer. Keys preserve local quaternions without decomposition. No GPU math, shader, rendering backend or core implementation changed.
+### Section 5 evidence: MSFT material levels (batch 222 job 2)
+Metadata/selection stay in lod/msft; gltf-pro owns material-index edits, texture refresh and later UV preparation. CPU tests cover chains, iterative traversal, per-primitive coverage, hysteresis, orthographic depth independence, UV2, restoration and disposal. The real msft-check verifies pixels and unchanged vertex buffers on native and full compatibility. No core/stage, hardware tier or timing claim.

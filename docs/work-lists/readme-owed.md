@@ -688,4 +688,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/cutscene (batch 217 job 2): document viewport keyTransform/ViewportKeying, Inspector picking/gizmo setup, saved bindings, manual/auto keying, quaternion/local coordinates, undo and borrowed/owned lifetime; examples deferred.
 - margoengine (batch 217 job 2): document generated cutscene/viewport alias.
->>>>>>> 09e20fc48 (feat(cutscene): key viewport gizmo transforms at the playhead)
+- @margoengine/lod (batch 222 job 2): document /msft metadata, per-primitive coverage, defaults, hysteresis, lifecycle, node-level composition and variant-selection ownership.
+- @margoengine/gltf-pro (batch 222 job 2): document setPrimitiveMaterials validation, texture refresh, later UV preparation, geometry retention, restore and progressive completion requirement.

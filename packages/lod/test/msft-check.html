@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Material LOD: FlightHelmet</title><canvas width="256" height="256" style="width:256px;height:256px"></canvas><script type="module">
+// FlightHelmet mobile geometry/textures: Gary Hsu / Microsoft, CC0; examples/assets/ATTRIBUTION.md.
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTFAsync} from '/packages/gltf-pro/dist/index.js';
+import {glbChunks,GLB_JSON,GLB_BIN} from '/packages/shared/glb.js';
+import {MSFTMaterialLOD} from '/packages/lod/dist/msft.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0.25,1.2],target:[0,0.25,0]}});engine.stop();
+const errors=[];engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const chunks=glbChunks(new Uint8Array(await (await fetch('/examples/assets/flight-helmet-mobile.glb')).arrayBuffer()));
+const doc=JSON.parse(new TextDecoder().decode(chunks.find(c=>c.type===GLB_JSON).data));
+doc.materials[0].extensions={...doc.materials[0].extensions,MSFT_lod:{ids:[1,2]}};
+doc.materials[0].extras={MSFT_screencoverage:[0.5,0.1]};
+for(const [i,color] of [[0,[1,0.01,0.01,1]],[1,[0.01,1,0.01,1]],[2,[0.01,0.01,1,1]]])doc.materials[i].pbrMetallicRoughness.baseColorFactor=color;
+doc.materials[2].pbrMetallicRoughness.baseColorTexture.texCoord=2;
+for(const mesh of doc.meshes)for(const primitive of mesh.primitives){primitive.material=0;primitive.attributes.TEXCOORD_2=primitive.attributes.TEXCOORD_0;}
+const model=await parseGLTFAsync(engine,doc,{buffers:[chunks.find(c=>c.type===GLB_BIN).data]});
+const controller=MSFTMaterialLOD.attach(engine,model,{hysteresis:0});
+const originals=model.primitives.map(p=>p.material),buffers=model.primitives.map(p=>p.buffers.vertex);
+const frame=async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
+const image=()=>{engine.render();const c=new OffscreenCanvas(256,256),g=c.getContext('2d');g.drawImage(engine.canvas,0,0);const d=g.getImageData(0,0,256,256).data;let red=0,blue=0;for(let i=0;i<d.length;i+=4){red+=d[i]>d[i+2]+20;blue+=d[i+2]>d[i]+20;}return {red,blue};};
+window.check={async run(){controller.bias=0.001;await frame();await frame();const high={levels:controller.levels,pixels:image()};controller.bias=10000;await frame();await frame();const low={levels:controller.levels,pixels:image()};const retained=model.primitives.every((p,i)=>p.buffers.vertex===buffers[i]),laterUV=model.primitives.every(p=>!!p.uvs);controller.dispose();await frame();return {high,low,retained,laterUV,restored:model.primitives.every((p,i)=>p.material===originals[i]),errors};}};
+window.ready=true;
+</script>
