@@ -10,6 +10,8 @@ test('generated API, import metadata and public help contain no unresolved merge
     'docs/clean-room.md',
     'docs/known-bugs.md',
     'docs/limits.md',
+    'docs/whitepaper/claims.md',
+    'docs/whitepaper/reproduce.md',
     'docs/work-lists/readme-owed.md',
     'site/llms.txt',
     'site/llms-full.txt',
@@ -17,7 +19,7 @@ test('generated API, import metadata and public help contain no unresolved merge
     'packages/margoengine/package.json',
   ]) {
     assert.equal(
-      /^(?:<{7}|>{7})(?:\s|$)/m.test(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')),
+      /^(?:<{7}|={7}|>{7})(?:\s|$)/m.test(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')),
       false,
       `${path} retains a merge boundary; regenerate with its owning script and stop the landing on any failure`,
     );

@@ -1,0 +1,146 @@
+{
+  "approvedCommit": "10bf82909",
+  "reason": "Restore prior approvals lost in a concurrent metadata merge; no new byte allowances.",
+  "entries": [
+    {
+      "entry": "@margoengine/audio",
+      "before": 7716,
+      "restored": 7907
+    },
+    {
+      "entry": "@margoengine/biomes/view",
+      "before": 10454,
+      "restored": 10645
+    },
+    {
+      "entry": "@margoengine/clustered/area",
+      "before": 10461,
+      "restored": 10652
+    },
+    {
+      "entry": "@margoengine/controls",
+      "before": 27517,
+      "restored": 27708
+    },
+    {
+      "entry": "@margoengine/core",
+      "before": 21630,
+      "restored": 21775
+    },
+    {
+      "entry": "@margoengine/creative",
+      "before": 19177,
+      "restored": 19368
+    },
+    {
+      "entry": "@margoengine/environment/cube-camera",
+      "before": 5691,
+      "restored": 5882
+    },
+    {
+      "entry": "@margoengine/lines",
+      "before": 19671,
+      "restored": 19862
+    },
+    {
+      "entry": "@margoengine/physics2d",
+      "before": 8199,
+      "restored": 8390
+    },
+    {
+      "entry": "@margoengine/post",
+      "before": 42058,
+      "restored": 42249
+    },
+    {
+      "entry": "@margoengine/post/anamorphic",
+      "before": 6551,
+      "restored": 6742
+    },
+    {
+      "entry": "@margoengine/post/bloom",
+      "before": 7005,
+      "restored": 7196
+    },
+    {
+      "entry": "@margoengine/post/blur",
+      "before": 6203,
+      "restored": 6394
+    },
+    {
+      "entry": "@margoengine/post/fxaa",
+      "before": 4699,
+      "restored": 4890
+    },
+    {
+      "entry": "@margoengine/post/lens",
+      "before": 6887,
+      "restored": 7078
+    },
+    {
+      "entry": "@margoengine/post/smaa",
+      "before": 6244,
+      "restored": 6435
+    },
+    {
+      "entry": "@margoengine/scatter/tiles",
+      "before": 3415,
+      "restored": 3606
+    },
+    {
+      "entry": "@margoengine/scenery/scenes",
+      "before": 19213,
+      "restored": 19404
+    },
+    {
+      "entry": "@margoengine/sciviz/webgl2",
+      "before": 4476,
+      "restored": 4667
+    },
+    {
+      "entry": "@margoengine/shader/effects",
+      "before": 8306,
+      "restored": 8497
+    },
+    {
+      "entry": "@margoengine/taa/upscale",
+      "before": 7112,
+      "restored": 7303
+    },
+    {
+      "entry": "@margoengine/terrain/stream",
+      "before": 12100,
+      "restored": 12291
+    },
+    {
+      "entry": "@margoengine/text",
+      "before": 16406,
+      "restored": 16597
+    },
+    {
+      "entry": "@margoengine/transitions/custom",
+      "before": 5275,
+      "restored": 5466
+    },
+    {
+      "entry": "@margoengine/transitions/mask",
+      "before": 5522,
+      "restored": 5713
+    },
+    {
+      "entry": "@margoengine/water",
+      "before": 20185,
+      "restored": 20817
+    },
+    {
+      "entry": "@margoengine/webgl2-compat lazy compute runtime and read-back",
+      "before": 31741,
+      "restored": 31756
+    },
+    {
+      "entry": "@margoengine/xr",
+      "before": 8967,
+      "restored": 9332
+    }
+  ]
+}

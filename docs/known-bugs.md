@@ -4317,3 +4317,15 @@ Batch 220 job 1: the requested missing math methods are supplied by math/compat;
 
 
 Batch 267 job 2: no open asset-tool defect remains in the CPU and real-CC0 both-backend checks; supported variants and provider/deployment limits are in docs/limits.md.
+
+### Fixed: batch273 scenery append-document integration
+Landing04dc98994 retained nested append-document merge boundaries, including
+incoming WFC notes, because its native Node helper failed but PowerShell
+continued to stage and push. The metadata test did fail; its exit status was
+not honored by that local orchestration. Preserve both sets of documentation,
+remove the boundaries, and regenerate public help from the repaired sources.
+The existing regression now includes both whitepaper documents and standalone
+separator boundaries. Future local landing commands check child status before
+commit/push; no repository hook or landing queue is introduced.
+
+The same incoming metadata merge reset28 approved size ceilings while leaving their runtime fixes present. Restore the exact approvals from10bf82909 and recompute the total; quality sizes is the regression for the resulting mismatch. No runtime change or newly raised allowance.
