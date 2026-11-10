@@ -486,3 +486,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/headless: document /gif encodeGIF over renderFrames and async pixel streams, optional exporters peer, repeat/duration/alpha options, cancellation and result bytes.
 
 - @margoengine/exporters and margoengine: document /palette quantizePalette plus paletteTexture, and /capture encodeGIFFrames stream, repeat/duration/cancellation options and delay rounding.
+
+- @margoengine/geometry: document geometry/hull convexHullTriangles source-index/double-precision contract, empty lower dimensions, normalized tolerance and cancellation; retain legacy convexGeometry behavior (batch 224 job 4).
+- @margoengine/mesh-edit: document convexMeshHull and general minkowskiSumMeshes, concavity/cavities, new face IDs/UVs, work counters/budgets, floating limits and cancellation (batch 224 job 4).
+- margoengine: document geometry/hull and mesh-edit/hull aliases and restored mesh-edit/repair manifest alias in the README phase (batch 224 job 4).

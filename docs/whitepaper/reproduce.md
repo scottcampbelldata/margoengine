@@ -3126,3 +3126,6 @@ After build:packages, run `node --test --test-timeout=60000 packages/tilemap/tes
 
 ### Batch 209 GIF correctness
 After build:packages, run node --test --test-timeout=120000 packages/headless/tests/gif.test.js packages/exporters/tests/palette.test.js packages/exporters/tests/capture.test.js. Render/decode proof on both GPU paths: node scripts/gpu-lock.mjs run --owner=gif-proof --gpu=rendered-gif-native-and-full-compat --wait-max=1200 --max=180 -- node packages/headless/tests/gif-gpu.mjs. The exporter capture-browser.mjs gate also passes natively and with --compat. It includes image transparency and the existing capture/codec checks. No README runner or benchmark used.
+
+### Batch 224 mesh hull/Minkowski
+After npm run build:packages run node --test --test-timeout=120000 packages/geometry/tests/hull-indices.test.js packages/geometry/tests/convex.test.js packages/mesh-edit/tests/hull.test.js. Analytic volumes (27,16,26,32.256 and disconnected volume16), large-offset source precision, cavity retention, zero plane triples for convex inputs, budget failure and cancellation are asserted independently. For rendering run the mesh-edit browser script natively and with --compat, plus packages/geometry/tests/gpu-check.mjs on each backend, under the shared GPU lock. Fixtures are synthetic correctness solids, not external demonstrations or measured speed scenes.

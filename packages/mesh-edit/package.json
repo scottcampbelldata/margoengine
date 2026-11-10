@@ -70,6 +70,10 @@
     "./repair": {
       "types": "./dist/repair.d.ts",
       "import": "./dist/repair.js"
+    },
+    "./hull": {
+      "types": "./dist/hull.d.ts",
+      "import": "./dist/hull.js"
     }
   },
   "files": [

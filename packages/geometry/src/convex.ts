@@ -98,8 +98,13 @@ function readPoints(input: ArrayLike<number> | readonly ArrayLike<number>[]): Fl
 }
 
 /** The hull's faces as point index triples, counter-clockwise seen from outside. */
-function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
+function quickhull(
+  points: Float64Array,
+  allowEmpty = false,
+  signal?: AbortSignal,
+): { faces: Face[]; tolerance: number } {
   const count = points.length / 3;
+  if (count < 4 && allowEmpty) return { faces: [], tolerance: 0 };
   if (count < 4)
     throw new RangeError(`convexGeometry got ${count} points; pass at least four points that are not in one plane`);
   // Roundoff bound for plane distances, scaled by the coordinates' magnitude.
@@ -132,7 +137,10 @@ function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
         d = Math.hypot(at(a, 0) - at(b, 0), at(a, 1) - at(b, 1), at(a, 2) - at(b, 2));
       if (d > best) [best, v0, v1] = [d, a, b];
     }
-  if (!(best > tolerance)) throw new RangeError('convexGeometry points all coincide; pass points that span a volume');
+  if (!(best > tolerance)) {
+    if (allowEmpty) return { faces: [], tolerance };
+    throw new RangeError('convexGeometry points all coincide; pass points that span a volume');
+  }
   const dx = at(v1, 0) - at(v0, 0),
     dy = at(v1, 1) - at(v0, 1),
     dz = at(v1, 2) - at(v0, 2),
@@ -146,7 +154,10 @@ function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
       d = Math.hypot(py * dz - pz * dy, pz * dx - px * dz, px * dy - py * dx) / dl;
     if (d > best) [best, v2] = [d, i];
   }
-  if (v2 < 0) throw new RangeError('convexGeometry points are all on one line; pass points that span a volume');
+  if (v2 < 0) {
+    if (allowEmpty) return { faces: [], tolerance };
+    throw new RangeError('convexGeometry points are all on one line; pass points that span a volume');
+  }
   const base = face(points, v0, v1, v2);
   let v3 = -1;
   best = tolerance;
@@ -154,7 +165,10 @@ function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
     const d = Math.abs(base.distance(points, i));
     if (d > best) [best, v3] = [d, i];
   }
-  if (v3 < 0) throw new RangeError('convexGeometry points are all in one plane; pass points that span a volume');
+  if (v3 < 0) {
+    if (allowEmpty) return { faces: [], tolerance };
+    throw new RangeError('convexGeometry points are all in one plane; pass points that span a volume');
+  }
   // Orient the base so the fourth point is behind it.
   if (base.distance(points, v3) > 0) [v1, v2] = [v2, v1];
   const faces = [
@@ -187,6 +201,7 @@ function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
     visible: Face[] = [],
     stack: { edge: HalfEdge; stop: HalfEdge; started: boolean }[] = [];
   for (let index = 0; index < faces.length; index++) {
+    signal?.throwIfAborted();
     const current = faces[index];
     if (current.mark || !current.outside.length) continue;
     let eye = current.outside[0],
@@ -234,6 +249,41 @@ function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
     faces.push(...created);
   }
   return { faces: faces.filter((f) => !f.mark), tolerance };
+}
+
+/** Options for the source-index hull API. */
+export interface ConvexHullTriangleOptions {
+  /** Cooperative cancellation during hull expansion. */
+  signal?: AbortSignal;
+}
+
+/** Outward triangle indices into the original points, without float32 position conversion.
+ * Coincident, collinear, coplanar and fewer-than-four point sets return no triangles.
+ * Predicates run in a translated unit frame using the existing Quickhull tolerance.
+ * @throws RangeError for nonfinite/overflowing points, TypeError for options, or the abort reason.
+ */
+export function convexHullTriangles(
+  points: ArrayLike<number> | readonly ArrayLike<number>[],
+  options: ConvexHullTriangleOptions = {},
+): Uint32Array {
+  if (!options || typeof options !== 'object' || Array.isArray(options))
+    throw new TypeError('Hull options need an object; pass signal or omit options.');
+  if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
+    throw new TypeError('Hull signal must be an AbortSignal; pass controller.signal.');
+  options.signal?.throwIfAborted();
+  const source = readPoints(points);
+  if (!source.length) return new Uint32Array();
+  let extent = 0;
+  for (let i = 0; i < source.length; i++) extent = Math.max(extent, Math.abs(source[i] - source[i % 3]));
+  if (!Number.isFinite(extent))
+    throw new RangeError('Hull coordinate span overflows; translate and rescale the points.');
+  if (!extent) return new Uint32Array();
+  const frame = source.map((x, i) => (x - source[i % 3]) / extent),
+    { faces } = quickhull(frame, true, options.signal),
+    indices: number[] = [];
+  for (const f of faces) indices.push(f.edge.prev.head, f.edge.head, f.edge.next.head);
+  options.signal?.throwIfAborted();
+  return Uint32Array.from(indices);
 }
 
 /**

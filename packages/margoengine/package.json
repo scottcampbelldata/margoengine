@@ -1354,6 +1354,10 @@
       "types": "./dist/geometry/gpu.d.ts",
       "import": "./dist/geometry/gpu.js"
     },
+    "./geometry/hull": {
+      "types": "./dist/geometry/hull.d.ts",
+      "import": "./dist/geometry/hull.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"
@@ -2121,6 +2125,10 @@
     "./mesh-edit/repair": {
       "types": "./dist/mesh-edit/repair.d.ts",
       "import": "./dist/mesh-edit/repair.js"
+    },
+    "./mesh-edit/hull": {
+      "types": "./dist/mesh-edit/hull.d.ts",
+      "import": "./dist/mesh-edit/hull.js"
     },
     "./mixer": {
       "types": "./dist/mixer.d.ts",

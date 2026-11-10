@@ -7,6 +7,7 @@ import { paintMeshWeights, VertexGroups } from '@margoengine/mesh-edit/weights';
 import { splitMeshByPlane } from '@margoengine/mesh-edit/section';
 import { batchBooleanMeshes } from '@margoengine/mesh-edit/boolean-batch';
 import { repairMesh } from '@margoengine/mesh-edit/repair';
+import { convexMeshHull, minkowskiSumMeshes } from '@margoengine/mesh-edit/hull';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -138,6 +139,14 @@ window.runSculptTests = async () => {
   assert(difference(empty, snapshot(engine)) > 1000, 'repaired output reaches the renderer');
   repairView.dispose();
   checks.push('repairMesh output renders');
+  const hull = convexMeshHull(createPrimitiveMesh('cube', 'hull')),
+    sum = minkowskiSumMeshes(hull, createPrimitiveMesh('cube', 'sum')),
+    sumSession = new MeshSculptSession(sum.mesh),
+    sumView = SculptView.attach(engine, sumSession);
+  assert(sum.convexPairs === 1, 'convex Minkowski uses one cell pair');
+  assert(difference(empty, snapshot(engine)) > 1000, 'hull and Minkowski output reaches the renderer');
+  sumView.dispose();
+  checks.push('convexMeshHull and minkowskiSumMeshes output renders');
   engine.dispose();
   return { checks };
 };

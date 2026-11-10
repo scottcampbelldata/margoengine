@@ -102,6 +102,10 @@
     "./gpu": {
       "types": "./dist/gpu.d.ts",
       "import": "./dist/gpu.js"
+    },
+    "./hull": {
+      "types": "./dist/hull.d.ts",
+      "import": "./dist/hull.js"
     }
   },
   "files": [

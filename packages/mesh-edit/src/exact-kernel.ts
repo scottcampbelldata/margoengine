@@ -1308,3 +1308,107 @@ export function batchExactKernel(
     work,
   };
 }
+
+/** @internal Convex interior BSP cells, bounded by the source box. Decisions and vertices stay exact until export. */
+export function convexCellsExact(
+  mesh: PolygonMesh,
+  maxCells: number,
+  maxTriples: number,
+  signal?: AbortSignal,
+): { cells: MutableVec3[][]; planeTriples: number } {
+  signal?.throwIfAborted();
+  const { ints, exponent } = integerCoordinates([mesh]),
+    space = new Space(exponent),
+    polys = polysOf(space, mesh, ints[0], 0),
+    used = [...new Set(mesh.faces.flatMap((f) => f.vertices))],
+    source = used.map((i) => space.point(ints[0][i][0], ints[0][i][1], ints[0][i][2], 1n));
+  if (
+    polys.every((poly) => {
+      signal?.throwIfAborted();
+      return source.every((p) => space.side(poly.support, p) <= 0);
+    })
+  )
+    return { cells: [used.map((i) => [...mesh.vertices[i]] as MutableVec3)], planeTriples: 0 };
+  const bounds: Plane[] = [];
+  for (let k = 0; k < 3; k++) {
+    let low = ints[0][used[0]][k],
+      high = low;
+    for (const i of used) {
+      const x = ints[0][i][k];
+      if (x < low) low = x;
+      if (x > high) high = x;
+    }
+    const n = [0n, 0n, 0n];
+    n[k] = 1n;
+    bounds.push(
+      space.facePlane(n, -high),
+      space.facePlane(
+        n.map((x) => -x),
+        low,
+      ),
+    );
+  }
+  const tree = new Tree(),
+    tick = () => signal?.throwIfAborted();
+  tree.build(space, polys, tick);
+  const stack = [{ node: tree, planes: bounds }],
+    cells: MutableVec3[][] = [];
+  let planeTriples = 0;
+  const append = (planes: Plane[], plane: Plane): Plane[] | null =>
+    planes.includes(plane.flip!) ? null : planes.includes(plane) ? planes : [...planes, plane];
+  const emit = (planes: Plane[]) => {
+    const points = new Map<string, Point>();
+    for (let i = 0; i < planes.length; i++)
+      for (let j = i + 1; j < planes.length; j++)
+        for (let k = j + 1; k < planes.length; k++) {
+          tick();
+          if (++planeTriples > maxTriples)
+            throw new RangeError(
+              'Minkowski plane-triple budget exceeded; raise maxPlaneTriples or simplify the solids.',
+            );
+          const a = planes[i],
+            b = planes[j],
+            c = planes[k],
+            n1 = [a.a, a.b, a.c],
+            n2 = [b.a, b.b, b.c],
+            n3 = [c.a, c.b, c.c];
+          if (!dot(n1, cross(n2, n3))) continue;
+          const p = space.meet(a, b, c);
+          if (planes.some((h) => space.side(h, p) > 0)) continue;
+          const g = gcd(gcd(gcd(p.X, p.Y), p.Z), p.W),
+            key = [p.X / g, p.Y / g, p.Z / g, p.W / g].join(',');
+          points.set(key, p);
+        }
+    const list = [...points.values()];
+    if (list.length < 4) return;
+    const p = list[0],
+      difference = (q: Point): bigint[] => [q.X * p.W - p.X * q.W, q.Y * p.W - p.Y * q.W, q.Z * p.W - p.Z * q.W],
+      v1 = difference(list[1]);
+    let n: bigint[] | undefined;
+    for (let i = 2; i < list.length; i++) {
+      const candidate = cross(v1, difference(list[i]));
+      if (candidate.some((x) => x !== 0n)) {
+        n = candidate;
+        break;
+      }
+    }
+    if (!n || !list.some((q) => dot(n!, difference(q)) !== 0n)) return;
+    if (cells.length >= maxCells)
+      throw new RangeError('Minkowski convex-cell budget exceeded; raise maxCells or simplify the solids.');
+    cells.push(list.map((q) => [q.x, q.y, q.z]));
+  };
+  while (stack.length) {
+    tick();
+    const { node, planes } = stack.pop()!,
+      plane = node.plane;
+    if (!plane) continue;
+    const back = append(planes, plane),
+      front = append(planes, plane.flip!);
+    if (back) {
+      if (node.back) stack.push({ node: node.back, planes: back });
+      else emit(back);
+    }
+    if (front && node.front) stack.push({ node: node.front, planes: front });
+  }
+  return { cells, planeTriples };
+}

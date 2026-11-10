@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13003434,
+  "total": 13018113,
   "history": [
     {
       "date": "2026-10-24",
@@ -6497,6 +6497,12 @@
       "date": "2026-11-10",
       "reason": "Batch 209 GIF: headless/gif absent -> 118 B (374 ceiling); exporters/palette absent -> 2597 B (2853 ceiling); capture 6944 -> 7667 B gzip (7241 -> 7923 ceiling). Shared median cut and one LZW writer, stream cancellation, variable delays and repeat policy. Splitting would duplicate codec logic or add loading plumbing. Core plus stage 24209 B unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-224-job4",
+      "reason": "New optional mesh-edit/hull 0 to 11992 gzip B (12352 ceiling), geometry/hull 0 to 2071 B (2327 ceiling). Reused source-index hull, exact BSP cells and one batch union cover general Minkowski sums without duplicated geometry code. geometry/extras grows 5570 to 5617 B within its existing ceiling; core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7699,6 +7705,8 @@
     "@margoengine/geometry/teapot": 2595,
     "@margoengine/tilemap/objects": 7294,
     "@margoengine/headless/gif": 374,
-    "@margoengine/exporters/palette": 2853
+    "@margoengine/exporters/palette": 2853,
+    "@margoengine/mesh-edit/hull": 12352,
+    "@margoengine/geometry/hull": 2327
   }
 }
