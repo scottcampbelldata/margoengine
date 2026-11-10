@@ -1,0 +1,720 @@
+{
+  "scope": "Phase diagnosis of retained failing run only; not a new native acceptance run or a compiler fix",
+  "recordedCheckpoint": "4a40f2e29 (later rebased as 205290793 and ba5e1b81b)",
+  "hardLeaseMinutes": 12,
+  "lastSubset": {
+    "phase": "subset",
+    "mask": 31,
+    "ms": 707653.5
+  },
+  "logicalPhase": {
+    "phase": "tracer-ready-wait",
+    "ms": 707664.1000000238
+  },
+  "lastEvent": {
+    "phase": "pipeline-ready",
+    "method": "createComputePipelineAsync",
+    "entry": "preview",
+    "label": "voxel-pathtracer preview",
+    "ms": 710230.1000000238
+  },
+  "outstandingPipelines": [
+    {
+      "phase": "pipeline-start",
+      "method": "createComputePipelineAsync",
+      "entry": "trace",
+      "label": "voxel-pathtracer trace",
+      "ms": 707663.6999999881
+    }
+  ],
+  "completedTracePipelines": {
+    "count": 31,
+    "totalMs": 704992.5000002384,
+    "minimumMs": 6179,
+    "maximumMs": 40723.30000001192
+  },
+  "recordedProcessTree": [
+    {
+      "pid": 31956,
+      "parentPid": 75672,
+      "name": "explorer.exe"
+    },
+    {
+      "pid": 22312,
+      "parentPid": 105752,
+      "name": "node.exe"
+    },
+    {
+      "pid": 75672,
+      "parentPid": 22312,
+      "name": "msedge.exe"
+    },
+    {
+      "pid": 100112,
+      "parentPid": 75672,
+      "name": "msedge.exe"
+    },
+    {
+      "pid": 55168,
+      "parentPid": 75672,
+      "name": "msedge.exe"
+    },
+    {
+      "pid": 108316,
+      "parentPid": 75672,
+      "name": "msedge.exe"
+    },
+    {
+      "pid": 70652,
+      "parentPid": 75672,
+      "name": "msedge.exe"
+    },
+    {
+      "pid": 98152,
+      "parentPid": 75672,
+      "name": "msedge.exe"
+    },
+    {
+      "pid": 92848,
+      "parentPid": 75672,
+      "name": "msedge.exe"
+    }
+  ],
+  "conclusions": [
+    "Subsets 0 through 30 returned images and completed tracer disposal. Subset 31 had no returned trace pipeline. Its preview and ids pipelines had returned.",
+    "The engine and device existed; the last subset had not begun renderImage. Its readback and teardown were therefore not the blocking operation.",
+    "Cumulative pipeline-creation readiness exhausted the lease. The records do not distinguish Dawn translation, native compiler optimization and driver compilation within createComputePipelineAsync.",
+    "No permanently stuck final compile is established. No retry, raised deadline or native repair is claimed.",
+    "The earlier WebGL2 run has no phase events or owned process snapshot, so remains unattributed; passing Vulkan continuation cannot identify it as bug45."
+  ],
+  "diagnostic": {
+    "hostLimitMs": 720000,
+    "cleanupReserveMs": 30000,
+    "activeBudgetMs": 690000,
+    "evidence": "host-owned phase, subset, features, pending operation IDs/labels, device loss and original timeout retained through teardown",
+    "path": "test-results/voxel-pathtracer-compose-<backend>-<phase>-diagnostic.json",
+    "regression": "packages/voxel-pathtracer/tests/compose-diagnostic.test.js",
+    "cpu": {
+      "status": "pass",
+      "tests": 12,
+      "packageTests": 159
+    },
+    "compatibility": {
+      "status": "pass",
+      "results": [
+        {
+          "compat": true,
+          "phase": "all",
+          "hardware": {
+            "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+            "webgpu": null,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+            "browserName": "chromium",
+            "browserVersion": "157.0.4341.42",
+            "requestedChannel": "msedge",
+            "launchArgs": [
+              "--use-angle=vulkan"
+            ],
+            "powerPreference": "high-performance",
+            "hostPlatform": "win32",
+            "headless": true
+          },
+          "result": {
+            "subsets": [
+              {
+                "mask": 0,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 1,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 2,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 3,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 4,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 5,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 6,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 7,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 8,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 9,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 10,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 11,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 12,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 13,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 14,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 15,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 16,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 17,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 18,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 19,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 20,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 21,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 22,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 23,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 24,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 25,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 26,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 27,
+                "actual": [
+                  1,
+                  1,
+                  1
+                ],
+                "expected": [
+                  1,
+                  1,
+                  1
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 28,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 29,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 30,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              },
+              {
+                "mask": 31,
+                "actual": [
+                  0.5,
+                  0.3333333134651184,
+                  0.25
+                ],
+                "expected": [
+                  0.5,
+                  0.3333333333333333,
+                  0.25
+                ],
+                "finite": true,
+                "firstBoundary": true
+              }
+            ],
+            "triangleMarker": true,
+            "reflected": {
+              "reference": [
+                0.16357384389266372,
+                0.061920445528812706,
+                0.03189677558839321
+              ],
+              "actual": [
+                0.16305164992809296,
+                0.06179698492633179,
+                0.031845534133026376
+              ],
+              "finite": true
+            },
+            "update": {
+              "actual": [
+                1,
+                1,
+                1
+              ],
+              "revision": 2
+            },
+            "errors": [],
+            "messages": []
+          }
+        }
+      ],
+      "hostFinalState": {
+        "status": "running",
+        "elapsedMs": 20740,
+        "phase": "browser-closed",
+        "mask": 31,
+        "features": [
+          "resampling",
+          "mesh",
+          "media",
+          "guiding",
+          "spectral"
+        ],
+        "lastEvent": {
+          "phase": "browser-closed"
+        },
+        "deviceLoss": {
+          "reason": "destroyed",
+          "message": "The device was destroyed"
+        },
+        "pending": []
+      }
+    }
+  },
+  "fullPackageReadme": {
+    "status": "failed, not retried",
+    "deadlineSeconds": 20,
+    "reason": "Example did not finish within 20 s while waiting for module completion",
+    "partialResults": [
+      {
+        "id": "voxel-pathtracer/readme-magicavoxel-files-fc75fa",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "voxel-pathtracer/readme-margoengine-voxel-pathtracer-cb4bdc",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "voxel-pathtracer/readme-combining-optional-tracing-featu-0fe341",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "voxel-pathtracer/readme-resampled-emissive-lighting-bc123e",
+        "result": "fail",
+        "place": "page",
+        "reason": "Example did not finish within 20 s while waiting for module completion"
+      }
+    ],
+    "limits": "No per-pipeline evidence for this failure; prior isolated passes cannot attribute or waive it. Blocks push."
+  },
+  "pairedSizeEvidence": {
+    "commit": "3e1b3bc13",
+    "dirty": true,
+    "coreStageGzip": 23924,
+    "meshGzip": 28206,
+    "networkRequests": 5
+  },
+  "verify": {
+    "status": "full run failed stale generated API size row; corrected api:check passes; unit continuation returned three inherited fixture failures",
+    "cause": "api:update preceded the refreshed size-record input, leaving controls 27266 instead of 27268 B. Generated-document ordering error, not an API source change.",
+    "successfulChainsRetained": true,
+    "shadowDisagreements": 0,
+    "correctedApiCheck": "pass, 899 entries and 8704 exports",
+    "correctedLLMs": "pass",
+    "correctedLinks": "pass",
+    "unitContinuation": {
+      "tests": 14097,
+      "pass": 14094,
+      "fail": 3,
+      "skipped": 0,
+      "cause": "ViewCube fake engine lacks existing EngineKernel.sceneOf. Current main already fixes the contract in d15e46fd2.",
+      "independentPrototype": "19/19 pass; discarded as redundant, adopt existing upstream fixture on rebase",
+      "browser": "pass",
+      "readme": "2/2 pass"
+    }
+  },
+  "landing": "Blocked by full-package resampled README deadline; native composition and full scenes remain open",
+  "integration": {
+    "base": "79dbd81d1",
+    "upstreamFixtureCommit": "d15e46fd2",
+    "upstreamFixtureTests": "19/19 pass after integrated rebuild",
+    "build": "pass",
+    "sizeArchive": "review-99-size-pair-20261109.json",
+    "canonicalRecords": "Newer upstream pair retained whole, no relabeling",
+    "remaining": "No push; full-package tracer README, native composition, full scenes and P3 findings remain open"
+  }
+}

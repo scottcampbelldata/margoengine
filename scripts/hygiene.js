@@ -35,6 +35,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 import { entries as errorHelp } from './errors/entries.js';
+import { assertCitedResultsTracked } from './support/cited-results.mjs';
 import { assertNoConflictMarkers } from './support/conflict-markers.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
 import { countMissingHelp, countNoFix } from './support/throw-messages.js';
@@ -44,6 +45,7 @@ const root = resolve(import.meta.dirname, '..');
 // This safety check is fatal even while the scored gates remain in warn mode.
 assertNoConflictMarkers(root);
 assertValidTrackedManifests(root);
+assertCitedResultsTracked(root);
 const quick = process.argv.includes('--verify');
 const strict = process.argv.includes('--strict');
 const slash = (p) => p.replaceAll('\\', '/');
