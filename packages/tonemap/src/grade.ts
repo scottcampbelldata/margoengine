@@ -124,7 +124,7 @@ const isCurve = (c: unknown) =>
  * @throws RangeError for a wheel, curve or hue multiplier out of range (checked now and every frame).
  */
 export class Grade implements TonemapExtension {
-  readonly key = 'grade';
+  readonly key: string = 'grade';
   private readonly buffer = new Float32Array(20 + 4 * SAMPLES);
   private readonly column = new Float32Array(SAMPLES);
   constructor(readonly options: GradeOptions = {}) {

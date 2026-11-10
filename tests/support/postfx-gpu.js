@@ -11,8 +11,8 @@ export function gpuHarness() {
   const resources = [],
     pipelines = [],
     groups = [],
-    writes = new Float32Array(256),
     counts = { buffers: 0, textures: 0, views: 0, groups: 0, compute: 0, render: 0, uploads: 0 };
+  let writes = new Float32Array(256);
   const pass = { setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, draw() {}, end() {} };
   const device = {
     createBuffer(descriptor) {
@@ -76,9 +76,11 @@ export function gpuHarness() {
       return descriptor;
     },
     queue: {
-      writeBuffer(_buffer, _offset, values) {
+      writeBuffer(buffer, offset, values, dataOffset = 0, size = values.length - dataOffset) {
+        if (offset + size * 4 > buffer.size) throw new RangeError('Mock buffer write exceeds its allocation');
+        if (writes.byteLength < buffer.size) writes = new Float32Array(buffer.size / 4);
         writes.fill(0);
-        writes.set(values);
+        for (let i = 0; i < size; i++) writes[offset / 4 + i] = values[dataOffset + i];
       },
       writeTexture() {
         counts.uploads++;
@@ -158,5 +160,18 @@ export function gpuHarness() {
     context.shader = shader;
     graph.execute(context);
   }
-  return { engine, context, frame, counts, resources, pipelines, groups, writes, originalColor, originalDepth };
+  return {
+    engine,
+    context,
+    frame,
+    counts,
+    resources,
+    pipelines,
+    groups,
+    get writes() {
+      return writes;
+    },
+    originalColor,
+    originalDepth,
+  };
 }

@@ -835,3 +835,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document generated voxel-net/webrtc alias.
 - @margoengine/vfx (batch 270 job 2): document /over-life, sampled spin/speed/growth/limit defaults, force composition, zero recovery, local-frame interaction, memory and replay; examples deferred.
 - margoengine (batch 270 job 2): document generated vfx/over-life alias; examples deferred.
+
+- @margoengine/tonemap: document optional HueGrade, degree units, circular hueHue points, live Grade controls and display-linear/HDR limits (batch 193 job 1).
+- margoengine: expose tonemap/hue in the optional entry index (batch 193 job 1).

@@ -5,7 +5,7 @@
 ```ts
 export class Grade implements TonemapExtension {
     readonly options: GradeOptions;
-    readonly key = "grade";
+    readonly key: string;
     constructor(options?: GradeOptions);
     patch(shader: string, binding: number): string;
     values(): Float32Array;

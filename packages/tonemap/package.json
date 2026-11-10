@@ -37,6 +37,10 @@
     "./local": {
       "types": "./dist/local.d.ts",
       "import": "./dist/local.js"
+    },
+    "./hue": {
+      "types": "./dist/hue.d.ts",
+      "import": "./dist/hue.js"
     }
   },
   "files": [
@@ -65,6 +69,7 @@
     "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs",
     "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs",
     "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs",
-    "test:gpu:local": "cd ../.. && node packages/tonemap/tests/local-browser.mjs"
+    "test:gpu:local": "cd ../.. && node packages/tonemap/tests/local-browser.mjs",
+    "test:gpu:hue": "cd ../.. && node packages/tonemap/tests/hue-browser.mjs"
   }
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13731428,
+  "total": 13733849,
   "history": [
     {
       "date": "2026-10-24",
@@ -7185,6 +7185,12 @@
       "commit": "aba617d0f",
       "reason": "Batch 270 job 2: new over-life entry 0 to 1575 B gzip, ceiling 1831 B. Root 32530 to 33476 B and base 11311 to 11317 B remain inside existing ceilings. Keeping lifecycle state with the feature avoids cross-entry synchronization; core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "911de66c4",
+      "reason": "Batch 193 adds optional HueGrade: absent to 2165 B min+gzip, retaining wheels and curves plus circular selective hue control, with no core or stage growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -8484,6 +8490,7 @@
     "margoengine/web": 577,
     "@margoengine/shader/compute-volume": 4961,
     "@margoengine/voxel-net/webrtc": 7194,
-    "@margoengine/vfx/over-life": 1831
+    "@margoengine/vfx/over-life": 1831,
+    "@margoengine/tonemap/hue": 2421
   }
 }
