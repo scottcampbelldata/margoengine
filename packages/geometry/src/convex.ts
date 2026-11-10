@@ -24,6 +24,9 @@ class Face {
   offset = 0;
   /** Outside points this face owns. */
   outside: number[] = [];
+  /** The outside point farthest above this face (the first of equals), kept as points are assigned. */
+  farPoint = -1;
+  farDistance = -Infinity;
   /** 0 on the hull, 1 seen from the current eye (being removed), 2 removed. */
   mark = 0;
   distance(points: Float64Array, i: number): number {
@@ -192,7 +195,13 @@ function quickhull(
       const d = f.distance(points, point);
       if (d > far) [far, owner] = [d, f];
     }
-    owner?.outside.push(point);
+    if (!owner) return;
+    owner.outside.push(point);
+    // Strictly greater keeps the first of equally distant points, as a scan of the outside list in order would.
+    if (far > owner.farDistance) {
+      owner.farDistance = far;
+      owner.farPoint = point;
+    }
   };
   for (let i = 0; i < count; i++) if (i !== v0 && i !== v1 && i !== v2 && i !== v3) assign(faces, i);
 
@@ -204,12 +213,7 @@ function quickhull(
     signal?.throwIfAborted();
     const current = faces[index];
     if (current.mark || !current.outside.length) continue;
-    let eye = current.outside[0],
-      far = -Infinity;
-    for (const p of current.outside) {
-      const d = current.distance(points, p);
-      if (d > far) [far, eye] = [d, p];
-    }
+    const eye = current.farPoint;
     // Depth-first walk over the faces the eye sees, collecting the horizon in counter-clockwise order.
     horizon.length = visible.length = 0;
     current.mark = 1;
@@ -339,7 +343,9 @@ export function convexGeometry(points: ArrayLike<number> | readonly ArrayLike<nu
   const groups = new Map<number, Face[]>();
   for (const f of faces) {
     const r = root(id.get(f)!);
-    groups.set(r, [...(groups.get(r) ?? []), f]);
+    const members = groups.get(r);
+    if (members) members.push(f);
+    else groups.set(r, [f]);
   }
   const at = (i: number, c: number) => source[i * 3 + c],
     // True when b lies on the segment's line from a to c, within the hull tolerance.
