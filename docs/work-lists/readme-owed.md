@@ -1048,3 +1048,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/exporters (batch 136 removal): remove obsolete bundled-Draco-encoder instructions and document the owned lazy artifact and external custom encoderPath compatibility during the README phase.
 - Tooling (API lock Day 0): document report coverage, locked/watch rollout and one-shot approved breaks in the README phase; examples deferred.
+- @margoengine/sciviz (batch 177 job 3): document /charts-extra families, own scales/layouts, SVG exports, data conventions, bounds and NOAA/EIA demo; copy-paste examples owed in README phase.
+- margoengine (batch 177 job 3): document sciviz/charts-extra optional alias in README phase.

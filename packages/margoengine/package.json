@@ -3466,6 +3466,10 @@
       "types": "./dist/sciviz/geo-lod.d.ts",
       "import": "./dist/sciviz/geo-lod.js"
     },
+    "./sciviz/charts-extra": {
+      "types": "./dist/sciviz/charts-extra.d.ts",
+      "import": "./dist/sciviz/charts-extra.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

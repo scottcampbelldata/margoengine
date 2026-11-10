@@ -1,7 +1,6 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14278028,
   "history": [
     {
       "date": "2026-10-24",
@@ -7504,12 +7503,6 @@
     },
     {
       "date": "2026-11-10",
-      "commit": "b1290e7f2",
-      "reason": "Batch 217 job 3: new optional cutscene/scroll entry, 0 to 2048 B gzip, ceiling 2304 B. Range repetition and scroll scrubbing share one clock owner and cleanup; core and stage unchanged at 24209 B.",
-      "grew": 1
-    },
-    {
-      "date": "2026-11-10",
       "commit": "3efc31f94",
       "reason": "Batch 177 statistical charts: maths 5703 B to 8854 B, ceiling 5959 B to 9120 B; new stats 6719 B, ceiling 6975 B gzip. Shared transforms, fractional-df confidence bands and SVG keep one math implementation. Core+stage remains 24209 B.",
       "grew": 2
@@ -7559,6 +7552,12 @@
       "date": "2026-11-10",
       "commit": "batch-180",
       "reason": "New optional sciviz/geo-lod: 0 -> 7261 B gzip; projected quadtree, bounded asynchronous tile residency, fallback/fades, elevation adapters and restore stay together. Splitting the layer/cache contract would add coordination and not reduce the selected feature. Core + stage unchanged at 24209 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-177-job3",
+      "reason": "New optional sciviz/charts-extra: 0 -> 7292 B gzip. Complete specialised vector charts, scales and layered/squarified layouts stay together; splitting would duplicate vector helpers and complicate composition. Core + stage unchanged at 24209 B.",
       "grew": 1
     }
   ],
@@ -8929,6 +8928,8 @@
     "@margoengine/gltf-pro/audio": 4973,
     "@margoengine/sciviz/curvilinear": 8476,
     "@margoengine/clustered/cube-projector": 4716,
-    "@margoengine/sciviz/geo-lod": 7517
-  }
+    "@margoengine/sciviz/geo-lod": 7517,
+    "@margoengine/sciviz/charts-extra": 7548
+  },
+  "total": 14285576
 }

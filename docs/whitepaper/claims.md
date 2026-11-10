@@ -4221,3 +4221,6 @@ not the complete route. This is backend support and fixture parity, with the bou
 limits.md, not universal numerical identity or a speed claim. Research: clean-room.md.
 
 Batch 136 removal: exporters ships no prebuilt third-party Draco encoder. The owned optional SIMD artifact remains lazy at 160,900 B raw / 59,962 B gzip, and the entry is 91,248 B gzip. Proof: default public compression with old vendor/dist directories absent, browser worker round-trip rendering on both backends and the committed 76-row replacement matrix. Third-party Basis encoder and decoder components retain their separate notices. Existing asset credits survive notice regeneration, covered by the supply-chain regression.
+## Batch 177 job 3: specialised chart coverage
+
+sciviz/charts-extra implements every specialised chart family named in batch 177 job 3, each with vector axes/scales and SVG export. Evidence: packages/sciviz/tests/charts-extra.test.js checks numerical placement, wind count conservation, hierarchy area conservation, nonoverlap, weighted layered ports, cycles, missing days and leap years; charts-extra-browser.mjs renders the 13 NOAA/EIA SVGs in both browser backend modes, checks visible ink/no raster/download and a 390 px layout. This claims chart families and the named static layout behavior, not all options of a rival or performance parity. No speed measurement.

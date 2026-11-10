@@ -1,0 +1,212 @@
+{
+  "sources": [
+    {
+      "url": "https://noaa-isd-pds.s3.amazonaws.com/isd-lite/data/2023/725030-14732-2023.gz",
+      "sha256": "118f4a16909e6d9cfa2c2ab11bce77628a0d5084f009c9f069af9528f808ddcc",
+      "bytes": 90967
+    },
+    {
+      "url": "https://www.eia.gov/totalenergy/data/browser/csv.php?tbl=T02.02",
+      "sha256": "0f81fe3837c80a259a068201518654e3ab6bd0727e4d8b056db83ad6ec3c850a",
+      "bytes": 1003546
+    },
+    {
+      "url": "https://www.eia.gov/totalenergy/data/browser/csv.php?tbl=T02.03",
+      "sha256": "feadd10f37eb57393b31e6ed37284d26912e29f8d7d0427bb0bf783f57da747e",
+      "bytes": 1164897
+    },
+    {
+      "url": "https://www.eia.gov/totalenergy/data/browser/csv.php?tbl=T02.04",
+      "sha256": "3b6b87dfb4d64012baa6bd3ba4b51da65a415777776a54c9c1cfd21dfade297d",
+      "bytes": 1169697
+    },
+    {
+      "url": "https://www.eia.gov/totalenergy/data/browser/csv.php?tbl=T02.05",
+      "sha256": "385daaeaba4924fc15301869f35b3d06e010a2bb99281dbc25b9c57a72ad004f",
+      "bytes": 808347
+    },
+    {
+      "url": "https://www.eia.gov/totalenergy/data/browser/csv.php?tbl=T02.06",
+      "sha256": "0984fd38118edd1a7691f1f7f33229e7181f242b01097f99ba2fcf1ca7105b3e",
+      "bytes": 1013607
+    }
+  ],
+  "outputs": {
+    "wind.json": "e1ff3edd6ae0cbfaefe9d45710c89e6c98f21c298441597172a57418bfad4408",
+    "energy.json": "2c0e20ac8577fd32c00dcb0e1e3d6997e1dd85b4324c67fff0e6722fa5ece14d"
+  },
+  "license": "US government public-domain data, NOAA and US EIA credit retained",
+  "wind": "JFK 725030-14732, January 2023 ISD-lite, valid speed in m/s, direction-from degrees. Missing direction allowed only for calm <0.5 m/s.",
+  "energy": "2023 annual MER tables 2.2 through 2.6, five disjoint primary-source categories, original trillion Btu. No electricity sales or allocated losses double counting. Non-numeric and zero cells absent from links; original cells retained below. Rounding may leave differences at totals.",
+  "energyCells": [
+    {
+      "MSN": "CLRCBUS",
+      "YYYYMM": "202313",
+      "Value": "Not Available",
+      "Column_Order": "1",
+      "Description": "Coal Consumed by the Residential Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "NNRCBUS",
+      "YYYYMM": "202313",
+      "Value": "4682.467",
+      "Column_Order": "2",
+      "Description": "Natural Gas Consumed by the Residential Sector (Excluding Supplemental Gaseous Fuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "PARCBUS",
+      "YYYYMM": "202313",
+      "Value": "955.281",
+      "Column_Order": "3",
+      "Description": "Petroleum Consumed by the Residential Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "RERCBUS",
+      "YYYYMM": "202313",
+      "Value": "680.674",
+      "Column_Order": "8",
+      "Description": "Total Renewable Energy Consumed by the Residential Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "CLCCBUS",
+      "YYYYMM": "202313",
+      "Value": "11.601",
+      "Column_Order": "1",
+      "Description": "Coal Consumed by the Commercial Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "NNCCBUS",
+      "YYYYMM": "202313",
+      "Value": "3447.386",
+      "Column_Order": "2",
+      "Description": "Natural Gas Consumed by the Commercial Sector (Excluding Supplemental Gaseous Fuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "PMCCBUS",
+      "YYYYMM": "202313",
+      "Value": "872.04",
+      "Column_Order": "3",
+      "Description": "Petroleum Consumed by the Commercial Sector (Excluding Biofuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "RECCBUS",
+      "YYYYMM": "202313",
+      "Value": "262.503",
+      "Column_Order": "10",
+      "Description": "Total Renewable Energy Consumed by the Commercial Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "CLICBUS",
+      "YYYYMM": "202313",
+      "Value": "911.699",
+      "Column_Order": "1",
+      "Description": "Coal Consumed by the Industrial Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "NNICBUS",
+      "YYYYMM": "202313",
+      "Value": "10859.636",
+      "Column_Order": "2",
+      "Description": "Natural Gas Consumed by the Industrial Sector (Excluding Supplemental Gaseous Fuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "PMICBUS",
+      "YYYYMM": "202313",
+      "Value": "8586.118",
+      "Column_Order": "3",
+      "Description": "Petroleum Consumed by the Industrial Sector (Excluding Biofuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "REICBUS",
+      "YYYYMM": "202313",
+      "Value": "2357.08",
+      "Column_Order": "10",
+      "Description": "Total Renewable Energy Consumed by the Industrial Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "CLACBUS",
+      "YYYYMM": "202313",
+      "Value": "0",
+      "Column_Order": "1",
+      "Description": "Coal Consumed by the Transportation Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "NGACBUS",
+      "YYYYMM": "202313",
+      "Value": "1358.248",
+      "Column_Order": "2",
+      "Description": "Natural Gas Consumed by the Transportation Sector (Excluding Supplemental Gaseous Fuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "PMACBUS",
+      "YYYYMM": "202313",
+      "Value": "24859.284",
+      "Column_Order": "3",
+      "Description": "Petroleum Consumed by the Transportation Sector (Excluding Biofuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "REACBUS",
+      "YYYYMM": "202313",
+      "Value": "1792.103",
+      "Column_Order": "5",
+      "Description": "Biomass Energy Consumed by the Transportation Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "CLEIBUS",
+      "YYYYMM": "202313",
+      "Value": "7247.322",
+      "Column_Order": "1",
+      "Description": "Coal Consumed by the Electric Power Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "NNEIBUS",
+      "YYYYMM": "202313",
+      "Value": "13328.647",
+      "Column_Order": "2",
+      "Description": "Natural Gas Consumed by the Electric Power Sector (Excluding Supplemental Gaseous Fuels)",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "PAEIBUS",
+      "YYYYMM": "202313",
+      "Value": "175.508",
+      "Column_Order": "3",
+      "Description": "Petroleum Consumed by the Electric Power Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "NUEGBUS",
+      "YYYYMM": "202313",
+      "Value": "8098.974",
+      "Column_Order": "5",
+      "Description": "Nuclear Electric Power Consumed by the Electric Power Sector",
+      "Unit": "Trillion Btu"
+    },
+    {
+      "MSN": "REEIBUS",
+      "YYYYMM": "202313",
+      "Value": "3227.917",
+      "Column_Order": "11",
+      "Description": "Total Renewable Energy Consumed by the Electric Power Sector",
+      "Unit": "Trillion Btu"
+    }
+  ],
+  "preparation": "prepare.py; HTTPS downloads with 60-second timeouts, SHA-256 before reduction"
+}

@@ -131,6 +131,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'examples/assets/sciviz/charts-extra/source.json',
+    'Batch 177 specialised charts: NOAA ISD-lite JFK January 2023 winds from the NOAA Open Data Dissemination bucket, and US EIA Monthly Energy Review 2023 annual primary energy by source and sector, tables 2.2 through 2.6. US government public-domain data, credit NOAA and US Energy Information Administration. Original source URLs, SHA-256 hashes and reductions are in source.json and prepare.py. Reduced standard data only, excluded from package tarballs; no implementation code copied.',
+  ],
+  [
     'examples/assets/sciviz/stats/source.json',
     'Batch 177 statistical charts: NOAA GHCN Central Park USW00094728 daily TMIN/TMAX for 2020, US government public domain (https://www.ncei.noaa.gov/pub/data/ghcn/daily/all/USW00094728.dly). NASA Exoplanet Archive public PSCompPars table snapshot 2026-05-30, pinned data-only mirror hannahrvs/Planetary-Composite-Data commit a0d5fee61a002a349ea9d72fa450d5310b7c5947; source and reduction hashes in source.json. NASA TAP returned HTTP 503 on both official hosts, so no live-result claim is made. Credit NASA Exoplanet Archive / NExScI / Caltech, https://exoplanetarchive.ipac.caltech.edu/docs/acknowledge.html. Only reduced standard scientific data are included under the standard-file exception; no notebook or implementation files were read/copied. Excluded from package tarballs.',
   ],
