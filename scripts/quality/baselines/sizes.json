@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12739915,
+  "total": 12752607,
   "history": [
     {
       "date": "2026-10-24",
@@ -6316,6 +6316,12 @@
       "commit": "batch-245-job-4",
       "reason": "Whole-format skeletal JSON reader: new spine entry 0 -> 16427 B gzip, ceiling 16920 B. Skeletal 7436 -> 7952 B, ceiling 7625 -> 8208 B, for direct bone-local bind positions, dark tint and ordered blends with transparent multiply. Keeping one cohesive schema/attachment/pose state avoids duplication from splits. Core/stage unchanged at 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-199-job-2",
+      "reason": "Optional selection/xray absent -> 12322 B gzip, ceiling 12692 B. It includes the shared Selection masks and model replay rather than duplicating them or adding a second renderer. Core + stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7470,6 +7476,7 @@
     "margoengine/loaders/ply": 314,
     "@margoengine/loaders/off": 2992,
     "margoengine/loaders/off": 314,
-    "@margoengine/sprites/spine": 16920
+    "@margoengine/sprites/spine": 16920,
+    "@margoengine/selection/xray": 12692
   }
 }

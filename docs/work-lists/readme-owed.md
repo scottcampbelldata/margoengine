@@ -371,3 +371,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/sprites | /spine JSON parse/load/serialize, whole-format rig mapping, regions, skins, constraints/events/curves, named deferred physics warnings; skeletal jointPositions, dark tint and blend runs | batch-245 job 4 |
 | margoengine | Generated /sprites/spine alias | batch-245 job 4 |
 | margoengine | Restore the exporters/sparse alias for the export already on main | batch-245 landing mirror repair |
+
+- @margoengine/selection: document xray XRaySelection styling, default cosine pulse, manual time/play, multiview advancement, ownership and disposal (batch 199 job 2).

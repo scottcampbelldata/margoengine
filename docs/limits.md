@@ -4418,3 +4418,8 @@ reader, including correct transparent multiply. The cohesive reader retains
 validation, round-trip data and posing together; splitting would duplicate the
 schema, attachment maps and constraint/pose state. Core plus stage remains
 24209 B, below the unchanged 25000 B limit, with no core/stage source changes.
+
+### Pulsing x-ray outlines (batch 199 job 2)
+`@margoengine/selection/xray` exports XRaySelection, XRaySelectionOptions and OutlinePulse. It supports the Selection mesh/model/source protocol, current-pose hidden and visible outlines, dashed or solid hidden lines, both distance algorithms and existing multisample support. Pulse defaults on, with two-second period and minimum 0.25; false disables it. The bounded cosine modulates linear outline brightness. `time = seconds` selects manual deterministic time; `play()` resumes frame-delta time, advanced once across multiple views. Options are mutable per frame. The helper owns its outline targets only; source buffers and meshes remain caller-owned. No new GPU passes beyond the existing Selection pipeline; one CPU style pass precedes it. Core and stage remain unchanged.
+
+Batch 199 job 2: new xray entry 12322 B min+gzip, ceiling 12692 B. The entry retains the existing Selection pipeline and its model/mask providers; splitting it would duplicate lifecycle and masks. Core plus stage remains 24209 B.

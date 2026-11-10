@@ -5808,3 +5808,6 @@ spine-check.mjs supplies 96 independent blend/clipping readbacks per backend plu
 licensed tree animation and exact backwards seek. Physics is data-only, warns
 per named constraint and awaits the physics phase. Broader exporter/high-curvature
 path polish remains private. No speed gate or timing benchmark was added.
+
+### Section 5 evidence: optional pulsing x-ray selection
+Batch 199 job 2 reuses the existing whole-selection and equal-depth masks, without new rendering maths or a second mask renderer. Pulse time advances once per frame, including multiple views. selection/test/pulse.test.js covers validation and time ownership; pulse.browser.mjs compares actual hidden/visible outline pixels at bright and dim phases using both morphology and JFA on an attributed real Box fixture. Existing xray browser evidence continues to prove hidden dash runs and PBR/core depth behaviour. No new hardware or speed claim.
