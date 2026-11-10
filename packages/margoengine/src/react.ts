@@ -27,3 +27,4 @@ export * from '@margoengine/react/xr-pointer';
 export * from '@margoengine/react/performance';
 export * from '@margoengine/react/instances';
 export * from '@margoengine/react/controls-extra';
+export * from '@margoengine/react/portals';

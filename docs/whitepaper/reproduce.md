@@ -3231,3 +3231,6 @@ Build packages, then node --test packages/animator/test/transitions.test.js test
 
 ### Batch 261 label clustering
 Build packages, then node --test --test-timeout=120000 packages/labels/tests/cluster.test.js. The normal labels CPU suite covers composition. Render node scripts/gpu-lock.mjs run --owner=labels-cluster --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for real centroid/count/zoom checks. Generated numeric clouds are correctness controls; no geographic demo is introduced.
+
+### Batch 266 scene portals
+Build packages, then node --test --test-timeout=60000 packages/react/tests/portals.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-portals-browser.mjs ; repeat with --compat appended. Texture, isolated overlay and stacked overlays must match direct native rendering pixel for pixel, with no errors and complete disposal.

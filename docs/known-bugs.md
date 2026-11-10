@@ -4540,3 +4540,5 @@ No open defect identified in the job: native and compatibility clipmap, RVT and 
 
 ### Batch 261 label clusters
 No open correctness defect identified. Independent all-pairs component tests include negative cells, grid seams, chains, minimum size and zoom splitting. Renderer tests show camera zoom restores individual labels; browser tests show count-bubble centroid alignment and logical zoom recovery on native WebGPU and WebGL2.
+
+Batch 266 portal ownership regressions: explicit RenderView replaces the implicit main view, avoiding a duplicate canvas draw; StrictMode, nested cameras, target resize and last-owner cleanup are covered by portals.test.js. No new open defect identified in the tested paths.

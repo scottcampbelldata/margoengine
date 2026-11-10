@@ -36,7 +36,8 @@
     "test:browser:priority": "node scripts/test-priority-browser.mjs",
     "test:browser:performance": "node scripts/test-performance-browser.mjs",
     "test:browser:textures": "node scripts/test-textures-browser.mjs",
-    "test:browser:controls-extra": "node scripts/test-controls-extra-browser.mjs"
+    "test:browser:controls-extra": "node scripts/test-controls-extra-browser.mjs",
+    "test:browser:portals": "node scripts/test-portals-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -219,6 +220,11 @@
       "types": "./dist/controls-extra.d.ts",
       "react-server": "./dist/rsc/controls-extra.js",
       "import": "./dist/controls-extra.js"
+    },
+    "./portals": {
+      "types": "./dist/portals.d.ts",
+      "react-server": "./dist/rsc/portals.js",
+      "import": "./dist/portals.js"
     }
   },
   "files": [

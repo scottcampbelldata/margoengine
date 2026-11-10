@@ -3762,3 +3762,6 @@ AnimatorGraph starts destinations at normalized offsets and restricts fade inter
 
 ### Batch 261 count-bubble clustering
 The optional cluster layout groups screen-space neighbors and retains exact member counts. Twenty seeded 80-point cases match independent all-pairs connectivity, and 100,000 coincident points form one bubble with zero pairwise distance tests. Camera zoom splits clusters without permanently hiding members. Browser checks place the bubble centroid within 1 px on native WebGPU and WebGL2. Work counts are deterministic, not a speed result.
+
+### Batch 266 scene portals
+React RenderTexture draws child content to a native material texture; Hud stacks isolated child scenes with independent cameras. Evidence: packages/react/tests/portals.test.js and packages/react/scripts/test-portals-browser.mjs, whose texture and overlay captures use direct native rendering as the exact pixel oracle on both GPU paths. No speed claim.

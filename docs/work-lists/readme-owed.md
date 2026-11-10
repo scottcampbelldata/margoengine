@@ -576,3 +576,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 261 job 3): document labels/cluster alias.
 
 | @margoengine/clustered | shapes: ShapeLights (sphere, disc, tube), setLights validation, MAX_SHAPE_LIGHTS, radianceFromPower and shapeLightArea, Clustered.shapes hook, no shadows | batch-52 job 3 |
+- @margoengine/react and margoengine: portals RenderTexture output/ref/onTexture, isolated Hud cameras, view ordering, physical target sizes and compatibility-device requirement.

@@ -6161,3 +6161,5 @@ Graph source selection and normalized destination entry are CPU pose controls; G
 
 ### 5. Batch 261 label cluster evidence
 Clustering is optional CPU layout over the existing renderer projection; count bubbles are DOM overlays. Radius-graph components have independent all-pairs proof, 100k deterministic coincident-point coverage, renderer camera-zoom splitting and native WebGPU/WebGL2 DOM alignment checks. Core/stage and GPU shaders are unchanged.
+
+Batch 266 section 5 portal evidence: RenderTexture uses existing target-bearing native views before main rendering; Hud uses native Scene views with preserved colour and fresh depth. The new optional React entry adds no core/backend math. portals.test.js checks camera/scene ownership, resize and implicit-view deduplication; test-portals-browser.mjs compares texture, Hud and stacked Hud pixels with direct native calls on WebGPU and compatibility WebGL2.

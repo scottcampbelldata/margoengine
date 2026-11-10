@@ -2802,6 +2802,10 @@
       "types": "./dist/react/controls-extra.d.ts",
       "import": "./dist/react/controls-extra.js"
     },
+    "./react/portals": {
+      "types": "./dist/react/portals.d.ts",
+      "import": "./dist/react/portals.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"
