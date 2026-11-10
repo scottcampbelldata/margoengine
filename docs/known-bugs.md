@@ -4390,3 +4390,6 @@ Batch 258 landing: existing image GPU fixture sampled two frames before the docu
 Batch 258 generated-page landing blocker: newly inherited MCP live-relay literals were absent from the shared error catalog. The catalog now names all 15 existing messages; the existing errors-page literal-coverage regression proves the repair, with no MCP runtime change.
 ### Batch 226 graph
 No open defect found in the requested row. Unrepresentable local shear is an explicit documented TRS limit and rejects before mutation.
+
+### Batch 226 clone
+No open defect found in the requested shared-geometry/material subtree-copy row. Plugin, animation and constraints remain owned by their packages and are outside mesh cloning.

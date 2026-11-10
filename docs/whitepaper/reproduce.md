@@ -2928,3 +2928,5 @@ Batch 208 job 2: npm run build:packages, node --test --test-timeout=120000 packa
 
 ### Mesh-edit plane sections
 Build with npm run build:packages, then run node --test --test-timeout=120000 packages/mesh-edit/tests/section.test.js. For GPU presentation use node scripts/gpu-lock.mjs run --owner=codex-batch224 --max=3 --wait-max=60 -- node packages/mesh-edit/scripts/test-browser.js; repeat with --compat on the browser script for the WebGL2 layer. The section fixtures are analytic synthetic solids, not imported demonstration assets. Assertions include cap closure and signed volume, annular section area 0.75, two disconnected regions, and rendered capped output. No benchmark is run.
+### Batch 226 clone
+After building packages: node --test --test-timeout=120000 packages/scene/tests/clone.test.js. Run node scripts/gpu-lock.mjs run --owner=scene-clone --max=4 --wait-max=60 -- node packages/scene/tests/graph-browser.mjs --clone, then the same command with --compat appended. Results: test-results/batch226/clone-*.json. No benchmark or README execution.

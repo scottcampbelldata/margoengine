@@ -6,7 +6,8 @@ const browser = await openBrowser({ startPath: '/tests/modern-extension.html', p
 const errors = [];
 browser.page.on('pageerror', (error) => errors.push(error.message));
 try {
-  const result = await browser.page.evaluate(async () => {
+  const feature = process.argv.includes('--clone') ? 'clone' : 'graph';
+  const result = await browser.page.evaluate(async (feature) => {
     const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
     const { attach, localToWorld, worldToLocal, rotateOnAxis, translateOnAxis } = await import('/packages/scene/dist/graph.js');
@@ -34,24 +35,32 @@ try {
         return [...ctx.getImageData(0, 0, 128, 128).data];
       };
       const before = await snap();
-      attach(destination, mesh);
+      let drawing = mesh;
+      if (feature === 'clone') {
+        const { cloneSubtree } = await import('/packages/scene/dist/clone.js');
+        const { children } = await import('/packages/scene/dist/index.js');
+        const copied = cloneSubtree(root);
+        drawing = children(copied)[0];
+        if (drawing.geometry !== mesh.geometry || drawing.material !== mesh.material) throw new Error('clone did not share resources');
+        mesh.dispose(); root.dispose();
+      } else attach(destination, mesh);
       const after = await snap();
-      const p = [1, 2, 3], recovered = worldToLocal(mesh, localToWorld(mesh, p));
-      rotateOnAxis(mesh, [0, 1, 0], Math.PI / 2);
-      translateOnAxis(mesh, [0, 0, 1], 0.25);
+      const p = [1, 2, 3], recovered = worldToLocal(drawing, localToWorld(drawing, p));
+      rotateOnAxis(drawing, [0, 1, 0], Math.PI / 2);
+      translateOnAxis(drawing, [0, 0, 1], 0.25);
       await snap();
       return { before, after, recovered, visible: engineRuntime(engine).stats.visible, errors,
         compat: !!globalThis.__margoCompat };
     } finally { engine.dispose(); canvas.remove(); }
-  });
+  }, feature);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(errors, []);
-  assert.deepEqual(result.after, result.before, 'world-preserving attach changes no rendered pixel');
+  assert.deepEqual(result.after, result.before, `${feature} changes no rendered pixel`);
   assert.ok(result.before.some((v, i) => i % 4 === 0 && v > result.before[i+1] + 15), 'red geometry rendered');
   assert.deepEqual(result.recovered, [1, 2, 3]);
   assert.equal(result.visible, 1);
   delete result.before; delete result.after;
   await mkdir('test-results/batch226', { recursive: true });
-  await writeFile(`test-results/batch226/graph-${result.compat ? 'compat' : 'webgpu'}.json`, JSON.stringify(result, null, 2));
+  await writeFile(`test-results/batch226/${feature}-${result.compat ? 'compat' : 'webgpu'}.json`, JSON.stringify(result, null, 2));
   console.log(result);
 } finally { await browser.close(); }

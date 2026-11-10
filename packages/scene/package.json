@@ -28,7 +28,8 @@
     "build": "node ../../scripts/build-optional.js scene",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node tests/graph-browser.mjs"
+    "test:gpu": "node tests/graph-browser.mjs",
+    "test:gpu:clone": "node tests/graph-browser.mjs --clone"
   },
   "sideEffects": false,
   "exports": {
@@ -47,6 +48,10 @@
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
+    },
+    "./clone": {
+      "types": "./dist/clone.d.ts",
+      "import": "./dist/clone.js"
     }
   },
   "files": [

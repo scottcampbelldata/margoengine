@@ -337,3 +337,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mesh-edit: document section split/trim/slice, arbitrary plane basis, ownership, source face maps, caps, UVs, empty/tangent results, float64 limits and cancellation (batch 224 job 1).
 - margoengine: document the generated mesh-edit/section alias in the README phase (batch 224 job 1).
+- @margoengine/scene (batch 226 clone): document cloneSubtree defaults, resource sharing/lifetimes, exact local transforms, structured metadata, ownership and rollback with examples in the README phase.
+- margoengine (batch 226 clone): document scene/clone generated alias in the README phase.
