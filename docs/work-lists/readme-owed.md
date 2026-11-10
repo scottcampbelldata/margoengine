@@ -809,3 +809,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: expose the generated decoders/jpeg optional facade in the decoder index.
 
 - @margoengine/voxel and margoengine (batch 240 job 2): document /objects, core/glTF graph sources, cell-centre origin, quarter turns, shared ownership, retained handles and streaming; runnable README examples owed in the README phase.
+
+- @margoengine/voxel-net: document /replay VoxelRecorder, recordVoxelFile/readVoxelRecording, recipient selection, forward tick stepping, cancellable play, file bounds/ownership and server.onSend observation.
+
+- margoengine: document the generated voxel-net/replay alias.

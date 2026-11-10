@@ -66,6 +66,10 @@
     "./rooms": {
       "types": "./dist/rooms.d.ts",
       "import": "./dist/rooms.js"
+    },
+    "./replay": {
+      "types": "./dist/replay.d.ts",
+      "import": "./dist/replay.js"
     }
   },
   "files": [

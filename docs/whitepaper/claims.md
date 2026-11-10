@@ -3994,3 +3994,5 @@ The optional decoders/jpeg entry and decoders/image dispatch expose the same cle
 ### Batch 240 job 2: object blocks
 
 VoxelObjects retains shared core Geometry identities across cells and snapshots a core glTF node graph while following chunk residency and edits. CPU objects.test.js proves two visible objects in one batch while a distant third is culled, graph transforms survive source disposal, unchanged handles survive edits, and chunk removal releases instances. objects-browser-check.mjs asserts matching native/compatibility pixels, one instanced draw for two visible cells, culling of a distant loaded chunk, edit/unload/reload and disposal. These are deterministic work counts and correctness results, not timing benchmarks.
+
+- Batch 242 job 2: optional voxel-net/replay records outbound messages by recipient/tick and reconstructs the observed world in a fresh client; validates framing, ownership and completeness and exposes write failures. Proof: packages/voxel-net/tests/replay.test.js (real socket/file round-trip, complete chunk equality, app order, malformed files and sink overflow). No deterministic execution or performance claim.

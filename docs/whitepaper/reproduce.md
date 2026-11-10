@@ -3445,3 +3445,5 @@ The additional worker/GPU round trip runs with node scripts/gpu-lock.mjs run --o
 ### Batch 240 job 2
 
 Build packages, then node --test --test-timeout=120000 packages/voxel/tests/objects.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch240 --max=3 --wait-max=60 -- node packages/voxel/tests/objects-browser-check.mjs, and again with --compat after the script. Two visible red placements share one core draw; a third loaded object at x=10000 is culled. Edits lower coverage, unload removes it, reload restores it bit for bit and disposal leaves zero coverage.
+
+- Batch 242 replay: build packages then node --test --test-timeout=30000 packages/voxel-net/tests/replay.test.js. Real loopback server, authored flat-world fixture, temporary recording file and exact reconstructed chunk snapshots. No GPU or external demo asset.

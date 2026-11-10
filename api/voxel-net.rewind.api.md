@@ -247,6 +247,7 @@ class VoxelServer {
     broadcast(data: Uint8Array): number;
     get tickRate(): number;
     onTick(listener: (tick: number, dt: number) => void): () => void;
+    onSend(listener: (player: VoxelServerPlayer, data: Uint8Array, tick: number) => void): () => void;
     onApp(listener: (player: VoxelServerPlayer, data: Uint8Array) => void): () => void;
     sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean;
     disconnect(player: VoxelServerPlayer, code?: number, reason?: string): boolean;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13667269,
+  "total": 13671109,
   "history": [
     {
       "date": "2026-10-24",
@@ -7133,6 +7133,11 @@
       "commit": "d2b23ddf8",
       "reason": "Batch 240 object block entry, shared geometry and instance lifetime",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-242",
+      "reason": "New optional voxel-net/replay: absent (0 B) -> 3584 B gzip; ordered bounded recording sink, binary file validation and tick playback. Server observation stays within its existing ceiling."
     }
   ],
   "items": {
@@ -8423,6 +8428,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/voxel-net/replay": 3840
   }
 }

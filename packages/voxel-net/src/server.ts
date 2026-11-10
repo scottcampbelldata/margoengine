@@ -668,6 +668,7 @@ export class VoxelServer {
   /** Receives errors that do not belong to one call: a failed generation, a broken client. Default console.error. */
   onError: (error: unknown) => void = (error) => console.error(error);
   readonly #tickListeners = new Set<(tick: number, dt: number) => void>();
+  readonly #sendListeners = new Set<(player: VoxelServerPlayer, data: Uint8Array, tick: number) => void>();
   readonly #tickRate: number;
   readonly #view: number;
   readonly #maxView: number;
@@ -889,6 +890,17 @@ export class VoxelServer {
       throw new TypeError('VoxelServer.onTick needs a function; pass (tick, dt) => {}');
     this.#tickListeners.add(listener);
     return () => this.#tickListeners.delete(listener);
+  }
+  /**
+   * Observes each outbound message, including welcome, in emission order with its recipient and tick.
+   * Every listener receives its own byte copy. Throws are reported through onError without interrupting delivery.
+   * Returns an unsubscribe; attach before players join to record complete streams.
+   */
+  onSend(listener: (player: VoxelServerPlayer, data: Uint8Array, tick: number) => void): () => void {
+    if (typeof listener !== 'function')
+      throw new TypeError('VoxelServer.onSend needs a function; pass (player, data, tick) => {}');
+    this.#sendListeners.add(listener);
+    return () => this.#sendListeners.delete(listener);
   }
   /**
    * Calls `listener(player, data)` with each app message a playing player sent with `VoxelNetClient.sendApp`, in order
@@ -2331,6 +2343,13 @@ export class VoxelServer {
   #write(c: Client, message: Uint8Array): void {
     c.quietTicks = 0;
     c.conn.send(message);
+    for (const listener of this.#sendListeners) {
+      try {
+        listener(c, message.slice(), this.#tick);
+      } catch (error) {
+        this.onError(error);
+      }
+    }
     this.metrics.bytesOut[NAMES[message[0]]] += message.length + header(message.length);
   }
 }
