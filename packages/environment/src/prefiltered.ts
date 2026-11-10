@@ -62,6 +62,8 @@ const fail = (): never => {
   throw new MargoError('failed', 'Invalid prefiltered IBL KTX2; export it again with savePrefilteredEnvironment');
 };
 const power = (n: number) => Number.isInteger(n) && n >= 1 && n <= 16384 && (n & (n - 1)) === 0;
+// The BRDF LUT edge is any integer Environment accepts for `brdfSize` (1..4096), not only a power of two.
+const lutEdge = (n: number) => Number.isInteger(n) && n >= 1 && n <= 4096;
 const bytes = (data: ArrayBuffer | ArrayBufferView) =>
   data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
 const view = (data: Uint8Array) => new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -77,7 +79,7 @@ function validate(data: PrefilteredIBL): void {
     for (let m = 0; m < mips.length; m++)
       if (!(mips[m] instanceof Uint16Array) || mips[m].length !== (edge >> m) ** 2 * 24) fail();
   }
-  if (!(data.brdf instanceof Uint32Array) || !power(Math.sqrt(data.brdf.length))) fail();
+  if (!(data.brdf instanceof Uint32Array) || !lutEdge(Math.sqrt(data.brdf.length))) fail();
   for (const sh of [data.radiance, data.irradiance])
     if (!(sh instanceof Float32Array) || sh.length !== 27 || !sh.every(Number.isFinite)) fail();
   if (!Number.isFinite(data.rotation) || !Number.isFinite(data.intensity) || data.intensity < 0) fail();
@@ -202,7 +204,7 @@ export function parsePrefilteredIBL(input: ArrayBuffer | ArrayBufferView): Prefi
   const edge = mu(4),
     cubeCount = mu(8),
     brdfSize = mu(12);
-  if (mu(0) !== 1 || !power(edge) || edge < size || cubeCount !== Math.log2(edge) + 1 || !power(brdfSize)) fail();
+  if (mu(0) !== 1 || !power(edge) || edge < size || cubeCount !== Math.log2(edge) + 1 || !lutEdge(brdfSize)) fail();
   const take = (offset: number, length: number): ArrayBuffer => {
     if (offset + length > meta!.length) fail();
     return meta!.slice(offset, offset + length).buffer;

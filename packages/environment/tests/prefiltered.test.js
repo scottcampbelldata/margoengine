@@ -35,6 +35,18 @@ test('KTX2 baked IBL preserves every source/specular mip, LUT, SH and metadata b
   assert.deepEqual(copy, data);
 });
 
+test('KTX2 baked IBL round-trips every brdfSize Environment accepts, not only powers of two (R5)', () => {
+  // Environment takes brdfSize as any integer 1..4096; a 100 x 100 LUT made savePrefilteredEnvironment throw.
+  for (const edge of [1, 3, 48, 100]) {
+    const data = make();
+    data.brdf = Uint32Array.from({ length: edge * edge }, (_, i) => 0x30003800 + i);
+    assert.deepEqual(parsePrefilteredIBL(encodePrefilteredIBL(data)), data, `brdfSize ${edge}`);
+  }
+  const data = make();
+  data.brdf = new Uint32Array(4097 * 4097);
+  assert.throws(() => encodePrefilteredIBL(data), 'brdfSize above 4096 is refused like Environment');
+});
+
 test('baked IBL rejects every truncated prefix, corrupt layout, overlapping levels and invalid values', () => {
   const encoded = encodePrefilteredIBL(make());
   for (let n = 0; n < encoded.length; n++) assert.throws(() => parsePrefilteredIBL(encoded.subarray(0, n)));

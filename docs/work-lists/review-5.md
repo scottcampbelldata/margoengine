@@ -54,3 +54,15 @@ feat and fix commits from the evening of 2026-11-09 to 2026-11-10 (`--since=2026
 | html | 749edcf18, 9725d50c6, 4e3337946 | | none found | Checked the CSS url() rewriter (strings, escapes, comments), original/copy element index pairing, font-face discovery through imports, blend masks' buffer release through remove(), GL state capture and texture unit 0. Mac sweep: CPU 21; test:browser (WebGPU and WebGL2) pass on Metal | |
 | selection | 1b7635421, 77bcbd78b, 29939ffc5, 6345b48f9, 518e907ee, 5345be708 | | none found | Checked area pixel-centre inclusion (half-open spans), micro-target centring, hit-detail cofactor normals and depth unprojection, x-ray pulse factor. highlight.ts and spatial.ts read only briefly (finish-later). Mac sweep: CPU 100; test:browser, xray-pulse, area, highlight pass on Metal | |
 | viewcube | 229d6715d, 3c62d6785, e2d2d6b0a, bc76eff07, 1011ada2b | | none found | Checked the UpViewCube frame (right = up x front, Z-up default front -Y, local/world inverse). compass.ts and fit.ts not reviewed in depth (finish-later). Mac sweep: CPU 34; test:browser pass on Metal | |
+
+
+## Lane L
+
+Packages, in order: environment, clustered, lightmap, scatter, water, inspector, terrain. Scope: each package's feature
+and fix commits since 2026-11-09 18:00. Mac sweep on the M6 Mac mini: CPU tests, then every GPU and browser test on
+WebGPU (Metal) and on the WebGL2 layer (`--compat`, ANGLE Metal).
+
+| Package | Commit | File:line | Defect | Input and wrong output | Fix |
+| --- | --- | --- | --- | --- | --- |
+| environment | f9ff16e06 | packages/environment/src/prefiltered.ts:80, :205 | The baked-IBL KTX2 saver and loader took only a power-of-two BRDF LUT edge, while Environment accepts any `brdfSize` from 1 to 4096, so an environment it built could not be saved | `new Environment(..., { brdfSize: 100 })` then `savePrefilteredEnvironment`: throws "Invalid prefiltered IBL KTX2; export it again with savePrefilteredEnvironment" (also 48, 3). Fix: the file takes any square LUT edge 1..4096, the range Environment accepts; regression test round-trips edges 1, 3, 48 and 100 and refuses 4097 | (this commit) |
+| environment | 2c88ee74b, c60f12635, a331427a0, 003abfa2d, 050760f80 | | none found | Mac sweep clean: CPU 192; all 17 GPU and browser suites pass on WebGPU and on `--compat` | |
