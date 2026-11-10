@@ -2472,3 +2472,5 @@ examples through `npm run check:readme-run -- --packages=controls`. No speed
 measurement, benchmark or exclusive GPU lease is required.
 
 FSM payload proof: build fsm, then node --test --test-timeout=120000 packages/fsm/test/events.test.js. No GPU or timing measurement is involved.
+
+FSM final/always proof: node --test --test-timeout=120000 packages/fsm/test/final.test.js after building packages. Includes delay split equivalence and cycle rejection without wall-clock assertions.

@@ -2905,3 +2905,6 @@ limited to this batch row, not all Cesium navigation, terrain or scene modes.
 
 ### FSM event payload delivery (batch 250 job 1)
 EventMachine delivers the same data object to guards, exit/entry hooks and EventTrace, including ancestor fallback and captured plan actions. packages/fsm/test/events.test.js verifies refusal, payload identity, delayed isolation and exception cleanup. Reference: W3C SCXML event data and Stately guard documentation cited in docs/clean-room.md.
+
+### FSM final and eventless transitions (batch 250 job 2)
+FinalMachine settles initial and event-triggered eventless chains, raises completion on the containing state once per final entry, stops at a top-level final, and preserves split-update behavior across delayed/eventless chains. Proof: packages/fsm/test/final.test.js against SCXML macrostep order and documented Stately final/always behavior, cited in docs/clean-room.md. No full SCXML interpreter claim.

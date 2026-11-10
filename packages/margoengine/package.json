@@ -1122,6 +1122,10 @@
       "types": "./dist/fsm/events.d.ts",
       "import": "./dist/fsm/events.js"
     },
+    "./fsm/final": {
+      "types": "./dist/fsm/final.d.ts",
+      "import": "./dist/fsm/final.js"
+    },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"

@@ -3456,3 +3456,8 @@ Entry measurement: controls/globe 0 to 3646 B min+gzip; ceiling 3902 B.
 Optional fsm/events preserves data by reference for guards, enter/exit hooks, nested plans and EventTrace. Initial entry, goto and delays have undefined data. Update hooks retain the seconds argument. No payload serialization or cloning; caller owns payload lifetime. Root FSM, core and stage sources unchanged.
 
 Batch 250 job 1: fsm/events 0 to 2362 B min+gzip, ceiling 2618 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+### FSM completion (batch 250 job 2)
+Optional fsm/final adds FinalMachine with final:true leaves, done.state.parent and always:true transitions. Final leaves have no children, regions or outgoing transitions. A top-level final stops events and clock advancement; goto explicitly restarts. Eventless steps run before queued completions and between delays. Limits: 10,000 eventless/internal steps per stabilization and 100,000 timed firings per update produce coded state errors; break cycles or use shorter deltas. Internal NUL-prefixed event names are reserved. Completion events retain the causing payload. Existing ParallelRegions remain ordinary region machines; FinalMachine completion is local to its hierarchy.
+
+Batch 250 job 2: fsm/final 0 to 2825 B min+gzip, ceiling 3081 B. Optional runtime is not loaded by the FSM root or core/stage.
