@@ -1,3 +1,4 @@
+import { themeFont } from './theme-style.js';
 // Optional chart presentation and interaction. Clean-room research: docs/clean-room.md, batch 177 job 4.
 import type { Figure, Layer, LineLayer, ScatterLayer, LineLayerOptions, ScatterLayerOptions } from './figure.js';
 import { RectsLayer } from './rects.js';
@@ -259,7 +260,7 @@ export class ChartPolish extends EventTarget {
     this.element = root;
     this.tooltip = document.createElement('div');
     this.tooltip.dataset.scivizUnifiedHover = '';
-    this.tooltip.style.cssText = `position:absolute;z-index:4;pointer-events:none;white-space:pre;font:12px system-ui;padding:8px;border:1px solid ${figure.theme.axis};color:${figure.theme.text};background:${figure.theme.background}`;
+    this.tooltip.style.cssText = `position:absolute;z-index:4;pointer-events:none;white-space:pre;font:${themeFont(figure.theme)};padding:8px;border:1px solid ${figure.theme.axis};color:${figure.theme.text};background:${figure.theme.background}`;
     this.tooltip.hidden = true;
     host.append(this.tooltip);
     for (const layer of figure.layers)
@@ -546,11 +547,11 @@ export class ChartPolish extends EventTarget {
       xf = numberFormatter(this.#options.xFormat),
       yf = numberFormatter(this.#options.yFormat),
       out: string[] = [];
-    const path = (d: string, c = theme.axis, w = 1) =>
+    const path = (d: string, c = theme.axis, w = theme.axisWidth ?? 1) =>
         out.push(`<path d="${d}" stroke="${c}" stroke-width="${w}" fill="none"/>`),
       text = (x: number, y: number, s: string, anchor = 'middle') =>
         out.push(
-          `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${theme.text}" font-family="system-ui" font-size="12">${xml(s)}</text>`,
+          `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${theme.text}" font-family="${xml(theme.fontFamily ?? 'system-ui')}" font-size="${theme.fontSize ?? 12}">${xml(s)}</text>`,
         );
     const axis = (mapping: BrokenScale, vertical: boolean, secondary = false) => {
       const bound = (v: number, side: 0 | 1) => {
@@ -566,7 +567,7 @@ export class ChartPolish extends EventTarget {
         major = (
           categories
             ? categories.map((_, i) => i + 0.5).filter((v) => v >= low && v <= high)
-            : ticks(low, high, 6).values
+            : ticks(low, high, theme.tickCount ?? 6).values
         ).filter((v) => Number.isFinite(mapping.inverse(mapping.forward(v)))),
         fmt = categories
           ? (v: number) => categories[Math.floor(v)]
@@ -580,19 +581,24 @@ export class ChartPolish extends EventTarget {
       for (const v of major) {
         const [x, y] = pos(v);
         if (vertical) {
-          if (!secondary) path(`M${p.x},${y}h${p.width}`, theme.grid);
-          path(`M${secondary ? p.x + p.width : p.x},${y}h${secondary ? 5 : -5}`);
+          if (!secondary && theme.gridStyle !== 'none')
+            path(`M${p.x},${y}h${p.width}`, theme.grid, theme.gridWidth ?? 1);
+          path(`M${secondary ? p.x + p.width : p.x},${y}h${(secondary ? 1 : -1) * (theme.tickSize ?? 5)}`);
           text(secondary ? p.x + p.width + 9 : p.x - 9, y + 4, fmt(v), secondary ? 'start' : 'end');
         } else {
-          path(`M${x},${p.y}v${p.height}`, theme.grid);
-          path(`M${x},${p.y + p.height}v5`);
+          if (theme.gridStyle !== 'none') path(`M${x},${p.y}v${p.height}`, theme.grid, theme.gridWidth ?? 1);
+          path(`M${x},${p.y + p.height}v${theme.tickSize ?? 5}`);
           text(x, p.y + p.height + 20, fmt(v));
         }
       }
       for (const v of minorTicks(major, categories ? 0 : (this.#options.minor ?? 4))) {
         if (!Number.isFinite(mapping.inverse(mapping.forward(v)))) continue;
         const [x, y] = pos(v);
-        path(vertical ? `M${secondary ? p.x + p.width : p.x},${y}h${secondary ? 3 : -3}` : `M${x},${p.y + p.height}v3`);
+        path(
+          vertical
+            ? `M${secondary ? p.x + p.width : p.x},${y}h${(secondary ? 1 : -1) * (theme.tickSize === undefined ? 3 : theme.tickSize * 0.6)}`
+            : `M${x},${p.y + p.height}v${theme.tickSize === undefined ? 3 : theme.tickSize * 0.6}`,
+        );
       }
     };
     axis(this.x, false);
@@ -643,6 +649,7 @@ export class ChartPolish extends EventTarget {
       canvas.offsetLeft,
       canvas.offsetTop,
       ...this.figure.bounds,
+      JSON.stringify(this.figure.theme),
       ...(this.#pointer ?? []),
       ...this.#hover.flatMap((h) => [h.x, h.y]),
     ].join(',');
@@ -652,6 +659,12 @@ export class ChartPolish extends EventTarget {
     this.element.setAttribute('height', String(canvas.clientHeight));
     this.element.style.left = canvas.offsetLeft + 'px';
     this.element.style.top = canvas.offsetTop + 'px';
+    Object.assign(this.tooltip.style, {
+      font: themeFont(this.figure.theme),
+      color: this.figure.theme.text,
+      background: this.figure.theme.background,
+      borderColor: this.figure.theme.axis,
+    });
     this.element.innerHTML = this.#svg();
     for (const i of this.#insets) {
       i.host.style.left = canvas.offsetLeft + i.rect[0] * canvas.clientWidth + 'px';

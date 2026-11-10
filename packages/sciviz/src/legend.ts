@@ -1,3 +1,4 @@
+import { themeFont } from './theme-style.js';
 // A legend: an HTML box over the canvas listing the named layers, each with a swatch in its colour (a stroke for lines,
 // a dot for scatters, a square for bars, histograms, heatmaps and surfaces).
 import type { Theme } from './axes.js';
@@ -46,7 +47,7 @@ export class Legend {
     root.setAttribute('role', 'list');
     root.setAttribute('aria-label', 'Legend');
     root.dataset.scivizLegend = '';
-    root.style.cssText = `position: absolute; z-index: 1; display: grid; gap: 3px; padding: 6px 9px; border-radius: 4px; pointer-events: none; font: 12px system-ui, sans-serif; color: ${theme.text}; background: ${theme.background}d9; border: 1px solid ${theme.grid}`;
+    root.style.cssText = `position: absolute; z-index: 1; display: grid; gap: 3px; padding: 6px 9px; border-radius: 4px; pointer-events: none; font: ${themeFont(theme)}; color: var(--margo-text, ${theme.text}); background: ${theme.background}d9; border: 1px solid ${theme.grid}`;
     host.append(root);
     this.element = root;
   }

@@ -11,11 +11,12 @@ import type { PointCloud, PointsPlugin } from '@margoengine/points';
 import type { Line, Lines } from '@margoengine/lines';
 import type { OrbitControls } from '@margoengine/controls/orbit';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { themeFont, validateThemeStyle } from './theme-style.js';
 import { Axes, THEMES, type AxesOptions, type Theme } from './axes.js';
 import { barRects, heatmapRects, histogram, type BinOptions } from './charts.js';
 import { arrowSegments, streamline, type StreamlineOptions, type VectorGrid } from './fields.js';
 import { ColorBar, type ColorBarOptions } from './colorbar.js';
-import type { Colormap } from './colormaps.js';
+import { colormapNames, type Colormap } from './colormaps.js';
 import { Interaction, type DragMode } from './interact.js';
 import { IsosurfaceLayer, levelColour, type IsosurfaceLayerOptions } from './isosurface.js';
 import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } from './pick.js';
@@ -26,7 +27,12 @@ import { timelineFigures } from './motion-state.js';
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
-import { publicationLabels, publicationOverlays, disposePublicationLabels, trackFigureCanvas } from './publication-labels.js';
+import {
+  publicationLabels,
+  publicationOverlays,
+  disposePublicationLabels,
+  trackFigureCanvas,
+} from './publication-labels.js';
 
 import { projectPoint } from '@margoengine/math/mat4';
 import {
@@ -429,6 +435,7 @@ export class Figure extends EventTarget {
   #series = 0;
   // Colours and widths of scatter and line layers, for SVG export.
   readonly #styles = new WeakMap<Layer, { color: string; colors?: Float32Array; width: number }>();
+  readonly #defaultLineWidths = new WeakSet<LineLayer>();
   readonly #dataOptions = new WeakMap<LineLayer | ScatterLayer, LineLayerOptions | ScatterLayerOptions>();
   readonly #dataUpdates = new WeakMap<LineLayer | ScatterLayer, Promise<LineLayer | ScatterLayer>>();
   // Axis updates run after one another; ready() waits for them and reports their errors.
@@ -496,7 +503,10 @@ export class Figure extends EventTarget {
     const types = options.scale ?? {};
     this.#scales = [axisScale(types.x), axisScale(types.y), axisScale(types.z)];
     this.engine = engine;
-    this.theme = { ...colors };
+    validateThemeStyle(colors);
+    if (colors.scalarMap !== undefined && !colormapNames.includes(colors.scalarMap))
+      throw typeError('Theme scalarMap needs a named colour map; choose colormapNames', 'sciviz');
+    this.theme = { ...colors, ...(colors.palette ? { palette: [...colors.palette] } : {}) };
     this.#options = options;
     this.renderer = renderer ?? new SciRenderer();
     (engine as unknown as Engine).use(this.renderer);
@@ -565,16 +575,46 @@ export class Figure extends EventTarget {
         throw typeError(`Theme ${key} needs a colour string; supply #rrggbb`, 'sciviz');
       hexRGB(theme[key], `Theme ${key}`);
     }
-    Object.assign(this.theme, theme);
+    validateThemeStyle(theme);
+    if (theme.scalarMap !== undefined && !colormapNames.includes(theme.scalarMap))
+      throw typeError('Theme scalarMap needs a named colour map; choose colormapNames', 'sciviz');
+    const next = { ...theme, ...(theme.palette ? { palette: [...theme.palette] } : {}) };
+    for (const key of [
+      'fontFamily',
+      'fontSize',
+      'titleSize',
+      'lineWidth',
+      'axisWidth',
+      'gridWidth',
+      'gridStyle',
+      'tickCount',
+      'tickSize',
+      'palette',
+      'scalarMap',
+    ] as const)
+      delete (this.theme as unknown as Record<string, unknown>)[key];
+    Object.assign(this.theme, next);
+    if (theme.lineWidth !== undefined)
+      for (const layer of this.#layers) {
+        if ('kind' in layer && layer.kind === 'line' && this.#defaultLineWidths.has(layer)) {
+          layer.line.material.width = theme.lineWidth;
+          const style = this.#styles.get(layer);
+          if (style) style.width = theme.lineWidth;
+          const options = this.#dataOptions.get(layer);
+          if (options) this.#dataOptions.set(layer, { ...options, width: theme.lineWidth });
+        }
+      }
     (this.engine as unknown as Engine).scene.background = theme.background;
     if (this.#legend) {
       Object.assign(this.#legend.element.style, {
+        font: themeFont(theme),
         color: theme.text,
         background: theme.background + 'd9',
         borderColor: theme.grid,
       });
     }
     for (const bar of this.#bars) {
+      bar.element.style.font = themeFont(theme);
       bar.element.style.color = theme.text;
       bar.element.style.textShadow = `0 0 3px ${theme.background}`;
       bar.bar.style.borderColor = theme.axis;
@@ -584,6 +624,7 @@ export class Figure extends EventTarget {
       await this.#axes?.update(this.#bounds, this.#model, this.#flat, this.#scales);
     });
     await this.#pending;
+    this.dispatchEvent(new CustomEvent('themechange', { detail: { theme: this.theme } }));
   }
 
   /** Replace axis chrome, or hide it for an optional chart controller. Waits for pending axis work. */
@@ -743,6 +784,7 @@ export class Figure extends EventTarget {
    */
   render(): void {
     this.#check();
+    this.#axes?.refreshTicks();
     if (this.#flat) {
       this.#fitView();
       this.engine.render({ views: this.#views });
@@ -1040,7 +1082,10 @@ export class Figure extends EventTarget {
 
   // The next colour of the series palette, as sRGB.
   #nextColour(): [number, number, number] {
-    return hexRGB(PALETTE[this.#series++ % PALETTE.length], 'palette colour');
+    return hexRGB(
+      (this.theme.palette ?? PALETTE)[this.#series++ % (this.theme.palette ?? PALETTE).length],
+      'palette colour',
+    );
   }
 
   #updateLegend(): void {
@@ -1125,7 +1170,7 @@ export class Figure extends EventTarget {
       bounds = positionBounds(positions);
     }
     const count = positions.length / 3,
-      map = resolveColormap(options.colormap);
+      map = resolveColormap(options.colormap ?? this.theme.scalarMap);
     const colourData = await read(data.color),
       sizeData = await read(data.size);
     if (colourData && colourData.length !== count)
@@ -1191,7 +1236,7 @@ export class Figure extends EventTarget {
         fy(y[i]),
         z && !this.#flat ? fz(z[i]) : 0,
       ];
-    const map = resolveColormap(options.colormap);
+    const map = resolveColormap(options.colormap ?? this.theme.scalarMap);
     if (c && c.length !== x.length)
       throw rangeError(`line color has ${c.length} values for ${x.length} points`, 'sciviz');
     const colours = c ? mapColours(c, map, rangeOption(options.range, 'line range') ?? extent(c)) : undefined;
@@ -1204,13 +1249,13 @@ export class Figure extends EventTarget {
         positions,
         colors: colours,
         color: colours ? '#ffffff' : colour,
-        width: options.width ?? 2,
+        width: options.width ?? this.theme.lineWidth ?? 2,
         join: 'round',
         cap: 'round',
       }),
     );
     const layer = this.#style(
-      { color: colours ? '#ffffff' : colour, colors: colours, width: options.width ?? 2 },
+      { color: colours ? '#ffffff' : colour, colors: colours, width: options.width ?? this.theme.lineWidth ?? 2 },
       {
         kind: 'line',
         line,
@@ -1220,6 +1265,7 @@ export class Figure extends EventTarget {
         name: options.name,
       },
     );
+    if (options.width === undefined) this.#defaultLineWidths.add(layer);
     this.#dataOptions.set(layer, { ...options, color: colour });
     return layer;
   }
@@ -1282,7 +1328,7 @@ export class Figure extends EventTarget {
       positions[i + 1] = points[i + 1];
       positions[i + 2] = this.#flat ? 0 : points[i + 2];
     }
-    const map = resolveColormap(options.colormap),
+    const map = resolveColormap(options.colormap ?? this.theme.scalarMap),
       colours = options.color
         ? undefined
         : mapColours(values, map, rangeOption(options.range, `${what} range`) ?? extent(values));
@@ -1290,14 +1336,16 @@ export class Figure extends EventTarget {
     const { Line } = await import('@margoengine/lines');
     this.#check();
     const colour = options.color ?? toHex(map.sample(0.6)),
-      width = options.width ?? 1.5;
+      width = options.width ?? this.theme.lineWidth ?? 1.5;
     const line = lines.add(
       new Line({ mode: 'segments', positions, colors: colours, color: colours ? '#ffffff' : colour, width }),
     );
-    return this.#style(
+    const layer = this.#style(
       { color: colour, colors: colours, width },
       { kind: 'line', line, bounds: positionBounds(positions), positions, values, name: options.name },
     );
+    if (options.width === undefined) this.#defaultLineWidths.add(layer);
+    return layer;
   }
 
   /**
@@ -1403,7 +1451,7 @@ export class Figure extends EventTarget {
     this.#check();
     this.#need3d('A surface');
     this.#linear('A surface');
-    const layer = new SurfaceLayer(this.renderer, z, options);
+    const layer = new SurfaceLayer(this.renderer, z, { colormap: this.theme.scalarMap, ...options });
     this.renderer.add(layer);
     return this.#add(layer);
   }
@@ -1414,7 +1462,7 @@ export class Figure extends EventTarget {
     requireGPU(this.renderer);
     this.#need3d('A volume');
     this.#linear('A volume');
-    const layer = new VolumeLayer(this.renderer, data, options);
+    const layer = new VolumeLayer(this.renderer, data, { colormap: this.theme.scalarMap, ...options });
     this.renderer.add(layer);
     return this.#add(layer);
   }
@@ -1433,7 +1481,7 @@ export class Figure extends EventTarget {
       throw fault('state', 'Device replaced; request the isosurface again', 'sciviz');
     const layer = new IsosurfaceLayer(this.renderer, gpu, data, {
       ...options,
-      color: options.color ?? levelColour(level, options.range, options.colormap),
+      color: options.color ?? levelColour(level, options.range, options.colormap ?? this.theme.scalarMap),
     });
     this.renderer.add(layer);
     try {
@@ -1470,7 +1518,7 @@ export class Figure extends EventTarget {
     },
     what: string,
   ): { colours: Uint32Array; swatch: string } {
-    const map = resolveColormap(options.colormap),
+    const map = resolveColormap(options.colormap ?? this.theme.scalarMap),
       colours = new Uint32Array(count);
     if (values) {
       const rgb = mapColours(values, map, rangeOption(options.range, `${what} range`) ?? extent(values));
@@ -1559,7 +1607,7 @@ export class Figure extends EventTarget {
       y: [number, number] = [fy(dy[0]), fy(dy[1])];
     if (!x.every(Number.isFinite) || !y.every(Number.isFinite))
       throw rangeError('Heatmap x and y must be above 0 on a log axis', 'sciviz');
-    const rects = heatmapRects(v, nx, ny, x, y, !!resolveColormap(options.colormap).encoding),
+    const rects = heatmapRects(v, nx, ny, x, y, !!resolveColormap(options.colormap ?? this.theme.scalarMap).encoding),
       { colours, swatch } = this.#colours(v.length, v, options, 'heatmap');
     return this.#rects('heatmap', rects, Float32Array.from(v), colours, options.name, swatch);
   }
@@ -1697,7 +1745,7 @@ export class Figure extends EventTarget {
         `<rect width="${width}" height="${height}" fill="${this.theme.background}"/>`,
         `<clipPath id="sciviz-plot"><rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}"/></clipPath>`,
       ];
-    if ((this.#options.grid ?? true) && this.#axes) {
+    if ((this.#options.grid ?? true) && this.#axes && this.theme.gridStyle !== 'none') {
       const grid: string[] = [];
       for (const x of this.#axes.drawnTicks.x) {
         const [sx] = at(x, y0);
@@ -1707,7 +1755,9 @@ export class Figure extends EventTarget {
         const [, sy] = at(x0, y);
         grid.push(`M${m.left} ${sy}H${m.left + pw}`);
       }
-      out.push(`<path d="${grid.join('')}" stroke="${this.theme.grid}" stroke-width="1" fill="none"/>`);
+      out.push(
+        `<path d="${grid.join('')}" stroke="${this.theme.grid}" stroke-width="${this.theme.gridWidth ?? 1}" fill="none"/>`,
+      );
     }
     out.push('<g clip-path="url(#sciviz-plot)">');
     const layers = [...this.#layers].filter(layerVisible),
@@ -1757,8 +1807,23 @@ export class Figure extends EventTarget {
         }
       }
     out.push('</g>');
+    if (this.#axes && this.theme.tickSize) {
+      const ticks: string[] = [],
+        size = this.theme.tickSize;
+      for (const x of this.#axes.drawnTicks.x) {
+        const [sx] = at(x, y0);
+        ticks.push(`M${sx} ${m.top + ph}v${-size}`);
+      }
+      for (const y of this.#axes.drawnTicks.y) {
+        const [, sy] = at(x0, y);
+        ticks.push(`M${m.left} ${sy}h${size}`);
+      }
+      out.push(
+        `<path d="${ticks.join('')}" fill="none" stroke="${this.theme.axis}" stroke-width="${this.theme.axisWidth ?? 1.5}"/>`,
+      );
+    }
     out.push(
-      `<rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}" fill="none" stroke="${this.theme.axis}" stroke-width="1.5"/>`,
+      `<rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}" fill="none" stroke="${this.theme.axis}" stroke-width="${this.theme.axisWidth ?? 1.5}"/>`,
     );
     // The window's data range, for tools that read the file.
     out.push(`<desc>x ${x0} to ${x1}, y ${y0} to ${y1}</desc>`);

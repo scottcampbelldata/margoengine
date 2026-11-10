@@ -880,6 +880,17 @@ interface Theme {
     readonly axis: string;
     readonly grid: string;
     readonly text: string;
+    readonly fontFamily?: string;
+    readonly fontSize?: number;
+    readonly titleSize?: number;
+    readonly lineWidth?: number;
+    readonly axisWidth?: number;
+    readonly gridWidth?: number;
+    readonly gridStyle?: 'solid' | 'none';
+    readonly tickCount?: number;
+    readonly tickSize?: number;
+    readonly palette?: readonly string[];
+    readonly scalarMap?: import('./colormaps.js').ColormapName;
 }
 
 interface Ticks {

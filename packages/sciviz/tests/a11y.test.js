@@ -223,6 +223,9 @@ test('keyboard movement, full table paging, live descriptions, weak discovery an
       ],
     });
     await a.refresh();
+    assert.equal(a.element.style.margin, '0px');
+    assert.equal(a.element.style.padding, '0px');
+    assert.equal(a.element.style.background, 'transparent');
     assert.equal(figureForCanvas(f.canvas), f.fig);
     assert.equal(f.engine.pace(0), false);
     assert.match(a.element.textContent, /5 series records/);
@@ -326,17 +329,25 @@ test('disposal aborts an unresolved application adapter without waiting for it',
   }
 });
 
-
 test('an external cancellation retains its exact reason while removing owned controls', async () => {
   const f = domFixture();
   try {
-    const c = new AbortController(), reason = { cancelled: 'external' };
+    const c = new AbortController(),
+      reason = { cancelled: 'external' };
     let started;
-    const ready = new Promise(r => started = r);
-    const a = attachAccessibility(f.fig, {signal: c.signal, series: () => { started(); return new Promise(() => {}); }});
+    const ready = new Promise((r) => (started = r));
+    const a = attachAccessibility(f.fig, {
+      signal: c.signal,
+      series: () => {
+        started();
+        return new Promise(() => {});
+      },
+    });
     await ready;
     c.abort(reason);
-    await assert.rejects(a.ready, e => e === reason);
+    await assert.rejects(a.ready, (e) => e === reason);
     assert.equal(a.element.isConnected, false);
-  } finally { f.restore(); }
+  } finally {
+    f.restore();
+  }
 });

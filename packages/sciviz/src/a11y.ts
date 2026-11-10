@@ -414,7 +414,7 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
   const root = doc.createElement('section');
   root.dataset.margoA11y = '';
   root.setAttribute('aria-label', options.title ?? 'Figure data access');
-  root.style.cssText = `position:absolute;top:${canvas.offsetTop + 8}px;left:${canvas.offsetLeft + 8}px;width:min(360px,calc(100% - 16px));font:14px/1.5 system-ui;color:#111111;z-index:40;pointer-events:none`;
+  root.style.cssText = `margin:0;padding:0;border:0;background:transparent;box-sizing:border-box;position:absolute;top:${canvas.offsetTop + 8}px;left:${canvas.offsetLeft + 8}px;width:min(360px,calc(100% - 16px));font:14px/1.5 system-ui;color:#111111;z-index:40;pointer-events:none`;
   const panel = doc.createElement('details'),
     launcher = doc.createElement('summary');
   launcher.textContent = 'Explore data';
@@ -746,7 +746,7 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
     if (active && !contrastApplied) originalTheme = { ...figure.theme };
     if (active || contrastApplied) {
       contrastApplied = active;
-      applyTheme(active ? HIGH_CONTRAST_THEME : originalTheme);
+      applyTheme(active ? { ...originalTheme, ...HIGH_CONTRAST_THEME } : originalTheme);
     }
   };
   useContrast();

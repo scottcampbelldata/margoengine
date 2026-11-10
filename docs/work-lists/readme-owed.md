@@ -1350,3 +1350,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 175 job 4): document /series Range/CORS/immutability, async format batches, owned TimeSeries, M4/min-max/LTTB limits, exact original selection events, progressive binding/cancellation and physical-unit FFT/STFT defaults.
 - margoengine (batch 175 job 4): document generated sciviz/series optional alias.
 - @margoengine/viz (batch 175 job 4): document generated sciviz/series optional alias.
+- @margoengine/sciviz (batch 178 job 6): themes, validated style tokens, scoped CSS refresh/disposal, author overrides, journal column/media presets and print/font limits.
+- margoengine and @margoengine/viz (batch 178 job 6): generated sciviz/themes alias.

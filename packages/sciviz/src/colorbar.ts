@@ -1,3 +1,4 @@
+import { themeFont } from './theme-style.js';
 // A colour bar: an HTML legend over the canvas's right edge (a vertical gradient of the colour map with nice-number
 // ticks and a title), so it stays crisp at any pixel ratio and needs no text rendering on the GPU.
 import { rangeError } from '../../shared/errors.js';
@@ -40,7 +41,7 @@ export class ColorBar {
     const root = document.createElement('div');
     root.setAttribute('role', 'img');
     root.setAttribute('aria-label', `Colour scale${options.label ? ` for ${options.label}` : ''} from ${lo} to ${hi}`);
-    root.style.cssText = `position: absolute; right: 16px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; font: 12px system-ui, sans-serif; color: ${theme.text}; text-shadow: 0 0 3px ${theme.background}`;
+    root.style.cssText = `position: absolute; right: 16px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; font: ${themeFont(theme)}; color: var(--margo-text, ${theme.text}); text-shadow: 0 0 3px var(--margo-background, ${theme.background})`;
     if (options.label) {
       const title = document.createElement('div');
       title.textContent = options.label;

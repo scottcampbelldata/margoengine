@@ -8293,3 +8293,5 @@ Evidence: 52 independent analytic cases, 44 native Rust tests and 236 pinned ext
 
 ## Batch 175 job 4: large time series
 Clean-room Range readers, M4/min-max/LTTB, exact original-row selection and physical-unit FFT/STFT reuse are documented with the compared papers, authors, years and format standards in docs/sciviz-series.md. No rival or companion source read. HTTP/CSV boundary tests and independent raster/analytic spectral oracles cover the implementation. GWOSC CC BY 4.0 strain and standard PyArrow writer outputs have pinned hashes under packages/sciviz/tests/fixtures/series.
+## Batch 178 job 6: scientific figure themes (2026-11-10)
+Compared Rougier/Droettboom/Bourne (2014), Brewer/Hatchard/Harrower (2003), Tol (2026), publisher final-column guidance and W3C CSS unit/cascade specifications. Full titles/authors/links and combination decisions are in [sciviz-themes.md](sciviz-themes.md#clean-room-basis). The theme-only controller cache and consumer-section CSS regressions follow the same CSS ownership contract. No companion or rival source read.

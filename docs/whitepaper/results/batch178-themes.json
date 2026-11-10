@@ -1,0 +1,372 @@
+{
+  "job": "batch178-job6",
+  "sizes": {
+    "index": {
+      "before": 61327,
+      "after": 62735
+    },
+    "themes": {
+      "before": 0,
+      "after": 19428
+    },
+    "format": {
+      "before": 7598,
+      "after": 7838
+    },
+    "a11y": {
+      "before": 6233,
+      "after": 6260
+    },
+    "spec": {
+      "before": 27443,
+      "after": 27463
+    }
+  },
+  "coreStage": {
+    "before": 24209,
+    "after": 24209
+  },
+  "vizKit": {
+    "previousRecorded": 256216,
+    "measured": 264653
+  },
+  "nativeCompat": [
+    {
+      "backend": "webgpu",
+      "ticks2": 6,
+      "ticks3": 12,
+      "png": [
+        336,
+        113
+      ],
+      "pdfWidth": 252.2834646,
+      "newPalette": 3,
+      "chartFont": 11,
+      "sourceMaps": [
+        "cividis",
+        "cividis",
+        "phase"
+      ],
+      "ligo": {
+        "pdfBytes": 30241,
+        "pngBytes": 87651
+      }
+    },
+    {
+      "backend": "webgl2",
+      "ticks2": 6,
+      "ticks3": 12,
+      "png": [
+        336,
+        113
+      ],
+      "pdfWidth": 252.2834646,
+      "newPalette": 3,
+      "chartFont": 11,
+      "sourceMaps": [
+        "cividis",
+        "cividis",
+        "phase"
+      ],
+      "ligo": {
+        "pdfBytes": 30241,
+        "pngBytes": 87644
+      }
+    }
+  ],
+  "unitTests": "5 themes tests and 8 accessibility regressions pass. Initial dependent closure: 943 passed; the two generated-file/size-record failures were corrected and rerun in the 24-test final export/unit closure.",
+  "notes": [
+    "Explicit author encodings and widths remain; palette/scalar defaults apply at mark creation.",
+    "No timing claim or benchmark. Fonts are caller-supplied in PDF; printer/profile proofing is required.",
+    "The controller cache includes theme state. CSS-sized native ticks also refresh on stopped-loop explicit renders.",
+    "Font-only modules do not import scalar-map validation, avoiding a dependency cycle that retained colour-map data in the format entry."
+  ],
+  "limits": "See docs/sciviz-themes.md; no universal CMYK, physical-monitor calibration or publisher-submission-compliance claim.",
+  "lighthouse": {
+    "version": "13.6.0",
+    "browser": "Edg/157.0.4341.42",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "method": "Loaded-page accessibility snapshots after complete accessible data readiness; no audits disabled",
+    "reports": [
+      {
+        "page": "sciviz-a11y.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-aggregate.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-amr.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-annotate.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-astronomy.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-atmosphere.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-calc.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-chart-polish.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-chart-polish.html?theme=print",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-chart-polish.html?theme=print-mono",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-charts-extra.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-cinematic.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-clip.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-cloud.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-colors.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-contour.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-contour2d.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-curvilinear.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-datasets.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-derive.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-engineering.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-export-vector.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-formats.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-geo-lod.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-geo-time.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-geo-vector.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-glyph.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-head.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-labels.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-lic.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-moving-flow.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-parcoords.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-pick-gpu.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-pipeline.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-pointcloud.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-points.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-probe.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-publication.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-publication.html?theme=print",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-query.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-share.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-stars.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-stats.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-stream.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-surface.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-tetvolume.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-tlc.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-transfer.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-tubes.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-views.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-volume-quality.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-volume.html",
+        "score": 1,
+        "failures": []
+      },
+      {
+        "page": "sciviz-wind.html",
+        "score": 1,
+        "failures": []
+      }
+    ]
+  },
+  "integratedSizes": {
+    "entries": {
+      "index": 62821,
+      "themes": 19428,
+      "format": 7838,
+      "a11y": 6343,
+      "spec": 27563
+    },
+    "viz": 264713,
+    "coreStage": 24209
+  }
+}

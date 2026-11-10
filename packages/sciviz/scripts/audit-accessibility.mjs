@@ -76,7 +76,7 @@ try {
       await flow.snapshot({ name: 'Loaded ' + name });
       const result = await flow.createFlowResult(),
         lhr = result.steps[0].lhr;
-      writeFileSync(`test-results/sciviz-a11y/lighthouse/${name}.json`, JSON.stringify(lhr, null, 2));
+      writeFileSync(`test-results/sciviz-a11y/lighthouse/${name.replace(/[^a-z0-9_.-]/gi, '_')}.json`, JSON.stringify(lhr, null, 2));
       const failures = Object.values(lhr.audits)
         .filter((a) => a.score !== null && a.score < 1)
         .map((a) => ({ id: a.id, title: a.title, items: a.details?.items }));

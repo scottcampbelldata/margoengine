@@ -6,6 +6,7 @@ import type { Label, LabelRenderer } from '@margoengine/labels';
 import type { EngineKernel } from '@margoengine/core';
 import { axisScale, type Scale } from './scales.js';
 import { toScene, type Bounds } from './layer.js';
+import { tickSegment, themeFont } from './theme-style.js';
 import { AxisLayout } from './axis-layout.js';
 
 /** Colours of a figure's chrome. */
@@ -14,6 +15,17 @@ export interface Theme {
   readonly axis: string;
   readonly grid: string;
   readonly text: string;
+  /** Font family CSS list. Default system-ui, sans-serif. */ readonly fontFamily?: string;
+  /** Tick/legend text in CSS pixels. Default 12. */ readonly fontSize?: number;
+  /** Axis title text in CSS pixels. Default 13 in 3D and 12 in 2D. */ readonly titleSize?: number;
+  /** Data line width in CSS pixels. Default 2 (field segments 1.5). */ readonly lineWidth?: number;
+  /** Frame/tick stroke in CSS pixels. Default 1.5. */ readonly axisWidth?: number;
+  /** Grid stroke in CSS pixels. Default 1. */ readonly gridWidth?: number;
+  /** Default solid; none hides the grid. */ readonly gridStyle?: 'solid' | 'none';
+  /** Approximate major tick count, default 5. Explicit AxesOptions.ticks wins. */ readonly tickCount?: number;
+  /** Tick mark length in CSS pixels, default 0. */ readonly tickSize?: number;
+  /** Categorical defaults for newly created uniform-colour marks. Explicit colours win. */ readonly palette?: readonly string[];
+  /** Default scalar map for newly created native layers. Explicit maps win. */ readonly scalarMap?: import('./colormaps.js').ColormapName;
 }
 
 /** The built-in themes. */
@@ -42,6 +54,8 @@ export class Axes {
   /** @internal The tick values last drawn on x and y, for export. */
   drawnTicks: { x: readonly number[]; y: readonly number[] } = { x: [], y: [] };
   #disposed = false;
+  #offTicks: (() => void) | undefined;
+  #updateTicks: (() => void) | undefined;
 
   /** @internal Current data-coordinate frame/grid lines for optional publication exporters. */
   publicationLines(): readonly Line[] {
@@ -75,10 +89,13 @@ export class Axes {
     await this.#loading;
     if (this.#disposed || !this.#lines || !this.#labels) return;
     const { Line } = await import('@margoengine/lines');
+    this.#offTicks?.();
+    this.#offTicks = undefined;
+    this.#updateTicks = undefined;
     for (const line of this.#drawn.splice(0)) this.#lines.remove(line);
     for (const label of this.#texts.splice(0)) label.remove();
     const [x0, x1, y0, y1, z0, z1] = bounds,
-      count = this.options.ticks ?? 5,
+      count = this.options.ticks ?? this.theme.tickCount ?? 5,
       // Ticks are chosen in data units and placed at their plot coordinates.
       at = (axis: number, lo: number, hi: number) => {
         const s = scales[axis],
@@ -109,12 +126,12 @@ export class Axes {
       [x0, y1, z0, x0, y1, z1],
       [x1, y1, z0, x1, y1, z1],
     ].flat();
-    this.#drawn.push(
-      this.#lines.add(
-        new Line({ mode: 'segments', positions: box, color: this.theme.axis, width: 1.5, matrix: model }),
-      ),
-    );
-    if (this.options.grid ?? true) {
+    const marks: { origin: [number, number, number]; axis: number }[] = [];
+    for (const x of tx.values) marks.push({ origin: [x, y0, z0], axis: 2 });
+    for (const y of ty.values) marks.push({ origin: [x0, y, z0], axis: 2 });
+    for (const z of tz.values) marks.push({ origin: [x0, y0, z], axis: 0 });
+    this.#drawn.push(this.#lines.add(this.#frameLine(Line, box, model, marks)));
+    if ((this.options.grid ?? true) && this.theme.gridStyle !== 'none') {
       const grid: number[] = [];
       // Floor (z = z0), back wall (y = y1) and left wall (x = x0).
       for (const x of tx.values) grid.push(x, y0, z0, x, y1, z0, x, y1, z0, x, y1, z1);
@@ -123,7 +140,13 @@ export class Axes {
       if (grid.length)
         this.#drawn.push(
           this.#lines.add(
-            new Line({ mode: 'segments', positions: grid, color: this.theme.grid, width: 1, matrix: model }),
+            new Line({
+              mode: 'segments',
+              positions: grid,
+              color: this.theme.grid,
+              width: this.theme.gridWidth ?? 1,
+              matrix: model,
+            }),
           ),
         );
     }
@@ -132,7 +155,7 @@ export class Axes {
       element.textContent = content;
       element.dataset.axis = axis;
       element.dataset.axisTitle = String(strong);
-      element.style.cssText = `font: ${strong ? '600 13px' : '12px'} system-ui, sans-serif; color: ${this.theme.text}; white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 0 3px ${this.theme.background}`;
+      element.style.cssText = `font: ${themeFont(this.theme, strong)}; color: var(--margo-text, ${this.theme.text}); white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 0 3px var(--margo-background, ${this.theme.background})`;
       this.#texts.push(this.#labels!.add(element, { position: toScene(model, ...data) }));
     };
     tx.values.forEach((v, k) => text(tx.labels[k], 'x', [v, y0, z0]));
@@ -147,7 +170,7 @@ export class Axes {
   #span(content: string, css = ''): HTMLSpanElement {
     const element = document.createElement('span');
     element.textContent = content;
-    element.style.cssText = `font: 12px system-ui, sans-serif; color: ${this.theme.text}; white-space: nowrap; font-variant-numeric: tabular-nums; ${css}`;
+    element.style.cssText = `font: ${themeFont(this.theme)}; color: var(--margo-text, ${this.theme.text}); white-space: nowrap; font-variant-numeric: tabular-nums; ${css}`;
     return element;
   }
 
@@ -163,22 +186,27 @@ export class Axes {
     const [x0, x1, y0, y1] = bounds,
       z = -1;
     const frame = [x0, y0, z, x1, y0, z, x1, y0, z, x1, y1, z, x1, y1, z, x0, y1, z, x0, y1, z, x0, y0, z];
-    if (this.options.grid ?? true) {
+    const marks: { origin: [number, number, number]; axis: number }[] = [];
+    for (const x of tx.values) marks.push({ origin: [x, y0, z], axis: 1 });
+    for (const y of ty.values) marks.push({ origin: [x0, y, z], axis: 0 });
+    if ((this.options.grid ?? true) && this.theme.gridStyle !== 'none') {
       const grid: number[] = [];
       for (const x of tx.values) grid.push(x, y0, z, x, y1, z);
       for (const y of ty.values) grid.push(x0, y, z, x1, y, z);
       if (grid.length)
         this.#drawn.push(
           this.#lines!.add(
-            new Line({ mode: 'segments', positions: grid, color: this.theme.grid, width: 1, matrix: model }),
+            new Line({
+              mode: 'segments',
+              positions: grid,
+              color: this.theme.grid,
+              width: this.theme.gridWidth ?? 1,
+              matrix: model,
+            }),
           ),
         );
     }
-    this.#drawn.push(
-      this.#lines!.add(
-        new Line({ mode: 'segments', positions: frame, color: this.theme.axis, width: 1.5, matrix: model }),
-      ),
-    );
+    this.#drawn.push(this.#lines!.add(this.#frameLine(Line, frame, model, marks)));
     const place = (element: HTMLElement, x: number, y: number, anchor: readonly [number, number]) =>
       this.#texts.push(
         this.#labels!.add(element, { position: toScene(model, x, y, 0), anchor, frustumCulling: false }),
@@ -186,15 +214,63 @@ export class Axes {
     tx.values.forEach((v, k) => place(this.#span(tx.labels[k], 'padding-top: 6px'), v, y0, [0.5, 0]));
     ty.values.forEach((v, k) => place(this.#span(ty.labels[k], 'padding-right: 8px'), x0, v, [1, 0.5]));
     const titles = this.options.titles ?? {};
-    place(this.#span(titles.x ?? 'x', 'font-weight: 600; padding-top: 24px'), (x0 + x1) / 2, y0, [0.5, 0]);
+    place(
+      this.#span(
+        titles.x ?? 'x',
+        `font-weight: 600; font-size: ${this.theme.titleSize ?? this.theme.fontSize ?? 12}px; padding-top: 24px`,
+      ),
+      (x0 + x1) / 2,
+      y0,
+      [0.5, 0],
+    );
     const yTitle = this.#span('', 'padding-right: 44px; display: inline-block');
     yTitle.append(
       this.#span(
         titles.y ?? 'y',
-        'font-weight: 600; display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg)',
+        `font-weight: 600; font-size: ${this.theme.titleSize ?? this.theme.fontSize ?? 12}px; display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg)`,
       ),
     );
     place(yTitle, x0, (y0 + y1) / 2, [1, 0.5]);
+  }
+
+  #frameLine(
+    Line: typeof import('@margoengine/lines').Line,
+    base: number[],
+    model: Float32Array,
+    marks: readonly { origin: readonly [number, number, number]; axis: number }[],
+  ): Line {
+    const line = new Line({
+      mode: 'segments',
+      positions: base,
+      color: this.theme.axis,
+      width: this.theme.axisWidth ?? 1.5,
+      matrix: model,
+    });
+    const size = this.theme.tickSize ?? 0;
+    if (size) {
+      let signature = '';
+      const update = () => {
+        const canvas = this.engine.canvas,
+          width = canvas.clientWidth || canvas.width,
+          height = canvas.clientHeight || canvas.height;
+        this.engine.camera.update(width / height, true);
+        const next = width + ',' + height + ',' + Array.from(this.engine.camera.matrix).join(',');
+        if (next === signature) return;
+        signature = next;
+        const points = [...base];
+        for (const m of marks) points.push(...tickSegment(this.engine, model, m.origin, m.axis, size));
+        line.setPositions(points);
+      };
+      this.#updateTicks = update;
+      update();
+      this.#offTicks = this.engine.onFrame(update);
+    }
+    return line;
+  }
+
+  /** @internal Explicit renders also update CSS-sized ticks while the animation loop is stopped. */
+  refreshTicks(): void {
+    this.#updateTicks?.();
   }
 
   /** @internal The tick label and title elements, for export. */
@@ -205,6 +281,9 @@ export class Axes {
   /** Removes the lines, the labels and both plugins. */
   dispose(): void {
     this.#disposed = true;
+    this.#offTicks?.();
+    this.#offTicks = undefined;
+    this.#updateTicks = undefined;
     for (const label of this.#texts.splice(0)) label.remove();
     const engine = this.engine as unknown as { removePlugin(name: string): void };
     for (const line of this.#drawn.splice(0)) this.#lines?.remove(line);

@@ -3691,6 +3691,14 @@
       "types": "./dist/sciviz/projections.d.ts",
       "import": "./dist/sciviz/projections.js"
     },
+    "./sciviz/series": {
+      "types": "./dist/sciviz/series.d.ts",
+      "import": "./dist/sciviz/series.js"
+    },
+    "./sciviz/themes": {
+      "types": "./dist/sciviz/themes.d.ts",
+      "import": "./dist/sciviz/themes.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -5238,10 +5246,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./sciviz/series": {
-      "types": "./dist/sciviz/series.d.ts",
-      "import": "./dist/sciviz/series.js"
     }
   },
   "dependencies": {
