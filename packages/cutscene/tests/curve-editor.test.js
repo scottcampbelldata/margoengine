@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CurveModel } from '../dist/curve-editor.js';
-import { TimelineModel } from '../dist/editor.js';
+import { JSDOM } from 'jsdom';
+import { CurveEditor, CurveModel } from '../dist/curve-editor.js';
+import { TimelineEditor, TimelineModel } from '../dist/editor.js';
 const scene = () => ({
   format: 'margo-cutscene',
   version: 1,
@@ -86,4 +87,39 @@ test('graph channels include scalar camera and vector properties without easing 
     curve = new CurveModel(timeline);
   assert.equal(curve.channels.length, 7);
   assert.ok(curve.channels.every((c) => c.field !== 'ease' && c.field !== 'time'));
+});
+
+test('graph reconciles channels after undo, redo and removal of the selected track', (t) => {
+  const dom = new JSDOM('<!doctype html><body></body>');
+  for (const name of ['window', 'document', 'AbortController']) {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, name);
+    Object.defineProperty(globalThis, name, { configurable: true, writable: true, value: dom.window[name] });
+    t.after(() => (previous ? Object.defineProperty(globalThis, name, previous) : delete globalThis[name]));
+  }
+  const editor = new TimelineEditor({ ...scene(), tracks: [] }, { parent: document.body });
+  const opacity = scene().tracks[0];
+  editor.model.addTrack(opacity);
+  const graph = new CurveEditor(editor);
+  t.after(() => {
+    graph.dispose();
+    editor.dispose();
+    dom.window.close();
+  });
+  assert.equal(graph.channel?.track, 'opacity', 'new numeric channels become selectable');
+  assert.equal(graph.element.querySelectorAll('[data-kind="key"]').length, 3);
+  assert.doesNotThrow(() => editor.model.undo());
+  assert.equal(graph.channel, undefined);
+  assert.equal(graph.element.querySelector('select').selectedIndex, -1);
+  assert.equal(graph.element.querySelectorAll('[data-kind="key"]').length, 0);
+  assert.doesNotThrow(() => editor.model.redo());
+  assert.equal(graph.channel?.track, 'opacity');
+  editor.model.addTrack(scene().tracks[1]);
+  graph.channel = { track: 'move', field: 'position', component: 1 };
+  assert.doesNotThrow(() => editor.model.undo());
+  assert.equal(graph.channel?.track, 'opacity', 'removed selection falls back to a remaining channel');
+  assert.equal(graph.element.querySelector('select').selectedIndex, 0);
+  graph.fit();
+  assert.ok(
+    [...graph.element.querySelectorAll('circle')].every((circle) => Number.isFinite(Number(circle.getAttribute('cy')))),
+  );
 });

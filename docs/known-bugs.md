@@ -1,6 +1,5 @@
 # Known bugs and unverified features
 
-Review 3 (8ee384c7e): cutscene/curve-editor.ts draw() retains a removed current channel across model changes. Repro: create an empty TimelineEditor, model.addTrack() a numeric property track, attach CurveEditor, then model.undo(); the document has zero tracks but undo throws 'Curve track must have keys'. Cause: draw rebuilds the channel list without reconciling current before calling points(current). Confirmed in JSDOM; regression should cover undo/redo of channel creation and switching to an existing channel. Review continues in private/handoffs/codex-review-3-handoff.md.
 
 Review 3 (f6246e14f): materials/transmission-layers.ts dispose() calls engine.removePlugin(name) without its owning scene. Repro: attach a TransmissionLayers to engine.createScene('other'), return to the default scene and call effect.dispose(); engine.sceneOf(effect) still equals the other scene and its plugin/pass registration remains. Cause: removePlugin defaults to the active scene. Confirmed with a real Engine/TransformStore and the recording GPU; follow-up regression should assert the secondary scene releases the plugin and passes. Review continues in private/handoffs/codex-review-3-handoff.md.
 

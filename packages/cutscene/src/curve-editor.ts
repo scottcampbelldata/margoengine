@@ -188,6 +188,7 @@ export class CurveEditor {
   }
   /** Frames the current key values with a 20 percent margin. */
   fit(): void {
+    this.reconcileChannels();
     const values = this.current ? this.model.points(this.current).map((p) => p.value) : [0];
     this.low = Math.min(...values);
     this.high = Math.max(...values);
@@ -218,8 +219,26 @@ export class CurveEditor {
     this.svg.append(node);
     return node;
   }
-  private draw(): void {
+  private reconcileChannels(): CurveChannel[] {
     const channels = this.model.channels;
+    this.current =
+      channels.find(
+        (c) =>
+          c.track === this.current?.track && c.field === this.current.field && c.component === this.current.component,
+      ) ?? channels[0];
+    return channels;
+  }
+  private draw(): void {
+    const previous = this.current;
+    const channels = this.reconcileChannels();
+    if (
+      previous?.track !== this.current?.track ||
+      previous?.field !== this.current?.field ||
+      previous?.component !== this.current?.component
+    ) {
+      this.fit();
+      return;
+    }
     this.select.replaceChildren(
       ...channels.map((c) => {
         const o = document.createElement('option');

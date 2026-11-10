@@ -5922,3 +5922,6 @@ Batch 183 landing fix: automatic shadow cascade distance also covers static non-
 Review 4 clustered binding reservation (2026-11-10): cube-cookie storage uses binding 152 and stochastic shadows use uniform binding 151 within the lighting group. They can be enabled together; existing cookie, shadow-sample and GPU storage limits are unchanged.
 
 Review 4 LTC size evidence (current-main parent, 2026-11-10): clustered/area 10545 to 10901 B min+gzip, ceiling 10652 to 11229 B; shapes 11898 to 12242 B and area-shapes 12817 to 13166 B stay within their existing ceilings. The owned angle evaluator closes the existing horizon-cancellation failure. Splitting it introduces shader loading/composition contracts while every relevant fragment still needs the same math. Core plus stage stays 24209 B. Parent comparison used the same modern build, core declarations and bare-import size method in a worktree-local output directory; no speed benchmark.
+
+
+Review 3 C1: CurveEditor reconciles selected numeric channels against the current timeline document before graph evaluation. Removing the selected channel falls back to the first remaining channel and refits its values; an empty document clears selection and redo restores an available channel. JSDOM regression covers the real editor and shared undo history. No public API change.

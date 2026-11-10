@@ -1082,3 +1082,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/shadows (batch 183 job 1): document automatic cascade distance for static PBR meshes and conservative bounds fallback for deformation, custom shading, displacement and instances.
 - @margoengine/clustered (review 4): cover cube cookies combined with stochastic shadows and their shared lighting-group ownership; README examples deferred.
 - @margoengine/clustered (review 4 LTC blocker): explain the owned edge-angle accuracy path and its unchanged shaped-light validation bounds during the README phase.
+
+
+- @margoengine/cutscene (review 3 C1): document graph channel reconciliation on undo/redo and fallback after track removal.
