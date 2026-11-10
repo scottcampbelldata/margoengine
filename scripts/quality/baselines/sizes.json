@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12241387,
+  "total": 12243318,
   "history": [
     {
       "date": "2026-10-24",
@@ -5540,6 +5540,12 @@
       "commit": "batch-256",
       "reason": "New optional netcode/migrate: 8351 B gzip, previously absent. Complete checkpoint validation, replication, handoff and recovery stay together; a split exposes protocol internals and duplicates lifecycle wiring. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-253",
+      "reason": "New optional @margoengine/input/xr: absent to 1675 B gzip, ceiling 1931 B. Cohesive device/action lifecycle stays together; splitting would add coordination without saving consumer bytes. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6586,6 +6592,7 @@
     "@margoengine/input/vector": 4551,
     "@margoengine/inspector/tweak": 4276,
     "@margoengine/navmesh/obstacles": 1814,
-    "@margoengine/netcode/migrate": 8607
+    "@margoengine/netcode/migrate": 8607,
+    "@margoengine/input/xr": 1931
   }
 }

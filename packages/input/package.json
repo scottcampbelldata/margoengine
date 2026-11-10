@@ -49,6 +49,10 @@
     "./vector": {
       "types": "./dist/vector.d.ts",
       "import": "./dist/vector.js"
+    },
+    "./xr": {
+      "types": "./dist/xr.d.ts",
+      "import": "./dist/xr.js"
     }
   },
   "files": [

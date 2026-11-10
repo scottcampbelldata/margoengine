@@ -1382,6 +1382,10 @@
       "types": "./dist/input/vector.d.ts",
       "import": "./dist/input/vector.js"
     },
+    "./input/xr": {
+      "types": "./dist/input/xr.d.ts",
+      "import": "./dist/input/xr.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"
