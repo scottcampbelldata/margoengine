@@ -1257,3 +1257,16 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 180 job 3): document geo-time tracks/keyframes, units, trails/fadeSteps, Timeline, SGP4/TLE/OMM/TEME and satelliteTrack, WMTS time source/raster selection, cache limits, cancellation and retained restore. Build phase: examples owed.
 - @margoengine/sciviz (batch 174 job 5): document annotate records and physical linear units, editable pointer/keyboard handles, ROI membership, first classified voxel/grid cell picking, PNG/SVG publication and native spec annotations restoration, AbortSignal/disposal and classification limits.
 - margoengine (batch 174 job 5): document generated sciviz/annotate optional alias.
+
+
+
+
+- @margoengine/game: standalone install, root and member subpaths, model-loading entry, optional peers, and adding a package at the shared release version.
+
+- @margoengine/web: standalone install, root and member subpaths, model-loading entry, optional peers, and adding a package at the shared release version.
+
+- @margoengine/viz: standalone install, root and member subpaths, model-loading entry, optional peers, and adding a package at the shared release version.
+
+- @margoengine/react-kit: standalone install, root and member subpaths, model-loading entry, optional peers, and adding a package at the shared release version.
+
+- margoengine: lead with core/stage alone, domain install profiles, or the full umbrella; preserve legacy kit subpaths.

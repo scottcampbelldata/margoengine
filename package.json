@@ -120,7 +120,11 @@
     "packages/weather",
     "packages/scene",
     "packages/worker",
-    "packages/biomes"
+    "packages/biomes",
+    "packages/game",
+    "packages/web",
+    "packages/viz",
+    "packages/react-kit"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

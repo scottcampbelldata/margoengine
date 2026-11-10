@@ -330,6 +330,11 @@ export function allowedBreak(breaks, entry, item) {
   );
 }
 
+/** New report packages enter watch mode only through api:update, after its breaking-change preflight. */
+export function enrollWatch(lock, names) {
+  return { ...lock, watch: [...new Set([...lock.watch, ...names.filter((name) => !lock.locked.includes(name))])].sort() };
+}
+
 /** The same decision drives check and update; update preflights every entry before writing any report. */
 export function assessChange(lock, breaks, packageName, entry, changes, update = false) {
   const locked = lock.locked.includes(packageName),

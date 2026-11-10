@@ -3,22 +3,22 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 100 published packages (98 in `packages/`
+assets the site and examples use. It covers all 104 published packages (102 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-90 of 100 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+92 of 104 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
 | `@dimforge/rapier2d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics2d, margoengine | Rapier 2D rigid-body solver; optional, the app installs and initializes it |
-| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
-| `react` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
-| `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
+| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/game, @margoengine/physics, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
+| `react` | 19.3.0 | MIT | optional peer | @margoengine/game, @margoengine/react, @margoengine/react-kit, @margoengine/ui, margoengine | React component bindings for the stage |
+| `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/react-kit, margoengine | React DOM root and portal rendering for scene and HTML components |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | margoengine | React DOM scheduling dependency |
 
 None of them has an install script (`preinstall`/`install`/`postinstall`), a deprecation notice or a source other
@@ -102,6 +102,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/exporters` | none | Basis Universal encoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | `@margoengine/fbx` | none | none | LICENSE, NOTICE |
 | `@margoengine/fsm` | none | none | LICENSE, NOTICE |
+| `@margoengine/game` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/geometry` | none | none | LICENSE, NOTICE |
 | `@margoengine/gltf` | none | none | LICENSE, NOTICE |
 | `@margoengine/gltf-pro` | none | none | LICENSE, NOTICE |
@@ -135,6 +136,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/quality` | none | none | LICENSE, NOTICE |
 | `@margoengine/ragdoll` | none | none | LICENSE, NOTICE |
 | `@margoengine/react` | react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
+| `@margoengine/react-kit` | react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/rigging` | none | none | LICENSE, NOTICE |
 | `@margoengine/road` | none | none | LICENSE, NOTICE |
 | `@margoengine/save` | none | none | LICENSE, NOTICE |
@@ -166,12 +168,14 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/vfx` | none | none | LICENSE, NOTICE |
 | `@margoengine/video` | none | none | LICENSE, NOTICE |
 | `@margoengine/viewcube` | none | none | LICENSE, NOTICE |
+| `@margoengine/viz` | none | none | LICENSE, NOTICE |
 | `@margoengine/voxel` | none | none | LICENSE, NOTICE |
 | `@margoengine/voxel-edit` | none | none | LICENSE, NOTICE |
 | `@margoengine/voxel-net` | none | none | LICENSE, NOTICE |
 | `@margoengine/voxel-pathtracer` | none | none | LICENSE, NOTICE |
 | `@margoengine/water` | none | none | LICENSE, NOTICE |
 | `@margoengine/weather` | none | none | LICENSE, NOTICE |
+| `@margoengine/web` | none | none | LICENSE, NOTICE |
 | `@margoengine/webgl2-compat` | none | none | LICENSE, NOTICE |
 | `@margoengine/wfc` | none | none | LICENSE, NOTICE |
 | `@margoengine/worker` | none | none | LICENSE, NOTICE |

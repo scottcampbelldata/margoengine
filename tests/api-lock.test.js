@@ -8,11 +8,21 @@ import {
   checkCoverage,
   classify,
   declarationHash,
+  enrollWatch,
   parseReport,
   readLock,
 } from '../scripts/api-lock.mjs';
 
 const root = resolve(import.meta.dirname, '..');
+test('api:update enrolls new packages without moving locked packages or mutating the existing lock', () => {
+  const original = { locked: ['@margoengine/core'], watch: ['@margoengine/web'], internal: ['packages/shared'], ticked: {} };
+  const next = enrollWatch(original, ['@margoengine/game', '@margoengine/core', '@margoengine/web']);
+  assert.deepEqual(next.watch, ['@margoengine/game', '@margoengine/web']);
+  assert.deepEqual(original.watch, ['@margoengine/web']);
+  assert.deepEqual(next.locked, original.locked);
+  assert.deepEqual(next.internal, original.internal);
+  assert.deepEqual(enrollWatch(next, ['@margoengine/game']), next);
+});
 const report = (body) => `## API Report File for "@margoengine/example"\n\n\`\`\`ts\n${body}\n\`\`\`\n`;
 const compare = (a, b) => classify(report(a), report(b));
 const lock = {

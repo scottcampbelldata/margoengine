@@ -51,6 +51,7 @@ export const TEST_TIMEOUT_MS = 300_000;
 export const PARALLEL = [
   ['npm run api:check'],
   ['npm run quality'],
+  ['node scripts/kit-install-check.mjs'],
   ['npm run check:parity'],
   ['npm run check:xr-runs'],
   ['npm run check:preview-contract'],

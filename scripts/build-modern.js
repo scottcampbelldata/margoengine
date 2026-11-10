@@ -11,7 +11,7 @@ import { buildInDependencyOrder, packageDependencies, packageOrder } from './pac
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
-import { importMap } from './umbrella.mjs';
+import { importMap, isInstallKit } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
 import { declarePackageCore } from './core-requirements.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
@@ -127,10 +127,11 @@ async function buildPackage(name) {
     return;
   }
   // margoengine is the one-install package: generated re-exports of every package (scripts/umbrella.mjs).
-  if (name === 'margoengine') {
+  if (name === 'margoengine' || isInstallKit(manifest.name)) {
     await tsc(name);
     // For pages without a bundler: every entry of every package on a CDN (docs/guides/imports.md).
-    await writeFile(`packages/${name}/dist/importmap.json`, `${JSON.stringify(importMap(), null, 2)}\n`);
+    if (name === 'margoengine')
+      await writeFile(`packages/${name}/dist/importmap.json`, `${JSON.stringify(importMap(), null, 2)}\n`);
     return;
   }
   if (name === 'react') {

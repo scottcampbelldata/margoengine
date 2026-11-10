@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-10",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "name": "core",
+      "packages": 1,
+      "installedBytes": 152779,
+      "packedBytes": 54848
+    },
+    {
+      "name": "stage",
+      "packages": 2,
+      "installedBytes": 273999,
+      "packedBytes": 94057
+    },
+    {
+      "name": "game",
+      "packages": 70,
+      "installedBytes": 24506552,
+      "packedBytes": 7764823
+    },
+    {
+      "name": "web",
+      "packages": 40,
+      "installedBytes": 19773382,
+      "packedBytes": 6321003
+    },
+    {
+      "name": "viz",
+      "packages": 42,
+      "installedBytes": 22561981,
+      "packedBytes": 7181870
+    },
+    {
+      "name": "react-kit",
+      "packages": 42,
+      "installedBytes": 29121993,
+      "packedBytes": 6611210
+    },
+    {
+      "name": "together",
+      "packages": 83,
+      "installedBytes": 32273316,
+      "packedBytes": 10251352
+    },
+    {
+      "name": "all",
+      "packages": 98,
+      "installedBytes": 55744429,
+      "packedBytes": 16206128
+    }
+  ]
+}

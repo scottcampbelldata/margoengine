@@ -35,7 +35,7 @@ import {
 import { createGlobalReports } from './api-report-globals.mjs';
 import { stalePackages } from './package-stamps.mjs';
 import { execFileSync } from 'node:child_process';
-import { assessChange, checkCoverage, classify, readLock } from './api-lock.mjs';
+import { assessChange, checkCoverage, classify, enrollWatch, readLock } from './api-lock.mjs';
 
 // The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
 // name (C:\Users\\..., what os.tmpdir() gives) matched no package and every cross-package import line
@@ -431,6 +431,7 @@ const summary = scopedPackage
   : surface();
 if (update) {
   mkdirSync(apiDir, { recursive: true });
+  writeIfChanged(join(apiDir, 'lock.json'), JSON.stringify(enrollWatch(lock, selectedReports.map((item) => item.pkg.name)), null, 2) + '\n');
   if (!scopedPackage)
     for (const file of readdirSync(apiDir))
       if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));

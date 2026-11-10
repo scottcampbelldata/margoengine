@@ -41,15 +41,19 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-98 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+102 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
-### Start here (3)
+### Start here (7)
 
 | Package | What it is |
 | --- | --- |
-| [`margoengine`](../packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 | [`@margoengine/stage`](../packages/stage/README.md) | The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine. |
 | [`@margoengine/core`](../packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package. |
+| [`@margoengine/game`](../packages/game/README.md) | Games: models, animation, light and shadow, sky, physics, audio, input, effects |
+| [`@margoengine/web`](../packages/web/README.md) | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
+| [`@margoengine/viz`](../packages/viz/README.md) | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
+| [`@margoengine/react-kit`](../packages/react-kit/README.md) | React and Next.js web install profile |
+| [`margoengine`](../packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 
 ### Setup and diagnostics (6)
 

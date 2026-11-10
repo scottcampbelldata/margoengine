@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { isInstallKit } from '../umbrella.mjs';
 
 export const WINDOW = 6;
 export const MIN_CHARS = 200;
@@ -145,7 +146,7 @@ export function duplicatesGate({ root, files, packages }) {
   for (const pkg of packages)
     for (const entry of pkg.entries) {
       // margoengine, the one-install package, is re-exports by design (scripts/umbrella.mjs).
-      if (!entry.src || pkg.name === 'margoengine') continue;
+      if (!entry.src || pkg.name === 'margoengine' || isInstallKit(pkg.name)) continue;
       const { program } = parseSync(entry.src, readFileSync(join(root, entry.src), 'utf8'));
       for (const node of program.body) {
         const spec = node.source?.value;

@@ -37,7 +37,7 @@ owns.
 1. `npm ci` on a clean checkout. It installs exactly `package-lock.json`, fails if the lockfile and the manifests
    disagree, and checks every tarball against its integrity hash. Never publish from a tree installed with
    `npm install`.
-2. `node scripts/set-version.mjs <x.y.z>`: all 98 packages move in lockstep (`tests/versions.test.js`).
+2. `node scripts/set-version.mjs <x.y.z>`: every package, install profile and tool moves in lockstep (`tests/versions.test.js`).
 3. `CHANGELOG.md` has a `## <x.y.z>` section (the workflow fails without one): user-facing changes, breaking changes
    with the migration, security fixes with their advisory.
 4. `npm audit --omit=dev` must report 0 vulnerabilities; any finding is fixed, or justified in the release notes with
@@ -58,9 +58,18 @@ owns.
 Run the `Publish` workflow from `main` with the version and `dry_run` checked; read the log; then run it again
 unchecked. Order inside the workflow:
 
-1. All workspace packages under `packages/` (the `@margoengine/*` packages and `margoengine`).
-2. `margo-convert` (depends on the `@margoengine` packages).
-3. `create-margo` last: its template installs the `@margoengine` packages, so they must exist first.
+1. Leaf workspace packages under `packages/`, in dependency order, including core and stage.
+2. `@margoengine/game`, `@margoengine/web`, `@margoengine/viz` and `@margoengine/react-kit`, after their members.
+3. `margoengine`, the install-everything option. The existing workspace publish command includes the four profiles;
+   do not expose create-margo until all names at the shared version are available. The registry may be temporarily
+   incomplete during publication, so the release announcement follows the last successful publish.
+4. `margo-convert` (depends on the `@margoengine` packages).
+5. `create-margo` last: its templates install the profiles, so they must exist first.
+
+Run `node scripts/kit-install-check.mjs` before a release to prove the domain dependency closures from packed
+tarballs, and its separate `scripts/kit-browser-check.mjs` under a shared GPU lock for native and compatibility
+first frames. See [kits](guides/kits.md) for names, contents and install measurements. No registry publication is
+part of these checks. README authoring remains in the owed list until the README phase.
 
 Afterwards: `npm create margo@latest my-app` in a clean directory, `npx margo-convert --help`, check the provenance
 badge on npmjs.com, tag the commit `v<x.y.z>`, and refresh the catalog and site (`npm run build:site`).

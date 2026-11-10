@@ -32,7 +32,7 @@ const siteExamples = {
 };
 // Package layers: the catalog and the sizes page list packages in this order.
 const layers = {
-  'Start here': ['margoengine', 'stage', 'core'],
+  'Start here': ['stage', 'core', 'game', 'web', 'viz', 'react-kit', 'margoengine'],
   'Setup and diagnostics': ['math', 'quality', 'webgl2-compat', 'worker', 'stats', 'inspector'],
   'Loading and formats': [
     'gltf',

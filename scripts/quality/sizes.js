@@ -11,6 +11,7 @@ import { parseSync } from 'rolldown/utils';
 import { LAZY_SPLITS, lazyFileDrift, unmeasuredLazyFiles } from '../lazy-files.js';
 import { bundleBytes, bundleSplit } from '../measure-size.js';
 import { slash } from './packages.js';
+import { isInstallKit } from '../umbrella.mjs';
 
 /** Budget headroom: 3% or 256 bytes, whichever is larger. */
 export const headroom = (bytes) => bytes + Math.max(256, Math.ceil(bytes * 0.03));
@@ -119,7 +120,7 @@ export async function sizesGate({ root, packages }) {
   };
   const leaks = {};
   // margoengine's kits re-export other packages by design; tests/umbrella.test.js shows an unused name costs nothing.
-  for (const pkg of packages.filter((p) => p.name !== 'margoengine'))
+  for (const pkg of packages.filter((p) => p.name !== 'margoengine' && !isInstallKit(p.name)))
     for (const entry of pkg.entries) {
       const heavy = [...reachOf(entry.specifier)].filter(
         (t) => !FOUNDATION.has(t) && bySpecifier.get(t) && !t.startsWith(pkg.name + '/') && t !== pkg.name,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15223013,
+  "total": 15225905,
   "history": [
     {
       "date": "2026-10-24",
@@ -7868,6 +7868,12 @@
       "date": "2026-11-10",
       "commit": "batch-174-job5",
       "reason": "Annotations entry absent to 7424 B gzip. Physical widgets, exact first-hit DDA, grid picking and one export/state lifecycle stay together; splitting duplicates projection and lifecycle. Owning sciviz figure fits descending source bounds. [{\"id\":\"@margoengine/sciviz/annotate\",\"prior\":0,\"now\":7424,\"ceiling\":7680}]"
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "2ed6fd460",
+      "reason": "batch120-new-optional-install-profile-roots-zero-to-game740-web321-viz578-react229-bytes-forwarding-only",
+      "grew": 4
     }
   ],
   "items": {
@@ -9282,6 +9288,10 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/sciviz/geo-time": 41056,
-    "@margoengine/sciviz/annotate": 7680
+    "@margoengine/sciviz/annotate": 7680,
+    "@margoengine/game": 996,
+    "@margoengine/web": 577,
+    "@margoengine/viz": 834,
+    "@margoengine/react-kit": 485
   }
 }

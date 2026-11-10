@@ -1,0 +1,3408 @@
+{
+  "name": "@margoengine/game",
+  "version": "1.0.0",
+  "description": "Games: models, animation, light and shadow, sky, physics, audio, input, effects",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/game"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "NOTICE"
+  ],
+  "scripts": {
+    "test": "node --test --test-timeout=120000 tests/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./animation": {
+      "types": "./dist/animation.d.ts",
+      "import": "./dist/animation.js"
+    },
+    "./animation/vat": {
+      "types": "./dist/animation/vat.d.ts",
+      "import": "./dist/animation/vat.js"
+    },
+    "./animation/sampling": {
+      "types": "./dist/animation/sampling.d.ts",
+      "import": "./dist/animation/sampling.js"
+    },
+    "./animation/pointer": {
+      "types": "./dist/animation/pointer.d.ts",
+      "import": "./dist/animation/pointer.js"
+    },
+    "./animation/interactivity": {
+      "types": "./dist/animation/interactivity.d.ts",
+      "import": "./dist/animation/interactivity.js"
+    },
+    "./animation/skeleton-utils": {
+      "types": "./dist/animation/skeleton-utils.d.ts",
+      "import": "./dist/animation/skeleton-utils.js"
+    },
+    "./animation/morph-gpu": {
+      "types": "./dist/animation/morph-gpu.d.ts",
+      "import": "./dist/animation/morph-gpu.js"
+    },
+    "./animation/lod": {
+      "types": "./dist/animation/lod.d.ts",
+      "import": "./dist/animation/lod.js"
+    },
+    "./animation/clip-utils": {
+      "types": "./dist/animation/clip-utils.d.ts",
+      "import": "./dist/animation/clip-utils.js"
+    },
+    "./animation/dqs": {
+      "types": "./dist/animation/dqs.d.ts",
+      "import": "./dist/animation/dqs.js"
+    },
+    "./animation/instanced-skin": {
+      "types": "./dist/animation/instanced-skin.d.ts",
+      "import": "./dist/animation/instanced-skin.js"
+    },
+    "./animation/geometry-cache": {
+      "types": "./dist/animation/geometry-cache.d.ts",
+      "import": "./dist/animation/geometry-cache.js"
+    },
+    "./animation/point-cache": {
+      "types": "./dist/animation/point-cache.d.ts",
+      "import": "./dist/animation/point-cache.js"
+    },
+    "./animation/mixer": {
+      "types": "./dist/animation/mixer.d.ts",
+      "import": "./dist/animation/mixer.js"
+    },
+    "./animation/playback": {
+      "types": "./dist/animation/playback.d.ts",
+      "import": "./dist/animation/playback.js"
+    },
+    "./animation/discrete-tracks": {
+      "types": "./dist/animation/discrete-tracks.d.ts",
+      "import": "./dist/animation/discrete-tracks.js"
+    },
+    "./animator": {
+      "types": "./dist/animator.d.ts",
+      "import": "./dist/animator.js"
+    },
+    "./animator/graph": {
+      "types": "./dist/animator/graph.d.ts",
+      "import": "./dist/animator/graph.js"
+    },
+    "./animator/inertialize": {
+      "types": "./dist/animator/inertialize.d.ts",
+      "import": "./dist/animator/inertialize.js"
+    },
+    "./animator/sync": {
+      "types": "./dist/animator/sync.d.ts",
+      "import": "./dist/animator/sync.js"
+    },
+    "./animator/warping": {
+      "types": "./dist/animator/warping.d.ts",
+      "import": "./dist/animator/warping.js"
+    },
+    "./animator/fbik": {
+      "types": "./dist/animator/fbik.d.ts",
+      "import": "./dist/animator/fbik.js"
+    },
+    "./animator/motion-matching": {
+      "types": "./dist/animator/motion-matching.d.ts",
+      "import": "./dist/animator/motion-matching.js"
+    },
+    "./animator/mirror": {
+      "types": "./dist/animator/mirror.d.ts",
+      "import": "./dist/animator/mirror.js"
+    },
+    "./animator/spline-ik": {
+      "types": "./dist/animator/spline-ik.d.ts",
+      "import": "./dist/animator/spline-ik.js"
+    },
+    "./animator/layers": {
+      "types": "./dist/animator/layers.d.ts",
+      "import": "./dist/animator/layers.js"
+    },
+    "./animator/blend-trees": {
+      "types": "./dist/animator/blend-trees.d.ts",
+      "import": "./dist/animator/blend-trees.js"
+    },
+    "./animator/masks": {
+      "types": "./dist/animator/masks.d.ts",
+      "import": "./dist/animator/masks.js"
+    },
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "import": "./dist/audio.js"
+    },
+    "./audio/occlusion": {
+      "types": "./dist/audio/occlusion.d.ts",
+      "import": "./dist/audio/occlusion.js"
+    },
+    "./audio/doppler": {
+      "types": "./dist/audio/doppler.d.ts",
+      "import": "./dist/audio/doppler.js"
+    },
+    "./audio/events": {
+      "types": "./dist/audio/events.d.ts",
+      "import": "./dist/audio/events.js"
+    },
+    "./audio/music": {
+      "types": "./dist/audio/music.d.ts",
+      "import": "./dist/audio/music.js"
+    },
+    "./audio/zones": {
+      "types": "./dist/audio/zones.d.ts",
+      "import": "./dist/audio/zones.js"
+    },
+    "./audio/ambisonics": {
+      "types": "./dist/audio/ambisonics.d.ts",
+      "import": "./dist/audio/ambisonics.js"
+    },
+    "./audio/pan": {
+      "types": "./dist/audio/pan.d.ts",
+      "import": "./dist/audio/pan.js"
+    },
+    "./audio/binaural": {
+      "types": "./dist/audio/binaural.d.ts",
+      "import": "./dist/audio/binaural.js"
+    },
+    "./audio/voices": {
+      "types": "./dist/audio/voices.d.ts",
+      "import": "./dist/audio/voices.js"
+    },
+    "./audio/sprites": {
+      "types": "./dist/audio/sprites.d.ts",
+      "import": "./dist/audio/sprites.js"
+    },
+    "./behavior": {
+      "types": "./dist/behavior.d.ts",
+      "import": "./dist/behavior.js"
+    },
+    "./behavior/steering": {
+      "types": "./dist/behavior/steering.d.ts",
+      "import": "./dist/behavior/steering.js"
+    },
+    "./behavior/perception": {
+      "types": "./dist/behavior/perception.d.ts",
+      "import": "./dist/behavior/perception.js"
+    },
+    "./behavior/eqs": {
+      "types": "./dist/behavior/eqs.d.ts",
+      "import": "./dist/behavior/eqs.js"
+    },
+    "./behavior/goap": {
+      "types": "./dist/behavior/goap.d.ts",
+      "import": "./dist/behavior/goap.js"
+    },
+    "./behavior/smart-objects": {
+      "types": "./dist/behavior/smart-objects.d.ts",
+      "import": "./dist/behavior/smart-objects.js"
+    },
+    "./behavior/flowfield": {
+      "types": "./dist/behavior/flowfield.d.ts",
+      "import": "./dist/behavior/flowfield.js"
+    },
+    "./behavior/htn": {
+      "types": "./dist/behavior/htn.d.ts",
+      "import": "./dist/behavior/htn.js"
+    },
+    "./behavior/context": {
+      "types": "./dist/behavior/context.d.ts",
+      "import": "./dist/behavior/context.js"
+    },
+    "./behavior/subtrees": {
+      "types": "./dist/behavior/subtrees.d.ts",
+      "import": "./dist/behavior/subtrees.js"
+    },
+    "./behavior/inspect": {
+      "types": "./dist/behavior/inspect.d.ts",
+      "import": "./dist/behavior/inspect.js"
+    },
+    "./behavior/fuzzy": {
+      "types": "./dist/behavior/fuzzy.d.ts",
+      "import": "./dist/behavior/fuzzy.js"
+    },
+    "./behavior/text": {
+      "types": "./dist/behavior/text.d.ts",
+      "import": "./dist/behavior/text.js"
+    },
+    "./behavior/triggers": {
+      "types": "./dist/behavior/triggers.d.ts",
+      "import": "./dist/behavior/triggers.js"
+    },
+    "./biomes": {
+      "types": "./dist/biomes.d.ts",
+      "import": "./dist/biomes.js"
+    },
+    "./biomes/toolkit": {
+      "types": "./dist/biomes/toolkit.d.ts",
+      "import": "./dist/biomes/toolkit.js"
+    },
+    "./biomes/presets": {
+      "types": "./dist/biomes/presets.d.ts",
+      "import": "./dist/biomes/presets.js"
+    },
+    "./biomes/region": {
+      "types": "./dist/biomes/region.d.ts",
+      "import": "./dist/biomes/region.js"
+    },
+    "./biomes/hydrology": {
+      "types": "./dist/biomes/hydrology.d.ts",
+      "import": "./dist/biomes/hydrology.js"
+    },
+    "./biomes/disturbance": {
+      "types": "./dist/biomes/disturbance.d.ts",
+      "import": "./dist/biomes/disturbance.js"
+    },
+    "./biomes/seasons": {
+      "types": "./dist/biomes/seasons.d.ts",
+      "import": "./dist/biomes/seasons.js"
+    },
+    "./biomes/erosion": {
+      "types": "./dist/biomes/erosion.d.ts",
+      "import": "./dist/biomes/erosion.js"
+    },
+    "./biomes/relief": {
+      "types": "./dist/biomes/relief.d.ts",
+      "import": "./dist/biomes/relief.js"
+    },
+    "./biomes/digest": {
+      "types": "./dist/biomes/digest.d.ts",
+      "import": "./dist/biomes/digest.js"
+    },
+    "./biomes/koppen": {
+      "types": "./dist/biomes/koppen.d.ts",
+      "import": "./dist/biomes/koppen.js"
+    },
+    "./biomes/zones": {
+      "types": "./dist/biomes/zones.d.ts",
+      "import": "./dist/biomes/zones.js"
+    },
+    "./biomes/multinoise": {
+      "types": "./dist/biomes/multinoise.d.ts",
+      "import": "./dist/biomes/multinoise.js"
+    },
+    "./biomes/view": {
+      "types": "./dist/biomes/view.d.ts",
+      "import": "./dist/biomes/view.js"
+    },
+    "./biomes/rivers": {
+      "types": "./dist/biomes/rivers.d.ts",
+      "import": "./dist/biomes/rivers.js"
+    },
+    "./biomes/cover": {
+      "types": "./dist/biomes/cover.d.ts",
+      "import": "./dist/biomes/cover.js"
+    },
+    "./biomes/far": {
+      "types": "./dist/biomes/far.d.ts",
+      "import": "./dist/biomes/far.js"
+    },
+    "./biomes/objects": {
+      "types": "./dist/biomes/objects.d.ts",
+      "import": "./dist/biomes/objects.js"
+    },
+    "./biomes/editor": {
+      "types": "./dist/biomes/editor.d.ts",
+      "import": "./dist/biomes/editor.js"
+    },
+    "./biomes/placement": {
+      "types": "./dist/biomes/placement.d.ts",
+      "import": "./dist/biomes/placement.js"
+    },
+    "./biomes/stats": {
+      "types": "./dist/biomes/stats.d.ts",
+      "import": "./dist/biomes/stats.js"
+    },
+    "./biomes/io": {
+      "types": "./dist/biomes/io.d.ts",
+      "import": "./dist/biomes/io.js"
+    },
+    "./biomes/workers": {
+      "types": "./dist/biomes/workers.d.ts",
+      "import": "./dist/biomes/workers.js"
+    },
+    "./biomes/gpu": {
+      "types": "./dist/biomes/gpu.d.ts",
+      "import": "./dist/biomes/gpu.js"
+    },
+    "./biomes/splines": {
+      "types": "./dist/biomes/splines.d.ts",
+      "import": "./dist/biomes/splines.js"
+    },
+    "./biomes/settlements": {
+      "types": "./dist/biomes/settlements.d.ts",
+      "import": "./dist/biomes/settlements.js"
+    },
+    "./biomes/graph": {
+      "types": "./dist/biomes/graph.d.ts",
+      "import": "./dist/biomes/graph.js"
+    },
+    "./biomes/ecosystem": {
+      "types": "./dist/biomes/ecosystem.d.ts",
+      "import": "./dist/biomes/ecosystem.js"
+    },
+    "./biomes/erosion-wasm": {
+      "types": "./dist/biomes/erosion-wasm.d.ts",
+      "import": "./dist/biomes/erosion-wasm.js"
+    },
+    "./bvh": {
+      "types": "./dist/bvh.d.ts",
+      "import": "./dist/bvh.js"
+    },
+    "./bvh/tree": {
+      "types": "./dist/bvh/tree.d.ts",
+      "import": "./dist/bvh/tree.js"
+    },
+    "./bvh/bake": {
+      "types": "./dist/bvh/bake.d.ts",
+      "import": "./dist/bvh/bake.js"
+    },
+    "./bvh/lines": {
+      "types": "./dist/bvh/lines.d.ts",
+      "import": "./dist/bvh/lines.js"
+    },
+    "./bvh/gpu": {
+      "types": "./dist/bvh/gpu.d.ts",
+      "import": "./dist/bvh/gpu.js"
+    },
+    "./bvh/scene": {
+      "types": "./dist/bvh/scene.d.ts",
+      "import": "./dist/bvh/scene.js"
+    },
+    "./bvh/points": {
+      "types": "./dist/bvh/points.d.ts",
+      "import": "./dist/bvh/points.js"
+    },
+    "./bvh/sdf": {
+      "types": "./dist/bvh/sdf.d.ts",
+      "import": "./dist/bvh/sdf.js"
+    },
+    "./bvh/inside": {
+      "types": "./dist/bvh/inside.d.ts",
+      "import": "./dist/bvh/inside.js"
+    },
+    "./bvh/gpu-build": {
+      "types": "./dist/bvh/gpu-build.d.ts",
+      "import": "./dist/bvh/gpu-build.js"
+    },
+    "./bvh/alpha": {
+      "types": "./dist/bvh/alpha.d.ts",
+      "import": "./dist/bvh/alpha.js"
+    },
+    "./bvh/alpha-triangles": {
+      "types": "./dist/bvh/alpha-triangles.d.ts",
+      "import": "./dist/bvh/alpha-triangles.js"
+    },
+    "./bvh/parallel": {
+      "types": "./dist/bvh/parallel.d.ts",
+      "import": "./dist/bvh/parallel.js"
+    },
+    "./cache": {
+      "types": "./dist/cache.d.ts",
+      "import": "./dist/cache.js"
+    },
+    "./cache/manager": {
+      "types": "./dist/cache/manager.d.ts",
+      "import": "./dist/cache/manager.js"
+    },
+    "./cache/hashed": {
+      "types": "./dist/cache/hashed.d.ts",
+      "import": "./dist/cache/hashed.js"
+    },
+    "./cache/ranges": {
+      "types": "./dist/cache/ranges.d.ts",
+      "import": "./dist/cache/ranges.js"
+    },
+    "./cache/vary": {
+      "types": "./dist/cache/vary.d.ts",
+      "import": "./dist/cache/vary.js"
+    },
+    "./cache/eviction": {
+      "types": "./dist/cache/eviction.d.ts",
+      "import": "./dist/cache/eviction.js"
+    },
+    "./cache/bundles": {
+      "types": "./dist/cache/bundles.d.ts",
+      "import": "./dist/cache/bundles.js"
+    },
+    "./cache/prefetch": {
+      "types": "./dist/cache/prefetch.d.ts",
+      "import": "./dist/cache/prefetch.js"
+    },
+    "./cache/stream": {
+      "types": "./dist/cache/stream.d.ts",
+      "import": "./dist/cache/stream.js"
+    },
+    "./cache/decoded": {
+      "types": "./dist/cache/decoded.d.ts",
+      "import": "./dist/cache/decoded.js"
+    },
+    "./cameras": {
+      "types": "./dist/cameras.d.ts",
+      "import": "./dist/cameras.js"
+    },
+    "./cameras/origin": {
+      "types": "./dist/cameras/origin.d.ts",
+      "import": "./dist/cameras/origin.js"
+    },
+    "./cameras/layers": {
+      "types": "./dist/cameras/layers.d.ts",
+      "import": "./dist/cameras/layers.js"
+    },
+    "./cameras/offaxis": {
+      "types": "./dist/cameras/offaxis.d.ts",
+      "import": "./dist/cameras/offaxis.js"
+    },
+    "./cameras/physical": {
+      "types": "./dist/cameras/physical.d.ts",
+      "import": "./dist/cameras/physical.js"
+    },
+    "./cameras/panini": {
+      "types": "./dist/cameras/panini.d.ts",
+      "import": "./dist/cameras/panini.js"
+    },
+    "./cameras/wide-cube": {
+      "types": "./dist/cameras/wide-cube.d.ts",
+      "import": "./dist/cameras/wide-cube.js"
+    },
+    "./cameras/panorama": {
+      "types": "./dist/cameras/panorama.d.ts",
+      "import": "./dist/cameras/panorama.js"
+    },
+    "./cameras/stereo": {
+      "types": "./dist/cameras/stereo.d.ts",
+      "import": "./dist/cameras/stereo.js"
+    },
+    "./cinematic": {
+      "types": "./dist/cinematic.d.ts",
+      "import": "./dist/cinematic.js"
+    },
+    "./cinematic/brain": {
+      "types": "./dist/cinematic/brain.d.ts",
+      "import": "./dist/cinematic/brain.js"
+    },
+    "./cinematic/composer": {
+      "types": "./dist/cinematic/composer.d.ts",
+      "import": "./dist/cinematic/composer.js"
+    },
+    "./cinematic/dolly": {
+      "types": "./dist/cinematic/dolly.d.ts",
+      "import": "./dist/cinematic/dolly.js"
+    },
+    "./cinematic/group": {
+      "types": "./dist/cinematic/group.d.ts",
+      "import": "./dist/cinematic/group.js"
+    },
+    "./cinematic/noise": {
+      "types": "./dist/cinematic/noise.d.ts",
+      "import": "./dist/cinematic/noise.js"
+    },
+    "./cinematic/confine": {
+      "types": "./dist/cinematic/confine.d.ts",
+      "import": "./dist/cinematic/confine.js"
+    },
+    "./cinematic/lens": {
+      "types": "./dist/cinematic/lens.d.ts",
+      "import": "./dist/cinematic/lens.js"
+    },
+    "./cinematic/physical-lens": {
+      "types": "./dist/cinematic/physical-lens.d.ts",
+      "import": "./dist/cinematic/physical-lens.js"
+    },
+    "./cinematic/ortho": {
+      "types": "./dist/cinematic/ortho.d.ts",
+      "import": "./dist/cinematic/ortho.js"
+    },
+    "./clustered": {
+      "types": "./dist/clustered.d.ts",
+      "import": "./dist/clustered.js"
+    },
+    "./clustered/shadows": {
+      "types": "./dist/clustered/shadows.d.ts",
+      "import": "./dist/clustered/shadows.js"
+    },
+    "./clustered/area": {
+      "types": "./dist/clustered/area.d.ts",
+      "import": "./dist/clustered/area.js"
+    },
+    "./clustered/directional": {
+      "types": "./dist/clustered/directional.d.ts",
+      "import": "./dist/clustered/directional.js"
+    },
+    "./clustered/ies": {
+      "types": "./dist/clustered/ies.d.ts",
+      "import": "./dist/clustered/ies.js"
+    },
+    "./clustered/projector": {
+      "types": "./dist/clustered/projector.d.ts",
+      "import": "./dist/clustered/projector.js"
+    },
+    "./clustered/physical-lobes": {
+      "types": "./dist/clustered/physical-lobes.d.ts",
+      "import": "./dist/clustered/physical-lobes.js"
+    },
+    "./clustered/units": {
+      "types": "./dist/clustered/units.d.ts",
+      "import": "./dist/clustered/units.js"
+    },
+    "./clustered/flicker": {
+      "types": "./dist/clustered/flicker.d.ts",
+      "import": "./dist/clustered/flicker.js"
+    },
+    "./clustered/budget": {
+      "types": "./dist/clustered/budget.d.ts",
+      "import": "./dist/clustered/budget.js"
+    },
+    "./clustered/shapes": {
+      "types": "./dist/clustered/shapes.d.ts",
+      "import": "./dist/clustered/shapes.js"
+    },
+    "./clustered/stochastic": {
+      "types": "./dist/clustered/stochastic.d.ts",
+      "import": "./dist/clustered/stochastic.js"
+    },
+    "./clustered/area-shapes": {
+      "types": "./dist/clustered/area-shapes.d.ts",
+      "import": "./dist/clustered/area-shapes.js"
+    },
+    "./clustered/shadow-atlas": {
+      "types": "./dist/clustered/shadow-atlas.d.ts",
+      "import": "./dist/clustered/shadow-atlas.js"
+    },
+    "./clustered/cube-projector": {
+      "types": "./dist/clustered/cube-projector.d.ts",
+      "import": "./dist/clustered/cube-projector.js"
+    },
+    "./clustered/area-texture": {
+      "types": "./dist/clustered/area-texture.d.ts",
+      "import": "./dist/clustered/area-texture.js"
+    },
+    "./clustered/layers": {
+      "types": "./dist/clustered/layers.d.ts",
+      "import": "./dist/clustered/layers.js"
+    },
+    "./clustered/contact": {
+      "types": "./dist/clustered/contact.d.ts",
+      "import": "./dist/clustered/contact.js"
+    },
+    "./compute": {
+      "types": "./dist/compute.d.ts",
+      "import": "./dist/compute.js"
+    },
+    "./compute/linalg": {
+      "types": "./dist/compute/linalg.d.ts",
+      "import": "./dist/compute/linalg.js"
+    },
+    "./compute/fft": {
+      "types": "./dist/compute/fft.d.ts",
+      "import": "./dist/compute/fft.js"
+    },
+    "./compute/signal": {
+      "types": "./dist/compute/signal.d.ts",
+      "import": "./dist/compute/signal.js"
+    },
+    "./compute/random": {
+      "types": "./dist/compute/random.d.ts",
+      "import": "./dist/compute/random.js"
+    },
+    "./compute/autodiff": {
+      "types": "./dist/compute/autodiff.d.ts",
+      "import": "./dist/compute/autodiff.js"
+    },
+    "./compute/sparse": {
+      "types": "./dist/compute/sparse.d.ts",
+      "import": "./dist/compute/sparse.js"
+    },
+    "./compute/stream": {
+      "types": "./dist/compute/stream.d.ts",
+      "import": "./dist/compute/stream.js"
+    },
+    "./compute/frame": {
+      "types": "./dist/compute/frame.d.ts",
+      "import": "./dist/compute/frame.js"
+    },
+    "./compute/subgroups": {
+      "types": "./dist/compute/subgroups.d.ts",
+      "import": "./dist/compute/subgroups.js"
+    },
+    "./compute/nn": {
+      "types": "./dist/compute/nn.d.ts",
+      "import": "./dist/compute/nn.js"
+    },
+    "./compute/graph": {
+      "types": "./dist/compute/graph.d.ts",
+      "import": "./dist/compute/graph.js"
+    },
+    "./compute/autotune": {
+      "types": "./dist/compute/autotune.d.ts",
+      "import": "./dist/compute/autotune.js"
+    },
+    "./compute/shape": {
+      "types": "./dist/compute/shape.d.ts",
+      "import": "./dist/compute/shape.js"
+    },
+    "./compute/decomp": {
+      "types": "./dist/compute/decomp.d.ts",
+      "import": "./dist/compute/decomp.js"
+    },
+    "./compute/cpu-wasm": {
+      "types": "./dist/compute/cpu-wasm.d.ts",
+      "import": "./dist/compute/cpu-wasm.js"
+    },
+    "./compute/nn-extra": {
+      "types": "./dist/compute/nn-extra.d.ts",
+      "import": "./dist/compute/nn-extra.js"
+    },
+    "./controls/transitions": {
+      "types": "./dist/controls/transitions.d.ts",
+      "import": "./dist/controls/transitions.js"
+    },
+    "./controls": {
+      "types": "./dist/controls.d.ts",
+      "import": "./dist/controls.js"
+    },
+    "./controls/orbit": {
+      "types": "./dist/controls/orbit.d.ts",
+      "import": "./dist/controls/orbit.js"
+    },
+    "./controls/fly": {
+      "types": "./dist/controls/fly.d.ts",
+      "import": "./dist/controls/fly.js"
+    },
+    "./controls/trackball": {
+      "types": "./dist/controls/trackball.d.ts",
+      "import": "./dist/controls/trackball.js"
+    },
+    "./controls/arcball": {
+      "types": "./dist/controls/arcball.d.ts",
+      "import": "./dist/controls/arcball.js"
+    },
+    "./controls/transform": {
+      "types": "./dist/controls/transform.d.ts",
+      "import": "./dist/controls/transform.js"
+    },
+    "./controls/drag": {
+      "types": "./dist/controls/drag.d.ts",
+      "import": "./dist/controls/drag.js"
+    },
+    "./controls/profiles": {
+      "types": "./dist/controls/profiles.d.ts",
+      "import": "./dist/controls/profiles.js"
+    },
+    "./controls/third-person": {
+      "types": "./dist/controls/third-person.d.ts",
+      "import": "./dist/controls/third-person.js"
+    },
+    "./controls/walk": {
+      "types": "./dist/controls/walk.d.ts",
+      "import": "./dist/controls/walk.js"
+    },
+    "./controls/globe": {
+      "types": "./dist/controls/globe.d.ts",
+      "import": "./dist/controls/globe.js"
+    },
+    "./controls/collide": {
+      "types": "./dist/controls/collide.d.ts",
+      "import": "./dist/controls/collide.js"
+    },
+    "./controls/box-gizmo": {
+      "types": "./dist/controls/box-gizmo.d.ts",
+      "import": "./dist/controls/box-gizmo.js"
+    },
+    "./controls/presentation": {
+      "types": "./dist/controls/presentation.d.ts",
+      "import": "./dist/controls/presentation.js"
+    },
+    "./controls/device-orientation": {
+      "types": "./dist/controls/device-orientation.d.ts",
+      "import": "./dist/controls/device-orientation.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./core/extension": {
+      "types": "./dist/core/extension.d.ts",
+      "import": "./dist/core/extension.js"
+    },
+    "./creative/paint": {
+      "types": "./dist/creative/paint.d.ts",
+      "import": "./dist/creative/paint.js"
+    },
+    "./creative": {
+      "types": "./dist/creative.d.ts",
+      "import": "./dist/creative.js"
+    },
+    "./creative/particles": {
+      "types": "./dist/creative/particles.d.ts",
+      "import": "./dist/creative/particles.js"
+    },
+    "./creative/targets": {
+      "types": "./dist/creative/targets.d.ts",
+      "import": "./dist/creative/targets.js"
+    },
+    "./creative/toon": {
+      "types": "./dist/creative/toon.d.ts",
+      "import": "./dist/creative/toon.js"
+    },
+    "./creative/post": {
+      "types": "./dist/creative/post.d.ts",
+      "import": "./dist/creative/post.js"
+    },
+    "./creative/grass": {
+      "types": "./dist/creative/grass.d.ts",
+      "import": "./dist/creative/grass.js"
+    },
+    "./creative/planet": {
+      "types": "./dist/creative/planet.d.ts",
+      "import": "./dist/creative/planet.js"
+    },
+    "./creative/stars": {
+      "types": "./dist/creative/stars.d.ts",
+      "import": "./dist/creative/stars.js"
+    },
+    "./creative/planet-atmosphere": {
+      "types": "./dist/creative/planet-atmosphere.d.ts",
+      "import": "./dist/creative/planet-atmosphere.js"
+    },
+    "./creative/grass-terrain": {
+      "types": "./dist/creative/grass-terrain.d.ts",
+      "import": "./dist/creative/grass-terrain.js"
+    },
+    "./creative/paint-aniso": {
+      "types": "./dist/creative/paint-aniso.d.ts",
+      "import": "./dist/creative/paint-aniso.js"
+    },
+    "./creative/targets-depth": {
+      "types": "./dist/creative/targets-depth.d.ts",
+      "import": "./dist/creative/targets-depth.js"
+    },
+    "./culling": {
+      "types": "./dist/culling.d.ts",
+      "import": "./dist/culling.js"
+    },
+    "./culling/dynamic": {
+      "types": "./dist/culling/dynamic.d.ts",
+      "import": "./dist/culling/dynamic.js"
+    },
+    "./culling/parts": {
+      "types": "./dist/culling/parts.d.ts",
+      "import": "./dist/culling/parts.js"
+    },
+    "./culling/models": {
+      "types": "./dist/culling/models.d.ts",
+      "import": "./dist/culling/models.js"
+    },
+    "./culling/shadows": {
+      "types": "./dist/culling/shadows.d.ts",
+      "import": "./dist/culling/shadows.js"
+    },
+    "./culling/lod": {
+      "types": "./dist/culling/lod.d.ts",
+      "import": "./dist/culling/lod.js"
+    },
+    "./culling/meshlets": {
+      "types": "./dist/culling/meshlets.d.ts",
+      "import": "./dist/culling/meshlets.js"
+    },
+    "./culling/webgl2": {
+      "types": "./dist/culling/webgl2.d.ts",
+      "import": "./dist/culling/webgl2.js"
+    },
+    "./culling/bounds": {
+      "types": "./dist/culling/bounds.d.ts",
+      "import": "./dist/culling/bounds.js"
+    },
+    "./culling/sort": {
+      "types": "./dist/culling/sort.d.ts",
+      "import": "./dist/culling/sort.js"
+    },
+    "./culling/depth": {
+      "types": "./dist/culling/depth.d.ts",
+      "import": "./dist/culling/depth.js"
+    },
+    "./cutscene": {
+      "types": "./dist/cutscene.d.ts",
+      "import": "./dist/cutscene.js"
+    },
+    "./cutscene/shots": {
+      "types": "./dist/cutscene/shots.d.ts",
+      "import": "./dist/cutscene/shots.js"
+    },
+    "./cutscene/render": {
+      "types": "./dist/cutscene/render.d.ts",
+      "import": "./dist/cutscene/render.js"
+    },
+    "./cutscene/record": {
+      "types": "./dist/cutscene/record.d.ts",
+      "import": "./dist/cutscene/record.js"
+    },
+    "./cutscene/lipsync": {
+      "types": "./dist/cutscene/lipsync.d.ts",
+      "import": "./dist/cutscene/lipsync.js"
+    },
+    "./cutscene/vfx": {
+      "types": "./dist/cutscene/vfx.d.ts",
+      "import": "./dist/cutscene/vfx.js"
+    },
+    "./cutscene/editor": {
+      "types": "./dist/cutscene/editor.d.ts",
+      "import": "./dist/cutscene/editor.js"
+    },
+    "./cutscene/curve-editor": {
+      "types": "./dist/cutscene/curve-editor.d.ts",
+      "import": "./dist/cutscene/curve-editor.js"
+    },
+    "./cutscene/viewport": {
+      "types": "./dist/cutscene/viewport.d.ts",
+      "import": "./dist/cutscene/viewport.js"
+    },
+    "./cutscene/nested-editor": {
+      "types": "./dist/cutscene/nested-editor.d.ts",
+      "import": "./dist/cutscene/nested-editor.js"
+    },
+    "./cutscene/scroll": {
+      "types": "./dist/cutscene/scroll.d.ts",
+      "import": "./dist/cutscene/scroll.js"
+    },
+    "./decoders/ktx2-hdr6": {
+      "types": "./dist/decoders/ktx2-hdr6.d.ts",
+      "import": "./dist/decoders/ktx2-hdr6.js"
+    },
+    "./decoders/zstd": {
+      "types": "./dist/decoders/zstd.d.ts",
+      "import": "./dist/decoders/zstd.js"
+    },
+    "./decoders/lz4": {
+      "types": "./dist/decoders/lz4.d.ts",
+      "import": "./dist/decoders/lz4.js"
+    },
+    "./decoders/jpeg": {
+      "types": "./dist/decoders/jpeg.d.ts",
+      "import": "./dist/decoders/jpeg.js"
+    },
+    "./decoders": {
+      "types": "./dist/decoders.d.ts",
+      "import": "./dist/decoders.js"
+    },
+    "./decoders/meshopt": {
+      "types": "./dist/decoders/meshopt.d.ts",
+      "import": "./dist/decoders/meshopt.js"
+    },
+    "./decoders/texture": {
+      "types": "./dist/decoders/texture.d.ts",
+      "import": "./dist/decoders/texture.js"
+    },
+    "./decoders/png": {
+      "types": "./dist/decoders/png.d.ts",
+      "import": "./dist/decoders/png.js"
+    },
+    "./decoders/brotli": {
+      "types": "./dist/decoders/brotli.d.ts",
+      "import": "./dist/decoders/brotli.js"
+    },
+    "./decoders/bzip2": {
+      "types": "./dist/decoders/bzip2.d.ts",
+      "import": "./dist/decoders/bzip2.js"
+    },
+    "./decoders/xz": {
+      "types": "./dist/decoders/xz.d.ts",
+      "import": "./dist/decoders/xz.js"
+    },
+    "./decoders/image": {
+      "types": "./dist/decoders/image.d.ts",
+      "import": "./dist/decoders/image.js"
+    },
+    "./decoders/bc": {
+      "types": "./dist/decoders/bc.d.ts",
+      "import": "./dist/decoders/bc.js"
+    },
+    "./decoders/webp": {
+      "types": "./dist/decoders/webp.d.ts",
+      "import": "./dist/decoders/webp.js"
+    },
+    "./decoders/webp-lossless": {
+      "types": "./dist/decoders/webp-lossless.d.ts",
+      "import": "./dist/decoders/webp-lossless.js"
+    },
+    "./decoders/tga": {
+      "types": "./dist/decoders/tga.d.ts",
+      "import": "./dist/decoders/tga.js"
+    },
+    "./decoders/pcx": {
+      "types": "./dist/decoders/pcx.d.ts",
+      "import": "./dist/decoders/pcx.js"
+    },
+    "./decoders/dds": {
+      "types": "./dist/decoders/dds.d.ts",
+      "import": "./dist/decoders/dds.js"
+    },
+    "./decoders/ktx": {
+      "types": "./dist/decoders/ktx.d.ts",
+      "import": "./dist/decoders/ktx.js"
+    },
+    "./decoders/tiff": {
+      "types": "./dist/decoders/tiff.d.ts",
+      "import": "./dist/decoders/tiff.js"
+    },
+    "./decoders/ktx2-layers": {
+      "types": "./dist/decoders/ktx2-layers.d.ts",
+      "import": "./dist/decoders/ktx2-layers.js"
+    },
+    "./decoders/ktx2-hdr": {
+      "types": "./dist/decoders/ktx2-hdr.d.ts",
+      "import": "./dist/decoders/ktx2-hdr.js"
+    },
+    "./decoders/ktx2-gpu": {
+      "types": "./dist/decoders/ktx2-gpu.d.ts",
+      "import": "./dist/decoders/ktx2-gpu.js"
+    },
+    "./decoders/ktx2-stream": {
+      "types": "./dist/decoders/ktx2-stream.d.ts",
+      "import": "./dist/decoders/ktx2-stream.js"
+    },
+    "./decoders/meshopt-simd": {
+      "types": "./dist/decoders/meshopt-simd.d.ts",
+      "import": "./dist/decoders/meshopt-simd.js"
+    },
+    "./decoders/jxl": {
+      "types": "./dist/decoders/jxl.d.ts",
+      "import": "./dist/decoders/jxl.js"
+    },
+    "./decoders/pvr": {
+      "types": "./dist/decoders/pvr.d.ts",
+      "import": "./dist/decoders/pvr.js"
+    },
+    "./decoders/draco-native": {
+      "types": "./dist/decoders/draco-native.d.ts",
+      "import": "./dist/decoders/draco-native.js"
+    },
+    "./decoders/draco-points": {
+      "types": "./dist/decoders/draco-points.d.ts",
+      "import": "./dist/decoders/draco-points.js"
+    },
+    "./decoders/bmp": {
+      "types": "./dist/decoders/bmp.d.ts",
+      "import": "./dist/decoders/bmp.js"
+    },
+    "./decoders/texture-rgba": {
+      "types": "./dist/decoders/texture-rgba.d.ts",
+      "import": "./dist/decoders/texture-rgba.js"
+    },
+    "./decoders/lzfse": {
+      "types": "./dist/decoders/lzfse.d.ts",
+      "import": "./dist/decoders/lzfse.js"
+    },
+    "./decoders/snappy": {
+      "types": "./dist/decoders/snappy.d.ts",
+      "import": "./dist/decoders/snappy.js"
+    },
+    "./decoders/avif": {
+      "types": "./dist/decoders/avif.d.ts",
+      "import": "./dist/decoders/avif.js"
+    },
+    "./ecs": {
+      "types": "./dist/ecs.d.ts",
+      "import": "./dist/ecs.js"
+    },
+    "./ecs/changes": {
+      "types": "./dist/ecs/changes.d.ts",
+      "import": "./dist/ecs/changes.js"
+    },
+    "./ecs/engine": {
+      "types": "./dist/ecs/engine.d.ts",
+      "import": "./dist/ecs/engine.js"
+    },
+    "./ecs/growable": {
+      "types": "./dist/ecs/growable.d.ts",
+      "import": "./dist/ecs/growable.js"
+    },
+    "./ecs/query": {
+      "types": "./dist/ecs/query.d.ts",
+      "import": "./dist/ecs/query.js"
+    },
+    "./ecs/relations": {
+      "types": "./dist/ecs/relations.d.ts",
+      "import": "./dist/ecs/relations.js"
+    },
+    "./ecs/schedule": {
+      "types": "./dist/ecs/schedule.d.ts",
+      "import": "./dist/ecs/schedule.js"
+    },
+    "./ecs/objects": {
+      "types": "./dist/ecs/objects.d.ts",
+      "import": "./dist/ecs/objects.js"
+    },
+    "./ecs/relation-query": {
+      "types": "./dist/ecs/relation-query.d.ts",
+      "import": "./dist/ecs/relation-query.js"
+    },
+    "./ecs/reactive": {
+      "types": "./dist/ecs/reactive.d.ts",
+      "import": "./dist/ecs/reactive.js"
+    },
+    "./ecs/serialize": {
+      "types": "./dist/ecs/serialize.d.ts",
+      "import": "./dist/ecs/serialize.js"
+    },
+    "./ecs/parallel": {
+      "types": "./dist/ecs/parallel.d.ts",
+      "import": "./dist/ecs/parallel.js"
+    },
+    "./environment": {
+      "types": "./dist/environment.d.ts",
+      "import": "./dist/environment.js"
+    },
+    "./environment/probes": {
+      "types": "./dist/environment/probes.d.ts",
+      "import": "./dist/environment/probes.js"
+    },
+    "./environment/volumetric": {
+      "types": "./dist/environment/volumetric.d.ts",
+      "import": "./dist/environment/volumetric.js"
+    },
+    "./environment/reflector": {
+      "types": "./dist/environment/reflector.d.ts",
+      "import": "./dist/environment/reflector.js"
+    },
+    "./environment/refractor": {
+      "types": "./dist/environment/refractor.d.ts",
+      "import": "./dist/environment/refractor.js"
+    },
+    "./environment/cube-camera": {
+      "types": "./dist/environment/cube-camera.d.ts",
+      "import": "./dist/environment/cube-camera.js"
+    },
+    "./environment/exr-write": {
+      "types": "./dist/environment/exr-write.d.ts",
+      "import": "./dist/environment/exr-write.js"
+    },
+    "./environment/exr-tiled": {
+      "types": "./dist/environment/exr-tiled.d.ts",
+      "import": "./dist/environment/exr-tiled.js"
+    },
+    "./environment/blend": {
+      "types": "./dist/environment/blend.d.ts",
+      "import": "./dist/environment/blend.js"
+    },
+    "./environment/ground": {
+      "types": "./dist/environment/ground.d.ts",
+      "import": "./dist/environment/ground.js"
+    },
+    "./environment/gi": {
+      "types": "./dist/environment/gi.d.ts",
+      "import": "./dist/environment/gi.js"
+    },
+    "./environment/fog-volumes": {
+      "types": "./dist/environment/fog-volumes.d.ts",
+      "import": "./dist/environment/fog-volumes.js"
+    },
+    "./environment/studio": {
+      "types": "./dist/environment/studio.d.ts",
+      "import": "./dist/environment/studio.js"
+    },
+    "./environment/prefiltered": {
+      "types": "./dist/environment/prefiltered.d.ts",
+      "import": "./dist/environment/prefiltered.js"
+    },
+    "./environment/reflector-pbr": {
+      "types": "./dist/environment/reflector-pbr.d.ts",
+      "import": "./dist/environment/reflector-pbr.js"
+    },
+    "./environment/exr-codecs": {
+      "types": "./dist/environment/exr-codecs.d.ts",
+      "import": "./dist/environment/exr-codecs.js"
+    },
+    "./fsm": {
+      "types": "./dist/fsm.d.ts",
+      "import": "./dist/fsm.js"
+    },
+    "./fsm/parallel": {
+      "types": "./dist/fsm/parallel.d.ts",
+      "import": "./dist/fsm/parallel.js"
+    },
+    "./fsm/document": {
+      "types": "./dist/fsm/document.d.ts",
+      "import": "./dist/fsm/document.js"
+    },
+    "./fsm/trace": {
+      "types": "./dist/fsm/trace.d.ts",
+      "import": "./dist/fsm/trace.js"
+    },
+    "./fsm/events": {
+      "types": "./dist/fsm/events.d.ts",
+      "import": "./dist/fsm/events.js"
+    },
+    "./fsm/final": {
+      "types": "./dist/fsm/final.d.ts",
+      "import": "./dist/fsm/final.js"
+    },
+    "./fsm/invoke": {
+      "types": "./dist/fsm/invoke.d.ts",
+      "import": "./dist/fsm/invoke.js"
+    },
+    "./fsm/inspect": {
+      "types": "./dist/fsm/inspect.d.ts",
+      "import": "./dist/fsm/inspect.js"
+    },
+    "./fsm/scxml": {
+      "types": "./dist/fsm/scxml.d.ts",
+      "import": "./dist/fsm/scxml.js"
+    },
+    "./geometry": {
+      "types": "./dist/geometry.d.ts",
+      "import": "./dist/geometry.js"
+    },
+    "./geometry/shapes": {
+      "types": "./dist/geometry/shapes.d.ts",
+      "import": "./dist/geometry/shapes.js"
+    },
+    "./geometry/triangulate": {
+      "types": "./dist/geometry/triangulate.d.ts",
+      "import": "./dist/geometry/triangulate.js"
+    },
+    "./geometry/extrude": {
+      "types": "./dist/geometry/extrude.d.ts",
+      "import": "./dist/geometry/extrude.js"
+    },
+    "./geometry/primitives": {
+      "types": "./dist/geometry/primitives.d.ts",
+      "import": "./dist/geometry/primitives.js"
+    },
+    "./geometry/utils": {
+      "types": "./dist/geometry/utils.d.ts",
+      "import": "./dist/geometry/utils.js"
+    },
+    "./geometry/extras": {
+      "types": "./dist/geometry/extras.d.ts",
+      "import": "./dist/geometry/extras.js"
+    },
+    "./geometry/nurbs": {
+      "types": "./dist/geometry/nurbs.d.ts",
+      "import": "./dist/geometry/nurbs.js"
+    },
+    "./geometry/nurbs-edit": {
+      "types": "./dist/geometry/nurbs-edit.d.ts",
+      "import": "./dist/geometry/nurbs-edit.js"
+    },
+    "./geometry/teapot": {
+      "types": "./dist/geometry/teapot.d.ts",
+      "import": "./dist/geometry/teapot.js"
+    },
+    "./geometry/sample": {
+      "types": "./dist/geometry/sample.d.ts",
+      "import": "./dist/geometry/sample.js"
+    },
+    "./geometry/optimize": {
+      "types": "./dist/geometry/optimize.d.ts",
+      "import": "./dist/geometry/optimize.js"
+    },
+    "./geometry/flow": {
+      "types": "./dist/geometry/flow.d.ts",
+      "import": "./dist/geometry/flow.js"
+    },
+    "./geometry/delaunay": {
+      "types": "./dist/geometry/delaunay.d.ts",
+      "import": "./dist/geometry/delaunay.js"
+    },
+    "./geometry/polygon": {
+      "types": "./dist/geometry/polygon.d.ts",
+      "import": "./dist/geometry/polygon.js"
+    },
+    "./geometry/sweep": {
+      "types": "./dist/geometry/sweep.d.ts",
+      "import": "./dist/geometry/sweep.js"
+    },
+    "./geometry/tessellate": {
+      "types": "./dist/geometry/tessellate.d.ts",
+      "import": "./dist/geometry/tessellate.js"
+    },
+    "./geometry/gpu": {
+      "types": "./dist/geometry/gpu.d.ts",
+      "import": "./dist/geometry/gpu.js"
+    },
+    "./geometry/hull": {
+      "types": "./dist/geometry/hull.d.ts",
+      "import": "./dist/geometry/hull.js"
+    },
+    "./gltf": {
+      "types": "./dist/gltf.d.ts",
+      "import": "./dist/gltf.js"
+    },
+    "./gltf/auto": {
+      "types": "./dist/gltf/auto.d.ts",
+      "import": "./dist/gltf/auto.js"
+    },
+    "./gltf/instancing": {
+      "types": "./dist/gltf/instancing.d.ts",
+      "import": "./dist/gltf/instancing.js"
+    },
+    "./gltf/meshopt": {
+      "types": "./dist/gltf/meshopt.d.ts",
+      "import": "./dist/gltf/meshopt.js"
+    },
+    "./gltf/quantized": {
+      "types": "./dist/gltf/quantized.d.ts",
+      "import": "./dist/gltf/quantized.js"
+    },
+    "./gltf/scene-data": {
+      "types": "./dist/gltf/scene-data.d.ts",
+      "import": "./dist/gltf/scene-data.js"
+    },
+    "./gltf/textured": {
+      "types": "./dist/gltf/textured.d.ts",
+      "import": "./dist/gltf/textured.js"
+    },
+    "./gltf-pro": {
+      "types": "./dist/gltf-pro.d.ts",
+      "import": "./dist/gltf-pro.js"
+    },
+    "./gltf-pro/model": {
+      "types": "./dist/gltf-pro/model.d.ts",
+      "import": "./dist/gltf-pro/model.js"
+    },
+    "./gltf-pro/asset": {
+      "types": "./dist/gltf-pro/asset.d.ts",
+      "import": "./dist/gltf-pro/asset.js"
+    },
+    "./gltf-pro/scene": {
+      "types": "./dist/gltf-pro/scene.d.ts",
+      "import": "./dist/gltf-pro/scene.js"
+    },
+    "./gltf-pro/extended": {
+      "types": "./dist/gltf-pro/extended.d.ts",
+      "import": "./dist/gltf-pro/extended.js"
+    },
+    "./gltf-pro/instancing": {
+      "types": "./dist/gltf-pro/instancing.d.ts",
+      "import": "./dist/gltf-pro/instancing.js"
+    },
+    "./gltf-pro/prepare": {
+      "types": "./dist/gltf-pro/prepare.d.ts",
+      "import": "./dist/gltf-pro/prepare.js"
+    },
+    "./gltf-pro/progressive": {
+      "types": "./dist/gltf-pro/progressive.d.ts",
+      "import": "./dist/gltf-pro/progressive.js"
+    },
+    "./gltf-pro/splats": {
+      "types": "./dist/gltf-pro/splats.d.ts",
+      "import": "./dist/gltf-pro/splats.js"
+    },
+    "./gltf-pro/lights": {
+      "types": "./dist/gltf-pro/lights.d.ts",
+      "import": "./dist/gltf-pro/lights.js"
+    },
+    "./gltf-pro/physics": {
+      "types": "./dist/gltf-pro/physics.d.ts",
+      "import": "./dist/gltf-pro/physics.js"
+    },
+    "./gltf-pro/interactivity": {
+      "types": "./dist/gltf-pro/interactivity.d.ts",
+      "import": "./dist/gltf-pro/interactivity.js"
+    },
+    "./gltf-pro/metadata": {
+      "types": "./dist/gltf-pro/metadata.d.ts",
+      "import": "./dist/gltf-pro/metadata.js"
+    },
+    "./gltf-pro/coordinates": {
+      "types": "./dist/gltf-pro/coordinates.d.ts",
+      "import": "./dist/gltf-pro/coordinates.js"
+    },
+    "./gltf-pro/worker": {
+      "types": "./dist/gltf-pro/worker.d.ts",
+      "import": "./dist/gltf-pro/worker.js"
+    },
+    "./gltf-pro/material-draw": {
+      "types": "./dist/gltf-pro/material-draw.d.ts",
+      "import": "./dist/gltf-pro/material-draw.js"
+    },
+    "./gltf-pro/spec-gloss": {
+      "types": "./dist/gltf-pro/spec-gloss.d.ts",
+      "import": "./dist/gltf-pro/spec-gloss.js"
+    },
+    "./gltf-pro/dds": {
+      "types": "./dist/gltf-pro/dds.d.ts",
+      "import": "./dist/gltf-pro/dds.js"
+    },
+    "./gltf-pro/audio": {
+      "types": "./dist/gltf-pro/audio.d.ts",
+      "import": "./dist/gltf-pro/audio.js"
+    },
+    "./input": {
+      "types": "./dist/input.d.ts",
+      "import": "./dist/input.js"
+    },
+    "./input/interactions": {
+      "types": "./dist/input/interactions.d.ts",
+      "import": "./dist/input/interactions.js"
+    },
+    "./input/players": {
+      "types": "./dist/input/players.d.ts",
+      "import": "./dist/input/players.js"
+    },
+    "./input/motion": {
+      "types": "./dist/input/motion.d.ts",
+      "import": "./dist/input/motion.js"
+    },
+    "./input/replay": {
+      "types": "./dist/input/replay.d.ts",
+      "import": "./dist/input/replay.js"
+    },
+    "./input/pen": {
+      "types": "./dist/input/pen.d.ts",
+      "import": "./dist/input/pen.js"
+    },
+    "./input/vector": {
+      "types": "./dist/input/vector.d.ts",
+      "import": "./dist/input/vector.js"
+    },
+    "./input/xr": {
+      "types": "./dist/input/xr.d.ts",
+      "import": "./dist/input/xr.js"
+    },
+    "./input/lock": {
+      "types": "./dist/input/lock.d.ts",
+      "import": "./dist/input/lock.js"
+    },
+    "./input/layout": {
+      "types": "./dist/input/layout.d.ts",
+      "import": "./dist/input/layout.js"
+    },
+    "./input/haptics": {
+      "types": "./dist/input/haptics.d.ts",
+      "import": "./dist/input/haptics.js"
+    },
+    "./lighting2d/sdf": {
+      "types": "./dist/lighting2d/sdf.d.ts",
+      "import": "./dist/lighting2d/sdf.js"
+    },
+    "./lighting2d": {
+      "types": "./dist/lighting2d.d.ts",
+      "import": "./dist/lighting2d.js"
+    },
+    "./lighting2d/soft": {
+      "types": "./dist/lighting2d/soft.d.ts",
+      "import": "./dist/lighting2d/soft.js"
+    },
+    "./lighting2d/cookie": {
+      "types": "./dist/lighting2d/cookie.d.ts",
+      "import": "./dist/lighting2d/cookie.js"
+    },
+    "./lighting2d/gi": {
+      "types": "./dist/lighting2d/gi.d.ts",
+      "import": "./dist/lighting2d/gi.js"
+    },
+    "./lighting2d/height": {
+      "types": "./dist/lighting2d/height.d.ts",
+      "import": "./dist/lighting2d/height.js"
+    },
+    "./lighting2d/emissive": {
+      "types": "./dist/lighting2d/emissive.d.ts",
+      "import": "./dist/lighting2d/emissive.js"
+    },
+    "./lightmap": {
+      "types": "./dist/lightmap.d.ts",
+      "import": "./dist/lightmap.js"
+    },
+    "./lightmap/global": {
+      "types": "./dist/lightmap/global.d.ts",
+      "import": "./dist/lightmap/global.js"
+    },
+    "./lightmap/refracted": {
+      "types": "./dist/lightmap/refracted.d.ts",
+      "import": "./dist/lightmap/refracted.js"
+    },
+    "./lightmap/mesh": {
+      "types": "./dist/lightmap/mesh.d.ts",
+      "import": "./dist/lightmap/mesh.js"
+    },
+    "./lightmap/directional": {
+      "types": "./dist/lightmap/directional.d.ts",
+      "import": "./dist/lightmap/directional.js"
+    },
+    "./lightmap/imported": {
+      "types": "./dist/lightmap/imported.d.ts",
+      "import": "./dist/lightmap/imported.js"
+    },
+    "./lightmap/gpu": {
+      "types": "./dist/lightmap/gpu.d.ts",
+      "import": "./dist/lightmap/gpu.js"
+    },
+    "./lightmap/probes": {
+      "types": "./dist/lightmap/probes.d.ts",
+      "import": "./dist/lightmap/probes.js"
+    },
+    "./lightmap/denoise": {
+      "types": "./dist/lightmap/denoise.d.ts",
+      "import": "./dist/lightmap/denoise.js"
+    },
+    "./lightmap/apply": {
+      "types": "./dist/lightmap/apply.d.ts",
+      "import": "./dist/lightmap/apply.js"
+    },
+    "./loaders/ply": {
+      "types": "./dist/loaders/ply.d.ts",
+      "import": "./dist/loaders/ply.js"
+    },
+    "./loaders/off": {
+      "types": "./dist/loaders/off.d.ts",
+      "import": "./dist/loaders/off.js"
+    },
+    "./loaders": {
+      "types": "./dist/loaders.d.ts",
+      "import": "./dist/loaders.js"
+    },
+    "./loaders/worker": {
+      "types": "./dist/loaders/worker.d.ts",
+      "import": "./dist/loaders/worker.js"
+    },
+    "./loaders/common": {
+      "types": "./dist/loaders/common.d.ts",
+      "import": "./dist/loaders/common.js"
+    },
+    "./loaders/usd": {
+      "types": "./dist/loaders/usd.d.ts",
+      "import": "./dist/loaders/usd.js"
+    },
+    "./loaders/font": {
+      "types": "./dist/loaders/font.d.ts",
+      "import": "./dist/loaders/font.js"
+    },
+    "./loaders/svg": {
+      "types": "./dist/loaders/svg.d.ts",
+      "import": "./dist/loaders/svg.js"
+    },
+    "./loaders/mtl": {
+      "types": "./dist/loaders/mtl.d.ts",
+      "import": "./dist/loaders/mtl.js"
+    },
+    "./loaders/render": {
+      "types": "./dist/loaders/render.d.ts",
+      "import": "./dist/loaders/render.js"
+    },
+    "./loaders/mocap": {
+      "types": "./dist/loaders/mocap.d.ts",
+      "import": "./dist/loaders/mocap.js"
+    },
+    "./loaders/vrml": {
+      "types": "./dist/loaders/vrml.d.ts",
+      "import": "./dist/loaders/vrml.js"
+    },
+    "./loaders/gcode": {
+      "types": "./dist/loaders/gcode.d.ts",
+      "import": "./dist/loaders/gcode.js"
+    },
+    "./loaders/textures": {
+      "types": "./dist/loaders/textures.d.ts",
+      "import": "./dist/loaders/textures.js"
+    },
+    "./loaders/nrrd": {
+      "types": "./dist/loaders/nrrd.d.ts",
+      "import": "./dist/loaders/nrrd.js"
+    },
+    "./loaders/ldraw": {
+      "types": "./dist/loaders/ldraw.d.ts",
+      "import": "./dist/loaders/ldraw.js"
+    },
+    "./loaders/threemf-materials": {
+      "types": "./dist/loaders/threemf-materials.d.ts",
+      "import": "./dist/loaders/threemf-materials.js"
+    },
+    "./loaders/vtk-xml": {
+      "types": "./dist/loaders/vtk-xml.d.ts",
+      "import": "./dist/loaders/vtk-xml.js"
+    },
+    "./loaders/3dm": {
+      "types": "./dist/loaders/3dm.d.ts",
+      "import": "./dist/loaders/3dm.js"
+    },
+    "./loaders/3ds": {
+      "types": "./dist/loaders/3ds.d.ts",
+      "import": "./dist/loaders/3ds.js"
+    },
+    "./loaders/lwo": {
+      "types": "./dist/loaders/lwo.d.ts",
+      "import": "./dist/loaders/lwo.js"
+    },
+    "./loaders/amf": {
+      "types": "./dist/loaders/amf.d.ts",
+      "import": "./dist/loaders/amf.js"
+    },
+    "./loaders/md2": {
+      "types": "./dist/loaders/md2.d.ts",
+      "import": "./dist/loaders/md2.js"
+    },
+    "./loaders/pdb": {
+      "types": "./dist/loaders/pdb.d.ts",
+      "import": "./dist/loaders/pdb.js"
+    },
+    "./loaders/tds": {
+      "types": "./dist/loaders/tds.d.ts",
+      "import": "./dist/loaders/tds.js"
+    },
+    "./loaders/kmz": {
+      "types": "./dist/loaders/kmz.d.ts",
+      "import": "./dist/loaders/kmz.js"
+    },
+    "./loaders/nurbs": {
+      "types": "./dist/loaders/nurbs.d.ts",
+      "import": "./dist/loaders/nurbs.js"
+    },
+    "./loaders/las": {
+      "types": "./dist/loaders/las.d.ts",
+      "import": "./dist/loaders/las.js"
+    },
+    "./loaders/vdb": {
+      "types": "./dist/loaders/vdb.d.ts",
+      "import": "./dist/loaders/vdb.js"
+    },
+    "./loaders/materialx": {
+      "types": "./dist/loaders/materialx.d.ts",
+      "import": "./dist/loaders/materialx.js"
+    },
+    "./loaders/lottie": {
+      "types": "./dist/loaders/lottie.d.ts",
+      "import": "./dist/loaders/lottie.js"
+    },
+    "./loaders/xml": {
+      "types": "./dist/loaders/xml.d.ts",
+      "import": "./dist/loaders/xml.js"
+    },
+    "./loaders/vtk-legacy": {
+      "types": "./dist/loaders/vtk-legacy.d.ts",
+      "import": "./dist/loaders/vtk-legacy.js"
+    },
+    "./loaders/geo": {
+      "types": "./dist/loaders/geo.d.ts",
+      "import": "./dist/loaders/geo.js"
+    },
+    "./loaders/threemf-lattice": {
+      "types": "./dist/loaders/threemf-lattice.d.ts",
+      "import": "./dist/loaders/threemf-lattice.js"
+    },
+    "./lod/msft": {
+      "types": "./dist/lod/msft.d.ts",
+      "import": "./dist/lod/msft.js"
+    },
+    "./lod/clusters": {
+      "types": "./dist/lod/clusters.d.ts",
+      "import": "./dist/lod/clusters.js"
+    },
+    "./lod": {
+      "types": "./dist/lod.d.ts",
+      "import": "./dist/lod.js"
+    },
+    "./lod/auto": {
+      "types": "./dist/lod/auto.d.ts",
+      "import": "./dist/lod/auto.js"
+    },
+    "./lod/fade": {
+      "types": "./dist/lod/fade.d.ts",
+      "import": "./dist/lod/fade.js"
+    },
+    "./lod/stream": {
+      "types": "./dist/lod/stream.d.ts",
+      "import": "./dist/lod/stream.js"
+    },
+    "./materials": {
+      "types": "./dist/materials.d.ts",
+      "import": "./dist/materials.js"
+    },
+    "./materials/atlas": {
+      "types": "./dist/materials/atlas.d.ts",
+      "import": "./dist/materials/atlas.js"
+    },
+    "./materials/transmission": {
+      "types": "./dist/materials/transmission.d.ts",
+      "import": "./dist/materials/transmission.js"
+    },
+    "./materials/batched": {
+      "types": "./dist/materials/batched.d.ts",
+      "import": "./dist/materials/batched.js"
+    },
+    "./materials/mips": {
+      "types": "./dist/materials/mips.d.ts",
+      "import": "./dist/materials/mips.js"
+    },
+    "./materials/prefilter": {
+      "types": "./dist/materials/prefilter.d.ts",
+      "import": "./dist/materials/prefilter.js"
+    },
+    "./materials/layered": {
+      "types": "./dist/materials/layered.d.ts",
+      "import": "./dist/materials/layered.js"
+    },
+    "./materials/alpha-hash": {
+      "types": "./dist/materials/alpha-hash.d.ts",
+      "import": "./dist/materials/alpha-hash.js"
+    },
+    "./materials/object-normal": {
+      "types": "./dist/materials/object-normal.d.ts",
+      "import": "./dist/materials/object-normal.js"
+    },
+    "./materials/hair": {
+      "types": "./dist/materials/hair.d.ts",
+      "import": "./dist/materials/hair.js"
+    },
+    "./materials/eye": {
+      "types": "./dist/materials/eye.d.ts",
+      "import": "./dist/materials/eye.js"
+    },
+    "./materials/skin": {
+      "types": "./dist/materials/skin.d.ts",
+      "import": "./dist/materials/skin.js"
+    },
+    "./materials/stochastic": {
+      "types": "./dist/materials/stochastic.d.ts",
+      "import": "./dist/materials/stochastic.js"
+    },
+    "./materials/serialization": {
+      "types": "./dist/materials/serialization.d.ts",
+      "import": "./dist/materials/serialization.js"
+    },
+    "./materials/transmission-layers": {
+      "types": "./dist/materials/transmission-layers.d.ts",
+      "import": "./dist/materials/transmission-layers.js"
+    },
+    "./materials/fur": {
+      "types": "./dist/materials/fur.d.ts",
+      "import": "./dist/materials/fur.js"
+    },
+    "./mixer": {
+      "types": "./dist/mixer.d.ts",
+      "import": "./dist/mixer.js"
+    },
+    "./mixer/sidechain": {
+      "types": "./dist/mixer/sidechain.d.ts",
+      "import": "./dist/mixer/sidechain.js"
+    },
+    "./mixer/snapshots": {
+      "types": "./dist/mixer/snapshots.d.ts",
+      "import": "./dist/mixer/snapshots.js"
+    },
+    "./mixer/worklet": {
+      "types": "./dist/mixer/worklet.d.ts",
+      "import": "./dist/mixer/worklet.js"
+    },
+    "./mixer/reflections": {
+      "types": "./dist/mixer/reflections.d.ts",
+      "import": "./dist/mixer/reflections.js"
+    },
+    "./mixer/loudness": {
+      "types": "./dist/mixer/loudness.d.ts",
+      "import": "./dist/mixer/loudness.js"
+    },
+    "./mixer/stereo": {
+      "types": "./dist/mixer/stereo.d.ts",
+      "import": "./dist/mixer/stereo.js"
+    },
+    "./mixer/analyser": {
+      "types": "./dist/mixer/analyser.d.ts",
+      "import": "./dist/mixer/analyser.js"
+    },
+    "./mixer/fx": {
+      "types": "./dist/mixer/fx.d.ts",
+      "import": "./dist/mixer/fx.js"
+    },
+    "./mixer/dynamics": {
+      "types": "./dist/mixer/dynamics.d.ts",
+      "import": "./dist/mixer/dynamics.js"
+    },
+    "./mixer/pitch": {
+      "types": "./dist/mixer/pitch.d.ts",
+      "import": "./dist/mixer/pitch.js"
+    },
+    "./navmesh": {
+      "types": "./dist/navmesh.d.ts",
+      "import": "./dist/navmesh.js"
+    },
+    "./navmesh/build": {
+      "types": "./dist/navmesh/build.d.ts",
+      "import": "./dist/navmesh/build.js"
+    },
+    "./navmesh/codec": {
+      "types": "./dist/navmesh/codec.d.ts",
+      "import": "./dist/navmesh/codec.js"
+    },
+    "./navmesh/links": {
+      "types": "./dist/navmesh/links.d.ts",
+      "import": "./dist/navmesh/links.js"
+    },
+    "./navmesh/hierarchy": {
+      "types": "./dist/navmesh/hierarchy.d.ts",
+      "import": "./dist/navmesh/hierarchy.js"
+    },
+    "./navmesh/debug": {
+      "types": "./dist/navmesh/debug.d.ts",
+      "import": "./dist/navmesh/debug.js"
+    },
+    "./navmesh/voxel": {
+      "types": "./dist/navmesh/voxel.d.ts",
+      "import": "./dist/navmesh/voxel.js"
+    },
+    "./navmesh/volume": {
+      "types": "./dist/navmesh/volume.d.ts",
+      "import": "./dist/navmesh/volume.js"
+    },
+    "./navmesh/tiles": {
+      "types": "./dist/navmesh/tiles.d.ts",
+      "import": "./dist/navmesh/tiles.js"
+    },
+    "./navmesh/agents": {
+      "types": "./dist/navmesh/agents.d.ts",
+      "import": "./dist/navmesh/agents.js"
+    },
+    "./navmesh/queries": {
+      "types": "./dist/navmesh/queries.d.ts",
+      "import": "./dist/navmesh/queries.js"
+    },
+    "./navmesh/wasm": {
+      "types": "./dist/navmesh/wasm.d.ts",
+      "import": "./dist/navmesh/wasm.js"
+    },
+    "./navmesh/obstacles": {
+      "types": "./dist/navmesh/obstacles.d.ts",
+      "import": "./dist/navmesh/obstacles.js"
+    },
+    "./net": {
+      "types": "./dist/net.d.ts",
+      "import": "./dist/net.js"
+    },
+    "./net/delay": {
+      "types": "./dist/net/delay.d.ts",
+      "import": "./dist/net/delay.js"
+    },
+    "./net/fields": {
+      "types": "./dist/net/fields.d.ts",
+      "import": "./dist/net/fields.js"
+    },
+    "./net/timeline": {
+      "types": "./dist/net/timeline.d.ts",
+      "import": "./dist/net/timeline.js"
+    },
+    "./netcode": {
+      "types": "./dist/netcode.d.ts",
+      "import": "./dist/netcode.js"
+    },
+    "./netcode/rollback": {
+      "types": "./dist/netcode/rollback.d.ts",
+      "import": "./dist/netcode/rollback.js"
+    },
+    "./netcode/websocket": {
+      "types": "./dist/netcode/websocket.d.ts",
+      "import": "./dist/netcode/websocket.js"
+    },
+    "./netcode/webrtc": {
+      "types": "./dist/netcode/webrtc.d.ts",
+      "import": "./dist/netcode/webrtc.js"
+    },
+    "./netcode/node": {
+      "types": "./dist/netcode/node.d.ts",
+      "import": "./dist/netcode/node.js"
+    },
+    "./netcode/rooms": {
+      "types": "./dist/netcode/rooms.d.ts",
+      "import": "./dist/netcode/rooms.js"
+    },
+    "./netcode/smoothing": {
+      "types": "./dist/netcode/smoothing.d.ts",
+      "import": "./dist/netcode/smoothing.js"
+    },
+    "./netcode/webtransport": {
+      "types": "./dist/netcode/webtransport.d.ts",
+      "import": "./dist/netcode/webtransport.js"
+    },
+    "./netcode/signal": {
+      "types": "./dist/netcode/signal.d.ts",
+      "import": "./dist/netcode/signal.js"
+    },
+    "./netcode/extrapolate": {
+      "types": "./dist/netcode/extrapolate.d.ts",
+      "import": "./dist/netcode/extrapolate.js"
+    },
+    "./netcode/relay": {
+      "types": "./dist/netcode/relay.d.ts",
+      "import": "./dist/netcode/relay.js"
+    },
+    "./netcode/hitboxes": {
+      "types": "./dist/netcode/hitboxes.d.ts",
+      "import": "./dist/netcode/hitboxes.js"
+    },
+    "./netcode/interest": {
+      "types": "./dist/netcode/interest.d.ts",
+      "import": "./dist/netcode/interest.js"
+    },
+    "./netcode/generate": {
+      "types": "./dist/netcode/generate.d.ts",
+      "import": "./dist/netcode/generate.js"
+    },
+    "./netcode/lobby": {
+      "types": "./dist/netcode/lobby.d.ts",
+      "import": "./dist/netcode/lobby.js"
+    },
+    "./netcode/presence": {
+      "types": "./dist/netcode/presence.d.ts",
+      "import": "./dist/netcode/presence.js"
+    },
+    "./netcode/generate-rust": {
+      "types": "./dist/netcode/generate-rust.d.ts",
+      "import": "./dist/netcode/generate-rust.js"
+    },
+    "./netcode/migrate": {
+      "types": "./dist/netcode/migrate.d.ts",
+      "import": "./dist/netcode/migrate.js"
+    },
+    "./oit": {
+      "types": "./dist/oit.d.ts",
+      "import": "./dist/oit.js"
+    },
+    "./oit/meshes": {
+      "types": "./dist/oit/meshes.d.ts",
+      "import": "./dist/oit/meshes.js"
+    },
+    "./oit/exact": {
+      "types": "./dist/oit/exact.d.ts",
+      "import": "./dist/oit/exact.js"
+    },
+    "./oit/moments": {
+      "types": "./dist/oit/moments.d.ts",
+      "import": "./dist/oit/moments.js"
+    },
+    "./oit/depth": {
+      "types": "./dist/oit/depth.d.ts",
+      "import": "./dist/oit/depth.js"
+    },
+    "./oit/vfx": {
+      "types": "./dist/oit/vfx.d.ts",
+      "import": "./dist/oit/vfx.js"
+    },
+    "./oit/peel": {
+      "types": "./dist/oit/peel.d.ts",
+      "import": "./dist/oit/peel.js"
+    },
+    "./oit/precise": {
+      "types": "./dist/oit/precise.d.ts",
+      "import": "./dist/oit/precise.js"
+    },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
+    },
+    "./physics/next": {
+      "types": "./dist/physics/next.d.ts",
+      "import": "./dist/physics/next.js"
+    },
+    "./physics/decomposition": {
+      "types": "./dist/physics/decomposition.d.ts",
+      "import": "./dist/physics/decomposition.js"
+    },
+    "./pixel": {
+      "types": "./dist/pixel.d.ts",
+      "import": "./dist/pixel.js"
+    },
+    "./pixel/palette": {
+      "types": "./dist/pixel/palette.d.ts",
+      "import": "./dist/pixel/palette.js"
+    },
+    "./pixel/render3d": {
+      "types": "./dist/pixel/render3d.d.ts",
+      "import": "./dist/pixel/render3d.js"
+    },
+    "./pixel/scale": {
+      "types": "./dist/pixel/scale.d.ts",
+      "import": "./dist/pixel/scale.js"
+    },
+    "./pixel/follow": {
+      "types": "./dist/pixel/follow.d.ts",
+      "import": "./dist/pixel/follow.js"
+    },
+    "./pixel/crt": {
+      "types": "./dist/pixel/crt.d.ts",
+      "import": "./dist/pixel/crt.js"
+    },
+    "./post": {
+      "types": "./dist/post.d.ts",
+      "import": "./dist/post.js"
+    },
+    "./post/bloom": {
+      "types": "./dist/post/bloom.d.ts",
+      "import": "./dist/post/bloom.js"
+    },
+    "./post/ssao": {
+      "types": "./dist/post/ssao.d.ts",
+      "import": "./dist/post/ssao.js"
+    },
+    "./post/scene-fade": {
+      "types": "./dist/post/scene-fade.d.ts",
+      "import": "./dist/post/scene-fade.js"
+    },
+    "./post/stack": {
+      "types": "./dist/post/stack.d.ts",
+      "import": "./dist/post/stack.js"
+    },
+    "./post/fxaa": {
+      "types": "./dist/post/fxaa.d.ts",
+      "import": "./dist/post/fxaa.js"
+    },
+    "./post/decals": {
+      "types": "./dist/post/decals.d.ts",
+      "import": "./dist/post/decals.js"
+    },
+    "./post/ssr": {
+      "types": "./dist/post/ssr.d.ts",
+      "import": "./dist/post/ssr.js"
+    },
+    "./post/gtao": {
+      "types": "./dist/post/gtao.d.ts",
+      "import": "./dist/post/gtao.js"
+    },
+    "./post/ssgi": {
+      "types": "./dist/post/ssgi.d.ts",
+      "import": "./dist/post/ssgi.js"
+    },
+    "./post/motion-blur": {
+      "types": "./dist/post/motion-blur.d.ts",
+      "import": "./dist/post/motion-blur.js"
+    },
+    "./post/lens-flare": {
+      "types": "./dist/post/lens-flare.d.ts",
+      "import": "./dist/post/lens-flare.js"
+    },
+    "./post/image": {
+      "types": "./dist/post/image.d.ts",
+      "import": "./dist/post/image.js"
+    },
+    "./post/smaa": {
+      "types": "./dist/post/smaa.d.ts",
+      "import": "./dist/post/smaa.js"
+    },
+    "./post/glitch": {
+      "types": "./dist/post/glitch.d.ts",
+      "import": "./dist/post/glitch.js"
+    },
+    "./post/afterimage": {
+      "types": "./dist/post/afterimage.d.ts",
+      "import": "./dist/post/afterimage.js"
+    },
+    "./post/outline": {
+      "types": "./dist/post/outline.d.ts",
+      "import": "./dist/post/outline.js"
+    },
+    "./post/mrt": {
+      "types": "./dist/post/mrt.d.ts",
+      "import": "./dist/post/mrt.js"
+    },
+    "./post/depth": {
+      "types": "./dist/post/depth.d.ts",
+      "import": "./dist/post/depth.js"
+    },
+    "./post/contact-shadows": {
+      "types": "./dist/post/contact-shadows.d.ts",
+      "import": "./dist/post/contact-shadows.js"
+    },
+    "./post/sss": {
+      "types": "./dist/post/sss.d.ts",
+      "import": "./dist/post/sss.js"
+    },
+    "./post/anamorphic": {
+      "types": "./dist/post/anamorphic.d.ts",
+      "import": "./dist/post/anamorphic.js"
+    },
+    "./post/blur": {
+      "types": "./dist/post/blur.d.ts",
+      "import": "./dist/post/blur.js"
+    },
+    "./post/lens": {
+      "types": "./dist/post/lens.d.ts",
+      "import": "./dist/post/lens.js"
+    },
+    "./post/material-decals": {
+      "types": "./dist/post/material-decals.d.ts",
+      "import": "./dist/post/material-decals.js"
+    },
+    "./post/selective-bloom": {
+      "types": "./dist/post/selective-bloom.d.ts",
+      "import": "./dist/post/selective-bloom.js"
+    },
+    "./post/mask": {
+      "types": "./dist/post/mask.d.ts",
+      "import": "./dist/post/mask.js"
+    },
+    "./post/pixelate": {
+      "types": "./dist/post/pixelate.d.ts",
+      "import": "./dist/post/pixelate.js"
+    },
+    "./post/halftone": {
+      "types": "./dist/post/halftone.d.ts",
+      "import": "./dist/post/halftone.js"
+    },
+    "./post/stylize": {
+      "types": "./dist/post/stylize.d.ts",
+      "import": "./dist/post/stylize.js"
+    },
+    "./post/curvature": {
+      "types": "./dist/post/curvature.d.ts",
+      "import": "./dist/post/curvature.js"
+    },
+    "./procedural": {
+      "types": "./dist/procedural.d.ts",
+      "import": "./dist/procedural.js"
+    },
+    "./procedural/tree": {
+      "types": "./dist/procedural/tree.d.ts",
+      "import": "./dist/procedural/tree.js"
+    },
+    "./procedural/poisson": {
+      "types": "./dist/procedural/poisson.d.ts",
+      "import": "./dist/procedural/poisson.js"
+    },
+    "./procedural/standin": {
+      "types": "./dist/procedural/standin.d.ts",
+      "import": "./dist/procedural/standin.js"
+    },
+    "./procedural/noise": {
+      "types": "./dist/procedural/noise.d.ts",
+      "import": "./dist/procedural/noise.js"
+    },
+    "./procedural/lsystem": {
+      "types": "./dist/procedural/lsystem.d.ts",
+      "import": "./dist/procedural/lsystem.js"
+    },
+    "./procedural/voronoi": {
+      "types": "./dist/procedural/voronoi.d.ts",
+      "import": "./dist/procedural/voronoi.js"
+    },
+    "./procedural/expression": {
+      "types": "./dist/procedural/expression.d.ts",
+      "import": "./dist/procedural/expression.js"
+    },
+    "./procedural/dungeon": {
+      "types": "./dist/procedural/dungeon.d.ts",
+      "import": "./dist/procedural/dungeon.js"
+    },
+    "./procedural/trees": {
+      "types": "./dist/procedural/trees.d.ts",
+      "import": "./dist/procedural/trees.js"
+    },
+    "./procedural/sdf": {
+      "types": "./dist/procedural/sdf.d.ts",
+      "import": "./dist/procedural/sdf.js"
+    },
+    "./procedural/textures": {
+      "types": "./dist/procedural/textures.d.ts",
+      "import": "./dist/procedural/textures.js"
+    },
+    "./procedural/buildings": {
+      "types": "./dist/procedural/buildings.d.ts",
+      "import": "./dist/procedural/buildings.js"
+    },
+    "./procedural/caves": {
+      "types": "./dist/procedural/caves.d.ts",
+      "import": "./dist/procedural/caves.js"
+    },
+    "./procedural/tree-mesh": {
+      "types": "./dist/procedural/tree-mesh.d.ts",
+      "import": "./dist/procedural/tree-mesh.js"
+    },
+    "./procedural/textures-pbr": {
+      "types": "./dist/procedural/textures-pbr.d.ts",
+      "import": "./dist/procedural/textures-pbr.js"
+    },
+    "./quality": {
+      "types": "./dist/quality.d.ts",
+      "import": "./dist/quality.js"
+    },
+    "./quality/warm": {
+      "types": "./dist/quality/warm.d.ts",
+      "import": "./dist/quality/warm.js"
+    },
+    "./quality/ssaa": {
+      "types": "./dist/quality/ssaa.d.ts",
+      "import": "./dist/quality/ssaa.js"
+    },
+    "./quality/features": {
+      "types": "./dist/quality/features.d.ts",
+      "import": "./dist/quality/features.js"
+    },
+    "./quality/power": {
+      "types": "./dist/quality/power.d.ts",
+      "import": "./dist/quality/power.js"
+    },
+    "./quality/demand": {
+      "types": "./dist/quality/demand.d.ts",
+      "import": "./dist/quality/demand.js"
+    },
+    "./quality/events": {
+      "types": "./dist/quality/events.d.ts",
+      "import": "./dist/quality/events.js"
+    },
+    "./quality/knobs": {
+      "types": "./dist/quality/knobs.d.ts",
+      "import": "./dist/quality/knobs.js"
+    },
+    "./ragdoll": {
+      "types": "./dist/ragdoll.d.ts",
+      "import": "./dist/ragdoll.js"
+    },
+    "./ragdoll/powered": {
+      "types": "./dist/ragdoll/powered.d.ts",
+      "import": "./dist/ragdoll/powered.js"
+    },
+    "./ragdoll/getup": {
+      "types": "./dist/ragdoll/getup.d.ts",
+      "import": "./dist/ragdoll/getup.js"
+    },
+    "./ragdoll/hulls": {
+      "types": "./dist/ragdoll/hulls.d.ts",
+      "import": "./dist/ragdoll/hulls.js"
+    },
+    "./ragdoll/profile": {
+      "types": "./dist/ragdoll/profile.d.ts",
+      "import": "./dist/ragdoll/profile.js"
+    },
+    "./ragdoll/balance": {
+      "types": "./dist/ragdoll/balance.d.ts",
+      "import": "./dist/ragdoll/balance.js"
+    },
+    "./rigging": {
+      "types": "./dist/rigging.d.ts",
+      "import": "./dist/rigging.js"
+    },
+    "./rigging/ik": {
+      "types": "./dist/rigging/ik.d.ts",
+      "import": "./dist/rigging/ik.js"
+    },
+    "./rigging/retarget": {
+      "types": "./dist/rigging/retarget.d.ts",
+      "import": "./dist/rigging/retarget.js"
+    },
+    "./rigging/hulls": {
+      "types": "./dist/rigging/hulls.d.ts",
+      "import": "./dist/rigging/hulls.js"
+    },
+    "./rigging/springs": {
+      "types": "./dist/rigging/springs.d.ts",
+      "import": "./dist/rigging/springs.js"
+    },
+    "./rigging/vrm": {
+      "types": "./dist/rigging/vrm.d.ts",
+      "import": "./dist/rigging/vrm.js"
+    },
+    "./rigging/autorig": {
+      "types": "./dist/rigging/autorig.d.ts",
+      "import": "./dist/rigging/autorig.js"
+    },
+    "./rigging/voxel-weights": {
+      "types": "./dist/rigging/voxel-weights.d.ts",
+      "import": "./dist/rigging/voxel-weights.js"
+    },
+    "./rigging/correctives": {
+      "types": "./dist/rigging/correctives.d.ts",
+      "import": "./dist/rigging/correctives.js"
+    },
+    "./rigging/transfer": {
+      "types": "./dist/rigging/transfer.d.ts",
+      "import": "./dist/rigging/transfer.js"
+    },
+    "./rigging/face": {
+      "types": "./dist/rigging/face.d.ts",
+      "import": "./dist/rigging/face.js"
+    },
+    "./rigging/vrm0": {
+      "types": "./dist/rigging/vrm0.d.ts",
+      "import": "./dist/rigging/vrm0.js"
+    },
+    "./rigging/mtoon": {
+      "types": "./dist/rigging/mtoon.d.ts",
+      "import": "./dist/rigging/mtoon.js"
+    },
+    "./rigging/vrm-constraints": {
+      "types": "./dist/rigging/vrm-constraints.d.ts",
+      "import": "./dist/rigging/vrm-constraints.js"
+    },
+    "./rigging/vrma": {
+      "types": "./dist/rigging/vrma.d.ts",
+      "import": "./dist/rigging/vrma.js"
+    },
+    "./rigging/pose-tracking": {
+      "types": "./dist/rigging/pose-tracking.d.ts",
+      "import": "./dist/rigging/pose-tracking.js"
+    },
+    "./road": {
+      "types": "./dist/road.d.ts",
+      "import": "./dist/road.js"
+    },
+    "./road/junctions": {
+      "types": "./dist/road/junctions.d.ts",
+      "import": "./dist/road/junctions.js"
+    },
+    "./road/banking": {
+      "types": "./dist/road/banking.d.ts",
+      "import": "./dist/road/banking.js"
+    },
+    "./road/terrain": {
+      "types": "./dist/road/terrain.d.ts",
+      "import": "./dist/road/terrain.js"
+    },
+    "./road/repair": {
+      "types": "./dist/road/repair.d.ts",
+      "import": "./dist/road/repair.js"
+    },
+    "./road/markings": {
+      "types": "./dist/road/markings.d.ts",
+      "import": "./dist/road/markings.js"
+    },
+    "./road/graph": {
+      "types": "./dist/road/graph.d.ts",
+      "import": "./dist/road/graph.js"
+    },
+    "./road/intersections": {
+      "types": "./dist/road/intersections.d.ts",
+      "import": "./dist/road/intersections.js"
+    },
+    "./road/lanes": {
+      "types": "./dist/road/lanes.d.ts",
+      "import": "./dist/road/lanes.js"
+    },
+    "./road/geojson": {
+      "types": "./dist/road/geojson.d.ts",
+      "import": "./dist/road/geojson.js"
+    },
+    "./road/structures": {
+      "types": "./dist/road/structures.d.ts",
+      "import": "./dist/road/structures.js"
+    },
+    "./save": {
+      "types": "./dist/save.d.ts",
+      "import": "./dist/save.js"
+    },
+    "./save/node": {
+      "types": "./dist/save/node.d.ts",
+      "import": "./dist/save/node.js"
+    },
+    "./save/engine": {
+      "types": "./dist/save/engine.d.ts",
+      "import": "./dist/save/engine.js"
+    },
+    "./save/slots": {
+      "types": "./dist/save/slots.d.ts",
+      "import": "./dist/save/slots.js"
+    },
+    "./save/remote": {
+      "types": "./dist/save/remote.d.ts",
+      "import": "./dist/save/remote.js"
+    },
+    "./save/safe": {
+      "types": "./dist/save/safe.d.ts",
+      "import": "./dist/save/safe.js"
+    },
+    "./save/opfs": {
+      "types": "./dist/save/opfs.d.ts",
+      "import": "./dist/save/opfs.js"
+    },
+    "./save/signed": {
+      "types": "./dist/save/signed.d.ts",
+      "import": "./dist/save/signed.js"
+    },
+    "./save/scene-state": {
+      "types": "./dist/save/scene-state.d.ts",
+      "import": "./dist/save/scene-state.js"
+    },
+    "./save/materials": {
+      "types": "./dist/save/materials.d.ts",
+      "import": "./dist/save/materials.js"
+    },
+    "./scene": {
+      "types": "./dist/scene.d.ts",
+      "import": "./dist/scene.js"
+    },
+    "./scene/bulk": {
+      "types": "./dist/scene/bulk.d.ts",
+      "import": "./dist/scene/bulk.js"
+    },
+    "./scene/mesh": {
+      "types": "./dist/scene/mesh.d.ts",
+      "import": "./dist/scene/mesh.js"
+    },
+    "./scene/graph": {
+      "types": "./dist/scene/graph.d.ts",
+      "import": "./dist/scene/graph.js"
+    },
+    "./scene/clone": {
+      "types": "./dist/scene/clone.d.ts",
+      "import": "./dist/scene/clone.js"
+    },
+    "./scene/tags": {
+      "types": "./dist/scene/tags.d.ts",
+      "import": "./dist/scene/tags.js"
+    },
+    "./scenery": {
+      "types": "./dist/scenery.d.ts",
+      "import": "./dist/scenery.js"
+    },
+    "./scenery/sky": {
+      "types": "./dist/scenery/sky.d.ts",
+      "import": "./dist/scenery/sky.js"
+    },
+    "./scenery/presets": {
+      "types": "./dist/scenery/presets.d.ts",
+      "import": "./dist/scenery/presets.js"
+    },
+    "./scenery/scenes": {
+      "types": "./dist/scenery/scenes.d.ts",
+      "import": "./dist/scenery/scenes.js"
+    },
+    "./scenery/stars": {
+      "types": "./dist/scenery/stars.d.ts",
+      "import": "./dist/scenery/stars.js"
+    },
+    "./scenery/aurora": {
+      "types": "./dist/scenery/aurora.d.ts",
+      "import": "./dist/scenery/aurora.js"
+    },
+    "./scenery/moon": {
+      "types": "./dist/scenery/moon.d.ts",
+      "import": "./dist/scenery/moon.js"
+    },
+    "./selection": {
+      "types": "./dist/selection.d.ts",
+      "import": "./dist/selection.js"
+    },
+    "./selection/spatial": {
+      "types": "./dist/selection/spatial.d.ts",
+      "import": "./dist/selection/spatial.js"
+    },
+    "./selection/hit-details": {
+      "types": "./dist/selection/hit-details.d.ts",
+      "import": "./dist/selection/hit-details.js"
+    },
+    "./selection/xray": {
+      "types": "./dist/selection/xray.d.ts",
+      "import": "./dist/selection/xray.js"
+    },
+    "./selection/area": {
+      "types": "./dist/selection/area.d.ts",
+      "import": "./dist/selection/area.js"
+    },
+    "./selection/highlight": {
+      "types": "./dist/selection/highlight.d.ts",
+      "import": "./dist/selection/highlight.js"
+    },
+    "./shader": {
+      "types": "./dist/shader.d.ts",
+      "import": "./dist/shader.js"
+    },
+    "./shader/noise": {
+      "types": "./dist/shader/noise.d.ts",
+      "import": "./dist/shader/noise.js"
+    },
+    "./shader/graph": {
+      "types": "./dist/shader/graph.d.ts",
+      "import": "./dist/shader/graph.js"
+    },
+    "./shader/readback": {
+      "types": "./dist/shader/readback.d.ts",
+      "import": "./dist/shader/readback.js"
+    },
+    "./shader/raw": {
+      "types": "./dist/shader/raw.d.ts",
+      "import": "./dist/shader/raw.js"
+    },
+    "./shader/effects": {
+      "types": "./dist/shader/effects.d.ts",
+      "import": "./dist/shader/effects.js"
+    },
+    "./shader/editor": {
+      "types": "./dist/shader/editor.d.ts",
+      "import": "./dist/shader/editor.js"
+    },
+    "./shader/compute-texture": {
+      "types": "./dist/shader/compute-texture.d.ts",
+      "import": "./dist/shader/compute-texture.js"
+    },
+    "./shader/lighting": {
+      "types": "./dist/shader/lighting.d.ts",
+      "import": "./dist/shader/lighting.js"
+    },
+    "./shader/deform": {
+      "types": "./dist/shader/deform.d.ts",
+      "import": "./dist/shader/deform.js"
+    },
+    "./shader/pass": {
+      "types": "./dist/shader/pass.d.ts",
+      "import": "./dist/shader/pass.js"
+    },
+    "./shader/utils": {
+      "types": "./dist/shader/utils.d.ts",
+      "import": "./dist/shader/utils.js"
+    },
+    "./shader/subgroups": {
+      "types": "./dist/shader/subgroups.d.ts",
+      "import": "./dist/shader/subgroups.js"
+    },
+    "./shader/serialization": {
+      "types": "./dist/shader/serialization.d.ts",
+      "import": "./dist/shader/serialization.js"
+    },
+    "./shader/compute-volume": {
+      "types": "./dist/shader/compute-volume.d.ts",
+      "import": "./dist/shader/compute-volume.js"
+    },
+    "./shader/editor-pass": {
+      "types": "./dist/shader/editor-pass.d.ts",
+      "import": "./dist/shader/editor-pass.js"
+    },
+    "./shader/texture-array": {
+      "types": "./dist/shader/texture-array.d.ts",
+      "import": "./dist/shader/texture-array.js"
+    },
+    "./shadows": {
+      "types": "./dist/shadows.d.ts",
+      "import": "./dist/shadows.js"
+    },
+    "./shadows/virtual": {
+      "types": "./dist/shadows/virtual.d.ts",
+      "import": "./dist/shadows/virtual.js"
+    },
+    "./shadows/light-function": {
+      "types": "./dist/shadows/light-function.d.ts",
+      "import": "./dist/shadows/light-function.js"
+    },
+    "./shadows/vsm": {
+      "types": "./dist/shadows/vsm.d.ts",
+      "import": "./dist/shadows/vsm.js"
+    },
+    "./shadows/transmission": {
+      "types": "./dist/shadows/transmission.d.ts",
+      "import": "./dist/shadows/transmission.js"
+    },
+    "./shadows/distance": {
+      "types": "./dist/shadows/distance.d.ts",
+      "import": "./dist/shadows/distance.js"
+    },
+    "./shadows/style": {
+      "types": "./dist/shadows/style.d.ts",
+      "import": "./dist/shadows/style.js"
+    },
+    "./shadows/rt": {
+      "types": "./dist/shadows/rt.d.ts",
+      "import": "./dist/shadows/rt.js"
+    },
+    "./shadows/rt-alpha": {
+      "types": "./dist/shadows/rt-alpha.d.ts",
+      "import": "./dist/shadows/rt-alpha.js"
+    },
+    "./sky": {
+      "types": "./dist/sky.d.ts",
+      "import": "./dist/sky.js"
+    },
+    "./sky/base": {
+      "types": "./dist/sky/base.d.ts",
+      "import": "./dist/sky/base.js"
+    },
+    "./sky/preetham": {
+      "types": "./dist/sky/preetham.d.ts",
+      "import": "./dist/sky/preetham.js"
+    },
+    "./sky/bruneton": {
+      "types": "./dist/sky/bruneton.d.ts",
+      "import": "./dist/sky/bruneton.js"
+    },
+    "./sky/clouds": {
+      "types": "./dist/sky/clouds.d.ts",
+      "import": "./dist/sky/clouds.js"
+    },
+    "./sky/night": {
+      "types": "./dist/sky/night.d.ts",
+      "import": "./dist/sky/night.js"
+    },
+    "./sky/fog": {
+      "types": "./dist/sky/fog.d.ts",
+      "import": "./dist/sky/fog.js"
+    },
+    "./sky/reflection": {
+      "types": "./dist/sky/reflection.d.ts",
+      "import": "./dist/sky/reflection.js"
+    },
+    "./sky/lighting": {
+      "types": "./dist/sky/lighting.d.ts",
+      "import": "./dist/sky/lighting.js"
+    },
+    "./sky/weather": {
+      "types": "./dist/sky/weather.d.ts",
+      "import": "./dist/sky/weather.js"
+    },
+    "./sky/sun": {
+      "types": "./dist/sky/sun.d.ts",
+      "import": "./dist/sky/sun.js"
+    },
+    "./sky/volumetric-clouds": {
+      "types": "./dist/sky/volumetric-clouds.d.ts",
+      "import": "./dist/sky/volumetric-clouds.js"
+    },
+    "./sky/cloud-shadows": {
+      "types": "./dist/sky/cloud-shadows.d.ts",
+      "import": "./dist/sky/cloud-shadows.js"
+    },
+    "./sky/aerial": {
+      "types": "./dist/sky/aerial.d.ts",
+      "import": "./dist/sky/aerial.js"
+    },
+    "./sky/hillaire": {
+      "types": "./dist/sky/hillaire.d.ts",
+      "import": "./dist/sky/hillaire.js"
+    },
+    "./sky/shafts": {
+      "types": "./dist/sky/shafts.d.ts",
+      "import": "./dist/sky/shafts.js"
+    },
+    "./sky/astro": {
+      "types": "./dist/sky/astro.d.ts",
+      "import": "./dist/sky/astro.js"
+    },
+    "./sky/weather-fx": {
+      "types": "./dist/sky/weather-fx.d.ts",
+      "import": "./dist/sky/weather-fx.js"
+    },
+    "./sky/presets": {
+      "types": "./dist/sky/presets.d.ts",
+      "import": "./dist/sky/presets.js"
+    },
+    "./sky/planet": {
+      "types": "./dist/sky/planet.d.ts",
+      "import": "./dist/sky/planet.js"
+    },
+    "./sky/compat-clouds": {
+      "types": "./dist/sky/compat-clouds.d.ts",
+      "import": "./dist/sky/compat-clouds.js"
+    },
+    "./splines": {
+      "types": "./dist/splines.d.ts",
+      "import": "./dist/splines.js"
+    },
+    "./splines/closest": {
+      "types": "./dist/splines/closest.d.ts",
+      "import": "./dist/splines/closest.js"
+    },
+    "./splines/frames": {
+      "types": "./dist/splines/frames.d.ts",
+      "import": "./dist/splines/frames.js"
+    },
+    "./splines/knots": {
+      "types": "./dist/splines/knots.d.ts",
+      "import": "./dist/splines/knots.js"
+    },
+    "./splines/mesh": {
+      "types": "./dist/splines/mesh.d.ts",
+      "import": "./dist/splines/mesh.js"
+    },
+    "./splines/fit": {
+      "types": "./dist/splines/fit.d.ts",
+      "import": "./dist/splines/fit.js"
+    },
+    "./splines/kinds": {
+      "types": "./dist/splines/kinds.d.ts",
+      "import": "./dist/splines/kinds.js"
+    },
+    "./splines/query": {
+      "types": "./dist/splines/query.d.ts",
+      "import": "./dist/splines/query.js"
+    },
+    "./splines/offset": {
+      "types": "./dist/splines/offset.d.ts",
+      "import": "./dist/splines/offset.js"
+    },
+    "./sprites": {
+      "types": "./dist/sprites.d.ts",
+      "import": "./dist/sprites.js"
+    },
+    "./sprites/animation": {
+      "types": "./dist/sprites/animation.d.ts",
+      "import": "./dist/sprites/animation.js"
+    },
+    "./sprites/aseprite": {
+      "types": "./dist/sprites/aseprite.d.ts",
+      "import": "./dist/sprites/aseprite.js"
+    },
+    "./sprites/atlas": {
+      "types": "./dist/sprites/atlas.d.ts",
+      "import": "./dist/sprites/atlas.js"
+    },
+    "./sprites/billboard": {
+      "types": "./dist/sprites/billboard.d.ts",
+      "import": "./dist/sprites/billboard.js"
+    },
+    "./sprites/shader": {
+      "types": "./dist/sprites/shader.d.ts",
+      "import": "./dist/sprites/shader.js"
+    },
+    "./sprites/skeletal": {
+      "types": "./dist/sprites/skeletal.d.ts",
+      "import": "./dist/sprites/skeletal.js"
+    },
+    "./sprites/slice": {
+      "types": "./dist/sprites/slice.d.ts",
+      "import": "./dist/sprites/slice.js"
+    },
+    "./sprites/pick": {
+      "types": "./dist/sprites/pick.d.ts",
+      "import": "./dist/sprites/pick.js"
+    },
+    "./sprites/blend": {
+      "types": "./dist/sprites/blend.d.ts",
+      "import": "./dist/sprites/blend.js"
+    },
+    "./sprites/spine": {
+      "types": "./dist/sprites/spine.d.ts",
+      "import": "./dist/sprites/spine.js"
+    },
+    "./stage/gltf": {
+      "types": "./dist/stage/gltf.d.ts",
+      "import": "./dist/stage/gltf.js"
+    },
+    "./stage/sky": {
+      "types": "./dist/stage/sky.d.ts",
+      "import": "./dist/stage/sky.js"
+    },
+    "./stage/particles": {
+      "types": "./dist/stage/particles.d.ts",
+      "import": "./dist/stage/particles.js"
+    },
+    "./stage/effects": {
+      "types": "./dist/stage/effects.d.ts",
+      "import": "./dist/stage/effects.js"
+    },
+    "./stage/environment": {
+      "types": "./dist/stage/environment.d.ts",
+      "import": "./dist/stage/environment.js"
+    },
+    "./stage/shadows": {
+      "types": "./dist/stage/shadows.d.ts",
+      "import": "./dist/stage/shadows.js"
+    },
+    "./stage/xr": {
+      "types": "./dist/stage/xr.d.ts",
+      "import": "./dist/stage/xr.js"
+    },
+    "./stage/viewer": {
+      "types": "./dist/stage/viewer.d.ts",
+      "import": "./dist/stage/viewer.js"
+    },
+    "./stage/physics": {
+      "types": "./dist/stage/physics.d.ts",
+      "import": "./dist/stage/physics.js"
+    },
+    "./stage/lights": {
+      "types": "./dist/stage/lights.d.ts",
+      "import": "./dist/stage/lights.js"
+    },
+    "./stage/scene": {
+      "types": "./dist/stage/scene.d.ts",
+      "import": "./dist/stage/scene.js"
+    },
+    "./stage/viewer-extras": {
+      "types": "./dist/stage/viewer-extras.d.ts",
+      "import": "./dist/stage/viewer-extras.js"
+    },
+    "./staging": {
+      "types": "./dist/staging.d.ts",
+      "import": "./dist/staging.js"
+    },
+    "./staging/accumulate": {
+      "types": "./dist/staging/accumulate.d.ts",
+      "import": "./dist/staging/accumulate.js"
+    },
+    "./staging/pathtrace": {
+      "types": "./dist/staging/pathtrace.d.ts",
+      "import": "./dist/staging/pathtrace.js"
+    },
+    "./staging/ground": {
+      "types": "./dist/staging/ground.d.ts",
+      "import": "./dist/staging/ground.js"
+    },
+    "./staging/pathtrace-materials": {
+      "types": "./dist/staging/pathtrace-materials.d.ts",
+      "import": "./dist/staging/pathtrace-materials.js"
+    },
+    "./staging/accumulate-ambient": {
+      "types": "./dist/staging/accumulate-ambient.d.ts",
+      "import": "./dist/staging/accumulate-ambient.js"
+    },
+    "./staging/caustics": {
+      "types": "./dist/staging/caustics.d.ts",
+      "import": "./dist/staging/caustics.js"
+    },
+    "./staging/backdrop": {
+      "types": "./dist/staging/backdrop.d.ts",
+      "import": "./dist/staging/backdrop.js"
+    },
+    "./stats": {
+      "types": "./dist/stats.d.ts",
+      "import": "./dist/stats.js"
+    },
+    "./stats/beacon": {
+      "types": "./dist/stats/beacon.d.ts",
+      "import": "./dist/stats/beacon.js"
+    },
+    "./stats/compile": {
+      "types": "./dist/stats/compile.d.ts",
+      "import": "./dist/stats/compile.js"
+    },
+    "./stats/leaks": {
+      "types": "./dist/stats/leaks.d.ts",
+      "import": "./dist/stats/leaks.js"
+    },
+    "./stats/phases": {
+      "types": "./dist/stats/phases.d.ts",
+      "import": "./dist/stats/phases.js"
+    },
+    "./stats/report": {
+      "types": "./dist/stats/report.d.ts",
+      "import": "./dist/stats/report.js"
+    },
+    "./stats/geometry": {
+      "types": "./dist/stats/geometry.d.ts",
+      "import": "./dist/stats/geometry.js"
+    },
+    "./stats/gl": {
+      "types": "./dist/stats/gl.d.ts",
+      "import": "./dist/stats/gl.js"
+    },
+    "./stats/panels": {
+      "types": "./dist/stats/panels.d.ts",
+      "import": "./dist/stats/panels.js"
+    },
+    "./terrain": {
+      "types": "./dist/terrain.d.ts",
+      "import": "./dist/terrain.js"
+    },
+    "./terrain/query": {
+      "types": "./dist/terrain/query.d.ts",
+      "import": "./dist/terrain/query.js"
+    },
+    "./terrain/layers-pbr": {
+      "types": "./dist/terrain/layers-pbr.d.ts",
+      "import": "./dist/terrain/layers-pbr.js"
+    },
+    "./terrain/stream": {
+      "types": "./dist/terrain/stream.d.ts",
+      "import": "./dist/terrain/stream.js"
+    },
+    "./terrain/sculpt": {
+      "types": "./dist/terrain/sculpt.d.ts",
+      "import": "./dist/terrain/sculpt.js"
+    },
+    "./terrain/holes": {
+      "types": "./dist/terrain/holes.d.ts",
+      "import": "./dist/terrain/holes.js"
+    },
+    "./terrain/rvt": {
+      "types": "./dist/terrain/rvt.d.ts",
+      "import": "./dist/terrain/rvt.js"
+    },
+    "./terrain/displace": {
+      "types": "./dist/terrain/displace.d.ts",
+      "import": "./dist/terrain/displace.js"
+    },
+    "./terrain/deform": {
+      "types": "./dist/terrain/deform.d.ts",
+      "import": "./dist/terrain/deform.js"
+    },
+    "./terrain/blend": {
+      "types": "./dist/terrain/blend.d.ts",
+      "import": "./dist/terrain/blend.js"
+    },
+    "./terrain/planet": {
+      "types": "./dist/terrain/planet.d.ts",
+      "import": "./dist/terrain/planet.js"
+    },
+    "./terrain/imagery": {
+      "types": "./dist/terrain/imagery.d.ts",
+      "import": "./dist/terrain/imagery.js"
+    },
+    "./terrain/overlays": {
+      "types": "./dist/terrain/overlays.d.ts",
+      "import": "./dist/terrain/overlays.js"
+    },
+    "./text": {
+      "types": "./dist/text.d.ts",
+      "import": "./dist/text.js"
+    },
+    "./text/rich": {
+      "types": "./dist/text/rich.d.ts",
+      "import": "./dist/text/rich.js"
+    },
+    "./text/msdf": {
+      "types": "./dist/text/msdf.d.ts",
+      "import": "./dist/text/msdf.js"
+    },
+    "./text/animate": {
+      "types": "./dist/text/animate.d.ts",
+      "import": "./dist/text/animate.js"
+    },
+    "./text/extrude": {
+      "types": "./dist/text/extrude.d.ts",
+      "import": "./dist/text/extrude.js"
+    },
+    "./text/fit": {
+      "types": "./dist/text/fit.d.ts",
+      "import": "./dist/text/fit.js"
+    },
+    "./text/selection": {
+      "types": "./dist/text/selection.d.ts",
+      "import": "./dist/text/selection.js"
+    },
+    "./text/curve": {
+      "types": "./dist/text/curve.d.ts",
+      "import": "./dist/text/curve.js"
+    },
+    "./tilemap": {
+      "types": "./dist/tilemap.d.ts",
+      "import": "./dist/tilemap.js"
+    },
+    "./tilemap/autotile": {
+      "types": "./dist/tilemap/autotile.d.ts",
+      "import": "./dist/tilemap/autotile.js"
+    },
+    "./tilemap/ldtk": {
+      "types": "./dist/tilemap/ldtk.d.ts",
+      "import": "./dist/tilemap/ldtk.js"
+    },
+    "./tilemap/tiled": {
+      "types": "./dist/tilemap/tiled.d.ts",
+      "import": "./dist/tilemap/tiled.js"
+    },
+    "./tilemap/iso": {
+      "types": "./dist/tilemap/iso.d.ts",
+      "import": "./dist/tilemap/iso.js"
+    },
+    "./tilemap/hex": {
+      "types": "./dist/tilemap/hex.d.ts",
+      "import": "./dist/tilemap/hex.js"
+    },
+    "./tilemap/path": {
+      "types": "./dist/tilemap/path.d.ts",
+      "import": "./dist/tilemap/path.js"
+    },
+    "./tilemap/fov": {
+      "types": "./dist/tilemap/fov.d.ts",
+      "import": "./dist/tilemap/fov.js"
+    },
+    "./tilemap/objects": {
+      "types": "./dist/tilemap/objects.d.ts",
+      "import": "./dist/tilemap/objects.js"
+    },
+    "./tilemap/plane": {
+      "types": "./dist/tilemap/plane.d.ts",
+      "import": "./dist/tilemap/plane.js"
+    },
+    "./tonemap": {
+      "types": "./dist/tonemap.d.ts",
+      "import": "./dist/tonemap.js"
+    },
+    "./tonemap/grade": {
+      "types": "./dist/tonemap/grade.d.ts",
+      "import": "./dist/tonemap/grade.js"
+    },
+    "./tonemap/custom": {
+      "types": "./dist/tonemap/custom.d.ts",
+      "import": "./dist/tonemap/custom.js"
+    },
+    "./tonemap/local": {
+      "types": "./dist/tonemap/local.d.ts",
+      "import": "./dist/tonemap/local.js"
+    },
+    "./tonemap/hue": {
+      "types": "./dist/tonemap/hue.d.ts",
+      "import": "./dist/tonemap/hue.js"
+    },
+    "./tonemap/export-cube": {
+      "types": "./dist/tonemap/export-cube.d.ts",
+      "import": "./dist/tonemap/export-cube.js"
+    },
+    "./toon": {
+      "types": "./dist/toon.d.ts",
+      "import": "./dist/toon.js"
+    },
+    "./toon/models": {
+      "types": "./dist/toon/models.d.ts",
+      "import": "./dist/toon/models.js"
+    },
+    "./toon/screen-outline": {
+      "types": "./dist/toon/screen-outline.d.ts",
+      "import": "./dist/toon/screen-outline.js"
+    },
+    "./toon/hatch-models": {
+      "types": "./dist/toon/hatch-models.d.ts",
+      "import": "./dist/toon/hatch-models.js"
+    },
+    "./toon/hatch": {
+      "types": "./dist/toon/hatch.d.ts",
+      "import": "./dist/toon/hatch.js"
+    },
+    "./transitions/mask": {
+      "types": "./dist/transitions/mask.d.ts",
+      "import": "./dist/transitions/mask.js"
+    },
+    "./transitions/custom": {
+      "types": "./dist/transitions/custom.d.ts",
+      "import": "./dist/transitions/custom.js"
+    },
+    "./transitions": {
+      "types": "./dist/transitions.d.ts",
+      "import": "./dist/transitions.js"
+    },
+    "./transitions/live": {
+      "types": "./dist/transitions/live.d.ts",
+      "import": "./dist/transitions/live.js"
+    },
+    "./transitions/presets": {
+      "types": "./dist/transitions/presets.d.ts",
+      "import": "./dist/transitions/presets.js"
+    },
+    "./transitions/glsl": {
+      "types": "./dist/transitions/glsl.d.ts",
+      "import": "./dist/transitions/glsl.js"
+    },
+    "./tween": {
+      "types": "./dist/tween.d.ts",
+      "import": "./dist/tween.js"
+    },
+    "./tween/stagger": {
+      "types": "./dist/tween/stagger.d.ts",
+      "import": "./dist/tween/stagger.js"
+    },
+    "./tween/motion-path": {
+      "types": "./dist/tween/motion-path.d.ts",
+      "import": "./dist/tween/motion-path.js"
+    },
+    "./tween/scroll": {
+      "types": "./dist/tween/scroll.d.ts",
+      "import": "./dist/tween/scroll.js"
+    },
+    "./tween/custom-ease": {
+      "types": "./dist/tween/custom-ease.d.ts",
+      "import": "./dist/tween/custom-ease.js"
+    },
+    "./tween/async": {
+      "types": "./dist/tween/async.d.ts",
+      "import": "./dist/tween/async.js"
+    },
+    "./tween/props": {
+      "types": "./dist/tween/props.d.ts",
+      "import": "./dist/tween/props.js"
+    },
+    "./tween/timeline": {
+      "types": "./dist/tween/timeline.d.ts",
+      "import": "./dist/tween/timeline.js"
+    },
+    "./tween/control": {
+      "types": "./dist/tween/control.d.ts",
+      "import": "./dist/tween/control.js"
+    },
+    "./tween/scroll-pin": {
+      "types": "./dist/tween/scroll-pin.d.ts",
+      "import": "./dist/tween/scroll-pin.js"
+    },
+    "./tween/inertia": {
+      "types": "./dist/tween/inertia.d.ts",
+      "import": "./dist/tween/inertia.js"
+    },
+    "./ui": {
+      "types": "./dist/ui.d.ts",
+      "import": "./dist/ui.js"
+    },
+    "./ui/react": {
+      "types": "./dist/ui/react.d.ts",
+      "import": "./dist/ui/react.js"
+    },
+    "./ui/world": {
+      "types": "./dist/ui/world.d.ts",
+      "import": "./dist/ui/world.js"
+    },
+    "./ui/input": {
+      "types": "./dist/ui/input.d.ts",
+      "import": "./dist/ui/input.js"
+    },
+    "./ui/markup": {
+      "types": "./dist/ui/markup.d.ts",
+      "import": "./dist/ui/markup.js"
+    },
+    "./ui/image": {
+      "types": "./dist/ui/image.d.ts",
+      "import": "./dist/ui/image.js"
+    },
+    "./ui/forms": {
+      "types": "./dist/ui/forms.d.ts",
+      "import": "./dist/ui/forms.js"
+    },
+    "./ui/world-gl": {
+      "types": "./dist/ui/world-gl.d.ts",
+      "import": "./dist/ui/world-gl.js"
+    },
+    "./ui/curved": {
+      "types": "./dist/ui/curved.d.ts",
+      "import": "./dist/ui/curved.js"
+    },
+    "./ui/keyboard": {
+      "types": "./dist/ui/keyboard.d.ts",
+      "import": "./dist/ui/keyboard.js"
+    },
+    "./ui/i18n": {
+      "types": "./dist/ui/i18n.d.ts",
+      "import": "./dist/ui/i18n.js"
+    },
+    "./ui/editor": {
+      "types": "./dist/ui/editor.d.ts",
+      "import": "./dist/ui/editor.js"
+    },
+    "./vfx": {
+      "types": "./dist/vfx.d.ts",
+      "import": "./dist/vfx.js"
+    },
+    "./vfx/base": {
+      "types": "./dist/vfx/base.d.ts",
+      "import": "./dist/vfx/base.js"
+    },
+    "./vfx/obstacles": {
+      "types": "./dist/vfx/obstacles.d.ts",
+      "import": "./dist/vfx/obstacles.js"
+    },
+    "./vfx/wrap": {
+      "types": "./dist/vfx/wrap.d.ts",
+      "import": "./dist/vfx/wrap.js"
+    },
+    "./vfx/sort": {
+      "types": "./dist/vfx/sort.d.ts",
+      "import": "./dist/vfx/sort.js"
+    },
+    "./vfx/texture": {
+      "types": "./dist/vfx/texture.d.ts",
+      "import": "./dist/vfx/texture.js"
+    },
+    "./vfx/soft": {
+      "types": "./dist/vfx/soft.d.ts",
+      "import": "./dist/vfx/soft.js"
+    },
+    "./vfx/curves": {
+      "types": "./dist/vfx/curves.d.ts",
+      "import": "./dist/vfx/curves.js"
+    },
+    "./vfx/emitter": {
+      "types": "./dist/vfx/emitter.d.ts",
+      "import": "./dist/vfx/emitter.js"
+    },
+    "./vfx/ribbons": {
+      "types": "./dist/vfx/ribbons.d.ts",
+      "import": "./dist/vfx/ribbons.js"
+    },
+    "./vfx/mesh": {
+      "types": "./dist/vfx/mesh.d.ts",
+      "import": "./dist/vfx/mesh.js"
+    },
+    "./vfx/events": {
+      "types": "./dist/vfx/events.d.ts",
+      "import": "./dist/vfx/events.js"
+    },
+    "./vfx/lit": {
+      "types": "./dist/vfx/lit.d.ts",
+      "import": "./dist/vfx/lit.js"
+    },
+    "./vfx/depth-collide": {
+      "types": "./dist/vfx/depth-collide.d.ts",
+      "import": "./dist/vfx/depth-collide.js"
+    },
+    "./vfx/stretch": {
+      "types": "./dist/vfx/stretch.d.ts",
+      "import": "./dist/vfx/stretch.js"
+    },
+    "./vfx/fields": {
+      "types": "./dist/vfx/fields.d.ts",
+      "import": "./dist/vfx/fields.js"
+    },
+    "./vfx/skinned": {
+      "types": "./dist/vfx/skinned.d.ts",
+      "import": "./dist/vfx/skinned.js"
+    },
+    "./vfx/flipbook": {
+      "types": "./dist/vfx/flipbook.d.ts",
+      "import": "./dist/vfx/flipbook.js"
+    },
+    "./vfx/shadows": {
+      "types": "./dist/vfx/shadows.d.ts",
+      "import": "./dist/vfx/shadows.js"
+    },
+    "./vfx/nodes": {
+      "types": "./dist/vfx/nodes.d.ts",
+      "import": "./dist/vfx/nodes.js"
+    },
+    "./vfx/space": {
+      "types": "./dist/vfx/space.d.ts",
+      "import": "./dist/vfx/space.js"
+    },
+    "./vfx/over-life": {
+      "types": "./dist/vfx/over-life.d.ts",
+      "import": "./dist/vfx/over-life.js"
+    },
+    "./vfx/shapes": {
+      "types": "./dist/vfx/shapes.d.ts",
+      "import": "./dist/vfx/shapes.js"
+    },
+    "./vfx/schedule": {
+      "types": "./dist/vfx/schedule.d.ts",
+      "import": "./dist/vfx/schedule.js"
+    },
+    "./vfx/json": {
+      "types": "./dist/vfx/json.d.ts",
+      "import": "./dist/vfx/json.js"
+    },
+    "./water": {
+      "types": "./dist/water.d.ts",
+      "import": "./dist/water.js"
+    },
+    "./water/fft": {
+      "types": "./dist/water/fft.d.ts",
+      "import": "./dist/water/fft.js"
+    },
+    "./water/query": {
+      "types": "./dist/water/query.d.ts",
+      "import": "./dist/water/query.js"
+    },
+    "./water/caustics": {
+      "types": "./dist/water/caustics.d.ts",
+      "import": "./dist/water/caustics.js"
+    },
+    "./water/ripples": {
+      "types": "./dist/water/ripples.d.ts",
+      "import": "./dist/water/ripples.js"
+    },
+    "./water/flow": {
+      "types": "./dist/water/flow.d.ts",
+      "import": "./dist/water/flow.js"
+    },
+    "./water/bodies": {
+      "types": "./dist/water/bodies.d.ts",
+      "import": "./dist/water/bodies.js"
+    },
+    "./water/scatter": {
+      "types": "./dist/water/scatter.d.ts",
+      "import": "./dist/water/scatter.js"
+    },
+    "./water/rain": {
+      "types": "./dist/water/rain.d.ts",
+      "import": "./dist/water/rain.js"
+    },
+    "./water/reflector": {
+      "types": "./dist/water/reflector.d.ts",
+      "import": "./dist/water/reflector.js"
+    },
+    "./water/underwater": {
+      "types": "./dist/water/underwater.d.ts",
+      "import": "./dist/water/underwater.js"
+    },
+    "./water/rivers": {
+      "types": "./dist/water/rivers.d.ts",
+      "import": "./dist/water/rivers.js"
+    },
+    "./weather": {
+      "types": "./dist/weather.d.ts",
+      "import": "./dist/weather.js"
+    },
+    "./weather/hail": {
+      "types": "./dist/weather/hail.d.ts",
+      "import": "./dist/weather/hail.js"
+    },
+    "./weather/puddles": {
+      "types": "./dist/weather/puddles.d.ts",
+      "import": "./dist/weather/puddles.js"
+    },
+    "./weather/snow": {
+      "types": "./dist/weather/snow.d.ts",
+      "import": "./dist/weather/snow.js"
+    },
+    "./weather/regions": {
+      "types": "./dist/weather/regions.d.ts",
+      "import": "./dist/weather/regions.js"
+    },
+    "./weather/drive": {
+      "types": "./dist/weather/drive.d.ts",
+      "import": "./dist/weather/drive.js"
+    },
+    "./weather/audio": {
+      "types": "./dist/weather/audio.d.ts",
+      "import": "./dist/weather/audio.js"
+    },
+    "./weather/data": {
+      "types": "./dist/weather/data.d.ts",
+      "import": "./dist/weather/data.js"
+    },
+    "./weather/gltf": {
+      "types": "./dist/weather/gltf.d.ts",
+      "import": "./dist/weather/gltf.js"
+    },
+    "./weather/lens": {
+      "types": "./dist/weather/lens.d.ts",
+      "import": "./dist/weather/lens.js"
+    },
+    "./weather/cover": {
+      "types": "./dist/weather/cover.d.ts",
+      "import": "./dist/weather/cover.js"
+    },
+    "./wfc": {
+      "types": "./dist/wfc.d.ts",
+      "import": "./dist/wfc.js"
+    },
+    "./wfc/overlapping": {
+      "types": "./dist/wfc/overlapping.d.ts",
+      "import": "./dist/wfc/overlapping.js"
+    },
+    "./wfc/constraints": {
+      "types": "./dist/wfc/constraints.d.ts",
+      "import": "./dist/wfc/constraints.js"
+    },
+    "./wfc/sockets": {
+      "types": "./dist/wfc/sockets.d.ts",
+      "import": "./dist/wfc/sockets.js"
+    },
+    "./wfc/chunks": {
+      "types": "./dist/wfc/chunks.d.ts",
+      "import": "./dist/wfc/chunks.js"
+    },
+    "./wfc/worker": {
+      "types": "./dist/wfc/worker.d.ts",
+      "import": "./dist/wfc/worker.js"
+    },
+    "./wfc/assemble": {
+      "types": "./dist/wfc/assemble.d.ts",
+      "import": "./dist/wfc/assemble.js"
+    },
+    "./wfc/tileset": {
+      "types": "./dist/wfc/tileset.d.ts",
+      "import": "./dist/wfc/tileset.js"
+    },
+    "./wfc/overlapping3d": {
+      "types": "./dist/wfc/overlapping3d.d.ts",
+      "import": "./dist/wfc/overlapping3d.js"
+    },
+    "./wfc/hex": {
+      "types": "./dist/wfc/hex.d.ts",
+      "import": "./dist/wfc/hex.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./worker/canvas": {
+      "types": "./dist/worker/canvas.d.ts",
+      "import": "./dist/worker/canvas.js"
+    },
+    "./worker/rpc": {
+      "types": "./dist/worker/rpc.d.ts",
+      "import": "./dist/worker/rpc.js"
+    },
+    "./worker/auto": {
+      "types": "./dist/worker/auto.d.ts",
+      "import": "./dist/worker/auto.js"
+    },
+    "./stage": {
+      "types": "./dist/stage.d.ts",
+      "import": "./dist/stage.js"
+    }
+  },
+  "dependencies": {
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/animator": "^1.0.0",
+    "@margoengine/audio": "^1.0.0",
+    "@margoengine/behavior": "^1.0.0",
+    "@margoengine/biomes": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/cache": "^1.0.0",
+    "@margoengine/cameras": "^1.0.0",
+    "@margoengine/cinematic": "^1.0.0",
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/compute": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/creative": "^1.0.0",
+    "@margoengine/culling": "^1.0.0",
+    "@margoengine/cutscene": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/ecs": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/fsm": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/input": "^1.0.0",
+    "@margoengine/lighting2d": "^1.0.0",
+    "@margoengine/lightmap": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0",
+    "@margoengine/lod": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
+    "@margoengine/mixer": "^1.0.0",
+    "@margoengine/navmesh": "^1.0.0",
+    "@margoengine/net": "^1.0.0",
+    "@margoengine/netcode": "^1.0.0",
+    "@margoengine/oit": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
+    "@margoengine/pixel": "^1.0.0",
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0",
+    "@margoengine/quality": "^1.0.0",
+    "@margoengine/ragdoll": "^1.0.0",
+    "@margoengine/rigging": "^1.0.0",
+    "@margoengine/road": "^1.0.0",
+    "@margoengine/save": "^1.0.0",
+    "@margoengine/scene": "^1.0.0",
+    "@margoengine/scenery": "^1.0.0",
+    "@margoengine/selection": "^1.0.0",
+    "@margoengine/shader": "^1.0.0",
+    "@margoengine/shadows": "^1.0.0",
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/splines": "^1.0.0",
+    "@margoengine/sprites": "^1.0.0",
+    "@margoengine/stage": "^1.0.0",
+    "@margoengine/staging": "^1.0.0",
+    "@margoengine/stats": "^1.0.0",
+    "@margoengine/terrain": "^1.0.0",
+    "@margoengine/text": "^1.0.0",
+    "@margoengine/tilemap": "^1.0.0",
+    "@margoengine/tonemap": "^1.0.0",
+    "@margoengine/toon": "^1.0.0",
+    "@margoengine/transitions": "^1.0.0",
+    "@margoengine/tween": "^1.0.0",
+    "@margoengine/ui": "^1.0.0",
+    "@margoengine/vfx": "^1.0.0",
+    "@margoengine/water": "^1.0.0",
+    "@margoengine/weather": "^1.0.0",
+    "@margoengine/wfc": "^1.0.0",
+    "@margoengine/worker": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@dimforge/rapier3d-compat": ">=0.14.0 <1",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@dimforge/rapier3d-compat": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  }
+}

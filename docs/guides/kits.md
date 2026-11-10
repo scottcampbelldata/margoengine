@@ -1,60 +1,126 @@
 # Kits
 
-A kit is one import line with the set of classes an app of one kind usually needs. It is part of `margoengine` (no
-extra install), and it costs nothing you do not use: a bundler keeps only the names you import, so
-`import {Shadows, createStage} from 'margoengine/game'` bundles the same bytes as importing them from their packages
-(`tests/umbrella.test.js` compares the two).
+Choose one of three ways in: install core or stage alone, install a domain kit, or install everything.
+All packages in a release share one version. npm publication is pending; the checks below use packed private
+repository builds and never the unrelated registry placeholder.
 
-<!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
-     Snippets may use the ambient names engine, canvas, mesh and model. -->
+| Install | What it gives you |
+| --- | --- |
+| `npm install @margoengine/core` | Rendering and transforms, no other engine package |
+| `npm install @margoengine/stage` | The stage facade plus core, nothing else required |
+| `npm install @margoengine/game` | Game systems, rendering, input, animation, worlds, audio and navigation |
+| `npm install @margoengine/web` | Product viewers and interactive web scenes |
+| `npm install @margoengine/viz` | Scientific figures, compute, spatial data, terrain, points and lines |
+| `npm install @margoengine/react-kit react react-dom` | The web profile with React bindings and sky, also used by Next.js |
+| `npm install margoengine` | Every engine package |
+
+A kit is a small package of typed re-exports, with a dependency on each member it exposes. It contains no copied
+engine implementation. Its root provides common names; its subpaths expose every entry of its members. Existing
+`margoengine/game`, `margoengine/web` and `margoengine/viz` imports remain supported by the full install.
+Installing a kit never installs `margoengine`. Physics development remains on hold; the game kit exposes the
+already-built physics package without changing it.
+
+To add a capability outside a profile, install its package at the same release version, for example
+`npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
+Optional third-party peers, including React and Rapier, remain app choices and are never silently installed by a kit.
+
+Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/web/gltf-pro'` (or
+`@margoengine/game/gltf-pro`). The loader is installed with the profile, but a page importing only the root emits
+no Draco or Basis files. Bundlers discover decoder assets before tree-shaking, so the root deliberately keeps the
+loader entry separate. A model app keeps the full glTF/compression support of the existing loader. No loader,
+core or stage implementation changed.
+
+## Research and format choice
+
+Reviewed 2026-11-10, public documentation and published package metadata only. Registry versions, dependency
+maps and unpacked bytes are frozen in [kits-registry.json](kits-registry.json); no rival implementation was read.
+
+| Project | Public packaging behaviour | Decision for Margo |
+| --- | --- | --- |
+| [three.js installation](https://threejs.org/manual/pages/installation.html) | One install contains the engine and separately imported addons; matching versions/CDNs are recommended | Keep the full umbrella and familiar subpath imports, add actual install profiles |
+| [Babylon npm packages](https://doc.babylonjs.com/setup/frameworkPackages/npmSupport/) | Scoped core, loaders, GUI and other ES modules install independently | Retain independent scoped packages beneath profiles |
+| [PlayCanvas standalone](https://developer.playcanvas.com/user-manual/engine/standalone/) | Engine install and create CLI; React is separate | Keep one-line scaffolding and a separate React profile |
+| [Bevy profiles](https://docs.rs/bevy/latest/bevy/#profiles) | Disable defaults and choose 2d, 3d, ui; individual crates remain available | Use domain dependency sets, without a JS runtime feature switch |
+| [Pixi v8 migration](https://pixijs.com/8.x/guides/migrations/v8) | Returned from separate packages to one package because mixed versions conflicted with shared caches | One release version and cross-kit singleton checks. `@pixi/core` stops at 7.4.3 because v8 consolidated into `pixi.js`, currently 8.22.0 in the snapshot |
+| [Godot build profiles](https://docs.godotengine.org/en/latest/engine_details/development/compiling/optimizing_for_size.html) | Custom export builds disable unused domains | Domain selection is useful; no custom engine build should be needed to install a Margo kit. Godot is an export target, not the web parity bar |
+| [Phaser installation](https://www.phaser.io/oss/docs/phaser/getting-started/installation) | One package or a create CLI template | Preserve the short starting path |
+| [Vite guide](https://vite.dev/guide/) | Separate tool and template scaffolder, third-party plugins | Keep create-margo separate from runtime profiles |
+| [Angular releases](https://angular.dev/reference/releases) | Related framework packages follow coordinated releases | Keep the existing single release version |
+| [Nx release policy](https://nx.dev/docs/reference/releases) | nx and scoped plugins release together in lockstep | Check every published package and template range together |
+| [Lodash per-method packages](https://lodash.com/per-method-packages) | Per-method installs duplicate shared internals, unlike the main package | Re-export the original modules; never bundle copies into each kit |
+
+The design combines information hiding from David L. Parnas, *On the Criteria To Be Used in Decomposing Systems
+into Modules* (1972), [paper record](https://doi.org/10.1184/r1/6607958), with declarative product membership from
+Don Batory, *Feature Models, Grammars, and Propositional Formulas* (2005),
+[paper](https://www.cs.utexas.edu/ftp/techreports/tr05-14.pdf), and the npm contributors'
+[package exports, dependencies and optional peers specification](https://docs.npmjs.com/cli/v11/configuring-npm/package-json)
+(2026). Domain profiles choose dependencies; subpaths choose loaded code. React merits a fourth profile because
+its peer/runtime and server-boundary requirements differ from plain web applications. A separate 2D-only kit is
+not claimed: the game profile already exposes the built sprites, tilemaps, pixel and 2D lighting entries.
+
+## Measured installs and correctness
+
+The unchanged legacy bundle profiles below are min+gzip startup JavaScript when every root name is used.
+They describe browser bundles, separately from npm install bytes. Lazy parts and decoder assets are extra.
+`tests/umbrella.test.js` checks these existing budgets within 3 percent.
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 365,936 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 256,216 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 95,846 B |
+| `margoengine/game` | Games | 365,936 B |
+| `margoengine/viz` | Visualization | 256,216 B |
+| `margoengine/web` | Web scenes | 95,846 B |
 
-The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 24,209 B). Wasm decoders, workers and lazily loaded parts
-are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
-moves more than 3%.
+`node scripts/kit-install-check.mjs` packs the checkout, serves a read-only local registry, installs in new folders
+inside this lane's ignored test-results directory with an isolated cache, and compares every installed engine
+package to the exact required transitive closure. It rejects version drift and any engine download outside our
+tarballs. Tooling is excluded from the measurement; React/React DOM are included for the React profile only.
+Bytes are actual file bytes in node_modules, including its generated lock metadata, not disk allocation or browser
+transfer. Packed bytes sum engine tarballs only. These numbers are a snapshot, not a speed claim or a size ceiling.
 
-Each kit also re-exports `createStage` and `Stage`, so a whole app can start from one line. Option types and the
-rest of each package stay in that package: `import type {ShadowsOptions} from 'margoengine/shadows'`.
+<!-- install-sizes:start -->
+| Profile | Engine packages | Installed B | Packed engine B |
+| --- | --- | --- | --- |
+| core | 1 | 152,779 | 54,848 |
+| stage | 2 | 273,999 | 94,057 |
+| game | 70 | 24,506,552 | 7,764,823 |
+| web | 40 | 19,773,382 | 6,321,003 |
+| viz | 42 | 22,561,981 | 7,181,870 |
+| react-kit | 42 | 29,121,993 | 6,611,210 |
+| together | 83 | 32,273,316 | 10,251,352 |
+| all | 98 | 55,744,429 | 16,206,128 |
+<!-- install-sizes:end -->
 
-`loadGLTF` is not in a kit: `import {loadGLTF} from 'margoengine/gltf-pro'`. It reaches the Draco and Basis decoders, and
-a bundler copies their Wasm files when it reads the module, before tree-shaking, so a kit that held it would put
-720 KB of files in every build, used or not.
+CPU tests check every kit subpath's binding identity, declared imports, current generation, optional boundaries,
+and root tree-shaking. The GPU check draws an actual packed application on native WebGPU, with core alone and
+stage plus core; each kit also draws with the separately installed WebGL2 compatibility package. The compatibility
+package is added only after recording the base install. No symlink to workspace engine code participates.
 
-## A game in one import
-
-```ts
-import {Physics, Shadows, createStage} from 'margoengine/game';
-
-await Physics.load();
-const stage = await createStage('#viewport');
-const physics = new Physics(stage.engine);
-const shadows = Shadows.attach(stage.engine, {resolution: 2048});
-const floor = stage.box({size: [10, 1, 10], position: [0, -0.5, 0]});
-const crate = stage.box({position: [0, 4, 0], color: '#c08040'});
-physics.addBody(floor, {type: 'fixed'});
-physics.addBody(crate, {colliders: {shape: 'box', restitution: 0.3}});
-shadows.add(floor);
-shadows.add(crate);
-```
-
-## Which kit
-
-- Most apps start with a kit and add single packages (`margoengine/<package>`) for anything else.
-- The kits overlap where apps overlap (orbit controls, the stage, post-processing); the same name is the same class
-  in every kit.
-- `npm create margo@latest my-game -- --template game` (or `viz`) starts an app from a kit.
+Reproduce: build packages; run `node scripts/kit-install-check.mjs`; then run
+`node scripts/gpu-lock.mjs run --owner=kit-check --wait-max=60 --max=4 --gpu=packed-kit-first-frames -- node scripts/kit-browser-check.mjs`.
+The packed-install CPU check is part of local CI's verify. Lanes run the fast gate only. README examples are owed
+in [readme-owed.md](../work-lists/readme-owed.md) during the build phase.
 
 ## Contents
 
 Generated from `scripts/umbrella.mjs` (`node scripts/umbrella.mjs` rewrites this section).
 
 <!-- kits:start -->
+### Install profile `@margoengine/game`
+
+`stage`, `core`, `animation`, `animator`, `materials`, `geometry`, `shadows`, `clustered`, `environment`, `sky`, `controls`, `input`, `physics`, `navmesh`, `audio`, `vfx`, `text`, `tween`, `post`, `tonemap`, `ecs`, `fsm`, `net`, `netcode`, `behavior`, `save`, `cutscene`, `cinematic`, `cameras`, `terrain`, `water`, `weather`, `biomes`, `scenery`, `creative`, `procedural`, `wfc`, `road`, `splines`, `tilemap`, `sprites`, `pixel`, `lighting2d`, `ui`, `rigging`, `ragdoll`, `mixer`, `transitions`, `toon`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `gltf`, `gltf-pro`, `decoders`, `loaders`, `bvh`, `selection`, `quality`, `stats`, `staging`, `lightmap`, `shader`, `compute`. Every exported subpath of each member is available as `@margoengine/game/<member>[/<entry>]`.
+
+### Install profile `@margoengine/web`
+
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `gltf-pro`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `staging`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`. Every exported subpath of each member is available as `@margoengine/web/<member>[/<entry>]`.
+
+### Install profile `@margoengine/viz`
+
+`stage`, `core`, `points`, `sciviz`, `compute`, `lines`, `splats`, `terrain`, `text`, `labels`, `html`, `controls`, `cameras`, `environment`, `tween`, `stats`, `post`, `tonemap`, `geometry`, `materials`, `loaders`, `exporters`, `gltf`, `gltf-pro`, `decoders`, `selection`, `viewcube`, `bvh`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `tiles`, `splines`. Every exported subpath of each member is available as `@margoengine/viz/<member>[/<entry>]`.
+
+### Install profile `@margoengine/react-kit`
+
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `gltf-pro`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `staging`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`, `react`, `sky`. Every exported subpath of each member is available as `@margoengine/react-kit/<member>[/<entry>]`.
+
 ### `margoengine/game`
 
 Games: models, animation, light and shadow, sky, physics, audio, input, effects.
