@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14674240,
+  "total": 14675990,
   "history": [
     {
       "date": "2026-10-24",
@@ -8117,16 +8117,22 @@
       "commit": "2f10e6d2c",
       "reason": "Batch 165 Cube parser: tonemap root gzip 12490 to 12598 B (+108 B); stream lines and remove 143748 redundant sample reads at 33 cubed, with identical bytes. Keep the synchronous parseCube API; splitting it would add an entry without removing the existing root API. Scott 2026-11-10 optional entry growth rule; no core/stage change.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "5e16f1bf4",
+      "reason": "batch 161 jobs 2 and 3: shared bone ranges, palette arrays swapped instead of copied and one coalesced bone write",
+      "grew": 2
     }
   ],
   "items": {
-    "@margoengine/animation": 24314,
+    "@margoengine/animation": 25172,
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 3792,
     "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9937,
-    "@margoengine/animation/interactivity": 26535,
+    "@margoengine/animation/interactivity": 27427,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/mixer": 5048,
     "@margoengine/animation/morph-gpu": 3265,

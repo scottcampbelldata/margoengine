@@ -3352,3 +3352,21 @@ and do not replace steady-state timing attribution. No speed verdict changed; ba
   offset. Identical output: every primitive's uploaded palette bytes equal the parent's product for it (inverse node,
   joint, inverse bind, then the encoding), linear and dual quaternion; the real-GPU skin and DQS checks pass unchanged.
 - Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-mixer --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).
+
+### Batch 161 job 3: palettes in one array, swapped not copied (rows 12.1, 12.3)
+
+- Cause, read from the code: through a native `writeBuffer`, every changed palette was copied into its uploaded twin
+  after the write (`uploadedPalette.set`, 2,752 B per RobotExpressive palette a frame), and each palette of a model went
+  up in its own `writeBuffer` although the bone ranges of one model are allocated back to back.
+- Fix: the palettes of an Animation live back to back in one Float32Array, in bone-offset order, with a second array as
+  the uploaded copy. A palette that went up swaps its live and uploaded views (the next frame overwrites every float);
+  when every palette changed and their ranges are contiguous in one page, one write uploads the live array. Otherwise
+  each changed palette goes up alone, so no frame uploads more bytes than before.
+- Work counts, both failing on the parent: copies into uploaded palettes over 30 Walking frames on a real WebGPU queue 0
+  (parent 60; `packages/animation/tests/upload-copies-browser.mjs`); bone writes per RobotExpressive frame 1 (parent 2;
+  `packages/animation/tests/palette-share.test.js`). Identical output: the GPU bone words read back equal the CPU
+  product word for word, every primitive's palette bytes equal the parent's, a held pose stays certified and uploads
+  nothing.
+- Not done: morph weights still go up per primitive (a span would need a staging copy for custom writers, which must
+  keep receiving the caller's own weight views); listed in finish-later.
+- Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-mixer,p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).

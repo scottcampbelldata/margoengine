@@ -98,7 +98,17 @@ interface Deformation {
   // These private input buffers keep their last successfully queued upload.
   // The shared deformed output is still dispatched for every render.
   paletteBits: Uint32Array;
-  uploadedPalette: Uint32Array;
+  /**
+   * While `palette` is known to be on the GPU (a native writer took it), the next palette is computed here and compared
+   * with `palette`; when it went up, or matched, the two swap, so the uploaded copy costs no copy. The views live in the
+   * Animation's two palette arrays.
+   */
+  spare: Float32Array;
+  spareBits: Uint32Array;
+  /** The view this frame's palette was computed into: `palette`, or `spare` while the uploaded one is cached. */
+  next: Float32Array;
+  /** This frame's bone upload is pending in `upload`: the palette changed, or must be written regardless. */
+  bonesChanged: boolean;
   uploadedWeights: Float32Array;
   bonesUploaded: boolean;
   weightsUploaded: boolean;
@@ -262,7 +272,10 @@ function deformationRecord(p: PBRPrimitive): Deformation {
     },
     palette: new Float32Array(),
     paletteBits: new Uint32Array(),
-    uploadedPalette: new Uint32Array(),
+    spare: new Float32Array(),
+    spareBits: new Uint32Array(),
+    next: new Float32Array(),
+    bonesChanged: false,
     uploadedWeights: new Float32Array(p.weights.length),
     bonesUploaded: false,
     weightsUploaded: false,
@@ -305,6 +318,13 @@ export class Animation implements EnginePlugin {
   private device?: GPUDevice;
   private arena?: DeformArena;
   private resources: Deformation[] = [];
+  /**
+   * The records that compute and upload a palette, in bone-offset order. Their palettes sit back to back in two
+   * Float32Arrays (live and uploaded), so when their bone ranges are contiguous in one page one write uploads them all.
+   */
+  private leaders: Deformation[] = [];
+  /** The two whole palette arrays of the last placement, so a single write needs no new view. */
+  private wholes: Float32Array[] = [new Float32Array(), new Float32Array()];
   /** The distinct nodes of `resources`, so the hidden check walks each node's ancestry once. */
   private deformedNodes: PBRPrimitive['node'][] = [];
   /** The resources' slots, in order (the arena's view of this Animation). */
@@ -757,9 +777,10 @@ export class Animation implements EnginePlugin {
       }
       record.joints = joints;
       record.inverseBind = joints.map((_, i) => inverseBind.subarray(i * 16, i * 16 + 16));
-      record.palette = Float32Array.from(joints.length ? joints.flatMap(() => Array.from(identity)) : identity);
-      record.paletteBits = new Uint32Array(record.palette.buffer);
-      record.uploadedPalette = new Uint32Array(record.palette.length);
+      if (!joints.length) {
+        record.palette = Float32Array.from(identity);
+        record.paletteBits = new Uint32Array(record.palette.buffer);
+      }
       records.push(record);
       specs.push({
         primitive: p,
@@ -784,13 +805,29 @@ export class Animation implements EnginePlugin {
     records.forEach((record, i) => {
       record.slot = slots[i];
       // A primitive sharing an earlier one's bone range shares its palette: same node, so same joints and binds.
-      const leader = records.slice(0, i).find((r) => r.slot.bones === slots[i].bones && !r.leader);
-      if (leader) {
-        record.leader = leader;
-        record.palette = leader.palette;
-        record.paletteBits = leader.paletteBits;
-        record.uploadedPalette = leader.uploadedPalette;
-      }
+      record.leader = records.slice(0, i).find((r) => r.slot.bones === slots[i].bones && !r.leader);
+    });
+    // The palettes of this placement in two arrays, in bone-offset order, identity until the first deformation.
+    const leaders = records
+        .filter((r) => r.joints.length && !r.leader)
+        .sort((a, b) => a.slot.bones.offset - b.slot.bones.offset),
+      floats = leaders.reduce((sum, r) => sum + r.joints.length * 16, 0),
+      live = new Float32Array(floats),
+      spare = new Float32Array(floats);
+    let at = 0;
+    for (const r of leaders) {
+      const length = r.joints.length * 16;
+      r.palette = live.subarray(at, at + length);
+      r.spare = spare.subarray(at, at + length);
+      for (let j = 0; j < length; j += 16) r.palette.set(identity, j);
+      r.paletteBits = new Uint32Array(live.buffer, at * 4, length);
+      r.spareBits = new Uint32Array(spare.buffer, at * 4, length);
+      at += length;
+    }
+    this.leaders.push(...leaders);
+    this.wholes = [live, spare];
+    this.followLeaders(records);
+    records.forEach((record, i) => {
       const weights = record.primitive.weights;
       if (weights.length && weights.byteLength <= weightRegion(slots[i].targets) * 4)
         device.queue.writeBuffer(record.weights, slots[i].weights.offset * 4, weights as Float32Array<ArrayBuffer>);
@@ -874,47 +911,38 @@ export class Animation implements EnginePlugin {
     for (let i = 0; !shown && i < this.deformedNodes.length; i++)
       if (!hiddenInTree(store, this.deformedNodes[i].id)) shown = true;
     if (!shown) return false;
+    const span = this.contiguous();
     for (const r of this.resources) {
       const weights = r.primitive.weights;
       for (let i = 0; i < weights.length; i++)
         if (!Number.isFinite(weights[i]))
           throw new RangeError('Invalid morph weights; set finite weights on the primitive');
       if (r.joints.length && !r.leader) {
+        const queue = context.device.queue,
+          writer = queue.writeBuffer,
+          reusable = reusableWriter(queue, writer),
+          // The uploaded palette is known to be on the GPU: compute into the spare view and compare.
+          cached = reusable && r.bonesUploaded && r.bonesQueue === queue,
+          palette = (r.next = cached ? r.spare : r.palette);
         if (!invertMatrixStable(r.primitive.node.matrix, this.inverse, this.workspace))
           throw new RangeError('Singular skinned mesh transform; give the skinned node a non-zero scale');
         for (let i = 0; i < r.joints.length; i++) {
           multiplyMatrices(this.joints.nodes[r.joints[i]].matrix, r.inverseBind[i], this.joint);
           multiplyMatrices(this.inverse, this.joint, this.product);
-          r.palette.set(this.product, i * 16);
+          palette.set(this.product, i * 16);
         }
-        for (let i = 0; i < r.palette.length; i++)
-          if (!Number.isFinite(r.palette[i]))
+        for (let i = 0; i < palette.length; i++)
+          if (!Number.isFinite(palette[i]))
             throw new RangeError('Skin matrix overflow; use finite joint transforms and inverse bind matrices');
-        this.options.skinning?.encode(r.palette);
-        const queue = context.device.queue,
-          writer = queue.writeBuffer,
-          reusable = reusableWriter(queue, writer);
-        let changed = !reusable || !r.bonesUploaded || r.bonesQueue !== queue;
+        this.options.skinning?.encode(palette);
+        let changed = !cached;
         // Stop at the first changed word: a playing clip changes the palette every frame, and comparing all of it
         // anyway was most of p-crossfade's upload time (100 RobotExpressive palettes, 1.2 ms a frame).
-        for (let i = 0; !changed && i < r.paletteBits.length; i++)
-          if (r.paletteBits[i] !== r.uploadedPalette[i]) changed = true;
-        if (changed) {
-          let uploaded = false;
-          r.bonesUploaded = false;
-          try {
-            writeInput(queue, writer, r, r.bones, r.slot.bones.offset * 64, r.palette as Float32Array<ArrayBuffer>);
-            if (reusable) {
-              r.uploadedPalette.set(r.paletteBits);
-              r.bonesQueue = queue;
-              uploaded = true;
-            }
-          } finally {
-            // A custom writer can reenter deformation; its outer call must not
-            // inherit an inner call's certification of this shared buffer.
-            r.bonesUploaded = uploaded;
-          }
-        }
+        for (let i = 0; !changed && i < r.spareBits.length; i++)
+          if (r.spareBits[i] !== r.paletteBits[i]) changed = true;
+        r.bonesChanged = changed;
+        // A palette that is not part of one contiguous run goes up now, as before.
+        if (changed && !span) this.uploadBones(queue, writer, reusable, r, palette, r.slot.bones.offset);
       }
       if (r.primitive.weights.length) {
         const values = r.primitive.weights,
@@ -957,7 +985,101 @@ export class Animation implements EnginePlugin {
         }
       }
     }
+    if (span) {
+      // Palettes back to back in one page and computed into one array: one write for all when every one changed (a
+      // playing clip), else each changed one alone, so no frame uploads more bytes than before.
+      const leaders = this.leaders,
+        queue = context.device.queue,
+        array = leaders[0].next.buffer;
+      let all = leaders[0].next.byteOffset === 0;
+      for (let k = 0; all && k < leaders.length; k++) all = leaders[k].bonesChanged && leaders[k].next.buffer === array;
+      if (all) {
+        const writer = queue.writeBuffer,
+          first = leaders[0];
+        this.uploadBones(
+          queue,
+          writer,
+          reusableWriter(queue, writer),
+          first,
+          this.wholes[0].buffer === array ? this.wholes[0] : this.wholes[1],
+          first.slot.bones.offset,
+          leaders,
+        );
+      } else
+        for (const r of leaders)
+          if (r.bonesChanged) {
+            const writer = queue.writeBuffer;
+            this.uploadBones(queue, writer, reusableWriter(queue, writer), r, r.next, r.slot.bones.offset);
+          }
+    }
+    // An unchanged palette matched the uploaded one: swap too, so every palette stays in the same array.
+    for (const r of this.leaders) if (!r.bonesChanged && r.next === r.spare) this.swap(r);
     return this.resources.length > 0;
+  }
+  /** True when this Animation's palettes are two or more, in one bone page, back to back in palette-array order. */
+  private contiguous(): boolean {
+    const leaders = this.leaders;
+    if (leaders.length < 2) return false;
+    const first = leaders[0],
+      page = first.slot.page;
+    let next = first.slot.bones.offset + first.joints.length;
+    for (let k = 1; k < leaders.length; k++) {
+      const r = leaders[k];
+      if (r.slot.page !== page || r.slot.bones.offset !== next) return false;
+      next += r.joints.length;
+    }
+    return (next - first.slot.bones.offset) * 64 === this.wholes[0].byteLength;
+  }
+  /** Swaps a palette's live and spare views (and its followers'). */
+  private swap(r: Deformation): void {
+    const palette = r.palette,
+      bits = r.paletteBits;
+    r.palette = r.spare;
+    r.spare = palette;
+    r.paletteBits = r.spareBits;
+    r.spareBits = bits;
+    this.followLeaders(this.resources);
+  }
+  /**
+   * Writes `values` (one palette, or the whole array `written` were computed into) at bone `offset`. Through a native
+   * writer the written records count as uploaded: what went up becomes `palette` by a swap of views, not a copy.
+   */
+  private uploadBones(
+    queue: GPUQueue,
+    writer: GPUQueue['writeBuffer'],
+    reusable: boolean,
+    r: Deformation,
+    values: Float32Array,
+    offset: number,
+    written: readonly Deformation[] = [r],
+  ): void {
+    let uploaded = false;
+    for (const w of written) w.bonesUploaded = false;
+    try {
+      writeInput(queue, writer, r, r.bones, offset * 64, values as Float32Array<ArrayBuffer>);
+      if (reusable) {
+        for (const w of written) {
+          // What went up becomes the uploaded palette.
+          if (w.next === w.spare) this.swap(w);
+          w.bonesQueue = queue;
+        }
+        uploaded = true;
+      }
+    } finally {
+      // A custom writer can reenter deformation; its outer call must not
+      // inherit an inner call's certification of this shared buffer.
+      for (const w of written) w.bonesUploaded = uploaded;
+    }
+  }
+  /** Points each record that shares a palette at its leader's current views. */
+  private followLeaders(records: readonly Deformation[]): void {
+    for (const r of records)
+      if (r.leader) {
+        r.palette = r.leader.palette;
+        r.paletteBits = r.leader.paletteBits;
+        r.spare = r.leader.spare;
+        r.spareBits = r.leader.spareBits;
+      }
   }
   private release(): void {
     if (this.model.createDeformationRenderer === this.createDeformationRenderer)
@@ -970,6 +1092,7 @@ export class Animation implements EnginePlugin {
       for (const slot of this.slots) this.arena.remove(slot);
     }
     this.resources = [];
+    this.leaders = [];
     this.deformedNodes = [];
     this.slots = [];
     this.arena = undefined;

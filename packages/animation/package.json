@@ -33,7 +33,8 @@
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:mixer": "cd ../.. && node packages/animation/tests/mixer-browser.mjs",
     "test:gpu:playback": "cd ../.. && node packages/animation/tests/playback-browser.mjs",
-    "test:gpu:discrete": "cd ../.. && node packages/animation/tests/discrete-browser.mjs"
+    "test:gpu:discrete": "cd ../.. && node packages/animation/tests/discrete-browser.mjs",
+    "test:gpu:uploads": "cd ../.. && node packages/animation/tests/upload-copies-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

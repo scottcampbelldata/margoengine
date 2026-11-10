@@ -76,7 +76,8 @@ for (const [mode, options] of [
       a.seek(0.4 + frame * 0.1);
       store.tick(false);
       assert.ok(a['upload'](context));
-      assert.equal(writes.length, 2, `frame ${frame}: bone writes`);
+      // Job 2 made it one palette per node (2 writes, parent 4); job 3 writes the two contiguous palettes at once.
+      assert.equal(writes.length, 1, `frame ${frame}: bone writes`);
       assert.equal(
         writes.reduce((sum, n) => sum + n, 0),
         [...nodes].reduce((sum, node) => sum + skinned.find((r) => r.primitive.node === node).joints.length * 64, 0),

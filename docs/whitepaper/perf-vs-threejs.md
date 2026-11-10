@@ -448,3 +448,10 @@ Rows 12.1 and 12.3 (`p-mixer`) stay slower until the quiet rerun. Each RobotExpr
 palettes a frame where two differ (two primitives per skinned node). The primitives of one node and skin now share one
 bone range, so a copy writes 2 palettes a frame instead of 4 with the same bytes per primitive
 (`packages/animation/tests/palette-share.test.js`); perf-history "Batch 161 job 2". Timing pending the quiet rerun.
+
+## Palettes swapped, not copied (batch 161 job 3)
+
+Rows 12.1 and 12.3 (`p-mixer`) stay slower until the quiet rerun. Each uploaded palette was copied into its cached twin
+every frame and each palette of a model went up alone. The palettes of an Animation now share one array and swap with
+the cached copy (0 copies over 30 frames on a real GPU queue, 60 before), and one write uploads a RobotExpressive
+copy's bones (2 before), the same bytes; perf-history "Batch 161 job 3". Timing pending the quiet rerun.
