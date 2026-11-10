@@ -4601,3 +4601,8 @@ Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lif
 
 The VFX replay fixture recorded early frames on the CPU fallback while the lazy WebGL2 GPU route was loading, then replayed on that route. Frame 40 differed in 182 particle words by a few float ulps, with identical picture and live count. The fixture now waits for actual route and pipeline readiness before reset and capture. The unchanged exact-byte and pixel assertions in packages/cutscene/tests/vfx-browser.mjs are the regression; no engine arithmetic or tolerance changed.
 >>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)
+
+### Resolved: batch 200 meshless scene refusal
+The light loader rejected every model without a renderable primitive before sceneExtras.finish could expose cameras or lights. The optional scene-data entry now opts into empty scene acceptance through GLTFExtension.allowEmptyScene; strict root behaviour and malformed-file rollback remain. The two meshless tests in packages/gltf/test/scene-data.test.js fail on the parent and pass with this change.
+
+Batch 200 rebase finding: shared docs on origin/main 8ee384c7e retain nested merge markers from mixer/cutscene rebases (for example docs/clean-room.md, Batch 216 onward); cause is prior conflict markers retained during append resolution. Repro: search lines starting with seven <, = or > characters in the six shared docs. Preserve existing content here; owning lanes repair in the fix phase under rule 21.

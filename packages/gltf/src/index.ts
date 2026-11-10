@@ -157,6 +157,8 @@ export interface GLTFBuilt {
 export interface GLTFExtension {
   /** The glTF extension names this one implements: `extensionsRequired` may list them. */
   readonly handles: readonly string[];
+  /** Accept scenes without renderable meshes, for data-only imports. Default false. */
+  readonly allowEmptyScene?: boolean;
   /** Reads vertex attribute `semantic` from accessor `id`, as float xyz; undefined leaves it to the loader. */
   attribute?(file: GLTFFile, semantic: string, id: number): Float32Array | undefined;
   /** Asynchronous work before anything is built. An extension with `load` needs `parseGLTFAsync` or `loadGLTF`. */
@@ -395,7 +397,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       }
       for (const child of node.children ?? []) stack.push({ id: child, parent: mesh });
     }
-    if (!renderable.length)
+    if (!renderable.length && !extensions.some((extension) => extension.allowEmptyScene))
       throw new MargoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
     const release = () => {
       for (let i = created.length - 1; i >= 0; i--) created[i].dispose();

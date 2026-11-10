@@ -149,6 +149,7 @@ const originals = /* @__PURE__ */ new WeakMap<object, GLTFNode[]>();
  */
 export const sceneExtras: GLTFExtension = {
   handles: [LIGHTS],
+  allowEmptyScene: true,
   read(file) {
     const nodes = file.doc.nodes ?? [];
     originals.set(file, nodes);

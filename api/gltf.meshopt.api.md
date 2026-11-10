@@ -88,6 +88,7 @@ interface GLTFDocument extends GLTFProperty {
 
 interface GLTFExtension {
     readonly handles: readonly string[];
+    readonly allowEmptyScene?: boolean;
     attribute?(file: GLTFFile, semantic: string, id: number): Float32Array | undefined;
     load?(file: GLTFFile, signal?: AbortSignal): Promise<void>;
     read?(file: GLTFFile): void;

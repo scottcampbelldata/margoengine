@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseGLTF } from '../dist/index.js';
+import { loadGLTF, parseGLTF, parseGLTFAsync } from '../dist/index.js';
+import { loadAuto } from '../dist/auto.js';
 import { instancing } from '../dist/instancing.js';
 import { sceneData, sceneExtras } from '../dist/scene-data.js';
 import { documentOf, headlessEngine } from './helpers.js';
@@ -8,7 +9,9 @@ import { documentOf, headlessEngine } from './helpers.js';
 const LIGHTS = 'KHR_lights_punctual',
   half = Math.SQRT1_2;
 const close = (actual, expected) =>
-  [...actual].forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-6, `${i}: ${value} vs ${expected[i]}`));
+  [...actual].forEach((value, i) =>
+    assert.ok(Math.abs(value - expected[i]) < 1e-6, `${i}: ${value} vs ${expected[i]}`),
+  );
 function file(rest = {}) {
   return documentOf([new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1])], {
     accessors: [
@@ -44,6 +47,104 @@ const withNodes = (...extra) => {
 };
 const light = (id) => ({ extensions: { [LIGHTS]: { light: id } } });
 
+function meshless() {
+  return {
+    asset: { version: '2.0' },
+    cameras: [{ type: 'perspective', perspective: { yfov: 0.7, znear: 0.1 } }],
+    extensionsUsed: [LIGHTS],
+    extensionsRequired: [LIGHTS],
+    extensions: { [LIGHTS]: { lights: [{ type: 'point', intensity: 3 }] } },
+    nodes: [
+      { name: 'rig', translation: [1, 2, 3], children: [1, 2] },
+      { name: 'view', camera: 0, translation: [0, 0, 2] },
+      { name: 'lamp', ...light(0) },
+      { camera: 0, name: 'other-scene' },
+    ],
+    scenes: [{ nodes: [0] }, { nodes: [3] }],
+    scene: 0,
+  };
+}
+
+test('scene-data loads meshless JSON and GLB through every loader without GPU resources', async () => {
+  const { engine, resources } = await headlessEngine();
+  try {
+    const doc = meshless(),
+      before = JSON.stringify(doc),
+      json = new TextEncoder().encode(before),
+      padded = (json.length + 3) & ~3,
+      glb = new Uint8Array(20 + padded),
+      header = new DataView(glb.buffer);
+    [0x46546c67, 2, glb.length, padded, 0x4e4f534a].forEach((v, i) => header.setUint32(i * 4, v, true));
+    glb.fill(32, 20);
+    glb.set(json, 20);
+    const fetched = [],
+      url = 'https://example.test/shot.gltf',
+      options = {
+        extensions: [sceneExtras],
+        fetch: async (target) => {
+          fetched.push(String(target));
+          return new Response(before);
+        },
+      };
+    const loaders = [
+      () => parseGLTF(engine, doc, [], options),
+      () => parseGLTFAsync(engine, before, [], options),
+      () => parseGLTFAsync(engine, glb, [], options),
+      () => loadGLTF(engine, url, options),
+      async () => {
+        const result = await loadAuto(engine, url, options);
+        assert.equal(result.loader, 'gltf');
+        return result.model;
+      },
+    ];
+    for (const load of loaders) {
+      const model = await load(),
+        { cameras, lights } = sceneData(model);
+      assert.equal(model.meshes.length, 0);
+      assert.equal(model.nodes.length, 3);
+      assert.equal(cameras.length, 1);
+      assert.deepEqual(cameras[0].position, [1, 2, 5]);
+      assert.equal(cameras[0].name, 'view');
+      assert.deepEqual(lights[0].position, [1, 2, 3]);
+      assert.equal(lights[0].intensity, 3);
+      assert.equal(resources.size, 0);
+      model.root.setPosition([9, 0, 0]);
+      model.dispose();
+      model.dispose();
+      assert.equal(engine.meshes.size, 0);
+    }
+    assert.deepEqual(fetched, [url, url]);
+    assert.equal(JSON.stringify(doc), before);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('scene-data accepts camera-only, light-only and empty scenes but root loading stays strict', async () => {
+  const { engine, resources } = await headlessEngine();
+  try {
+    for (const nodes of [[{ camera: 0 }], [light(0)], [{ name: 'transform' }], []]) {
+      const doc = { ...meshless(), nodes, scenes: [{ nodes: nodes.map((_, i) => i) }] },
+        model = parseGLTF(engine, doc, [], { extensions: [sceneExtras] });
+      assert.equal(model.meshes.length, 0);
+      assert.equal(sceneData(model).cameras.length, nodes[0]?.camera === 0 ? 1 : 0);
+      assert.equal(sceneData(model).lights.length, nodes[0]?.extensions ? 1 : 0);
+      model.dispose();
+    }
+    assert.throws(() => parseGLTF(engine, { asset: { version: '2.0' }, nodes: [{}] }), /no renderable meshes/);
+    const invalid = meshless();
+    invalid.cameras[0].perspective.yfov = 0;
+    assert.throws(() => parseGLTF(engine, invalid, [], { extensions: [sceneExtras] }), /camera yfov/);
+    const missing = meshless();
+    missing.nodes[2].extensions[LIGHTS].light = 7;
+    assert.throws(() => parseGLTF(engine, missing, [], { extensions: [sceneExtras] }), /Missing glTF light/);
+    assert.equal(engine.meshes.size, 0);
+    assert.equal(resources.size, 0);
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('cameras come back as plain data, with their projection and place', async () => {
   const { engine } = await headlessEngine();
   try {
@@ -64,8 +165,14 @@ test('cameras come back as plain data, with their projection and place', async (
     assert.equal(byType.zfar, 50);
     assert.equal(byType.aspectRatio, 1.5);
     assert.deepEqual(byType.position, [1, 2, 3]);
-    assert.deepEqual(byType.direction.map((v) => v + 0), [0, 0, -1]);
-    assert.equal(byType.node, model.nodes.find((node) => node.name === 'main'));
+    assert.deepEqual(
+      byType.direction.map((v) => v + 0),
+      [0, 0, -1],
+    );
+    assert.equal(
+      byType.node,
+      model.nodes.find((node) => node.name === 'main'),
+    );
     const orthographic = cameras.find((c) => c.type === 'orthographic');
     assert.deepEqual([orthographic.xmag, orthographic.ymag, orthographic.znear, orthographic.zfar], [2, 3, 0, 9]);
     // Turned 90 degrees about y, -z points along -x.

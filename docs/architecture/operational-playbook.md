@@ -1305,8 +1305,7 @@ A6000 only.
 
 **Textured meshes on the light path (2026-11-06).** `@margoengine/gltf/textured` keeps a mesh a core mesh, claims its batch and draws it
 with core's shader plus a UV input and a texture read, in one extra render pass per frame for all textured meshes of a scene.
-WebGPU only. A cut-out picks and casts shadows as solid, and `engine.stats.drawCalls` leaves these draws out. Evidence:
-`packages/gltf/test/textured.test.js` and `scripts/test-gltf-browser.mjs`.
+Native WebGPU and the full WebGL2 compatibility layer share this render path; the preview refuses it. Cut-out shadow masks and draw counts are covered, while core GPU picking remains solid; texturedAlphaMasks provides alpha-aware CPU rays. Evidence: `packages/gltf/test/textured.test.js` and `scripts/test-gltf-browser.mjs` on both backends (batch 200, 2026-11-10): texel RGB [97,27,155], five expected shadow pixels and no errors. No new renderer or GPU maths was added. Meshless scene-data loads allocate no geometry; the loader tests cover scene placement and rollback.
 
 **Lighting in a node graph (2026-11-06).** `Material` gains one internal step, `relight`, that runs after the effects composed; it returns
 the code unchanged for every other material. `@margoengine/shader/lighting` reads the sun, its shadow visibility, the clustered

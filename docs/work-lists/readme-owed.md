@@ -648,3 +648,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/cutscene (batch 217 job 1): document curve-editor CurveEditor/CurveModel, scalar/vector channels, normalized handles, graph dragging, clip trims, shared undo, keyboard and disposal; examples deferred.
 - margoengine (batch 217 job 1): document generated cutscene/curve-editor alias.
+
+- @margoengine/gltf (batch 200): scene-data accepts meshless camera/light and empty scenes; allowEmptyScene defaults false; clarify textured WebGL2 compatibility support and preview escalation. Add examples only in the README phase.
