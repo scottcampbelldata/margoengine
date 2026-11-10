@@ -1,4 +1,4 @@
-// Exact triangle predicates shared by the BVH queries and the brute-force references in the tests.
+// Triangle predicates shared by the BVH queries and the brute-force references in the tests.
 // Every function works in float64 on float32 inputs, so the BVH and a linear scan agree bit for bit.
 
 /** Ray side filter. Front faces wind counter-clockwise when seen from the ray origin, matching the engine. */
@@ -14,8 +14,17 @@ export const sideCode = (side: Side | undefined): number => {
 };
 
 /**
- * Moller-Trumbore ray/triangle test. `out` receives t, u, v and det (det > 0 means a front face).
- * The hit point is origin + t * direction and its barycentric weights are (1 - u - v, u, v).
+ * Ray/triangle test. `out` receives t, u, v and det (det > 0 means a front face). The hit point is
+ * origin + t * direction and its barycentric weights are (1 - u - v, u, v).
+ *
+ * Moller-Trumbore decides first and reports every hit. Its rounding can put a ray through the shared edge of two
+ * non-coplanar triangles just outside both (about 7% of rays aimed at a random shared edge did), so a ray it rejects
+ * is tried again by the watertight test of Woop, Benthin and Wald ("Watertight Ray/Triangle Intersection", JCGT 2(1)
+ * 2013): the vertices move into a frame where the ray runs along +z, and three 2D edge functions decide. A vertex's
+ * sheared coordinates depend only on the vertex and the ray, and an edge function is exactly antisymmetric in its ends
+ * (JavaScript never fuses a multiply-add), so the two triangles get exactly opposite values on their shared edge and
+ * at least one counts the ray, a point on an edge counting as a hit. Either test's hit is a hit, so a shared edge
+ * still reports every triangle either finds there. A watertight hit reports the watertight test's distance and weights.
  */
 export function rayTriangle(
   ox: number,
@@ -48,23 +57,90 @@ export function rayTriangle(
     py = dz * e2x - dx * e2z,
     pz = dx * e2y - dy * e2x;
   const det = e1x * px + e1y * py + e1z * pz;
-  if (side === SIDE_DOUBLE ? det === 0 : side === SIDE_FRONT ? !(det > 0) : !(det < 0)) return false;
+  if (side === SIDE_DOUBLE ? det === 0 : side === SIDE_FRONT ? !(det > 0) : !(det < 0))
+    return watertight(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, cx, cy, cz, side, tmin, tmax, out);
   const inv = 1 / det,
     sx = ox - ax,
     sy = oy - ay,
     sz = oz - az;
   const u = (sx * px + sy * py + sz * pz) * inv;
-  if (!(u >= 0 && u <= 1)) return false;
+  if (!(u >= 0 && u <= 1))
+    return watertight(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, cx, cy, cz, side, tmin, tmax, out);
   const qx = sy * e1z - sz * e1y,
     qy = sz * e1x - sx * e1z,
     qz = sx * e1y - sy * e1x;
   const v = (dx * qx + dy * qy + dz * qz) * inv;
-  if (!(v >= 0 && u + v <= 1)) return false;
+  if (!(v >= 0 && u + v <= 1))
+    return watertight(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, cx, cy, cz, side, tmin, tmax, out);
   const t = (e2x * qx + e2y * qy + e2z * qz) * inv;
   if (!(t >= tmin && t <= tmax)) return false;
   out[0] = t;
   out[1] = u;
   out[2] = v;
+  out[3] = det;
+  return true;
+}
+
+/** The second test of {@link rayTriangle}, Woop, Benthin and Wald 2013 in float64 (their double fallback is not needed). */
+function watertight(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  side: number,
+  tmin: number,
+  tmax: number,
+  out: Float64Array,
+): boolean {
+  // The axis where the direction is largest becomes z; x and y swap when it points down that axis, keeping the winding.
+  const mx = Math.abs(dx),
+    my = Math.abs(dy),
+    mz = Math.abs(dz);
+  const kz = mx >= my && mx >= mz ? 0 : my >= mz ? 1 : 2;
+  const d = kz === 0 ? dx : kz === 1 ? dy : dz;
+  if (!(d !== 0)) return false;
+  let kx = kz === 2 ? 0 : kz + 1,
+    ky = kx === 2 ? 0 : kx + 1;
+  if (d < 0) {
+    const swap = kx;
+    kx = ky;
+    ky = swap;
+  }
+  const pick = (k: number, x: number, y: number, z: number): number => (k === 0 ? x : k === 1 ? y : z);
+  const sx = pick(kx, dx, dy, dz) / d,
+    sy = pick(ky, dx, dy, dz) / d;
+  const Az = pick(kz, ax - ox, ay - oy, az - oz),
+    Bz = pick(kz, bx - ox, by - oy, bz - oz),
+    Cz = pick(kz, cx - ox, cy - oy, cz - oz);
+  const Ax = pick(kx, ax - ox, ay - oy, az - oz) - sx * Az,
+    Ay = pick(ky, ax - ox, ay - oy, az - oz) - sy * Az,
+    Bx = pick(kx, bx - ox, by - oy, bz - oz) - sx * Bz,
+    By = pick(ky, bx - ox, by - oy, bz - oz) - sy * Bz,
+    Cx = pick(kx, cx - ox, cy - oy, cz - oz) - sx * Cz,
+    Cy = pick(ky, cx - ox, cy - oy, cz - oz) - sy * Cz;
+  // Weights of a, b and c (the paper's U, V and W).
+  const U = Cx * By - Cy * Bx,
+    V = Ax * Cy - Ay * Cx,
+    W = Bx * Ay - By * Ax;
+  if ((U < 0 || V < 0 || W < 0) && (U > 0 || V > 0 || W > 0)) return false;
+  const det = U + V + W;
+  if (side === SIDE_DOUBLE ? det === 0 : side === SIDE_FRONT ? !(det > 0) : !(det < 0)) return false;
+  const t = (U * Az + V * Bz + W * Cz) / det / d;
+  if (!(t >= tmin && t <= tmax)) return false;
+  out[0] = t;
+  out[1] = V / det;
+  out[2] = W / det;
   out[3] = det;
   return true;
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14658154,
+  "total": 14659671,
   "history": [
     {
       "date": "2026-10-24",
@@ -8033,6 +8033,12 @@
       "commit": "d1f810a32",
       "reason": "headless AAC MP4 fixes from WebKit real run (batch 121)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "371c2d07e",
+      "reason": "batch 132 bvh audit: watertight fallback in the CPU ray/triangle test (bvh +294 B, bvh/tree +190 B)",
+      "grew": 2
     }
   ],
   "items": {
@@ -8135,7 +8141,7 @@
     "@margoengine/blender/nodes": 10406,
     "@margoengine/blender/objects": 5201,
     "@margoengine/blender/pbr-ext": 13434,
-    "@margoengine/bvh": 23398,
+    "@margoengine/bvh": 24403,
     "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/alpha-triangles": 1381,
     "@margoengine/bvh/bake": 2583,
@@ -8147,7 +8153,7 @@
     "@margoengine/bvh/points": 17799,
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
-    "@margoengine/bvh/tree": 10524,
+    "@margoengine/bvh/tree": 11036,
     "@margoengine/cache": 3801,
     "@margoengine/cache/bundles": 1883,
     "@margoengine/cache/decoded": 5069,

@@ -9374,6 +9374,9 @@ TAA reset restarts its eight Halton samples and discards history for the named v
 ## J6 scientific dashboard integration
 The eight optional packages in [the scientific dashboard](integration-sciviz.md) share a canvas on native WebGPU and WebGL2 compatibility, with exact restored probes, an exact compute reduction and zero tracked allocations/scene ownership after disposal. Inputs are three authored XYZ points and a static canvas VideoFrame. Compute contexts are recreated explicitly on the replacement device; no transparent array-restoration, codec, speed or all-options claim is made.
 
+## J6 public CAD-format integration
+The ten optional packages in [the public format viewer](integration-engineering.md) compose STL/USDZ round trips, authored FBX, mesh editing, selection, orthographic navigation, LOD, frustum culling and GLB export. Four exact probes and five draws survive replacement on both backends; teardown leaves zero tracked live resources and scene ownership. Authored small meshes stand in for production CAD; coverage is limited to those public mesh formats and calls. No large-assembly quality or speed claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
