@@ -2215,6 +2215,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 Batch 209 GIF: shared exporter palette/codec CPU correctness includes LZW dictionary growth, transparent frames, async cancellation and centisecond rounding. gif-gpu.mjs renders through native WebGPU and full WebGL2 compatibility and independently decodes every frame; three-frame fixture error is zero. Existing exporter capture-browser checks pass on both paths. This changes no render math or core/stage code.
 
+Batch 207 meshopt: section-exact round trips cover seven file variants, plus bounded corrupt-stream and expansion-bomb rejection. Both backends compare all pixels of original and compressed static/animated draws. Existing codecs and GPU layouts are unchanged; no throughput/latency proof is claimed during the speed deferral.
+
 Batch 209 headless/null uses the existing renderer injection API with a no-op renderer. Core/stage code and GPU math stay unchanged. CPU evidence proves real hierarchy matrices, multi-scene plugin isolation, animation sampling, disposal and no GPU request. No GPU rendering work is introduced or claimed, so this entry needs no GPU slot.
 Batch 205 large: input/decoded/array/scene/geometry/texture/output budgets are per import and remain
 cumulative before allocation. CPU proof covers 200 MiB input and 2,500,002 complete expanded vertices.

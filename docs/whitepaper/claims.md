@@ -3682,3 +3682,7 @@ caller-supplied displacement padding. WebGL2 model Hi-Z remains outside this
 claim, as documented in limits.md. No performance result is claimed.
 
 With exact coplanar patch coverage, the same job 1 scene now keeps 1 of 81 rows behind the wall on both backends, still with byte-identical pixels; moving the wall restores 81 immediately. This is a deterministic visibility count, not a speed claim.
+
+
+## Batch 207 job 3: lossless .margo meshopt
+The optional meshopt entry compresses geometry with Margo's existing encoder and reads it with its existing decoder. Static, compact, uint16, animated, object hierarchy, curves and lightmap fixtures preserve every section byte and scene value. Download bytes are never increased; the animated fixture saves 9408 of 28924 bytes. Corrupt streams and decoded-size bombs reject before GPU upload. Original/compressed static and animated rendering is byte-identical across both GPU backends, including animation deformation, with no validation errors and released mesh handles. No throughput, quantization or comparison-engine timing claim.

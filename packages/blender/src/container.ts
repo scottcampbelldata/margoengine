@@ -7,6 +7,8 @@ const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 export const animatedFlag = 1;
 /** Header flag of a file with curves, point clouds or volumes (FORMAT.md, "Curves, points and volumes"). */
 export const shapesFlag = 2;
+/** Header flag for lossless meshopt geometry sections, read only by the optional meshopt entry. */
+export const meshoptFlag = 4;
 
 /** One entry of the section table: its type, the element stride its flags select and its bytes in the file. */
 export interface MargoSection {
@@ -33,7 +35,7 @@ export interface MargoContainer {
  */
 export function readContainer(
   input: ArrayBuffer | ArrayBufferView,
-  accept: 0 | typeof animatedFlag | typeof shapesFlag,
+  accept: 0 | typeof animatedFlag | typeof shapesFlag | typeof meshoptFlag,
 ): MargoContainer {
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input))
     throw new TypeError(
@@ -70,6 +72,8 @@ export function readContainer(
     throw new TypeError(
       ".margo with curves, point clouds or volumes; load it with parseMargoCurves or loadMargoCurves from @margoengine/blender/curves",
     );
+  if (flags === meshoptFlag && accept !== meshoptFlag)
+    throw new TypeError('Meshopt .margo geometry; expand it with expandMargoMeshopt or load it with loadMargoMeshopt from @margoengine/blender/meshopt');
   for (let at = 20; at < 64; at += 4)
     if (
       at !== 24 &&
@@ -86,7 +90,9 @@ export function readContainer(
     );
   const sections: MargoSection[] = [],
     types =
-      flags === animatedFlag
+      flags === meshoptFlag
+        ? [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        : flags === animatedFlag
         ? [1, 2, 3, 4, 5]
         : flags === shapesFlag
           ? [1, 2, 3, 4, 6, 7]

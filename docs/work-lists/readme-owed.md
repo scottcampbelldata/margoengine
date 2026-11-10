@@ -509,3 +509,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/culling: document /bounds BoxCulledMeshes, BoxCulledModels and BoxDynamicInstances, inherited methods, padding and compatibility behaviour (batch 223 job 2).
 - margoengine: document the generated culling/bounds alias (batch 223 job 2).
+
+
+- @margoengine/blender (batch 207 job 3): document meshopt compression/expansion and loaders, lossless index order, no-growth fallback, flags/section bounds, AbortSignal and options.parse for other entries.
+- margoengine (batch 207 job 3): document blender/meshopt alias.

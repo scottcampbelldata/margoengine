@@ -390,6 +390,10 @@
       "types": "./dist/blender/lightmap.d.ts",
       "import": "./dist/blender/lightmap.js"
     },
+    "./blender/meshopt": {
+      "types": "./dist/blender/meshopt.d.ts",
+      "import": "./dist/blender/meshopt.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

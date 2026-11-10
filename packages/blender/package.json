@@ -62,13 +62,18 @@
     "./lightmap": {
       "types": "./dist/lightmap.d.ts",
       "import": "./dist/lightmap.js"
+    },
+    "./meshopt": {
+      "types": "./dist/meshopt.d.ts",
+      "import": "./dist/meshopt.js"
     }
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:browser:objects": "node tests/objects-browser.mjs",
-    "test:browser:lightmap": "node tests/lightmap-browser.mjs"
+    "test:browser:lightmap": "node tests/lightmap-browser.mjs",
+    "test:browser:meshopt": "node tests/meshopt-browser.mjs"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",

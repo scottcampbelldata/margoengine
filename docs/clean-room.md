@@ -6735,3 +6735,8 @@ oppositely wound pairs stay separate. Cached patches compare snapshots so
 mutable public software geometry refreshes them. Inner full-cell coverage and
 far-depth bounds still apply to every patch; no corner-only sampling shortcut
 was introduced. Regression tests cover seams and actual concave gaps.
+
+
+## Batch 207 job 3: meshopt geometry in .margo
+Sources consulted before implementation: Arseny Kapoulkine and Jasper St. Pierre / Khronos, *EXT_meshopt_compression* specification (ratified, current revision read 2026-11-10), https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_meshopt_compression/README.md (buffer-view independence, modes and version-0 attribute byte lanes; specification only, no codec source); Martin Isenburg, Peter Lindstrom and Jack Snoeyink, *Streaming Compression of Triangle Meshes* (SGP 2005), https://diglib.eg.org/server/api/core/bitstreams/3a3e5359-779e-4d2b-bade-3394cd4f4920/content (search extract, full fetch 403; streaming memory/locality considered, algorithm not implemented); Khronos 3D Formats Working Group, *glTF 2.0.1* (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (accessor and original element order).
+Reuses Margo's own exporters/meshopt encodeVertexBuffer and decoders/meshopt decoder without changes; no external implementation read or copied. Attribute mode also encodes index bytes, padded to four then trimmed: this avoids triangle-codec cyclic rotations and preserves provoking vertices exactly. Each section is independently compressed only when its wrapper saves bytes; whole-file fallback prevents metadata growth. Compression streams are existing owning-package CPU code; the integration adds no new heavy codec loop, Wasm bundle or timing claim.

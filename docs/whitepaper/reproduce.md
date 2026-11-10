@@ -3153,3 +3153,7 @@ edits; native mesh/model Hi-Z also asserts reduction behind the wall. CPU layout
 and transformed-corner checks: `node --test --test-timeout=120000
 packages/culling/test/bounds-extended.test.js`. Cesium Box data and licence are
 shared with job 1. No timing test or benchmark is needed for these claims.
+
+
+## Batch 207 job 3
+After build: node --test --test-timeout=120000 packages/blender/tests/meshopt.test.js. GPU: node scripts/gpu-lock.mjs run --owner=meshopt --max=3 --wait-max=60 -- node packages/blender/tests/meshopt-browser.mjs, then the same script with --compat. It compresses the own fixtures at runtime and compares every decoded RGBA pixel with the original static/animated load. The CPU suite compares every original binary section and manifest, validates unchanged triangle order and checks decoder corruption/size/abort rejection. No wall-clock assertions.

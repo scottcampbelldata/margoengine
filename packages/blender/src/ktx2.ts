@@ -1,3 +1,4 @@
+import { writeMargo } from './write-container.js';
 // @margoengine/blender/ktx2: .margo scenes whose textures are KTX2 (Basis Universal) instead of PNG, so they download
 // smaller and, on an engine created with the texture-compression features, stay compressed on the GPU. compressMargo turns an exported file's PNG sections into KTX2 sections with
 // @margoengine/exporters/ktx2 (Node or browser); parseMargoKTX2 transcodes them with @margoengine/decoders' KTX2Decoder
@@ -55,33 +56,6 @@ function imageUses(doc: Record<string, unknown>): Map<number, "srgb" | "linear" 
   return uses;
 }
 
-/** Writes a .margo container: the manifest, then `sections` in order, with header `flags` (FORMAT.md). */
-function writeMargo(
-  manifest: unknown,
-  sections: readonly { type: number; flags: number; bytes: Uint8Array }[],
-  flags: number,
-): Uint8Array<ArrayBuffer> {
-  const json = new TextEncoder().encode(JSON.stringify(manifest)),
-    all = [{ type: 1, flags: 0, bytes: json }, ...sections],
-    pad = (n: number) => (n + 3) & ~3;
-  let length = 64 + all.length * 16;
-  for (const s of all) length += pad(s.bytes.byteLength);
-  if (length > maxBytes || json.byteLength > 1024 * 1024)
-    throw new RangeError(".margo exceeds 256 MiB or its 1 MiB manifest after compression; split the scene");
-  const out = new Uint8Array(length),
-    view = new DataView(out.buffer);
-  [0x4f47524d, 1, length, all.length, 64, flags, 80].forEach((v, i) => view.setUint32(i * 4, v, true));
-  let at = 64 + all.length * 16;
-  all.forEach((s, i) => {
-    view.setUint32(64 + i * 16, s.type, true);
-    view.setUint32(68 + i * 16, at, true);
-    view.setUint32(72 + i * 16, s.bytes.byteLength, true);
-    view.setUint32(76 + i * 16, s.flags, true);
-    out.set(s.bytes, at);
-    at += pad(s.bytes.byteLength);
-  });
-  return out;
-}
 
 /**
  * Returns a copy of a static `.margo` file with every embedded PNG re-encoded as KTX2 (Basis Universal, section type
