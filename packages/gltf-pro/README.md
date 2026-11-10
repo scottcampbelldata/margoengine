@@ -444,7 +444,7 @@ Read against the two extensions' READMEs on the Khronos glTF repository as of 20
 - A fixture is a clustered point light with its profile resampled for its node, so it can aim anywhere, uplights included. The beam runs down the node's -Z. `multiplier` and `color` scale it as the extension says; `color` clamps to 0 to 1.
 - `.ies` files read through `parseIES`: types B and C, as the extension requires. Type A, which it leaves optional, is refused.
 - A cube face reads as the sRGB decode of rgb / alpha with its rows swapped, which is how the one real file reads. `Environment` prefilters its own mips from mip 0, so the file's lower mips are not read, and its own irradiance comes from the same cube: `irradianceCoefficients` stays in `lights.imageLight` as data.
-- `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES` and `rotateCube` are the steps between.
+- `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES`, `placeIESLights` (the fixtures and aimed profiles for a list of lights, given each node's world matrix) and `rotateCube` are the steps between. Fixtures share an aimed profile only when they use the same parsed profile and point the same way (batch 132: two unnamed profiles of one LM-63 format once shared the first one's beam).
 
 Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their nodes were when applied, and at most 16 fixtures differ in profile or aim.
 

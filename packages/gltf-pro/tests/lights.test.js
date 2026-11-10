@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseIES, iesCandela } from '../../clustered/dist/ies.js';
-import { gltfIESLights, gltfImageLight, orientIES, rotateCube } from '../dist/lights.js';
+import { gltfIESLights, gltfImageLight, orientIES, placeIESLights, rotateCube } from '../dist/lights.js';
 import { cubeDocument, dataURI, pngOf } from './support/cube-png.js';
 
 const file = (name) => new URL(`./fixtures/lights/${name}`, import.meta.url),
@@ -169,4 +169,22 @@ test('what a file gets wrong is refused', async () => {
   await assert.rejects(image((light) => (light.rotation = [0, 0, 0, 2])), /rotation/);
   await assert.rejects(image((light) => (light.intensity = -1)), /intensity/);
   await assert.rejects(image((light, cube) => (cube.images.length = 2)), /image index/);
+});
+
+test('two unnamed profiles of one format aimed alike keep their own candela (batch 132)', () => {
+  // Both profiles have the default name "" and the same LM-63 format line; the aimed-profile cache once keyed on
+  // format + name + aim, so the second fixture drew the first profile's beam at the first one's intensity.
+  const bright = parseIES(profileText),
+    dim = parseIES(profileText.replace(/8500/g, '4250')),
+    identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    light = (profile, nodeIndex) => ({ name: '', profile, nodeIndex, multiplier: 1, color: [1, 1, 1] });
+  assert.equal(bright.format, dim.format);
+  assert.deepEqual([bright.peak, dim.peak], [8500, 5250]);
+  const { fixtures, profiles } = placeIESLights([light(bright, 0), light(dim, 1)], () => identity, iesCandela);
+  near(fixtures[0].intensity, bright.peak, 1e-6, 'the first fixture');
+  near(fixtures[1].intensity, dim.peak, 1e-6, 'the second fixture');
+  assert.notEqual(profiles[0], profiles[1]);
+  // One profile on two nodes aimed alike still shares a single aimed profile.
+  const shared = placeIESLights([light(bright, 0), light(bright, 1)], () => identity, iesCandela);
+  assert.equal(shared.profiles[0], shared.profiles[1]);
 });

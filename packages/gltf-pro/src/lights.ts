@@ -334,6 +334,49 @@ export async function gltfImageLight(
 }
 
 /**
+ * The point lights and aimed profiles for `lights`, each placed by its node's world matrix (`matrixOf`). Lights that
+ * use the same profile and point the same way share one aimed profile (IESLights holds 16); the cache is keyed by the
+ * parsed profile itself, so two unnamed profiles of one format stay apart.
+ */
+export function placeIESLights(
+  lights: readonly GLTFIESLight[],
+  matrixOf: (nodeIndex: number) => ArrayLike<number>,
+  candelaOf: (profile: IESProfile, theta: number, phi: number) => number,
+  exposure = 1,
+): { fixtures: PointLight[]; profiles: IESProfile[] } {
+  const oriented = new Map<IESProfile, Map<string, IESProfile>>(),
+    fixtures: PointLight[] = [],
+    profiles: IESProfile[] = [];
+  for (const light of lights) {
+    const m = matrixOf(light.nodeIndex),
+      unit = (k: number): Vec3 => {
+        const scale = Math.hypot(m[k], m[k + 1], m[k + 2]) || 1;
+        return [m[k] / scale, m[k + 1] / scale, m[k + 2] / scale];
+      },
+      basis: [Vec3, Vec3, Vec3] = [unit(0), unit(4), unit(8)],
+      key = basis
+        .flat()
+        .map((v) => v.toFixed(3))
+        .join();
+    let aimed = oriented.get(light.profile);
+    if (!aimed) oriented.set(light.profile, (aimed = new Map()));
+    let profile = aimed.get(key);
+    if (!profile) aimed.set(key, (profile = orientIES(light.profile, candelaOf, basis)));
+    const intensity = profile.peak * light.multiplier * exposure;
+    fixtures.push({
+      position: [m[12], m[13], m[14]],
+      // Where the light falls below 1/256 of a candela at a metre, as `clusteredLights` sets a punctual light's.
+      range: Math.sqrt(intensity * 256) || 1,
+      color: light.color,
+      intensity,
+      decay: 2,
+    });
+    profiles.push(profile);
+  }
+  return { fixtures, profiles };
+}
+
+/**
  * Lights `model` with the file's EXT_lights_ies fixtures, placed where their nodes are now, and its scene's
  * EXT_lights_image_based environment. Keeps the model's KHR_lights_punctual point and spot lights in the same list.
  * A file with neither makes nothing and loads neither package.
@@ -368,37 +411,7 @@ export async function applyGLTFLightExtensions(
       removers.push(() => ies.dispose());
       engine.store.tick(false);
       const punctual = model.clusteredLights(),
-        oriented = new Map<string, IESProfile>(),
-        fixtures: PointLight[] = [],
-        profiles: IESProfile[] = [];
-      for (const light of iesLights) {
-        const m = model.nodes[light.nodeIndex].matrix,
-          unit = (k: number): Vec3 => {
-            const scale = Math.hypot(m[k], m[k + 1], m[k + 2]) || 1;
-            return [m[k] / scale, m[k + 1] / scale, m[k + 2] / scale];
-          },
-          basis: [Vec3, Vec3, Vec3] = [unit(0), unit(4), unit(8)],
-          // Lights aimed alike share a profile: IESLights holds 16.
-          key =
-            light.profile.format +
-            light.name +
-            basis
-              .flat()
-              .map((v) => v.toFixed(3))
-              .join();
-        let profile = oriented.get(key);
-        if (!profile) oriented.set(key, (profile = orientIES(light.profile, iesCandela, basis)));
-        const intensity = profile.peak * light.multiplier * exposure;
-        fixtures.push({
-          position: [m[12], m[13], m[14]],
-          // Where the light falls below 1/256 of a candela at a metre, as `clusteredLights` sets a punctual light's.
-          range: Math.sqrt(intensity * 256) || 1,
-          color: light.color,
-          intensity,
-          decay: 2,
-        });
-        profiles.push(profile);
-      }
+        { fixtures, profiles } = placeIESLights(iesLights, (node) => model.nodes[node].matrix, iesCandela, exposure);
       clustered.setLights([...punctual, ...fixtures]);
       ies.setProfiles([...punctual.map(() => null), ...profiles]);
       removers.push(clustered.add(model));
