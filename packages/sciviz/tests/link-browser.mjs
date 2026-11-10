@@ -35,6 +35,12 @@ for (const compat of [false, true]) {
         return { hash, lit };
       };
       const before = await Promise.all([demo.figure, demo.histogram, demo.heatmap].map(pixels));
+      const area = demo.figure.engine.canvas.getBoundingClientRect();
+      const brushed = demo.figure.select({ rect: [area.width * .42, area.height * .42, area.width * .52, area.height * .58] });
+      check(brushed.points.some((p) => p.layer === demo.cloud && p.indices.length > 0 && p.indices.length < demo.cloud.count), 'bound source layers remain brushable through their visible proxy');
+      demo.cloudBinding.visible = false;
+      check(demo.figure.select({ rect: [0, 0, area.width, area.height] }).points.length === 0, 'hidden proxies do not select their source geometry');
+      demo.cloudBinding.visible = true; demo.selection.clear();
       const subset = [];
       for (let i = 0; i < demo.cloud.count; i++)
         if (demo.cloud.values[i] > 0.8 && demo.cloud.values[i] < 1.1) subset.push(i);

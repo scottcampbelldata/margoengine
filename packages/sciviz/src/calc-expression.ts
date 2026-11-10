@@ -8,7 +8,7 @@ export interface ScalarNode {
   column?: number;
 }
 export interface Column {
-  values: Float32Array;
+  values: ArrayLike<number>;
   width: number;
   offset: number;
 }
@@ -36,12 +36,16 @@ const unary = new Set([
 const binary = new Set(['min', 'max', 'pow', 'atan2']);
 
 /** @internal Statically typed scalar/vector grammar, without execution of caller code. */
-export function expression(source: string, columns: ReadonlyMap<string, Column>): ScalarNode[] {
+export function expression(source: string, columns: ReadonlyMap<string, Column>, options: {
+  precision?: 'f32' | 'f64';
+  predicates?: boolean;
+  reduce?: (op: string, args: ScalarNode[]) => ScalarNode[];
+} = {}): ScalarNode[] {
   if (typeof source !== 'string' || source.length > 4096) bad('expression must be a string of at most 4096 characters');
   const tokens: string[] = [];
   let at = 0;
   const pattern =
-    /\s*(?:(\d*\.\d+(?:[eE][+-]?\d+)?|\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)|([A-Za-z_]\w*)|(`[^`]+`)|([+*/%^(),\[\]-]))/y;
+    /\s*(?:(\d*\.\d+(?:[eE][+-]?\d+)?|\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)|([A-Za-z_]\w*)|(`[^`]+`)|(&&|\|\||<=|>=|==|!=|[!<>+*/%^(),\[\]-]))/y;
   while (at < source.length && source.slice(at).trim()) {
     pattern.lastIndex = at;
     const match = pattern.exec(source);
@@ -64,14 +68,15 @@ export function expression(source: string, columns: ReadonlyMap<string, Column>)
     if (++depth > 64 || ++nodes > 512) bad('expression exceeds 64 nesting levels or 512 nodes');
     const token = tokens[cursor++];
     let a: ScalarNode[];
-    if (token === '+' || token === '-') {
+    if (token === '!' && options.predicates) a = parse(25).map((x) => node('!', x));
+    else if (token === '+' || token === '-') {
       a = parse(25);
       if (token === '-') a = a.map((x) => node('neg', x));
     } else if (token === '(') {
       a = parse();
       take(')');
     } else if (token && /^\d|^\.\d/.test(token)) {
-      const value = Math.fround(Number(token));
+      const value = options.precision === 'f64' ? Number(token) : Math.fround(Number(token));
       if (!Number.isFinite(value)) bad('literal exceeds float32');
       a = [literal(value)];
     } else if (token && tokens[cursor] === '(') {
@@ -99,11 +104,16 @@ export function expression(source: string, columns: ReadonlyMap<string, Column>)
             node('*', args[0][(k + 2) % 3], args[1][(k + 1) % 3]),
           ),
         );
+      else if (options.reduce && ['min', 'max', 'sum', 'mean', 'count'].includes(token) && args.length === 1)
+        a = options.reduce(token, args[0]);
       else if (unary.has(token) && args.length === 1) a = args[0].map((x) => node(token, x));
       else if (binary.has(token) && args.length === 2) a = combine(token, args[0], args[1]);
       else if (token === 'clamp' && args.length === 3) a = combine('min', combine('max', args[0], args[1]), args[2]);
       else bad(`unknown function or wrong arguments: ${token}`);
-    } else if (token === 'pi' || token === 'e') a = [literal(Math.fround(token === 'pi' ? Math.PI : Math.E))];
+    } else if (token === 'pi' || token === 'e') {
+      const value = token === 'pi' ? Math.PI : Math.E;
+      a = [literal(options.precision === 'f64' ? value : Math.fround(value))];
+    }
     else if (token === 'iHat' || token === 'jHat' || token === 'kHat')
       a = [0, 1, 2].map((k) => literal(k === ['iHat', 'jHat', 'kHat'].indexOf(token) ? 1 : 0));
     else {
@@ -121,7 +131,8 @@ export function expression(source: string, columns: ReadonlyMap<string, Column>)
     }
     while (true) {
       const op = tokens[cursor],
-        power = op === '+' || op === '-' ? 10 : op === '*' || op === '/' || op === '%' ? 20 : op === '^' ? 30 : 0;
+        power = op === '+' || op === '-' ? 10 : op === '*' || op === '/' || op === '%' ? 20 : op === '^' ? 30
+          : options.predicates ? op === '||' ? 1 : op === '&&' ? 2 : ['==', '!='].includes(op) ? 3 : ['<', '>', '<=', '>='].includes(op) ? 4 : 0 : 0;
       if (power === 0 || power < minimum) break;
       cursor++;
       a = combine(op, a!, parse(power + (op === '^' ? 0 : 1)));
@@ -139,12 +150,13 @@ export function evaluate(
   n: ScalarNode,
   row: readonly number[],
   cache = new Map<ScalarNode, { value: number; error: number }>(),
+  precision: 'f32' | 'f64' = 'f32',
 ): { value: number; error: number } {
   const cached = cache.get(n);
   if (cached) return cached;
   if (n.op === 'literal') return { value: n.value!, error: 0 };
   if (n.op === 'column') return { value: row[n.column!], error: 0 };
-  const args = n.args.map((x) => evaluate(x, row, cache)),
+  const args = n.args.map((x) => evaluate(x, row, cache, precision)),
     a = args[0].value,
     b = args[1]?.value,
     ea = args[0].error,
@@ -153,6 +165,12 @@ export function evaluate(
     hi = a + ea;
   let value: number, error: number;
   switch (n.op) {
+    case '!': value = Number(!Number.isFinite(a) || a === 0); error = 0; break;
+    case '&&': value = Number(Number.isFinite(a) && a !== 0 && Number.isFinite(b) && b !== 0); error = 0; break;
+    case '||': value = Number((Number.isFinite(a) && a !== 0) || (Number.isFinite(b) && b !== 0)); error = 0; break;
+    case '<': case '>': case '<=': case '>=': case '==': case '!=':
+      value = Number(Number.isFinite(a) && Number.isFinite(b) && (n.op === '<' ? a < b : n.op === '>' ? a > b : n.op === '<=' ? a <= b : n.op === '>=' ? a >= b : n.op === '==' ? a === b : a !== b));
+      error = 0; break;
     case '+':
       value = a + b;
       error = ea + eb;
@@ -256,6 +274,7 @@ export function evaluate(
       error = ea;
     }
   }
+  if (precision === 'f64') { const result = { value, error: 0 }; cache.set(n, result); return result; }
   // Includes transcendental implementation error and subnormal flushing, not discretisation error.
   const absolute = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'log', 'log2'].includes(n.op);
   error += 32 * 2 ** -23 * (absolute ? Math.max(1, Math.abs(value)) : Math.abs(value)) + 2 ** -120;

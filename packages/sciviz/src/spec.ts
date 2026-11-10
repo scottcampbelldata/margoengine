@@ -709,7 +709,7 @@ async function populate(figure: Figure, spec: FigureSpec, options: FigureLoadOpt
   for (const layer of figure.layers) if (!wanted.includes(layer)) figure.remove(layer);
   if (wanted.some((layer, i) => figure.layers[i] !== layer))
     throw typeError('Resource order differs from layer order; save layers in creation order', 'sciviz');
-  figure.setLimits(spec.limits as [number, number, number, number, number, number]);
+  figure.setLimits(spec.limits as [number, number, number, number, number, number], { space: 'plot' });
   Object.assign(figure.engine.camera, spec.camera);
   figure.dragMode = spec.dragMode as Figure['dragMode'];
   if (spec.selection) figure.setSelection((await io.decode(spec.selection, refs)) as PointSelection, { emit: false });

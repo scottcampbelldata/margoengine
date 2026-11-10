@@ -135,7 +135,9 @@ export class Figure extends EventTarget {
     setAxes(options: AxesOptions | false, signal?: AbortSignal): Promise<void>;
     setAxisScales(scales: readonly [Scale, Scale, Scale]): void;
     addChartLayer<L extends RectsLayer>(layer: L): L;
-    setLimits(limits?: Bounds | readonly [number, number, number, number]): void;
+    setLimits(limits?: Bounds | readonly [number, number, number, number], options?: {
+        readonly space?: 'data' | 'plot';
+    }): void;
     render(): void;
     get dragMode(): DragMode;
     set dragMode(mode: DragMode);

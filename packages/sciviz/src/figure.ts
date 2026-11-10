@@ -26,6 +26,7 @@ import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
 import { publicationLabels, disposePublicationLabels } from './publication-labels.js';
+
 import { projectPoint } from '@margoengine/math/mat4';
 import {
   dataToScene,
@@ -415,6 +416,7 @@ export class Figure extends EventTarget {
   // Axis scales (a date axis takes its origin from the first data it sees), the legend and the next series colour.
   readonly #scales: [Scale, Scale, Scale];
   readonly #dated = [false, false, false];
+  #customScales = false;
   #legend: Legend | undefined;
   #timeline: Timeline | undefined;
   #series = 0;
@@ -556,6 +558,7 @@ export class Figure extends EventTarget {
   setAxisScales(scales: readonly [Scale, Scale, Scale]): void {
     this.#check();
     this.#need2d('Custom axis mappings');
+    this.#customScales = true;
     for (let i = 0; i < 3; i++) {
       this.#scales[i] = scales[i];
       this.#dated[i] = true;
@@ -658,16 +661,28 @@ export class Figure extends EventTarget {
   /**
    * Sets the data window: [xmin, xmax, ymin, ymax, zmin, zmax], or [xmin, xmax, ymin, ymax] for a 2D chart. With no
    * argument, goes back to the `limits` option or the layers' bounds. Panning and zooming a 2D chart set it too.
+   * Native axes accept data units by default. `space: 'plot'` restores already-mapped windows without remapping.
+   * Custom axis mappings own plot units by default.
    */
-  setLimits(limits?: Bounds | readonly [number, number, number, number]): void {
+  setLimits(limits?: Bounds | readonly [number, number, number, number], options: { readonly space?: 'data' | 'plot' } = {}): void {
     this.#check();
     if (limits) this.#checkBounds(limits, 'Figure limits');
-    this.#window = limits ? this.#full(limits) : undefined;
+    if (options.space !== undefined && options.space !== 'data' && options.space !== 'plot')
+      throw rangeError('Figure limit space must be data or plot', 'sciviz');
+    this.#window = limits ? this.#full(limits, options.space !== 'plot') : undefined;
     this.#refit();
   }
 
-  #full(b: Bounds | readonly [number, number, number, number]): Bounds {
-    return b.length === 4 ? [b[0], b[1], b[2], b[3], -1, 1] : ([...b] as Bounds);
+  #full(b: Bounds | readonly [number, number, number, number], map = true): Bounds {
+    const result: Bounds = b.length === 4 ? [b[0], b[1], b[2], b[3], -1, 1] : ([...b] as Bounds);
+    // Built-in limits are data units, just like layer input. A custom mapping owns its plot coordinates.
+    if (map && !this.#customScales) for (let axis = 0; axis < b.length / 2; axis++) {
+      const map = this.#forward(axis, [b[axis * 2]]);
+      result[axis * 2] = map(b[axis * 2]); result[axis * 2 + 1] = map(b[axis * 2 + 1]);
+      if (!Number.isFinite(result[axis * 2]) || !Number.isFinite(result[axis * 2 + 1]))
+        throw rangeError('Figure limits must be in the domain of their axis scales', 'sciviz');
+    }
+    return result;
   }
 
   /**

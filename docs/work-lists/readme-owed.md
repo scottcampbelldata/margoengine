@@ -1231,3 +1231,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/pixel (review 3 P1): document zero-lerp stationary axes across the full finite nonnegative update delta domain; examples deferred.
 
 - @margoengine/weather (review 2): document direct GLTFWeather/PrecipitationCover disposal in secondary scenes and retained caller models; examples deferred.
+- @margoengine/sciviz (batch 174 job 4): document query predicates/reductions and f64/null policy, keyed extraction, sortable virtualised Spreadsheet/keyboard/AbortSignal, selected time-series snapshots and plot lifecycle, native scaled limits in data units and setLimits space: 'plot' for portable windows.
+- margoengine (batch 174 job 4): cover the generated sciviz/query alias and refreshed sciviz/monitor alias.

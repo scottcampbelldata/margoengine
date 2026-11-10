@@ -3611,6 +3611,10 @@
       "types": "./dist/sciviz/ometiff.d.ts",
       "import": "./dist/sciviz/ometiff.js"
     },
+    "./sciviz/query": {
+      "types": "./dist/sciviz/query.d.ts",
+      "import": "./dist/sciviz/query.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14571921,
+  "total": 14579587,
   "history": [
     {
       "date": "2026-10-24",
@@ -7799,6 +7799,18 @@
       "commit": "861df30d9",
       "reason": "clustered: raised light caps (maxLights, paged light buffer), batch 53 job 2",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-174-job4",
+      "reason": "Query entry 0 to 7125 B min+gzip, ceiling 7381 B: safe f64 calculator predicates, typed extraction, two-axis DOM virtualisation and selected time series. Rebased SelectionStore retains portable history state from main. Kept together to share keyed identity; splitting adds lifecycle glue. Figure root 57366 B; core/stage untouched.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-174-job4",
+      "reason": "Shared calculator grammar measured from source 6722 to 7007 B gzip; built calc 7007 B. Additive predicates/reductions preserve defaults. Extra link-browser regressions cover the existing main linked-draw identity, without an additional registry. Native scaled limits and portable plot-space restoration are repaired in sciviz. Optional calc budget growth keeps one grammar rather than duplicating it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8654,7 +8666,7 @@
     "@margoengine/sciviz": 58432,
     "@margoengine/sciviz/atmosphere": 33055,
     "@margoengine/sciviz/bricks": 27589,
-    "@margoengine/sciviz/calc": 6978,
+    "@margoengine/sciviz/calc": 7263,
     "@margoengine/sciviz/categorical": 22371,
     "@margoengine/sciviz/cgns": 18856,
     "@margoengine/sciviz/charts-extra": 7548,
@@ -9208,6 +9220,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/sciviz/query": 7381
   }
 }

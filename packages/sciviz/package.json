@@ -259,6 +259,10 @@
     "./ometiff": {
       "types": "./dist/ometiff.d.ts",
       "import": "./dist/ometiff.js"
+    },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "import": "./dist/query.js"
     }
   },
   "files": [
@@ -315,6 +319,7 @@
     "limits": "node scripts/browser-root.mjs tests/limits-browser.mjs",
     "test:browser:limits": "node scripts/browser-root.mjs tests/limits-browser.mjs && node scripts/browser-root.mjs tests/limits-browser.mjs --backend=webgl2 --output=test-results/sciviz-limits-webgl2.json",
     "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs",
-    "test:browser:stream": "node scripts/browser-root.mjs tests/stream-browser.mjs"
+    "test:browser:stream": "node scripts/browser-root.mjs tests/stream-browser.mjs",
+    "test:browser:query": "node scripts/browser-root.mjs tests/query-browser.mjs"
   }
 }

@@ -1,0 +1,25 @@
+import { Figure, type LineLayer } from '@margoengine/sciviz';
+import { ColumnarTable } from '@margoengine/sciviz/table';
+import { QuerySelection, Spreadsheet } from '@margoengine/sciviz/query';
+
+const source = await (await fetch('/examples/assets/sciviz/stats/ghcn.json')).json() as { date: string; tmax: number; tmin: number }[];
+export const query = new QuerySelection(new ColumnarTable({ date: new Float64Array(source.map((v) => Date.parse(v.date))), tmax: Float64Array.from(source, (v) => v.tmax), tmin: Float64Array.from(source, (v) => v.tmin) }), { rowIds: source.map((v) => v.date) });
+export const sheet = new Spreadsheet(document.querySelector<HTMLElement>('#ghcn')!, query);
+export const figure = await Figure.create(document.querySelector<HTMLCanvasElement>('#series')!, { mode: '2d', scale: { x: 'date' }, limits: [Date.parse('2020-01-01'), Date.parse('2021-01-01'), -10, 40] });
+const values = new Float32Array(await (await fetch('/examples/assets/sciviz/tmr-tet-values.bin')).arrayBuffer());
+const positions = new Float32Array(await (await fetch('/examples/assets/sciviz/tmr-tet-points.bin')).arrayBuffer());
+export const tmr = new QuerySelection(new ColumnarTable({ x: Float64Array.from(values, (_, i) => positions[3 * i]), span: Float64Array.from(values, (_, i) => positions[3 * i + 1]), eddy: values }));
+export const tmrSheet = new Spreadsheet(document.querySelector<HTMLElement>('#tmr')!, tmr);
+export const tmrFigure = await Figure.create(document.querySelector<HTMLCanvasElement>('#tmrplot')!, { mode: '2d' });
+tmr.select('eddy > 0.9 * max(eddy)'); await tmr.plot(tmrFigure, 'x', 'eddy');
+let layer: LineLayer | null = null;
+let pending = Promise.resolve();
+export const ready = () => pending;
+const status = document.querySelector<HTMLElement>('#status')!;
+const update = () => { pending = pending.then(async () => { if (layer) figure.remove(layer); layer = await query.plot(figure, 'date', 'tmax'); status.textContent = `${query.rows().length} daily rows and ${tmr.rows().length} NASA samples selected. Extracted daily table: ${query.extract().length} rows.`; }); };
+query.selection.addEventListener('change', update);
+document.querySelector<HTMLFormElement>('#query')!.addEventListener('submit', (event) => { event.preventDefault(); try { query.select(document.querySelector<HTMLInputElement>('input')!.value); } catch (error) { status.textContent = String(error); } });
+document.querySelector('#clear')!.addEventListener('click', () => query.selection.clear());
+document.querySelector('#undo')!.addEventListener('click', () => query.selection.undo());
+query.select('tmax > 0.9 * max(tmax)'); await ready(); await Promise.all([figure.ready(), tmrFigure.ready()]); status.dataset.ready = 'true';
+addEventListener('pagehide', () => { sheet.dispose(); tmrSheet.dispose(); query.dispose(); tmr.dispose(); figure.dispose(); tmrFigure.dispose(); }, { once: true });
