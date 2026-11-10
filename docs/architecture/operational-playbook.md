@@ -5564,6 +5564,10 @@ milliseconds, disconnects and moves on, waiting for the proof of teardown only u
 2,000 ms. Survivors past 120 s are recorded in
 `test-results/browser-host-survivors.log`. Evidence: the 40-cycle loop under load in
 docs/known-bugs.md, `tests/browser-host.test.js`, `tests/browser-teardown.test.js`.
+A close that failed 677 ms after the end (batch 217) was a false survivor: the
+native waiter took a pid whose start time it could not read (gone between lookup
+and read, or taken by a service this user cannot query) for one of ours. It now
+skips such a pid; two regressions in `tests/browser-teardown.test.js` (2026-11-10).
 Missing: a run on the laptop and the Mac mini, and the cause of the kernel's delay.
 
 #### Batch 197 globe control evidence

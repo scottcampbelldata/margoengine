@@ -69,9 +69,9 @@ export function taskkillPids(output) {
 
 /**
  * Windows: waits until each of `pids` has finished exiting, its handles closed (its process object signalled), and
- * resolves to the ones still running when `waitMs` ran out. A pid that is gone, or that a newer process took after
- * `sinceMs` (epoch ms), is not waited for. Node has no call that waits on a process it did not start, so .NET's
- * `Process.WaitForExit` does, from one Windows PowerShell for all the pids.
+ * resolves to the ones still running when `waitMs` ran out. A pid that is gone, that a newer process took after
+ * `sinceMs` (epoch ms), or whose start time cannot be read is not waited for. Node has no call that waits on a process
+ * it did not start, so .NET's `Process.WaitForExit` does, from one Windows PowerShell for all the pids.
  * @param {number[]} pids
  * @param {number} waitMs
  * @param {number} sinceMs
@@ -87,7 +87,13 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
     `$since = [DateTimeOffset]::FromUnixTimeMilliseconds(${Math.round(sinceMs)}).UtcDateTime`,
     `foreach ($id in @(${ids.join(',')})) {`,
     '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch [ArgumentException] { continue }',
-    '  try { if ($p.StartTime.ToUniversalTime() -gt $since) { continue } } catch { $id; continue }',
+    // A start time that cannot be read means the pid names no process of ours any more, so it is not waited for or
+    // reported: either the kernel finished with ours between the lookup and the read (PowerShell's getter then gives
+    // $null, and the process object is already signalled), or a newer process this user cannot query (a service:
+    // 135 of 958 processes on the dev PC) took the pid. Every process Chromium starts as this user is readable, during
+    // its teardown too. Reporting it failed a close with SHUTDOWN_TIMEOUT 677 ms after the end.
+    '  $start = $p.StartTime',
+    '  if ($null -eq $start -or $start.ToUniversalTime() -gt $since) { continue }',
     '  $left = [int][Math]::Max(0, ($end - [DateTime]::UtcNow).TotalMilliseconds)',
     '  if (-not $p.WaitForExit($left)) { $id }',
     '}',

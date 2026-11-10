@@ -4,7 +4,7 @@
 // script that does not: a script that starts a browser and a server of its own must tear both down with `closeAll`, and
 // the shared launchers (`launchBrowser`, `openBrowser`, `startDevServer`) bound their own closes.
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createServer, request } from 'node:http';
@@ -421,6 +421,40 @@ test('Windows endTree leaves a live replacement process alone after checking its
   } finally {
     if (replacement?.pid) await endTree(replacement.pid);
   }
+});
+
+// Lane P's cutscene GPU suite passed every check, then its close failed with SHUTDOWN_TIMEOUT: the host's waiter had
+// reported an ended Chromium child as a survivor 677 ms after the end. The waiter took a start time it could not read
+// for a process still running; the pid named no process of ours by then.
+test('Windows waiter: an ended process gone before its start time was read is not a survivor', { timeout: 15_000 }, async () => {
+  if (process.platform !== 'win32') return;
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  await new Promise((resolve, reject) => child.once('spawn', resolve).once('error', reject));
+  const exited = new Promise((resolve) => child.once('exit', resolve));
+  const lookup = '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch [ArgumentException] { continue }';
+  try {
+    // The race made certain: the process is found, then ended, and its start time is read only once it is gone.
+    const survivors = await waitSignaled([child.pid], 5000, Date.now() - 60_000, (file, args, options, callback) => {
+      assert.ok(args[3].includes(lookup), 'the waiter still looks the process up first');
+      const widened = args[3].replace(lookup, `${lookup}\n  Stop-Process -Id $id -Force; Start-Sleep -Milliseconds 1500`);
+      return execFile(file, [...args.slice(0, 3), widened], options, callback);
+    });
+    await exited;
+    assert.deepEqual(survivors, [], 'a process the kernel has finished with is not still present');
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+});
+
+test('Windows waiter: a pid held by a process this user cannot query is not reported as ours', { timeout: 15_000 }, async () => {
+  if (process.platform !== 'win32') return;
+  // The System process (pid 4) stands in for a service that took an ended Chromium child's pid.
+  const readable = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '$null -ne [Diagnostics.Process]::GetProcessById(4).StartTime'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  }).trim();
+  assert.equal(readable, 'False', 'the stand-in must be a process whose start time this user cannot read');
+  assert.deepEqual(await waitSignaled([4], 2000, 0), []);
 });
 
 test('the pids come from taskkill lines, never the parent it names', () => {
