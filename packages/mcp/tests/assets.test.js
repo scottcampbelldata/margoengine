@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { AssetLibrary, createAssetTools } from '../dist/assets.js';
 import { AssetInstaller } from '../dist/assets-page.js';
+
+// The test-results folder is not tracked, so a run from the package folder must create it first.
+async function scratch() {
+  await mkdir(join(process.cwd(), 'test-results'), { recursive: true });
+  return mkdtemp(join(process.cwd(), 'test-results/assets-test-'));
+}
 
 const PH = 'https://api.polyhaven.com/';
 const DL = 'https://dl.polyhaven.org/';
@@ -82,7 +88,7 @@ test('catalogues search names/tags, enforce CC0 on all Khronos legal records and
 test('download preserves relative dependencies, hashes and licence manifest, and wires only owned downloads', {
   timeout: 10000,
 }, async () => {
-  const directory = await mkdtemp(join(process.cwd(), 'test-results/assets-test-'));
+  const directory = await scratch();
   const calls = [];
   const library = new AssetLibrary({
     directory,
@@ -119,7 +125,7 @@ test('download rejects traversal, unsafe redirects, bad checksums and byte caps,
   timeout: 10000,
 }, async () => {
   for (const failure of ['path', 'redirect', 'checksum', 'size']) {
-    const directory = await mkdtemp(join(process.cwd(), 'test-results/assets-test-'));
+    const directory = await scratch();
     const get = (url, opts) => {
       const path = String(url);
       if (path === PH + 'files/test_rock')
