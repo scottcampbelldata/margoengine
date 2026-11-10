@@ -146,7 +146,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/save: document optional materials capture/restore, assigning restored slots, lazy shader codecs, aborts and resource resolvers.
 | @margoengine/html | texture-gl: portable HTMLTextureGL, both rasterizers, WebGPU/preview depth, input, disposal and resource lifetime. | Batch 260 job 1 |
 | margoengine | Generated html/texture-gl alias. | Batch 260 job 1 |
-<<<<<<< HEAD
 - @margoengine/xr: document xr/locomotion SmoothLocomotion.attach after requestSession, thumbstick options, teleport/turn, stereo comfort defaults, onEye and disposal.
 
 
@@ -170,19 +169,15 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document /stats/geometry alias.
 | @margoengine/input | haptics: native triggerRumble parameters/defaults, capabilities, completion/preemption, AbortSignal/timeout, reset ownership and physical acceptance | batch-253 job 5 |
 | margoengine | Generated input/haptics alias plus restored existing audio/binaural, materials/serialization, save/materials, save/scene-state and shader/serialization mirrors | batch-253 job 5 |
-<<<<<<< HEAD
 - @margoengine/xr: document xr/hands SkinnedHands.create(xr, { left, right }), profile asset loading, hand-tracking session request, jointNames, borrowed model ownership and cleanup.
 
 
 - @margoengine/audio/sprites: AudioSpriteBank named offset/duration/loop maps, overlap and natural-end disposal; loadAudioFallback URL/MIME lists, capability probing, abort and failure causes.
 - @margoengine/worker (batch 257 job 3): replace the pointer-lock limitation with page/worker requestPointerLock and exitPointerLock, pointerLocked state, existing PointerLockControls integration, trusted activation, raw input, AbortSignal/deadline and disposal behavior.
-=======
-=======
 
 - @margoengine/ecs (batch 249 job 1): objects entry, objectField factories, mixed ObjectComponent fields, identity, packed row lifetime and touch.
 - margoengine (batch 249 job 1): generated ecs/objects alias.
->>>>>>> d3eba2dfb (feat(ecs): add packed object and string component fields)
->>>>>>> 7e7892c52 (feat(ecs): add packed object and string component fields)
 
 - @margoengine/stats: document /gl asynchronous frame/pass timing, early plugin registration, explicit scopes, disjoint/loss handling, limits, unavailable state, draw counts, reports, panel and disposal.
 - margoengine: document /stats/gl alias.
+- @margoengine/xr: document xr/ar-extra session negotiation, DOM overlay root ownership, current/legacy image targets, copied observations, mesh visualization and persistent anchor lifetime/abort cleanup.

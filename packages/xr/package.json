@@ -31,7 +31,8 @@
     "prepack": "npm run build",
     "test:gpu:pointers": "cd ../.. && node packages/xr/tests/pointer.browser.mjs",
     "test:gpu:locomotion": "cd ../.. && node packages/xr/tests/locomotion.browser.mjs",
-    "test:gpu:hands": "cd ../.. && node packages/xr/tests/hands.browser.mjs"
+    "test:gpu:hands": "cd ../.. && node packages/xr/tests/hands.browser.mjs",
+    "test:gpu:ar-extra": "cd ../.. && node packages/xr/tests/ar-extra.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -70,6 +71,10 @@
     "./hands": {
       "types": "./dist/hands.d.ts",
       "import": "./dist/hands.js"
+    },
+    "./ar-extra": {
+      "types": "./dist/ar-extra.d.ts",
+      "import": "./dist/ar-extra.js"
     }
   },
   "files": [
@@ -80,7 +85,8 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/selection": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
@@ -94,13 +100,17 @@
     },
     "@margoengine/gltf-pro": {
       "optional": true
+    },
+    "@margoengine/geometry": {
+      "optional": true
     }
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
       "test:gpu:pointers": 3,
       "test:gpu:locomotion": 3,
-      "test:gpu:hands": 3
+      "test:gpu:hands": 3,
+      "test:gpu:ar-extra": 3
     }
   }
 }

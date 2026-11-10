@@ -3207,7 +3207,6 @@ Additional material proof: distinct typed views preserve backing-buffer aliasing
 ### HTML texture preview (batch 260 job 1)
 The optional html/texture-gl entry draws the existing live HTML textures on native WebGL2 preview and retains the WebGPU path. Evidence: packages/html/test/html-browser.js textureScenario checks opaque panel/button pixels, a partial foreground occluder, native DOM hit routing, invalidation, idle draw counts and disposal on all three routes. No claim that scene occlusion blocks pointer routing; that remains the existing texture contract.
 
-<<<<<<< HEAD
 ### XR smooth movement evidence
 
 The optional xr/locomotion entry adds planar smooth motion, smooth yaw and a movement-driven per-eye angular vignette. Proof: packages/xr/tests/locomotion.test.js covers axis mapping, dead zones, speed, frame delta, teleport, lost input and session/abort cleanup; packages/xr/tests/locomotion.browser.mjs compares both eyes, both XR routes and native WebGPU with the WebGL2 bridge. These checks establish rendering and input behavior, not sickness mitigation or headset validation.
@@ -3255,17 +3254,15 @@ capture from this module, including list change notifications.
 
 - Stats geometry (batch 264): optional command-derived triangle, submitted-vertex and instance counters with panel/JSON output. Proof: packages/stats/test/geometry.test.js and scripts/test-stats-parity.mjs; native WebGPU/WebGL2 boxes each submit 24 triangles, 72 vertices, 2 instances. Unknown indirect/bundle work remains explicit. No claim about shader invocations, unique geometry or elapsed speed.
 Batch 253 trigger-rumble claim: independent native left/right trigger and strong/weak handle channels, accurate complete/preempted/unsupported outcomes, bounded cancellation and per-actuator call ownership. Proof: packages/input/test/haptics.test.js. Research and native/specialised public API comparison: docs/clean-room.md Batch 253 job 5. Synthetic actuator conformance does not claim physical tactile acceptance.
-<<<<<<< HEAD
 ### XR skinned hands
 
 The optional xr/hands entry drives real glTF skins from the 25 named WebXR joints using Margo Animation. Named mapping preserves authored hierarchy; CPU tests cover tracking loss, source replacement, abort, restoration and scene lifetime. Standard MIT generic-hand assets provide real weighted meshes. Rendering checks cover both XR routes and backends. This establishes software behavior, not real-device proof.
 
 Batch 254 sprites: optional audio/sprites plays named shared-buffer intervals with independent overlap and loop bounds, and selects codec URL alternatives through canPlayType plus fetch/decode fallback. CPU tests cover immutable maps, bounds, overlap, cleanup, candidate ordering, exhausted failure causes and cancellation. Real browser Web Audio offline rendering checks named clip/loop PCM directly against the licensed recording and checks native capability probing plus a controlled HTTP failure before a working WAV. Device output and other browser codecs unmeasured.
 Batch 257 job 3: worker canvas pointer-lock forwarding supports page/worker requests, native state/error events, document movement deltas and unchanged PointerLockControls. CPU evidence is pointer-lock.test.js; native Chromium evidence is browser-check.mjs, which locks from a trusted click, rotates the worker camera and exits from the worker. No speed claim.
-=======
-=======
 Batch 249 job 1: ecs/objects stores arbitrary JS values beside numeric fields and participates in existing queries, tracking and destruction. Proof: packages/ecs/test/objects.test.js. No performance or GPU claim.
->>>>>>> d3eba2dfb (feat(ecs): add packed object and string component fields)
->>>>>>> 7e7892c52 (feat(ecs): add packed object and string component fields)
 
 - Stats WebGL2 (batch 264): asynchronous GPU frame and named-pass elapsed times with native preview draw counters. Proof: packages/stats/test/gl.test.js and scripts/test-stats-parity.mjs. Disjoint/lost/overflow samples invalidate atomically; unsupported timing never substitutes a CPU duration. No benchmark or presentation-latency claim.
+### XR AR extras
+
+The optional xr/ar-extra entry supports native DOM overlays, image/marker tracking, detected triangle meshes and persistent anchor save/restore/delete. CPU coverage includes copied snapshots, pose-only movement, removal, callback disposal, abort and concurrent anchor ownership. Stereo rendering compares detected standard Box meshes on both routes and backends; browser stand-ins exercise negotiated module APIs. These software tests do not prove real marker detection, mapping accuracy or persistence across device restarts.

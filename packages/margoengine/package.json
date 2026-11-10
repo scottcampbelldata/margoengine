@@ -3953,6 +3953,10 @@
     "./xr/hands": {
       "types": "./dist/xr/hands.d.ts",
       "import": "./dist/xr/hands.js"
+    },
+    "./xr/ar-extra": {
+      "types": "./dist/xr/ar-extra.d.ts",
+      "import": "./dist/xr/ar-extra.js"
     }
   },
   "dependencies": {
