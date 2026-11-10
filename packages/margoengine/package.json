@@ -1170,6 +1170,10 @@
       "types": "./dist/exporters/splats.d.ts",
       "import": "./dist/exporters/splats.js"
     },
+    "./exporters/textures": {
+      "types": "./dist/exporters/textures.d.ts",
+      "import": "./dist/exporters/textures.js"
+    },
     "./exporters/sparse": {
       "types": "./dist/exporters/sparse.d.ts",
       "import": "./dist/exporters/sparse.js"
@@ -2922,6 +2926,14 @@
       "types": "./dist/selection/spatial.d.ts",
       "import": "./dist/selection/spatial.js"
     },
+    "./selection/hit-details": {
+      "types": "./dist/selection/hit-details.d.ts",
+      "import": "./dist/selection/hit-details.js"
+    },
+    "./selection/xray": {
+      "types": "./dist/selection/xray.d.ts",
+      "import": "./dist/selection/xray.js"
+    },
     "./shader": {
       "types": "./dist/shader.d.ts",
       "import": "./dist/shader.js"
@@ -3577,6 +3589,10 @@
     "./ui/curved": {
       "types": "./dist/ui/curved.d.ts",
       "import": "./dist/ui/curved.js"
+    },
+    "./ui/keyboard": {
+      "types": "./dist/ui/keyboard.d.ts",
+      "import": "./dist/ui/keyboard.js"
     },
     "./usdz": {
       "types": "./dist/usdz.d.ts",

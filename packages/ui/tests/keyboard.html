@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Virtual keyboard checks</title><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block;width:700px;height:400px}</style><canvas width="700" height="400"></canvas><script type="module">
+import {Engine} from '@margoengine/core';
+import {Ui,UiRenderer} from '@margoengine/ui';
+import {TextInput} from '@margoengine/ui/input';
+import {VirtualKeyboard} from '@margoengine/ui/keyboard';
+const canvas=document.querySelector('canvas'),engine=await Engine.create(canvas),ui=new Ui({width:700,height:400,safeArea:[0,0,0,0],reducedMotion:true});
+// NASA planet names are public-domain facts: https://nssdc.gsfc.nasa.gov/planetary/factsheet/ .
+const field=new TextInput({value:'Mars',anchor:'top-left',width:300}),keyboard=new VirtualKeyboard({anchor:'bottom-left',rows:[['a','b','Shift','Backspace','Enter']]});ui.add(field,keyboard);
+const renderer=UiRenderer.attach(engine,ui);await ui.ready;ui.focus(field);field.select();let running=true;function tick(){if(running){engine.render(0);requestAnimationFrame(tick)}}tick();
+window.keyboardTest={field,keyboard,ui,renderer,rect:i=>({...keyboard.children[0].children[i].rect}),close(){running=false;engine.dispose();ui.dispose()}};
+</script></html>

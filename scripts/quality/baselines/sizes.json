@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12764219,
+  "total": 12765990,
   "history": [
     {
       "date": "2026-10-24",
@@ -6328,6 +6328,12 @@
       "commit": "43e08376d",
       "reason": "Batch 204 job 2: new optional exporters/textures entry, 0 to 10015 B gzip, ceiling 10316 B. Clean-room linear-light resize plus platform WebP/AVIF serialization and GLB fallback/role management; splitting the single processing entry would complicate callers. No core/stage change.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-259",
+      "reason": "Optional ui/keyboard: absent to 1514 B gzip, ceiling 0 to 1770 B. Reuse shared widget/text ownership and existing engine renderers instead of duplicating rendering, focus or layout. Splitting would complicate the optional API and require duplicate state. Core/stage untouched.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7484,6 +7490,8 @@
     "margoengine/loaders/off": 314,
     "@margoengine/sprites/spine": 16920,
     "@margoengine/selection/xray": 12692,
-    "@margoengine/exporters/textures": 10316
+    "@margoengine/exporters/textures": 10316,
+    "@margoengine/ui/keyboard": 1770,
+    "leak @margoengine/ui/keyboard -> @margoengine/text": 1
   }
 }

@@ -61,6 +61,10 @@
     "./curved": {
       "types": "./dist/curved.d.ts",
       "import": "./dist/curved.js"
+    },
+    "./keyboard": {
+      "types": "./dist/keyboard.d.ts",
+      "import": "./dist/keyboard.js"
     }
   },
   "files": [
@@ -94,6 +98,7 @@
     "test:browser:input": "npm run build && node tests/text-input-browser.mjs",
     "test:browser:image": "npm run build && node tests/image-browser.mjs",
     "test:browser:forms": "npm run build && node tests/forms-browser.mjs",
-    "test:browser:world-gl": "npm run build && node tests/world-gl-browser.mjs"
+    "test:browser:world-gl": "npm run build && node tests/world-gl-browser.mjs",
+    "test:browser:keyboard": "npm run build && node tests/keyboard-browser.mjs"
   }
 }

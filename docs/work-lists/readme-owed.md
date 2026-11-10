@@ -381,3 +381,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine (batch 265 landing): generated exporters/sparse alias, owed with its owning package examples.
 - `@margoengine/exporters/textures`: document resize/encode/format-probe/GLB APIs, defaults, colour/data roles, native encoder detection, cancellation, PNG/JPEG fallbacks and runtime/size limits, with runnable examples during the README phase.
+- @margoengine/ui (batch 259 job 2): document /keyboard VirtualKeyboard, custom rows, field connection, shift/caps, editing controls and XR/gamepad setup in the README phase.
+- margoengine (batch 259 job 2): document generated ui/keyboard alias in the README phase.
