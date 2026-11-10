@@ -1,5 +1,5 @@
 {
-  "scope": "Failure 10 repaired; original pre-push acceptance passed",
+  "scope": "Failure 10 repaired and final integration accepted",
   "base": "a105c063f",
   "corePlusStageGzip": 23950,
   "sourceSizes": {
@@ -151,6 +151,12 @@
       "aborted": false,
       "seconds": 2.8
     },
-    "deviceGpu": "Queued; pending final acceptance"
+    "deviceGpu": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 318
+    },
+    "deviceProof": "Native/compat parity, device restore exact, 32 bit-identical semantic probes, 4 shader modules and zero errors"
   }
 }
