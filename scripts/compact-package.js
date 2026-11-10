@@ -12,10 +12,11 @@ const real = (path) => (existsSync(path) ? realpathSync(path) : path);
 
 export async function compactPackage(name, directory = `packages/${name}`) {
   const root = resolve(directory, 'dist'),
-    // Shared helpers bundled into core and the stage; everything else stays an import.
-    shared = (name === 'core' ? ['clear-color', 'view-rect', 'errors', 'hypot'] : ['mesh-source', 'errors']).map(
-      (file) => real(resolve(directory, `../shared/${file}.js`)),
-    ),
+    // Every packages/shared helper core and the stage import is bundled into them (shared is not published, so a
+    // ../../shared import left in dist breaks an installed package; tests/dts-self-contained.test.js). Everything else stays
+    // an import. A fixed list once missed the stage's glTF route and lights helpers.
+    sharedDir = real(resolve(directory, '../shared')),
+    isShared = (path) => dirname(real(path)) === sharedDir,
     files = (await readdir(root)).filter((file) => file.endsWith('.js'));
   for (const file of files)
     await writeFile(
@@ -42,7 +43,7 @@ export async function compactPackage(name, directory = `packages/${name}`) {
       rollupOptions: {
         external: (id, importer) =>
           !!importer &&
-          ((name !== 'stage' && name !== 'core') || !shared.includes(real(resolve(dirname(importer), id)))),
+          ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
         output: { ...compactOutput, comments: { annotation: true } },
       },
     },
