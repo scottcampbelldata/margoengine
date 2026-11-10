@@ -2446,6 +2446,10 @@
       "types": "./dist/procedural/tree-mesh.d.ts",
       "import": "./dist/procedural/tree-mesh.js"
     },
+    "./procedural/textures-pbr": {
+      "types": "./dist/procedural/textures-pbr.d.ts",
+      "import": "./dist/procedural/textures-pbr.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"

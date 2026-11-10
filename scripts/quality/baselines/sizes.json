@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12666220,
+  "total": 12671422,
   "history": [
     {
       "date": "2026-10-24",
@@ -6262,6 +6262,12 @@
       "commit": "batch239-job2",
       "reason": "Shared clipped-direction validation keeps full finite, convex bounds and authored unit checks. Blender index 4301 to 4340 B; curves 6450 to 6490 B min+gzip. Splitting the shared validator duplicates the validated contract; core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-230",
+      "reason": "New optional procedural/textures-pbr entry: 0 to 4946 B gzip for four GPU maps, 11 motifs and complete filtered mipmaps; a split would duplicate GPU lifecycle and settings; no core or stage change",
+      "grew": 1
     }
   ],
   "items": {
@@ -7400,6 +7406,7 @@
     "margoengine/behavior/triggers": 320,
     "margoengine/react/instances": 318,
     "margoengine/bvh/parallel": 11405,
-    "@margoengine/tiles/features": 9837
+    "@margoengine/tiles/features": 9837,
+    "@margoengine/procedural/textures-pbr": 5202
   }
 }

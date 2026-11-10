@@ -81,6 +81,10 @@
     "./tree-mesh": {
       "types": "./dist/tree-mesh.d.ts",
       "import": "./dist/tree-mesh.js"
+    },
+    "./textures-pbr": {
+      "types": "./dist/textures-pbr.d.ts",
+      "import": "./dist/textures-pbr.js"
     }
   },
   "files": [
@@ -103,7 +107,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
-    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs && node test/tree-mesh-browser.mjs",
+    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs && node test/tree-mesh-browser.mjs && node test/textures-pbr-browser.mjs",
     "prepack": "npm run build",
     "build:dungeon": "node scripts/build-dungeon.mjs",
     "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test",

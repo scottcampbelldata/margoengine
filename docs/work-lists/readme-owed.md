@@ -344,3 +344,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf-pro: cover convex interpolatedDirections prepared geometry and adding later UV buffers with writeGeometry.
 
 - margoengine: cover the generated tiles/features alias.
+- @margoengine/procedural (batch 230 textures-pbr): createPBRTextureBaker, four-map formats, palettes, controls, explicit animation time, mipmaps, compatibility-layer setup and lifecycle; examples deferred.
+- margoengine (batch 230 textures-pbr): generated procedural/textures-pbr alias; examples deferred.
