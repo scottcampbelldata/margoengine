@@ -28,9 +28,9 @@
     "build": "node ../../scripts/build-optional.js scene",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node tests/graph-browser.mjs",
-    "test:gpu:clone": "node tests/graph-browser.mjs --clone",
-    "test:gpu:tags": "node tests/graph-browser.mjs --tags"
+    "test:gpu": "cd ../.. && node packages/scene/tests/graph-browser.mjs && node packages/scene/tests/graph-browser.mjs --compat",
+    "test:gpu:clone": "cd ../.. && node packages/scene/tests/graph-browser.mjs --clone && node packages/scene/tests/graph-browser.mjs --clone --compat",
+    "test:gpu:tags": "cd ../.. && node packages/scene/tests/graph-browser.mjs --tags && node packages/scene/tests/graph-browser.mjs --tags --compat"
   },
   "sideEffects": false,
   "exports": {

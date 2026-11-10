@@ -32,6 +32,7 @@ export interface TileFeaturePick {
 }
 
 export class TileFeatures implements EnginePlugin, Disposable {
+    static attach(engine: EngineKernel, options?: TileFeaturesOptions): TileFeatures;
     readonly name: string;
     constructor(engine: EngineKernel, options?: TileFeaturesOptions);
     setup(engine: EngineKernel): void;

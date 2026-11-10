@@ -48,7 +48,7 @@ try {
         const { cloneSubtree } = await import('/packages/scene/dist/clone.js');
         tags(mesh).add('renderable', 'red');
         if (queryTags(engine.scene, 'renderable && red')[0] !== mesh) throw new Error('tag query missed rendered mesh');
-        const observer = new SceneEvents(engine);
+        const observer = SceneEvents.attach(engine);
         let added = 0, disposed = 0;
         observer.on('added', (event) => {
           if (event.mesh !== mesh) return;

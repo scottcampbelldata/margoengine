@@ -75,3 +75,13 @@ test('invalid geometry, packing, disposed output and unsupported engines fail cl
   );
   assert.throws(() => new StereoOutput({}).render(-1), RangeError);
 });
+
+test('attach owns a stereo output with the requested settings and supports disposal', () => {
+  const output = StereoOutput.attach({}, { mode: 'anaglyph', eyeSeparation: 0.08 });
+  assert.ok(output instanceof StereoOutput);
+  assert.equal(output.options.mode, 'anaglyph');
+  assert.equal(output.rig.options.eyeSeparation, 0.08);
+  output[Symbol.dispose]();
+  output.dispose();
+  assert.throws(() => output.render(), { code: 'disposed' });
+});

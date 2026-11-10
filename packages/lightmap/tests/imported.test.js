@@ -17,3 +17,22 @@ test('invalid external irradiance fails before GPU work', () => {
   for (const width of [0, 1.5, 4097, NaN]) assert.throws(() => readLightmap({ ...input, width }), RangeError);
   assert.throws(() => readLightmap({ ...input, data: new Uint8Array(3) }), RangeError);
 });
+
+test('attach applies a bake through the model engine and restores it on disposal', () => {
+  const primitive = { material: {}, definition: { attributes: { TEXCOORD_1: 1 } }, nodeIndex: 0 };
+  const plugins = new Map(), engine = {
+    use(plugin) { plugins.set(plugin.name, plugin); },
+    removePlugin(name) { plugins.delete(name); },
+  };
+  const model = { root: { engine }, primitives: [primitive], nodes: [{}] };
+  const lightmap = { width: 1, height: 1, data: new Uint8Array([10, 20, 30, 255]), scale: 1 };
+  const installation = ImportedLightmapInstallation.attach(model, lightmap, [0]);
+  assert.equal(plugins.get(installation.name), installation);
+  assert.deepEqual(installation.lightmap.data, lightmap.data);
+  installation.dispose();
+  assert.equal(plugins.size, 0);
+  assert.equal(primitive.extension, undefined);
+  const failure = new Error('registration failed');
+  engine.use = () => { throw failure; };
+  assert.throws(() => ImportedLightmapInstallation.attach(model, lightmap), (e) => e === failure);
+});

@@ -24,7 +24,7 @@ async function setup() {
     { position: [0.5, 0.5, 4], target: [0.5, 0.5, 0] },
   );
   const world = new VoxelWorld({ blocks: new BlockTypes() }),
-    objects = new VoxelObjects(engine, world);
+    objects = VoxelObjects.attach(engine, world);
   return { engine, world, objects, draws };
 }
 test('core geometry is shared and instanced; edits retain unchanged handles and chunks stream away', async () => {

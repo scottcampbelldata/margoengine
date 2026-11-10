@@ -6659,3 +6659,14 @@ The optional pointcloud adapter owns the data-frame origin, shared selection and
 ### Section 5 evidence addendum: batch 177 chart presentation
 
 The Figure integration permits optional CPU chart controllers to borrow its axis mappings and CSS plot rectangle, queue axis-chrome replacement, set mappings and add ready 2D RectsLayers. It adds no renderer shader or core/stage feature. Native visibility consistently filters drawing picks, region selections and SVG traces. RGB images use the existing native instanced rectangle path; clustering reorders CPU data before the same path. Evidence: chart-polish-browser.mjs on WebGPU and the WebGL2 compatibility mode, including hidden-trace picks/exports, native date adoption, nested unique clips, zoom controls, resize and borrowed inset/controller cleanup; existing sciviz and WebGL2 drawing checks cover the owner integration. Large photographic textures, optimal dendrogram leaf ordering and all rival styling knobs are not claims of this chart row.
+
+
+API conventions audit repair (2026-11-10): tests/api-conventions.test.js follows local declaration bases
+as well as exported ones, with a synthetic regression for missing and cyclic factories. Lifecycle factories
+and disposal are exercised by their owning package tests. The lane runs CPU tests of changed packages and
+dependents and GPU tests only of changed packages; the scheduled full GPU check supplies dependent coverage.
+No core, stage or rendering mathematics changed. See docs/conventions.md, Lifecycle repair audit.
+
+The scene package's three GPU commands now set their repository serving root before launching the
+fixture. Its browser-root CPU regression executes the real command setup without a GPU and rejects
+package-relative serving of repository-root fixture URLs. The tags GPU route exercises SceneEvents.attach.

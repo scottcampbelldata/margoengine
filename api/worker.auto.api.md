@@ -9,6 +9,7 @@ export class AutoScene {
     readonly canvas: HTMLCanvasElement;
     readonly mode: 'page' | 'worker';
     readonly fallbackReason: unknown;
+    [Symbol.dispose]: () => Promise<void>;
     [Symbol.asyncDispose]: () => Promise<void>;
     get disposed(): boolean;
     dispose(): Promise<void>;

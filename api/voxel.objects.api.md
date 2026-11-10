@@ -15,6 +15,7 @@ export type ObjectBlockSource = MeshHandle | {
 
 export class VoxelObjects {
     readonly world: VoxelWorld;
+    static attach(engine: EngineKernel, world: VoxelWorld): VoxelObjects;
     constructor(engine: EngineKernel, world: VoxelWorld);
     define(name: string, source: ObjectBlockSource, options?: ObjectBlockOptions): number;
     at(x: number, y: number, z: number): readonly MeshHandle[];

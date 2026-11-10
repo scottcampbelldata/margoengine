@@ -9,6 +9,7 @@ import { MaterialSide, PBRModel, TextureTransform } from "@margoengine/gltf-pro"
 import { ColorInput } from "@margoengine/math";
 
 export class Fur {
+    static attach(engine: EngineKernel, geometry: MeshGeometry, options?: FurShellOptions): Fur;
     readonly shells: readonly FurShell[];
     readonly root: Mesh;
     constructor(engine: EngineKernel, geometry: MeshGeometry, { shells, fur, ...material }?: FurShellOptions);

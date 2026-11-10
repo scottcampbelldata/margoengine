@@ -10,6 +10,7 @@ import {
 import { sampleTrackInto } from '@margoengine/animation/sampling';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { rangeError } from '../../shared/errors.js';
 import type { DiscreteClip, BoundDiscreteTrack, DiscreteValue } from './discrete-tracks.js';
@@ -351,6 +352,17 @@ export class AnimationAction {
 
 /** Independent clip actions on one or more roots. Call update(delta) or register as an engine plugin. */
 export class AnimationMixer implements EnginePlugin {
+  /** Creates and registers a mixer for a root; disposing it removes its engine registration. */
+  static attach(engine: EngineKernel, root: MixerRoot): AnimationMixer {
+    const mixer = new AnimationMixer(root);
+    try {
+      engine.use(mixer);
+      return mixer;
+    } catch (error) {
+      mixer.dispose();
+      throw error;
+    }
+  }
   /** Unique plugin identity. */
   readonly name: string;
   /** Global seconds. Default 0. */

@@ -75,6 +75,10 @@ let count = 0;
  * The controller owns no picking engine: bvh's existing raycasts supply the surface hit and instance row.
  */
 export class TileFeatures implements EnginePlugin, Disposable {
+  /** Creates a registered feature controller. Defaults match the constructor. */
+  static attach(engine: EngineKernel, options: TileFeaturesOptions = {}): TileFeatures {
+    return new TileFeatures(engine, options);
+  }
   readonly name = `tile-features-${++count}`;
   private readonly entries = new Map<PBRPrimitive, Entry>();
   private disposed = false;

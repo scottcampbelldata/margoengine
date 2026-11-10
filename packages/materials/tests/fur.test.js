@@ -4,7 +4,7 @@ import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorde
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { pbrShader } from '../../gltf-pro/src/shader.ts';
 import { shadowDepth } from '../../shadows/src/shader.ts';
-import { FurMaterial, createFur } from '../dist/fur.js';
+import { Fur, FurMaterial, createFur } from '../dist/fur.js';
 
 const geometry = {
   positions: [-1, -1, 0, 1, -1, 0, 0, 1, 0],
@@ -106,7 +106,7 @@ test('createFur owns a complete parented shell stack, updates controls atomicall
     { position: [0, 0, 5], target: [0, 0, 0] },
     null,
   );
-  const fur = createFur(engine, geometry, { shells: 8, fur: { length: 0.3 } });
+  const fur = Fur.attach(engine, geometry, { shells: 8, fur: { length: 0.3 } });
   assert.equal(fur.shells.length, 8);
   assert.equal(fur.root, fur.shells[0].root);
   assert.deepEqual(

@@ -7,6 +7,7 @@ import { EngineKernel } from "@margoengine/core";
 import { Material } from "@margoengine/materials";
 
 export class AssetInstaller implements Disposable {
+    static attach(engine: EngineKernel, options?: AssetInstallerOptions): AssetInstaller;
     constructor(engine: EngineKernel, options?: AssetInstallerOptions);
     readonly load: (args: Record<string, unknown>, signal: AbortSignal) => Promise<Json>;
     dispose(): void;

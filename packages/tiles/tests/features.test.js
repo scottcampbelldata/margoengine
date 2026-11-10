@@ -119,7 +119,7 @@ test('controller disposal during feature image decoding rejects the decoration a
 });
 test('real CC0 sample: ray hits resolve feature ID and the exact structural metadata row', async () => {
   const f = fixture(),
-    features = new TileFeatures(f.engine),
+    features = TileFeatures.attach(f.engine),
     decoration = await features.decorate(f.context);
   const feature = features.resolve(pick(f));
   assert.equal(feature.id, 0);

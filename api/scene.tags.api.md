@@ -15,6 +15,7 @@ export interface SceneEvent {
 export type SceneEventType = 'added' | 'removed' | 'disposed';
 
 export class SceneEvents {
+    static attach(engine: EngineKernel): SceneEvents;
     constructor(engine: EngineKernel);
     on(type: SceneEventType, callback: (event: SceneEvent) => void, options?: SceneListenerOptions): () => void;
     dispose(): void;

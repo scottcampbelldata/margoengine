@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
 import type { Font, GlyphBitmap, ShelfPacker, TextLayout, AtlasSlot } from '@margoengine/text';
 import { applyView } from '../../shared/view-rect.js';
 import { fault, rangeError } from '../../shared/errors.js';
@@ -56,6 +57,18 @@ interface Shape {
  * Create asynchronously, then attach with engine.use(layer). No DOM elements per point.
  */
 export class GPULabelLayer implements EnginePlugin {
+  /** Loads the font and registers the layer. Default options match create(). */
+  static async attach(engine: EngineKernel, options: GPULabelOptions = {}): Promise<GPULabelLayer> {
+    const layer = await GPULabelLayer.create(options);
+    try {
+      options.signal?.throwIfAborted();
+      engine.use(layer);
+      return layer;
+    } catch (error) {
+      layer.dispose();
+      throw error;
+    }
+  }
   readonly name: string;
   readonly order: number;
   readonly font: Font;
@@ -450,6 +463,9 @@ export class GPULabelLayer implements EnginePlugin {
   }
   /** Releases GPU resources; CPU labels can be reused after attaching again. */
   dispose(): void {
+    const engine = this.engine;
+    this.engine = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.releaseGPU();
     this.gl?.dispose();
     this.gl = undefined;

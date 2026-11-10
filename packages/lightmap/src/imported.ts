@@ -35,6 +35,10 @@ export function readLightmap(input: Omit<ImportedLightmap, 'scale'> & { scale?: 
 let serial = 0;
 /** Owns the lightmap GPU texture and restores the previous material extension on disposal. */
 export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
+  /** Applies a validated external bake to the model's engine. Nodes default to all primitives. */
+  static attach(model: PBRModel, lightmap: ImportedLightmap, nodes?: readonly number[]): ImportedLightmapInstallation {
+    return applyLightmap(model, lightmap, nodes);
+  }
   readonly name = `imported-lightmap:${++serial}`;
   readonly texture: Texture;
   readonly lightmap: ImportedLightmap;

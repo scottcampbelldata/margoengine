@@ -231,6 +231,10 @@ export interface FurShellOptions extends FurMaterialOptions {
 export type FurShell = MaterialMesh & { material: FurMaterial };
 /** Owned shell stack, rooted at shells[0].root. Set time explicitly for deterministic wind. */
 export class Fur {
+  /** Creates an owned shell stack in this engine. Defaults match the constructor. */
+  static attach(engine: EngineKernel, geometry: MeshGeometry, options: FurShellOptions = {}): Fur {
+    return new Fur(engine, geometry, options);
+  }
   readonly shells: readonly FurShell[];
   readonly root: Mesh;
   private disposed = false;

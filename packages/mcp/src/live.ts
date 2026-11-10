@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
 import type { PackageObjectsOptions, PropertyValue } from '@margoengine/inspector/packages';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { Json, ToolDefinition, ToolResult } from './server.js';
@@ -27,6 +28,17 @@ export interface LivePageOptions extends PackageObjectsOptions {
 
 /** Dev-only engine plugin: inspect package properties, capture the canvas and read bounded error history. */
 export class LivePageBridge implements EnginePlugin, Disposable {
+  /** Registers an explicitly enabled development bridge with this engine. */
+  static attach(engine: EngineKernel, options: LivePageOptions): LivePageBridge {
+    const bridge = new LivePageBridge(options);
+    try {
+      engine.use(bridge);
+      return bridge;
+    } catch (error) {
+      bridge.dispose();
+      throw error;
+    }
+  }
   readonly name = 'mcp:live';
   private engine?: Engine;
   private lifetime = new AbortController();
@@ -177,11 +189,13 @@ export class LivePageBridge implements EnginePlugin, Disposable {
   }
   /** Aborts polling and removes every owned error listener. */
   dispose(): void {
+    const engine = this.engine;
+    this.engine = undefined;
     this.lifetime.abort();
     this.events?.removeEventListener('error', this.recordError);
     this.events?.removeEventListener('unhandledrejection', this.recordError);
-    this.engine?.gpu?.removeEventListener('uncapturederror', this.recordError);
-    this.engine = undefined;
+    engine?.gpu?.removeEventListener('uncapturederror', this.recordError);
+    engine?.sceneOf?.(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

@@ -79,6 +79,7 @@ export class ViewportKeying {
     private readonly options: ViewportKeyingOptions,
     gizmo: InspectorGizmo,
   ) {
+    this.dispose = this.dispose.bind(this);
     options.signal?.throwIfAborted();
     if (options.gizmo && (options.gizmo.engine !== engine || options.gizmo.inspector !== inspector))
       throw new RangeError('Viewport gizmo must belong to this engine and inspector; pass their gizmo');
@@ -147,7 +148,7 @@ export class ViewportKeying {
     this.key();
   };
   /** Removes keying UI/listeners and disposes only an owned gizmo. The editor, inspector and scene are borrowed. */
-  readonly dispose = (): void => {
+  dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.abort.abort();
@@ -157,7 +158,7 @@ export class ViewportKeying {
     if (!this.options.gizmo) this.gizmo.dispose();
     this.element.remove();
     this.before = undefined;
-  };
+  }
   [Symbol.dispose](): void {
     this.dispose();
   }

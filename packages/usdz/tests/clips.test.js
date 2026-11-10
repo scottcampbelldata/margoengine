@@ -54,7 +54,7 @@ test('topology-changing cache frames match OpenUSD and replace complete models',
   headlessModels(async () => {
     const want = JSON.parse(readFileSync(new URL('topology-openusd.json', folder), 'utf8'));
     const engine = await headless(),
-      player = new ValueClipPlayer(engine, 'topology.usda', read);
+      player = ValueClipPlayer.attach(engine, 'topology.usda', read);
     try {
       for (const [time, counts] of Object.entries(want)) {
         const model = await player.setTimeCode(Number(time));

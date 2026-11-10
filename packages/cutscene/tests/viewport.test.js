@@ -43,3 +43,26 @@ test('invalid transforms and mismatched targets refuse without editing history',
   assert.throws(() => keyTransform(model, 'hero', 'hero', { time: 0, scale: [NaN, 1, 1] }), /refused/);
   assert.equal(model.save(), before);
 });
+
+test('dispose is a prototype method and abort still disposes the attached viewport tool', async () => {
+  assert.equal(typeof ViewportKeying.prototype.dispose, 'function');
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM('<div id="editor"></div>');
+  const engine = { canvas: new dom.window.EventTarget() }, editor = { element: dom.window.document.querySelector('#editor') }, inspector = {};
+  const listeners = new Map(), controller = new AbortController();
+  const gizmo = { engine, inspector, controls: {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type, listener) { if (listeners.get(type) === listener) listeners.delete(type); },
+  }, dispose() { assert.fail('borrowed gizmo stays alive'); } };
+  // DOM and Node AbortSignal implementations must match when listeners are installed.
+  const Original = globalThis.AbortController;
+  globalThis.AbortController = dom.window.AbortController;
+  try {
+    const tool = await ViewportKeying.attach(engine, editor, inspector, { gizmo, signal: controller.signal });
+    assert.equal(tool.element.isConnected, true);
+    controller.abort();
+    assert.equal(tool.element.isConnected, false);
+    assert.equal(listeners.size, 0);
+    tool[Symbol.dispose]();
+  } finally { globalThis.AbortController = Original; dom.window.close(); }
+});

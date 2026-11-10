@@ -8,6 +8,7 @@ import { Camera, EngineKernel, RenderView } from "@margoengine/core";
 export type StereoMode = 'side-by-side' | 'top-bottom' | 'anaglyph' | 'parallax-barrier';
 
 export class StereoOutput {
+    static attach(engine: EngineKernel, options?: StereoOutputOptions): StereoOutput;
     readonly options: StereoOutputOptions;
     readonly rig: StereoRig;
     constructor(engine: EngineKernel, options?: StereoOutputOptions);

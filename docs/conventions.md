@@ -242,3 +242,47 @@ one budget that throws `SHUTDOWN_TIMEOUT` naming what was still open. A plain `s
 connection a browser holds, so a suite that passed every assertion could hang on its cleanup for ever. `launchBrowser`,
 `openBrowser` and `startDevServer` already close that way. `tests/browser-teardown.test.js` (part of `npm run verify`)
 fails for any script that starts a browser and an HTTP server of its own without `closeAll`.
+
+## Lifecycle repair audit (2026-11-10)
+
+Engine-bound factories are additive convenience APIs. Construction that already registers or installs a
+wrapper is called once; plugin factories register through the owning engine and dispose a newly created
+resource if registration fails. GPULabelLayer and LivePageBridge detach their registrations on disposal.
+LensDrops.attach lazily loads the optional post/stack peer and owns its one-effect PostStack; disposing
+the returned lens removes both registrations. It accepts an optional AbortSignal before and after the load.
+ImportedLightmapInstallation.attach takes the model, bake and optional node indices, matching applyLightmap.
+StereoOutput, Fur, AssetInstaller, SceneEvents, ValueClipPlayer and VoxelObjects factories retain their
+constructor defaults and ownership. AnimationMixer.attach takes the engine and mixer root.
+
+ViewportKeying exposes a prototype disposal method, bound per instance so extracted callbacks still work.
+AutoScene's disposal symbols return the same cleanup promise as dispose(); use await using for a scope
+that waits for asynchronous cleanup. A plain using scope starts cleanup but does not await its completion.
+The API-report audit follows local unexported base classes, with cycle protection, while checking exported
+engine-bound classes. Its fixture includes valid inherited, missing and cyclic factories.
+
+Clean-room research compared the standard's scope cleanup protocol with TypeScript's inherited static
+members and promise return semantics. No companion code or other engine sources were consulted:
+
+- Ron Buckton and TC39, *ECMAScript Explicit Resource Management* (2026),
+  https://tc39.es/proposal-explicit-resource-management/: synchronous disposal does not await a return value;
+  asynchronous disposal is the awaited lifetime protocol.
+- Microsoft TypeScript team, *Classes* (living handbook, consulted 2026),
+  https://www.typescriptlang.org/docs/handbook/2/classes.html: static members are inherited, including
+  through local bases; prototype methods need binding when used as callbacks.
+- Microsoft TypeScript team, *Variable Declaration* (living handbook, consulted 2026),
+  https://www.typescriptlang.org/docs/handbook/variable-declarations.html: using and await using scopes.
+
+Regression evidence: tests/api-conventions.test.js plus the changed packages' CPU lifecycle, mixer, GPU-label
+layout, imported-bake, stereo, shell, scene-tag, clip-player, voxel-object, viewport and auto-scene tests.
+
+Scene GPU command repair: npm launches scripts from the package directory, while the fixture requests
+repository-root URLs. All three scene scripts now change to the repository before launching their
+fixture. tests/package-browser-root.test.js executes each command's directory setup from the
+package directory, verifies its actual served root and checks both entry and requested page exist.
+Research: npm contributors, *Scripts* (living documentation, consulted 2026),
+https://docs.npmjs.com/cli/v11/using-npm/scripts/; Node.js contributors, *Child process*
+(living documentation, consulted 2026), https://nodejs.org/api/child_process.html. The explicit command
+root retains the existing browser helper and exact pixel assertions.
+Each repaired scene GPU command executes both native and --compat routes.
+The same command-root regression covers the worker matrix command, which also serves repository-root module URLs.
+The rebased sciviz engineering and pointcloud commands also uses its existing browser-root launcher, as required by packages/sciviz/tests/browser-root.test.js.

@@ -26,6 +26,7 @@ export interface AutoSceneOptions {
 
 /** Running shared scene with its selected execution mode and lifetime owner. Use await using for cleanup. */
 export class AutoScene {
+  declare [Symbol.dispose]: () => Promise<void>;
   declare [Symbol.asyncDispose]: () => Promise<void>;
   private closing?: Promise<void>;
   /** @internal Created by runScene. */
@@ -45,6 +46,10 @@ export class AutoScene {
   /** Aborts scene lifetime, runs cleanup once, and terminates an owned worker even if cleanup fails. */
   dispose(): Promise<void> {
     return (this.closing ??= this.cleanup());
+  }
+  /** Starts cleanup and returns its completion. Use await using to await asynchronous cleanup at scope exit. */
+  [(Symbol.dispose ?? Symbol()) as symbol](): Promise<void> {
+    return this.dispose();
   }
   [(Symbol.asyncDispose ?? Symbol()) as symbol](): Promise<void> {
     return this.dispose();

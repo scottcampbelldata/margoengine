@@ -18,7 +18,7 @@ export class ViewportKeying {
     static attach(engine: EngineKernel, editor: TimelineEditor, inspector: Inspector, options?: ViewportKeyingOptions): Promise<ViewportKeying>;
     private constructor();
     key(): ItemRef;
-    readonly dispose: () => void;
+    dispose(): void;
     [Symbol.dispose](): void;
 }
 

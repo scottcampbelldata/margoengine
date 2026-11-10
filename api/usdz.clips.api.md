@@ -20,6 +20,7 @@ export interface ClipFrameOptions extends ValueClipPlayerOptions {
 export type ClipReader = (id: string, signal?: AbortSignal) => Promise<Uint8Array | undefined> | Uint8Array | undefined;
 
 export class ValueClipPlayer {
+    static attach(engine: EngineKernel, root: string, read: ClipReader, options?: ValueClipPlayerOptions): ValueClipPlayer;
     get timeCode(): number | undefined;
     constructor(engine: EngineKernel, root: string, read: ClipReader, options?: ValueClipPlayerOptions);
     get model(): PBRModel | undefined;

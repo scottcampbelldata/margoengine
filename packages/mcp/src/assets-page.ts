@@ -10,6 +10,10 @@ export interface AssetInstallerOptions {
 }
 /** Optional-package scene wiring for LivePageBridge.addAsset. Owns only the resources it installs. */
 export class AssetInstaller implements Disposable {
+  /** Creates the page-side asset owner. Default materials are empty. */
+  static attach(engine: EngineKernel, options: AssetInstallerOptions = {}): AssetInstaller {
+    return new AssetInstaller(engine, options);
+  }
   private readonly lifetime = new AbortController();
   private readonly cleanup: (() => void)[] = [];
   private environmentId = 0;

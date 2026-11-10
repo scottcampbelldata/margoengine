@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LensDrops, lensField, lensWGSL } from '../dist/lens.js';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
+import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+
+test('attach owns the HDR stack and detaches both registrations on disposal', async () => {
+  const gpu = optionalGPU();
+  const engine = new Engine({ width: 8, height: 8 }, await TransformStore.create(16),
+    { backend: 'webgpu', gpu: gpu.engine.gpu, add() {}, remove() {}, render() {}, dispose() {} }, undefined, null);
+  try {
+    const lens = await LensDrops.attach(engine, { wetness: 0.4 });
+    assert.equal(engine.hasPlugin('post:stack'), true);
+    assert.equal(engine.hasPlugin(lens.name), true);
+    lens[Symbol.dispose]();
+    lens.dispose();
+    assert.equal(engine.hasPlugin('post:stack'), false);
+    assert.equal(engine.hasPlugin(lens.name), false);
+    await assert.rejects(LensDrops.attach(engine, {}, AbortSignal.abort()), { name: 'AbortError' });
+    assert.equal(engine.hasPlugin('post:stack'), false);
+  } finally { engine.dispose(); gpu.cleanup(); }
+});
 
 test('the lens field is finite, deterministic, dry at zero wetness, and changes with seed and travel',()=>{
  let drops=0,streaks=0,moved=0,seeded=0;

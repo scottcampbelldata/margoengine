@@ -37,6 +37,10 @@ const xyz = (v: { x: number; y: number; z: number }): [number, number, number] =
  * extending outside a chunk. Call update after block edits and before rendering. No GPU allocation on construction.
  */
 export class VoxelObjects {
+  /** Subscribes object-block placement to this world. Call update before rendering. */
+  static attach(engine: EngineKernel, world: VoxelWorld): VoxelObjects {
+    return new VoxelObjects(engine, world);
+  }
   private readonly engine: Engine;
   private readonly templates = new Map<number, readonly Node[]>();
   private readonly pending = new Set<string>();

@@ -1096,3 +1096,33 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/tilemap (review 4): describe Wang weights as finite nonnegative relative values, zero exclusions and deterministic normalized selection; README examples deferred.
 - @margoengine/sciviz (batch 177 job 4): document /format ChartPolish lifecycle, normalized vs original coordinates, supported existing traces, secondary/broken/inset axes, hover and controller SVG; /categorical bands/jitter/RGB/clustering and limits; Figure axis chrome/mappings/rectangle integration APIs. README examples owed.
 - margoengine (batch 177 job 4): document optional sciviz/format and sciviz/categorical aliases in README phase.
+
+
+
+- @margoengine/animation: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/cameras: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/cutscene: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/labels: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/lightmap: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/materials: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/mcp: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/scene: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/tiles: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/usdz: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/voxel: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/weather: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/worker: document the API conventions lifecycle repair, attachment ownership and disposal.
+
+- @margoengine/sciviz: retain the common browser-root launcher for the engineering and pointcloud fixtures when documenting package test commands.

@@ -28,6 +28,10 @@ const installed = new WeakSet<EngineKernel>();
  * Dispose the observer to restore its wrappers; errors in listeners go to engine.onError after every listener runs.
  */
 export class SceneEvents {
+  /** Installs a reversible lifecycle observer on this engine. */
+  static attach(engine: EngineKernel): SceneEvents {
+    return new SceneEvents(engine);
+  }
   private active = true;
   private readonly runtime;
   private readonly listeners = new Set<Listener>();

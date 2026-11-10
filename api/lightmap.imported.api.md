@@ -15,6 +15,7 @@ export interface ImportedLightmap {
 }
 
 export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
+    static attach(model: PBRModel, lightmap: ImportedLightmap, nodes?: readonly number[]): ImportedLightmapInstallation;
     readonly name: string;
     readonly texture: Texture;
     readonly lightmap: ImportedLightmap;

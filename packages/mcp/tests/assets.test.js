@@ -186,3 +186,11 @@ test('page wiring rejects inherited material names before loading a texture', { 
     installer.dispose();
   }
 });
+
+test('attach creates a disposable asset owner whose callback rejects after disposal', async () => {
+  const installer = AssetInstaller.attach({});
+  assert.ok(installer instanceof AssetInstaller);
+  installer[Symbol.dispose]();
+  installer.dispose();
+  await assert.rejects(installer.load({ kind: 'model', url: 'https://example.invalid/model.glb' }, new AbortController().signal), { name: 'AbortError' });
+});

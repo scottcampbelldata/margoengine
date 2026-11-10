@@ -4310,3 +4310,10 @@ Batch 175 job 2 claim: optional sciviz/pointcloud draws existing points octree/C
 ## Batch 177 job 4: chart presentation and interaction
 
 Optional sciviz/format extends an existing 2D Figure's line/scatter traces with independent secondary y, broken and inset axes, locale/SI/engineering/percent/fixed/date formatting, minor ticks, keyboard/click legend filtering and isolation, original-unit unified hover, templates, crosshair/spikes, two zoom sliders and named spans. Optional sciviz/categorical adds reversible bands, stable jitter, exact RGB/RGBA display cells and hierarchically clustered heatmaps with both dendrograms. ChartPolish.toSVG exports custom chrome and uniquely names inset clips; ClusterHeatmap.toSVG includes dendrograms. Native Figure visibility now also governs picks, selection and vector export. Proof: chart-polish.test.js numerical references and chart-polish-browser.mjs GHCN real-data interactions on both browser backends, pixel image count, original-unit picking, hidden exports, inset XML/unique IDs, responsive resize and disposal. No speed or full rival-options claim.
+
+
+API conventions repair (2026-11-10): optional engine features expose attachment factories and the
+disposal protocol; the declaration audit follows inherited factories through local bases. Proof is
+tests/api-conventions.test.js and the package regressions listed in docs/conventions.md. AutoScene's
+Symbol.dispose starts asynchronous cleanup; await using or awaiting dispose() is needed to wait for it.
+No speed, rendering-quality or universal backend-parity claim is made by these API additions.

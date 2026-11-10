@@ -59,7 +59,7 @@ test('attach/clone notifications see finished transforms and metadata; failed cl
   using e=await make();
   const a=e.createMesh().setPosition([3,0,0]), b=e.createMesh().setPosition([-2,0,0]), c=e.createMesh(a).setPosition([1,0,0]);
   tags(c).add('ready'); c.name='ready';
-  using observer=new SceneEvents(e);
+  using observer=SceneEvents.attach(e);
   const before=worldMatrix(c), matrices=[];
   observer.on('added',event=>matrices.push(worldMatrix(event.mesh)),{mesh:c});
   attach(b,c);

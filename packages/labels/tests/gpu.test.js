@@ -93,3 +93,20 @@ test('depth conventions, invalid input, font changes, abort and atlas exhaustion
   layer.dispose();
   layer[Symbol.dispose]();
 });
+
+test('attach waits for fonts, registers once, detaches and leaves no registration on abort', async () => {
+  const plugins = new Map(), engine = {
+    use(layer) { assert.equal(loaded, true); plugins.set(layer.name, layer); layer.setup(this); },
+    sceneOf(layer) { return plugins.get(layer.name) === layer ? this : undefined; },
+    removePlugin(name) { const layer = plugins.get(name); plugins.delete(name); layer?.dispose(); },
+  };
+  let loaded = false;
+  const layer = await GPULabelLayer.attach(engine, { font: { ...font, async load() { loaded = true; } } });
+  assert.equal(plugins.get(layer.name), layer);
+  layer[Symbol.dispose]();
+  layer.dispose();
+  assert.equal(plugins.size, 0);
+  const abort = new AbortController();
+  await assert.rejects(GPULabelLayer.attach(engine, { font: { ...font, async load() { abort.abort(); } }, signal: abort.signal }), { name: 'AbortError' });
+  assert.equal(plugins.size, 0);
+});

@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
@@ -119,6 +120,21 @@ const shader = (hdr: boolean) => `${fullscreen}${displayShader}${lensWGSL}
  * @throws TypeError/RangeError for invalid options; MargoError for standalone setup or disposed use.
  */
 export class LensDrops implements EnginePlugin {
+  /** Lazily creates an owned one-effect PostStack. Await attachment; abort cancels before registration. */
+  static async attach(engine: EngineKernel, options: LensDropsOptions = {}, signal?: AbortSignal): Promise<LensDrops> {
+    signal?.throwIfAborted();
+    const { PostStack } = await import('@margoengine/post/stack');
+    signal?.throwIfAborted();
+    const lens = new LensDrops(options);
+    try {
+      lens.stack = PostStack.attach(engine, [lens]);
+      return lens;
+    } catch (error) {
+      lens.dispose();
+      throw error;
+    }
+  }
+  private stack?: { dispose(): void };
   readonly name = 'weather-lens';
   private engine?: Engine;
   private uniform?: GPUBuffer;
@@ -173,6 +189,7 @@ export class LensDrops implements EnginePlugin {
   dispose(): void {
     if(this.disposed)return;
     this.disposed=true;
+    this.stack?.dispose();this.stack=undefined;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.uniform?.destroy();this.uniform=undefined;this.sampler=undefined;this.pipelines.clear();
   }

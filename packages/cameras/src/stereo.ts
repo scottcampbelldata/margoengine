@@ -135,6 +135,10 @@ interface OutputState {
 
 /** Replaces the application's engine.render call. Two scene draws and one packing pass, with no XR session. */
 export class StereoOutput {
+  /** Creates stereo output for the application's frame loop. Defaults match the constructor. */
+  static attach(engine: EngineKernel, options: StereoOutputOptions = {}): StereoOutput {
+    return new StereoOutput(engine, options);
+  }
   /** Mutable settings, validated on render. */
   readonly options: StereoOutputOptions;
   /** The eye cameras, also usable for picking or custom view layouts. */

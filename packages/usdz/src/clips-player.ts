@@ -107,6 +107,10 @@ export async function* valueClipFrames(
 
 /** Owns the current cache frame, including changing topology; await setTimeCode before requesting the next frame. */
 export class ValueClipPlayer {
+  /** Creates a clip player without loading a frame. Default options match the constructor. */
+  static attach(engine: EngineKernel, root: string, read: ClipReader, options: ValueClipPlayerOptions = {}): ValueClipPlayer {
+    return new ValueClipPlayer(engine, root, read, options);
+  }
   private current?: PBRModel;
   private pending?: AbortController;
   private disposed = false;

@@ -82,3 +82,19 @@ test('unconnected relay times out and shutdown rejects pending work', { timeout:
   await host.close();
   await rejected;
 });
+
+test('attach registers the live bridge and disposal removes registration and listeners', async () => {
+  const { engine } = context();
+  engine.use = function (plugin) { this.plugins.set(plugin.name, plugin); plugin.setup(this); };
+  engine.sceneOf = function (plugin) { return this.plugins.get(plugin.name) === plugin ? this : undefined; };
+  engine.removePlugin = function (name) { const plugin = this.plugins.get(name); this.plugins.delete(name); plugin?.dispose(); };
+  const events = new EventTarget();
+  const bridge = LivePageBridge.attach(engine, { enabled: true, events });
+  assert.equal(engine.plugins.get(bridge.name), bridge);
+  bridge.dispose();
+  assert.equal(engine.plugins.size, 0);
+  events.dispatchEvent(new Event('error'));
+  await assert.rejects(bridge.handle('errors'), { name: 'AbortError' });
+  assert.throws(() => LivePageBridge.attach(engine, { enabled: false }), /enabled/);
+  assert.equal(engine.plugins.size, 0);
+});

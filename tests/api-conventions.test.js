@@ -15,6 +15,47 @@ const NOT_FEATURES = new Map([['PBRModel', 'created by gltf-pro loadGLTF']]);
 
 const isClass = (value) => typeof value === 'function' && /^class\b/.test(Function.prototype.toString.call(value));
 
+function reportAttachProblems(text) {
+  // A bundled declaration can keep an inherited factory in a local, unexported base.
+  const classes = new Map(
+    [...text.matchAll(/^(export )?(?:declare )?(?:abstract )?class (\w+)([^\n]*)\{\n([\s\S]*?)^\}/gm)].map(
+      ([, exported, name, head, body]) => [name, { exported: Boolean(exported), base: head.match(/extends (\w+)/)?.[1], body }],
+    ),
+  );
+  const hasAttach = (name, seen = new Set()) => {
+    if (!classes.has(name) || seen.has(name)) return false;
+    seen.add(name);
+    const { body, base } = classes.get(name);
+    return /^ {4}static (?:async )?attach[(<]/m.test(body) || hasAttach(base, seen);
+  };
+  return [...classes].filter(([name, { body, exported }]) => exported &&
+    /^ {4}constructor\((?:engine|instance|source|readonly engine): (?:Camera \| )?EngineKernel\b/m.test(body) &&
+    !NOT_FEATURES.has(name) && !hasAttach(name)).map(([name]) => name);
+}
+
+test('report audit follows local bases while still rejecting missing and cyclic factories', () => {
+  const report = `declare abstract class LocalBase {
+    static attach<T>(engine: EngineKernel): T;
+}
+declare class Intermediate extends LocalBase {
+}
+export class Inherited extends Intermediate {
+    constructor(engine: EngineKernel);
+}
+declare class Empty {
+}
+export class Missing extends Empty {
+    constructor(engine: EngineKernel);
+}
+declare class Loop extends Cyclic {
+}
+export class Cyclic extends Loop {
+    constructor(engine: EngineKernel);
+}
+`;
+  assert.deepEqual(reportAttachProblems(report), ['Missing', 'Cyclic']);
+});
+
 async function packageClasses() {
   const found = new Map();
   for (const dir of (await readdir('packages')).sort()) {
@@ -74,19 +115,7 @@ test('classes constructed from the engine have static attach (API reports)', asy
   for (const file of await readdir('api')) {
     if (file.startsWith('core') || file.startsWith('stage') || file.startsWith('margoengine')) continue;
     const text = (await readFile(`api/${file}`, 'utf8')).replaceAll('\r', '');
-    const classes = new Map(
-      [...text.matchAll(/^export (?:declare )?(?:abstract )?class (\w+)([^\n]*)\{\n([\s\S]*?)^\}/gm)].map(
-        ([, name, head, body]) => [name, { base: head.match(/extends (\w+)/)?.[1], body }],
-      ),
-    );
-    const hasAttach = (name) =>
-      classes.has(name) &&
-      (/^ {4}static (?:async )?attach[(<]/m.test(classes.get(name).body) || hasAttach(classes.get(name).base));
-    for (const [name, { body }] of classes) {
-      const engineFirst =
-        /^ {4}constructor\((?:engine|instance|source|readonly engine): (?:Camera \| )?EngineKernel\b/m.test(body);
-      if (engineFirst && !NOT_FEATURES.has(name) && !hasAttach(name)) problems.push(`${file} ${name}`);
-    }
+    for (const name of reportAttachProblems(text)) problems.push(`${file} ${name}`);
   }
   assert.deepEqual(problems, []);
 });

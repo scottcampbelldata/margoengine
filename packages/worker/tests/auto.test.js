@@ -88,3 +88,13 @@ test('invalid options, missing modules, missing exports and runtime errors rejec
   await assert.rejects(runScene(new EventTarget(), sceneURL, { data: state }), /scene failed/);
   assert.equal(state.calls.length, 1);
 });
+
+test('both disposal symbols share one asynchronous cleanup and preserve its completion', async () => {
+  const state = data();
+  const scene = await runScene(new EventTarget(), sceneURL, { mode: 'page', data: state });
+  const closing = scene[Symbol.dispose]();
+  assert.equal(closing, scene.dispose());
+  assert.equal(closing, scene[Symbol.asyncDispose]());
+  await closing;
+  assert.equal(state.disposals, 1);
+});
