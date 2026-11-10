@@ -4058,3 +4058,13 @@ prototype attachment set and follows each live mesh. Regression: packages/react/
 explicit material and live material edits. Instances is built independently of the remaining texture/priority/adaptive jobs.
 
 Outside batch 265: full verify on parent d34cadf03 plus Instances reached tests/catalog.test.js teardown SHUTDOWN_TIMEOUT at 30,000 ms for Chromium PID 94292 (absent on inspection); the existing Windows child-exit/stdio observation defect recurred. Repro: npm run verify; log retained as test-results/batch265-verify-job2-final.log. No React test failed and no timeout was raised or accepted as passing.
+
+### Batch 197 transition correctness
+
+The optional controls/transitions entry has no known open defect from its current
+suite. Opposite-side moves preserve a nonzero eye distance; symmetric quintic
+evaluation fixes the new transition polynomial's endpoint rounding overshoot.
+Tests reject a target path through a minimum-radius shell and invalid replacement
+requests without disturbing a running move. Existing controls remain covered by
+all 324 unit cases. Custom perspective projections and dynamically moving fit
+bounds are explicit API limits, documented in the controls README.

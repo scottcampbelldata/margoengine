@@ -3,9 +3,67 @@ import { engineRuntime } from '@margoengine/core/extension';
 import { OrbitControls, TransformControls } from '@margoengine/controls';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { ArcballControls, ArcballGizmo } from '@margoengine/controls/arcball';
+import * as TransitionControls from '@margoengine/controls/transitions';
 
 const state = { errors: [] };
 window.controlsState = state;
+
+// All transition variants use their engine-owned update hook on both real backends.
+window.transitionCheck = async () => {
+  const rows = [],
+    errors = [];
+  for (const backend of ['webgpu', 'webgl2']) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    canvas.style.width = canvas.style.height = '128px';
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend,
+      fallback: backend === 'webgl2' ? webglRenderer : undefined,
+      camera: { position: [5, 3, 8], target: [0, 0, 0] },
+    });
+    const device = backend === 'webgpu' ? engineRuntime(engine).gpu : null;
+    device?.pushErrorScope('validation');
+    const mesh = engine
+      .createMesh()
+      .setGeometry(box())
+      .setMaterial(new PbrMaterial({ color: '#ffffff' }));
+    try {
+      for (const name of ['OrbitControls', 'MapControls', 'ArcballControls', 'TrackballControls']) {
+        engine.camera.position = [5, 3, 8];
+        engine.camera.target = [0, 0, 0];
+        engine.camera.up = [0, 1, 0];
+        const control = new TransitionControls[name](engine);
+        const pending = control.transitions.fitToBox(
+          { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] },
+          { duration: 0.2, padding: 0.1 },
+        );
+        for (let i = 0; i < 13; i++) engine.render({ delta: 1 / 60 });
+        const pixels = read(engine).data;
+        let foreground = 0;
+        for (let i = 0; i < pixels.length; i += 4)
+          if (pixels[i] > 100 && pixels[i + 1] > 100 && pixels[i + 2] > 100) foreground++;
+        const completed = await pending;
+        const interrupted = control.transitions.setLookAt([0, 1, -8], [0, 0, 0]);
+        canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, clientX: 64, clientY: 64, cancelable: true }));
+        const cancelled = !(await interrupted);
+        engine.render({ delta: 1 / 60 });
+        control.dispose();
+        rows.push({ backend: engine.backend, name, foreground, completed, cancelled });
+      }
+      if (device) {
+        await device.queue.onSubmittedWorkDone();
+        const error = await device.popErrorScope();
+        if (error) errors.push(error.message);
+      }
+    } finally {
+      mesh.dispose();
+      engine.dispose();
+      canvas.remove();
+    }
+  }
+  return { rows, errors };
+};
 
 // Track listeners the controls add to the canvas, so dispose can be verified.
 function trackListeners(element) {

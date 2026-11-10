@@ -566,6 +566,10 @@
       "types": "./dist/compute/autotune.d.ts",
       "import": "./dist/compute/autotune.js"
     },
+    "./controls/transitions": {
+      "types": "./dist/controls/transitions.d.ts",
+      "import": "./dist/controls/transitions.js"
+    },
     "./controls": {
       "types": "./dist/controls.d.ts",
       "import": "./dist/controls.js"

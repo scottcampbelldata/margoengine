@@ -211,12 +211,16 @@ export class TrackballControls extends Controls {
     this.camera.position = [...this.saved.position];
     this.camera.up = [...this.saved.up];
     this.state = 'none';
+    this.clearPending();
+    this.dispatchEvent({ type: 'change' });
+  }
+
+  protected clearPending(): void {
     this.spin = [0, 0, 0];
     this.coastRate = 0;
     this.zoomStart = this.zoomEnd;
     this.panStart = [...this.panEnd];
     this.spreadStart = this.spreadEnd;
-    this.dispatchEvent({ type: 'change' });
   }
 
   /** Applies the gathered rotation, zoom and pan, and the coast, for `delta` seconds (default 1/60). Returns true when the camera moved. */

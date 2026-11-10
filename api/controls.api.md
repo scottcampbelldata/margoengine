@@ -66,6 +66,8 @@ export class ArcballControls extends Controls {
     dollyOut(factor: number): void;
     getDistance(): number;
     update(delta?: number): boolean;
+    protected clearPending(): void;
+    protected applyNow(): void;
 }
 
 export interface ArcballControlsOptions {
@@ -450,6 +452,9 @@ export class OrbitControls extends Controls {
     dollyIn(factor: number): void;
     dollyOut(factor: number): void;
     update(delta?: number): boolean;
+    protected clearPending(): void;
+    protected applyNow(): void;
+    protected keyAction(action: KeyAction): void;
 }
 
 export interface OrbitProjection {
@@ -541,6 +546,7 @@ export class TrackballControls extends Controls {
     protected onDisconnect(): void;
     saveState(): void;
     reset(): void;
+    protected clearPending(): void;
     update(delta?: number): boolean;
 }
 

@@ -490,6 +490,56 @@ SolidWorks, AutoCAD, Inventor, Fusion, Blender, Maya, Onshape and Rhino are trad
 are named here only to say whose mouse mapping a profile follows; Margo Engine is not affiliated with or endorsed by
 any of them.
 
+## Interruptible camera transitions
+
+Import `OrbitControls`, `MapControls`, `ArcballControls` or `TrackballControls` from
+`@margoengine/controls/transitions` to add `controls.transitions`. Their existing
+input, engine update, saved state and disposal APIs stay available. The root entry
+does not load transitions. With an engine, moves advance before rendering; with a
+bare camera, call `update(deltaSeconds)` yourself:
+
+```ts
+import {Camera} from '@margoengine/core';
+import {OrbitControls} from '@margoengine/controls/transitions';
+
+const camera = new Camera({position: [0, 2, 10], target: [0, 0, 0]});
+using controls = new OrbitControls(camera);
+const completed = controls.transitions.setLookAt([8, 3, -4], [1, 0, 0], {duration: 0.6});
+for (let frame = 0; frame < 60; frame++) controls.update(1 / 60);
+console.log(await completed); // true; input, replacement, abort or disposal resolves false
+
+await controls.transitions.setTarget([0, 0, 0], {duration: 0});
+await controls.transitions.fitToBox({min: [-2, -1, -3], max: [2, 1, 3]}, {aspect: 16 / 9, duration: 0});
+await controls.transitions.fitToSphere({centre: [0, 0, 0], radius: 3}, {aspect: 16 / 9, duration: 0});
+```
+
+All four methods return `Promise<boolean>`. Options: `duration` (0.6 seconds),
+`easing` (quintic smoothstep with zero endpoint velocity and acceleration),
+`signal` (none), and `up` (current up for arcball and rolling trackball, world +Y
+otherwise). Fits also take `padding` (0.05 of each dimension on each side) and
+`aspect` (element width/height, or 1 without an element). `active` reports motion;
+`cancel()` stops at the current view. Pointer, wheel and bound key input cancel
+before applying their motion. Replacement, `reset()` and `dispose()` settle the
+old promise and detach its abort listener. Invalid requests throw without
+interrupting a valid move; an already aborted signal resolves false immediately.
+
+Eye distance and orthographic zoom interpolate geometrically; target translation
+uses the eased parameter. World-up controls interpolate azimuth and polar angle;
+arcball and rolling trackball use quaternion interpolation, preserving roll and
+avoiding a zero-length view on an opposite-side move. Existing damping/coast is
+cleared without changing the saved reset state. External camera or zoom changes
+cancel on the next update. An engine pause also pauses the move.
+
+Fits retain the view direction, contain every box corner or the full sphere
+silhouette, and check the near/far planes. Orthographic fits need an attached
+`@margoengine/cameras` projection and an updated camera matrix. Assign it to
+`controls.projection` for orbit/map/trackball; pass `{projection}` as the third
+constructor argument for arcball. Distance, polar, azimuth, target box/shell and
+zoom limits are respected; an unreachable fit or a straight target path through
+the minimum target radius throws instead of clipping silently. Custom perspective
+projections are not accepted by the fit methods. Moving bounds are sampled when
+called; subsequent scene motion does not retarget the move.
+
 ## How it works
 
 - **Camera model.** The Margo Engine `Camera` is a position, a target, `fov`, `near`, `far` and an `up` vector (default world +Y). All controls write `camera.position` and `camera.target` and nothing else. `OrbitControls.target` reads and writes `camera.target`. The core camera rejects a view parallel to its `up`, so with the default +Y every control keeps the view at least a hair off the poles (orbit uses an epsilon on the polar angle, the walk controls cap pitch just under 90 degrees).

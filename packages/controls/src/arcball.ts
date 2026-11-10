@@ -443,13 +443,13 @@ export class ArcballControls extends Controls {
       angle = Math.atan2(length, dot(p, q)) * this.rotateSpeed;
     this.rotate(world, -angle);
   }
-  private clearPending(): void {
+  protected clearPending(): void {
     this.spinAngle = 0;
     this.shift.fill(0);
     this.logScale = 0;
     this.cursor = null;
   }
-  private applyNow(): void {
+  protected applyNow(): void {
     if (!this.enableDamping) this.update(0);
   }
 

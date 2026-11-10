@@ -5364,3 +5364,13 @@ maths changes. Real-engine CPU tests inspect per-instance matrices, materials, d
 The paired browser gate uses the existing CC-BY-4.0 Cesium Box fixture to compare native and React pixels and draw
 counts, plus exact-instance GPU pointer delivery, range suppression and named Scenes on WebGPU and compatibility.
 No wall-clock benchmark or custom-shader instancing parity claim is made.
+
+### Batch 197 transition evidence (section 5)
+
+Camera maths for controls/transitions is outside core and stage. Quaternion frame
+interpolation, angular world-up interpolation, logarithmic distance/zoom and
+analytic frustum fits are covered by 324 controls unit cases. Eight actual GPU
+cases render fits and interrupt them on both WebGPU and the WebGL2 compatibility
+renderer, without validation errors. Existing gizmo, input and scene ownership
+GPU checks also pass. No new shader or hardware tier requirement is introduced.
+The evidence is correctness only; no wall-clock benchmark or speed claim was run.

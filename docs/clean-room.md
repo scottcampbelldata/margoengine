@@ -5000,3 +5000,37 @@ scale, colour and pointer events. Tests show those plus groups, children, range/
 live refs and Scene ownership. Custom shader attributes are outside this job row and no shader API parity is claimed.
 No rival source, companion code or implementation file was read or copied. Existing standard Cesium Box.glb data
 (CC-BY-4.0, 2017) supplies the browser demo, with provenance in packages/procedural/test/fixtures/sdf/NOTICE.md.
+
+## Batch 197 job 1: interruptible control transitions
+
+Research compared before implementation (2026-11-10):
+- Ken Shoemake, *Animating Rotation with Quaternion Curves* (1985), SIGGRAPH,
+  https://doi.org/10.1145/325334.325242 and paper
+  https://www.cs.cmu.edu/~kiranb/animation/p245-shoemake.pdf . Reviewed rotation
+  representation and spherical interpolation; use Margo's existing quaternion
+  helpers for rolled camera frames rather than interpolating eye coordinates.
+- Jarke J. van Wijk and Wim A.A. Nuij, *Smooth and Efficient Zooming and Panning*
+  (2003), IEEE InfoVis, https://doi.org/10.1109/INFVIS.2003.1249004 ; compared the
+  abstract and the introduction of their expanded *A Model for Smooth Viewing
+  and Navigation of Large 2D Information Spaces* (2004),
+  https://vanwijk.win.tue.nl/zptvcg.pdf . Separate centre, orientation and positive
+  scale; logarithmic eye distance/zoom avoids zero-distance interpolation.
+  This is not their optimal 2D navigation path algorithm.
+- Brian Birtles, Robert Flack, Stephen McGruer and Antoine Quint, *Web Animations*
+  (W3C Working Draft, 2023), https://www.w3.org/TR/web-animations-1/ . Compared
+  explicit timeline progress, easing and cancellation lifecycle. Margo uses an
+  engine delta clock and resolves cancellation false, rather than DOM animation
+  cancellation's rejected finished promise.
+- Yomotsu, *camera-controls API reference*, v3.1.2 (accessed 2026-11-10),
+  https://yomotsu.github.io/camera-controls/classes/CameraControls.html . Public
+  API descriptions only: setLookAt/setTarget, box/sphere fitting, promises,
+  cancel/stop and navigation limits. No linked implementation or companion code
+  was opened. No rival code, files, dependency or asset was adopted.
+
+Combined design: quintic endpoint easing, angular/quaternion orientation,
+logarithmic distance/zoom, target translation, analytic camera-frame box-corner
+and sphere-tangent fitting. Symmetric quintic evaluation avoids rounding above
+one near the final sample; the regression samples 30 and 60 fps through opposite
+views. Input clears existing inertia through protected package hooks and cancels
+before applying a new gesture. Synthetic boxes and sphere samples are correctness
+fixtures, not downloaded demo assets. No new public asset demo or speed claim.

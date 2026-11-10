@@ -311,6 +311,15 @@ try {
   }
   assert.deepEqual(owner.errors, []);
   report.owner = owner;
+  report.transitions = await page.evaluate(() => window.transitionCheck());
+  assert.equal(report.transitions.rows.length, 8);
+  for (const row of report.transitions.rows) {
+    assert.ok(row.foreground > 1000, `${row.backend} ${row.name}: fitted mesh actually renders`);
+    assert.equal(row.completed, true);
+    assert.equal(row.cancelled, true);
+  }
+  assert.deepEqual(report.transitions.errors, []);
+  checks.push('All four transition controls fit and render, and wheel input interrupts, on WebGPU and WebGL2');
   checks.push(
     '12 real GPU wrapper owner/disposal cases render their scenes, detach, preserve identity and release input',
   );

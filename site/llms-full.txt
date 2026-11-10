@@ -6001,6 +6001,21 @@ Optional entry byte counts (bare peers external): @margoengine/react/instances 0
 
 Measured evidence: [batch-265-instances.json](whitepaper/results/batch-265-instances.json). All three native/wrapper scenes have exact pixels on both backends and one draw call; GPU pointer delivery names the clicked instance.
 
+## Batch 197 job 1: optional camera transitions
+
+`controls/transitions` adds interruptible setLookAt, setTarget, fitToBox and
+fitToSphere on orbit, map, arcball and trackball. All 324 controls unit tests pass;
+eight real rendered cases cover all four controls on WebGPU and WebGL2, fitting
+and wheel interruption with zero validation errors. See transitions.test.js and
+controls-browser.js. This establishes this job's four operations, not every
+camera-controls feature. Easing defaults to 0.6 s quintic; fits default to 5%
+padding per side. Custom perspective projections are rejected; orthographic fits
+need a writable projection zoom and an updated matrix. Fits sample static bounds,
+respect navigation limits, and reject unreachable framing. The optional entry
+is 13,676 B gzip (new entry, previously 0 B); the full four-control bundle avoids
+separate duplicated transition implementations. Core/stage source is unchanged,
+measuring 23,950 B in the current local build; no root budget is raised.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -10063,6 +10078,16 @@ prototype attachment set and follows each live mesh. Regression: packages/react/
 explicit material and live material edits. Instances is built independently of the remaining texture/priority/adaptive jobs.
 
 Outside batch 265: full verify on parent d34cadf03 plus Instances reached tests/catalog.test.js teardown SHUTDOWN_TIMEOUT at 30,000 ms for Chromium PID 94292 (absent on inspection); the existing Windows child-exit/stdio observation defect recurred. Repro: npm run verify; log retained as test-results/batch265-verify-job2-final.log. No React test failed and no timeout was raised or accepted as passing.
+
+### Batch 197 transition correctness
+
+The optional controls/transitions entry has no known open defect from its current
+suite. Opposite-side moves preserve a nonzero eye distance; symmetric quintic
+evaluation fixes the new transition polynomial's endpoint rounding overshoot.
+Tests reject a target path through a minimum-radius shell and invalid replacement
+requests without disturbing a running move. Existing controls remain covered by
+all 324 unit cases. Custom perspective projections and dynamically moving fit
+bounds are explicit API limits, documented in the controls README.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

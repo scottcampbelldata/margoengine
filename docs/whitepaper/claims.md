@@ -2868,3 +2868,14 @@ StrictMode cleanup are covered. No rival pixel comparison or speed claim.
 Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.
 
 Measured evidence: [batch-265-instances.json](results/batch-265-instances.json). All three native/wrapper scenes have exact pixels on both backends and one draw call; GPU pointer delivery names the clicked instance.
+
+### Batch 197: interruptible camera moves
+
+`@margoengine/controls/transitions` supplies eased setLookAt/setTarget and box/
+sphere fits across orbit, map, arcball and trackball. Proof: all 324 controls unit
+tests, including frame-rate agreement, roll, antipodal views, perspective corners
+and sphere samples, orthographic zoom, navigation limits and promise lifecycle.
+The browser suite renders all eight control/backend combinations and cancels each
+by wheel input. This matches the four requested camera-controls operations; it
+is not a claim of the rival's full unrelated API or timing equivalence. No speed
+result is claimed. Research and exact limits are in clean-room.md and limits.md.

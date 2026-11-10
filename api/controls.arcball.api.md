@@ -63,6 +63,8 @@ export class ArcballControls extends Controls {
     dollyOut(factor: number): void;
     getDistance(): number;
     update(delta?: number): boolean;
+    protected clearPending(): void;
+    protected applyNow(): void;
 }
 
 export interface ArcballControlsOptions {

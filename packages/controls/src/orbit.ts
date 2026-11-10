@@ -556,7 +556,7 @@ export class OrbitControls extends Controls {
     this.camera.position = p;
     this.camera.target = t;
   }
-  private clearPending(): void {
+  protected clearPending(): void {
     this.turnAzimuth = this.turnPolar = 0;
     this.shiftTarget.fill(0);
     this.dollyScale = 1;
@@ -569,7 +569,7 @@ export class OrbitControls extends Controls {
   private zoomScale(pixels: number): number {
     return 2 ** ((this.zoomSpeed * pixels) / PIXELS_PER_DOUBLING);
   }
-  private applyNow(): void {
+  protected applyNow(): void {
     this.update(0);
   }
 
@@ -784,7 +784,7 @@ export class OrbitControls extends Controls {
     }
     this.applyNow();
   };
-  private keyAction(action: KeyAction): void {
+  protected keyAction(action: KeyAction): void {
     if (action === 'fit') {
       this.dispatchEvent({ type: 'fit' });
       return;

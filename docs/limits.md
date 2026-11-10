@@ -3410,3 +3410,18 @@ instancing API remains separate. Preview and compatibility backends work. No cor
 Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.
 
 Measured evidence: [batch-265-instances.json](whitepaper/results/batch-265-instances.json). All three native/wrapper scenes have exact pixels on both backends and one draw call; GPU pointer delivery names the clicked instance.
+
+## Batch 197 job 1: optional camera transitions
+
+`controls/transitions` adds interruptible setLookAt, setTarget, fitToBox and
+fitToSphere on orbit, map, arcball and trackball. All 324 controls unit tests pass;
+eight real rendered cases cover all four controls on WebGPU and WebGL2, fitting
+and wheel interruption with zero validation errors. See transitions.test.js and
+controls-browser.js. This establishes this job's four operations, not every
+camera-controls feature. Easing defaults to 0.6 s quintic; fits default to 5%
+padding per side. Custom perspective projections are rejected; orthographic fits
+need a writable projection zoom and an updated matrix. Fits sample static bounds,
+respect navigation limits, and reject unreachable framing. The optional entry
+is 13,676 B gzip (new entry, previously 0 B); the full four-control bundle avoids
+separate duplicated transition implementations. Core/stage source is unchanged,
+measuring 23,950 B in the current local build; no root budget is raised.

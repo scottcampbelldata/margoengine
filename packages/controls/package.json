@@ -33,6 +33,10 @@
   },
   "sideEffects": false,
   "exports": {
+    "./transitions": {
+      "types": "./dist/transitions.d.ts",
+      "import": "./dist/transitions.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

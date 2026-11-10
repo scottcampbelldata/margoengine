@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12021083,
+  "total": 12035170,
   "history": [
     {
       "date": "2026-10-24",
@@ -5288,6 +5288,12 @@
       "commit": "batch-268-pointer",
       "reason": "New optional XR pointer, spatial selection and React bridge entries; per-entry measured bytes recorded in docs/limits.md. Lazy proximity BVH avoids importing it for ray-only clients.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-197-job1",
+      "reason": "New optional controls/transitions entry: 0 to 13676 B gzip; 14087 B ceiling includes standard headroom. All four control variants share one transition implementation; core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6287,6 +6293,7 @@
     "@margoengine/selection/spatial": 2313,
     "@margoengine/react/xr-pointer": 1516,
     "@margoengine/react/instances": 2928,
-    "margoengine/react/instances": 318
+    "margoengine/react/instances": 318,
+    "@margoengine/controls/transitions": 14087
   }
 }

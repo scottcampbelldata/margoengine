@@ -59,6 +59,7 @@ export class TrackballControls extends Controls {
     protected onDisconnect(): void;
     saveState(): void;
     reset(): void;
+    protected clearPending(): void;
     update(delta?: number): boolean;
 }
 

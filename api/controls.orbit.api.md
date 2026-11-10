@@ -118,6 +118,9 @@ export class OrbitControls extends Controls {
     dollyIn(factor: number): void;
     dollyOut(factor: number): void;
     update(delta?: number): boolean;
+    protected clearPending(): void;
+    protected applyNow(): void;
+    protected keyAction(action: KeyAction): void;
 }
 
 export interface OrbitProjection {

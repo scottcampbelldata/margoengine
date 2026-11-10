@@ -1,0 +1,49 @@
+{
+  "batch": 197,
+  "job": 1,
+  "feature": "@margoengine/controls/transitions",
+  "entryGzipBefore": 0,
+  "entryGzipAfter": 13676,
+  "entryCeiling": 14087,
+  "coreStageGzipBeforeAndAfter": 23950,
+  "controlsUnitTests": {
+    "passed": 324,
+    "failed": 0,
+    "skipped": 0
+  },
+  "renderedCases": {
+    "controls": 4,
+    "backends": [
+      "webgpu",
+      "webgl2"
+    ],
+    "cases": 8,
+    "validationErrors": 0
+  },
+  "browserChecks": 18,
+  "readmeExamples": {
+    "passed": 15,
+    "failed": 0
+  },
+  "api": {
+    "entries": 909,
+    "exports": 8747,
+    "matches": true,
+    "scope": "full check before final rebase"
+  },
+  "lint": "passed",
+  "hygiene": "passed",
+  "verify": {
+    "fullInvocations": 2,
+    "resumed": "passed",
+    "repositoryUnitRun": {
+      "tests": 14249,
+      "passed": 14249,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "historicalFailure": "Initial interrupted attempt failed quality; API comments and generated llms were repaired before the resumed complete passing verify."
+  },
+  "notes": "No benchmark, timing assertion, exclusive GPU lease, core/stage change or rival source adoption. One interrupted browser run overlapped the clean package rebuild; the post-build run passed. This receipt covers the requested four operations, not unrelated rival APIs."
+}

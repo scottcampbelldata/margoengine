@@ -2442,3 +2442,14 @@ Build packages, then run npm test --workspace=@margoengine/react. For real rende
 then append --compat for the WebGL2 compatibility device. Each leaf has a three-minute outer process-tree deadline.
 Reports: test-results/react-instances.json and react-instances-compat.json. The page uses the unmodified Cesium
 Box.glb standard fixture and its linked licence notice. README: npm run check:readme-run -- --packages=react,margoengine.
+
+### Batch 197 camera transitions
+
+Run `npm test --workspace packages/controls` for transition maths/lifecycle and
+existing controls. Then run
+`node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=3 --wait-max=60 -- npm run test:browser --workspace packages/controls`.
+The controls-browser.json report contains eight transition rows: four controls
+times WebGPU/WebGL2, fitted foreground pixels, completion and wheel cancellation,
+and no GPU errors. These are generated correctness fixtures, not asset demos.
+Run `npm run check:readme-run -- --packages=controls` for the copy-paste sample.
+The build phase adds no benchmark or timing assertion.
