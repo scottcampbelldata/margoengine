@@ -183,6 +183,30 @@
     "./pdf": {
       "types": "./dist/pdf.d.ts",
       "import": "./dist/pdf.js"
+    },
+    "./hdf5": {
+      "types": "./dist/hdf5.d.ts",
+      "import": "./dist/hdf5.js"
+    },
+    "./cgns": {
+      "types": "./dist/cgns.d.ts",
+      "import": "./dist/cgns.js"
+    },
+    "./xdmf": {
+      "types": "./dist/xdmf.d.ts",
+      "import": "./dist/xdmf.js"
+    },
+    "./exodus": {
+      "types": "./dist/exodus.d.ts",
+      "import": "./dist/exodus.js"
+    },
+    "./openfoam": {
+      "types": "./dist/openfoam.d.ts",
+      "import": "./dist/openfoam.js"
+    },
+    "./ensight": {
+      "types": "./dist/ensight.d.ts",
+      "import": "./dist/ensight.js"
     }
   },
   "files": [
@@ -215,7 +239,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node scripts/browser-root.mjs tests/sciviz-browser.mjs && node scripts/browser-root.mjs tests/bricks-browser.mjs && node scripts/browser-root.mjs tests/entries-browser.mjs && node scripts/browser-root.mjs tests/restoration-browser.mjs && node scripts/browser-root.mjs tests/demos-browser.mjs && node scripts/browser-root.mjs tests/webgl2-browser.mjs && node scripts/browser-root.mjs tests/formats-browser.mjs && node scripts/browser-root.mjs tests/derive-browser.mjs && node scripts/browser-root.mjs tests/pipeline-browser.mjs && node scripts/browser-root.mjs tests/contour-browser.mjs && node scripts/browser-root.mjs tests/clip-browser.mjs && node scripts/browser-root.mjs tests/probe-browser.mjs && node scripts/browser-root.mjs tests/calc-browser.mjs && node scripts/browser-root.mjs tests/glyph-browser.mjs && node scripts/browser-root.mjs tests/transfer-browser.mjs && node scripts/browser-root.mjs tests/labels-browser.mjs && node scripts/browser-root.mjs tests/cinematic-browser.mjs && node scripts/browser-root.mjs tests/volume-depth-browser.mjs && node scripts/browser-root.mjs tests/volume-quality-browser.mjs && node scripts/browser-root.mjs tests/link-browser.mjs && node scripts/browser-root.mjs tests/datasets-browser.mjs && node scripts/browser-root.mjs tests/curvilinear-browser.mjs && node scripts/browser-root.mjs tests/geo-lod-browser.mjs",
+    "test:browser": "npm run build && node scripts/browser-root.mjs tests/sciviz-browser.mjs && node scripts/browser-root.mjs tests/bricks-browser.mjs && node scripts/browser-root.mjs tests/entries-browser.mjs && node scripts/browser-root.mjs tests/restoration-browser.mjs && node scripts/browser-root.mjs tests/demos-browser.mjs && node scripts/browser-root.mjs tests/webgl2-browser.mjs && node scripts/browser-root.mjs tests/formats-browser.mjs && node scripts/browser-root.mjs tests/derive-browser.mjs && node scripts/browser-root.mjs tests/pipeline-browser.mjs && node scripts/browser-root.mjs tests/contour-browser.mjs && node scripts/browser-root.mjs tests/clip-browser.mjs && node scripts/browser-root.mjs tests/probe-browser.mjs && node scripts/browser-root.mjs tests/calc-browser.mjs && node scripts/browser-root.mjs tests/glyph-browser.mjs && node scripts/browser-root.mjs tests/transfer-browser.mjs && node scripts/browser-root.mjs tests/labels-browser.mjs && node scripts/browser-root.mjs tests/cinematic-browser.mjs && node scripts/browser-root.mjs tests/volume-depth-browser.mjs && node scripts/browser-root.mjs tests/volume-quality-browser.mjs && node scripts/browser-root.mjs tests/link-browser.mjs && node scripts/browser-root.mjs tests/datasets-browser.mjs && node scripts/browser-root.mjs tests/curvilinear-browser.mjs && node scripts/browser-root.mjs tests/geo-lod-browser.mjs && node tests/engineering-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
     "build:flow": "node scripts/build-flow.mjs",

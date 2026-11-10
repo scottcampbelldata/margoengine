@@ -1,0 +1,15 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object p; }
+dimensions [0 0 0 0 0 0 0];
+internalField nonuniform List<scalar>
+8
+(
+1
+2
+3
+4
+5
+6
+7
+8
+);
+boundaryField { walls { type fixedValue; value uniform 9; } }

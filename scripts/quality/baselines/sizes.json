@@ -7583,6 +7583,12 @@
       "commit": "4dd42884e",
       "reason": "Batch 178 job 2: new optional math 0 to 4750 B and PDF 0 to 5434 B min+gzip; ceilings 5002 and 5700 B. Parser/layout and PDF object/graphics ownership stay together; splitting would fragment shared text outlining and export lifetimes. Core and stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "dad175e1e",
+      "reason": "Batch 176 job 2: new optional entries, before 0 B each; after hdf5 8990, cgns 18306, xdmf 19254, exodus 20029, openfoam 10566, ensight 11539 gzip B. Complete owner readers, field conversion and dataset normalization are worth the optional bytes. Splitting only to reduce individual entries would add orchestration without reducing bytes used by an importer. Core plus stage stays 24209 B.",
+      "grew": 6
     }
   ],
   "items": {
@@ -8959,7 +8965,13 @@
     "@margoengine/decoders/snappy": 1506,
     "@margoengine/sciviz/table": 12694,
     "@margoengine/sciviz/math": 5002,
-    "@margoengine/sciviz/pdf": 5700
+    "@margoengine/sciviz/pdf": 5700,
+    "@margoengine/sciviz/cgns": 18856,
+    "@margoengine/sciviz/ensight": 11819,
+    "@margoengine/sciviz/exodus": 20567,
+    "@margoengine/sciviz/hdf5": 9260,
+    "@margoengine/sciviz/openfoam": 10883,
+    "@margoengine/sciviz/xdmf": 19832
   },
-  "total": 14335618
+  "total": 14426835
 }

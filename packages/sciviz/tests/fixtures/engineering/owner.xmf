@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.2">
+  <Domain>
+    <Grid GridType="Uniform">
+      <Topology TopologyType="Tetrahedron" Dimensions="1">
+        <DataItem Dimensions="1 4" NumberType="Int" Precision="8" Format="HDF">owner.h5:/Block_0_t000000/Topology</DataItem>
+      </Topology>
+      <Geometry GeometryType="XYZ">
+        <DataItem Dimensions="4 3" NumberType="Float" Precision="4" Format="HDF">owner.h5:/Block_0_t000000/Geometry/Points</DataItem>
+      </Geometry>
+      <Attribute Name="stress" Active="1" AttributeType="None" Center="Cell">
+        <DataItem Dimensions="1" NumberType="Float" Precision="8" Format="HDF">owner.h5:/Block_0_t000000/Cell/stress</DataItem>
+      </Attribute>
+      <Attribute Name="temperature" Active="1" AttributeType="None" Center="Node">
+        <DataItem Dimensions="4" NumberType="Float" Precision="8" Format="HDF">owner.h5:/Block_0_t000000/Node/temperature</DataItem>
+      </Attribute>
+      <Attribute Name="velocity" Active="1" AttributeType="None" Center="Node">
+        <DataItem Dimensions="4 3" NumberType="Float" Precision="8" Format="HDF">owner.h5:/Block_0_t000000/Node/velocity</DataItem>
+      </Attribute>
+    </Grid>
+  </Domain>
+</Xdmf>

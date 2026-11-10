@@ -62,6 +62,9 @@ packages/weather/tests/fixtures/metar/*.txt -text
 packages/procedural/test/fixtures/buildings/twobuildings.city.json -text
 
 # Real scientific demo data. Provenance and decompressed layout: examples/assets/sciviz/README.md.
+packages/sciviz/tests/fixtures/engineering/** -text
+packages/sciviz/tests/fixtures/engineering/seacas-can.ex2 filter=lfs diff=lfs merge=lfs -text
+packages/sciviz/tests/fixtures/engineering/ensight-owner/* filter=lfs diff=lfs merge=lfs -text
 examples/assets/sciviz/*.nrrd filter=lfs diff=lfs merge=lfs -text
 examples/assets/sciviz/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/sciviz/*.nc filter=lfs diff=lfs merge=lfs -text

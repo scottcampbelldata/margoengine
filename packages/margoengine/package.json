@@ -3495,6 +3495,30 @@
       "types": "./dist/sciviz/pdf.d.ts",
       "import": "./dist/sciviz/pdf.js"
     },
+    "./sciviz/hdf5": {
+      "types": "./dist/sciviz/hdf5.d.ts",
+      "import": "./dist/sciviz/hdf5.js"
+    },
+    "./sciviz/cgns": {
+      "types": "./dist/sciviz/cgns.d.ts",
+      "import": "./dist/sciviz/cgns.js"
+    },
+    "./sciviz/xdmf": {
+      "types": "./dist/sciviz/xdmf.d.ts",
+      "import": "./dist/sciviz/xdmf.js"
+    },
+    "./sciviz/exodus": {
+      "types": "./dist/sciviz/exodus.d.ts",
+      "import": "./dist/sciviz/exodus.js"
+    },
+    "./sciviz/openfoam": {
+      "types": "./dist/sciviz/openfoam.d.ts",
+      "import": "./dist/sciviz/openfoam.js"
+    },
+    "./sciviz/ensight": {
+      "types": "./dist/sciviz/ensight.d.ts",
+      "import": "./dist/sciviz/ensight.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -1075,3 +1075,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 178 job 2): document generated sciviz/math and sciviz/pdf aliases; examples deferred.
 
 - @margoengine/tiles (review 2): document feature decorator cancellation/disposal during preceding decoration and asynchronous feature image decoding.
+
+- @margoengine/sciviz (batch 176 job 2): document /hdf5 lazy lifetime/hyperslabs, /cgns and /xdmf resource and solution selection, /exodus time/results/entity sets, /openfoam mesh/field/patch loading, /ensight parts/times, source formats and explicit limits; runnable examples deferred to the README phase.
+- margoengine (batch 176 job 2): document generated sciviz engineering entry forwarding; examples deferred.

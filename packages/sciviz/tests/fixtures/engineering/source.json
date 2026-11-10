@@ -1,0 +1,284 @@
+{
+  "batch": "176 job 2",
+  "sources": [
+    {
+      "files": "nasa-*.cgns",
+      "title": "NASA TMR flat plate 35 by 25 CGNS grids",
+      "url": "https://tmbwg.github.io/turbmodels/flatplate_grids.html",
+      "license": "US government public domain",
+      "transformation": "Original ADF files are retained; -hdf files are CGNS CGIO cgio_copy_file output. Coordinate/element values unchanged. CGNS library shipped with VTK 9.7.2, public API only."
+    },
+    {
+      "files": "hdf-*.h5",
+      "title": "Original Margo numerical and string fixtures",
+      "license": "Apache-2.0",
+      "writer": "h5py 3.16.0 using HDF5 2.0.0; libver earliest/v108/v110/latest; engineering-fixtures.py"
+    },
+    {
+      "files": "owner.xmf, owner.h5",
+      "title": "Original Margo tetra with point and cell fields",
+      "license": "Apache-2.0",
+      "writer": "Xdmf2 library through VTK 9.7.2 vtkXdmfWriter; engineering-vtk-fixtures.py"
+    },
+    {
+      "files": "exodus-*.exo",
+      "title": "Original Margo two-time-step tetra",
+      "license": "Apache-2.0",
+      "writer": "Exodus II 9.04 public C API through VTK 9.7.2 binary library; exodus-fixtures.py. NetCDF-4 is a lossless storage conversion through netCDF4 1.7.5, with all variables and attributes retained."
+    },
+    {
+      "files": "seacas-can.ex2",
+      "title": "SEACAS IOSS can impact sample",
+      "url": "https://raw.githubusercontent.com/sandialabs/seacas/master/packages/seacas/libraries/ioss/src/main/test/can.ex2",
+      "license": "BSD-3-Clause, Sandia Corporation; https://github.com/sandialabs/seacas/blob/master/LICENSE",
+      "transformation": "None; byte-for-byte original standard sample data."
+    },
+    {
+      "files": "foam-ascii/**",
+      "title": "OpenFOAM Foundation airFoil2D tutorial polyMesh",
+      "url": "https://github.com/OpenFOAM/OpenFOAM-dev/tree/master/tutorials/incompressibleFluid/airFoil2D/constant/polyMesh",
+      "license": "GPL-3.0-or-later; standard sample data exception only, no implementation source",
+      "transformation": "None; original standard case mesh files."
+    },
+    {
+      "files": "foam-owner-*/**",
+      "title": "Original Margo 2 by 2 by 2 hexahedron mesh and fields",
+      "license": "Apache-2.0",
+      "writer": "OpenFOAM 12 blueCFD-Core 2024-1 blockMesh and foamFormatConvert; openfoam-fixtures.py. Original dictionaries and public CLI only; no implementation source read."
+    },
+    {
+      "files": "ensight-owner/**",
+      "title": "Ansys EnSight RC aircraft Gold example",
+      "url": "https://github.com/ansys/example-data/tree/main/pyensight/RC_Plane",
+      "license": "MIT, ANSYS Inc.; https://github.com/ansys/example-data/blob/main/LICENSE",
+      "writer": "EnSight 10.2.0; original case header dated 2016-09-29, files retained byte-for-byte."
+    }
+  ],
+  "files": [
+    {
+      "path": "exodus-classic.exo",
+      "bytes": 2900,
+      "sha256": "903a39222ffda48002bbac130a182f2d7c403277a49a0021587d54f9abc7084f"
+    },
+    {
+      "path": "exodus-netcdf4.exo",
+      "bytes": 40442,
+      "sha256": "fe4c08f47d580c3f259aab273d6bacbd60d7bc7d79013646b113ea641c872fa0"
+    },
+    {
+      "path": "hdf-earliest.h5",
+      "bytes": 273376,
+      "sha256": "67674f491411371aa9d3543fd0a14aef0c927b6978c07d262a401a6f328b60e7"
+    },
+    {
+      "path": "hdf-latest.h5",
+      "bytes": 179495,
+      "sha256": "7eea105fab3d52931247368a2b92934e7c4bd8a1996726006eda730eba2414a9"
+    },
+    {
+      "path": "hdf-v108.h5",
+      "bytes": 270082,
+      "sha256": "242ef5c96fd458711b9e4e3f5db35a16d53d354dcd48090bb2c5c7440c4a9173"
+    },
+    {
+      "path": "hdf-v110.h5",
+      "bytes": 153323,
+      "sha256": "28c07bc5dec0e8c3beca79b2e66645cbf8ccff2c041910b02781898fa3290e82"
+    },
+    {
+      "path": "LICENSE-ANSYS.txt",
+      "bytes": 1114,
+      "sha256": "46617266d39d9ecdd829d29ef6e9a237e9312e71531ddc258e2303e28ab041db"
+    },
+    {
+      "path": "LICENSE-OpenFOAM.txt",
+      "bytes": 35646,
+      "sha256": "a62f4262b9739f43478d025ed9fc5419585ec27b4b50e88f55e3186141e18ef1"
+    },
+    {
+      "path": "LICENSE-SEACAS.txt",
+      "bytes": 1641,
+      "sha256": "179a5b4824aeeb7da619269e556cd6ed0e71032d2c86bd1c0a1a95a48634a9fe"
+    },
+    {
+      "path": "nasa-struct-hdf.cgns",
+      "bytes": 67645,
+      "sha256": "0f88a523dbebe6f71652ad4df946fa169ae14bc072086848769289493ce1b496"
+    },
+    {
+      "path": "nasa-struct.cgns",
+      "bytes": 57344,
+      "sha256": "9189cfe553611240270b28f4eca8775acf06fd018c36d0cc06b196319b17f87a"
+    },
+    {
+      "path": "nasa-tri-hdf.cgns",
+      "bytes": 159512,
+      "sha256": "afcad5a980d6b59ee5702790c570cdc743df1c0858594dd3db9925b3e4bd845c"
+    },
+    {
+      "path": "nasa-tri.cgns",
+      "bytes": 245760,
+      "sha256": "01c964e40abb9089593a54d8825c4531fe65020b15951766360b0bb54c50b011"
+    },
+    {
+      "path": "owner.h5",
+      "bytes": 10840,
+      "sha256": "2dd26703d899094bb1af3e2ae54ea284ae0e45d0b943945f6900112edb602bd8"
+    },
+    {
+      "path": "owner.xmf",
+      "bytes": 1299,
+      "sha256": "d8ad99056aae6b0735eada55c22837b96b67b166f81816b4102e40e0ae600fbd"
+    },
+    {
+      "path": "seacas-can.ex2",
+      "bytes": 17629528,
+      "sha256": "04bea4337fcecf2388a40d3288a815dee0c2fe647b691b9e8f474db91b0619cc"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.case",
+      "bytes": 854,
+      "sha256": "d9a25ec7db62a097459cc352056a2eccba74ba83f7a1161d339ef5acd785008a"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.geo",
+      "bytes": 30144756,
+      "sha256": "b7b2e763edeb92dd9d5a5ac1d320703446ddce796139f9fb0b308a801fc2e399"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.p",
+      "bytes": 1267940,
+      "sha256": "dabc8867dbe6cf29ba8b8daea848ca1cacb1aff01552374905d96836e2aa9f60"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.staticPressure",
+      "bytes": 1267940,
+      "sha256": "66beb4c48f42054a0e255fef492cf27aadb9d2d62c3e4c1ef97c289467462961"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.turbViscosity",
+      "bytes": 1267940,
+      "sha256": "5d87ff8b51f607038deee6a8844986a812f4aafc1dc9e40855aa984615129369"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.velocity",
+      "bytes": 3798740,
+      "sha256": "b1193146f0096cb7417834706278b72d04b97c803c7383a9e66205a5412a4e3f"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.vorticity",
+      "bytes": 3798740,
+      "sha256": "8e1f1f68123be970a8e764c40bd827736256485694381efaaa1ac42c57227874"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.wallShearStress",
+      "bytes": 3798740,
+      "sha256": "7b837260926d9f9f8bda31baafc71f0b3f358e4749822be60aab97848bfc3e01"
+    },
+    {
+      "path": "ensight-owner/extra300_RC_Plane_nodal.yPlus",
+      "bytes": 1267940,
+      "sha256": "abc22e3efa043be0ad4dd79c1f7af966549073bc2d7ae90559245c5bb83ed719"
+    },
+    {
+      "path": "foam-ascii/constant/polyMesh/boundary",
+      "bytes": 1052,
+      "sha256": "7744212a4646640a031bac21879bc901d70d9fc9e939e07576bce8f9ddc8fd20"
+    },
+    {
+      "path": "foam-ascii/constant/polyMesh/cells",
+      "bytes": 396547,
+      "sha256": "d5715925bb85d57f6fbae6d41579aaa91e3fa411d5863c9a92d06fbf8bbe413b"
+    },
+    {
+      "path": "foam-ascii/constant/polyMesh/faces",
+      "bytes": 1075835,
+      "sha256": "8c198f4b3b068bf18a03fbf6ce1bacc989e251e1f70eeb92774104fa40f5ba7e"
+    },
+    {
+      "path": "foam-ascii/constant/polyMesh/neighbour",
+      "bytes": 106360,
+      "sha256": "69d6b4022707c1d88ea11244d0d508faac3ff77420bd6c259bf1019a4f2b57c1"
+    },
+    {
+      "path": "foam-ascii/constant/polyMesh/owner",
+      "bytes": 214280,
+      "sha256": "ded79e040947d55714121354ba37f92f1a5f07e29e407d6523b09c42bbff0a0d"
+    },
+    {
+      "path": "foam-ascii/constant/polyMesh/points",
+      "bytes": 486569,
+      "sha256": "5d1c490b27421d1e5d80715bb53b88411efad92f60545ac626ce5de03ea356a9"
+    },
+    {
+      "path": "foam-owner-ascii/0/p",
+      "bytes": 238,
+      "sha256": "60b9a79ca080227867c0db56d090d123f38aafc250c9e88c734aad473f555ffe"
+    },
+    {
+      "path": "foam-owner-ascii/0/U",
+      "bytes": 292,
+      "sha256": "fe794cb011537a1cadae08b5ace6d5108ccc8ea6ace2816efee4729fb119d371"
+    },
+    {
+      "path": "foam-owner-ascii/constant/polyMesh/boundary",
+      "bytes": 1085,
+      "sha256": "927087b8b2fa69554c0a2e8942eb89217a6ec7a8de54b78a17dde30944696512"
+    },
+    {
+      "path": "foam-owner-ascii/constant/polyMesh/faces",
+      "bytes": 1420,
+      "sha256": "f71ac24c341f430732c94fb07b3c2e0846f7f751153d848770ec227814b8bfc2"
+    },
+    {
+      "path": "foam-owner-ascii/constant/polyMesh/neighbour",
+      "bytes": 1025,
+      "sha256": "a8bed87dd4b656a4db135b772de11196a6c0ed2ad9c5ff4ffe5b1e92c99c490e"
+    },
+    {
+      "path": "foam-owner-ascii/constant/polyMesh/owner",
+      "bytes": 1069,
+      "sha256": "dcbb6978fa71980f0b8d8f08f7e59662fb9d4d4e15bbbc0fb43fd4a403e2c912"
+    },
+    {
+      "path": "foam-owner-ascii/constant/polyMesh/points",
+      "bytes": 1199,
+      "sha256": "356efd5e07955a8049fcb2a043c1d8ec61fb84c445ddf5fb2be82116403f3c85"
+    },
+    {
+      "path": "foam-owner-binary/0/p",
+      "bytes": 1163,
+      "sha256": "a301950ad266f8b66144a07c9412fcdbb13274d1aae38b7405b042ca8a4a87ca"
+    },
+    {
+      "path": "foam-owner-binary/0/U",
+      "bytes": 1299,
+      "sha256": "61450b5e3a9dcf49fe199388694983fd4a864ee032155cd74469e098e7ec2f7a"
+    },
+    {
+      "path": "foam-owner-binary/constant/polyMesh/boundary",
+      "bytes": 1088,
+      "sha256": "dac7732dbc880179b2c7e0eee28f7954c17d4d9f3f70c995e63853209b7d3941"
+    },
+    {
+      "path": "foam-owner-binary/constant/polyMesh/faces",
+      "bytes": 1662,
+      "sha256": "bd58edbc2da29fb204c9f29a35dd61b5866be2083175d8743a7f64030ac97d13"
+    },
+    {
+      "path": "foam-owner-binary/constant/polyMesh/neighbour",
+      "bytes": 1048,
+      "sha256": "7a3dba540be70d9b199b51362e2356405946ff4e9ac4fb6d824f1ac2725b4792"
+    },
+    {
+      "path": "foam-owner-binary/constant/polyMesh/owner",
+      "bytes": 1140,
+      "sha256": "18c5c221e387e13e9904ebf4c39dedd6e99200d643d2de28db9a9bcdb45f8eaa"
+    },
+    {
+      "path": "foam-owner-binary/constant/polyMesh/points",
+      "bytes": 1576,
+      "sha256": "e3543479655d16c800b2e1f9d7cc9c37bed16c0ef0001c1a6e68c0012d42b135"
+    }
+  ]
+}
