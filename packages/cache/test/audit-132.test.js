@@ -122,6 +122,7 @@ test('a failed bundle load stops fetching the rest', async () => {
     bundles: { one: { files: manifestFiles } },
   });
   await assert.rejects(bundles.load('one', { concurrency: 1 }));
+  // fixed-wait: a check that nothing happens; a stopped worker would have asked again within this time
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(network.log.length, 1, `${network.log.length} requests after the first failed`);
 });
@@ -141,6 +142,7 @@ test('concurrency 4: other workers stop after a failure', async () => {
     bundles: { one: { files: manifestFiles } },
   });
   await assert.rejects(bundles.load('one'));
+  // fixed-wait: a check that nothing happens; stopped workers would have asked again within this time
   await new Promise((r) => setTimeout(r, 200));
   assert.ok(network.log.length <= 4, `${network.log.length} of 40 files requested after the load failed`);
 });

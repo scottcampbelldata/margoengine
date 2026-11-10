@@ -20,6 +20,7 @@ await runSuite(
       const { TerrainImagery } = await import('/packages/terrain/dist/imagery.js');
       const { TerrainOverlays } = await import('/packages/terrain/dist/overlays.js');
       const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+      const { watchCanvas, readCanvas } = await import('/scripts/support/canvas-frame.js');
       const load = async (url) =>
         createImageBitmap(await (await fetch(url)).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
       const photo = await load('/packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_diff_1k.jpg');
@@ -49,6 +50,7 @@ await runSuite(
           camera: { position: [0, 120, 0.01], target: [0, 0, 0], near: 0.1, far: 1000 },
         });
         const device = engine.gpu;
+        watchCanvas(canvas);
         device.pushErrorScope('validation');
         engine.lighting.direction.set([0, 1, 0, 0]);
         engine.lighting.radiance.set([0, 0, 0, 1]);
@@ -146,9 +148,8 @@ await runSuite(
             { color },
           );
           await render();
-          const ctx = new OffscreenCanvas(192, 192).getContext('2d');
-          ctx.drawImage(canvas, 0, 0);
-          const value = [...ctx.getImageData(96, 96, 1, 1).data].slice(0, 3);
+          const centre = (96 * 192 + 96) * 4,
+            value = [...readCanvas(canvas).slice(centre, centre + 3)];
           overlays.remove(id);
           await render();
           return value;
@@ -177,11 +178,10 @@ await runSuite(
           ],
         ];
         const b = overlays.addPolygon(polygon, { color: [0, 1, 0, 1] });
-        const firstBake = await render(),
-          painted = await probe();
-        const ctx = new OffscreenCanvas(192, 192).getContext('2d');
-        ctx.drawImage(canvas, 0, 0);
-        const pixels = ctx.getImageData(0, 0, 192, 192).data;
+        const firstBake = await render();
+        // Read before the probe's mapAsync: once the browser presents, the canvas reads as transparent black.
+        const pixels = readCanvas(canvas);
+        const painted = await probe();
         let red = 0,
           green = 0;
         for (let k = 0; k < pixels.length; k += 4) {

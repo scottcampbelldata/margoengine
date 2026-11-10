@@ -64,6 +64,20 @@ Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
 1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
 WebCodecs section 9.4 (2026); sources in clean-room.md.
 
+### Fixed 2026-11-10: terrain overlays check read its canvas after the browser presented it
+
+- **What:** `packages/terrain/test/overlays.browser.mjs` (native WebGPU, "overlays visible on the actual terrain")
+  failed once in the batch 169 gate on a busy machine; an A/B right after passed with red 313/273, green 1169/1105.
+- **Cause:** the check drew its frame, awaited a compute probe's `mapAsync`, and only then copied the canvas. When the
+  browser ran a rendering update during that await it presented the canvas texture, and the later `drawImage` read
+  transparent black (every pixel 0,0,0,0, measured in Chromium 157). A quiet machine usually finished the await first.
+  The RVT, overlay bake and probes were right throughout.
+- **Fix:** the check reads the canvas in the task that drew the frame, before the probe. `scripts/support/canvas-frame.js`
+  (`watchCanvas`, `readCanvas`) marks a canvas frame expired once the task that took its texture ends and
+  `readCanvas` throws on an expired canvas, so the old order fails on every run instead of on a busy one.
+- **Regression:** `tests/canvas-frame.test.js`; the overlays check now reads through `readCanvas`, which threw on every
+  run with the old order.
+
 ### Fixed: Water inside a TAA capture at 4x lost the whole frame
 
 C2 row c2-007 (taa, shadows, toon, water, points with a DepthTexture probe) read depth 0 at every probe on native
