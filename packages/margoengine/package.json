@@ -3550,6 +3550,10 @@
       "types": "./dist/ui/world-gl.d.ts",
       "import": "./dist/ui/world-gl.js"
     },
+    "./ui/curved": {
+      "types": "./dist/ui/curved.d.ts",
+      "import": "./dist/ui/curved.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

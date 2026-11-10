@@ -29,6 +29,7 @@ export interface UiRay {
 
 export class WorldPanel {
     readonly ui: Ui;
+    get surface(): readonly [number, number, number, number];
     readonly matrix: Float32Array<ArrayBuffer>;
     width: number;
     height: number;

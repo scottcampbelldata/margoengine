@@ -354,3 +354,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 249 job 5): generated ecs/parallel alias.
 - @margoengine/selection: document hit-details HitDetails replacement for Picking, fields/defaults, batch staging, core zero UV, overlay/proxy contracts, AbortSignal and disposal (batch 199 job 1).
 - @margoengine/cache: replace stale Node-only prefetch/throttle and RangeCache browser/service worker limitations with batch-208 browser evidence; document worker flush lifetime and offline range behavior.
+- @margoengine/ui (batch 259 job 1): document /curved CurvedPanel arc dimensions, ray mapping, segment limits, layoutPanels arrangements and /world-gl renderer setup in the README phase.
+- margoengine (batch 259 job 1): document ui/curved alias in the README phase.

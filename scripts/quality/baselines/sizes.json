@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12693625,
+  "total": 12696137,
   "history": [
     {
       "date": "2026-10-24",
@@ -6280,6 +6280,12 @@
       "commit": "batch-199-job-1",
       "reason": "selection root 21061 -> 21308 B gzip; hit-details absent -> 15002 B, ceilings 21142 -> 21948 and new 15453. Shared replay hooks retain one-pass current-pose visibility and one staging map; splitting the same picker would duplicate its ownership and decoding. Core + stage unchanged at 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-259",
+      "reason": "UI curved surfaces: absent to 1436 B; world ceiling 9277 to 9836 B, world-gl ceiling 7556 to 7816 B. Procedural tessellation shares panel textures, XR routing and GPU lifetime; splitting would duplicate those owners. Core plus stage 24209 B unchanged. The inherited world renderer reaches the shared text owner, as world already does; curved does not duplicate it.",
+      "grew": 3
     }
   ],
   "items": {
@@ -7163,7 +7169,7 @@
     "@margoengine/ui/input": 4606,
     "@margoengine/ui/markup": 10820,
     "@margoengine/ui/react": 33009,
-    "@margoengine/ui/world": 9277,
+    "@margoengine/ui/world": 9836,
     "@margoengine/usdz": 12708,
     "@margoengine/usdz dist/workers/usdz.js": 117288,
     "@margoengine/usdz/anim": 6436,
@@ -7402,7 +7408,7 @@
     "margoengine/web": 577,
     "@margoengine/math/curve": 2659,
     "@margoengine/procedural/tree-mesh": 4676,
-    "@margoengine/ui/world-gl": 7556,
+    "@margoengine/ui/world-gl": 7816,
     "leak @margoengine/ui/world-gl -> @margoengine/text": 1,
     "@margoengine/scene/graph": 2254,
     "margoengine/scene/graph": 314,
@@ -7422,6 +7428,8 @@
     "@margoengine/procedural/textures-pbr": 5202,
     "@margoengine/ecs dist/workers/parallel.js": 750,
     "@margoengine/ecs/parallel": 5194,
-    "@margoengine/selection/hit-details": 15453
+    "@margoengine/selection/hit-details": 15453,
+    "@margoengine/ui/curved": 1692,
+    "leak @margoengine/ui/curved -> @margoengine/text": 1
   }
 }

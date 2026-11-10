@@ -4,6 +4,7 @@
 import { Engine, box, PbrMaterial } from '@margoengine/core';
 import { Button, Panel, Ui, parseRgba, themes } from '@margoengine/ui';
 import { WorldPanel, WorldPanels } from '@margoengine/ui/world-gl';
+import { CurvedPanel } from '@margoengine/ui/curved';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
 const checks = [];
@@ -45,7 +46,10 @@ async function run() {
   ui.add(new Panel({ background: 'surface', anchor: 'stretch', bleed: true }), go);
   await ui.ready;
   // NASA planetary names: https://nssdc.gsfc.nasa.gov/planetary/factsheet/ (public domain).
-  const panel = new WorldPanel(ui, { width: 2, pixelRatio: 2 });
+  const shape = new URLSearchParams(location.search).get('shape');
+  const panel = shape
+    ? new CurvedPanel(ui, { shape, width: 2, pixelRatio: 2 })
+    : new WorldPanel(ui, { width: 2, pixelRatio: 2 });
   const panels = WorldPanels.attach(engine).add(panel);
 
   let stateRestores = 0;
@@ -150,7 +154,7 @@ async function run() {
       assert(gpuErrors.length === 0, `GPU errors: ${gpuErrors}`);
       // The 2 by 1 panel at 3 metres under a 60 degree view (4:3) spans about 113 to 287 of the 400 pixels across.
       near(at(200, 170), primary, 10, 'button colour below the label at the centre');
-      near(at(110, 150), surface, 10, 'panel surface left of the button');
+      near(at(shape ? 130 : 110, 150), surface, 10, 'panel surface left of the button');
       near(at(20, 150), BACKGROUND, 4, 'scene left of the panel');
       near(at(200, 20), BACKGROUND, 4, 'scene above the panel');
     },

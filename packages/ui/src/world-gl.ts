@@ -16,13 +16,17 @@ interface GlPanel {
 }
 const VERTEX = `#version 300 es
 precision highp float;
-uniform mat4 model; uniform mat4 viewProj; uniform vec2 size; uniform bool back;
-out vec2 uv;
-void main(){vec2 c=vec2(float((0x32>>gl_VertexID)&1),float((0x2c>>gl_VertexID)&1));gl_Position=viewProj*model*vec4((c.x-.5)*size.x,(.5-c.y)*size.y,0.,1.);uv=vec2(back?1.-c.x:c.x,1.-c.y);}`;
+uniform mat4 model; uniform mat4 viewProj; uniform vec2 size; uniform vec4 surface; uniform vec3 eye;
+out vec2 uv; out float facing;
+void main(){int v=gl_VertexID%6;int cell=gl_VertexID/6;int cols=int(surface.z);
+vec2 c=(vec2(float(cell%cols),float(cell/cols))+vec2(float((0x32>>v)&1),float((0x2c>>v)&1)))/surface.zw;
+vec3 p=vec3((c.x-.5)*size.x,(.5-c.y)*size.y,0.);vec3 n=vec3(0.,0.,1.);
+if(surface.y>.5){float r=surface.x;float a=p.x/r;float b=surface.y>1.5?p.y/r:0.;n=vec3(sin(a)*cos(b),sin(b),cos(a)*cos(b));p=vec3(r*n.x,surface.y>1.5?r*n.y:p.y,r*(n.z-1.));}
+vec4 world=model*vec4(p,1.);facing=dot(eye-world.xyz,(model*vec4(n,0.)).xyz);gl_Position=viewProj*world;uv=c;}`;
 const FRAGMENT = `#version 300 es
 precision highp float;
-uniform sampler2D panel;in vec2 uv;out vec4 color;
-void main(){color=texture(panel,uv);}`;
+uniform sampler2D panel; uniform bool doubleSided;in vec2 uv;in float facing;out vec4 color;
+void main(){if(facing<0.&&!doubleSided)discard;color=texture(panel,vec2(facing<0.?1.-uv.x:uv.x,uv.y));}`;
 /** World panels on both native backends. The existing WebGPU renderer is reused unchanged. */
 export class GlWorldPanels extends BaseWorldPanels {
   private glEngine?: Engine;
@@ -243,8 +247,10 @@ export class GlWorldPanels extends BaseWorldPanels {
         gl.bindTexture(gl.TEXTURE_2D, data.texture);
         gl.uniformMatrix4fv(gl.getUniformLocation(program, 'model'), false, p.matrix);
         gl.uniform2f(gl.getUniformLocation(program, 'size'), p.width, p.height);
-        gl.uniform1i(gl.getUniformLocation(program, 'back'), p.side(context.camera.position) < 0 ? 1 : 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.uniform4fv(gl.getUniformLocation(program, 'surface'), p.surface);
+        gl.uniform3fv(gl.getUniformLocation(program, 'eye'), context.camera.position);
+        gl.uniform1i(gl.getUniformLocation(program, 'doubleSided'), p.doubleSided ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6 * p.surface[2] * p.surface[3]);
         this.stats.panels++;
         this.stats.drawCalls++;
       }

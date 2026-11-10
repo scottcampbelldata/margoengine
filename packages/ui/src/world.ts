@@ -71,6 +71,10 @@ export interface WorldPanelOptions {
  * WorldPanels.attach(engine).add(panel);
  */
 export class WorldPanel {
+  /** Optional parametric surface: radius, kind (1 cylinder, 2 sphere), horizontal and vertical segments. */
+  get surface(): readonly [number, number, number, number] {
+    return [0, 0, 1, 1];
+  }
   /** The pose: column-major, rotation and translation only. */
   readonly matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   /** Width in world units. */
@@ -319,7 +323,7 @@ export class WorldPanels implements EnginePlugin {
   private readonly descriptor = overlayPass();
   private readonly cameras: { buffer: GPUBuffer; group: GPUBindGroup }[] = [];
   private readonly cameraData = new Float32Array(20);
-  private readonly panelData = new Float32Array(20);
+  private readonly panelData = new Float32Array(24);
   private readonly mipCache = new Map<unknown, unknown>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private engine?: Engine;
@@ -441,7 +445,7 @@ export class WorldPanels implements EnginePlugin {
       both = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
     this.panelLayout = device.createBindGroupLayout({
       entries: [
-        { binding: 0, visibility: both, buffer: { type: 'uniform', minBindingSize: 80 } },
+        { binding: 0, visibility: both, buffer: { type: 'uniform', minBindingSize: 96 } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       ],
@@ -529,7 +533,7 @@ export class WorldPanels implements EnginePlugin {
         mipLevelCount: levels,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
       }),
-      uniform = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+      uniform = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
       painter = new UiPainter(
         { atlasSize: 1024, colorAtlasSize: 512, maxPages: 16 },
         { rects: 0, glyphs: 0, drawCalls: 0, uploads: 0 },
@@ -651,7 +655,8 @@ export class WorldPanels implements EnginePlugin {
       p[16] = panel.width;
       p[17] = panel.height;
       p[18] = linear;
-      p[19] = 0;
+      p[19] = panel.doubleSided ? 1 : 0;
+      p.set(panel.surface, 20);
       this.device.queue.writeBuffer(gpu.uniform, 0, p);
     }
     this.descriptor.colorAttachments[0].view = context.color;
@@ -660,9 +665,9 @@ export class WorldPanels implements EnginePlugin {
     applyView(pass, context);
     pass.setPipeline(this.pipeline(context));
     pass.setBindGroup(1, this.camera(context.view?.index ?? 0, context));
-    for (const [, gpu] of shown) {
+    for (const [panel, gpu] of shown) {
       pass.setBindGroup(0, gpu.group);
-      pass.draw(6);
+      pass.draw(6 * panel.surface[2] * panel.surface[3]);
       stats.drawCalls++;
       stats.panels++;
     }
@@ -711,29 +716,43 @@ export class WorldPanels implements EnginePlugin {
  * panel's UI texture (linear premultiplied, from an sRGB texture) and writes it in the target's encoding.
  */
 const panelShader: string = /* wgsl */ `
-struct Panel { model: mat4x4f, size: vec2f, linear: f32, pad: f32 }
+struct Panel { model: mat4x4f, size: vec2f, linear: f32, pad: f32, surface: vec4f }
 struct View { viewProj: mat4x4f, eye: vec4f }
 @group(0) @binding(0) var<uniform> panel: Panel;
 @group(0) @binding(1) var panelSampler: sampler;
 @group(0) @binding(2) var panelTexture: texture_2d<f32>;
 @group(1) @binding(0) var<uniform> view: View;
 
-struct Out { @builtin(position) clip: vec4f, @location(0) uv: vec2f }
+struct Out { @builtin(position) clip: vec4f, @location(0) uv: vec2f, @location(1) facing: f32 }
 @vertex fn panelVertex(@builtin(vertex_index) vi: u32) -> Out {
-  let c = vec2f(f32((0x32u >> vi) & 1u), f32((0x2cu >> vi) & 1u));
-  let world = panel.model * vec4f((c.x - 0.5) * panel.size.x, (0.5 - c.y) * panel.size.y, 0.0, 1.0);
+  let corner = vi % 6u;
+  let cell = vi / 6u;
+  let columns = u32(panel.surface.z);
+  let c = (vec2f(f32(cell % columns), f32(cell / columns)) + vec2f(f32((0x32u >> corner) & 1u), f32((0x2cu >> corner) & 1u))) / panel.surface.zw;
+  var local = vec3f((c.x - 0.5) * panel.size.x, (0.5 - c.y) * panel.size.y, 0.0);
+  var normal = vec3f(0.0, 0.0, 1.0);
+  if (panel.surface.y > 0.5) {
+    let r = panel.surface.x;
+    let a = local.x / r;
+    let b = select(0.0, local.y / r, panel.surface.y > 1.5);
+    normal = vec3f(sin(a) * cos(b), sin(b), cos(a) * cos(b));
+    local = vec3f(r * normal.x, select(local.y, r * normal.y, panel.surface.y > 1.5), r * (normal.z - 1.0));
+  }
+  let world = panel.model * vec4f(local, 1.0);
   // From behind, the UI is mirrored back to reading order.
-  let behind = dot(view.eye.xyz - panel.model[3].xyz, panel.model[2].xyz) < 0.0;
   var o: Out;
   o.clip = view.viewProj * world;
-  o.uv = vec2f(select(c.x, 1.0 - c.x, behind), c.y);
+  o.facing = dot(view.eye.xyz - world.xyz, (panel.model * vec4f(normal, 0.0)).xyz);
+  o.uv = c;
   return o;
 }
 fn toSrgb(c: vec3f) -> vec3f {
   return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3f(0.0031308));
 }
 @fragment fn panelFragment(i: Out) -> @location(0) vec4f {
-  let c = textureSample(panelTexture, panelSampler, i.uv);
+  if (i.facing < 0.0 && panel.pad < 0.5) { discard; }
+  let uv = vec2f(select(i.uv.x, 1.0 - i.uv.x, i.facing < 0.0), i.uv.y);
+  let c = textureSample(panelTexture, panelSampler, uv);
   if (panel.linear > 0.5 || c.a <= 0.0) { return c; }
   return vec4f(toSrgb(c.rgb / c.a) * c.a, c.a);
 }

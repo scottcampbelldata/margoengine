@@ -57,6 +57,10 @@
     "./world-gl": {
       "types": "./dist/world-gl.d.ts",
       "import": "./dist/world-gl.js"
+    },
+    "./curved": {
+      "types": "./dist/curved.d.ts",
+      "import": "./dist/curved.js"
     }
   },
   "files": [
