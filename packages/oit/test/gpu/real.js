@@ -13,6 +13,7 @@ import { PostStack, FXAA } from '../../../post/dist/index.js';
 import { VFX } from '../../../vfx/dist/index.js';
 import { OIT } from '../../dist/index.js';
 import { ExactOIT } from '../../dist/exact.js';
+import { PeelOIT } from '../../dist/peel.js';
 import { MomentOIT } from '../../dist/moments.js';
 import { TransparentDepth } from '../../dist/depth.js';
 import { addEffect } from '../../dist/vfx.js';
@@ -25,6 +26,7 @@ const passes = {
   blending: () => OIT.attach(engine, { blending: true }),
   moments: () => MomentOIT.attach(engine),
   exact: () => ExactOIT.attach(engine),
+  peel: () => PeelOIT.attach(engine),
 };
 let engine, canvas, pass, stack, model, centre, radius, taken;
 const draw = async () => {

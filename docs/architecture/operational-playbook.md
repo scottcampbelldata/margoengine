@@ -2229,6 +2229,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 Batch 238 job 4 adds two optional modifier compute passes around splat projection. Pre-pass writes canonical-space position/opacity before sorting; post-pass edits evaluated SH/fog colour before relighting. CPU canonical snapshots guarantee non-accumulation and restoration. Both-backend GPU evidence covers degree-4 analytic colour, extended opacity, seek identity, disable/setRest/restoration callbacks, ownership and pixel-exact restoration of the existing real capture. No covariance deformation, learned field or timing claim. Core/stage stay unchanged.
 
+Batch 190 job 1 adds optional oit/peel without core/stage changes. Private depth32float selection and R32F previous-depth sampling peel nearest distinct depths without storage buffers or float32 blending, then resolve far to near against opaque scene depth. Both native WebGPU and the full WebGL2 compatibility layer pass analytic crossing/occlusion/order/post/alpha checks and a real CC0 Khronos PBR asset. CPU recording covers multiview resize, restoration and disposal. Transparent edges are pixel-centre sampled even when the opaque scene is multisampled; coplanar surfaces share one depth. No speed claim or timing gate was added.
+
 Batch 206 PreviewSurface: independent alpha sampling and numeric primvar storage use existing PBR material shading hooks and later-UV input. Indexed/topology and geometry-budget regressions run on CPU; native/compatibility direct-worker GPU tests exercise upload, interpolation and disposal. uploadImage now declares the WebGPU external-copy destination usages, tested in its owning gltf-pro package. No core/stage feature.
 
 

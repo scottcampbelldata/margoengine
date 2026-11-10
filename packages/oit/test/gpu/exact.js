@@ -8,6 +8,7 @@ import { PostStack, FXAA } from '../../../post/dist/index.js';
 import { OIT } from '../../dist/index.js';
 import { ExactOIT } from '../../dist/exact.js';
 import { MomentOIT } from '../../dist/moments.js';
+import { PeelOIT } from '../../dist/peel.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
@@ -64,10 +65,12 @@ window.check = {
         ? { add() {}, dispose() {} }
         : o.mode === 'weighted'
           ? OIT.attach(engine)
+          : o.mode === 'peel'
+            ? PeelOIT.attach(engine, options)
           : o.mode === 'moment'
             ? MomentOIT.attach(engine, o.depthRange ? { depthRange: o.depthRange } : {})
             : ExactOIT.attach(engine, options);
-    const layers = [
+    const layers = o.layerData ?? [
       [[1, 0, 0], 0.6, 0.5],
       [[0, 1, 0], 0.3, 0.4],
       [[0, 0, 1], 0, 0.6],

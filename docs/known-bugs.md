@@ -1,5 +1,7 @@
 # Known bugs and unverified features
 
+Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
+
 ### Batch 238 follow-up: transformed bitmap alpha precision
 
 Whole untransformed straight-alpha bitmap uploads now preserve every channel. A cropped, flipped or explicitly premultiplied ImageBitmap still passes through Canvas2D in webgl2-compat/device/render.ts and can quantize low-alpha RGB. Repro: crop the 61x23 diagnostic WebP from splats/test/gpu/check.mjs before copying it and compare straight RGB at alpha 0 or 1. Cause: Canvas2D stores premultiplied colour; a GPU transform path is needed to retain straight RGB through these operations. This existing transformed-copy gap is outside the progressive-loading job; unchanged-bitmap regression and existing transform semantics both pass.

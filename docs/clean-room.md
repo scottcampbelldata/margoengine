@@ -1,5 +1,16 @@
 # Clean room
 
+## Batch 190 job 1: texture depth peeling
+
+Sources read, without reading companion or rival implementation code:
+
+- Cass Everitt, *Interactive Order-Independent Transparency*, 2001, [depth peeling and depth invariance](https://developer.download.nvidia.com/assets/gamedev/docs/OrderIndependentTransparency.pdf).
+- Louis Bavoil and Kevin Myers, *Order Independent Transparency with Dual Depth Peeling*, 2008, [sections Depth Peeling and Depth Comparisons](https://developer.download.nvidia.com/SDK/10/opengl/src/dual_depth_peeling/doc/DualDepthPeeling.pdf).
+- Khronos WebGL Working Group, *EXT_color_buffer_float*, 2017, [renderable R32F and RGBA16F](https://registry.khronos.org/webgl/extensions/EXT_color_buffer_float/).
+- Babylon.js documentation, *Transparent Rendering*, retrieved 2026-11-10, [public OIT contract](https://doc.babylonjs.com/features/featuresDeepDive/materials/advanced/transparent_rendering): WebGL2/WebGPU, five dual passes by default for ten layers, no refraction, antialiasing listed as unsupported.
+
+Compared front-to-back peeling, dual peeling and the existing linked lists. `oit/peel` combines Everitt's nearest-layer capture with Bavoil/Myers' unbiased 32-bit depth comparisons, reversed for Margo's reversed Z. It uses hardware depth selection and unblended R32F depth output, avoiding float32 blending and fragment storage. Each captured layer is blended far to near with a hardware test against opaque depth. Ten nearest distinct depths by default match the rival's default layer budget; the positive integer budget is adjustable. Unlike dual peeling it redraws once per layer. No timing claim. Native and compatibility pixel checks cover analytic transport, intersecting sheets, reordered registration, opaque occlusion, post and canvas alpha. The existing CC0 Khronos GlassVaseFlowers asset exercises real PBR primitives; its source/licence remain in THIRD-PARTY-NOTICES.md. No external code or new asset was copied.
+
 ## Batch 204 job 2: texture resize and native image encoding
 
 Research and comparisons are recorded in [exporter-textures.md](exporter-textures.md):

@@ -2490,6 +2490,10 @@
       "types": "./dist/oit/vfx.d.ts",
       "import": "./dist/oit/vfx.js"
     },
+    "./oit/peel": {
+      "types": "./dist/oit/peel.d.ts",
+      "import": "./dist/oit/peel.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"

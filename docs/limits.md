@@ -1,5 +1,7 @@
 # Design envelope
 
+Batch 190 job 1: `@margoengine/oit/peel` adds PeelOIT, 3037 B min+gzip (new from 0 B, ceiling 3293 B). It captures ten nearest distinct depths by default, adjustable with a positive safe integer `layers`; more layers cost one geometry redraw and one resolve draw each. Storage is `12 * layers + 8` bytes per pixel, 128 B/pixel at the default, independent of scene MSAA. Exact order holds at distinct raster depths; coplanar fragments share one layer and the last submitted wins. Transparent coverage is single sample even over a 4x opaque target; post FXAA works. This matches the documented rival antialiasing restriction. RGBA16F captured radiance still has a 65504 maximum. Full WebGL2 compatibility requires renderable floating targets; no fragment storage or float32 blending. Refraction, transmission/custom blending, depth overrides and particles remain on their existing paths; addEffect explicitly refuses this model-only pass. Core and stage remain unchanged at 24209 B combined gzip.
+
 Batch 204 job 2: optional exporters/textures is 10015 B gzip (new from 0 B),
 ceiling 10316 B. Resize accepts at most 16384 per side and 16777216 pixels for
 input, output and horizontal intermediate (Float64 RGBA, at most 512 MiB).

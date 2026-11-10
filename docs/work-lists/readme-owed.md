@@ -1,5 +1,8 @@
 # README work owed
 
+- @margoengine/oit (batch 190 job 1): document /peel PeelOIT, ten-layer default, adjustable layers/order, full WebGL2 support, resource costs and single-sample/coplanar/model-only limits; examples deferred.
+- margoengine (batch 190 job 1): document the oit/peel forwarding entry; examples deferred.
+
 Scott (2026-11-09): README examples and `check:readme-run` wait until the features are built. Each job that changes a package adds one line here. The README phase before release clears this list; it must be empty at release.
 
 | Package | What its README must cover | Added by |

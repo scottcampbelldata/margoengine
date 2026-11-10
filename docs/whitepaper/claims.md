@@ -1,5 +1,7 @@
 # Claims and evidence
 
+Batch 190 job 1: optional `oit/peel` provides exact depth-ordered alpha transport at distinct per-pixel raster depths on native WebGPU and full WebGL2 compatibility. The four analytic layers differ by at most 0.66 of 255 on the tested GPU at scene MSAA 1x and 4x, and reversing registration changes no pixel. Crossing sheets swap order per pixel; a two-layer budget keeps the nearest two and opaque surfaces hide farther ones. Post and transparent canvas alpha checks pass. This is single-sample peeling, with the limits in limits.md, not a claim of sample-frequency edge reconstruction or refraction. Public rival behavior and research comparisons are in clean-room.md; no performance comparison is claimed.
+
 Batch 256 job 4: ten tests in `packages/netcode/tests/migrate.test.js` establish
 confirmed-state recovery through successive host departures under loss/jitter,
 rollback of a partial commit, arbitrary-target handoff, stale-epoch rejection,

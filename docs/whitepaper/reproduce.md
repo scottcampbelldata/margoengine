@@ -1,5 +1,7 @@
 # Reproducing Margo's numbers
 
+Batch 190 job 1: after building packages, run `node --test --test-timeout=120000 packages/oit/test/*.test.js` and `node scripts/gpu-lock.mjs run --owner=codex-batch190 --max=3 --wait-max=60 --gpu=depth-peeling-pixel-correctness -- node packages/oit/test/gpu/peel-check.mjs`, then the same GPU command with `--compat` appended. The GPU checks compare against analytic alpha transport at 1x/4x scene MSAA, reorder meshes, cross sheets, limit layers, insert opaque occluders and check post/canvas alpha. They also load the existing CC0 Khronos GlassVaseFlowers sample with environment lighting and post processing. CPU recording covers private writable depth, immutable scene depth, resize between views, restoration, disposal and rejection of unsupported effect attachment. No benchmark or timing assertion is used.
+
 Batch 256 job 4: build packages and run
 `node --test --test-timeout=30000 packages/netcode/tests/migrate.test.js`.
 Seeded virtual-clock mesh fixtures cover loss/jitter and precise interruptions

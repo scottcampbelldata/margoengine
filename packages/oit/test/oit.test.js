@@ -8,6 +8,7 @@ import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { OIT } from '../dist/index.js';
 import { addMesh } from '../dist/meshes.js';
 import { ExactOIT } from '../dist/exact.js';
+import { PeelOIT } from '../dist/peel.js';
 import { MomentOIT } from '../dist/moments.js';
 import { TransparentDepth } from '../dist/depth.js';
 import { addEffect } from '../dist/vfx.js';
@@ -60,6 +61,88 @@ async function scene(samples = 4) {
 const of = (log, name) => log.filter((e) => e[0] === name);
 const passes = (log) => of(log, 'beginRenderPass').map((e) => e[1]);
 const draws = (log) => of(log, 'pass.drawIndexed').length;
+
+test('depth peeling stores nearest layers privately and composites far to near against scene depth', async () => {
+  const { engine, model, view, frame, id } = await scene(4),
+    oit = PeelOIT.attach(engine, { layers: 3 });
+  oit.add(model);
+  const log = frame(0),
+    list = passes(log),
+    peeled = list.filter((p) => p.label === 'oit:peel');
+  assert.equal(peeled.length, 3);
+  assert.ok(peeled.every((p) => p.colorAttachments.length === 2 && p.depthStencilAttachment.depthClearValue === 0));
+  const composite = list.at(-1);
+  assert.equal(composite.label, 'oit:peel:resolve');
+  assert.equal(composite.depthStencilAttachment.view, id(view.c.depth));
+  const pipelines = of(log, 'renderPipeline').map((e) => e[2]);
+  for (const p of pipelines.filter((p) => p.fragment.entryPoint === 'transparent')) {
+    assert.equal(p.multisample.count, 1);
+    assert.equal(p.depthStencil.depthWriteEnabled, true);
+    assert.equal(p.depthStencil.format, 'depth32float');
+    assert.deepEqual(p.fragment.targets, oit.targets);
+  }
+  const resolve = pipelines.find((p) => p.label === 'oit:peel:resolve');
+  assert.equal(resolve.multisample.count, 4);
+  assert.equal(resolve.depthStencil.depthWriteEnabled, false);
+  assert.ok(of(log, 'module').some((e) => e[2].code.includes('clip.z>=previous')));
+  assert.equal(of(log, 'computePipeline').length, 0);
+  const effect = {
+    setTransparency() {
+      throw new Error('must not take over');
+    },
+    drawTransparent() {},
+  };
+  assert.throws(() => addEffect(oit, effect), /models only/);
+  await null;
+  const next = frame(1);
+  assert.equal(of(next, 'texture').length, 0);
+  assert.equal(of(next, 'renderPipeline').length, 0);
+  oit.dispose();
+  assert.ok(!passes(frame(2)).some((p) => p.label?.startsWith('oit:peel')));
+  engine.dispose();
+});
+
+test('depth peeling validates options and accepts a full compatibility device without fragment storage', async () => {
+  for (const layers of [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+    assert.throws(() => new PeelOIT({ layers }), RangeError);
+  assert.equal(new PeelOIT().layers, 10);
+  const { engine, gpu } = await scene(1);
+  gpu.device.adapterInfo = { vendor: 'margo-webgl2' };
+  const oit = PeelOIT.attach(engine);
+  oit.dispose();
+  assert.throws(() => oit.ready(), /disposed/);
+  engine.dispose();
+});
+
+test('depth peeling resizes between views and recreates private resources after device restoration', async () => {
+  const { engine, model, view, gpu } = await scene(1),
+    oit = PeelOIT.attach(engine, { layers: 2 });
+  oit.add(model);
+  const log = gpu.record(() => {
+    view.begin(0);
+    view.c.view = { id: 'left', viewport: [0, 0, 64, 96], index: 0 };
+    engine.frameGraph.execute(view.c);
+    view.c.width = 256;
+    view.c.height = 192;
+    view.c.view = { id: 'right', viewport: [64, 0, 64, 96], index: 1 };
+    engine.frameGraph.execute(view.c);
+  });
+  assert.equal(passes(log).filter((p) => p.label === 'oit:peel').length, 4);
+  const textures = of(log, 'texture')
+    .map((e) => e[2])
+    .filter((t) => t.label?.startsWith('oit:peel:'));
+  assert.equal(textures.length, 12, 'six private textures per view size');
+  assert.deepEqual(textures.at(-1).size, [256, 192]);
+  const restored = gpu.record(() => {
+    oit.onDeviceRestored(engine);
+    view.begin(1);
+    engine.frameGraph.execute(view.c);
+  });
+  assert.equal(of(restored, 'texture').filter((e) => e[2].label?.startsWith('oit:peel:')).length, 6);
+  assert.ok(passes(restored).some((p) => p.label === 'oit:peel:resolve'));
+  oit.dispose();
+  engine.dispose();
+});
 
 test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r16float, then one composite over the scene (MSAA 4x)', async () => {
   const { engine, model, view, frame, id } = await scene(4),
@@ -309,8 +392,9 @@ test('ExactOIT refuses compatibility devices before creating GPU resources', asy
     if (capability === 'compatibility') gpu.device.features = new Set();
     if (capability === 'fragment-limit') gpu.device.limits.maxStorageBuffersInFragmentStage = 0;
     const calls = gpu.record(() => {
-      assert.throws(() => ExactOIT.attach(engine), (error) =>
-        error.code === 'unsupported' && /use OIT on this device/.test(error.message),
+      assert.throws(
+        () => ExactOIT.attach(engine),
+        (error) => error.code === 'unsupported' && /use OIT on this device/.test(error.message),
       );
     });
     assert.equal(of(calls, 'createBuffer').length, 0, capability);
@@ -340,7 +424,11 @@ test('MomentOIT: BLEND primitives draw twice, into the moments and then shaded b
   assert.equal(list[1].colorAttachments.length, 1);
   assert.deepEqual(list[0].depthStencilAttachment, readOnly);
   assert.deepEqual(list[1].depthStencilAttachment, readOnly);
-  assert.equal(draws(log), 7, 'opaque + transmission (tint, then lit), then two BLEND primitives in each of two passes');
+  assert.equal(
+    draws(log),
+    7,
+    'opaque + transmission (tint, then lit), then two BLEND primitives in each of two passes',
+  );
   const formats = of(log, 'texture')
     .map((e) => e[2])
     .filter((t) => t.label?.startsWith('oit:'))
@@ -364,7 +452,13 @@ test('MomentOIT: BLEND primitives draw twice, into the moments and then shaded b
 });
 
 test('MomentOIT refuses a depth range it cannot warp', () => {
-  for (const depthRange of [[0, 1], [2, 1], [1, 1], [-1, 2], [1, Number.POSITIVE_INFINITY]])
+  for (const depthRange of [
+    [0, 1],
+    [2, 1],
+    [1, 1],
+    [-1, 2],
+    [1, Number.POSITIVE_INFINITY],
+  ])
     assert.throws(() => new MomentOIT({ depthRange }), RangeError);
 });
 
@@ -417,13 +511,18 @@ test('TransparentDepth redraws transparent surfaces, depth only, after the pass 
   assert.equal(of(frame(1), 'beginRenderPass').length, list.length, 'steady frames keep the same passes');
   assert.equal(glass.velocity(model).shadowPrimitives.length, 3, 'two BLEND primitives and the glass');
   remove();
-  assert.equal(passes(frame(3)).some((p) => p.label === 'oit:depth'), false, 'a removed model writes nothing');
+  assert.equal(
+    passes(frame(3)).some((p) => p.label === 'oit:depth'),
+    false,
+    'a removed model writes nothing',
+  );
   glass.dispose();
   oit.dispose();
 });
 
 test('TransparentDepth refuses settings it cannot keep', () => {
-  for (const threshold of [0, -1, 1.5, Number.NaN]) assert.throws(() => new TransparentDepth({ threshold }), RangeError);
+  for (const threshold of [0, -1, 1.5, Number.NaN])
+    assert.throws(() => new TransparentDepth({ threshold }), RangeError);
   assert.throws(() => new TransparentDepth({ order: 0 }), RangeError);
 });
 
@@ -455,7 +554,13 @@ test('addEffect hands an effect the pass, draws it in the pass and hands it back
   assert.match(oit.surface(1), /fn margoTransparentAt\(color:vec4f,clip:vec4f,depth:f32\)/);
   assert.doesNotMatch(oit.surface(1), /\bOut\b|f\.view/, 'nothing of the PBR shader, which an effect does not have');
   assert.match(oit.declarations(2), /fn margoTransparent\(color:vec4f,i:Out\)/);
-  assert.deepEqual(passes(frame(0)).map((p) => p.label).slice(-2), ['oit:accumulate', 'oit:composite'], 'no model needed');
+  assert.deepEqual(
+    passes(frame(0))
+      .map((p) => p.label)
+      .slice(-2),
+    ['oit:accumulate', 'oit:composite'],
+    'no model needed',
+  );
   assert.equal(effect.drawn.length, 1);
   remove();
   assert.deepEqual(effect.hooks, [], 'handed back');
