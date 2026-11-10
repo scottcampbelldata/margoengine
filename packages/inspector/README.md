@@ -74,8 +74,192 @@ shader shows the WGSL of the latest WebGPU frame; both build their text only whi
 `EditHistory` from `margoengine/inspector/history`, `snapshotMeshes`/`restoreSnapshot`/`parseSnapshot` from
 `margoengine/inspector/snapshot` and `describeEngine` from `margoengine/inspector/resources`.
 
-Not included: creating or deleting entities, reparenting, shader editing and a GPU memory view (WebGPU does not report
-resource sizes). Other packages' lights, materials, shadows and effects are edited in the package panel below.
+Creation, deletion and reparenting use the optional `/edit` entry; WGSL editing uses `/shaders`.
+The root panel has no GPU memory view (WebGPU does not report resource sizes).
+Other packages' lights, materials, shadows and effects are edited in the package panel below.
+
+## Choose an optional editor
+
+Import each feature from `@margoengine/inspector/<entry>` or its forwarding alias
+`margoengine/inspector/<entry>`. Attaching the root Inspector does not attach these editors.
+Use an existing inspector's `history` where an editor accepts one to share undo and redo.
+Importing an entry does not install texture instrumentation, start a relay or create a panel.
+
+| Entry | Public starting point | Purpose |
+|---|---|---|
+| `tweak` | `new TweakPanel(options)` | Bind application settings without an engine. |
+| `gizmo` | `InspectorGizmo.attach(engine, inspector, options)` | Transform the inspector selection. |
+| `edit` | `SceneEditor.attach(engine, inspector, options)` | Create and edit core entity hierarchies. |
+| `textures` | `TextureCapture.start(options)`, `TextureViewer.attach(capture, options)` | Capture WebGPU textures before opening a viewer. |
+| `animation` | `AnimationPanel.attach(engine, players, options)` | Inspect clip playback and skeletons. |
+| `gl` | `GLInspector.attach(engine, options)`, `captureGLFrame(engine, options)` | Native WebGL2 preview overlays and frame capture. |
+| `tools` | `CameraTools.attach(engine, options)` | Camera selection, canvas capture and glTF export. |
+| `shaders` | `ShaderEditor.attach(engine, options)`, `recompileShader(mesh, wgsl, options)` | Edit a WgslMaterial with device diagnostics. |
+| `remote` | `RemoteTarget.attach(engine, options)`, `new RemoteInspector(options)` | Inspect another running page. |
+| `remote-relay` | `await createRemoteRelay(options)` | Node development relay for remote pages. |
+
+## Application settings and gesture undo
+
+`TweakPanel` needs a DOM but no engine. Its default parent is `document.body`, title is
+`Parameters`, and history is a new `EditHistory`. `parent`, `title`, `history` and `signal`
+override those choices. `add(object, key, options)` returns a binding for a number, string,
+boolean, vector, enum or function button. `addColor` selects colour controls;
+`addFolder(title)` creates a child panel sharing the history.
+
+Numeric `min` and `max` default to unbounded, with no quantization until `step` is set.
+`axes` overrides ranges per vector component. Colours accept `#rrggbb`, 24-bit integers,
+or RGB(A) components; `colorScale` defaults to 1 and also accepts 255, while alpha stays
+in 0..1. `options` supplies an enum array or a label-to-value map. `readonly` defaults
+to false; `label` defaults to the property key. Function buttons are outside history
+unless their binding has an `undo` function.
+
+`binding.setValue(value)` validates and records one step. Input events in a gesture
+coalesce until change or blur; Escape cancels the pending gesture. Vector and colour
+component edits preserve the bound object's identity. `getValue`, `reset`, `onChange`
+and `refresh` expose the binding without DOM events; `onChange` returns an unsubscribe
+function. Call `panel.refresh()` after application writes: there is no polling timer.
+`panel.undo()` and `panel.redo()` use its history. Dispose bindings or the whole panel
+when finished; aborting the supplied signal disposes the panel and its folders.
+
+## Selection gizmos
+
+Attach `InspectorGizmo` after its Inspector is attached to the same engine. The gizmo
+follows `inspector.selected`; `sync()` updates it immediately after a programmatic
+selection. `controls` exposes the underlying TransformControls. The toolbar defaults
+to `inspector.root`; `parent: null` hides it. The default mode is translate, space is
+world, size is 1, and translation/rotation/scale snapping is off. Other control options
+and defaults are documented in [TransformControls](../controls/README.md).
+
+Pass `cameraControls` to suspend those controls for a gizmo drag and restore their
+previous enabled state afterward. A completed drag is one step in `inspector.history`.
+Canvas keyboard shortcuts default to enabled: W/E/R choose move/rotate/scale, Q changes
+space, +/- change size and Escape cancels a drag. `keyboard: false` leaves keyboard
+handling to the application. Disposal removes listeners, toolbar and controls, restores
+the canvas tabindex and camera control state, and detaches the owned plugin. An abort
+signal, engine disposal or removal of a connected inspector also releases the gizmo.
+
+## Create, delete, duplicate and reparent
+
+`SceneEditor` attaches to the inspector's scene, with one editor per scene. Its toolbar
+defaults to `inspector.root` and may be hidden with `parent: null`. `createPrimitive`
+defaults to a box at the root origin; supported kinds are box, sphere, plane, cylinder,
+cone, capsule, torus, circle, ring and torusKnot, using geometry-package dimensions.
+An optional parent makes the new primitive's origin parent-relative.
+
+`createLight` supports point (default), spot, directional and ambient lights with white
+colour, intensity 1, range 10, angle PI/4 and penumbra 0. The returned mesh is a
+selectable transform anchor. `light(handle)` reads a copy of its settings and
+`setLight(handle, values)` records a checked edit. Existing `lights` and `directional`
+plugins must belong to this scene; otherwise the editor finds or attaches its lighting
+plugins when needed. Clustered point/spot lighting requires WebGPU.
+
+`delete()` and `duplicate()` default to the current selection and operate on its
+subtree. Duplication shares immutable geometry and copies each distinct material once.
+`reparent(handle, parent)` preserves the local transform, accepts null for the root,
+and rejects cycles before editing. Tree dragging uses the same operation. Delete and
+Ctrl/Cmd+D shortcuts in the tree default to enabled (`keyboard: false` disables them).
+These operations use the inspector history; package-owned PBR subtrees must be edited
+through their owning package rather than this core hierarchy editor.
+
+Deletion retains original handles for undo, hides the subtree and removes its drawable
+geometry. Deleted handles are finally disposed when their last retaining history entry
+is discarded. Editor disposal removes its UI, input and owned lights while keeping
+scene meshes and shared history usable. The supplied signal also disposes it.
+
+## Texture capture and previews
+
+Start `TextureCapture` before `Engine.create` and before loading textures. A viewer
+opened later can then inspect earlier captured textures. The default GPU is
+`navigator.gpu`; `gpu: null` watches only devices explicitly passed to `watchDevice`.
+`watchGPU` follows future adapter/device requests, `watchAdapter` follows future
+devices, and `watchDevice` captures future texture creation. Existing resources need
+`register(device, texture)`, which does not change their usage. `watchCanvas(context)`
+captures future swapchain textures and must run before the desired canvas frame.
+
+`inspectable` defaults to true: captured creation descriptors gain TEXTURE_BINDING
+without mutating application descriptors. Turning it off preserves usage flags, but
+resources without TEXTURE_BINDING cannot be previewed. `list()` reports live metadata;
+`onChange` returns an unsubscribe function. Destroyed or collected textures disappear.
+
+`preview(id, options)` returns width, height and top-left RGBA display bytes, rather than
+raw source-format data. Defaults are mip 0, layer 0, channel rgba, exposure 1 and range
+[0,1]. Layers select array/cube faces or a 3D slice at the chosen mip. Channels are
+rgba, rgb, r, g, b and a; isolated channels display as grayscale. Aspect defaults to
+depth-only for depth formats, stencil-only for stencil8 and all otherwise. An explicit
+aspect must exist in the source. Exposure multiplies values before range mapping and
+clamping, so integer and HDR textures need an appropriate range. Invalid mip, layer,
+aspect or mapping rejects; this is a display preview, not a lossless texture export.
+
+`TextureViewer.attach` defaults to `document.body`; `select(id, options)` resolves after
+the pixels are visible. A preview signal cancels its wait without cancelling unrelated
+GPU work. Disposing the viewer cancels its preview but keeps the capture alive. Disposing
+or aborting the capture removes its owned wrappers and metadata without destroying
+application textures. Keep both handles and dispose each owner explicitly.
+
+## Animation playback and skeletons
+
+`AnimationPanel.attach(engine, players, options)` accepts live Animation players from
+that engine. Omitting players discovers existing Animation plugins; `add(player)` adds
+later players. `parent` defaults to `document.body`; null leaves the controls detached.
+`state(player, clipIndex)` returns a copy of a clip's time, weight, playing, loop and
+speed. Indices distinguish clips with duplicate names. `set(player, clipIndex, patch)`
+updates these values and immediately poses scrubs and weight changes. Time, weight and
+speed must be finite and nonnegative; time clamps to clip duration. UI scrubbing pauses
+that clip. Positive clip weights normalize per model; all-zero weights show the pose
+captured when the player was added.
+
+The panel owns each added player's clock until `remove(player)` or disposal. Initial
+time and weight select the player's current clip; other weights start at zero, while
+playing, loop and speed follow its captured state. Skeleton checkboxes show an SVG
+overlay on either backend when skins exist. Removal restores the saved pose and player
+state for a live model, without disposing the player or model. Model disposal removes
+its controls. Panel disposal, engine disposal or its abort signal releases all models,
+helpers and DOM.
+
+## Native WebGL2 preview inspection
+
+The root Inspector's debug overlays are WebGPU-only. For an engine using the WebGL2
+preview backend, attach `GLInspector` and use `setDebug` with wireframe, normals, bounds
+or lights. Its parent defaults to `document.body`; null keeps controls detached.
+This entry operates on the engine's native WebGL2 context and owns its debug program
+and overlays; it does not load a compatibility renderer or require a compatibility-package
+peer dependency. Overlay drawing restores the GL state it changes.
+
+`capture(options)` or standalone `captureGLFrame(engine, options)` reports native draw
+calls, arguments, program/framebuffer/vertex-array ids, viewport, depth/blend/cull state,
+shader sources and per-view passes with owners and CPU/GPU costs. `render` defaults to
+true; false waits for the next application frame. `timeout` defaults to 5000 ms and
+must be positive and finite. Only one capture per engine may be pending. `signal`
+cancels capture; panel disposal cancels its own pending capture. Temporary capture
+wrappers are removed on success or failure. GPU costs are null when timer queries are
+unsupported or disjoint; a null value is not zero cost. Context loss disables overlays;
+dispose and reattach after restoring the context.
+
+## Cameras, screenshots, recordings and glTF
+
+`CameraTools.attach` defaults to `document.body`; use `parent: inspector.root` to place
+it beside the tree or null for detached controls. `cameras` supplies named application
+cameras; `addCamera` adds or replaces one and `removeCamera` removes it. Id `default`
+and ids starting with `model:` are reserved. `list()` includes application cameras and
+live loaded-model cameras discovered from scene plugins or supplied in `models`.
+Await `select(id)` to activate one. The selected camera's live pose/projection is copied
+each update; selecting default restores the engine camera captured at attach time.
+
+`screenshot(options)` renders and returns a Blob of canvas pixels, excluding DOM
+overlays. Type defaults to image/png; JPEG/WebP requests may fall back to PNG in the
+browser. Lossy `quality` defaults to the browser choice and accepts 0..1; `timeout`
+defaults to 10000 ms. `startRecording(options)` lazily loads video/record and returns
+its recording handle. Await `stopRecording()` for the final encoded Blob; the browser
+must support canvas capture and MediaRecorder. Only one recording may start or run
+at once. Recording options are those of [video/record](../video/README.md).
+
+`exportGLTF(options)` lazily loads exporters. It defaults to binary GLB for the engine
+scene; `binary: false` returns embedded-buffer glTF JSON. Passing a live `model` from
+this engine selects model export, preserving its PBR data, skins and attached animations
+through the model exporter. Screenshot, recording and export accept operation signals;
+the panel's signal disposes the tools. Disposal restores the original camera, aborts
+pending work, disposes recording, revokes owned download URLs and removes the panel.
+Loaded-camera projection support is imported only when selecting a loaded camera.
 
 ## Edit other packages' objects
 
@@ -134,16 +318,57 @@ A good edit swaps in a new material with the same uniforms, textures and other v
 back. `recompileShader(mesh, wgsl, {device: engine.gpu})` does the same without a panel and returns the compiler's
 messages. Diagnostics need WebGPU; generated shaders of other materials stay read only in the Inspector.
 
+Pass actual materials-package `createMesh` results drawing a `WgslMaterial` in `meshes`
+(an array or a function called by `refresh`). `history` defaults to a new EditHistory;
+pass the inspector history to share undo. `parent` defaults to `document.body`, `live`
+defaults to true, `delayMs` defaults to 400 (0..10000), and `timeoutMs` defaults to 3000.
+`apply()` resolves with the edit result; `result` holds the last displayed result.
+
+Standalone `recompileShader` needs the drawing device for compiler checks. Without
+`device`, it swaps unchecked. Its `settleMs` defaults to 50 and must be between zero and
+`timeoutMs`; timeoutMs accepts 0..60000. Keep rendering while awaiting an edit: the
+first checked edit may need a frame to learn the full generated module. Inspect `ok`,
+`modules` and `diagnostics`, rather than assuming a resolved promise proves compilation.
+Diagnostics use 1-based edited-text coordinates, with zero for engine-generated text.
+An unchanged edit may return ok with zero modules. Zero observed modules do not prove
+GPU compilation; keep the target visible and rendering for that evidence. Dispose the editor
+to remove its timer, listeners and panel; meshes and their materials remain app-owned.
+
 ## Remote inspection
 
 `margoengine/inspector/remote` inspects a scene running on a phone or headset from a desktop browser. The page on the
 device attaches a `RemoteTarget`, the desktop page creates a `RemoteInspector`, and the two talk over any string
 channel: `channelTransport` wraps a MessagePort, BroadcastChannel or WebSocket the app already has, and
 `relayTransport` goes through the development relay that `margoengine/inspector/remote-relay` starts in Node
-(`createRemoteRelay({host: '0.0.0.0'})` prints a LAN url and a token). The desktop panel lists the device's lights,
+(`createRemoteRelay({host: '0.0.0.0'})` returns a LAN url and a token). The desktop panel lists the device's lights,
 materials, shadows, post effects and meshes with their values, edits them (each edit is checked on the device, with
 undo), shows the frame rate and takes a screenshot of the device's canvas. The target runs only that fixed list of
 operations and, when given a token, refuses requests without it. Development builds only.
+
+Start the Node relay separately from the browser bundles. Its defaults are host
+127.0.0.1, port 0 (a free port), a random 32-byte base64url token and a 16000000-byte
+message limit. A supplied token needs at least 16 characters; maxBytes accepts
+1..16000000. Use the returned `url` and `token` for each `relayTransport`, with role
+target on the scene page and viewer on the desktop page. The token travels in the
+Authorization header, never in the URL. Configure the same optional protocol token
+on RemoteTarget and RemoteInspector as well. Anyone holding the relay token can
+inspect the scene; keep this facility in development builds.
+
+Attach the target before awaiting `viewer.connect()`. Connect resolves after hello
+and scene delivery; `set`, `undo`, `redo` and `capture` return promises for target
+operations. The viewer parent defaults to document.body, with null for no panel;
+`timeoutMs` defaults to 10000 and accepts 100..120000. A screenshot returns base64 PNG
+data, mimeType and dimensions, of canvas pixels only. `relayTransport`'s `onError` is called
+once on a send/stream failure, after which that transport stops. Dispose the target
+and viewer, close their transports, then await the relay's `close()` (or use async
+disposal) when the session ends.
+
+For browser checks, wait for relay state delivery and shader pipeline/submitted-work
+readiness rather than sleeping for a guessed duration. The package's
+`test:browser:remote` exercises two browser connections to a real local relay on one
+machine; it does not prove phone/headset hardware behavior. `test:browser:shaders`
+checks real compiler diagnostics, rollback and panel undo on WebGPU. Native preview
+coverage is in `test:browser:gl` and `test:browser:gl:compat`.
 
 ## Plugin and pass view
 

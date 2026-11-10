@@ -14,7 +14,7 @@
 
 - @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase. DONE (sciviz-readme-phase)
 - @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase. DONE (voxel-readme-phase)
-- @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase.
+- @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase. DONE (inspector-prose-phase; examples tracked separately)
 - @margoengine/react: performance proof waits for target factor/dimensions and pipeline readiness; review test guidance in the README phase. DONE (react-readme-phase).
 
 - @margoengine/sciviz (batch 179 job 4): document /provenance opt-in factories, metadata schema and integrity checks, automatic PNG/SVG metadata, PDF info export, successful-call trace replay, history bounds and explicit application codecs/registries. DONE (sciviz-readme-phase)
@@ -149,7 +149,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: tween/inertia alias (batch 215 job 6).
 | @margoengine/input | vector: VectorInput, wasd, radial processing, generated scalar channels, contexts, rebinding and replay | batch-253 job 1 |
 | margoengine | Generated input/vector alias | batch-253 job 1 |
-| @margoengine/inspector | Standalone tweak bindings, folders, colours, vectors, enums, buttons and gesture undo. | Batch 262 job 1 |
+| @margoengine/inspector | Standalone tweak bindings, folders, colours, vectors, enums, buttons and gesture undo. | Batch 262 job 1 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Optional inspector/tweak import and shared history usage. | Batch 262 job 1 |
 
 | @margoengine/navmesh | obstacles ObstacleNavMesh, cylinder/rotated-box shapes, world dimensions, grouped handles, moves, deferred rebuilds and baked cell-run semantics | batch-252 job 5 |
@@ -158,7 +158,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated netcode/migrate alias | batch-256 job 4 |
 | @margoengine/input | xr: descriptors/map/binding, attach/update order, source filters, select/grip/poses, pinch distances, recording and lifecycle | batch-253 job 2 |
 | margoengine | Generated input/xr alias | batch-253 job 2 |
-| @margoengine/inspector | Selection gizmos, camera arbitration, toolbar and whole-drag undo. | Batch 262 job 2 |
+| @margoengine/inspector | Selection gizmos, camera arbitration, toolbar and whole-drag undo. | Batch 262 job 2 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Optional inspector/gizmo import. | Batch 262 job 2 |
 
 
@@ -185,7 +185,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/animation: document captureState/restoreState clip identity, time, pause, loop and speed.
 - @margoengine/animator: document playback snapshots, fade/layer replacement, same model definitions and paired stateful-clock hooks.
 - @margoengine/save: document optional scene-state stable bindings, light/shadow capture and transactional restoration.
-| @margoengine/inspector | Scene primitives and lights, delete/duplicate/reparent, tree dragging, retained history handles and disposal. | Batch 262 job 3 |
+| @margoengine/inspector | Scene primitives and lights, delete/duplicate/reparent, tree dragging, retained history handles and disposal. | Batch 262 job 3 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Optional inspector/edit import and undoable scene editing. | Batch 262 job 3 |
 | @margoengine/react | Material lifecycle proof observes current plugin identities, including StrictMode name reuse. | Batch 262 job 3  DONE (react-readme-phase) |
 
@@ -217,7 +217,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Document the sprites/pick alias and target-pixel coordinate convention | batch-245 job 3 |
 | @margoengine/html | blend: HTMLBlend rectangular apertures, canvas alpha requirement, shared ownership, input routing, panel transforms and disposal. | Batch 260 job 2 |
 | margoengine | Generated html/blend alias and synchronised upstream export aliases. | Batch 260 job 2 |
-| @margoengine/inspector | Startup texture capture, late viewers, mip/channel/layer/aspect previews, exposure/range, cancellation and capture limits. | Batch 262 job 4 |
+| @margoengine/inspector | Startup texture capture, late viewers, mip/channel/layer/aspect previews, exposure/range, cancellation and capture limits. | Batch 262 job 4 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Optional inspector/textures import and capture startup ordering. | Batch 262 job 4 |
 | @margoengine/webgl2-compat | Stencil-aspect sampling extension, coded capability refusal, depth restoration and ordinary-view aliases. | Batch 262 job 4 |
 | margoengine | Generated aliases for APIs already on main: save/scene-state, audio/binaural, materials/serialization, save/materials, shader/serialization and xr/locomotion; also inspector/textures. | Batch 262 job 4 |
@@ -290,7 +290,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | water/caustics optional facade | Batch 234 caustics |
 
 - @margoengine/worker (batch 257 job 4): document Firefox WebGL2 worker evidence, browser-matrix and strict browser selection, default-profile WebGPU gaps and the distinction between Windows WebKit fallback and unproved native Safari.
-| @margoengine/inspector | animation: AnimationPanel.attach, per-clip set/state, play/pause/scrub/weights, skeleton, ownership and disposal | batch-263 job 1 |
+| @margoengine/inspector | animation: AnimationPanel.attach, per-clip set/state, play/pause/scrub/weights, skeleton, ownership and disposal | batch-263 job 1 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Generated inspector/animation alias | batch-263 job 1 |
 
 - @margoengine/wfc: document /tileset buildTileset/parseTilesetXML, six symmetry classes, orientation actions, subset selection, frequency weights, XML vocabulary and source-index assembly integration (batch 237 job 2).
@@ -318,7 +318,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/ui | forms entry: Select, RadioGroup, Tabs content ownership, Checkbox, ColorPicker, normalized channels, mirror/input attachment and disposal. | batch-258 job 3 |
 | margoengine | ui/forms alias and accessible form setup. | batch-258 job 3 |
-| @margoengine/inspector | gl: GLInspector attach/setDebug/capture, native preview backend, state restoration, timing limits and cancellation | batch-263 job 2 |
+| @margoengine/inspector | gl: GLInspector attach/setDebug/capture, native preview backend, state restoration, timing limits and cancellation | batch-263 job 2 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Generated inspector/gl alias | batch-263 job 2 |
 
 - @margoengine/math (batch 220 job 1): document math/compat import migration, 17 methods, radians/shear layout, native and separate cameras, axis-angle output, degenerate/closed geometry, color spaces, cloning and original-entry size preservation.
@@ -370,7 +370,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine: document the optional sciviz/pipeline facade and its equivalence to @margoengine/sciviz/pipeline after the build phase.
 
-| @margoengine/inspector | tools: CameraTools placement, camera registration/loaded discovery, screenshot, recording start/stop, model/scene GLB and glTF, lazy dependencies and disposal | batch-263 job 3 |
+| @margoengine/inspector | tools: CameraTools placement, camera registration/loaded discovery, screenshot, recording start/stop, model/scene GLB and glTF, lazy dependencies and disposal | batch-263 job 3 DONE (inspector-prose-phase; examples tracked separately) |
 | margoengine | Generated inspector/tools alias | batch-263 job 3 |
 - @margoengine/animation: document registered-scene disposal, terminal controller lifetime and asynchronous geometry-cache scene/signal ownership.
 - @margoengine/react: document browser script repository-root invocation. DONE (react-readme-phase).
@@ -378,7 +378,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/math (batch 220 job 2): document /curve scalar/keyed APIs, four modes and string constants, tension and boundary policies, copied/normalized keys, channel editing, reusable packed interpolants, sampling, limits and a tuning-table example.
 - margoengine (batch 220 job 2): document generated math/curve alias and regenerated bridges to the already-built exporters/optimize-extra and exporters/splats entries.
 
-- @margoengine/inspector (batch 220 landing repair): document native-context capture/overlay ownership, removal of the compatibility-package peer dependency and coded shader failure cleanup.
+- @margoengine/inspector (batch 220 landing repair): document native-context capture/overlay ownership, removal of the compatibility-package peer dependency and coded shader failure cleanup. DONE (inspector-prose-phase; examples tracked separately)
 - @margoengine/procedural (batch 230 tree-mesh): meshTree, generateParametricTree, meshTreeLODs, parameter defaults, material atlases and integration with /trees and /lod; examples deferred.
 - margoengine (batch 230 tree-mesh): generated procedural/tree-mesh alias; examples deferred.
 
@@ -1211,7 +1211,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (lane L fix): createFallbackFigure now takes the layer as `compat: await import('@margoengine/webgl2-compat')`; README prose updated, example deferred. DONE (sciviz-readme-phase)
 
 | @margoengine/environment | exr-tiled: run the `parseTiledEXR` example (levels: all) under check:readme-run; fixture `/texture-mips.exr` still to provide. | Batch 51 job 2 |
-| @margoengine/inspector | shaders: ShaderEditor.attach with a WgslMaterial mesh, recompileShader result and diagnostics, undo | batch-107 job 2 |
+| @margoengine/inspector | shaders: ShaderEditor.attach with a WgslMaterial mesh, recompileShader result and diagnostics, undo | batch-107 job 2 DONE (inspector-prose-phase; examples tracked separately) |
 
 - @margoengine/clustered (batch 52 job 4): document ShadowAtlas per-face caching (stable tiles, which changes redraw which faces); examples deferred.
 
@@ -1231,7 +1231,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/scatter (batch 64 job 6): document /grass GrassScatter, GrassShape defaults and ranges, ring segments, blade randomness, attach without meshes and limits; example deferred.
 - margoengine (batch 64 job 6): document the scatter/grass forwarding entry.
 
-| @margoengine/inspector | remote: createRemoteRelay with host 0.0.0.0, RemoteTarget.attach on the phone page, RemoteInspector.connect on the desktop page, set, undo, capture | batch-107 job 3 |
+| @margoengine/inspector | remote: createRemoteRelay with host 0.0.0.0, RemoteTarget.attach on the phone page, RemoteInspector.connect on the desktop page, set, undo, capture | batch-107 job 3 DONE (inspector-prose-phase; examples tracked separately) |
 
 - @margoengine/environment (batch 51 job 3): volumetric, a runnable `multipleScattering` example (attach with a distance, switch back to 0 live).
 
@@ -1516,3 +1516,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/exporters: cover clean-room Basis SIMD requirements, linked CSP/load errors, per-call load recovery and the external encoderPath override in README examples during the README phase.
 
 - @margoengine/webgl2-compat: add bias/offset footprint regression coverage and test:gpu:bias reproduction to examples in the README phase; the incorrect mip-blending prose is corrected by review5 now.
+- @margoengine/inspector: optional-entry copy-paste examples and their runtime validation remain owed; round 3 instruction prohibits writing/fixing examples and check:readme-run. Prose coverage is complete.
