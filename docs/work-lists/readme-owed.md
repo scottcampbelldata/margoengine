@@ -821,3 +821,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 270 job 1): document generated vfx/space alias; examples deferred.
 
 - @margoengine/water and margoengine (batch 235 job 2): cover /flow painted/generated providers, encoded versus signed RG, two normal maps or procedural detail, world region, speed/period/scale/defaults, setTime, borrowed lifetimes and restoration; examples deferred.
+
+
+
+- @margoengine/toon (batch 194 job 2): document /screen-outline pixel Toon and ModelOutlines, physical pixel units, defaults/ranges, live model styles, per-view projection and hull limits; README examples deferred.
+- margoengine (batch 194 job 2): document generated toon/screen-outline alias; README examples deferred.

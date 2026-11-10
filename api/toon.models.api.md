@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface ModelOutlineOptions {
     outline?: number;
@@ -16,6 +16,9 @@ export interface ModelOutlineOptions {
 }
 
 export class ModelOutlines implements EnginePlugin {
+    protected get maxOutline(): number;
+    protected outlineShader(code: string): string;
+    protected outlineFrame(_values: Float32Array, _context: Context): void;
     readonly name = "toon:models";
     smooth: boolean;
     vertexColors: boolean;
@@ -42,6 +45,10 @@ export interface OutlineStyle {
 export function positionRings(vertices: Float32Array, stride?: number): Uint32Array;
 
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 interface ModelLike {
   readonly root: Mesh;

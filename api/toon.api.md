@@ -4,11 +4,15 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ToonOptions } from "@margoengine/creative";
 
 export class Toon implements EnginePlugin {
     readonly name = "toon";
+    protected readonly values: Float32Array;
+    protected get maxOutline(): number;
+    protected outlineData(_context?: PassContext): Float32Array;
+    protected outlineShader(code: string): string;
     constructor({ outline, color, ...options }?: ToonPipelineOptions);
     static attach(engine: EngineKernel, options?: ToonPipelineOptions): Toon;
     setup(engine: Engine): void;

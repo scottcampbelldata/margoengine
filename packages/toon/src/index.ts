@@ -1,9 +1,16 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { ToonShading, type ToonOptions } from '@margoengine/creative/toon';
 import { MargoError } from '@margoengine/math/errors';
 import { meshVertex } from '../../shared/gpu.js';
+import { retire, writeUniform } from '../../shared/frame-resources.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** `ToonShading`'s ramp options plus the inverted-hull outline. */
 export interface ToonPipelineOptions extends ToonOptions {
@@ -26,18 +33,30 @@ export class Toon implements EnginePlugin {
   private buffer?: GPUBuffer;
   private pipeline?: GPURenderPipeline;
   private format = '';
-  private readonly values: Float32Array;
+  protected readonly values: Float32Array;
+  /** Width limit for optional outline projections. */
+  protected get maxOutline(): number {
+    return 10;
+  }
+  /** Parameters for the selected outline projection. */
+  protected outlineData(_context?: PassContext): Float32Array {
+    return this.values;
+  }
+  /** Shader transform for optional outline projections. */
+  protected outlineShader(code: string): string {
+    return code;
+  }
   private disposed = false;
   constructor({ outline = 0.025, color = [0.015, 0.015, 0.015], ...options }: ToonPipelineOptions = {}) {
     if (
       !Number.isFinite(outline) ||
       outline < 0 ||
-      outline > 10 ||
+      outline > this.maxOutline ||
       color.length !== 3 ||
       color.some((v) => !Number.isFinite(v) || v < 0 || v > 1)
     )
       throw new RangeError(
-        'Toon outline must be between 0 and 10 and color three channels between 0 and 1; pass finite values in range.',
+        `Toon outline must be between 0 and ${this.maxOutline} and color three channels between 0 and 1; pass finite values in range.`,
       );
     this.shading = new ToonShading(options);
     this.values = new Float32Array([...color, outline]);
@@ -55,8 +74,10 @@ export class Toon implements EnginePlugin {
       );
     this.engine = engine;
     this.shading.setup(engine);
-    this.buffer = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    engine.gpu.queue.writeBuffer(this.buffer, 0, this.values as Float32Array<ArrayBuffer>);
+    this.buffer = engine.gpu.createBuffer({
+      size: this.outlineData().byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
   }
   registerPasses(graph: FrameGraph): void {
     this.shading.registerPasses(graph);
@@ -68,12 +89,13 @@ export class Toon implements EnginePlugin {
         const format =
           c.format + ':' + (c.descriptor.multisample?.count ?? 1) + ':' + c.descriptor.depthStencil!.format;
         if (this.format !== format) {
-          const code =
+          const code = this.outlineShader(
             meshVertex.replace(
               'let p=model*vec4f(i.position,1);',
               'let normal=normalize(mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xyz,i.m1.xyz))*i.normal*sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))));let p=model*vec4f(i.position,1)+vec4f(normal*outline.w,0);',
             ) +
-            '@group(0) @binding(1) var<uniform> outline:vec4f; @fragment fn fragment(i:Output)->@location(0) vec4f{return vec4f(outline.rgb,1);}';
+              '@group(0) @binding(1) var<uniform> outline:vec4f; @fragment fn fragment(i:Output)->@location(0) vec4f{return vec4f(outline.rgb,1);}',
+          );
           const module = c.device.createShaderModule({ code });
           this.pipeline = c.device.createRenderPipeline({
             ...c.descriptor,
@@ -85,17 +107,23 @@ export class Toon implements EnginePlugin {
           });
           this.format = format;
         }
+        const binding = writeUniform(
+          c.device,
+          this.buffer!,
+          this.outlineData(c) as Float32Array<ArrayBuffer>,
+          c.view ?? c,
+        );
         c.draw({
           pipeline: this.pipeline!,
           clear: false,
-          bindings: [{ binding: 1, resource: { buffer: this.buffer! } }],
+          bindings: [{ binding: 1, resource: binding ?? { buffer: this.buffer! } }],
         });
       },
     });
   }
   private release(): void {
     this.shading.dispose();
-    this.buffer?.destroy();
+    if (this.engine?.gpu) retire(this.engine.gpu, this.buffer);
     this.buffer = undefined;
     this.pipeline = undefined;
     this.format = '';

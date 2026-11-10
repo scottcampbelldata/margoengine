@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13710619,
+  "total": 13717442,
   "history": [
     {
       "date": "2026-10-24",
@@ -7162,6 +7162,12 @@
       "commit": "batch-235-job-2",
       "reason": "New optional water/flow: absent to 2902 B gzip, ceiling 3158 B. Dual-phase shading, procedural/authored normals and borrowed texture lifecycle belong in this entry; a split would duplicate binding/lifetime logic. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-194",
+      "reason": "Pixel hull entry: root 1493 to 2155 B for projection hooks and per-view uniform ownership; screen-outline 0 to 5821 B including shared hull renderers. Splitting duplicates draws/resources; core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8152,9 +8158,10 @@
     "@margoengine/tonemap/custom": 1459,
     "@margoengine/tonemap/grade": 1808,
     "@margoengine/tonemap/local": 2386,
-    "@margoengine/toon": 1665,
+    "@margoengine/toon": 2411,
     "@margoengine/toon/hatch": 1998,
     "@margoengine/toon/models": 4843,
+    "@margoengine/toon/screen-outline": 6077,
     "@margoengine/transitions": 4563,
     "@margoengine/transitions/custom": 5466,
     "@margoengine/transitions/glsl": 16190,

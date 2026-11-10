@@ -106,18 +106,18 @@ interface Run {
   mirrored: boolean;
 }
 
-function checked(outline: number, color: readonly number[]): void {
+function checked(outline: number, color: readonly number[], maximum = 10): void {
   if (
     typeof outline !== 'number' ||
     !Number.isFinite(outline) ||
     outline < 0 ||
-    outline > 10 ||
+    outline > maximum ||
     !Array.isArray(color) ||
     color.length !== 3 ||
     color.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1)
   )
     throw new RangeError(
-      'ModelOutlines outline must be between 0 and 10 and color three channels between 0 and 1; pass finite values in range.',
+      `ModelOutlines outline must be between 0 and ${maximum} and color three channels between 0 and 1; pass finite values in range.`,
     );
 }
 const determinant = (m: ArrayLike<number>): number =>
@@ -133,6 +133,16 @@ const determinant = (m: ArrayLike<number>): number =>
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class ModelOutlines implements EnginePlugin {
+  /** Width limit for optional outline projections. */
+  protected get maxOutline(): number {
+    return 10;
+  }
+  /** Shader transform for optional outline projections. */
+  protected outlineShader(code: string): string {
+    return code;
+  }
+  /** Extra frame parameters for optional outline projections. */
+  protected outlineFrame(_values: Float32Array, _context: Context): void {}
   readonly name = 'toon:models';
   private engine?: Engine;
   private width: number;
@@ -174,7 +184,7 @@ export class ModelOutlines implements EnginePlugin {
     vertexColors = false,
     models,
   }: ModelOutlineOptions = {}) {
-    checked(outline, color);
+    checked(outline, color, this.maxOutline);
     if (models !== undefined && (!Array.isArray(models) || !models.every(isModel)))
       throw new TypeError('ModelOutlines models must be loaded models; pass the PBRModels loadGLTF returned');
     this.width = outline;
@@ -194,7 +204,7 @@ export class ModelOutlines implements EnginePlugin {
     return this.width;
   }
   set outline(v: number) {
-    checked(v, this.rgb);
+    checked(v, this.rgb, this.maxOutline);
     this.width = v;
   }
   /** Outline colour, linear RGB 0..1. */
@@ -202,7 +212,7 @@ export class ModelOutlines implements EnginePlugin {
     return this.rgb;
   }
   set color(v: readonly [number, number, number]) {
-    checked(this.width, v);
+    checked(this.width, v, this.maxOutline);
     this.rgb = [v[0], v[1], v[2]];
   }
   /** Width and colour by material name, over `outline` and `color`. */
@@ -215,7 +225,7 @@ export class ModelOutlines implements EnginePlugin {
     for (const [name, style] of Object.entries(v)) {
       if (!style || typeof style !== 'object')
         throw new TypeError(`ModelOutlines material '${name}' needs a style object; pass {outline, color}`);
-      checked(style.outline ?? 0, style.color ?? [0, 0, 0]);
+      checked(style.outline ?? 0, style.color ?? [0, 0, 0], this.maxOutline);
       styles[name] = { outline: style.outline, color: style.color && [style.color[0], style.color[1], style.color[2]] };
     }
     this.styles = styles;
@@ -324,8 +334,8 @@ export class ModelOutlines implements EnginePlugin {
       samples = c.descriptor.multisample?.count ?? 1,
       key = c.format + ':' + samples + ':' + depth.format + ':' + depth.depthCompare;
     if (this.key !== key) {
-      const plain = device.createShaderModule({ code: plainCode }),
-        smooth = device.createShaderModule({ code: smoothCode }),
+      const plain = device.createShaderModule({ code: this.outlineShader(plainCode) }),
+        smooth = device.createShaderModule({ code: this.outlineShader(smoothCode) }),
         plainLayout = device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
         smoothLayout = device.createPipelineLayout({ bindGroupLayouts: [this.layout, this.ringLayout!] }),
         pipeline = (cullMode: GPUCullMode, module: GPUShaderModule, layout: GPUPipelineLayout): GPURenderPipeline =>
@@ -369,6 +379,7 @@ export class ModelOutlines implements EnginePlugin {
       v = this.values;
     v.set(c.camera.matrix);
     v[16] = +this.vertexColors;
+    this.outlineFrame(v, c);
     const copy = writeUniform(device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
     device.queue.writeBuffer(this.storage!, 0, this.rows as Float32Array<ArrayBuffer>, 0, rows * 20);
     const pass = beginScenePass(c, this.colorAttachment, this.depthAttachment);

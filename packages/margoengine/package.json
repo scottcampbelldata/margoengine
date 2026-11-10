@@ -3934,6 +3934,10 @@
       "types": "./dist/toon/models.d.ts",
       "import": "./dist/toon/models.js"
     },
+    "./toon/screen-outline": {
+      "types": "./dist/toon/screen-outline.d.ts",
+      "import": "./dist/toon/screen-outline.js"
+    },
     "./toon/hatch": {
       "types": "./dist/toon/hatch.d.ts",
       "import": "./dist/toon/hatch.js"

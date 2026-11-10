@@ -30,6 +30,10 @@
       "types": "./dist/models.d.ts",
       "import": "./dist/models.js"
     },
+    "./screen-outline": {
+      "types": "./dist/screen-outline.d.ts",
+      "import": "./dist/screen-outline.js"
+    },
     "./hatch": {
       "types": "./dist/hatch.d.ts",
       "import": "./dist/hatch.js"
@@ -54,6 +58,6 @@
     "build": "node ../../scripts/build-optional.js toon",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/toon/test/models-check.mjs && node packages/toon/test/hatch-check.mjs"
+    "test:gpu": "cd ../.. && node packages/toon/test/models-check.mjs && node packages/toon/test/hatch-check.mjs && node packages/toon/test/screen-outline.browser.mjs"
   }
 }

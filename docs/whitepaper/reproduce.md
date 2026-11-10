@@ -3455,3 +3455,8 @@ Batch 270 job 1: build packages, run node --test --test-timeout=120000 packages/
 ### Batch 235 job 2: flow maps
 
 After building packages, run node --test --test-timeout=60000 packages/water/test/flow-map.test.js. Run node scripts/gpu-lock.mjs run --owner=water-flow --wait-max=60 --max=4 -- node packages/water/test/flow-map.browser.mjs, then repeat with --compat after the script path. Vector/slope error must be below 2e-6; fixed-time screenshots must match and advancing time must change the image. Reports and PNGs: test-results/water-flow-webgpu and water-flow-compat. The real NOAA observation and licence are attributed in packages/water/test/data/README.md.
+
+
+
+### Batch 194 job 2
+See [toon parity](../toon-parity.md) for the CPU and shared-lock GPU commands, repeat GPU with MARGO_COMPAT=1. The screen-outline browser checks measure physical-pixel silhouette bands at two distances for perspective/orthographic core and materials meshes and draw the real animated Fox. Existing model and hatch suites remain in test:gpu.

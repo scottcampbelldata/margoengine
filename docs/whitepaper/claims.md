@@ -4004,3 +4004,8 @@ Batch 270 job 1: vfx/space matches the requested local/world emitter translation
 ### Batch 235 job 2: flow-directed river shading (2026-11-10)
 
 Optional water/flow supports painted encoded RG and generated signed vector textures, dual-phase analytic or authored normal detail, spatial phase noise, repeat/time control and local world regions. Evidence: packages/water/test/flow-map.browser.mjs checks reference values, visible animation, deterministic fixed time and ripple/query composition on both backends. This is a shading claim, not a fluid-solver or timing claim.
+
+
+
+### Batch 194 job 2: pixel outline width
+Optional toon/screen-outline keeps core and model hull widths in drawing-buffer pixels using exact homogeneous projection derivatives and the active viewport. Proof: screen-outline.test.js per-view uniforms/ownership and screen-outline.browser.mjs on native WebGPU and full WebGL2 compatibility, core/material spheres at two distances with both projection types (5 px requested, 4..5 px rasterized) and animated CC0 Fox poses. This is the batch width behaviour documented by drei Outlines, retaining existing deformed/instanced model paths; no performance or image-dilation claim. See docs/toon-parity.md and docs/clean-room.md.
