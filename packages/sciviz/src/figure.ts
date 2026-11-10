@@ -1381,12 +1381,14 @@ export class Figure extends EventTarget {
    */
   async toPNG(options: PNGOptions = {}): Promise<Blob> {
     // Export code loads on first use.
-    const { paintOverlays, swatches, textRuns } = await import('./export.js');
-    await this.#pending;
+    const { paintOverlays, swatches, textRuns, captureGPU } = await import('./export.js');
+    await this.ready();
     this.#check();
     const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
-    this.render();
-    const bitmap = await createImageBitmap(canvas),
+    if (this.#flat) this.#fitView();
+    const bitmap = this.engine.gpu
+        ? await captureGPU(this.engine, canvas, () => this.render())
+        : (this.render(), await createImageBitmap(canvas)),
       out = new OffscreenCanvas(bitmap.width, bitmap.height),
       g = out.getContext('2d')!;
     g.drawImage(bitmap, 0, 0);

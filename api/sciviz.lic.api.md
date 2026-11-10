@@ -612,6 +612,15 @@ interface VectorGrid {
     readonly bounds: readonly [number, number, number, number, number, number];
 }
 
+interface VolumeClassification {
+    readonly size: readonly [number, number];
+    readonly rgba: Uint8Array;
+    readonly kind: 'gradient' | 'preintegrated';
+    readonly gradientMax?: number;
+    readonly step?: number;
+    readonly density?: number;
+}
+
 class VolumeLayer implements Drawable {
     visible: boolean;
     readonly transparent = true;
@@ -626,6 +635,8 @@ class VolumeLayer implements Drawable {
     constructor(renderer: SciRenderer, data: DataSource, options?: VolumeLayerOptions);
     get clip(): readonly ClipPlane[];
     set clip(planes: readonly ClipPlane[]);
+    setClassification(value?: VolumeClassification): void;
+    classificationUniforms(): readonly number[];
     restore(): void;
     setModel(figure: Float32Array): void;
     get model(): Float32Array;

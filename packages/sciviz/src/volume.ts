@@ -60,6 +60,39 @@ export interface VolumeLayerOptions {
 
 const MAX_PLANES = 4;
 
+/** A snapshotted linear-light RGBA8 classifier, supplied by the optional transfer entry. */
+export interface VolumeClassification {
+  /** Table width and height, each 2..2048. */
+  readonly size: readonly [number, number];
+  /** Unpremultiplied linear RGB and opacity, row major. */
+  readonly rgba: Uint8Array;
+  /** Gradient magnitude or front/back scalar classification. */
+  readonly kind: 'gradient' | 'preintegrated';
+  /** Maximum gradient in scalar units per data unit. Required for gradient classification. */
+  readonly gradientMax?: number;
+  /** Preintegration segment length in voxels. Default 1. */
+  readonly step?: number;
+  /** Density baked into preintegration. Default 1. */
+  readonly density?: number;
+}
+
+const classifyWGSL = /* wgsl */ `
+fn gradient(p: vec3f, dims: vec3f, spacing: vec3f) -> vec3f {
+  let d = 1.0 / dims;
+  let low = clamp(p - d, d * 0.5, 1.0 - d * 0.5);
+  let high = clamp(p + d, d * 0.5, 1.0 - d * 0.5);
+  let g = vec3f(
+    textureSampleLevel(data, linearSampler, vec3f(high.x, p.y, p.z), 0.0).r - textureSampleLevel(data, linearSampler, vec3f(low.x, p.y, p.z), 0.0).r,
+    textureSampleLevel(data, linearSampler, vec3f(p.x, high.y, p.z), 0.0).r - textureSampleLevel(data, linearSampler, vec3f(p.x, low.y, p.z), 0.0).r,
+    textureSampleLevel(data, linearSampler, vec3f(p.x, p.y, high.z), 0.0).r - textureSampleLevel(data, linearSampler, vec3f(p.x, p.y, low.z), 0.0).r);
+  return g / max((high - low) * dims, vec3f(1.0)) / spacing;
+}
+fn classify(v: f32, y: f32, kind: f32) -> vec4f {
+  if (kind < 0.5) { return textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0); }
+  let n = vec2f(textureDimensions(transfer));
+  return textureSampleLevel(transfer, linearSampler, (vec2f(v, y) * (n - 1.0) + 0.5) / n, 0.0);
+}`;
+
 /** WGSL of the volume pipeline. */
 const volumeShader = /* Shader notes kept outside the uploaded source:
  * The 36 vertices of the unit box, counter-clockwise seen from outside.
@@ -70,11 +103,12 @@ const volumeShader = /* Shader notes kept outside the uploaded source:
  * Opacity was defined per voxel; correct it for the step length (1 - (1 - a)^(step / voxel)).
  * The gradient points up the data; the surface faces the other way.
  */ /* wgsl */ `${frameWGSL}
-struct Volume { model: mat4x4f, toBox: mat4x4f, normalModel: mat4x4f, dims: vec4f, params: vec4f, planes: array<vec4f, 4> }
+struct Volume { model: mat4x4f, toBox: mat4x4f, normalModel: mat4x4f, dims: vec4f, params: vec4f, planes: array<vec4f, 4>, classification: vec4f, spacing: vec4f }
 @group(1) @binding(0) var<uniform> volume: Volume;
 @group(1) @binding(1) var data: texture_3d<f32>;
 @group(1) @binding(2) var transfer: texture_2d<f32>;
 @group(1) @binding(3) var linearSampler: sampler;
+${classifyWGSL}
 struct Out { @builtin(position) clip: vec4f, @location(0) world: vec3f, @location(1) ndc: vec4f }
 fn corner(index: u32) -> vec3f {
   let faces = array<vec3u, 6>(vec3u(0u, 1u, 2u), vec3u(0u, 2u, 1u), vec3u(1u, 2u, 0u), vec3u(1u, 0u, 2u), vec3u(2u, 0u, 1u), vec3u(2u, 1u, 0u));
@@ -133,8 +167,14 @@ fn kept(p: vec3f) -> bool {
     if (!kept(p)) { continue; }
     let v = sample(p);
     if (volume.params.y > 0.5) { peak = max(peak, v); continue; }
-    let tf = textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0);
-    let a = 1.0 - pow(1.0 - clamp(tf.a * volume.params.z, 0.0, 0.999), stride / voxel);
+    var coordinate = 0.5;
+    if (volume.classification.x == 1.0) { coordinate = length(gradient(p, volume.dims.xyz, volume.spacing.xyz)) * volume.classification.y; }
+    if (volume.classification.x == 2.0) { coordinate = sample(origin + dir * min(t, exit)); }
+    let tf = classify(v, coordinate, volume.classification.x);
+    var a = 1.0 - pow(1.0 - clamp(tf.a * volume.params.z, 0.0, 0.999), stride / voxel);
+    if (volume.classification.x == 2.0) {
+      a = 1.0 - pow(max(1.0 - tf.a, 0.0), stride / voxel / volume.classification.z * volume.params.z / volume.classification.w);
+    }
     if (a < 0.002) { continue; }
     var rgb = tf.rgb;
     if (volume.params.w > 0.5) {
@@ -152,7 +192,7 @@ fn kept(p: vec3f) -> bool {
     if (alpha > 0.99) { break; }
   }
   if (volume.params.y > 0.5) {
-    let tf = textureSampleLevel(transfer, linearSampler, vec2f(peak, 0.5), 0.0);
+    let tf = classify(peak, select(0.5, peak, volume.classification.x == 2.0), volume.classification.x);
     return vec4f(toOutput(tf.rgb), clamp(max(tf.a, peak) * volume.params.z, 0.0, 1.0));
   }
   if (alpha < 0.002) { discard; }
@@ -161,11 +201,12 @@ fn kept(p: vec3f) -> bool {
 
 /** WGSL of a slice: a plane through the volume at a fixed coordinate, coloured by the transfer function's colours. */
 const sliceShader = /* wgsl */ `${frameWGSL}
-struct Slice { model: mat4x4f, plane: vec4f }
+struct Slice { model: mat4x4f, plane: vec4f, dims: vec4f, classification: vec4f, spacing: vec4f }
 @group(1) @binding(0) var<uniform> slice: Slice;
 @group(1) @binding(1) var data: texture_3d<f32>;
 @group(1) @binding(2) var transfer: texture_2d<f32>;
 @group(1) @binding(3) var linearSampler: sampler;
+${classifyWGSL}
 struct Out { @builtin(position) clip: vec4f, @location(0) box: vec3f }
 @vertex fn vertex(@builtin(vertex_index) index: u32) -> Out {
   let quad = array<vec2f, 6>(vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(0.0, 1.0));
@@ -181,7 +222,10 @@ struct Out { @builtin(position) clip: vec4f, @location(0) box: vec3f }
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
   let v = textureSampleLevel(data, linearSampler, in.box, 0.0).r;
-  let rgb = textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0).rgb;
+  var coordinate = 0.5;
+  if (slice.classification.x == 1.0) { coordinate = length(gradient(in.box, slice.dims.xyz, slice.spacing.xyz)) * slice.classification.y; }
+  if (slice.classification.x == 2.0) { coordinate = v; }
+  let rgb = classify(v, coordinate, slice.classification.x).rgb;
   return vec4f(toOutput(rgb), slice.plane.z);
 }`;
 
@@ -191,7 +235,7 @@ function halfVoxels(values: ArrayLike<number>, lo: number, hi: number): Uint16Ar
     scale = 1 / (hi - lo);
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
-    out[i] = f16Bits(v === v ? Math.min(1, Math.max(0, (v - lo) * scale)) : 0);
+    out[i] = f16Bits(v === v ? Math.min(65504, Math.max(-65504, (v - lo) * scale)) : 0);
   }
   return out;
 }
@@ -210,7 +254,7 @@ const packShader = /* wgsl */ `struct Pack { nx: u32, rows: u32, rowWords: u32, 
   for (var k = 0u; k < 2u; k++) {
     if (i + k < pack.nx) {
       let v = src[row * pack.nx + i + k];
-      pair[k] = select(0.0, clamp((v - pack.lo) * pack.scale, 0.0, 1.0), v == v);
+      pair[k] = select(0.0, clamp((v - pack.lo) * pack.scale, -65504.0, 65504.0), v == v);
     }
   }
   dst[row * pack.rowWords + word] = pack2x16float(pair);
@@ -278,7 +322,8 @@ export class VolumeLayer implements Drawable {
   #layout: GPUBindGroupLayout | undefined;
   #group: GPUBindGroup | undefined;
   readonly #opacity: VolumeLayerOptions['opacity'];
-  readonly #values = new Float32Array(76);
+  readonly #values = new Float32Array(80);
+  #classification: VolumeClassification | undefined;
   #model = new Float32Array(16);
   #figure: Float32Array = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   readonly #slices = new Set<SliceLayer>();
@@ -365,16 +410,18 @@ export class VolumeLayer implements Drawable {
         { bytesPerRow: nx * 2, rowsPerImage: ny },
         [nx, ny, nz],
       );
+    const classification = this.#classification,
+      size = classification?.size ?? [256, 1];
     this.#transfer = device.createTexture({
-      size: [256, 1],
-      format: 'rgba8unorm-srgb',
+      size: [...size],
+      format: classification ? 'rgba8unorm' : 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     device.queue.writeTexture(
       { texture: this.#transfer },
-      transferTable(this.colormap, this.#opacity),
-      { bytesPerRow: 1024 },
-      [256, 1],
+      classification?.rgba ?? transferTable(this.colormap, this.#opacity),
+      { bytesPerRow: size[0] * 4 },
+      size,
     );
     this.#sampler = device.createSampler({
       magFilter: 'linear',
@@ -399,15 +446,82 @@ export class VolumeLayer implements Drawable {
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       ],
     });
-    this.#group = device.createBindGroup({
-      layout: this.#layout,
+    this.#bind();
+  }
+
+  #bind(): void {
+    this.#group = this.#renderer.device!.createBindGroup({
+      layout: this.#layout!,
       entries: [
-        { binding: 0, resource: { buffer: this.#uniform } },
-        { binding: 1, resource: this.#texture.createView({ dimension: '3d' }) },
-        { binding: 2, resource: this.#transfer.createView() },
-        { binding: 3, resource: this.#sampler },
+        { binding: 0, resource: { buffer: this.#uniform! } },
+        { binding: 1, resource: this.#texture!.createView({ dimension: '3d' }) },
+        { binding: 2, resource: this.#transfer!.createView() },
+        { binding: 3, resource: this.#sampler! },
       ],
     });
+  }
+
+  /** Replace classification on an existing layer, or pass undefined to restore its original map and opacity. */
+  setClassification(value?: VolumeClassification): void {
+    if (this.#disposed)
+      throw typeError('Volume is disposed; create a new volume before editing classification', 'sciviz');
+    if (value) {
+      const { size, rgba, kind } = value;
+      if (
+        size.length !== 2 ||
+        size.some(
+          (n) =>
+            !Number.isInteger(n) || n < 2 || n > Math.min(2048, this.#renderer.device!.limits.maxTextureDimension2D),
+        ) ||
+        rgba.length !== size[0] * size[1] * 4
+      )
+        throw rangeError(
+          'Classification needs 2..2048 texels per axis and four bytes per texel; resize the table',
+          'sciviz',
+        );
+      if (
+        !['gradient', 'preintegrated'].includes(kind) ||
+        (kind === 'gradient' && !(Number.isFinite(value.gradientMax) && value.gradientMax! > 0)) ||
+        ![value.step ?? 1, value.density ?? 1].every((n) => Number.isFinite(n) && n > 0)
+      )
+        throw rangeError(
+          'Classification needs a positive gradientMax, step and density; correct the table metadata',
+          'sciviz',
+        );
+      this.#classification = { ...value, size: [...size], rgba: new Uint8Array(rgba) };
+    } else this.#classification = undefined;
+    const size = value?.size ?? [256, 1],
+      device = this.#renderer.device!;
+    const texture = device.createTexture({
+      size: [...size],
+      format: value ? 'rgba8unorm' : 'rgba8unorm-srgb',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+      { texture },
+      this.#classification?.rgba ?? transferTable(this.colormap, this.#opacity),
+      { bytesPerRow: size[0] * 4 },
+      size,
+    );
+    this.#transfer?.destroy();
+    this.#transfer = texture;
+    this.#bind();
+    for (const slice of this.#slices) slice.restore();
+  }
+
+  /** @internal Classification uniforms shared with slices. */
+  classificationUniforms(): readonly number[] {
+    const c = this.#classification,
+      b = this.bounds,
+      d = this.dims;
+    return [
+      c ? (c.kind === 'gradient' ? 1 : 2) : 0,
+      (this.range[1] - this.range[0]) / (c?.gradientMax ?? 1),
+      c?.step ?? 1,
+      c?.density ?? 1,
+      ...d.map((n, i) => Math.abs(b[2 * i + 1] - b[2 * i]) / (n - 1)),
+      0,
+    ];
   }
 
   #uploadGpu(device: GPUDevice, lo: number, hi: number): void {
@@ -494,7 +608,7 @@ export class VolumeLayer implements Drawable {
 
   /** @internal Whether the source texture belongs to the current device. */
   get valid(): boolean {
-    return !!this.#group;
+    return !this.#disposed && !!this.#group;
   }
 
   /**
@@ -532,6 +646,7 @@ export class VolumeLayer implements Drawable {
     v.set([this.quality, this.mode === 'mip' ? 1 : 0, this.density, this.shading ? 1 : 0], 52);
     v.fill(0, 56);
     this.#clip.forEach((p, k) => v.set([...p.normal, p.offset], 56 + k * 4));
+    v.set(this.classificationUniforms(), 72);
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
   }
 
@@ -609,7 +724,7 @@ export class SliceLayer implements Drawable {
   #layout: GPUBindGroupLayout | undefined;
   #group: GPUBindGroup | undefined;
   #model = new Float32Array(16);
-  readonly #values = new Float32Array(20);
+  readonly #values = new Float32Array(32);
   #disposed = false;
 
   /** @internal Use `volume.slice()`. */
@@ -630,6 +745,7 @@ export class SliceLayer implements Drawable {
   #build(): void {
     const device = this.#renderer.device!,
       { data, transfer, sampler } = this.#volume.resources();
+    this.#uniform?.destroy();
     this.#uniform = device.createBuffer({
       size: this.#values.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -643,9 +759,9 @@ export class SliceLayer implements Drawable {
       ],
     });
     this.#group = device.createBindGroup({
-      layout: this.#layout,
+      layout: this.#layout!,
       entries: [
-        { binding: 0, resource: { buffer: this.#uniform } },
+        { binding: 0, resource: { buffer: this.#uniform! } },
         { binding: 1, resource: data.createView({ dimension: '3d' }) },
         { binding: 2, resource: transfer.createView() },
         { binding: 3, resource: sampler },
@@ -681,6 +797,8 @@ export class SliceLayer implements Drawable {
       throw rangeError(`Slice position must be in [0, 1], got ${this.position}`, 'sciviz');
     this.#values.set(this.#model, 0);
     this.#values.set([{ x: 0, y: 1, z: 2 }[this.axis], this.position, this.opacity, 0], 16);
+    this.#values.set([...this.#volume.dims, 0], 20);
+    this.#values.set(this.#volume.classificationUniforms(), 24);
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, this.#values);
   }
 

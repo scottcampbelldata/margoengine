@@ -2,6 +2,55 @@
 // over it at the canvas's resolution) and SVG (text and colour bars as vector elements over the frame as an embedded
 // PNG; a 2D chart whose layers are all bars, heatmaps, lines or scatters of up to 50,000 points is vector throughout).
 import type { Colormap } from './colormaps.js';
+import type { EngineKernel } from '@margoengine/core';
+
+/** @internal Copy the fresh canvas frame to an owned buffer before awaiting GPU completion. */
+export async function captureGPU(
+  engine: EngineKernel,
+  canvas: HTMLCanvasElement,
+  render: () => void,
+): Promise<ImageBitmap> {
+  const device = engine.gpu!,
+    context = canvas.getContext('webgpu') as unknown as GPUCanvasContext,
+    configuration = context.getConfiguration()!;
+  const { width, height } = canvas,
+    format = configuration.format;
+  // Capture commands are encoded during the canvas texture's lifetime. Copying to
+  // an owned buffer before awaiting avoids stale and automatically expired images.
+  if (!((configuration.usage ?? 0x10) & 0x01))
+    context.configure({ ...configuration, usage: (configuration.usage ?? 0x10) | 0x01 });
+  const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
+  const buffer = device.createBuffer({ size: bytesPerRow * height, usage: 0x01 | 0x08 });
+  try {
+    render();
+    const texture = context.getCurrentTexture();
+    const encoder = device.createCommandEncoder();
+    encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow, rowsPerImage: height }, [width, height]);
+    device.queue.submit([encoder.finish()]);
+    // Mapping orders both deferred compatibility replay and native GPU execution.
+    // Unlike a canvas texture, this target remains owned across browser tasks.
+    await buffer.mapAsync(1);
+    const mapped = new Uint8Array(buffer.getMappedRange()),
+      pixels = new Uint8ClampedArray(width * height * 4),
+      bgra = format.startsWith('bgra');
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const from = y * bytesPerRow + x * 4,
+          to = (y * width + x) * 4;
+        pixels[to] = mapped[from + (bgra ? 2 : 0)];
+        pixels[to + 1] = mapped[from + 1];
+        pixels[to + 2] = mapped[from + (bgra ? 0 : 2)];
+        pixels[to + 3] = mapped[from + 3];
+      }
+    buffer.unmap();
+    const output = new OffscreenCanvas(width, height),
+      outputContext = output.getContext('2d')!;
+    outputContext.putImageData(new ImageData(pixels, width, height), 0, 0);
+    return await createImageBitmap(output);
+  } finally {
+    buffer.destroy();
+  }
+}
 
 /** Options for `figure.toPNG()`. */
 export interface PNGOptions {

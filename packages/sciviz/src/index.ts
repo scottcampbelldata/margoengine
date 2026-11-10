@@ -36,7 +36,7 @@ export type { Bins, BinOptions } from './charts.js';
 export { SurfaceLayer } from './surface.js';
 export type { SurfaceLayerOptions } from './surface.js';
 export { VolumeLayer, SliceLayer, transferTable } from './volume.js';
-export type { ClipPlane, VolumeLayerOptions } from './volume.js';
+export type { ClipPlane, VolumeLayerOptions, VolumeClassification } from './volume.js';
 export { IsosurfaceLayer } from './isosurface.js';
 export type { IsosurfaceLayerOptions } from './isosurface.js';
 export { ColorBar } from './colorbar.js';

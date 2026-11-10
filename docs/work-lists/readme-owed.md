@@ -731,3 +731,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mixer (batch 212 dynamics): document gate hysteresis/hold/floor, expanderCurve/range, LR4 phase compensation, per-band settings, envelope direction, createBusDynamics ownership and peak safety.
 
 - margoengine (batch 212 dynamics): document generated mixer/dynamics alias.
+- @margoengine/sciviz (batch 173 job 1): document /transfer physical units, rectangle/triangle/Gaussian widgets, modality presets, histogram, editor/binding lifetimes, existing-volume LUT updates, preintegration and its step/density assumptions; examples deferred.
+- margoengine (batch 173 job 1): document optional sciviz/transfer alias after build phase.

@@ -3250,6 +3250,10 @@
       "types": "./dist/sciviz/probe.d.ts",
       "import": "./dist/sciviz/probe.js"
     },
+    "./sciviz/transfer": {
+      "types": "./dist/sciviz/transfer.d.ts",
+      "import": "./dist/sciviz/transfer.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
