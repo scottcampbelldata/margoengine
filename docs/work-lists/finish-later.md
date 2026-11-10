@@ -54,3 +54,7 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 52.5 | @margoengine/clustered | area-texture: prove against a path-traced reference of a detailed image under rough and sharp lobes, and measure the error of the single filtered lookup |
 | 52.5 | @margoengine/clustered | area-texture: clip the vector form factor at the horizon as the scalar integral is, and filter anisotropically for lobes stretched along one axis of the light |
 | 52.5 | @margoengine/clustered | area-texture: images from GPU textures or video (today CPU RGBA8 pixels, copied and filtered on setTextures) |
+| 66.5 | @margoengine/water | underwater: the surface seen from below keeps its above-water shading; add a total-internal-reflection and Snell-window term (the parked batch 234 screen trace banded on FFT scenes) |
+| 66.5 | @margoengine/water | underwater: waterline uses one probe plane under the camera; sample a row across the near plane so a crest crossing the lens bends the line |
+| 66.5 | @margoengine/water | underwater: per-view uniform so split-screen views each get their own probe (today the last view's camera wins, as caustics) |
+| 66.5 | @margoengine/water | underwater: GPU cost of the 24-step shaft march at 1080p, and a half-resolution march option |

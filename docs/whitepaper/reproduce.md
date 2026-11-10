@@ -3773,3 +3773,7 @@ Batch 177 job 5: node --test --test-timeout=60000 packages/sciviz/tests/stream.t
 
 ### Batch 107 job 2
 Build packages, run `node --test packages/inspector/test/shaders.test.js`, then under the shared GPU lock `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:shaders` (native WebGPU only).
+
+### List 3 batch 66 job 5: underwater view
+
+Build packages. CPU: node --test packages/water/test/underwater.test.js. GPU: node packages/water/test/underwater.browser.mjs, then again with --compat after the script path; results land in test-results/water-underwater-<mode>.json.

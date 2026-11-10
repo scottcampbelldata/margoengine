@@ -4907,6 +4907,10 @@
       "types": "./dist/water/reflector.d.ts",
       "import": "./dist/water/reflector.js"
     },
+    "./water/underwater": {
+      "types": "./dist/water/underwater.d.ts",
+      "import": "./dist/water/underwater.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

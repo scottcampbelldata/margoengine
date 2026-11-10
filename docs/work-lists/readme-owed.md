@@ -1186,3 +1186,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 64 job 5): document the scatter/simplify forwarding entry.
 
 - @margoengine/water and margoengine (batch 67 job 1): /bodies WaterBodies with outline and river path bodies, levels, waves share, colours, setBodies, sample, bounds, rasterizeWaterBodies and sampleWaterBodies; examples deferred.
+
+- @margoengine/water and margoengine (list 3 batch 66 job 5): document /underwater attach or PostStack stage, Water/FFTOcean surfaces, absorption/scattering/anisotropy/shafts/steps/distances/waterline defaults, exact pass-through above water and when disabled; examples deferred.

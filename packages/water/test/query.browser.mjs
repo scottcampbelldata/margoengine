@@ -355,9 +355,9 @@ return Probe(vec4f(i.world,1),vec4f(${fft ? 'oceanAt(i.base).normal' : 'normaliz
     assert.ok(row.maxVelocity < 0.03, JSON.stringify(row));
     assert.equal(row.disposedRejected, true);
   }
-  await mkdir('docs/whitepaper/results', { recursive: true });
+  await mkdir('test-results', { recursive: true });
   await writeFile(
-    `docs/whitepaper/results/batch234-water-query-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-query-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(
       { hardware: browser.hardware, observation: { station: '46042', windSpeed: observation[6] }, ...result },
       null,

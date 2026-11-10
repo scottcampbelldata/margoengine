@@ -114,6 +114,7 @@ not explain them. Bright seabed under total internal reflection is physically
 valid and must remain. Remaining cause is not isolated: distinguish reflection
 from transmission, then measure bad-pixel inputs, hit coverage, depth residual
 and sampled radiance. No fourth speculative tracing round or acceptance claim.
+List 3 batch 66 job 5 then built water/underwater fresh on main without the screen traces (fog, absorption, waterline and shafts only); the underside reflection remains open in finish-later.md.
 The independent caustics job landed as `3369f2e4f`; the retained underwater
 branches above must not be deleted. This note accompanies batch 213 job 1.
 
@@ -4957,3 +4958,7 @@ Batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t 
 - Batch 178 job 3 media quality: manually setting a scatter cloud material to world size before perspective tiled capture makes its splats too small in short tiles. Repro: scatter.cloud.material.sizeUnits = world, capture with tileSize below image height. Cause: the points focal-length uniform uses tile height while the capture camera retains its full-view fov. Default sciviz pixel-size scatter is unaffected. Fix-phase item under rule 22; all required media formats are built.
 
 Batch 177 job 5: no open correctness defect in the checked live-data paths. Source cancellation covers asynchronous parse waits, including a parser that synchronously aborts its signal. A removed trace no longer appears in ChartPolish unified hover. The streaming SVG regression counts its 64 clipped data circles separately from the intentional legend swatch. Protocol fixtures close the RFC 6455 connection once; no renderer/browser shutdown code changed.
+
+### Fixed: water query browser check rewrote a tracked record (list 3 batch 66 job 5)
+
+packages/water/test/query.browser.mjs wrote docs/whitepaper/results/batch234-water-query-<mode>.json on every GPU run, so a landing's refresh found a tracked file changed and stopped. It now writes test-results/water-query-<mode>.json; the committed record stays as recorded. Regression: packages/water/test/results-path.test.js fails on any water browser check that writes under docs/.

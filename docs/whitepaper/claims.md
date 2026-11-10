@@ -4370,3 +4370,7 @@ scatter/simplify builds Scatter's three LOD rings from one mesh by quadric-error
 
 ### Batch 67 job 1: water bodies from outlines and splines
 water/bodies draws lakes, pools and rivers on one Water with their own levels, wave shares and colours, and nothing outside them. Evidence: packages/water/test/bodies.test.js checks exact signed distances, non-convex insides, spline levels and widths, overlap order and validation on the CPU; packages/water/test/bodies.browser.mjs checks on WebGPU that the dry probe shows the background, the river draws, the lake takes its colour, WaveQuery heights match the CPU body map (still lake below 1e-4 m, river below 2e-3 m), a still body has no wave velocity, and dispose restores the open-water frame exactly.
+
+### List 3 batch 66 job 5: underwater view (2026-11-10)
+
+Optional water/underwater adds Beer-Lambert fog and colour absorption, a near-plane waterline and single-scattered light shafts focused by the rendered surface when the camera is submerged, for Water and FFTOcean, and passes the scene through bit-exactly above water or when disabled. Proof: packages/water/test/underwater.browser.mjs (linear HDR recorders; extinction within 0.0007 relative of exp(-aL); exact rows above the independently projected waterline). Stand-in scene geometry; no timing claim.

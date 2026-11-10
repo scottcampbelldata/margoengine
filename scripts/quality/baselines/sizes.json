@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14509935,
+  "total": 14517096,
   "history": [
     {
       "date": "2026-10-24",
@@ -7715,6 +7715,12 @@
       "commit": "8615c5ebe",
       "reason": "landed with push-anyway: feat(clustered): textured rectangle area lights (new entry @margoengine/clustered/area-texture)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d63578fe8",
+      "reason": "landed with push-anyway: feat(water): add underwater fog, absorption, waterline and light shafts",
+      "grew": 1
     }
   ],
   "items": {
@@ -8955,6 +8961,7 @@
     "@margoengine/water/query": 4719,
     "@margoengine/water/reflector": 2660,
     "@margoengine/water/ripples": 3940,
+    "@margoengine/water/underwater": 7161,
     "@margoengine/weather": 5230,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/cover": 1795,
