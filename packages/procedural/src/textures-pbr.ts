@@ -37,7 +37,11 @@ export interface PBRTextureOptions extends Omit<TextureBakeOptions, 'pattern'> {
 /** Four owned GPU textures, usable on native WebGPU or the full WebGL2 compatibility device. */
 export interface PBRTextureSet {
   readonly albedo: GPUTexture;
-  /** RGB tangent-space XYZ in [0,1], +Y green and +Z facing outward. */
+  /**
+   * RGB tangent-space XYZ in [0,1], +Z facing outward. +Y (green) points toward increasing v (texel row 0 is v = 0),
+   * which is "up the image" for the bottom-left UV origin of materials meshes. A top-left-origin glTF mesh reads up the
+   * image as decreasing v, so its green channel needs flipping (1 - g).
+   */
   readonly normal: GPUTexture;
   /** Identical RGB channels; glTF samples green. */
   readonly roughness: GPUTexture;
