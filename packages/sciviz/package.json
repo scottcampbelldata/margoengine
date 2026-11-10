@@ -243,6 +243,10 @@
     "./export-media": {
       "types": "./dist/export-media.d.ts",
       "import": "./dist/export-media.js"
+    },
+    "./stream": {
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
     }
   },
   "files": [
@@ -299,6 +303,7 @@
     "test:browser:monitor": "node scripts/browser-root.mjs tests/monitor-browser.mjs",
     "limits": "node scripts/browser-root.mjs tests/limits-browser.mjs",
     "test:browser:limits": "node scripts/browser-root.mjs tests/limits-browser.mjs && node scripts/browser-root.mjs tests/limits-browser.mjs --backend=webgl2 --output=test-results/sciviz-limits-webgl2.json",
-    "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs"
+    "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs",
+    "test:browser:stream": "node scripts/browser-root.mjs tests/stream-browser.mjs"
   }
 }

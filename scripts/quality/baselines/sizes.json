@@ -7666,6 +7666,12 @@
       "commit": "7669633ec",
       "reason": "batch183-landing-main-lines-debug-shared-tile-frame-9549-to-9874B-ceiling-9836-to-10171B-keeps-complete-batch-debug-path-no-split-root-24209B-unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-177-job5",
+      "reason": "Complete optional live data, native identity-preserving updates and a weak chart mapping handshake. New stream entry before 0 B; prior format 7306 B and prior root 56161 B. Measured after {\"@margoengine/sciviz\":{\"beforeCeiling\":56635,\"after\":56730},\"@margoengine/sciviz/format\":{\"beforeCeiling\":7562,\"after\":7560},\"@margoengine/sciviz/stream\":{\"beforeCeiling\":0,\"after\":4194}}. Optional ceilings rise where needed; a split would complicate source/window composition without saving core bytes. Core + stage remains 24209 B. Final shared-main integration: sciviz root 56668 -> 57223 B gzip, ceiling 58369 -> 58432; native identity-preserving replacements stay in the owning Figure rather than duplicating factories in an optional controller.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8485,7 +8491,7 @@
     "@margoengine/scenery/scenes": 19404,
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
-    "@margoengine/sciviz": 58369,
+    "@margoengine/sciviz": 58432,
     "@margoengine/sciviz/atmosphere": 33055,
     "@margoengine/sciviz/bricks": 27589,
     "@margoengine/sciviz/calc": 6978,
@@ -9060,7 +9066,8 @@
     "@margoengine/sciviz/spec": 25645,
     "@margoengine/lines/tiles": 665,
     "@margoengine/sciviz/export-media": 7250,
-    "@margoengine/stage/viewer-extras": 9908
+    "@margoengine/stage/viewer-extras": 9908,
+    "@margoengine/sciviz/stream": 4450
   },
-  "total": 14574328
+  "total": 14578841
 }

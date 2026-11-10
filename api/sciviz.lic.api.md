@@ -229,6 +229,15 @@ class Figure extends EventTarget {
         readonly z?: DataSource;
         readonly color?: DataSource;
     }, options?: LineLayerOptions): Promise<LineLayer>;
+    updateData<L extends LineLayer | ScatterLayer>(layer: L, data: {
+        readonly x: DataSource;
+        readonly y: DataSource;
+        readonly z?: DataSource;
+        readonly color?: DataSource;
+        readonly size?: DataSource;
+    }, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<L>;
     quiver(data: {
         readonly x: DataSource;
         readonly y: DataSource;

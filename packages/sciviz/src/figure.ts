@@ -414,6 +414,8 @@ export class Figure extends EventTarget {
   #series = 0;
   // Colours and widths of scatter and line layers, for SVG export.
   readonly #styles = new WeakMap<Layer, { color: string; colors?: Float32Array; width: number }>();
+  readonly #dataOptions = new WeakMap<LineLayer | ScatterLayer, LineLayerOptions | ScatterLayerOptions>();
+  readonly #dataUpdates = new WeakMap<LineLayer | ScatterLayer, Promise<LineLayer | ScatterLayer>>();
   // Axis updates run after one another; ready() waits for them and reports their errors.
   #pending: Promise<void> = Promise.resolve();
   #disposed = false;
@@ -1070,7 +1072,7 @@ export class Figure extends EventTarget {
       }),
     );
     const style = { color: toHex(uniform), colors: colours, width: options.size ?? (count > 200_000 ? 2 : 3) };
-    return this.#style(style, {
+    const layer = this.#style(style, {
       kind: 'scatter',
       cloud,
       bounds,
@@ -1079,6 +1081,8 @@ export class Figure extends EventTarget {
       values: colourData,
       name: options.name,
     });
+    this.#dataOptions.set(layer, { ...options, color: style.color, size: options.size ?? style.width });
+    return layer;
   }
 
   /** A line plot through (x, y, z) (z omitted for a flat line), coloured by `color` data through a colour map. */
@@ -1118,7 +1122,7 @@ export class Figure extends EventTarget {
         cap: 'round',
       }),
     );
-    return this.#style(
+    const layer = this.#style(
       { color: colours ? '#ffffff' : colour, colors: colours, width: options.width ?? 2 },
       {
         kind: 'line',
@@ -1129,6 +1133,53 @@ export class Figure extends EventTarget {
         name: options.name,
       },
     );
+    this.#dataOptions.set(layer, { ...options, color: colour });
+    return layer;
+  }
+
+  /** Replace native line/scatter data atomically, retaining layer identity, styling, visibility, picking and legend references. Concurrent updates serialize; abort leaves previous data intact. */
+  updateData<L extends LineLayer | ScatterLayer>(
+    layer: L,
+    data: {
+      readonly x: DataSource;
+      readonly y: DataSource;
+      readonly z?: DataSource;
+      readonly color?: DataSource;
+      readonly size?: DataSource;
+    },
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<L> {
+    const run = async (): Promise<L> => {
+      this.#check();
+      options.signal?.throwIfAborted();
+      const style = this.#dataOptions.get(layer);
+      if (!this.#layers.has(layer) || !style)
+        throw typeError('Update a native line/scatter created by this Figure', 'sciviz');
+      if (layer.kind === 'line' && data.size !== undefined)
+        throw typeError('Use per-point sizes with a scatter trace, not a line', 'sciviz');
+      const next =
+        layer.kind === 'line'
+          ? await this.line(data, style as LineLayerOptions)
+          : await this.scatter(data, style as ScatterLayerOptions);
+      if (options.signal?.aborted || !this.#layers.has(layer)) {
+        this.remove(next);
+        options.signal?.throwIfAborted();
+        throw fault('disposed', 'Keep the original layer in this Figure until its update completes', 'sciviz');
+      }
+      if (next.kind === 'line') next.line.visible = layerVisible(layer);
+      else next.cloud.visible = layerVisible(layer);
+      this.#layers.delete(next);
+      this.#free(layer);
+      Object.assign(layer, next);
+      this.#styles.set(layer, this.#styles.get(next)!);
+      this.#refit();
+      this.#updateLegend();
+      return layer;
+    };
+    const pending = this.#dataUpdates.get(layer) ?? Promise.resolve(layer);
+    const result = pending.then(run, run);
+    this.#dataUpdates.set(layer, result);
+    return result;
   }
 
   // A line layer of separate segments (pairs of points in data units) coloured by a value per point.

@@ -1,0 +1,11 @@
+{
+  "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson",
+  "sha256": "9f243fe073ab6cf1f1ed3a3708a1c361b6fbe5fa666e010f6c19d8c5cc030dfd",
+  "bytes": 130675,
+  "generated": 1794303826000,
+  "count": 183,
+  "license": "US Geological Survey public-domain US government data; credit USGS Earthquake Hazards Program",
+  "terms": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+  "format": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php",
+  "preparation": "Unmodified all_day GeoJSON response. Demo filters finite magnitude/time and sorts by time. Replay controls use these real observations; live mode polls the official feed with AbortSignal."
+}

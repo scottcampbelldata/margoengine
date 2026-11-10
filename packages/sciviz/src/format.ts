@@ -4,6 +4,7 @@ import { RectsLayer } from './rects.js';
 import { axisScale, type Scale } from './scales.js';
 import { ticks } from './ticks.js';
 import { rangeError, fault } from '../../shared/errors.js';
+import { chartDataAdapters } from './chart-data.js';
 
 /** Numeric display. Defaults: locale en-US, mode number, maximumFractionDigits 3. Dates use UTC unless timeZone is supplied. */
 export interface NumberFormatOptions {
@@ -214,6 +215,8 @@ export class ChartPolish extends EventTarget {
   /** Use polishFigure(), which waits for axis resources before attachment. */
   constructor(figure: Figure, options: ChartPolishOptions = {}) {
     super();
+    if (chartDataAdapters.has(figure))
+      throw fault('attached', 'Reuse the existing chart controller or dispose it first', 'sciviz');
     options.signal?.throwIfAborted();
     minorTicks([0, 1], options.minor ?? 4);
     numberFormatter(options.xFormat);
@@ -301,6 +304,35 @@ export class ChartPolish extends EventTarget {
     const off = figure.engine.onFrame(this.#frame);
     this.#frame = off;
     options.signal?.addEventListener('abort', () => this.dispose(), { once: true, signal });
+    chartDataAdapters.set(figure, {
+      read: (layer) => {
+        const t = this.#traces.find((t) => t.layer === layer);
+        return t
+          ? {
+              x: t.x,
+              y: t.y,
+              color: layer.values,
+              size: layer.kind === 'scatter' ? (layer.cloud.sizes ?? undefined) : undefined,
+            }
+          : undefined;
+      },
+      update: async (layer, data, signal) => {
+        this.#check();
+        const t = this.#traces.find((t) => t.layer === layer);
+        if (!t) throw rangeError('Add the live trace through this chart controller before binding it', 'sciviz');
+        const sy = t.secondary ? this.secondaryY! : this.y;
+        await figure.updateData(
+          layer,
+          { ...data, x: Array.from(data.x, (v) => this.x.forward(v)), y: Array.from(data.y, (v) => sy.forward(v)) },
+          { signal },
+        );
+        t.x = Float64Array.from(data.x);
+        t.y = Float64Array.from(data.y);
+        this.#updateHover();
+      },
+      forwardX: (value) => this.x.forward(value),
+      inverseX: (value) => this.x.inverse(value),
+    });
     this.relayout();
   }
   #bindLegend(): void {
@@ -478,7 +510,7 @@ export class ChartPolish extends EventTarget {
     }
     const hits: ChartHover[] = [];
     for (const t of this.#traces) {
-      if (!visible(t.layer)) continue;
+      if (!visible(t.layer) || !this.figure.layers.includes(t.layer)) continue;
       let i = -1,
         dist = Infinity;
       for (let j = 0; j < t.x.length; j++) {
@@ -724,6 +756,7 @@ export class ChartPolish extends EventTarget {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    chartDataAdapters.delete(this.figure);
     this.#abort.abort();
     this.#resize.disconnect();
     this.#legendObserver.disconnect();

@@ -3559,6 +3559,10 @@
       "types": "./dist/sciviz/export-media.d.ts",
       "import": "./dist/sciviz/export-media.js"
     },
+    "./sciviz/stream": {
+      "types": "./dist/sciviz/stream.d.ts",
+      "import": "./dist/sciviz/stream.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -131,6 +131,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'examples/assets/sciviz/stream/source.json',
+    'Batch 177 live data: unmodified USGS Earthquake Hazards Program all_day GeoJSON snapshot, US government public domain, credit USGS. Official feed https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson and format https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php. Original generated time, count, SHA-256 and preparation are recorded in source.json and prepare.mjs. Standard data only under the standard-file exception, excluded from package tarballs; no external implementation files copied.',
+  ],
+  [
     'examples/assets/sciviz/charts-extra/source.json',
     'Batch 177 specialised charts: NOAA ISD-lite JFK January 2023 winds from the NOAA Open Data Dissemination bucket, and US EIA Monthly Energy Review 2023 annual primary energy by source and sector, tables 2.2 through 2.6. US government public-domain data, credit NOAA and US Energy Information Administration. Original source URLs, SHA-256 hashes and reductions are in source.json and prepare.py. Reduced standard data only, excluded from package tarballs; no implementation code copied.',
   ],

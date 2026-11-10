@@ -1170,3 +1170,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/blender: record the four package browser commands and their repository-root serving behavior during the README phase.
 - @margoengine/stage (batch 183 job 3): document viewer-extras controller, explicit margo-viewer registration, attributes/defaults, annotations, animation/variants/picking/poster, WebXR requirements and cancellation/ownership; examples deferred.
 - margoengine (batch 183 job 3): document the generated stage/viewer-extras alias; examples deferred.
+- @margoengine/sciviz (batch 177 job 5): document /stream append/patch, original data/channels, rollover, cancellation/disposal, async WebSocket/SSE/polling sources, sliding/smooth date windows, Figure.updateData identity and transient allocations, and integration with /format. README examples owed.
+- margoengine (batch 177 job 5): document the optional sciviz/stream alias in README phase.
