@@ -1,0 +1,94 @@
+[
+  {
+    "file": "abc_color_irot_alpha_irot.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/90d3b6661e1475bb1652cba7d85c24f8c748ab07/tests/data/abc_color_irot_alpha_irot.avif",
+    "sha256": "b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b",
+    "bytes": 10597,
+    "license": "BSD-2-Clause; standard sample/test asset exception",
+    "dimensions": {
+      "width": 256,
+      "height": 512,
+      "depth": 8,
+      "icc": 0
+    },
+    "inputSha256": "b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b",
+    "reference": "abc_color_irot_alpha_irot.avif.rgba.zlib",
+    "referenceSha256": "950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744",
+    "width": 256,
+    "height": 512,
+    "oracle": "Pillow 13.0.0, libavif 1.4.2",
+    "maxRGBDifference": 0
+  },
+  {
+    "file": "sofa_grid1x5_420.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/90d3b6661e1475bb1652cba7d85c24f8c748ab07/tests/data/sofa_grid1x5_420.avif",
+    "sha256": "c9e04ff9d90d7093454750fa33b7543ee5479e0cfb151e2c3d2ce6a16c1651c1",
+    "bytes": 25409,
+    "license": "BSD-2-Clause; standard sample/test asset exception",
+    "dimensions": {
+      "width": 1024,
+      "height": 770,
+      "depth": 8,
+      "icc": 0
+    },
+    "inputSha256": "c9e04ff9d90d7093454750fa33b7543ee5479e0cfb151e2c3d2ce6a16c1651c1",
+    "reference": "sofa_grid1x5_420.avif.rgba.zlib",
+    "referenceSha256": "86ae5e398f9c8df4bda38fee08c5a8a7605611d029eec3f21f4f5f6c6dc25bac",
+    "width": 1024,
+    "height": 770,
+    "oracle": "Pillow 13.0.0, libavif 1.4.2",
+    "maxRGBDifference": 2
+  },
+  {
+    "file": "paris_icc_exif_xmp.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/90d3b6661e1475bb1652cba7d85c24f8c748ab07/tests/data/paris_icc_exif_xmp.avif",
+    "sha256": "961bc38b61e60b7651fa20efa24269ae2f35e4958822a81c908c9bbf9b3f66e1",
+    "bytes": 21132,
+    "license": "BSD-2-Clause; standard sample/test asset exception",
+    "dimensions": {
+      "width": 403,
+      "height": 302,
+      "depth": 8,
+      "icc": 596
+    },
+    "inputSha256": "961bc38b61e60b7651fa20efa24269ae2f35e4958822a81c908c9bbf9b3f66e1",
+    "reference": "paris_icc_exif_xmp.avif.rgba.zlib",
+    "referenceSha256": "29e0a7e34ad936f2f3e6ef88d62ea0152f82d406c6ff61415254aaeadf470f46",
+    "width": 403,
+    "height": 302,
+    "oracle": "Pillow 13.0.0, libavif 1.4.2",
+    "maxRGBDifference": 1
+  },
+  {
+    "file": "white_1x1.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/90d3b6661e1475bb1652cba7d85c24f8c748ab07/tests/data/white_1x1.avif",
+    "sha256": "ea4e43d1f07e4c00de16c13afa32376111bb306e51f08212cf4c1b6064df3667",
+    "bytes": 305,
+    "license": "BSD-2-Clause; standard sample/test asset exception",
+    "dimensions": {
+      "width": 1,
+      "height": 1,
+      "depth": 8,
+      "icc": 0
+    },
+    "inputSha256": "ea4e43d1f07e4c00de16c13afa32376111bb306e51f08212cf4c1b6064df3667",
+    "reference": "white_1x1.avif.rgba.zlib",
+    "referenceSha256": "340dab2cf54d9052ea365d06f26673e3440bf8d9c3ad63b3c3867a9a72c3e078",
+    "width": 1,
+    "height": 1,
+    "oracle": "Pillow 13.0.0, libavif 1.4.2",
+    "maxRGBDifference": 0
+  },
+  {
+    "file": "kimono.mirror-vertical.rotate270.crop.avif",
+    "source": "Link-U conformance, crop (39,272,330,385), counterclockwise 90 degrees then mirror around vertical axis",
+    "license": "CC-BY-SA-4.0",
+    "inputSha256": "daa55f4a4bcf2f64e1efdf43c50a4ffa9aa341b0941d3ad5c3765d9c488a5ad9",
+    "reference": "kimono.mirror-vertical.rotate270.crop.avif.rgba.zlib",
+    "referenceSha256": "206d37d9bc209e88a08bd6e25e405c15f6312e6858df0e440ab563e159cbe81d",
+    "width": 385,
+    "height": 330,
+    "oracle": "FFmpeg v9.0.2 software decode and swscale; BT.2020 limited to full, centered chroma, bilinear+accurate_rnd+full_chroma_int; no autorotate or input cropping",
+    "maxRGBDifference": 1
+  }
+]

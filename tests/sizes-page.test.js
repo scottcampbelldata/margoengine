@@ -11,6 +11,7 @@ import { JSDOM } from 'jsdom';
 import { readSizesInputs, sizesPage } from '../scripts/build-sizes.js';
 import { LAZY_FILES, lazyFileDrift, unmeasuredLazyFiles } from '../scripts/lazy-files.js';
 import { CORE_STAGE_GZIP_LIMIT } from '../scripts/core-budget.js';
+import { sceneGraph } from '../scripts/support/basic-scene-graph.mjs';
 
 const inputs = readSizesInputs(),
   { catalog, sizes, network } = inputs;
@@ -30,7 +31,11 @@ test('lazy file package groups stay contiguous in table order', () => {
 
 test('every lazy file names what it leaves out as patterns, or entry-sizes.mjs cannot measure it', () => {
   for (const { file, measure, external } of LAZY_FILES)
-    if (measure === 'bundle') assert.ok(external.every((pattern) => pattern instanceof RegExp), file);
+    if (measure === 'bundle')
+      assert.ok(
+        external.every((pattern) => pattern instanceof RegExp),
+        file,
+      );
 });
 
 test('sizes page lists every catalog package with numbers from the same measured commit', () => {
@@ -124,7 +129,10 @@ test('lazy file drift finds an unlisted worker, Wasm or URL-loaded file and a li
     unbuilt: ['packages/a/dist/gone.worker.js'],
   });
   // A row with no measurement (b3e5e8f7d listed cpu-kernel.wasm without measuring it, and this file failed to load).
-  write('examples/package-benchmarks/results/entry-sizes.json', JSON.stringify({ lazyFiles: { 'packages/a/dist/listed.wasm': {} } }));
+  write(
+    'examples/package-benchmarks/results/entry-sizes.json',
+    JSON.stringify({ lazyFiles: { 'packages/a/dist/listed.wasm': {} } }),
+  );
   assert.deepEqual(unmeasuredLazyFiles(root, [row('packages/a/dist/listed.wasm'), row('packages/a/dist/codec.wasm')]), [
     'packages/a/dist/codec.wasm',
   ]);
@@ -136,7 +144,11 @@ test('lazy file drift finds an unlisted worker, Wasm or URL-loaded file and a li
 test('sizes page lists every file loaded later, with its measured bytes and the call that loads it', () => {
   const root = new URL('../', import.meta.url);
   // Both ways: every built worker and .wasm is listed in scripts/lazy-files.js, and every listed one was built.
-  assert.deepEqual(lazyFileDrift(fileURLToPath(root)), { unlisted: [], unbuilt: [] }, 'run npm run build:packages first');
+  assert.deepEqual(
+    lazyFileDrift(fileURLToPath(root)),
+    { unlisted: [], unbuilt: [] },
+    'run npm run build:packages first',
+  );
   for (const entry of LAZY_FILES) assert.ok(existsSync(new URL(entry.file, root)), entry.file);
   for (const name of [
     'draco_decoder.wasm',
@@ -177,15 +189,22 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
     paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|worker/i.test(path)),
     [],
   );
-  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (addGLTF)', 'Model'])
+  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf-pro (addGLTF)', 'Model'])
     assert.equal(network.files.filter((file) => file.role === role).length, 1, role);
   assert.ok(
     network.files.every((file) => file.role),
     'every request is an expected file',
   );
-  // Since the stage feature entries (2026-10-27) the build emits only what the app imports: no .wasm, worker or
-  // other pack waits unfetched beside it.
-  assert.deepEqual(network.notFetched, [], 'the build emitted no file the page does not fetch');
+  const graph = sceneGraph(network.buildManifest);
+  const required = new Set(['index.html', 'model.glb', ...graph.entry, ...graph.gltf]);
+  assert.deepEqual([...paths].sort(), [...required].sort(), 'exactly the selected PBR static request graph');
+  const deferred = [...graph.emittedFiles].filter((path) => !required.has(path));
+  assert.deepEqual(
+    network.notFetched.map((file) => file.path).sort(),
+    deferred.sort(),
+    'every deferred file belongs to the selected glTF feature, with no unrelated asset',
+  );
+  assert.ok(network.notFetched.every((file) => file.raw > 0 && !required.has(file.path)));
   for (const key of ['transferred', 'raw', 'gzip', 'brotli'])
     assert.equal(
       network.total[key],
@@ -218,5 +237,6 @@ test('sizes page refuses a network record from another build', () => {
 
 test('every external of a file loaded later is a pattern, as entry-sizes tests each id against it', () => {
   for (const { file, external = [] } of LAZY_FILES)
-    for (const pattern of external) assert.ok(pattern instanceof RegExp, `${file} lists ${pattern}, which is no RegExp`);
+    for (const pattern of external)
+      assert.ok(pattern instanceof RegExp, `${file} lists ${pattern}, which is no RegExp`);
 });

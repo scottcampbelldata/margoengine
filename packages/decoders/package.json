@@ -28,12 +28,14 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/*.test.js",
+    "test": "npm run build && node --test tests/*.test.js && npm run test:avif:native",
     "test:browser": "npm run build && node scripts/test-browser.js",
-    "test:gpu:jpeg": "node tests/jpeg-browser.mjs",
+    "test:gpu:jpeg": "cd ../.. && node packages/decoders/tests/jpeg-browser.mjs",
     "test:gpu:node-gltf": "node scripts/test-node-gltf.mjs",
     "prepack": "npm run build",
-    "test:browser:hdr6": "cd ../.. && node packages/decoders/tests/hdr6-browser.mjs"
+    "test:browser:hdr6": "cd ../.. && node packages/decoders/tests/hdr6-browser.mjs",
+    "test:browser:avif": "cd ../.. && node packages/decoders/tests/avif-browser.mjs",
+    "test:avif:native": "node scripts/test-avif-native.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -168,6 +170,10 @@
     "./snappy": {
       "types": "./dist/snappy.d.ts",
       "import": "./dist/snappy.js"
+    },
+    "./avif": {
+      "types": "./dist/avif.d.ts",
+      "import": "./dist/avif.js"
     }
   },
   "files": [

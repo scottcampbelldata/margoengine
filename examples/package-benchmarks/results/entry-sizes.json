@@ -1,6 +1,6 @@
 {
-  "commit": "0ebc05527",
-  "dirty": true,
+  "commit": "d4145eda4",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 59802,
@@ -62,8 +62,8 @@
         "gzip": 1043
       },
       "./mixer": {
-        "raw": 14783,
-        "gzip": 4792
+        "raw": 14919,
+        "gzip": 4858
       },
       "./playback": {
         "raw": 4787,
@@ -384,8 +384,8 @@
         "gzip": 15215
       },
       "./pbr-ext": {
-        "raw": 37543,
-        "gzip": 13049
+        "raw": 37534,
+        "gzip": 13042
       },
       "./live": {
         "raw": 12473,
@@ -546,8 +546,8 @@
         "gzip": 2486
       },
       "./stereo": {
-        "raw": 6771,
-        "gzip": 3144
+        "raw": 6882,
+        "gzip": 3195
       }
     },
     "@margoengine/cinematic": {
@@ -594,16 +594,16 @@
     },
     "@margoengine/clustered": {
       ".": {
-        "raw": 41215,
-        "gzip": 14045
+        "raw": 41259,
+        "gzip": 14057
       },
       "./shadows": {
         "raw": 33093,
         "gzip": 12052
       },
       "./area": {
-        "raw": 19556,
-        "gzip": 10545
+        "raw": 20195,
+        "gzip": 10901
       },
       "./directional": {
         "raw": 5933,
@@ -634,16 +634,16 @@
         "gzip": 497
       },
       "./shapes": {
-        "raw": 23222,
-        "gzip": 11898
+        "raw": 23861,
+        "gzip": 12242
       },
       "./stochastic": {
         "raw": 5371,
         "gzip": 2257
       },
       "./area-shapes": {
-        "raw": 26107,
-        "gzip": 12817
+        "raw": 26746,
+        "gzip": 13166
       },
       "./shadow-atlas": {
         "raw": 39304,
@@ -651,7 +651,7 @@
       },
       "./cube-projector": {
         "raw": 13519,
-        "gzip": 4493
+        "gzip": 4494
       }
     },
     "@margoengine/compute": {
@@ -930,12 +930,12 @@
         "gzip": 11520
       },
       "./curve-editor": {
-        "raw": 9565,
-        "gzip": 3550
+        "raw": 9918,
+        "gzip": 3637
       },
       "./viewport": {
-        "raw": 3568,
-        "gzip": 1492
+        "raw": 3596,
+        "gzip": 1503
       },
       "./nested-editor": {
         "raw": 41580,
@@ -992,8 +992,8 @@
         "gzip": 3926
       },
       "./image": {
-        "raw": 1672636,
-        "gzip": 768274
+        "raw": 2670828,
+        "gzip": 1037682
       },
       "./bc": {
         "raw": 10230,
@@ -1078,6 +1078,10 @@
       "./snappy": {
         "raw": 2844,
         "gzip": 1250
+      },
+      "./avif": {
+        "raw": 1000780,
+        "gzip": 270887
       }
     },
     "@margoengine/dof": {
@@ -1384,8 +1388,8 @@
         "gzip": 9448
       },
       "./optimize-extra": {
-        "raw": 16315,
-        "gzip": 6214
+        "raw": 16369,
+        "gzip": 6242
       },
       "./materials": {
         "raw": 55338,
@@ -1458,8 +1462,8 @@
         "gzip": 3177
       },
       "dist/workers/fbx.js": {
-        "raw": 340726,
-        "gzip": 115202
+        "raw": 340717,
+        "gzip": 115197
       }
     },
     "@margoengine/fsm": {
@@ -1610,12 +1614,12 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 242105,
-        "gzip": 78058
+        "raw": 242108,
+        "gzip": 78052
       },
       "./model": {
-        "raw": 187191,
-        "gzip": 58923
+        "raw": 187194,
+        "gzip": 58921
       },
       "./asset": {
         "raw": 18025,
@@ -1626,19 +1630,19 @@
         "gzip": 1439
       },
       "./extended": {
-        "raw": 25624,
-        "gzip": 8748
+        "raw": 25615,
+        "gzip": 8743
       },
       "./instancing": {
         "raw": 8296,
         "gzip": 3192
       },
       "./prepare": {
-        "raw": 94165,
-        "gzip": 31501
+        "raw": 94156,
+        "gzip": 31500
       },
       "./progressive": {
-        "raw": 266475,
+        "raw": 266478,
         "gzip": 86739
       },
       "./splats": {
@@ -1666,16 +1670,16 @@
         "gzip": 568
       },
       "./worker": {
-        "raw": 244119,
-        "gzip": 78581
+        "raw": 244122,
+        "gzip": 78575
       },
       "./material-draw": {
         "raw": 700,
         "gzip": 432
       },
       "./spec-gloss": {
-        "raw": 30125,
-        "gzip": 10176
+        "raw": 30116,
+        "gzip": 10171
       },
       "./dds": {
         "raw": 17337,
@@ -1686,8 +1690,8 @@
         "gzip": 4717
       },
       "dist/workers/gltf.js": {
-        "raw": 104801,
-        "gzip": 35506
+        "raw": 104792,
+        "gzip": 35501
       },
       "dist/workers/progressive.js": {
         "raw": 49990,
@@ -1700,8 +1704,8 @@
         "gzip": 2645
       },
       "./video": {
-        "raw": 17363,
-        "gzip": 7064
+        "raw": 17832,
+        "gzip": 7297
       },
       "./ffmpeg": {
         "raw": 2162,
@@ -1894,8 +1898,8 @@
         "gzip": 1347
       },
       "./gpu": {
-        "raw": 15029,
-        "gzip": 5778
+        "raw": 15287,
+        "gzip": 5875
       },
       "./distance": {
         "raw": 2284,
@@ -1962,8 +1966,8 @@
         "gzip": 4215
       },
       "./imported": {
-        "raw": 2702,
-        "gzip": 1279
+        "raw": 2787,
+        "gzip": 1311
       },
       "./gpu": {
         "raw": 18965,
@@ -1984,40 +1988,44 @@
     },
     "@margoengine/lines": {
       ".": {
-        "raw": 54501,
-        "gzip": 19926
+        "raw": 55518,
+        "gzip": 20291
       },
       "./edges": {
-        "raw": 11772,
-        "gzip": 4705
+        "raw": 11937,
+        "gzip": 4770
       },
       "./pick": {
-        "raw": 15703,
-        "gzip": 6201
+        "raw": 16371,
+        "gzip": 6465
       },
       "./trail": {
-        "raw": 13335,
-        "gzip": 5239
+        "raw": 13500,
+        "gzip": 5309
       },
       "./batch": {
-        "raw": 15120,
-        "gzip": 6334
+        "raw": 15770,
+        "gzip": 6592
       },
       "./hidden": {
-        "raw": 10060,
-        "gzip": 3960
+        "raw": 10225,
+        "gzip": 4021
       },
       "./stroke": {
-        "raw": 11302,
-        "gzip": 4407
+        "raw": 11467,
+        "gzip": 4470
       },
       "./texture": {
-        "raw": 16817,
-        "gzip": 6361
+        "raw": 16982,
+        "gzip": 6421
       },
       "./debug": {
-        "raw": 25610,
-        "gzip": 9549
+        "raw": 26425,
+        "gzip": 9874
+      },
+      "./tiles": {
+        "raw": 625,
+        "gzip": 409
       }
     },
     "@margoengine/loaders": {
@@ -2091,7 +2099,7 @@
       },
       "./vtk-xml": {
         "raw": 20024,
-        "gzip": 7578
+        "gzip": 7575
       },
       "./3dm": {
         "raw": 9076,
@@ -2151,7 +2159,7 @@
       },
       "./vtk-legacy": {
         "raw": 17544,
-        "gzip": 6336
+        "gzip": 6332
       },
       "./geo": {
         "raw": 24383,
@@ -2208,8 +2216,8 @@
         "gzip": 1811
       },
       "./transmission": {
-        "raw": 22260,
-        "gzip": 8173
+        "raw": 22275,
+        "gzip": 8181
       },
       "./batched": {
         "raw": 121685,
@@ -2256,12 +2264,12 @@
         "gzip": 37854
       },
       "./transmission-layers": {
-        "raw": 13551,
-        "gzip": 4930
+        "raw": 13581,
+        "gzip": 4937
       },
       "./fur": {
-        "raw": 6592,
-        "gzip": 2878
+        "raw": 6748,
+        "gzip": 2960
       }
     },
     "@margoengine/math": {
@@ -2420,8 +2428,8 @@
         "gzip": 3021
       },
       "./live": {
-        "raw": 5375,
-        "gzip": 2394
+        "raw": 5563,
+        "gzip": 2471
       },
       "./live-host": {
         "raw": 3075,
@@ -2436,8 +2444,8 @@
         "gzip": 4409
       },
       "./assets-page": {
-        "raw": 2427,
-        "gzip": 1035
+        "raw": 2579,
+        "gzip": 1114
       },
       "./http": {
         "raw": 12413,
@@ -2780,8 +2788,8 @@
     },
     "@margoengine/points": {
       ".": {
-        "raw": 72633,
-        "gzip": 24514
+        "raw": 73098,
+        "gzip": 24676
       },
       "./las": {
         "raw": 40390,
@@ -2800,12 +2808,12 @@
         "gzip": 15309
       },
       "./octree": {
-        "raw": 26139,
-        "gzip": 9372
+        "raw": 26415,
+        "gzip": 9465
       },
       "./surfels": {
-        "raw": 41763,
-        "gzip": 14938
+        "raw": 42039,
+        "gzip": 15030
       },
       "./potree": {
         "raw": 49603,
@@ -2816,8 +2824,8 @@
         "gzip": 5759
       },
       "./clip": {
-        "raw": 20290,
-        "gzip": 7268
+        "raw": 20566,
+        "gzip": 7364
       }
     },
     "@margoengine/post": {
@@ -3452,8 +3460,8 @@
         "gzip": 1144
       },
       "./tags": {
-        "raw": 6843,
-        "gzip": 2676
+        "raw": 6947,
+        "gzip": 2720
       }
     },
     "@margoengine/scenery": {
@@ -3488,12 +3496,12 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 160072,
-        "gzip": 56817
+        "raw": 160384,
+        "gzip": 56915
       },
       "./bricks": {
-        "raw": 66283,
-        "gzip": 27234
+        "raw": 66388,
+        "gzip": 27269
       },
       "./colormaps": {
         "raw": 37653,
@@ -3504,16 +3512,16 @@
         "gzip": 13846
       },
       "./geo": {
-        "raw": 9587,
-        "gzip": 4197
+        "raw": 9685,
+        "gzip": 4230
       },
       "./graph": {
-        "raw": 52105,
-        "gzip": 22568
+        "raw": 52203,
+        "gzip": 22605
       },
       "./grids": {
-        "raw": 56536,
-        "gzip": 24586
+        "raw": 56639,
+        "gzip": 24623
       },
       "./maths": {
         "raw": 21395,
@@ -3532,12 +3540,12 @@
         "gzip": 4527
       },
       "./flow": {
-        "raw": 24353,
-        "gzip": 9175
+        "raw": 24464,
+        "gzip": 9217
       },
       "./lic": {
-        "raw": 53772,
-        "gzip": 23527
+        "raw": 53881,
+        "gzip": 23571
       },
       "./tubes": {
         "raw": 6076,
@@ -3556,8 +3564,8 @@
         "gzip": 3993
       },
       "./atmosphere": {
-        "raw": 79646,
-        "gzip": 32459
+        "raw": 79998,
+        "gzip": 32575
       },
       "./pipeline": {
         "raw": 4558,
@@ -3572,8 +3580,8 @@
         "gzip": 5236
       },
       "./glyph": {
-        "raw": 11007,
-        "gzip": 4387
+        "raw": 11107,
+        "gzip": 4430
       },
       "./calc": {
         "raw": 17184,
@@ -3588,12 +3596,12 @@
         "gzip": 5996
       },
       "./labels": {
-        "raw": 16873,
-        "gzip": 6529
+        "raw": 16974,
+        "gzip": 6565
       },
       "./cinematic": {
-        "raw": 17314,
-        "gzip": 6442
+        "raw": 17418,
+        "gzip": 6480
       },
       "./volume-quality": {
         "raw": 20141,
@@ -3604,8 +3612,8 @@
         "gzip": 3802
       },
       "./link": {
-        "raw": 11768,
-        "gzip": 4662
+        "raw": 13237,
+        "gzip": 5170
       },
       "./export-vector": {
         "raw": 9120,
@@ -3647,10 +3655,6 @@
         "raw": 12255,
         "gzip": 5434
       },
-      "./pointcloud": {
-        "raw": 47150,
-        "gzip": 21055
-      },
       "./hdf5": {
         "raw": 22870,
         "gzip": 8990
@@ -3675,9 +3679,9 @@
         "raw": 31246,
         "gzip": 11539
       },
-      "./geo-vector": {
-        "raw": 61206,
-        "gzip": 25913
+      "./pointcloud": {
+        "raw": 47150,
+        "gzip": 21055
       },
       "./format": {
         "raw": 18847,
@@ -3692,12 +3696,24 @@
         "gzip": 6322
       },
       "./parcoords": {
-        "raw": 23818,
-        "gzip": 8860
+        "raw": 25110,
+        "gzip": 9276
       },
       "./monitor": {
         "raw": 5795,
         "gzip": 2534
+      },
+      "./geo-vector": {
+        "raw": 61206,
+        "gzip": 25913
+      },
+      "./spec": {
+        "raw": 61827,
+        "gzip": 24979
+      },
+      "./export-media": {
+        "raw": 16774,
+        "gzip": 6994
       }
     },
     "@margoengine/selection": {
@@ -3706,8 +3722,8 @@
         "gzip": 21514
       },
       "./spatial": {
-        "raw": 4348,
-        "gzip": 2101
+        "raw": 4371,
+        "gzip": 2110
       },
       "./hit-details": {
         "raw": 46254,
@@ -3798,8 +3814,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 56175,
-        "gzip": 18546
+        "raw": 56572,
+        "gzip": 18681
       },
       "./virtual": {
         "raw": 46665,
@@ -3958,8 +3974,8 @@
         "gzip": 22273
       },
       "./progressive": {
-        "raw": 89294,
-        "gzip": 31464
+        "raw": 89706,
+        "gzip": 31574
       },
       "./formats": {
         "raw": 56530,
@@ -4064,8 +4080,8 @@
         "gzip": 3027
       },
       "./gltf": {
-        "raw": 3063,
-        "gzip": 1473
+        "raw": 3527,
+        "gzip": 1660
       },
       "./sky": {
         "raw": 782,
@@ -4098,6 +4114,10 @@
       "./physics": {
         "raw": 2175,
         "gzip": 1181
+      },
+      "./lights": {
+        "raw": 3700,
+        "gzip": 1701
       },
       "./scene": {
         "raw": 7591,
@@ -4288,8 +4308,8 @@
         "gzip": 7416
       },
       "./autotile": {
-        "raw": 4158,
-        "gzip": 1831
+        "raw": 4250,
+        "gzip": 1868
       },
       "./ldtk": {
         "raw": 6185,
@@ -4366,8 +4386,8 @@
         "gzip": 2745
       },
       "./features": {
-        "raw": 27036,
-        "gzip": 9575
+        "raw": 27126,
+        "gzip": 9596
       },
       "./fade": {
         "raw": 4338,
@@ -4594,12 +4614,12 @@
         "gzip": 4773
       },
       "./clips": {
-        "raw": 61609,
-        "gzip": 23155
+        "raw": 61769,
+        "gzip": 23241
       },
       "dist/workers/usdz.js": {
-        "raw": 395782,
-        "gzip": 133945
+        "raw": 395785,
+        "gzip": 133944
       }
     },
     "@margoengine/vfx": {
@@ -4854,8 +4874,8 @@
         "gzip": 5323
       },
       "./objects": {
-        "raw": 3749,
-        "gzip": 1678
+        "raw": 3857,
+        "gzip": 1728
       },
       "./wind": {
         "raw": 7366,
@@ -5132,8 +5152,8 @@
         "gzip": 4972
       },
       "./lens": {
-        "raw": 7986,
-        "gzip": 3601
+        "raw": 8285,
+        "gzip": 3718
       },
       "./cover": {
         "raw": 3722,
@@ -5250,8 +5270,8 @@
         "gzip": 2156
       },
       "./auto": {
-        "raw": 11772,
-        "gzip": 3920
+        "raw": 11823,
+        "gzip": 3923
       },
       "dist/workers/scene.js": {
         "raw": 7038,
@@ -5417,9 +5437,9 @@
       "brotli": 26976
     },
     "packages/shadows/dist/index.js": {
-      "raw": 56175,
-      "gzip": 18546,
-      "brotli": 16383
+      "raw": 56572,
+      "gzip": 18681,
+      "brotli": 16585
     },
     "packages/xr/dist/index.js": {
       "raw": 29010,
@@ -5427,9 +5447,9 @@
       "brotli": 8318
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1464180,
-      "gzip": 589010,
-      "brotli": 480704
+      "raw": 1464183,
+      "gzip": 589011,
+      "brotli": 480497
     },
     "packages/staging/dist/index.js": {
       "raw": 23383,
@@ -5516,6 +5536,16 @@
       "gzip": 9355,
       "brotli": 8390
     },
+    "packages/decoders/dist/avif.worker.js": {
+      "raw": 2376,
+      "gzip": 1248,
+      "brotli": 1083
+    },
+    "packages/decoders/dist/avif.wasm": {
+      "raw": 746450,
+      "gzip": 197572,
+      "brotli": 158650
+    },
     "packages/decoders/dist/hdr6.wasm": {
       "raw": 73034,
       "gzip": 30458,
@@ -5567,9 +5597,9 @@
       "brotli": 129002
     },
     "packages/gltf-pro/dist/workers/gltf.js": {
-      "raw": 104380,
-      "gzip": 35456,
-      "brotli": 31473
+      "raw": 104371,
+      "gzip": 35452,
+      "brotli": 31438
     },
     "packages/gltf-pro/dist/workers/progressive.js": {
       "raw": 49697,
@@ -5577,14 +5607,14 @@
       "brotli": 14322
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 338103,
-      "gzip": 114989,
-      "brotli": 93290
+      "raw": 338094,
+      "gzip": 114986,
+      "brotli": 93161
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 391743,
-      "gzip": 133636,
-      "brotli": 113783
+      "raw": 391746,
+      "gzip": 133633,
+      "brotli": 113601
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21482,

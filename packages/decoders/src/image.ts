@@ -1,6 +1,6 @@
 // Any stored texture as RGBA8 pixels (`@margoengine/decoders/image`), for tools that need the picture itself: an exporter
 // writing PNG, a converter. The file's own signature picks the reader, and each reader loads only when a file needs it.
-import { decodeFailed, deviceUnsupported } from './errors.js';
+import { decodeFailed } from './errors.js';
 import { readKTX2Index } from './ktx2-file.js';
 import { decodePNG } from './png.js';
 import type { TranscodedKTX2Result } from './protocol.js';
@@ -32,6 +32,20 @@ export function imageFormat(bytes: Uint8Array): 'png' | 'jpeg' | 'webp' | 'dds' 
   if (bytes[0] === 0xab && text(1, 6) === 'KTX 11') return 'ktx';
   if (bytes[0] === 0xab && text(1, 6) === 'KTX 20') return 'ktx2';
   if (text(4, 4) === 'ftyp' && /^avi[fs]$/.test(text(8, 4))) return 'avif';
+  if (text(4, 4) === 'ftyp' && bytes.length >= 16) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let size = view.getUint32(0),
+      start = 8;
+    if (size === 1 && bytes.length >= 24 && view.getUint32(8) === 0) {
+      size = view.getUint32(12);
+      start = 16;
+    }
+    if (size === 0) size = bytes.length;
+    if (size >= start + 8 && size <= bytes.length) {
+      for (let at = start; at + 4 <= size; at += 4)
+        if (at !== start + 4 && /^avi[fs]$/.test(text(at, 4))) return 'avif';
+    }
+  }
   return undefined;
 }
 
@@ -100,7 +114,7 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
  * if (file.length) console.log((await decodeImage(file)).width);
  *
  * @throws TypeError when `bytes` is not a Uint8Array.
- * @throws MargoError `unsupported` for AVIF and unsupported JPEG coding modes.
+ * @throws MargoError `unsupported` for unsupported coding tools or image item types.
  * @throws MargoError `failed` when the bytes are not a known image, or are damaged.
  */
 export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions = {}): Promise<DecodedImage> {
@@ -124,8 +138,10 @@ export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions
       options.signal?.throwIfAborted();
       return decodeJPEG(bytes, options);
     }
-    case 'avif':
-      throw deviceUnsupported(`decodeImage does not read ${format} files; use the browser's image decoder`);
+    case 'avif': {
+      const image = await (await import('./avif.js')).decodeAVIF(bytes, options);
+      return { width: image.width, height: image.height, data: image.data as Uint8Array };
+    }
     default:
       throw decodeFailed('This file is not an image decodeImage reads; pass a PNG, WebP, DDS, KTX or KTX2 file');
   }

@@ -24,7 +24,7 @@ execFileSync(
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
 // Build the optional clean-room asset from our crate, never from a registry codec.
-for (const feature of ['draco', 'hdr6']) {
+for (const feature of ['draco', 'hdr6', 'avif']) {
   const native = spawn(
     'cargo',
     [
@@ -37,7 +37,14 @@ for (const feature of ['draco', 'hdr6']) {
       '--manifest-path',
       resolve(root, `native/${feature}/Cargo.toml`),
     ],
-    { windowsHide: true, stdio: 'inherit' },
+    {
+      windowsHide: true,
+      stdio: 'inherit',
+      env:
+        feature === 'avif'
+          ? { ...process.env, RUSTFLAGS: '-C target-feature=+simd128 -C link-arg=--max-memory=1073741824' }
+          : process.env,
+    },
   );
   let nativeTimeout = false,
     nativeEnded = Promise.resolve([]);
@@ -58,10 +65,10 @@ for (const feature of ['draco', 'hdr6']) {
   }
   await copyFile(
     resolve(root, `native/${feature}/target/wasm32-unknown-unknown/release/margoengine_${feature}.wasm`),
-    resolve(dist, feature === 'draco' ? 'draco-native.wasm' : 'hdr6.wasm'),
+    resolve(dist, feature === 'draco' ? 'draco-native.wasm' : `${feature}.wasm`),
   );
 }
-for (const worker of ['draco-native', 'hdr6']) {
+for (const worker of ['draco-native', 'hdr6', 'avif']) {
   await build({
     configFile: false,
     publicDir: false,

@@ -1,7 +1,334 @@
 {
-  "commit": "974b6a6a2",
+  "commit": "d4145eda4",
   "dirty": false,
   "browser": "msedge 157.0.4341.42 headless",
+  "buildManifest": {
+    "../../../packages/animation/dist/index.js": {
+      "file": "assets/dist-BPDCXx1G.js",
+      "name": "dist",
+      "src": "../../../packages/animation/dist/index.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_version-YYhCZP03.js",
+        "_model-Dgo3ejxs-Bf3VJW4Y.js",
+        "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
+      ]
+    },
+    "../../../packages/decoders/dist/basis/basis_transcoder.js": {
+      "file": "assets/basis_transcoder-DRsa3jdg.js",
+      "src": "../../../packages/decoders/dist/basis/basis_transcoder.js"
+    },
+    "../../../packages/decoders/dist/basis/basis_transcoder.wasm": {
+      "file": "assets/basis_transcoder-VXdx5NbI.wasm",
+      "src": "../../../packages/decoders/dist/basis/basis_transcoder.wasm"
+    },
+    "../../../packages/decoders/dist/decoder.worker.js": {
+      "file": "assets/decoder.worker-DuddskkO.js",
+      "src": "../../../packages/decoders/dist/decoder.worker.js"
+    },
+    "../../../packages/decoders/dist/draco/draco_decoder.wasm": {
+      "file": "assets/draco_decoder-Z1_iN-Ht.wasm",
+      "src": "../../../packages/decoders/dist/draco/draco_decoder.wasm"
+    },
+    "../../../packages/decoders/dist/draco/draco_wasm_wrapper.js": {
+      "file": "assets/draco_wasm_wrapper-fZCQGLGb.js",
+      "src": "../../../packages/decoders/dist/draco/draco_wasm_wrapper.js"
+    },
+    "../../../packages/decoders/dist/index.js": {
+      "file": "assets/dist-CvGs8hlY.js",
+      "name": "dist",
+      "src": "../../../packages/decoders/dist/index.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_meshopt-D0I6gboe.js",
+        "_texture-D-u4lFVe.js"
+      ],
+      "assets": [
+        "assets/decoder.worker-DuddskkO.js",
+        "assets/draco_wasm_wrapper-fZCQGLGb.js",
+        "assets/draco_decoder-Z1_iN-Ht.wasm",
+        "assets/basis_transcoder-DRsa3jdg.js",
+        "assets/basis_transcoder-VXdx5NbI.wasm"
+      ]
+    },
+    "../../../packages/gltf-pro/dist/compression-CzpUdV8Z.js": {
+      "file": "assets/compression-CzpUdV8Z-06wb_MIm.js",
+      "name": "compression-CzpUdV8Z",
+      "src": "../../../packages/gltf-pro/dist/compression-CzpUdV8Z.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_errors-THVaUwlL-CVTt9P7e.js",
+        "_asset-ByDCtABg-9ESDVZ7l.js"
+      ]
+    },
+    "../../../packages/gltf-pro/dist/dds.js": {
+      "file": "assets/dds-D1fO5pS4.js",
+      "name": "dds",
+      "src": "../../../packages/gltf-pro/dist/dds.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_errors-THVaUwlL-CVTt9P7e.js"
+      ]
+    },
+    "../../../packages/gltf-pro/dist/extended.js": {
+      "file": "assets/extended-DExc1eud.js",
+      "name": "extended",
+      "src": "../../../packages/gltf-pro/dist/extended.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_extended-CaeBbLdO.js"
+      ]
+    },
+    "../../../packages/gltf-pro/dist/index.js": {
+      "file": "assets/dist-2OP0Fp3o.js",
+      "name": "dist",
+      "src": "../../../packages/gltf-pro/dist/index.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_preload-helper-CRzLMJPS.js",
+        "_model-Dgo3ejxs-Bf3VJW4Y.js",
+        "_asset-ByDCtABg-9ESDVZ7l.js",
+        "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/decoders/dist/index.js"
+      ]
+    },
+    "../../../packages/gltf-pro/dist/optimize-7SEzNA23.js": {
+      "file": "assets/optimize-7SEzNA23-BesG8gNH.js",
+      "name": "optimize-7SEzNA23",
+      "src": "../../../packages/gltf-pro/dist/optimize-7SEzNA23.js",
+      "isDynamicEntry": true
+    },
+    "../../../packages/gltf-pro/dist/spec-gloss.js": {
+      "file": "assets/spec-gloss-B-pv4k8o.js",
+      "name": "spec-gloss",
+      "src": "../../../packages/gltf-pro/dist/spec-gloss.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_errors-THVaUwlL-CVTt9P7e.js",
+        "_shader-DnO9Uahe-CYDstRbv.js",
+        "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
+        "_extended-CaeBbLdO.js"
+      ]
+    },
+    "../../../packages/gltf-pro/dist/splats.js": {
+      "file": "assets/splats-D85IrhD_.js",
+      "name": "splats",
+      "src": "../../../packages/gltf-pro/dist/splats.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_preload-helper-CRzLMJPS.js",
+        "_errors-THVaUwlL-CVTt9P7e.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/splats/dist/data.js",
+        "../../../packages/splats/dist/index.js"
+      ]
+    },
+    "../../../packages/splats/dist/compat-CDoDsXE8.js": {
+      "file": "assets/compat-CDoDsXE8-CDoDsXE8.js",
+      "name": "compat-CDoDsXE8",
+      "src": "../../../packages/splats/dist/compat-CDoDsXE8.js",
+      "isDynamicEntry": true
+    },
+    "../../../packages/splats/dist/data.js": {
+      "file": "assets/data-CKs3yTi9.js",
+      "name": "data",
+      "src": "../../../packages/splats/dist/data.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_data-Bgqcd67T-LhgzpA49.js"
+      ]
+    },
+    "../../../packages/splats/dist/encode-BC_HEDWB.js": {
+      "file": "assets/encode-BC_HEDWB-Crs4T1xT.js",
+      "name": "encode-BC_HEDWB",
+      "src": "../../../packages/splats/dist/encode-BC_HEDWB.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_preload-helper-CRzLMJPS.js",
+        "_data-Bgqcd67T-LhgzpA49.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/splats/dist/errors-BPm2c1ar.js"
+      ]
+    },
+    "../../../packages/splats/dist/errors-BPm2c1ar.js": {
+      "file": "assets/errors-BPm2c1ar-yH7JG8Hh.js",
+      "name": "errors-BPm2c1ar",
+      "src": "../../../packages/splats/dist/errors-BPm2c1ar.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_errors-BPm2c1ar-mpjgtJAk.js"
+      ]
+    },
+    "../../../packages/splats/dist/index.js": {
+      "file": "assets/dist-oIo7mdpt.js",
+      "name": "dist",
+      "src": "../../../packages/splats/dist/index.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_version-YYhCZP03.js",
+        "_extension-Bn1Wm_pY.js",
+        "_preload-helper-CRzLMJPS.js",
+        "_errors-BPm2c1ar-mpjgtJAk.js",
+        "_data-Bgqcd67T-LhgzpA49.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/splats/dist/compat-CDoDsXE8.js"
+      ]
+    },
+    "../../../packages/splats/dist/sog-DDo_i01Z.js": {
+      "file": "assets/sog-DDo_i01Z-DdVJV3TC.js",
+      "name": "sog-DDo_i01Z",
+      "src": "../../../packages/splats/dist/sog-DDo_i01Z.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_errors-BPm2c1ar-mpjgtJAk.js",
+        "_data-Bgqcd67T-LhgzpA49.js",
+        "_zip-BUnK-s_n-DSfmHgCo.js"
+      ]
+    },
+    "../../../packages/splats/dist/spz-NB0JqBtx.js": {
+      "file": "assets/spz-NB0JqBtx-yWGqk58x.js",
+      "name": "spz-NB0JqBtx",
+      "src": "../../../packages/splats/dist/spz-NB0JqBtx.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_preload-helper-CRzLMJPS.js",
+        "_errors-BPm2c1ar-mpjgtJAk.js",
+        "_data-Bgqcd67T-LhgzpA49.js",
+        "_zip-BUnK-s_n-DSfmHgCo.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/splats/dist/zstd-CsYgdoCI.js"
+      ]
+    },
+    "../../../packages/splats/dist/zstd-CsYgdoCI.js": {
+      "file": "assets/zstd-CsYgdoCI-E8DwME2m.js",
+      "name": "zstd-CsYgdoCI",
+      "src": "../../../packages/splats/dist/zstd-CsYgdoCI.js",
+      "isDynamicEntry": true
+    },
+    "_asset-ByDCtABg-9ESDVZ7l.js": {
+      "file": "assets/asset-ByDCtABg-9ESDVZ7l.js",
+      "name": "asset-ByDCtABg",
+      "imports": [
+        "_preload-helper-CRzLMJPS.js",
+        "_errors-THVaUwlL-CVTt9P7e.js",
+        "_meshopt-D0I6gboe.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/gltf-pro/dist/dds.js",
+        "../../../packages/gltf-pro/dist/splats.js",
+        "../../../packages/gltf-pro/dist/spec-gloss.js",
+        "../../../packages/gltf-pro/dist/extended.js",
+        "../../../packages/gltf-pro/dist/compression-CzpUdV8Z.js",
+        "../../../packages/gltf-pro/dist/optimize-7SEzNA23.js"
+      ]
+    },
+    "_data-Bgqcd67T-LhgzpA49.js": {
+      "file": "assets/data-Bgqcd67T-LhgzpA49.js",
+      "name": "data-Bgqcd67T",
+      "imports": [
+        "_preload-helper-CRzLMJPS.js",
+        "_errors-BPm2c1ar-mpjgtJAk.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/splats/dist/spz-NB0JqBtx.js",
+        "../../../packages/splats/dist/sog-DDo_i01Z.js",
+        "../../../packages/splats/dist/encode-BC_HEDWB.js"
+      ]
+    },
+    "_errors-BPm2c1ar-mpjgtJAk.js": {
+      "file": "assets/errors-BPm2c1ar-mpjgtJAk.js",
+      "name": "errors-BPm2c1ar"
+    },
+    "_errors-THVaUwlL-CVTt9P7e.js": {
+      "file": "assets/errors-THVaUwlL-CVTt9P7e.js",
+      "name": "errors-THVaUwlL"
+    },
+    "_extended-CaeBbLdO.js": {
+      "file": "assets/extended-CaeBbLdO.js",
+      "name": "extended",
+      "imports": [
+        "_shader-DnO9Uahe-CYDstRbv.js"
+      ]
+    },
+    "_extension-Bn1Wm_pY.js": {
+      "file": "assets/extension-Bn1Wm_pY.js",
+      "name": "extension",
+      "imports": [
+        "_version-YYhCZP03.js"
+      ]
+    },
+    "_meshopt-D0I6gboe.js": {
+      "file": "assets/meshopt-D0I6gboe.js",
+      "name": "meshopt"
+    },
+    "_model-Dgo3ejxs-Bf3VJW4Y.js": {
+      "file": "assets/model-Dgo3ejxs-Bf3VJW4Y.js",
+      "name": "model-Dgo3ejxs",
+      "imports": [
+        "_version-YYhCZP03.js",
+        "_extension-Bn1Wm_pY.js",
+        "_preload-helper-CRzLMJPS.js",
+        "_errors-THVaUwlL-CVTt9P7e.js",
+        "_asset-ByDCtABg-9ESDVZ7l.js",
+        "_shader-DnO9Uahe-CYDstRbv.js",
+        "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
+        "_texture-D-u4lFVe.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/gltf-pro/dist/compression-CzpUdV8Z.js"
+      ]
+    },
+    "_preload-helper-CRzLMJPS.js": {
+      "file": "assets/preload-helper-CRzLMJPS.js",
+      "name": "preload-helper"
+    },
+    "_shader-DnO9Uahe-CYDstRbv.js": {
+      "file": "assets/shader-DnO9Uahe-CYDstRbv.js",
+      "name": "shader-DnO9Uahe",
+      "imports": [
+        "_errors-THVaUwlL-CVTt9P7e.js"
+      ]
+    },
+    "_texture-D-u4lFVe.js": {
+      "file": "assets/texture-D-u4lFVe.js",
+      "name": "texture"
+    },
+    "_texture-coordinates-XFsEMdU6-rNEcXW-P.js": {
+      "file": "assets/texture-coordinates-XFsEMdU6-rNEcXW-P.js",
+      "name": "texture-coordinates-XFsEMdU6"
+    },
+    "_version-YYhCZP03.js": {
+      "file": "assets/version-YYhCZP03.js",
+      "name": "version"
+    },
+    "_zip-BUnK-s_n-DSfmHgCo.js": {
+      "file": "assets/zip-BUnK-s_n-DSfmHgCo.js",
+      "name": "zip-BUnK-s_n",
+      "imports": [
+        "_errors-BPm2c1ar-mpjgtJAk.js"
+      ]
+    },
+    "index.html": {
+      "file": "assets/index-DEnfwi_0.js",
+      "name": "index",
+      "src": "index.html",
+      "isEntry": true,
+      "imports": [
+        "_version-YYhCZP03.js",
+        "_preload-helper-CRzLMJPS.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/gltf-pro/dist/index.js",
+        "../../../packages/animation/dist/index.js"
+      ]
+    }
+  },
   "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
@@ -9,37 +336,118 @@
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 807,
-      "raw": 557,
-      "gzip": 371,
-      "brotli": 222
+      "transferred": 891,
+      "raw": 641,
+      "gzip": 393,
+      "brotli": 242
     },
     {
-      "path": "assets/index-DG_RKRCa.js",
+      "path": "assets/index-DEnfwi_0.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 24400,
-      "raw": 58626,
-      "gzip": 24018,
-      "brotli": 21178
+      "transferred": 25669,
+      "raw": 61646,
+      "gzip": 25287,
+      "brotli": 22302
     },
     {
-      "path": "assets/version-D1MoAe5f.js",
+      "path": "assets/version-YYhCZP03.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2796,
-      "raw": 4866,
-      "gzip": 2426,
-      "brotli": 2181
+      "transferred": 957,
+      "raw": 1077,
+      "gzip": 587,
+      "brotli": 526
     },
     {
-      "path": "assets/dist-DkwhzuMS.js",
-      "role": "@margoengine/gltf (addGLTF)",
+      "path": "assets/preload-helper-CRzLMJPS.js",
+      "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 7343,
-      "raw": 18127,
-      "gzip": 6971,
-      "brotli": 6269
+      "transferred": 1168,
+      "raw": 1534,
+      "gzip": 798,
+      "brotli": 682
+    },
+    {
+      "path": "assets/extension-Bn1Wm_pY.js",
+      "role": "Shared chunk",
+      "encoding": "identity",
+      "transferred": 441,
+      "raw": 120,
+      "gzip": 125,
+      "brotli": 113
+    },
+    {
+      "path": "assets/dist-2OP0Fp3o.js",
+      "role": "@margoengine/gltf-pro (addGLTF)",
+      "encoding": "identity",
+      "transferred": 1299,
+      "raw": 978,
+      "gzip": 596,
+      "brotli": 544
+    },
+    {
+      "path": "assets/errors-THVaUwlL-CVTt9P7e.js",
+      "role": "Shared chunk",
+      "encoding": "identity",
+      "transferred": 486,
+      "raw": 165,
+      "gzip": 149,
+      "brotli": 119
+    },
+    {
+      "path": "assets/meshopt-D0I6gboe.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 3444,
+      "raw": 7135,
+      "gzip": 3074,
+      "brotli": 2705
+    },
+    {
+      "path": "assets/asset-ByDCtABg-9ESDVZ7l.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 10168,
+      "raw": 30907,
+      "gzip": 9796,
+      "brotli": 8891
+    },
+    {
+      "path": "assets/texture-D-u4lFVe.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 1007,
+      "raw": 1189,
+      "gzip": 637,
+      "brotli": 553
+    },
+    {
+      "path": "assets/texture-coordinates-XFsEMdU6-rNEcXW-P.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 1680,
+      "raw": 3127,
+      "gzip": 1310,
+      "brotli": 1189
+    },
+    {
+      "path": "assets/shader-DnO9Uahe-CYDstRbv.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 11443,
+      "raw": 37710,
+      "gzip": 11071,
+      "brotli": 10059
+    },
+    {
+      "path": "assets/model-Dgo3ejxs-Bf3VJW4Y.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 45389,
+      "raw": 134354,
+      "gzip": 44997,
+      "brotli": 39503
     },
     {
       "path": "model.glb",
@@ -52,11 +460,112 @@
     }
   ],
   "total": {
-    "requests": 5,
-    "transferred": 36951,
-    "raw": 83508,
-    "gzip": 34240,
-    "brotli": 30209
+    "requests": 14,
+    "transferred": 105647,
+    "raw": 281915,
+    "gzip": 99274,
+    "brotli": 87787
   },
-  "notFetched": []
+  "notFetched": [
+    {
+      "path": "assets/basis_transcoder-DRsa3jdg.js",
+      "raw": 58516
+    },
+    {
+      "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+      "raw": 527333
+    },
+    {
+      "path": "assets/compat-CDoDsXE8-CDoDsXE8.js",
+      "raw": 1134
+    },
+    {
+      "path": "assets/compression-CzpUdV8Z-06wb_MIm.js",
+      "raw": 4131
+    },
+    {
+      "path": "assets/data-Bgqcd67T-LhgzpA49.js",
+      "raw": 21284
+    },
+    {
+      "path": "assets/data-CKs3yTi9.js",
+      "raw": 335
+    },
+    {
+      "path": "assets/dds-D1fO5pS4.js",
+      "raw": 17211
+    },
+    {
+      "path": "assets/decoder.worker-DuddskkO.js",
+      "raw": 17754
+    },
+    {
+      "path": "assets/dist-BPDCXx1G.js",
+      "raw": 72154
+    },
+    {
+      "path": "assets/dist-CvGs8hlY.js",
+      "raw": 7044
+    },
+    {
+      "path": "assets/dist-oIo7mdpt.js",
+      "raw": 27142
+    },
+    {
+      "path": "assets/draco_decoder-Z1_iN-Ht.wasm",
+      "raw": 192420
+    },
+    {
+      "path": "assets/draco_wasm_wrapper-fZCQGLGb.js",
+      "raw": 58456
+    },
+    {
+      "path": "assets/encode-BC_HEDWB-Crs4T1xT.js",
+      "raw": 10578
+    },
+    {
+      "path": "assets/errors-BPm2c1ar-mpjgtJAk.js",
+      "raw": 365
+    },
+    {
+      "path": "assets/errors-BPm2c1ar-yH7JG8Hh.js",
+      "raw": 50
+    },
+    {
+      "path": "assets/extended-CaeBbLdO.js",
+      "raw": 2460
+    },
+    {
+      "path": "assets/extended-DExc1eud.js",
+      "raw": 59
+    },
+    {
+      "path": "assets/optimize-7SEzNA23-BesG8gNH.js",
+      "raw": 3727
+    },
+    {
+      "path": "assets/sog-DDo_i01Z-DdVJV3TC.js",
+      "raw": 11597
+    },
+    {
+      "path": "assets/spec-gloss-B-pv4k8o.js",
+      "raw": 2872
+    },
+    {
+      "path": "assets/splats-D85IrhD_.js",
+      "raw": 4104
+    },
+    {
+      "path": "assets/spz-NB0JqBtx-yWGqk58x.js",
+      "raw": 4260
+    },
+    {
+      "path": "assets/zip-BUnK-s_n-DSfmHgCo.js",
+      "raw": 2633
+    },
+    {
+      "path": "assets/zstd-CsYgdoCI-E8DwME2m.js",
+      "raw": 12266
+    }
+  ]
 }

@@ -43,7 +43,10 @@ test('every BC format has a vector or a hand-made block', () => {
   signed[0] = 0x81; // -127
   signed[1] = 0x81;
   assert.deepEqual([...decodeBC('bc4-r-snorm', signed, 4, 4).data.subarray(0, 4)], [0, 128, 128, 255]);
-  assert.throws(() => decodeBC('bc1-rgba-unorm', new Uint8Array(7), 4, 4), (e) => e.code === 'failed');
+  assert.throws(
+    () => decodeBC('bc1-rgba-unorm', new Uint8Array(7), 4, 4),
+    (e) => e.code === 'failed',
+  );
 });
 
 test('a size that is no multiple of four crops the last blocks', () => {
@@ -116,7 +119,7 @@ test('decodeImage stops on an aborted signal', async () => {
 test('decodeImage refuses what it cannot read, by name', async () => {
   await assert.rejects(decodeImage(new Uint8Array(16)), (e) => e.code === 'failed');
   await assert.rejects(decodeImage(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), (e) => e.code === 'failed');
-  await assert.rejects(decodeImage(new TextEncoder().encode('\0\0\0\x1cftypavif')), (e) => e.code === 'unsupported');
+  await assert.rejects(decodeImage(new TextEncoder().encode('\0\0\0\x1cftypavif')), (e) => e.code === 'failed');
   await assert.rejects(decodeImage('a.webp'), TypeError);
 });
 
@@ -128,11 +131,26 @@ test('textureFileToRGBA unpacks plain formats and refuses ETC and ASTC', async (
   assert.deepEqual(await rgba('r8unorm', new Uint8Array([9])), [9, 0, 0, 255]);
   assert.deepEqual(await rgba('rg8unorm', new Uint8Array([9, 8])), [9, 8, 0, 255]);
   assert.deepEqual(await rgba('rg8snorm', new Uint8Array([127, 0x81])), [255, 0, 128, 255]);
-  assert.deepEqual(await rgba('rgba32float', new Uint8Array(new Float32Array([1, 0, 0, 0.5]).buffer)), [255, 0, 0, 128]);
-  assert.deepEqual(await rgba('rgba16float', new Uint8Array(new Uint16Array([0x3c00, 0, 0, 0x3c00]).buffer)), [255, 0, 0, 255]);
-  assert.deepEqual(await rgba('rgb10a2unorm', new Uint8Array(new Uint32Array([1023 | (3 << 30)]).buffer)), [255, 0, 0, 255]);
-  await assert.rejects(textureFileToRGBA(of('etc2-rgb8unorm', 4, 4, new Uint8Array(8))), (e) => e.code === 'unsupported');
-  await assert.rejects(textureFileToRGBA(of('astc-4x4-unorm', 4, 4, new Uint8Array(16))), (e) => e.code === 'unsupported');
+  assert.deepEqual(
+    await rgba('rgba32float', new Uint8Array(new Float32Array([1, 0, 0, 0.5]).buffer)),
+    [255, 0, 0, 128],
+  );
+  assert.deepEqual(
+    await rgba('rgba16float', new Uint8Array(new Uint16Array([0x3c00, 0, 0, 0x3c00]).buffer)),
+    [255, 0, 0, 255],
+  );
+  assert.deepEqual(
+    await rgba('rgb10a2unorm', new Uint8Array(new Uint32Array([1023 | (3 << 30)]).buffer)),
+    [255, 0, 0, 255],
+  );
+  await assert.rejects(
+    textureFileToRGBA(of('etc2-rgb8unorm', 4, 4, new Uint8Array(8))),
+    (e) => e.code === 'unsupported',
+  );
+  await assert.rejects(
+    textureFileToRGBA(of('astc-4x4-unorm', 4, 4, new Uint8Array(16))),
+    (e) => e.code === 'unsupported',
+  );
 });
 
 test('the reference PNGs read', () => {

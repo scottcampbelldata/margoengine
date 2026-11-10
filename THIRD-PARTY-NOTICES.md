@@ -409,3 +409,19 @@ idr0096-crop.ome.tiff: Tratwal et al., idr0096-tratwal-marrowquant, GFP11_6192_o
 All owner-generated synthetic FITS/MRC/TIFF fixtures are original Margo test data, written using installed libraries' public APIs. No library or rival implementation source is incorporated.
 ### Published colour definitions (batch 178 job 4)
 Numerical facts in packages/sciviz/src/cvd-data.ts are transcribed from Table 1 of the Machado, Oliveira and Fernandes (2009) author supplement, https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html . Tol categorical sRGB definitions in colormaps.ts come from Paul Tol, Colour schemes and templates (2026), https://sronpersonalpages.nl/~pault/ . These are published numerical definitions, not copied software or other repository files. No software licence for an external implementation is used or asserted. Full references and clean-room decisions: docs/sciviz-colors.md. Existing OISST and 2MASS public-domain assets are reused unchanged.
+
+### Batch 203 AVIF conformance assets and numerical standard tables
+
+`packages/decoders/native/avif/tests/fixtures/NOTICE.md` records the unmodified
+AOM AVIF specification Link-U conformance images (CC-BY-SA-4.0), pinned source
+URLs, authors and SHA-256 manifest. These are test assets, never runtime assets.
+`packages/decoders/native/avif/src/cdf_tables.rs` and `tables.rs` contain numerical
+standard data extracted from the published AOM AV1 specification by
+`packages/decoders/scripts/avif-spec-tables.py`, not external implementation code.
+Source: de Rivaz and Haughton, AV1 Bitstream & Decoding Process Specification
+(2023), <https://aomediacodec.github.io/av1-spec/>; licensing information:
+<https://aomedia.org/license/>. The generator records the input document hash.
+
+## Batch 203 AVIF additional conformance assets
+
+The additional four libavif standard images and their independently decoded RGB references use the BSD-2-Clause test-asset license, Copyright 2019 Joe Drago, reproduced in packages/decoders/native/avif/tests/fixtures/NOTICE.md. container-references.json pins original URLs/revisions and SHA-256 values. The analytic tools-* rasters are Margo-authored CC0-1.0 data, encoded only through opaque development tools, except tools-superres.avif, a resized/re-encoded Kaede Fujisaki fox conformance asset retaining CC-BY-SA-4.0 attribution from the Link-U corpus. No encoder or external decoder implementation/binary ships as AVIF runtime code.

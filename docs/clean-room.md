@@ -7962,3 +7962,78 @@ Compared Kai Ninomiya, Brandon Jones and Jim Blandy (editors), W3C WebGPU (2026)
 ## Review 3 SV2: cancellable SSE byte waits (2026-11-10)
 
 Compared WHATWG contributors, DOM Standard, Aborting ongoing activities (2026), https://dom.spec.whatwg.org/#aborting-ongoing-activities ; Ecma International, ECMAScript 2024 Language Specification, AsyncGeneratorEnqueue and asynchronous iterator closure (2024), https://tc39.es/ecma262/2024/multipage/control-abstraction-objects.html#sec-asyncgeneratorenqueue ; and WHATWG contributors, HTML Standard, Parsing an event stream (2026), https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream . DOM supplies rejection with the exact abort reason; generator queuing explains why a source return cannot itself interrupt its pending next; HTML retains existing SSE framing and decoding. Reuse the entry's abort listener/promise settlement for byte reads and cleanup as well as asynchronous parsers. The byte adapter requests return once on early termination, observes its completion/rejection, and lets abort settle without waiting for an uncooperative source. Normal exhaustion makes no return request. No source protocol, data bound or engine API changes. The original independent pending-read regression fails before the fix; tracked tests retain normal framing and prove abort identity, pending cleanup, normal exhaustion and early return. No external implementation or companion code was read.
+
+## Batch 203 job 4: clean-room AVIF still images
+
+The native/avif crate is Margo-authored from the numerical algorithms in the
+standards below. No AV1 decoder implementation source, glue or binary was read
+or imported. The crate has no dependencies. Its parser, entropy reader,
+coefficient reconstruction, integer transforms, all intra predictors, screen-content tools,
+film grain and container composition are owned Rust. The optional /avif entry runs one lazy SIMD
+Wasm asset in browser and Node workers; no platform or app-installed decoder is called.
+
+Research compared and combined:
+
+- Peter de Rivaz and Jack Haughton, *AV1 Bitstream & Decoding Process
+  Specification* (AOM, 2023), <https://aomediacodec.github.io/av1-spec/>.
+  Read the sequence/frame/OBU syntax, tile partition and intra syntax, entropy
+  decoding, coefficient contexts, dequantization, inverse transforms, intra
+  prediction, deblocking, CDEF, super-resolution and loop restoration. This is the normative source for integer
+  rounding, adaptation, context numbering and the numerical tables. Read the applicable palette/cache/token, MV-stack, intra-copy, film-grain generation,
+  scaling and overlap clauses in this continuation. The full inter-frame specification is outside this still-image job.
+- Yannis Guyon, Leo Barnes and Wan-Teh Chang (editors), *AV1 Image File
+  Format (AVIF) v1.2.0* (AOM, 2025),
+  <https://aomediacodec.github.io/av1-avif/v1.2.0.html>. Read the still-image,
+  configuration, auxiliary alpha, derived-image and required-box clauses.
+- ISO/IEC, *ISO base media file format*, ISO/IEC 14496-12:2015, section 8.11,
+  <https://www.iso.org/standard/68960.html>; Nokia, *HEIF Technical Information*
+  (2017), <https://nokiatech.github.io/heif/technical.html>. Consulted the item
+  directory, location, reference, property and derived-grid descriptions.
+- Jingning Han et al., *A Technical Overview of AV1* (Proceedings of the IEEE,
+  2021), <https://arxiv.org/abs/2008.06091>. Overview consulted, not read in full.
+  It motivates distinct entropy, block reconstruction and frame-filter stages.
+- Yue Chen et al., *An Overview of Core Coding Tools in the AV1 Video Codec*
+  (Picture Coding Symposium, 2018),
+  <https://norkin.org/pdf/PCS_2018_AV1_tools_overview.pdf>. Coding-tool overview
+  consulted, not read in full. The adaptive multi-symbol coder and intra tool
+  inventory informed the module boundaries; the AV1 spec remains authoritative.
+- Hui Su, Alexander Bokov, Urvang Joshi, Debargha Mukherjee, Jingning Han and
+  Yue Chen, *Context-Adaptive Recursive-Filtering-Based Intra Prediction in
+  Video Coding* (2019),
+  <https://research.google/pubs/context-adaptive-recursive-filtering-based-intra-prediction-in-video-coding/>.
+  Abstract consulted to distinguish research extensions from AV1's fixed normative
+  recursive filter; Margo implements the standard's five fixed filters.
+
+The avif-spec-tables.py generator accepts only numerical arrays from the published
+AV1 standard document. Its generated constants record the document URL and input
+SHA-256. It does not consume a codec repository or translate implementation code.
+The original, unmodified Link-U conformance images and their sources, attribution,
+CC-BY-SA-4.0 license and hashes are recorded alongside the tests. They exercise
+all three profiles, 8/10/12 bits, 4:2:0/4:2:2/4:4:4, monochrome, odd dimensions
+and container transformations. The committed independent reference corpus proves scalar and Wasm sample identity
+for the named files; it does not claim exhaustive AV1 conformance.
+
+The row-finalization SIMD path uses explicit four-lane integer add, shift, min
+and max instructions. The work-count comparison is four lane operations for four
+samples versus sixteen scalar operations, with no timing claim. The test-only
+transform probe executes 912 native-scalar/Wasm contracts and checks emitted SIMD
+instructions. A quiet-machine speed result is deferred to the speed phase.
+
+The reconstruction checkpoint now includes deblocking, CDEF, super-resolution,
+Wiener restoration and self-guided restoration. Additional research: Steinar
+Midtskogen and Jean-Marc Valin, *The AV1 Constrained Directional Enhancement
+Filter (CDEF)* (2017 revision), <https://arxiv.org/abs/1602.05975>, abstract
+consulted, not read in full. The numerical filter is from the normative AV1
+clauses, not the paper's companion implementation. W3C, *WebCodecs* (Working
+Draft, 9 November 2026), <https://www.w3.org/TR/webcodecs/>, was consulted for
+raw VideoFrame copyTo formats and the independent oracle capture.
+
+Six raw frames match Chromium 157.0.4341.42; the 12-bit monochrome frame and nine independent tool encodings match libdav1d through PyAV 19.0.2. All 16 frames, totaling 14,828,077 unshifted YUV samples, are exact in native Rust and actual Wasm SIMD. Coverage asserts 20 palette blocks, 22/7/1243 lossless copy blocks, 50 lossy copy blocks, 34 subsampled copy blocks, nonzero Wiener/SGR units, film grain, four tiles with qmatrices and 3:2 super-resolution. Tool rasters and generation settings are original; encoder binaries are opaque development oracles and never ship.
+
+Additional research read for this continuation: Andrey Norkin and Neil Birkbeck, *Film Grain Synthesis for AV1 Video Codec* (DCC, 2018), described in Norkin's *Film grain synthesis in AV1* (2019), https://norkin.org/research/film_grain/index.html . The description explains the AR model, scaling LUT and overlap; the exact equations and Gaussian data are from AV1 7.18.3, not companion code. ITU-T, *H.273: Coding-independent code points for video signal type identification* (2024), https://www.itu.int/rec/T-REC-H.273-202407-I/en , tables 2/3/4 and equations 14-84, supplies CICP matrix/transfer mathematics. W3C CSS Working Group, *CSS Color Module Level 4* (2026), https://www.w3.org/TR/css-color-4/ , supplies the primaries/white-point interpretation; H.273 remains normative. Compared direct coefficient conversion, chromaticity-derived conversion and constant-luminance/LMS conversion; use the declared CICP system rather than guessing an ICC display profile.
+
+The container stage validates configuration/header/spatial/pixel-depth agreement, resolves bounded item extents, composes identity and shared grids in YUV before chroma interpolation, applies item transforms in association order, and handles auxiliary and premultiplied alpha. It preserves ICC bytes and source precision. Independent RGBA data covers rational crop/rotate/mirror, a five-tile grid, alpha and ICC. The fast libavif RGB path differs in the uncommon BT.2020 kimono blue coefficient; a centered/full-precision swscale oracle resolves that case within the unchanged one-level bound. Other RGB references permit their specified one/two-level resampling/rounding differences, alpha always exact. Exact normative YUV proof is separate from optional RGB resampling.
+
+The public worker lifecycle covers AbortSignal, transfer, timeout, disposal/restart, malformed files, bounded padded workspace and lazy /image dispatch. Browser GPU tests verify 4,762,292 uploaded/read-back bytes per backend on native WebGPU and WebGL2 compatibility. This is still-image/intra decoding, not animated or progressive inter-frame playback, encrypted/external items, tone mapping or automatic ICC display management. No timing claim is made.
+
+Batch 203 landing integration: main 3d7dd74c9 selects gltf-pro from Stage/gltf, while the size recorder still searched for the legacy gltf chunk. Research: Vite contributors, Backend Integration (Vite 4 documentation, retrieved 2026), https://v4.vite.dev/guide/backend-integration , defines imports, dynamicImports and assets; WHATWG contributors, HTML Standard module graph fetching (2026), https://html.spec.whatwg.org/multipage/webappapis.html , separates static descendant loading from dynamic import calls. The owned graph walker uses visited sets, pins exact static request closure, records deferred codec assets belonging to the selected loader, rejects unrelated emitted packs and still rejects every fetched decoder/worker/Wasm. Original regressions cover cycles, shared imports, deferred/unrelated assets and missing edges. No README fixture, stage runtime or protected browser helper changed.

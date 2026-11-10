@@ -26,6 +26,8 @@ for (const pattern of [
   /^draco-native-.*\.wasm$/,
   /^hdr6\.worker-.*\.js$/,
   /^hdr6-.*\.wasm$/,
+  /^avif\.worker-.*\.js$/,
+  /^avif-.*\.wasm$/,
   /^draco_decoder-.*\.wasm$/,
   /^draco_wasm_wrapper-.*\.js$/,
   /^basis_transcoder-.*\.wasm$/,

@@ -1,0 +1,408 @@
+[
+  {
+    "file": "fox.profile0.8bpc.yuv420.avif",
+    "width": 1204,
+    "height": 800,
+    "depth": 8,
+    "subX": true,
+    "subY": true,
+    "format": "I420",
+    "samples": 1444800,
+    "browser": "157.0.4341.42",
+    "oracle": "VideoDecoder",
+    "inputSha256": "d0ca9be129d6d06a65f7e852388c9d017b23bf5349af166634a6dacd567dd5e9",
+    "decodedSha256": "a9f523bde5a466a809c019a31731e902b6039e94310ae7f5128b78416892c02d",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        11,
+        12
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "fox.profile0.10bpc.yuv420.avif",
+    "width": 1204,
+    "height": 800,
+    "depth": 10,
+    "subX": true,
+    "subY": true,
+    "format": "I420P10",
+    "samples": 1444800,
+    "browser": "157.0.4341.42",
+    "oracle": "VideoDecoder",
+    "inputSha256": "3f64c834081df61854d514fab050998cae2d236952c3f4d8c9fc18d99965c820",
+    "decodedSha256": "95cbbfe1b6528c403723b489418c3b97171844570c19ed85bc3839746709950c",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        11,
+        12
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "fox.profile1.8bpc.yuv444.avif",
+    "width": 1204,
+    "height": 800,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "I444",
+    "samples": 2889600,
+    "browser": "157.0.4341.42",
+    "oracle": "VideoDecoder",
+    "inputSha256": "a3927fd56a620eb45bc2b563afcf6d6f413344d12c0ef9fa90020c29b390a439",
+    "decodedSha256": "aed39a4af8687b7f27256f112a5ab17b78766391c309dcfb946a23a27c627a06",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        27,
+        18
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "fox.profile2.10bpc.yuv422.avif",
+    "width": 1204,
+    "height": 800,
+    "depth": 10,
+    "subX": true,
+    "subY": false,
+    "format": "I422P10",
+    "samples": 1926400,
+    "browser": "157.0.4341.42",
+    "oracle": "VideoDecoder",
+    "inputSha256": "fc4995d5ad3ffcb36e97fcd75b4c7c0d0baf5e223016c9b8411b5680fd994357",
+    "decodedSha256": "77b49484ac7f062bfb1fece9f6e805dfc421e958bbd7345010d1659d53b86a48",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        15,
+        12
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "fox.profile2.12bpc.yuv444.avif",
+    "width": 1204,
+    "height": 800,
+    "depth": 12,
+    "subX": false,
+    "subY": false,
+    "format": "I444P12",
+    "samples": 2889600,
+    "browser": "157.0.4341.42",
+    "oracle": "ImageDecoder",
+    "inputSha256": "f3e7adaa9d16c74837a83ee2981a95321fc375e9478183f5841d1de43b261f4c",
+    "decodedSha256": "e75e1166b5b890754c6edaa0d1764a27c338bbebff3ce8636b7e323865fe9b9f",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        35,
+        10
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "kimono.mirror-vertical.rotate270.crop.avif",
+    "width": 1024,
+    "height": 722,
+    "depth": 8,
+    "subX": true,
+    "subY": true,
+    "format": "I420",
+    "samples": 1108992,
+    "browser": "157.0.4341.42",
+    "oracle": "VideoDecoder",
+    "inputSha256": "daa55f4a4bcf2f64e1efdf43c50a4ffa9aa341b0941d3ad5c3765d9c488a5ad9",
+    "decodedSha256": "df94976947599be05c4eee6867a5492f52cd516da733934e7a223eee9e9eafbe",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "fox.profile2.12bpc.yuv420.monochrome.odd-width.odd-height.avif",
+    "width": 1203,
+    "height": 799,
+    "depth": 12,
+    "subX": true,
+    "subY": true,
+    "format": "gray12le",
+    "samples": 961197,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "05dd5aa3df65b4ad612ec8911a68eb5fbb651379dda9fce12407f4a368f1e426",
+    "decodedSha256": "0676bbdc8d1c5de1b45e80a0f8dd69c9e2f49fa2f6a4435376744a5b595baa9f",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        7,
+        8
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-palette.avif",
+    "width": 128,
+    "height": 128,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 49152,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "c2e50024c615f3f1d1cb81b4fba4be089bc6f44bf70f8b76993eda0ba5a2dbfc",
+    "decodedSha256": "a5dd6550b771210e6960a651197d2f0f6ab3cb3f9249891c5bb6c483c26c45a8",
+    "coverage": {
+      "tools": [
+        20,
+        0,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-copy-allintra.avif",
+    "width": 1024,
+    "height": 128,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 393216,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "08005f5ea86939d9ea735035918fbbd3fd0ad9ff731cd9f79ddbe11136a30b26",
+    "decodedSha256": "02384b9d0ef95fc1b8a2e951b14777dc85389c5c1c4e5288572ed143001eb50d",
+    "coverage": {
+      "tools": [
+        0,
+        22,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-copy-good.avif",
+    "width": 1024,
+    "height": 128,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 393216,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "1110897d5784d382e09dc69e6ba4ec2317b68922635d0a316ed59e3f9d9e00d3",
+    "decodedSha256": "02384b9d0ef95fc1b8a2e951b14777dc85389c5c1c4e5288572ed143001eb50d",
+    "coverage": {
+      "tools": [
+        0,
+        7,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-copy-realtime.avif",
+    "width": 1024,
+    "height": 128,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 393216,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "98576f84bee913665a71a082683f6783283bf1cd721d569694c68275cab46e3f",
+    "decodedSha256": "02384b9d0ef95fc1b8a2e951b14777dc85389c5c1c4e5288572ed143001eb50d",
+    "coverage": {
+      "tools": [
+        0,
+        1243,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-grain.avif",
+    "width": 128,
+    "height": 128,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 49152,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "1da327860a12658c0dc1b755c1fd723f33024117a158af86943c54f8c9866bff",
+    "decodedSha256": "8c7896ed0fa20504ce73e695f3092fc6d4613022382d9f0a80ab717ce4881a0d",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": true,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-tiles.avif",
+    "width": 256,
+    "height": 256,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 196608,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "59a7f1834c684bc331f554838944ed81f80e2366a41bbc15ba3ff26e4bb39828",
+    "decodedSha256": "25682be1c7caebdb4403508b05c314f1cafe164437036360348e05a282e5d973",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 4,
+      "qmatrix": true
+    }
+  },
+  {
+    "file": "tools-superres.avif",
+    "width": 256,
+    "height": 256,
+    "depth": 8,
+    "subX": true,
+    "subY": true,
+    "format": "yuv420p",
+    "samples": 98304,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "e754fef2f475e02365a849f25ea4cc437816c14e3ba0ec9149ec1e04b4df1784",
+    "decodedSha256": "534a203bed90e8733637509e051f7649d128a24612817a3eec3ee63be9bdc5c8",
+    "coverage": {
+      "tools": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "superres": 12,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-copy-lossy.avif",
+    "width": 1024,
+    "height": 128,
+    "depth": 8,
+    "subX": false,
+    "subY": false,
+    "format": "yuv444p",
+    "samples": 393216,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "d4be1e46a4616621c1c300434ca660805c04548326ee2afb585a107c4d6c4c42",
+    "decodedSha256": "700071ffcaf4730cbd411655200a0f460be772eedccd0bf064712ac13de6e40e",
+    "coverage": {
+      "tools": [
+        0,
+        50,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  },
+  {
+    "file": "tools-copy-420.avif",
+    "width": 1024,
+    "height": 128,
+    "depth": 8,
+    "subX": true,
+    "subY": true,
+    "format": "yuv420p",
+    "samples": 196608,
+    "oracle": "FFmpeg libavcodec 63.1.102 through PyAV 19.0.2, libdav1d",
+    "inputSha256": "d830833472d6f139864e230bc43570180c95e962d1e2112ec7037dad0515aa76",
+    "decodedSha256": "37bbeea122a053a627493ba2c9e45b34ed5dc041f9f5d32ab4a6c0d126b76d38",
+    "coverage": {
+      "tools": [
+        0,
+        34,
+        0,
+        0
+      ],
+      "superres": 8,
+      "grain": false,
+      "tiles": 1,
+      "qmatrix": false
+    }
+  }
+]

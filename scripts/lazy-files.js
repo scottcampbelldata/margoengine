@@ -365,6 +365,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/avif.worker.js',
+    label: 'avif.worker.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First AVIFDecoder.decode(): browser or Node module worker, retained until dispose()',
+  },
+  {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/avif.wasm',
+    label: 'avif.wasm',
+    kind: 'Rust SIMD AV1 still-image decoder',
+    measure: 'file',
+    when: 'With the AVIF worker above, once per worker; decoderPath can relocate the asset',
+  },
+  {
+    package: '@margoengine/decoders',
     file: 'packages/decoders/dist/hdr6.wasm',
     label: 'hdr6.wasm',
     kind: 'Wasm',

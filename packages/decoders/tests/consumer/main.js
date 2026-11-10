@@ -4,6 +4,8 @@ import { JXLDecoder } from '../../dist/jxl.js';
 import { DracoPointsDecoder } from '../../dist/draco-points.js';
 import { DracoDecoder as NativeDraco } from '../../dist/draco-native.js';
 import { KTX2HDR6Decoder } from '../../dist/ktx2-hdr6.js';
+import { AVIFDecoder } from '../../dist/avif.js';
+import avifURL from '../../native/avif/tests/fixtures/white_1x1.avif?url';
 import hdr6URL from '../fixtures/ktx2-hdr6/intermediate-real.ktx2?url';
 import boxURL from '../fixtures/Box.bin?url';
 import ktxURL from '../fixtures/AnisotropyBarnLamp_normalbump.ktx2?url';
@@ -11,6 +13,14 @@ import jxlURL from '../fixtures/jxl/grayscale.jxl?url';
 import cubeURL from '../fixtures/draco-points/cube_pc.drc?url';
 
 window.runConsumer = async () => {
+  const avif = new AVIFDecoder({ workerLimit: 1 });
+  try {
+    const image = await avif.decode(await (await fetch(avifURL)).arrayBuffer());
+    if (image.width !== 1 || image.height !== 1 || image.data.join(',') !== '253,253,253,255')
+      throw new Error('AVIF production module worker or lazy SIMD asset failed');
+  } finally {
+    avif.dispose();
+  }
   const hdr6 = new KTX2HDR6Decoder({ workerLimit: 1 });
   try {
     const texture = await hdr6.decode(await (await fetch(hdr6URL)).arrayBuffer());

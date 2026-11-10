@@ -1,0 +1,107 @@
+[
+  {
+    "file": "fox.profile0.8bpc.yuv420.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/fox.profile0.8bpc.yuv420.avif",
+    "sha256": "d0ca9be129d6d06a65f7e852388c9d017b23bf5349af166634a6dacd567dd5e9",
+    "bytes": 63490
+  },
+  {
+    "file": "fox.profile0.10bpc.yuv420.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/fox.profile0.10bpc.yuv420.avif",
+    "sha256": "3f64c834081df61854d514fab050998cae2d236952c3f4d8c9fc18d99965c820",
+    "bytes": 64431
+  },
+  {
+    "file": "fox.profile1.8bpc.yuv444.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/fox.profile1.8bpc.yuv444.avif",
+    "sha256": "a3927fd56a620eb45bc2b563afcf6d6f413344d12c0ef9fa90020c29b390a439",
+    "bytes": 74235
+  },
+  {
+    "file": "fox.profile2.10bpc.yuv422.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/fox.profile2.10bpc.yuv422.avif",
+    "sha256": "fc4995d5ad3ffcb36e97fcd75b4c7c0d0baf5e223016c9b8411b5680fd994357",
+    "bytes": 68853
+  },
+  {
+    "file": "fox.profile2.12bpc.yuv444.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/fox.profile2.12bpc.yuv444.avif",
+    "sha256": "f3e7adaa9d16c74837a83ee2981a95321fc375e9478183f5841d1de43b261f4c",
+    "bytes": 75333
+  },
+  {
+    "file": "fox.profile2.12bpc.yuv420.monochrome.odd-width.odd-height.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/fox.profile2.12bpc.yuv420.monochrome.odd-width.odd-height.avif",
+    "sha256": "05dd5aa3df65b4ad612ec8911a68eb5fbb651379dda9fce12407f4a368f1e426",
+    "bytes": 55263
+  },
+  {
+    "file": "kimono.mirror-vertical.rotate270.crop.avif",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/bf4c18d1f3971069b75e87d6ee469790589f4f09/testFiles/Link-U/kimono.mirror-vertical.rotate270.crop.avif",
+    "sha256": "daa55f4a4bcf2f64e1efdf43c50a4ffa9aa341b0941d3ad5c3765d9c488a5ad9",
+    "bytes": 85578
+  },
+  {
+    "file": "tools-palette.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "c2e50024c615f3f1d1cb81b4fba4be089bc6f44bf70f8b76993eda0ba5a2dbfc",
+    "bytes": 484
+  },
+  {
+    "file": "tools-copy-allintra.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "08005f5ea86939d9ea735035918fbbd3fd0ad9ff731cd9f79ddbe11136a30b26",
+    "bytes": 68235
+  },
+  {
+    "file": "tools-copy-good.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "1110897d5784d382e09dc69e6ba4ec2317b68922635d0a316ed59e3f9d9e00d3",
+    "bytes": 65969
+  },
+  {
+    "file": "tools-copy-realtime.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "98576f84bee913665a71a082683f6783283bf1cd721d569694c68275cab46e3f",
+    "bytes": 210289
+  },
+  {
+    "file": "tools-grain.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "1da327860a12658c0dc1b755c1fd723f33024117a158af86943c54f8c9866bff",
+    "bytes": 8649
+  },
+  {
+    "file": "tools-tiles.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "59a7f1834c684bc331f554838944ed81f80e2366a41bbc15ba3ff26e4bb39828",
+    "bytes": 33867
+  },
+  {
+    "file": "tools-superres.avif",
+    "source": "Kaede Fujisaki fox image from the pinned Link-U conformance fixture; resized to 256x256 and encoded by black-box SVT-AV1 through PyAV 19.0.2, superres 12/8",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "e754fef2f475e02365a849f25ea4cc437816c14e3ba0ec9149ec1e04b4df1784",
+    "bytes": 17601
+  },
+  {
+    "file": "tools-copy-lossy.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "d4be1e46a4616621c1c300434ca660805c04548326ee2afb585a107c4d6c4c42",
+    "bytes": 19881
+  },
+  {
+    "file": "tools-copy-420.avif",
+    "source": "Margo-authored analytic raster; black-box libaom in imageio-ffmpeg v9.0.2; no encoder implementation read",
+    "license": "CC0-1.0",
+    "sha256": "d830833472d6f139864e230bc43570180c95e962d1e2112ec7037dad0515aa76",
+    "bytes": 62842
+  }
+]

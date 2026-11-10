@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14603957,
+  "total": 15164189,
   "history": [
     {
       "date": "2026-10-24",
@@ -7817,6 +7817,18 @@
       "commit": "batch178-job4",
       "reason": "Batch 178 job 4: construction maps, Tol schemes, Machado diagnostic, exact scale/bin/special-colour GPU and publication contracts. Rebuilt parent/current entry measurements in docs/whitepaper/results/batch178-colors.json. Root 56915 to 60026 B; colormaps 16880 to 22069 B. Optional growth retains one shared classification owner; a split would duplicate shader metadata or require application registration glue. Also reconcile inherited lines/debug 9874 B against its 9836 B ceiling after the job 3 shared Lines frame expansion; its source is unchanged here. No precision or feature is removed. Core+stage 24209 unchanged.",
       "grew": 13
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "a8b294f2f",
+      "reason": "AVIF adds one complete clean-room lazy Rust SIMD decoder: image gzip 1037682 bytes and new avif 270887 bytes. Keeping CDFs, integer transforms, filters and still-image tools together preserves quality without splitting the codec into more load steps. Core plus stage remains 24209 bytes.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d4145eda4",
+      "reason": "Inherited main tiled-camera capture and allocation inventory grow lines/debug from 9549 to 9874 gzip B; ceiling 9836 to 10171. Retain shared Line/LineBatch camera and resource ownership; splitting would duplicate it. Budget-only landing repair, no lines runtime change; core plus stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8057,7 +8069,7 @@
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/draco-native": 67462,
     "@margoengine/decoders/draco-points": 154011,
-    "@margoengine/decoders/image": 787595,
+    "@margoengine/decoders/image": 1068813,
     "@margoengine/decoders/jpeg": 4030,
     "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 2851,
@@ -9227,6 +9239,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/decoders/avif": 279014
   }
 }

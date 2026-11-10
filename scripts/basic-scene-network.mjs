@@ -22,6 +22,7 @@ import { listenWhenFree } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { sceneGraph } from './support/basic-scene-graph.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
@@ -113,28 +114,35 @@ await writeFile(join(out, 'model.glb'), cubeGLB());
 
 // Expected: the HTML, the entry chunk and its static imports, the @margoengine/gltf chunk (and its static imports), the model.
 const manifest = JSON.parse(readFileSync(join(out, '.vite/manifest.json'), 'utf8'));
-const withImports = (key) => [manifest[key].file, ...(manifest[key].imports ?? []).flatMap(withImports)];
-const gltfKey = Object.keys(manifest).find((key) => /packages\/gltf\/dist\/index\.js$/.test(key));
-assert.ok(gltfKey, 'the build has an @margoengine/gltf chunk');
-const [entry, ...entryImports] = withImports('index.html'),
-  [gltf, ...gltfImports] = withImports(gltfKey);
+const graph = sceneGraph(manifest);
+const [entry, ...entryImports] = graph.entry,
+  [gltf, ...gltfImports] = graph.gltf;
 const roles = new Map([
   ['index.html', 'Page'],
   ...entryImports.map((file) => [file, 'Shared chunk']),
   ...gltfImports.map((file) => [file, 'Shared chunk']),
   [entry, 'Entry: core + stage + app'],
-  [gltf, '@margoengine/gltf (addGLTF)'],
+  [gltf, '@margoengine/gltf-pro (addGLTF)'],
   ['model.glb', 'Model'],
 ]);
 const expected = new Set(roles.keys());
 const built = readdirSync(out, { recursive: true })
   .map((file) => file.replaceAll('\\', '/'))
   .filter((file) => !file.startsWith('.vite') && statSync(join(out, file)).isFile());
+assert.deepEqual(
+  [...built].sort(),
+  [...new Set([...expected, ...graph.emittedFiles])].sort(),
+  'every emitted file belongs to the selected glTF feature graph',
+);
 // Regression (2026-10-27): the stage's class methods put every optional pack into every stage app's build.
 assert.deepEqual(
-  built.filter((file) => /\.wasm$|worker|sky|particles|post|environment|shadows/i.test(file)),
+  built.filter(
+    (file) =>
+      /sky|particles|post|environment|shadows/i.test(file) ||
+      (/\.wasm$|worker/i.test(file) && !graph.deferredAssets.has(file)),
+  ),
   [],
-  'the build emits no Wasm, worker or optional pack the app does not import',
+  'the build emits no unrelated optional pack or worker/Wasm outside the selected PBR loader asset graph',
 );
 
 const release = await acquire({ owner: 'basic-scene-network', max: 1, waitMax: 60, poll: 2000 });
@@ -240,6 +248,7 @@ try {
     commit: git('rev-parse', '--short', 'HEAD'),
     dirty: git('status', '--porcelain', '--', 'packages') !== '',
     browser: `${browserLabel()} ${browserVersion} headless`,
+    buildManifest: manifest,
     adapter,
     method:
       'Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults',

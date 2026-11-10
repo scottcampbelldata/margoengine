@@ -1238,3 +1238,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/water (review 2): document live Caustics/Ripples composition across attachment and removal; examples deferred.
 
 - @margoengine/sciviz (review 3 SV2): document pending SSE byte-read cancellation, exact abort reasons and caller-owned iterator cleanup; examples deferred.
+
+- @margoengine/decoders: batch 203 job 4 AVIF still decoding, browser/Node workers, cancellation and resource limits, precision/color metadata and declared still-image limitations; write examples only after the feature is built.
+
+- margoengine (batch 203 job 4): document the generated decoders/avif forwarding entry after the build phase.
+
+- Tooling (batch 203 landing integration): explain current PBR basic-scene network rows and deferred emitted codec assets during the README phase; no README example changed.
