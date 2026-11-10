@@ -25,6 +25,7 @@ export type { GLTFDocument } from '../../shared/gltf.js';
 import { withMaterials } from './default-materials.js';
 import { hasSplats } from './splat-state.js';
 import { hasDraco } from './draco-state.js';
+import { decodeWithoutBrowser } from './node-image-decode.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
 export interface KTX2Image {
   readonly ktx2: TranscodedKTX2Result;
@@ -1162,15 +1163,7 @@ export async function decodeImage(
 ): Promise<ImageBitmap | GLTFPixelImage> {
   signal?.throwIfAborted();
   try {
-    if (typeof createImageBitmap !== 'function') {
-      // Runtime resolution in Node: browser bundlers must not discover optional codec workers/Wasm while
-      // merely reading a model-free install kit's exports, before tree shaking removes this loader.
-      const decoderEntry = '@margoengine/decoders/image';
-      const { decodeImage: decodePixels } = (await import(
-        /* @vite-ignore */ /* webpackIgnore: true */ decoderEntry
-      )) as typeof import('@margoengine/decoders/image');
-      return await decodePixels(data, { signal });
-    }
+    if (typeof createImageBitmap !== 'function') return await decodeWithoutBrowser(data, signal);
     // The Blob copies the bytes; a copy before it is needed only for a SharedArrayBuffer, which a Blob refuses.
     const part = data.buffer instanceof ArrayBuffer ? (data as Uint8Array<ArrayBuffer>) : new Uint8Array(data);
     return await createImageBitmap(new Blob([part], { type }), {

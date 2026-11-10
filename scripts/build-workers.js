@@ -8,11 +8,17 @@ import { build } from 'vite';
 const decoderStub = fileURLToPath(new URL('./worker-decoder-stub.js', import.meta.url)),
   poolStub = fileURLToPath(new URL('./worker-pool-stub.js', import.meta.url)),
   emptyStub = fileURLToPath(new URL('./worker-empty-stub.js', import.meta.url)),
+  nodeImageStub = fileURLToPath(new URL('./worker-node-image-stub.js', import.meta.url)),
   packagesDir = fileURLToPath(new URL('../packages/', import.meta.url)),
   biomesSrc = fileURLToPath(new URL('../packages/biomes/src/', import.meta.url));
 
 const aliases = [
   { find: /^@margoengine\/decoders$/, replacement: decoderStub },
+  // Browser workers always have createImageBitmap; gltf-pro's Node image fallback would name the decoder package.
+  { find: /^\.\/node-image-decode\.js$/, replacement: nodeImageStub },
+  // Another package's parser worker (fbx) takes gltf-pro's prepare from the sources, so the stub above applies there
+  // too: the built entry has the Node fallback inlined in a shared chunk.
+  { find: /^@margoengine\/gltf-pro\/prepare$/, replacement: `${packagesDir}gltf-pro/src/prepare.ts` },
   // A biome world worker never starts workers itself (its world has workers: false).
   { find: /^@margoengine\/biomes\/workers$/, replacement: poolStub },
   // Nor does it get a GPU device (its options name none), so it never loads the GPU kernels.

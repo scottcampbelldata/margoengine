@@ -50,3 +50,13 @@ test('published worker URLs stay literal import.meta.url', () => {
     assert.doesNotMatch(code, /(?:''|""|``)\s*\+\s*import\.meta\.url/, url);
   }
 });
+
+// Regression (2026-11-10): 8412c0f14 put gltf-pro's Node image fallback, a runtime import of
+// @margoengine/decoders/image, inside asset.ts, so the gltf, progressive and fbx parser workers carried a decoder
+// specifier that an IIFE cannot resolve. The fallback lives in its own module, which the worker build swaps for a stub.
+test("gltf-pro's Node image fallback is its own module, and parser workers get a stub that says why", async () => {
+  assert.doesNotMatch(text('packages/gltf-pro/src/asset.ts'), /@margoengine\/decoders\/image/);
+  assert.match(text('packages/gltf-pro/src/node-image-decode.ts'), /'@margoengine\/decoders\/image'/);
+  const { decodeWithoutBrowser } = await import('../scripts/worker-node-image-stub.js');
+  await assert.rejects(decodeWithoutBrowser(new Uint8Array(4)), /createImageBitmap is not available in this worker/);
+});
