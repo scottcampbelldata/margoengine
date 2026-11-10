@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13264922,
+  "total": 13267153,
   "history": [
     {
       "date": "2026-10-24",
@@ -6723,6 +6723,12 @@
       "commit": "batch-247-job1",
       "reason": "Scott optional-size ruling: new exact GPU painted SDF 0 to 2667 B (ceiling 2923 B); GI 8834 to 9670 B (ceiling 9100 to 9961 B) for painted nearest-hit tracing, binding and lifecycle. Splitting the synchronous shader contract would add adapters and fragment the visibility path. Core plus stage unchanged at 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7830de179",
+      "reason": "Batch 218 live entry 2501 to 4732 B gzip for built-ins masks and validated custom WGSL. One shared composition retains capture ownership rather than splitting competing pipelines. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7662,7 +7668,7 @@
     "@margoengine/toon/models": 4843,
     "@margoengine/transitions": 4563,
     "@margoengine/transitions/custom": 5466,
-    "@margoengine/transitions/live": 2757,
+    "@margoengine/transitions/live": 4988,
     "@margoengine/transitions/mask": 5713,
     "@margoengine/tween": 5759,
     "@margoengine/tween/async": 3656,

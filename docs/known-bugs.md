@@ -4548,3 +4548,11 @@ No open defect in the new placement entry. Its CPU and real-data GPU comparisons
 
 - FBX surface control-net animation (batch 205 follow-up): connect a Skin or BlendShape to NURBS/Patch geometry, as in surfaces.test.js. Generated surface vertices have different rational support from source control points and general bone transforms cannot be represented exactly by a single glTF vertex bind position. Import explicitly refuses with a polygon-bake remedy; exact animated control-net baking remains follow-up work.
 Batch 247 job 1 fills the missing painted-geometry input: optional SDFScene2D now rebuilds exact GPU distance fields, casts opaque pixel shadows and emits the painted color through GI. Regression source: packages/lighting2d/tests/sdf-regressions.js. Painted diffuse reflection and temporal history remain the next explicit batch job, not an existing source claim.
+
+
+
+### Batch 218 job 1
+
+The former crossfade-only live composition gap is closed for all four built-ins, greyscale masks and trusted custom WGSL. CPU lifecycle/validation tests and full-live-browser pixel fixtures cover the added modes; the existing live recovery and resize checks remain.
+
+Fixed for this landing: compatibility render pipelines accepted explicit layouts missing statically used resources, and async validation also emitted uncaptured errors. render.ts now checks the reflected resource interface and routes async failure only to rejection. device.test.js and compute-limits.test.js retain the regressions. The global WGSL corpus also lacked labels shaders already on main; a scoped real-GPU recording refresh now covers it for the owning package CPU gate. Recorded labels shader ownership is identified by exact equality to packages/labels/src/gpu-shader.ts.

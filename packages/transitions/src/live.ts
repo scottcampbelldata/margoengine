@@ -10,12 +10,21 @@ import {
 } from '@margoengine/core/extension';
 import { fullscreen, render, group, draw } from '../../shared/gpu.js';
 import { fault } from '../../shared/errors.js';
+import { kinds, shader as builtinShader } from './builtin.js';
+import { customCode } from './custom-code.js';
+import type { TransitionKind } from './index.js';
 import { floatOutput } from './formats.js';
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
 /** Cameras borrowed for the two scenes. Neither camera nor scene is disposed by the transition. */
 export interface LiveTransitionOptions {
+  /** Initial built-in kind. Default crossfade. Use start(kind, seconds) to select another. */
+  kind?: TransitionKind | 'crossfade';
+  /** Optional greyscale mask. ImageData is copied; keep a borrowed ImageBitmap open through disposal. */
+  mask?: ImageData | ImageBitmap;
+  /** Mask threshold half-width. Default 0.02; zero is a hard edge, otherwise 0.000001..1. */
+  softness?: number;
   /** Outgoing camera. Default engine.camera. */
   beforeCamera?: Camera;
   /** Incoming camera. Default engine.camera. */
@@ -30,23 +39,13 @@ export interface LiveTransitionFrame {
   /** Scene frustum culling. Default true. */
   culling?: boolean;
 }
-const shader =
-  fullscreen +
-  `
-@group(0) @binding(0) var<uniform> progress:vec4f;
-@group(0) @binding(1) var before:texture_2d<f32>;
-@group(0) @binding(2) var after:texture_2d<f32>;
-@fragment fn fragment(i:Vertex)->@location(0) vec4f {
- let size=vec2i(textureDimensions(before));
- let q=clamp(vec2i(i.uv*vec2f(size)),vec2i(0),size-1);
- let a=textureLoad(before,q,0);let b=textureLoad(after,q,0);
- if(progress.x<=0.0){return a;}if(progress.x>=1.0){return b;}
- return mix(a,b,progress.x);
-}`;
-/** Renders two live scenes every frame, then cross-fades their resolved RGBA8 images. WebGPU only. */
+/** Renders two live scenes every frame, then composites their resolved RGBA8 images. WebGPU only. */
 export class LiveTransitions implements EnginePlugin {
   readonly name = 'transitions:live';
   private output?: Scene;
+  private code = builtinShader;
+  private mask?: GPUTexture;
+  private maskSource?: { width: number; height: number; data: Uint8ClampedArray } | ImageBitmap;
   private images: GPUTexture[] = [];
   private uniform?: GPUBuffer;
   private pipeline?: GPURenderPipeline;
@@ -56,7 +55,7 @@ export class LiveTransitions implements EnginePlugin {
   private elapsed = 1;
   private duration = 1;
   private disposed = false;
-  private readonly values = new Float32Array(4);
+  private readonly values = new Float32Array([1, 4, 0.02, 0]);
   private constructor(
     private readonly engine: Engine,
     private readonly before: Scene,
@@ -81,6 +80,11 @@ export class LiveTransitions implements EnginePlugin {
     )
       throw new TypeError('Live transition cameras must be Camera instances; use engine.camera or new Camera()');
     const effect = new LiveTransitions(runtime, before, after, { ...options });
+    const kind = options.kind ?? 'crossfade';
+    if (kind !== 'crossfade' && !kinds.includes(kind))
+      throw new RangeError('Unknown live transition kind; choose wipe, dissolve, radial, chromatic or crossfade');
+    effect.values[1] = kind === 'crossfade' ? 4 : kinds.indexOf(kind);
+    if (options.mask) effect.configureMask(options.mask, options.softness ?? 0.02);
     effect.output = engine.createScene('transitions:live');
     try {
       effect.output.use(effect);
@@ -93,13 +97,76 @@ export class LiveTransitions implements EnginePlugin {
   get progress(): number {
     return Math.min(1, this.elapsed / this.duration);
   }
-  /** Restarts the cross-fade, duration finite (0,60] seconds. Default 1. */
-  start(seconds = 1): void {
+  /** Restarts the current kind; duration defaults to 1 second, finite (0,60]. */
+  start(seconds?: number): void;
+  /** Selects a built-in kind. Displacement defaults to 0.02, finite 0..0.25. Masks and custom shaders ignore kind. */
+  start(kind: TransitionKind | 'crossfade', seconds?: number, displacement?: number): void;
+  start(kindOrSeconds: TransitionKind | 'crossfade' | number = 1, seconds = 1, displacement = 0.02): void {
     this.live();
-    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 60)
-      throw new RangeError('Live transition seconds must be finite in (0,60]; check the duration');
-    this.duration = seconds;
+    const kind =
+      typeof kindOrSeconds === 'number'
+        ? this.values[1]!
+        : kindOrSeconds === 'crossfade'
+          ? 4
+          : kinds.indexOf(kindOrSeconds);
+    const duration = typeof kindOrSeconds === 'number' ? kindOrSeconds : seconds;
+    if (
+      !Number.isFinite(duration) ||
+      duration <= 0 ||
+      duration > 60 ||
+      kind < 0 ||
+      !Number.isFinite(displacement) ||
+      displacement < 0 ||
+      displacement > 0.25
+    )
+      throw new RangeError(
+        'Live transition needs a known kind, seconds in (0,60] and displacement in [0,0.25]; check start arguments',
+      );
+    this.duration = duration;
     this.elapsed = 0;
+    this.values[1] = kind;
+    this.values[2] = displacement;
+  }
+  private configureMask(image: ImageData | ImageBitmap, softness: number): void {
+    const data = typeof ImageData !== 'undefined' && image instanceof ImageData;
+    const bitmap = typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap;
+    if ((!data && !bitmap) || (data && !(image.data instanceof Uint8ClampedArray)))
+      throw new TypeError('Live mask needs 8-bit ImageData or an open ImageBitmap; decode the image first');
+    const limit = Math.min(4096, this.engine.gpu!.limits.maxTextureDimension2D);
+    if (![image.width, image.height].every((n) => Number.isSafeInteger(n) && n > 0 && n <= limit))
+      throw new RangeError('Live mask dimensions exceed device limits; use an image of 1..min(4096, device limit)');
+    if (!Number.isFinite(softness) || softness < 0 || softness > 1 || (softness > 0 && softness < 0.000001))
+      throw new RangeError('Live mask softness is out of range; use zero or 0.000001..1');
+    this.maskSource = data ? { width: image.width, height: image.height, data: image.data.slice() } : image;
+    this.code = `${fullscreen}
+@group(0) @binding(0) var<uniform> settings:vec4f;
+@group(0) @binding(1) var before:texture_2d<f32>;
+@group(0) @binding(2) var after:texture_2d<f32>;
+@group(0) @binding(3) var mask:texture_2d<f32>;
+fn sample(t:texture_2d<f32>,pixel:vec2u,extent:vec2u)->vec4f {
+ let n=textureDimensions(t);let q=(pixel*n+n/2u)/extent;
+ return textureLoad(t,vec2i(min(q,n-1u)),0);
+}
+@fragment fn fragment(i:Vertex)->@location(0) vec4f {
+ let p=settings.x;let pixel=vec2u(i.position.xy);let extent=textureDimensions(after);
+ if(p<=0.0){return sample(before,pixel,extent);}if(p>=1.0){return sample(after,pixel,extent);}
+ let edge=sample(mask,pixel,extent).r;
+ let weight=${softness === 0 ? 'select(0.0,1.0,edge<=p)' : `1.0-smoothstep(p-f32(${softness}),p+f32(${softness}),edge)`};
+ return mix(sample(before,pixel,extent),sample(after,pixel,extent),weight);
+}`;
+  }
+  /** Validates trusted WGSL before attaching. Same transition function and sample helper as the custom entry. */
+  static async custom(
+    engine: EngineKernel,
+    before: Scene,
+    after: Scene,
+    wgsl: string,
+    options: Omit<LiveTransitionOptions, 'mask' | 'softness' | 'kind'> & { signal?: AbortSignal } = {},
+  ): Promise<LiveTransitions> {
+    const code = await customCode(engine, wgsl, options.signal);
+    const effect = LiveTransitions.attach(engine, before, after, options);
+    effect.code = code;
+    return effect;
   }
   private live(): void {
     if (this.disposed || this.engine.disposed) throw fault('disposed', 'Live transition is disposed; attach a new one');
@@ -129,6 +196,8 @@ export class LiveTransitions implements EnginePlugin {
       throw new TypeError(
         'Live transition target must be a separate single-sample 2D float color render attachment with MSAA resolve support; choose rgba8unorm',
       );
+    if (this.maskSource && Math.max(width, height) > 65535)
+      throw new RangeError('Live mask captures exceed integer addressing limits; use dimensions at most 65535');
     if (this.images[0]?.width !== width || this.images[0]?.height !== height) {
       this.releaseImages();
       try {
@@ -171,6 +240,25 @@ export class LiveTransitions implements EnginePlugin {
     });
   }
   setup(engine: Engine): void {
+    const source = this.maskSource;
+    if (source) {
+      if (source.width < 1 || source.height < 1)
+        throw fault('state', 'Live mask bitmap is closed; keep it open until transition disposal');
+      this.mask = engine.gpu!.createTexture({
+        size: [source.width, source.height],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      if ('data' in source)
+        engine.gpu!.queue.writeTexture(
+          { texture: this.mask },
+          source.data as Uint8ClampedArray<ArrayBuffer>,
+          { bytesPerRow: source.width * 4 },
+          [source.width, source.height],
+        );
+      else
+        engine.gpu!.queue.copyExternalImageToTexture({ source }, { texture: this.mask }, [source.width, source.height]);
+    }
     this.uniform = engine.gpu!.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
   registerPasses(graph: FrameGraph): void {
@@ -181,7 +269,7 @@ export class LiveTransitions implements EnginePlugin {
         if (c.backend !== 'webgpu' || !this.images.length) return;
         const samples = c.descriptor.multisample?.count ?? 1;
         if (!this.pipeline || this.format !== c.format || this.samples !== samples) {
-          this.pipeline = render(c.device, shader, c.format, { multisample: { count: samples } });
+          this.pipeline = render(c.device, this.code, c.format, { multisample: { count: samples } });
           this.format = c.format;
           this.samples = samples;
           this.bind = undefined;
@@ -190,6 +278,7 @@ export class LiveTransitions implements EnginePlugin {
           { buffer: this.uniform! },
           this.images[0]!.createView(),
           this.images[1]!.createView(),
+          ...(this.mask ? [this.mask.createView()] : []),
         ]);
         this.elapsed = Math.min(this.duration, this.elapsed + c.delta);
         this.values[0] = this.progress;
@@ -206,6 +295,8 @@ export class LiveTransitions implements EnginePlugin {
   onDeviceRestored(engine: Engine): void {
     this.releaseImages();
     this.uniform?.destroy();
+    this.mask?.destroy();
+    this.mask = undefined;
     this.pipeline = undefined;
     this.setup(engine);
   }
@@ -217,6 +308,9 @@ export class LiveTransitions implements EnginePlugin {
     this.output = undefined;
     this.releaseImages();
     this.uniform?.destroy();
+    this.mask?.destroy();
+    this.mask = undefined;
+    this.maskSource = undefined;
     this.uniform = undefined;
     this.pipeline = undefined;
   }

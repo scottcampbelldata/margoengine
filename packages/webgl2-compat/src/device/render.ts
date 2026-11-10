@@ -170,7 +170,7 @@ export class CompatRenderPipeline {
   constructor(
     readonly device: CompatDevice,
     descriptor: GPURenderPipelineDescriptor,
-    deferLink = false,
+    private readonly deferLink = false,
     prebuilt?: GLSLProgram,
   ) {
     const gl = device.gl,
@@ -222,7 +222,7 @@ export class CompatRenderPipeline {
     this.layouts = explicit ? [...explicit.bindGroupLayouts] : [];
     if (!prebuilt && (vertexModule.error || fragmentModule?.error)) {
       this.failure = 'createRenderPipeline: a shader module of the pipeline failed to compile';
-      device.validationError(this.failure);
+      if (!this.deferLink) device.validationError(this.failure);
       return;
     }
     try {
@@ -249,7 +249,7 @@ export class CompatRenderPipeline {
     } catch (error) {
       if ((error as { code?: string }).code === 'unsupported') throw error;
       this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: ${(error as Error).message}`;
-      device.validationError(this.failure);
+      if (!this.deferLink) device.validationError(this.failure);
       return;
     }
     if (device.adapter.tierFormats) {
@@ -266,7 +266,21 @@ export class CompatRenderPipeline {
         },
       };
     }
-    if (!explicit) this.layouts = autoLayouts(this.glsl);
+    const inferred = autoLayouts(this.glsl);
+    // Prebuilt programs are internal compute lowerings: their layouts retain compute visibility.
+    // Validate user render descriptors here, before any backend-specific lowering.
+    if (explicit && !prebuilt) {
+      for (const [group, required] of inferred.entries()) {
+        for (const resource of required.entries) {
+          const declared = explicit.bindGroupLayouts[group]?.entries.find((e) => e.binding === resource.binding);
+          if (!declared || (declared.visibility & resource.visibility) !== resource.visibility) {
+            this.failure = `createRenderPipeline: layout omits group ${group} binding ${resource.binding} or its shader visibility; declare every statically used resource`;
+            if (!this.deferLink) device.validationError(this.failure);
+            return;
+          }
+        }
+      }
+    } else if (!explicit) this.layouts = inferred;
     for (const [slot, layout] of [...(descriptor.vertex.buffers ?? [])].entries()) {
       if (!layout) continue;
       const stride = layout.arrayStride;
@@ -342,7 +356,7 @@ export class CompatRenderPipeline {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       const logs = this.shaders.map((s) => gl.getShaderInfoLog(s)).filter(Boolean);
       this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: WebGL2 refused the translated program: ${[...logs, gl.getProgramInfoLog(program)].join(' ')}`;
-      this.device.validationError(this.failure);
+      if (!this.deferLink) this.device.validationError(this.failure);
       return;
     }
     for (const s of this.shaders) gl.deleteShader(s);

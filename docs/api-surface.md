@@ -94,7 +94,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/tiles | `./properties` 8, `./imagery` 18, `./style` 6, `.` 83, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11, `./features` 7, `./fade` 3 | 194 |  | 15,813 |
 | @margoengine/tonemap | `.` 9, `./grade` 5, `./custom` 2, `./local` 2 | 6 |  | 12,490 |
 | @margoengine/toon | `.` 2, `./models` 4, `./hatch` 3 | 2 |  | 1,430 |
-| @margoengine/transitions | `./mask` 2, `./custom` 2, `.` 2, `./live` 3 | 4 |  | 4,496 |
+| @margoengine/transitions | `./mask` 2, `./custom` 2, `.` 2, `./live` 3 | 5 |  | 4,496 |
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6, `./async` 6, `./props` 8, `./timeline` 3, `./control` 3, `./scroll-pin` 6, `./inertia` 5 | 34 |  | 5,503 |
 | @margoengine/ui | `.` 101, `./react` 23, `./world` 10, `./input` 5, `./markup` 11, `./image` 3, `./forms` 12, `./world-gl` 11, `./curved` 4, `./keyboard` 3, `./i18n` 6, `./editor` 5 | 558 |  | 32,387 |
 | @margoengine/usdz | `.` 12, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4, `./materialx` 3, `./instancer` 2, `./shapes` 2, `./curves` 2 | 98 |  | 12,337 |

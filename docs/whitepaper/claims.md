@@ -3781,3 +3781,8 @@ Batch 205 surfaces: optional NURBS and all five patch bases tessellate through t
 Soft per-bone animation influence supports weights 0..1 for independently running graph or single-clip layers. Proof: packages/animator/test/masks.test.js asserts translation, scale, quaternion and morph results under fractional override/additive weights, runtime edits, validation and entry identity; layers-browser.mjs renders real Fox skinning with fractional masks on both backends. No motion-quality or performance superiority claim.
 ### Batch 247 job 1: painted alpha and emission
 Painted source alpha builds an exact sampled-centre signed distance field each frame and supplies opaque GI geometry and linear HDR emission without polygon authoring. Proof: packages/lighting2d/tests/sdf.test.js and sdf-regressions.js. Tiny independently generated fields are compared to brute-force distances; GI pixels are compared to analytic opaque pixel rectangles. Wall removal, offscreen sources, HDR, resize and device restoration are asserted on native WebGPU and the WebGL2 compatibility layer. Exact EDT describes grid-centre distances, not continuous art outlines or arbitrary-scene GI accuracy. No speed claim.
+
+
+### Batch 218 job 1: live transition modes
+
+All frozen built-in kinds, mask threshold wipes and the custom WGSL function contract can composite two changing scenes through `transitions/live`. Proof: packages/transitions/test/full-live-browser.js independently checks pixel values at 1x/4x while both inputs change; live.test.js checks selection, invalid arguments, cancellation and late scene disposal. This is correctness evidence, with no visual-quality or speed claim.

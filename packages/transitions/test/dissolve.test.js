@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const code = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
+const code = readFileSync(new URL('../src/builtin.ts', import.meta.url), 'utf8');
 // Exact JS twin of the dissolve threshold: PCG (Jarzynski and Olano, JCGT 9(3), 2020) nested over the pixel.
 const pcg = (v) => {
   const s = (Math.imul(v, 747796405) + 2891336453) >>> 0;

@@ -85,5 +85,5 @@ test('asynchronous render validation preserves GPUPipelineError instead of assig
   await assert.rejects(CompatDevice.prototype.createRenderPipelineAsync.call(d, {
     layout: 'auto', vertex: { module: { error: new Error('invalid module') } },
   }), { name: 'GPUPipelineError', reason: 'validation' });
-  assert.equal(d.errors.length, 1);
+  assert.equal(d.errors.length, 0, 'async render validation rejects without emitting an uncaptured error');
 });

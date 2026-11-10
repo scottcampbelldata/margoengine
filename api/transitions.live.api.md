@@ -13,6 +13,9 @@ export interface LiveTransitionFrame {
 }
 
 export interface LiveTransitionOptions {
+    kind?: TransitionKind | 'crossfade';
+    mask?: ImageData | ImageBitmap;
+    softness?: number;
     beforeCamera?: Camera;
     afterCamera?: Camera;
 }
@@ -23,6 +26,10 @@ export class LiveTransitions implements EnginePlugin {
     static attach(engine: EngineKernel, before: Scene, after: Scene, options?: LiveTransitionOptions): LiveTransitions;
     get progress(): number;
     start(seconds?: number): void;
+    start(kind: TransitionKind | 'crossfade', seconds?: number, displacement?: number): void;
+    static custom(engine: EngineKernel, before: Scene, after: Scene, wgsl: string, options?: Omit<LiveTransitionOptions, 'mask' | 'softness' | 'kind'> & {
+        signal?: AbortSignal;
+    }): Promise<LiveTransitions>;
     render({ delta, target, culling }?: LiveTransitionFrame): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -30,4 +37,8 @@ export class LiveTransitions implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+// Not exported from this entry, but used by the exports above:
+
+type TransitionKind = 'wipe' | 'dissolve' | 'radial' | 'chromatic';
 ```

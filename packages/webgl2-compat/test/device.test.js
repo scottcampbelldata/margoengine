@@ -519,3 +519,35 @@ test('texture replay selects stencil aspects, restores depth and isolates simult
     assert.throws(() => bind(['stencil-only']), (error) => error.code === 'unsupported' && /WEBGL_stencil_texturing/.test(error.message));
   } finally { device.destroy(); }
 });
+
+test('explicit render layouts must declare every statically used resource with stage visibility', async () => {
+  const { device } = await offsetDevice(false);
+  try {
+    const module = device.createShaderModule({
+      code: `
+@group(1) @binding(3) var t:texture_2d<f32>;
+@vertex fn v()->@builtin(position) vec4f {return vec4f(0,0,0,1);}
+@fragment fn f()->@location(0) vec4f {return textureLoad(t,vec2i(0),0);}`,
+    });
+    for (const entries of [[], [{ binding: 3, visibility: 1, texture: {} }]]) {
+      const layout = device.createPipelineLayout({
+        bindGroupLayouts: [device.createBindGroupLayout({ entries: [] }), device.createBindGroupLayout({ entries })],
+      });
+      device.pushErrorScope('validation');
+      await assert.rejects(
+        device.createRenderPipelineAsync({
+          layout,
+          vertex: { module, entryPoint: 'v' },
+          fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+        }),
+        /layout omits group 1 binding 3/,
+      );
+      assert.equal(await device.popErrorScope(), null, 'async validation is delivered through pipeline rejection');
+      device.pushErrorScope('validation');
+      device.createRenderPipeline({layout, vertex:{module,entryPoint:'v'}, fragment:{module,entryPoint:'f',targets:[{format:'rgba8unorm'}]}});
+      assert.match((await device.popErrorScope()).message, /layout omits/);
+    }
+  } finally {
+    device.destroy();
+  }
+});
