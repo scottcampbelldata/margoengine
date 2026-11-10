@@ -2110,6 +2110,16 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 273 round 9 groups failures 11 through 26 in
+`docs/work-lists/batch-273-compat-triage.md`. Native reference fixtures explicitly
+disable the outer forced-compatibility shim while continuing to select the
+layer inside their own comparison. `tests/compat-baselines.test.js` executes
+all seven canonical setup calls under `MARGO_COMPAT=1` in verify and therefore
+check:merge. Its assertions fail when those opt-outs are removed. This repairs
+the reference-selection class, with original GPU assertions retained; it does
+not prove the unresolved rendering, XR setup, limits, validation or wait cases.
+Dispersion failure 9 is parked with its full-grid state-dependence in known-bugs.
+
 Batch 134's private ETC2/EAC draft has exact independent alpha and EAC
 parameter oracles, edge-padding and coded-error checks. EAC interval masks
 preserve error and header ties while reducing full palette constructions on

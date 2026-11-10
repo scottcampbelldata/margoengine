@@ -394,6 +394,11 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   Recorded COPY_WRITE_BUFFER writes include dispersion 8 then 0 at byte 1436;
   these input bytes do not prove actual uniform binding/readback correctness.
   Receipt: whitepaper/results/batch-273-dispersion-state-checkpoint.json.
+  PARKED by coordinator ruling for round 9. The unchanged-zero insertion moves
+  the error between two 4x comparisons while the focused sequence and 1x stay
+  exact. This is state-dependent, with the uniform-binding versus multisample
+  replay/resolve cause unresolved. Resume in the fix phase with a full-grid
+  draw-binding and resolved-attachment trace; do not change the exact bound.
 - `materials/test:gpu:render-state`: failure 10 repaired in the optional device.
   The earlier signed polygon-offset clamp repair is retained. Dynamic stencil
   references now use the target's low eight bits before GL's signed clamp;
@@ -439,11 +444,15 @@ passes. The following additional failures remain with batch 273:
 - `splats/test:gpu`: all GPU checks print success, then the command does not exit
   before its 62 s body bound. This is not a passing suite. Cleanup remains with
   the dedicated teardown owner; no teardown repair is attempted in this lane.
-- `terrain/test:gpu`: its native/compatibility comparison receives vendor
-  `margo-webgl2` for the native baseline under the outer `MARGO_COMPAT=1` shim.
-  `webgl2-compat/test:gpu` similarly fails its plain-device full-level assertion.
-  Their dual-backend fixtures need native baselines independent of the outer
-  forced-backend runner; these failures do not establish a rendering difference.
+- Resolved reference selection for failures 21 and 25: the outer forced shim
+  replaced the native baseline in seven comparison drivers. Each now opts out
+  of that shim and retains its own backend selection. All seven setup
+  regressions fail without the fix. The full terrain suite passes natively
+  and under MARGO_COMPAT=1, closing failure 21. The six affected compatibility
+  comparison leaves pass with that override. Failure 25's original assertion
+  is repaired, but its complete package suite is not claimed: it includes the
+  tracer compilation assigned to a separate owner. No bounds or work changed.
+  Receipt: whitepaper/results/batch-273-native-baselines.json.
 - `voxel/test:gpu`, `test:gpu:slow-compile` and `test:gpu:slow-mesh`: the bevel
   fixture needs 2,048 texture array layers on an adapter advertising 256. Review
   the fixture/device request and hardware route without dropping texture work.

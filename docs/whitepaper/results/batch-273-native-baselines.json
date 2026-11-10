@@ -1,0 +1,200 @@
+{
+  "change": "Independent native reference setup for forced compatibility runs",
+  "failures": {
+    "21": "Full terrain suites pass with and without MARGO_COMPAT",
+    "25": "Original plain-device failure and six native comparison leaves repaired; full package suite remains unverified because its tracer compilation belongs to the dedicated owner"
+  },
+  "closedOfficialSuites": [
+    5,
+    6,
+    10,
+    21
+  ],
+  "regression": {
+    "file": "tests/compat-baselines.test.js",
+    "before": {
+      "pass": 0,
+      "fail": 7
+    },
+    "after": {
+      "pass": 7,
+      "fail": 0
+    },
+    "initialNegativeFixture": "A first two-driver control failed both. The expanded control initially failed six because its CRLF replacement did not remove the multiline compute option. The corrected control checks every replacement and fails all seven."
+  },
+  "affectedUnits": {
+    "pass": 274,
+    "fail": 0,
+    "skipped": 0
+  },
+  "gpu": [
+    {
+      "name": "adapter",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "parity",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "features",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "compute",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "routes",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "xr",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "terrain-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    },
+    {
+      "name": "terrain-native",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false
+    }
+  ],
+  "terrain": {
+    "clipmap": {
+      "share": 0,
+      "mean": 0.00022135416666666666,
+      "max": 1,
+      "ground": 48010,
+      "native": {
+        "calls": 0,
+        "glDraws": 0,
+        "drawCalls": 6,
+        "baked": 0
+      },
+      "compat": {
+        "calls": 48,
+        "glDraws": 6,
+        "drawCalls": 6,
+        "baked": 0
+      }
+    },
+    "weights": {
+      "share": 0,
+      "mean": 0.00018229166666666667,
+      "max": 1,
+      "ground": 45922,
+      "native": {
+        "calls": 0,
+        "glDraws": 0,
+        "drawCalls": 6,
+        "baked": 0
+      },
+      "compat": {
+        "calls": 48,
+        "glDraws": 6,
+        "drawCalls": 6,
+        "baked": 0
+      }
+    },
+    "rvt": {
+      "share": 0,
+      "mean": 0.0000390625,
+      "max": 1,
+      "ground": 48010,
+      "native": {
+        "calls": 0,
+        "glDraws": 0,
+        "drawCalls": 6,
+        "baked": 1310720
+      },
+      "compat": {
+        "calls": 50,
+        "glDraws": 6,
+        "drawCalls": 6,
+        "baked": 1310720
+      }
+    }
+  },
+  "entryGzip": {
+    "before": {
+      "index": 105186,
+      "device": 105232,
+      "xr": 105035,
+      "tiers": 104920
+    },
+    "after": {
+      "index": 105186,
+      "device": 105232,
+      "xr": 105035,
+      "tiers": 104920
+    }
+  },
+  "coreAndStageGzip": 23950,
+  "gates": {
+    "lint": true,
+    "hygiene": true,
+    "verify": {
+      "pass": true,
+      "invocations": 1,
+      "tests": 14206,
+      "passed": 14206,
+      "failed": 0,
+      "skipped": 0,
+      "sourceBase": "55e916e4a",
+      "limitMinutes": 40
+    },
+    "readmeRuntime": {
+      "pass": true,
+      "examples": 30,
+      "node": 3,
+      "browser": 27,
+      "failed": 0
+    }
+  },
+  "unchanged": [
+    "runtime source",
+    "exports",
+    "numerical assertions",
+    "image bounds",
+    "scene grids",
+    "resource checks"
+  ],
+  "dispersion": "Failure 9 parked by coordinator at round 9; full-grid state dependence retained in known-bugs",
+  "excluded": [
+    "tracer compilation owned by another lane",
+    "teardown hunting owned by another lane",
+    "speed-phase measurements"
+  ],
+  "integration": {
+    "main": "ca57659ac",
+    "preservedBothSharedDocs": true,
+    "regeneratedGuides": true,
+    "affectedChecks": {
+      "tests": 51,
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "externalAssets": 647,
+      "documentationLinks": true
+    },
+    "note": "Three newer main commits change test assets, decoder harness/docs and GPU lock timeout bookkeeping. No package runtime source changed; affected tests and generated guides pass after integration. Full verify was invoked once before that integration."
+  }
+}

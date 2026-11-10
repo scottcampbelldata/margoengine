@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/adapter.html', port: 'free' }),
+// Both feature levels here are native WebGPU, independent of the caller's forced WebGL2 run.
+const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/adapter.html', port: 'free', compat: false }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

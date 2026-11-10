@@ -11,7 +11,7 @@ import { decodePNG } from '../../../tests/support/png.js';
 
 const MAX_SHARE = 0.001,
   MAX_MEAN = 0.25;
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/routes.html', port: 'free' });
+const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/routes.html', port: 'free', compat: false });
 const { page } = context;
 const origin = new URL(page.url()).origin;
 const pageErrors = [];

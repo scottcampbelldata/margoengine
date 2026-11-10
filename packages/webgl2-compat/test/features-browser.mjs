@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/features.html', port: 'free' });
+const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/features.html', port: 'free', compat: false });
 const { page } = context;
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

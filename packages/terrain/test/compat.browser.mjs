@@ -16,7 +16,8 @@ import { decodePNG } from '../../../tests/support/png.js';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const MAX_SHARE = 0.001,
   MAX_MEAN = 0.25;
-const context = await openBrowser({ startPath: '/packages/terrain/test/compat.html', port: 'free' }),
+// This fixture selects both backends itself; the outer forced-backend shim must not replace its native baseline.
+const context = await openBrowser({ startPath: '/packages/terrain/test/compat.html', port: 'free', compat: false }),
   { page, hardware } = context;
 const origin = new URL(page.url()).origin,
   pageErrors = [];

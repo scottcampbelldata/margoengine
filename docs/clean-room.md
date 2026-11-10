@@ -4762,3 +4762,28 @@ rule. Subsequent retrieval used primary standards and papers. No Rust decoder
 math changed in this continuation; metadata conversion was established by
 the complete discovery/held opaque experiments recorded above. Historical
 reconstruction gaps remain unimplemented.
+
+### Batch 273 round 9: independent comparison baselines
+
+Research before repair: W3C GPU for the Web Working Group, *WebGPU*, Candidate
+Recommendation Draft, 15 September 2026, adapter selection and optional
+capabilities sections, https://www.w3.org/TR/webgpu/ . Native core and native
+compatibility feature levels have different default features; neither is the
+WebGL2-backed adapter. Khronos WebGL Working Group, *WebGL 2.0 Specification*,
+editor draft (2026), https://registry.khronos.org/webgl/specs/latest/2.0/ ,
+texture-array limit and context sections, separates GL capabilities from the
+WebGPU defaults. These standards guide the grouping and capability diagnosis.
+
+Scientific comparison: Alastair F. Donaldson, *Metamorphic Testing of Android
+Graphics Drivers* (MET 2019), full one-page abstract,
+https://www.doc.ic.ac.uk/~afd/homepages/papers/pdfs/2019/MET.pdf ; Alastair F.
+Donaldson, Hugues Evrard and Paul Thomson, *Putting Randomized Compiler Testing
+into Production* (ECOOP 2020), abstract and introduction only,
+https://www.doc.ic.ac.uk/~afd/papers/2020/ECOOP_GraphicsFuzz.pdf . Both motivate
+comparisons whose semantic inputs agree and whose test setup is itself checked.
+Combine that requirement with the feature-level contract: an outer backend
+override cannot supply the reference backend. The repair uses openBrowser's
+existing explicit override in seven canonical drivers and executes those setup
+calls in a regression. No shader, pixel tolerance, scene or runtime changes.
+No companion code, other engine source or foreign repository files were read
+or used. No timing measurement or driver-cause inference is made.

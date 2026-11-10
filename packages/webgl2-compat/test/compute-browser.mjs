@@ -41,6 +41,7 @@ const strictPolicy = {
 };
 
 const context = await openBrowser({
+  compat: false,
   startPath: '/packages/webgl2-compat/test/compute.html',
   port: 'free',
   plugins: [strictPolicy],

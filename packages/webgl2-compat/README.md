@@ -292,6 +292,14 @@ precision and no alpha, within 2 of 255 on the Bloom and Tonemap test frame. The
 [limits.md](../../docs/limits.md), and what does not run yet is in [known-bugs.md](../../docs/known-bugs.md). The check is
 `test/adapter-browser.mjs`, in `test:gpu`.
 
+The native-versus-layer fixtures select their own backends. Their browser
+harness uses `compat: false` even when the outer runner sets `MARGO_COMPAT=1`,
+so that environment variable cannot replace the native reference. Adapter
+feature-level checks, rendering, texture/command features, compute, package
+routes and XR keep their original assertions on both sides. The terrain
+comparison follows the same rule. This setup distinction does not establish
+parity for the remaining failures in `docs/known-bugs.md`.
+
 ### XR (`margoengine/webgl2-compat/xr`)
 
 `XR` from `margoengine/xr` draws through the browser's `XRGPUBinding`, which needs WebGPU. Headsets and phones without it

@@ -2794,3 +2794,17 @@ geometry fingerprints remain exact. Strict per-file RSS fails116/113; no
 memory-parity or replacement claim follows. Generic scalar inventory8,580
 is exact;440 usable wide cases and12 historical predictor3 cases expose
 native gaps. [Complete per-file evidence](results/batch-133-resources-inventory.json).
+
+### Batch 273 round 9: native reference selection
+
+Seven comparison drivers now select their native reference independently of
+the outer MARGO_COMPAT override. All seven setup regressions fail without
+the explicit override and pass with it. The six affected compatibility leaves
+(native feature level, render/pick/restore, command/texture features, compute,
+package routes and XR) pass under MARGO_COMPAT=1. The whole terrain GPU suite
+passes both with and without that environment override. Its three comparison
+scenes retain all draw/bake work and image bounds. This closes official suite
+21; suite 25's original setup error is repaired, but the complete package suite
+is not claimed while tracer compilation remains with its dedicated owner.
+Runtime, exports and size are unchanged. No speed claim is made.
+[Receipt](results/batch-273-native-baselines.json).

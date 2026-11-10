@@ -3322,3 +3322,13 @@ complete historical predictor-3 streams with intact position/float canaries
 are accepted in versions 1.0/1.1/1.2; native rejects method 3. These are
 concrete gaps, not skips or unavailable-feature conclusions. Historical KD
 and the remaining prediction/transform/quantization cross product remain open.
+
+### Batch 273 round 9: comparison setup
+
+Seven native-reference browser drivers opt out of the outer forced-backend
+shim and continue selecting the compatibility device in their own cases.
+This changes no device limit, render path, image bound or package runtime.
+Compatibility entry gzip sizes stay root 105186, device 105232, XR 105035,
+tiers 104920 bytes; core plus stage stays 23950 bytes, below 25000.
+Remaining defects and coverage limits are retained in known-bugs and
+`work-lists/batch-273-compat-triage.md`; full suite closure requires every leaf.

@@ -2363,3 +2363,22 @@ results/batch-133-resources-inventory.json. Re-run the regression with node
 The resource command returns nonzero when RSS or linear-memory parity fails.
 A completed --resume checkpoint rechecks that result without new samples.
 Run dedicated package/README readers only after verify completes its build.
+
+### Batch 273 round 9: independent native references
+
+After building, run node --experimental-test-module-mocks --test
+--test-timeout=60000 tests/compat-baselines.test.js. It executes all seven
+canonical drivers through their real openBrowser setup under MARGO_COMPAT=1.
+Removing their compat:false options makes all seven fail; restore them before
+GPU validation. The same regression runs in verify and check:merge.
+
+With MARGO_COMPAT=1, run the six changed webgl2-compat comparison leaves:
+adapter-browser.mjs, compat-browser-check.mjs, features-browser.mjs,
+compute-browser.mjs, routes-browser.mjs and xr-browser.mjs under
+packages/webgl2-compat/test/. Run npm run test:gpu --workspace
+@margoengine/terrain once with MARGO_COMPAT=1 and once without it. Every GPU
+leaf takes one shared lock with --wait-max=60 and a bounded --max; no CPU
+preparation holds the GPU. The native feature-level fixture is deliberately
+not the WebGL2 layer. No test assertion or image bound changes.
+Do not invoke the unrelated tracer compilation or teardown investigations.
+[Receipt](results/batch-273-native-baselines.json).
