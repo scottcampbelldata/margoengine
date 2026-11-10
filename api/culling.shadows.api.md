@@ -58,6 +58,13 @@ type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface CullShape {
+    shader(code: string, matrix: string): string;
+    write(target: Float32Array, offset: number, vertices: Float32Array, stride: number, padding?: number): void;
+    cpu(records: Float32Array, at: number, vertices: Float32Array, stride: number, padding: number, frame: Float32Array): boolean;
+    prepare(context: PassContext, occlusion: boolean): void;
+}
+
 interface CulledBatch {
     geometry: Geometry;
     material: PbrMaterial;
@@ -172,6 +179,7 @@ type CullingBounds = 'sphere' | 'box';
 type CullingMode = 'none' | 'frustum' | 'occlusion';
 
 class DynamicInstances implements EnginePlugin {
+    protected shape?: CullShape;
     readonly name: string;
     readonly capacity: number;
     readonly matrices: Float32Array;

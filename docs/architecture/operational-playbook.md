@@ -6069,3 +6069,14 @@ The optional road network reader builds CPU topology and exact WGS84 east/up/sou
 
 ### Section 5 evidence: batch 172 probe geometry
 Optional sciviz/probe owns f64 barycentric/isoparametric inversion, bucket candidate selection, exact declared-cell-model integrals, profile masks and resampling. Shared optional cell-complex logic adds explicit opt-in line/vertex validation for probes; contour and clip retain their prior surface/volume restrictions. CPU coverage retains those entries' tests plus the new analytical probe oracles. probe-browser.mjs renders real NASA/OpenNeuro data and verifies actual chart hover moves the 3D marker on WebGPU and WebGL2. Existing renderers and compute bindings are reused; no core/stage or backend shader is changed. Conditioning, sampled field models, bounded iteration and quadrature-point Jacobian checks are explicit in docs/sciviz-analysis.md. This is not an exact arithmetic geometry kernel or a speed certification.
+
+### Section 5 evidence: batch 223 oriented boxes
+
+Culling's optional /bounds subclasses add box tests to the existing mesh, model
+and moving-instance cull passes through a package-local shape hook. Uniforms and
+plain-model items append two aligned vec4 records only in these subclasses.
+The plane support sum stays valid under shear; clip-coordinate interval padding
+keeps near-depth tests conservative under oblique transforms. CPU tests pin
+uniform alignment, padding, all three shader paths and 100 transformed-corner
+comparisons. The licensed Cesium rod fixture compares culled and original pixels
+on native and full WebGL2 routes; no core/stage or backend code changes.

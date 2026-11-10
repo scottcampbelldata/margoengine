@@ -506,3 +506,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 233 job 3): road/geojson alias after build phase.
 - @margoengine/sciviz: document /probe locator ownership, barycentric/trilinear cell models, integration dimensions, masks/resampling, profile/chart linkage, pipeline params, precision/conditioning limits and NASA/OpenNeuro demo.
 - margoengine: document generated sciviz/probe alias alongside the owning optional entry.
+
+- @margoengine/culling: document /bounds BoxCulledMeshes, BoxCulledModels and BoxDynamicInstances, inherited methods, padding and compatibility behaviour (batch 223 job 2).
+- margoengine: document the generated culling/bounds alias (batch 223 job 2).

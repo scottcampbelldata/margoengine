@@ -1,4 +1,5 @@
 // Clean room: Greene, Kass and Miller (1993); Hasselgren et al. (2005), docs/clean-room.md.
+import { coveragePolygons } from './planar-coverage.js';
 /** Interleaved xyz/normal vertices and triangle indices accepted by the software depth buffer. */
 export interface TriangleGeometry {
   readonly vertices: Float32Array;
@@ -25,6 +26,14 @@ export function transform(m: ArrayLike<number>, x: number, y: number, z: number)
 export class SoftwareDepthBuffer {
   readonly depth: Float64Array;
   private camera: ArrayLike<number> = new Float32Array(16);
+  private polygons = new WeakMap<
+    TriangleGeometry,
+    {
+      polygons: number[][];
+      vertices: Float32Array;
+      indices: Uint32Array;
+    }
+  >();
   constructor(
     readonly width = 128,
     readonly height = 128,
@@ -42,7 +51,19 @@ export class SoftwareDepthBuffer {
   }
   /** Add real opaque triangles. Default single-sided; near-plane crossings conservatively do not occlude. */
   rasterize(geometry: TriangleGeometry, matrix: ArrayLike<number>, doubleSided = false): void {
-    const { vertices, indices } = geometry;
+    const { vertices } = geometry;
+    let cached = this.polygons.get(geometry);
+    if (
+      !cached ||
+      cached.vertices.length !== vertices.length ||
+      cached.indices.length !== geometry.indices.length ||
+      !vertices.every((v, i) => v === cached!.vertices[i]) ||
+      !geometry.indices.every((v, i) => v === cached!.indices[i])
+    ) {
+      cached = { polygons: coveragePolygons(geometry), vertices: vertices.slice(), indices: geometry.indices.slice() };
+      this.polygons.set(geometry, cached);
+    }
+    const polygons = cached.polygons;
     const points: number[][] = [];
     for (let i = 0; i < vertices.length; i += 6) {
       const p = transform(matrix, vertices[i], vertices[i + 1], vertices[i + 2]);
@@ -52,8 +73,8 @@ export class SoftwareDepthBuffer {
       matrix[0] * (matrix[5] * matrix[10] - matrix[6] * matrix[9]) -
       matrix[4] * (matrix[1] * matrix[10] - matrix[2] * matrix[9]) +
       matrix[8] * (matrix[1] * matrix[6] - matrix[2] * matrix[5]);
-    for (let i = 0; i < indices.length; i += 3) {
-      const clip = [points[indices[i]], points[indices[i + 1]], points[indices[i + 2]]];
+    for (const polygon of polygons) {
+      const clip = polygon.map((i) => points[i]);
       // Crossing the near/eye plane cannot occlude safely without clipping. Keep those triangles out.
       if (clip.some((p) => !p || !p.every(Number.isFinite) || p[3] <= 1e-6 || p[2] < 0 || p[2] >= p[3])) continue;
       const p = clip.map((q) => [
@@ -74,9 +95,9 @@ export class SoftwareDepthBuffer {
       for (let y = y0; y <= y1; y++)
         for (let x = x0; x <= x1; x++) {
           let covered = true;
-          for (let e = 0; e < 3 && covered; e++) {
+          for (let e = 0; e < p.length && covered; e++) {
             const a = p[e],
-              b = p[(e + 1) % 3],
+              b = p[(e + 1) % p.length],
               margin = 1e-4 * (Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]));
             for (let c = 0; c < 4; c++) if (sign * edge(a, b, x + (c & 1), y + (c >> 1)) < margin) covered = false;
           }

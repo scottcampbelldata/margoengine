@@ -10,6 +10,7 @@ import type {
   PbrMaterial,
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import type { CullShape } from './shape.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 
 declare const GPUBufferUsage: {
@@ -167,6 +168,7 @@ let serial = 0;
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class DynamicInstances implements EnginePlugin {
+  protected shape?: CullShape;
   readonly name = 'dynamic-instances:' + ++serial;
   /** Most instances alive at once. */
   readonly capacity: number;
@@ -221,10 +223,10 @@ export class DynamicInstances implements EnginePlugin {
   };
   private picking?: Promise<number | null>;
   private readonly frame = new Float32Array(44);
-  private readonly part = new ArrayBuffer(64);
-  private readonly partWords = new Uint32Array(this.part);
-  private readonly partFloats = new Float32Array(this.part);
-  private readonly sphere = new Float32Array(this.part, 16, 4);
+  private part = new ArrayBuffer(64);
+  private partWords = new Uint32Array(this.part);
+  private partFloats = new Float32Array(this.part);
+  private sphere = new Float32Array(this.part, 16, 4);
   private batch?: Batch;
   private readonly redirect: { instances: GPUBuffer; args: GPUBuffer } = {} as never;
   private route?: ReturnType<typeof import('./compat.js').dynamicRoute>;
@@ -413,6 +415,12 @@ export class DynamicInstances implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
+    if (this.shape && this.part.byteLength === 64) {
+      this.part = new ArrayBuffer(96);
+      this.partWords = new Uint32Array(this.part);
+      this.partFloats = new Float32Array(this.part);
+      this.sphere = new Float32Array(this.part, 16, 4);
+    }
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
@@ -467,6 +475,7 @@ export class DynamicInstances implements EnginePlugin {
     floats[13] = data[1];
     floats[14] = data[2];
     floats[15] = 1;
+    this.shape?.write(floats, 16, this.geometry.vertices, 6);
     const m = c.camera.matrix,
       canvas = this.engine!.canvas,
       ratio = canvas.clientWidth ? c.width / canvas.clientWidth : 1,
@@ -477,7 +486,20 @@ export class DynamicInstances implements EnginePlugin {
     f[41] = (Math.hypot(m[1], m[5], m[9]) * c.height) / 2;
     f[42] = this.minRadius * ratio;
     if (this.route)
-      this.route(d, this.high, this.matrices, this.tints, b, f, floats, this.sphere, this.geometry.indices.length);
+      this.route(
+        d,
+        this.high,
+        this.matrices,
+        this.tints,
+        b,
+        f,
+        floats,
+        this.sphere,
+        this.geometry.indices.length,
+        this.shape
+          ? (records, at, frame) => this.shape!.cpu(records, at, this.geometry.vertices, 6, 0, frame)
+          : undefined,
+      );
     else {
       d.queue.writeBuffer(b.frame, 0, f as Float32Array<ArrayBuffer>);
       d.queue.writeBuffer(b.part, 0, this.part);
@@ -546,7 +568,7 @@ export class DynamicInstances implements EnginePlugin {
     try {
       const buffers = {
         frame: make(this.frame.byteLength, GPUBufferUsage.UNIFORM),
-        part: make(64, GPUBufferUsage.UNIFORM),
+        part: make(this.part.byteLength, GPUBufferUsage.UNIFORM),
         matrices: make(n * ROW * 4, S),
         rows: make(n * 16, S),
         world: make(n * 96, S | GPUBufferUsage.VERTEX),
@@ -581,7 +603,7 @@ export class DynamicInstances implements EnginePlugin {
         entry('storage'),
       ].map((e, binding) => ({ binding, ...e })),
     });
-    const module = d.createShaderModule({ code: shader }),
+    const module = d.createShaderModule({ code: this.shape?.shader(shader, 'matrix(i)') ?? shader }),
       pipelineLayout = d.createPipelineLayout({ bindGroupLayouts: [layout] }),
       pipeline = (entryPoint: string) =>
         d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });

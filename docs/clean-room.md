@@ -6701,3 +6701,37 @@ Compared RFC 7946, OSM XML/width/lane specifications, Md Kaisar Ahmed (2022) OSM
 - NIST Digital Library of Mathematical Functions, "Section 3.5: Quadrature", edited by F. W. J. Olver et al., current 2026 edition, https://dlmf.nist.gov/3.5 . Gaussian polynomial exactness supports the three-node tensor rule for a nonfolded trilinear hexahedron's polynomial field times Jacobian product. Simplex field integration instead uses exact barycentric means; these approaches are combined by cell type.
 - Kitware, "VTK 9.5 Release Details: vtkIntegrateAttributes integration strategies", 2025, https://docs.vtk.org/en/v9.5.0/release_details/9.5.html . Behavioral reference for separating Gaussian integration from triangulation-based field integration. The probe entry states explicitly which field model each cell type uses.
 - NASA TMR FUN3D SA slice and the OpenNeuro ds000030 UCLA CNP T1 already attributed in this repository provide the real-data demonstrations. Only repository data and public mathematical descriptions were used; no rival or companion source was read. Uniform coordinate buckets narrow cell candidates; the implementation does not claim a ray-traversal algorithm or a measured Rust/Wasm gain.
+
+## Batch 223: oriented boxes on all culling lists
+
+Gil Gribb and Klaus Hartmann, *Fast Extraction of Viewing Frustum Planes from the
+World-View-Projection Matrix*, 2001,
+https://scottfielder.com/Literature/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf ,
+and Stefan Gottschalk, Ming C. Lin and Dinesh Manocha, *OBBTree: A Hierarchical
+Structure for Rapid Interference Detection*, SIGGRAPH 1996,
+https://techreports.cs.unc.edu/papers/96-013.pdf , motivate plane tests using the
+support radius of a transformed box. Compared with a sphere this retains actual
+axis extents under rotation, reflection, nonuniform scale and shear. Combine it
+with Greene, Kass and Miller (1993), cited above, for depth bounds: projected
+corners give conservative screen and near-depth intervals. We expand each clip
+coordinate by transformed world-error bounds before division, so padding stays
+conservative under oblique transforms too. Sphere size cuts remain unchanged.
+The optional subclass owns all box mathematics; ordinary cullers only dispatch
+an optional package-local shape hook. Tests use the existing attributed Cesium
+Box sample, scaled into rods. No rival source or companion implementation used.
+
+The software occluder now removes an internal diagonal only for an exactly
+coplanar convex triangle pair with consistent winding. This applies the
+inessential-diagonal principle described by Stefan Hertel and Kurt Mehlhorn,
+*Fast triangulation of the plane with respect to simple polygons*, 1985
+(expanding their 1983 paper), https://doi.org/10.1016/S0019-9958(85)80044-9 ,
+compared with Bernard Chazelle and David P. Dobkin, *Optimal Convex
+Decompositions*, 1985,
+https://www.cs.princeton.edu/~chazelle/pubs/OptimalConvexDecomp.pdf .
+We need safe convex patches, not a minimum decomposition, so a linear adjacency
+pass only joins pairs. Exact float32 dyadic integer predicates verify
+coplanarity and convexity before removing a diagonal. Folded, concave and
+oppositely wound pairs stay separate. Cached patches compare snapshots so
+mutable public software geometry refreshes them. Inner full-cell coverage and
+far-depth bounds still apply to every patch; no corner-only sampling shortcut
+was introduced. Regression tests cover seams and actual concave gaps.

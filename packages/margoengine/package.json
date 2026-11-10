@@ -774,6 +774,10 @@
       "types": "./dist/culling/webgl2.d.ts",
       "import": "./dist/culling/webgl2.js"
     },
+    "./culling/bounds": {
+      "types": "./dist/culling/bounds.d.ts",
+      "import": "./dist/culling/bounds.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

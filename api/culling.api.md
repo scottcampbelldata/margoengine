@@ -68,6 +68,7 @@ export interface CulledInstancesOptions {
 }
 
 export class CulledMeshes implements EnginePlugin {
+    protected shape?: CullShape;
     readonly name: string;
     minRadius: number;
     occlusion: boolean;
@@ -144,6 +145,13 @@ export interface OccluderSource {
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface CullShape {
+    shader(code: string, matrix: string): string;
+    write(target: Float32Array, offset: number, vertices: Float32Array, stride: number, padding?: number): void;
+    cpu(records: Float32Array, at: number, vertices: Float32Array, stride: number, padding: number, frame: Float32Array): boolean;
+    prepare(context: PassContext, occlusion: boolean): void;
+}
 
 class Pyramid {
     width: number;

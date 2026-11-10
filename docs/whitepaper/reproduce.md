@@ -3145,3 +3145,11 @@ package test:gpu command, then with `--compat`, through the shared GPU lock. No 
 After build: node --test --test-timeout=120000 packages/road/test/geojson.test.js, then the shared-lock road browser gate above. Real data source/license is packages/road/test/fixtures/osm-source.json. Both backends render a source road in local WGS84 metres, restore identical pixels and dispose it. No timing assertion.
 
 Batch 172 probes: build packages, run node --test packages/sciviz/tests/probe.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=5 --wait-max=60 -- node packages/sciviz/tests/probe-browser.mjs. Serve examples/sciviz-probe.html; hover either chart. The test reports four data-view pixel counts, 32768 MRI target points, 101 valid NASA profile samples and zero difference between profile and dataset resampling. CPU oracles include the warped trilinear cell with volume 1.25 and field integral 1/6, rather than a triangulation-derived expectation. No timing run.
+
+Batch 223 box bounds: after building packages, hold a shared GPU slot for
+`node packages/culling/test/gpu/bounds-extended-check.mjs` and repeat with
+`--compat`. Each of the three routes compares all pixels across camera and wall
+edits; native mesh/model Hi-Z also asserts reduction behind the wall. CPU layout
+and transformed-corner checks: `node --test --test-timeout=120000
+packages/culling/test/bounds-extended.test.js`. Cesium Box data and licence are
+shared with job 1. No timing test or benchmark is needed for these claims.

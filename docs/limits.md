@@ -4763,3 +4763,42 @@ road/geojson imports standard line GeoJSON and OSM XML/Overpass ways with lane/w
 Batch 172 job 4: sciviz/probe accepts up to 8000000 points/snapshot and 1000000 profile samples. Uniform cell buckets max 32 per axis; cells spanning over 128 buckets use a separate candidate list. Hex inverse mapping takes at most 24 Newton steps with the documented f64 coordinate residual; inputs must be convex, finite and nonfolded. Non-hexa mixed cells use pulling-linear fields, while hexa/image sampling is trilinear. Field integrals are exact for these declared field models to f64 arithmetic precision, not for unknown continuous physical fields. Resampling masks outside points and keeps sampled source cell fields separate from point fields; no conservative cell-average remap or label-nearest policy is claimed. See docs/sciviz-analysis.md. Core and stage source unchanged; no speed claim.
 
 Batch 172 job 4 sizes: probe 0 to 6588 B min+gzip, ceiling 6844 B. Explicit lower-dimensional cell support in shared optional analysis logic changes contour 3067 to 3101 B and clip 5140 to 5176 B, within their existing 3323/5396 B ceilings. One owner retains tuple interpolation, masks, locator and linked-plot lifecycle; splitting would duplicate that ownership. Core + stage remains 24209 B. Both GPU backends render the four probe views, retain 32768 MRI samples and 101 valid NASA samples, and produce zero profile/dataset resampling difference. No speed claim.
+
+### Oriented box culling subclasses
+
+`@margoengine/culling/bounds` exports BoxCulledMeshes, BoxCulledModels and
+BoxDynamicInstances. They inherit the corresponding ordinary culler's options
+and methods, retaining stable compaction, picking and complete shadow lists.
+Frustum tests use transformed local boxes, including shear and reflection;
+BoxCulledMeshes and native BoxCulledModels also use them for Hi-Z occlusion.
+Model padding expands each local half-extent. Deformed model primitives still
+retain their original conservative bypass. Ordinary sphere cullers do not load
+box mathematics. BoxCulledModels runs box frustum/size culling on the full WebGL2
+layer; its Hi-Z remains native-only. BoxCulledMeshes uses current CPU depth there.
+BoxDynamicInstances adds box frustum tests on both backends; its base class has
+no occlusion option. Geometry position arrays are treated as immutable, as for
+ordinary core Geometry; model array replacement refreshes cached bounds.
+
+Batch 223 job 2 also joins exactly coplanar convex triangle pairs before CPU
+depth rasterization, using exact dyadic predicates for the float32 positions.
+This removes their internal seam while preserving real holes, folds and back
+faces. Larger triangulations may still retain extra candidates. Snapshot
+validation refreshes cached patches when software geometry changes in place.
+The software entry's earlier 28-of-81 figure is job 1's historical measurement;
+the current entry can reject additional hidden rows with the same pixels.
+
+Batch 223 job 2 minified gzip entry measurements (parent-source rebuild to final build, bare peer imports external):
+
+| Entry | Before B | After B |
+| --- | ---: | ---: |
+| @margoengine/culling | 13871 | 13961 |
+| @margoengine/culling/dynamic | 7336 | 7452 |
+| @margoengine/culling/parts | 14778 | 14180 |
+| @margoengine/culling/models | 9455 | 9540 |
+| @margoengine/culling/shadows | 20611 | 20302 |
+| @margoengine/culling/lod | 3878 | 3878 |
+| @margoengine/culling/meshlets | 17708 | 17117 |
+| @margoengine/culling/webgl2 | 2442 | 3028 |
+| @margoengine/culling/bounds | 0 | 19447 |
+
+Optional /bounds groups the three subclasses so they share the existing cullers and one set of box mathematics. The software entry grows from 2,442 to 3,028 B for exact convex-patch coverage and cache validation. Splitting these predicates into another entry would duplicate their state or add a needless asynchronous boundary. Core plus stage remains 24,209 B.

@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { loadCompatRoute } from '../../shared/compat.js';
+import type { CullShape } from './shape.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
 import { computeShader, fillFrame, instanceCull, occludedCull } from './shaders.js';
@@ -84,6 +85,7 @@ let serial = 0;
  * `occlusion`, instances hidden behind last frame's large ones are dropped too.
  */
 export class CulledMeshes implements EnginePlugin {
+  protected shape?: CullShape;
   readonly name = 'culled-meshes:' + ++serial;
   /** See {@link CulledMeshesOptions.minRadius}; may change at any time. */
   minRadius: number;
@@ -194,7 +196,7 @@ export class CulledMeshes implements EnginePlugin {
           ...[3, 4, 5, 6, 7].map(() => buffer('storage')),
         ].map((e, binding) => ({ binding, ...e })),
       });
-      const module = d.createShaderModule({ code: shader }),
+      const module = d.createShaderModule({ code: this.shape?.shader(shader, 'records[i].m') ?? shader }),
         pipelineLayout = d.createPipelineLayout({ bindGroupLayouts: [layout] }),
         entry = (entryPoint: string) =>
           d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
@@ -205,6 +207,7 @@ export class CulledMeshes implements EnginePlugin {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     fillFrame(this.frame, c, engine.canvas, this.minRadius);
+    this.shape?.prepare(c, this.occlusion && !!this.route);
     d.queue.writeBuffer(this.frameBuffer, 0, this.frame as Float32Array<ArrayBuffer>);
     const route = this.route,
       p = this.pipelines,
@@ -222,7 +225,7 @@ export class CulledMeshes implements EnginePlugin {
       pass = route ? undefined : c.encoder.beginComputePass();
     for (const batch of active) {
       const slot = this.slots.get(batch.geometry)!;
-      if (route) route(d, batch, slot.drawn!, slot.args!, this.frame);
+      if (route) route(d, batch, slot.drawn!, slot.args!, this.frame, this.shape?.cpu);
       else {
         const groups = Math.ceil(batch.count / 256);
         pass!.setBindGroup(0, occluding ? slot.occluders!.cull! : slot.group!);
@@ -254,7 +257,7 @@ export class CulledMeshes implements EnginePlugin {
     if (o?.samples !== samples) {
       this.dropOcclusion();
       const module = d.createShaderModule({ code: computeShader(samples) }),
-        own = d.createShaderModule({ code: occludedShader }),
+        own = d.createShaderModule({ code: this.shape?.shader(occludedShader, 'records[i].m') ?? occludedShader }),
         entry = (shader: GPUShaderModule, entryPoint: string) =>
           d.createComputePipeline({ layout: 'auto', compute: { module: shader, entryPoint } }),
         uniform = d.createBuffer({ size: 448, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -373,7 +376,8 @@ export class CulledMeshes implements EnginePlugin {
   // Per-geometry storage, sized to the batch count (doubling) and rebound when core replaces its instance buffer.
   private slot(d: GPUDevice, engine: Engine, batch: Batch): Slot {
     let slot = this.slots.get(batch.geometry);
-    if (!slot) this.slots.set(batch.geometry, (slot = { capacity: 0, buffers: [], data: new Uint32Array(8) }));
+    if (!slot)
+      this.slots.set(batch.geometry, (slot = { capacity: 0, buffers: [], data: new Uint32Array(this.shape ? 16 : 8) }));
     const instance = engine.geometryBuffers(batch.geometry)!.instance;
     if (batch.count > slot.capacity) {
       for (const b of slot.buffers) b.destroy();
@@ -387,7 +391,7 @@ export class CulledMeshes implements EnginePlugin {
       slot.buffers = [];
       slot.occluders = undefined;
       slot.capacity = n;
-      slot.uniform = make(32, GPUBufferUsage.UNIFORM);
+      slot.uniform = make(slot.data.byteLength, GPUBufferUsage.UNIFORM);
       slot.drawn = make(n * 96, S | GPUBufferUsage.VERTEX);
       slot.args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
       make(n * 4, S);
@@ -417,6 +421,7 @@ export class CulledMeshes implements EnginePlugin {
     words[0] = batch.count;
     words[1] = batch.geometry.indices.length;
     new Float32Array(words.buffer).set(batch.geometry.bounds, 4);
+    this.shape?.write(new Float32Array(words.buffer), 8, batch.geometry.vertices, 6);
     d.queue.writeBuffer(slot.uniform!, 0, words as Uint32Array<ArrayBuffer>);
     return slot;
   }

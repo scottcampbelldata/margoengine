@@ -81,10 +81,12 @@ export function cullMeshes(
   sphere: ArrayLike<number>,
   frame: Float32Array,
   drawn: Float32Array,
+  test?: (records: Float32Array, at: number, frame: Float32Array) => boolean,
 ): number {
   let kept = 0;
   for (let i = 0; i < count; i++)
-    if (keeps(records, i * 24, sphere, frame)) drawn.set(records.subarray(i * 24, i * 24 + 24), kept++ * 24);
+    if (keeps(records, i * 24, sphere, frame) && (!test || test(records, i * 24, frame)))
+      drawn.set(records.subarray(i * 24, i * 24 + 24), kept++ * 24);
   return kept;
 }
 
@@ -145,14 +147,22 @@ export function meshesRoute() {
     batch: {
       instances: Float32Array;
       count: number;
-      geometry: { bounds: ArrayLike<number>; indices: ArrayLike<number> };
+      geometry: { bounds: ArrayLike<number>; indices: ArrayLike<number>; vertices: Float32Array };
     },
     drawn: GPUBuffer,
     argsBuffer: GPUBuffer,
     frame: Float32Array,
+    test?: import('./shape.js').CullShape['cpu'],
   ): void => {
     if (packed.length < batch.count * 24) packed = new Float32Array(batch.count * 48);
-    const kept = cullMeshes(batch.instances, batch.count, batch.geometry.bounds, frame, packed);
+    const kept = cullMeshes(
+      batch.instances,
+      batch.count,
+      batch.geometry.bounds,
+      frame,
+      packed,
+      test ? (records, at, frame) => test(records, at, batch.geometry.vertices, 6, 0, frame) : undefined,
+    );
     if (kept) device.queue.writeBuffer(drawn, 0, packed as Float32Array<ArrayBuffer>, 0, kept * 24);
     args[0] = batch.geometry.indices.length;
     args[1] = kept;
@@ -181,6 +191,7 @@ export function dynamicRoute(capacity: number) {
     part: Float32Array,
     sphere: Float32Array,
     indices: number,
+    test?: (records: Float32Array, at: number, frame: Float32Array) => boolean,
   ): void => {
     // The state word of each row shares the tints' buffer (Uint32 view, made once).
     if (states?.buffer !== tints.buffer) states = new Uint32Array(tints.buffer, tints.byteOffset, tints.length);
@@ -203,7 +214,7 @@ export function dynamicRoute(capacity: number) {
       for (let k = 0; k < 3; k++) world[out + 16 + k] = part[12 + k] * tints[i * 4 + k];
       world[out + 19] = 1;
       for (let k = 0; k < 4; k++) world[out + 20 + k] = part[8 + k];
-      if (keeps(world, out, sphere, frame)) {
+      if (keeps(world, out, sphere, frame) && (!test || test(world, out, frame))) {
         // A loop, not set(subarray): a view per kept row would be garbage every frame.
         for (let k = 0; k < 24; k++) drawn[kept * 24 + k] = world[out + k];
         kept++;

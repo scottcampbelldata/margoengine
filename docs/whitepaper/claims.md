@@ -3672,3 +3672,13 @@ GeoJSON lines and OSM XML/Overpass ways produce source-tagged local metre road n
 
 ### Batch 172 job 4: probes and field integrals
 The optional probe entry supplies a reusable locator, barycentric and true trilinear sampling, linked polyline profiles, exact cell-model integrals and image/dataset resampling. probe.test.js checks affine and distorted-hexa sampling, source tuples/IDs, signed images, line/area/volume integrals, a varying-Jacobian trilinear oracle, masks, ownership, empty input and pipeline cancellation. probe-browser.mjs exercises real NASA and OpenNeuro data, chart pointer events and 3D markers, coverage, exact dataset/profile agreement and disposal on both GPU backends. No exact-predicate, conservative-remapping or speed claim.
+
+Batch 223 oriented boxes: the three optional /bounds subclasses preserve the
+unculled images while rejecting long thin meshes, model primitives and dynamic
+instances whose spheres overlap the view. Native Hi-Z also rejects rods behind
+an opaque wall using their box near depth. The box support test is checked
+against transformed corners for reflection and shear; model bounds include
+caller-supplied displacement padding. WebGL2 model Hi-Z remains outside this
+claim, as documented in limits.md. No performance result is claimed.
+
+With exact coplanar patch coverage, the same job 1 scene now keeps 1 of 81 rows behind the wall on both backends, still with byte-identical pixels; moving the wall restores 81 immediately. This is a deterministic visibility count, not a speed claim.

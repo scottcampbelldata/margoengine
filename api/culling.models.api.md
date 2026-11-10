@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Geometry, Mesh } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export interface CullableInstances {
     readonly count: number;
@@ -40,6 +40,7 @@ export interface CulledModelOptions {
 }
 
 export class CulledModels implements EnginePlugin {
+    protected shape?: CullShape;
     readonly name: string;
     minRadius: number;
     occlusion: boolean;
@@ -64,6 +65,13 @@ export interface CulledModelsOptions {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+interface CullShape {
+    shader(code: string, matrix: string): string;
+    write(target: Float32Array, offset: number, vertices: Float32Array, stride: number, padding?: number): void;
+    cpu(records: Float32Array, at: number, vertices: Float32Array, stride: number, padding: number, frame: Float32Array): boolean;
+    prepare(context: PassContext, occlusion: boolean): void;
+}
 
 interface OccluderContext {
     device: GPUDevice;

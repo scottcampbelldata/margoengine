@@ -4,9 +4,10 @@
 
 ```ts
 import { EngineKernel, Geometry, PbrMaterial } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export class DynamicInstances implements EnginePlugin {
+    protected shape?: CullShape;
     readonly name: string;
     readonly capacity: number;
     readonly matrices: Float32Array;
@@ -75,5 +76,12 @@ interface Buffers {
     groups: GPUBuffer;
     drawn: GPUBuffer;
     args: GPUBuffer;
+}
+
+interface CullShape {
+    shader(code: string, matrix: string): string;
+    write(target: Float32Array, offset: number, vertices: Float32Array, stride: number, padding?: number): void;
+    cpu(records: Float32Array, at: number, vertices: Float32Array, stride: number, padding: number, frame: Float32Array): boolean;
+    prepare(context: PassContext, occlusion: boolean): void;
 }
 ```

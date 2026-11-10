@@ -5,6 +5,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import type { CullShape } from './shape.js';
 import { compatTier } from '../../shared/compat.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { OccluderList, type OccluderInput } from './occluders.js';
@@ -169,6 +170,7 @@ function sphereOf(vertices: Float32Array, out: Float32Array): void {
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class CulledModels implements EnginePlugin {
+  protected shape?: CullShape;
   readonly name = 'culled-models:' + ++serial;
   /** See {@link CulledModelsOptions.minRadius}; may change at any time. */
   minRadius: number;
@@ -295,7 +297,7 @@ export class CulledModels implements EnginePlugin {
       name: this.name,
       order: -1e6,
       execute: (c) => {
-        if (c.backend === 'webgpu' && !this.compat) this.cull(c);
+        if (c.backend === 'webgpu' && (!this.compat || this.shape)) this.cull(c);
       },
     });
   }
@@ -311,7 +313,7 @@ export class CulledModels implements EnginePlugin {
     this.uniform ??= d.createBuffer({ size: 448, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     fillFrame(this.frame, c, this.engine!.canvas, this.minRadius);
     d.queue.writeBuffer(this.frameBuffer, 0, this.frame as Float32Array<ArrayBuffer>);
-    const o = this.occlusion && this.outside?.size ? this.occlude(c) : undefined;
+    const o = !this.compat && this.occlusion && this.outside?.size ? this.occlude(c) : undefined;
     this.tick++;
     this.live.length = 0;
     const pass = c.encoder.beginComputePass();
@@ -382,15 +384,16 @@ export class CulledModels implements EnginePlugin {
     for (let i = 0; i < n; i++) {
       const primitive = live[i],
         record = this.records.get(primitive)!,
-        at = i * ITEM;
+        at = i * (this.shape ? ITEM + 8 : ITEM);
       list.data.set(primitive.node.matrix, at);
       list.data.set(record.sphere, at + 16);
       list.words[at + 20] = primitive.indices.length;
+      this.shape?.write(list.data, at + 24, primitive.vertices, 20, record.padding);
       record.args = list.args;
       record.offset = i * 20;
       primitive.culled = record;
     }
-    d.queue.writeBuffer(list.items, 0, list.data as Float32Array<ArrayBuffer>, 0, n * ITEM);
+    d.queue.writeBuffer(list.items, 0, list.data as Float32Array<ArrayBuffer>, 0, n * (this.shape ? ITEM + 8 : ITEM));
     const { plain } = this.pipelines!;
     if (list.hiz !== hiz) {
       list.group = d.createBindGroup({
@@ -415,7 +418,7 @@ export class CulledModels implements EnginePlugin {
     list?.items.destroy();
     list?.args.destroy();
     const capacity = Math.max(64, 2 ** Math.ceil(Math.log2(n))),
-      data = new Float32Array(capacity * ITEM);
+      data = new Float32Array(capacity * (this.shape ? ITEM + 8 : ITEM));
     list = this.list = {
       capacity,
       items: d.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }),
@@ -449,7 +452,7 @@ export class CulledModels implements EnginePlugin {
         samples,
         table,
         pyramid: new Pyramid(d, samples, stages, this.uniform!, table, this.words),
-        cull: entry(occludedShader, 'cull'),
+        cull: entry(this.shape?.shader(occludedShader, 'b.node*records[i].m') ?? occludedShader, 'cull'),
       };
     }
     const pyramid = o.pyramid,
@@ -520,7 +523,7 @@ export class CulledModels implements EnginePlugin {
           ...[3, 4, 5, 6, 7].map(() => buffer('storage')),
         ].map((e, binding) => ({ binding, ...e })),
       }),
-      module = d.createShaderModule({ code: shader }),
+      module = d.createShaderModule({ code: this.shape?.shader(shader, 'b.node*records[i].m') ?? shader }),
       pipelineLayout = d.createPipelineLayout({ bindGroupLayouts: [layout] }),
       entry = (entryPoint: string) =>
         d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
@@ -531,7 +534,10 @@ export class CulledModels implements EnginePlugin {
       scatter: entry('scatter'),
       plain: d.createComputePipeline({
         layout: 'auto',
-        compute: { module: d.createShaderModule({ code: plainShader }), entryPoint: 'plain' },
+        compute: {
+          module: d.createShaderModule({ code: this.shape?.shader(plainShader, 'items[i].node') ?? plainShader }),
+          entryPoint: 'plain',
+        },
       }),
     };
   }
@@ -551,7 +557,7 @@ export class CulledModels implements EnginePlugin {
           buffers.push(b);
           return b;
         },
-        data = new ArrayBuffer(96),
+        data = new ArrayBuffer(this.shape ? 128 : 96),
         drawn = make(n * 96, S | GPUBufferUsage.VERTEX),
         args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
       slot = {
@@ -559,7 +565,7 @@ export class CulledModels implements EnginePlugin {
         padding: -1,
         sphere: new Float32Array(4),
         buffers,
-        uniform: make(96, GPUBufferUsage.UNIFORM),
+        uniform: make(data.byteLength, GPUBufferUsage.UNIFORM),
         drawn,
         args,
         data,
@@ -593,6 +599,7 @@ export class CulledModels implements EnginePlugin {
     slot.words[1] = primitive.indices.length;
     slot.floats.set(slot.sphere, 4);
     slot.floats.set(primitive.node.matrix, 8);
+    this.shape?.write(slot.floats, 24, primitive.vertices, 20, padding);
     d.queue.writeBuffer(slot.uniform, 0, slot.data);
     return slot;
   }

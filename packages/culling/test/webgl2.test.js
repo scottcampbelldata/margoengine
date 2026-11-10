@@ -14,7 +14,7 @@ test('inner coverage keeps holes, edges, near crossings and coplanar surfaces', 
   assert.equal(depth.visible(bounds, at(0.4, 0, 0.3)), false);
   assert.equal(depth.visible(bounds, at(0.4, 0, 0.95)), true);
   assert.equal(depth.visible(bounds, at(0.89, 0, 0.3)), true);
-  assert.equal(depth.visible(bounds, at(0, 0, 0.3)), true, 'triangle seams remain conservatively visible');
+  assert.equal(depth.visible(bounds, at(0, 0, 0.3)), false, 'coplanar shared diagonals have complete coverage');
   assert.equal(depth.visible(bounds, at(0.4, 0, 0.85)), true, 'coplanar target kept');
   depth.clear(identity);
   depth.rasterize(box(1.8, 1.8, 0.1), at(0, 0, 1.1), true);
