@@ -598,3 +598,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/transitions (batch 218 job 1): document live built-in selection, mask image ownership and softness, LiveTransitions.custom with AbortSignal, exact endpoints and compatibility layer support; examples deferred.
 
 - @margoengine/webgl2-compat (batch 218 job 1): document explicit render layout static-resource/visibility validation and async pipeline error delivery; examples deferred.
+- @margoengine/rigging (batch 213 job 3): vrm-constraints reader, evaluator, Animator/scene attachment, live weights, dependency rules and disposal.
+- @margoengine/gltf-pro (batch 213 job 3): retained required VRMC_node_constraint data and explicit optional runtime.
+- margoengine (batch 213 job 3): rigging/vrm-constraints alias.

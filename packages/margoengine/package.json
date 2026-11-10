@@ -2874,6 +2874,10 @@
       "types": "./dist/rigging/mtoon.d.ts",
       "import": "./dist/rigging/mtoon.js"
     },
+    "./rigging/vrm-constraints": {
+      "types": "./dist/rigging/vrm-constraints.d.ts",
+      "import": "./dist/rigging/vrm-constraints.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

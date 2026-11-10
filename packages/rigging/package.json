@@ -80,6 +80,10 @@
     "./mtoon": {
       "types": "./dist/mtoon.d.ts",
       "import": "./dist/mtoon.js"
+    },
+    "./vrm-constraints": {
+      "types": "./dist/vrm-constraints.d.ts",
+      "import": "./dist/vrm-constraints.js"
     }
   },
   "files": [
@@ -120,6 +124,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/rigging-browser.mjs",
     "prepack": "npm run build",
-    "test:mtoon:browser": "node tests/mtoon-browser.mjs"
+    "test:mtoon:browser": "node tests/mtoon-browser.mjs",
+    "test:constraints:browser": "node tests/vrm-constraints.browser.mjs"
   }
 }

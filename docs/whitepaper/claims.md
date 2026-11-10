@@ -3786,3 +3786,4 @@ Painted source alpha builds an exact sampled-centre signed distance field each f
 ### Batch 218 job 1: live transition modes
 
 All frozen built-in kinds, mask threshold wipes and the custom WGSL function contract can composite two changing scenes through `transitions/live`. Proof: packages/transitions/test/full-live-browser.js independently checks pixel values at 1x/4x while both inputs change; live.test.js checks selection, invalid arguments, cancellation and late scene disposal. This is correctness evidence, with no visual-quality or speed claim.
+Batch 213 job 3: optional VRM roll, aim and rotation constraints run after animation with dependency ordering, live validated weights and owned detachment. Proof: 120 pinned public-runtime quaternion observations plus two real skinned/MToon avatars on native and compatibility with exact restoration. Scope and primary research: ../rigging-vrm-constraints.md. No speed or cross-vendor certification.

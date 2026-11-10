@@ -195,6 +195,8 @@ const supported = new Set([
   'EXT_mesh_gpu_instancing',
   // Retained until @margoengine/rigging/mtoon installs its authored material rendering.
   'VRMC_materials_mtoon',
+  // Retained for the optional rigging/vrm-constraints controller.
+  'VRMC_node_constraint',
   // Data until @margoengine/gltf-pro/lights applies them.
   'EXT_lights_ies',
   'EXT_lights_image_based',

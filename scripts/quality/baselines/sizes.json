@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13267153,
+  "total": 13270407,
   "history": [
     {
       "date": "2026-10-24",
@@ -6729,6 +6729,12 @@
       "commit": "7830de179",
       "reason": "Batch 218 live entry 2501 to 4732 B gzip for built-ins masks and validated custom WGSL. One shared composition retains capture ownership rather than splitting competing pipelines. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-213-job3",
+      "reason": "New optional VRM constraint reader, stateless evaluator and scene/Animator controller: 0 to 2998 B min+gzip, ceiling 0 to 3254 B. Shared rest-space math and ownership belong together; splitting would duplicate state without saving an optional import. Core plus stage unchanged at 24209 B. Restore eight incoming-main ceilings and remove six stale umbrella keys accidentally restored by the previous local rebase helper.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6754,6 +6760,7 @@
     "@margoengine/animator/graph": 10483,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/layers": 11052,
+    "@margoengine/animator/masks": 11364,
     "@margoengine/animator/mirror": 2030,
     "@margoengine/animator/motion-matching": 7250,
     "@margoengine/animator/spline-ik": 4094,
@@ -7048,6 +7055,7 @@
     "@margoengine/fbx/legacy": 6650,
     "@margoengine/fbx/pbr": 3843,
     "@margoengine/fbx/scene-extras": 2735,
+    "@margoengine/fbx/surfaces": 3433,
     "@margoengine/fbx/textures": 751,
     "@margoengine/fbx/worker": 23796,
     "@margoengine/fsm": 1852,
@@ -7155,6 +7163,7 @@
     "@margoengine/lighting2d/emissive": 4410,
     "@margoengine/lighting2d/gi": 9961,
     "@margoengine/lighting2d/height": 7337,
+    "@margoengine/lighting2d/sdf": 2923,
     "@margoengine/lighting2d/soft": 6392,
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/directional": 4473,
@@ -7168,6 +7177,7 @@
     "@margoengine/lines/hidden": 4136,
     "@margoengine/lines/pick": 6245,
     "@margoengine/lines/stroke": 4663,
+    "@margoengine/lines/texture": 6617,
     "@margoengine/lines/trail": 5451,
     "@margoengine/loaders": 53650,
     "@margoengine/loaders dist/workers/usd.js": 8435,
@@ -7423,6 +7433,7 @@
     "@margoengine/react/performance": 5769,
     "@margoengine/react/physics": 6167,
     "@margoengine/react/points": 1460,
+    "@margoengine/react/portals": 4235,
     "@margoengine/react/post": 4243,
     "@margoengine/react/selection": 1412,
     "@margoengine/react/shadows": 3839,
@@ -7449,6 +7460,7 @@
     "@margoengine/rigging/transfer": 3680,
     "@margoengine/rigging/voxel-weights": 5534,
     "@margoengine/rigging/vrm": 10739,
+    "@margoengine/rigging/vrm-constraints": 3254,
     "@margoengine/rigging/vrm0": 6744,
     "@margoengine/road": 1979,
     "@margoengine/road/banking": 1297,
@@ -7476,6 +7488,7 @@
     "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
+    "@margoengine/scatter/surface": 1515,
     "@margoengine/scatter/textured": 1719,
     "@margoengine/scatter/tiles": 3606,
     "@margoengine/scene": 1974,
@@ -7503,6 +7516,7 @@
     "@margoengine/sciviz/flow": 9392,
     "@margoengine/sciviz/formats": 14262,
     "@margoengine/sciviz/geo": 4293,
+    "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 23118,
     "@margoengine/sciviz/grids": 24307,
     "@margoengine/sciviz/lic": 24165,
@@ -7697,6 +7711,7 @@
     "@margoengine/usdz dist/workers/usdz.js": 121784,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/compose": 19101,
+    "@margoengine/usdz/curves": 3531,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7905,
@@ -7943,17 +7958,9 @@
     "leak @margoengine/usdz/compose -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
+    "margoengine/fbx/surfaces": 314,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/react/portals": 4235,
-    "@margoengine/lines/texture": 6617,
-    "@margoengine/scatter/surface": 1515,
-    "@margoengine/sciviz/glyph": 4644,
-    "@margoengine/fbx/surfaces": 3433,
-    "margoengine/fbx/surfaces": 314,
-    "@margoengine/usdz/curves": 3531,
-    "@margoengine/animator/masks": 11364,
-    "@margoengine/lighting2d/sdf": 2923
+    "margoengine/web": 577
   }
 }
