@@ -4770,3 +4770,5 @@ Batch 194 job 3 reobserved the existing physical-composition compatibility limit
 
 
 - Batch 173 job 3: opaque geometry strictly inside a volume does not terminate the ordinary or cinematic ray at scene depth. Repro: insert an opaque plane halfway through a constant-opacity box; samples behind it still contribute. Cause: volume paths test only their rasterized proxy (ordinary) or overlay (cinematic), not per-pixel scene-depth ray distance. Job 4 owns the scene-depth regression and implementation.
+
+- Voxel-net native Deno host: native WebSocket has no ping/pong observation hook. After clientTimeout without application input, the existing authoritative server can close an otherwise reachable idle client. Repro: join via serveVoxelDeno then stop client.update longer than clientTimeout. Cause: Deno handles control pongs internally and exposes only application message activity. Follow-up: native-provider liveness integration without inventing byte counters. Keep client.update running meanwhile.

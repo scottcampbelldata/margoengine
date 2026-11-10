@@ -510,7 +510,10 @@ async function generatorThread(data: GeneratorData): Promise<void> {
   let running = 0,
     closing = false;
   const endWhenIdle = () => {
-    if (closing && !running) port.close();
+    if (closing && !running) {
+      if (typeof port.close === 'function') port.close();
+      else (globalThis as unknown as { close(): void }).close();
+    }
   };
   port.on('message', async (job: { id: number; cx: number; cy: number; cz: number } | 'close') => {
     if (job === 'close') {

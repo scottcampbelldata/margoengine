@@ -871,3 +871,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 173 job 3): document cinematicVolume, independent default-off lighting modes, HG/radiance/step/sample defaults, camera-rest resets, scene metric, exact cost readback, disposal/source sharing, limits and real EMDB/TCIA demo; examples in README phase.
 - margoengine (batch 173 job 3): document optional sciviz/cinematic alias in README phase.
+
+- @margoengine/voxel-net: document /server-runtimes Bun/Deno factories, native listener ownership, AbortSignal/await using, authentication facade, TLS types, shared test:runtimes command and Deno idle input requirement.
+
+- margoengine: document generated voxel-net/server-runtimes alias.

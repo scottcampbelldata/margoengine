@@ -74,6 +74,10 @@
     "./webrtc": {
       "types": "./dist/webrtc.d.ts",
       "import": "./dist/webrtc.js"
+    },
+    "./server-runtimes": {
+      "types": "./dist/server-runtimes.d.ts",
+      "import": "./dist/server-runtimes.js"
     }
   },
   "files": [
@@ -95,6 +99,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "bench": "node bench/run.mjs",
     "prepack": "npm run build",
-    "test:browser": "node tests/webrtc-browser.mjs"
+    "test:browser": "node tests/webrtc-browser.mjs",
+    "test:runtimes": "node tests/server-runtimes-check.mjs"
   }
 }

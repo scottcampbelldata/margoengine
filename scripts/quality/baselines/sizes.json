@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13820705,
+  "total": 13840765,
   "history": [
     {
       "date": "2026-10-24",
@@ -7251,6 +7251,11 @@
       "commit": "batch-173-cinematic",
       "reason": "Batch 173 job 3: optional cinematic entry 0 to 6006 B min+gzip; ceiling 6262 B. Shared classified transport, HG paths, camera-rest accumulation and exact work counters; splitting duplicates resource ownership. Root 52045 B. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-242",
+      "reason": "New optional voxel-net/server-runtimes: absent (0 B) -> 19475 B gzip, including its lazy authoritative server, native Bun/Deno adapters, atomic pending accounting and request facade. Splitting out a required server factory would increase setup without reducing loaded bytes."
     }
   ],
   "items": {
@@ -8565,6 +8570,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/sciviz/cinematic": 6262
+    "@margoengine/sciviz/cinematic": 6262,
+    "@margoengine/voxel-net/server-runtimes": 20060
   }
 }
