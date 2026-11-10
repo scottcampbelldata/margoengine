@@ -42,6 +42,12 @@ try {
   const ping=new MargoNodeMaterial({...g,nodes:[g.nodes[math.indexOf('PINGPONG')]]});
   ping.extension.output='color=vec3f(bn0.x/16.0+0.125);';primitive.extension=ping.extension;
   const pingFrames=[];for(const [a,b] of pingPongTruth){ping.set('a',a).set('b',b);pingFrames.push(await render());}
+  // HSV blends with a grey on the hue side: a grey has no hue, so HUE and COLOR keep a and SATURATION keeps a grey a.
+  const hsvCases=[['HUE',[.2,.6,.2],[.5,.5,.5]],['COLOR',[.2,.6,.2],[.3,.3,.3]],['SATURATION',[.5,.5,.5],[.8,.2,.2]],['HUE',[.2,.6,.2],[.2,.2,.8]]],hsvFrames=[];
+  for(const [blend,ca,cb] of hsvCases){
+   const hsv=new MargoNodeMaterial({version:1,bounds:graph.bounds,parameters:{f:{value:[1]},ca:{value:[...ca,1]},cb:{value:[...cb,1]}},surface:{},nodes:[{name:'Mix',op:'mix',mode:'RGBA',type:'color',blend,inputs:[{parameter:'f'},{parameter:'ca'},{parameter:'cb'}]}]});
+   hsv.extension.output='color=bn0.xyz;';primitive.extension=hsv.extension;hsvFrames.push(await render());
+  }
   console.log('nodes-test: math rendered');const variants=[];
   for(const blend of blends){const g=structuredClone(graph);g.nodes.find(n=>n.op==='mix').blend=blend;variants.push(g);}
   for(const mode of ['FLOAT','VECTOR']){const g=structuredClone(graph);Object.assign(g.nodes.find(n=>n.op==='mix'),{mode,type:mode==='FLOAT'?'float':'vector'});variants.push(g);}
@@ -65,7 +71,7 @@ try {
   coordinates.bounds=[[-1,-1,0],[1,1,0]];coordinates.unitScale=2;primitive.extension=new MargoNodeMaterial(coordinates).extension;const units=await render();
   console.log('nodes-test: render checks finished');const validation=(await engine.gpu.popErrorScope())?.message??null;
   loaded.dispose();loaded.dispose();const remaining=engine.meshes.size;engine.dispose();canvas.remove();
-  return {frames,overridden,stable,mathFrames,zeroFrames,pingFrames,math,variants:variants.length,noiseFrames,beforeNoise,afterNoise,resetNoise,crossedRamp,metres,units,validation,remaining};
+  return {hsvFrames,frames,overridden,stable,mathFrames,zeroFrames,pingFrames,math,variants:variants.length,noiseFrames,beforeNoise,afterNoise,resetNoise,crossedRamp,metres,units,validation,remaining};
  },pingPongTruth);
  const png=async url=>decodePNG(Buffer.from(url.split(',')[1],'base64'));
  const center=async url=>{const p=await png(url);return [...p.data.subarray((64*p.width+64)*4,(64*p.width+64)*4+3)];};
@@ -79,6 +85,11 @@ try {
  const smooth=(a,b,k)=>Math.min(a,b)-Math.max(k-Math.abs(a-b),0)**3/k**2/6;
  const expected=[a+b,a-b,a*b,a/b,a*b+c,a**b,Math.log(a)/Math.log(b),Math.sqrt(a),1/Math.sqrt(a),Math.abs(a),Math.exp(a),Math.min(a,b),Math.max(a,b),1,0,1,0,smooth(a,b,c),-smooth(-a,-b,c),Math.floor(a+.5),Math.floor(a),Math.ceil(a),Math.trunc(a),a%1,a-Math.trunc(a/b)*b,a-Math.floor(a/b)*b,wrap(a,b,c),Math.floor(div(a,b))*b,b-Math.abs(wrap(a,2*b,0)-b),Math.sin(a),Math.cos(a),Math.tan(a),Math.asin(a),Math.acos(a),Math.atan(a),Math.atan2(a,b),Math.sinh(a),Math.cosh(a),Math.tanh(a),a*Math.PI/180,a*180/Math.PI];
  for(let i=0;i<expected.length;i++){const actual=(await center(result.mathFrames[i]))[0],want=Math.round((expected[i]*.01+.5)*255);assert.ok(Math.abs(actual-want)<=1,`${result.math[i]} ${actual} vs ${want}`);}
+ // Grey hue side: unchanged a (Blender's mix keeps it); a coloured b still lends its hue (blue onto green).
+ for(const [i,want] of [[.2,.6,.2],[.2,.6,.2],[.5,.5,.5],[.2,.2,.6]].entries()){
+  const got=await center(result.hsvFrames[i]);
+  for(let k=0;k<3;k++)assert.ok(Math.abs(got[k]-Math.round(want[k]*255))<=1,`HSV blend case ${i}: ${got} vs ${want.map(v=>Math.round(v*255))}`);
+ }
  for(const frame of result.zeroFrames)assert.ok(Math.abs((await center(frame))[0]-128)<=1,'divide/modulo/floored-modulo/snap by zero must return zero');
  for(const [i,[a,b,value]] of pingPongTruth.entries()){
   const actual=(await center(result.pingFrames[i]))[0],want=Math.round((value/16+.125)*255);

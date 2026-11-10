@@ -13,14 +13,16 @@ export const mathExpressions: Record<string, string> = {
   ARCCOSINE: 'acos(clamp(a,-1.0,1.0))', ARCTANGENT: 'atan(a)', ARCTAN2: 'atan2(a,b)',
   SINH: 'sinh(a)', COSH: 'cosh(a)', TANH: 'tanh(a)', RADIANS: 'radians(a)', DEGREES: 'degrees(a)',
 };
+// A grey has no hue (HSV hue is undefined at saturation 0): HUE and COLOR leave `a` as it is when `b` is grey, and
+// SATURATION leaves a grey `a` grey, instead of reading hue 0 as red.
 export const blendExpressions: Record<string, string> = {
   MIX: 'b', ADD: 'a+b', MULTIPLY: 'a*b', SUBTRACT: 'a-b', SCREEN: '1.0-(1.0-a)*(1.0-b)',
   DIVIDE: 'vec3f(bnDiv(a.x,b.x),bnDiv(a.y,b.y),bnDiv(a.z,b.z))', DIFFERENCE: 'abs(a-b)',
   EXCLUSION: 'a+b-2.0*a*b', DARKEN: 'min(a,b)', LIGHTEN: 'max(a,b)',
   OVERLAY: 'select(2.0*a*b,1.0-2.0*(1.0-a)*(1.0-b),a>=vec3f(0.5))',
   DODGE: 'min(vec3f(1),a/max(1.0-b,vec3f(1e-20)))', BURN: '1.0-min(vec3f(1),(1.0-a)/max(b,vec3f(1e-20)))',
-  HUE: 'bnRGB(vec3f(bnHSV(b).x,bnHSV(a).yz))', SATURATION: 'bnRGB(vec3f(bnHSV(a).x,bnHSV(b).y,bnHSV(a).z))',
-  VALUE: 'bnRGB(vec3f(bnHSV(a).xy,bnHSV(b).z))', COLOR: 'bnRGB(vec3f(bnHSV(b).xy,bnHSV(a).z))',
+  HUE: 'select(a,bnRGB(vec3f(bnHSV(b).x,bnHSV(a).yz)),bnHSV(b).y!=0.0)', SATURATION: 'select(a,bnRGB(vec3f(bnHSV(a).x,bnHSV(b).y,bnHSV(a).z)),bnHSV(a).y!=0.0)',
+  VALUE: 'bnRGB(vec3f(bnHSV(a).xy,bnHSV(b).z))', COLOR: 'select(a,bnRGB(vec3f(bnHSV(b).xy,bnHSV(a).z)),bnHSV(b).y!=0.0)',
   SOFT_LIGHT: '(1.0-a)*a*b+a*(1.0-(1.0-a)*(1.0-b))', LINEAR_LIGHT: 'a+2.0*b-1.0',
 };
 
