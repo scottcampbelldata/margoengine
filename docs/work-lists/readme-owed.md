@@ -614,3 +614,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/blender (batch 207 job 4): document nodes export toggle, parse/loadMargoNodes, controller parameters/get/set/reset/seek, disposal, node coverage, bounds, cancellation and accepted noise/subframe differences.
 - margoengine (batch 207 job 4): document blender/nodes alias.
+
+- @margoengine/labels (batch 261 job 4): document RoutedCallouts, angled elbow/port reordering, side and overflow settings, pure routeCalloutLeaders preconditions, exact predicates, complexity and disposal.
+- margoengine (batch 261 job 4): document labels/callouts-route alias.

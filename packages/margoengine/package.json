@@ -1686,6 +1686,10 @@
       "types": "./dist/labels/cluster.d.ts",
       "import": "./dist/labels/cluster.js"
     },
+    "./labels/callouts-route": {
+      "types": "./dist/labels/callouts-route.d.ts",
+      "import": "./dist/labels/callouts-route.js"
+    },
     "./lighting2d/sdf": {
       "types": "./dist/lighting2d/sdf.d.ts",
       "import": "./dist/lighting2d/sdf.js"

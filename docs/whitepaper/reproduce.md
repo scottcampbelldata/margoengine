@@ -3267,3 +3267,6 @@ Batch 216 physical lens: after build:packages, run node --test packages/cinemati
 
 ## Batch 207 job 4
 Build packages, then node --test --test-timeout=120000 packages/blender/tests/nodes.test.js. Regenerate the own CC0 fixture/oracle: C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_nodes.py -- packages/blender/tests/fixtures. The script exports with live_nodes=True and bake_size at its default (asserting no images created), bakes a separate Cycles emission oracle and rejects an unsupported reachable node by name. Run node scripts/gpu-lock.mjs run --owner=codex-batch207 --max=2 --wait-max=60 -- node packages/blender/tests/nodes-browser.mjs and repeat with --compat. No timing assertion or exclusive GPU hold.
+
+### Batch 261 elbow routing
+After build, run node --test --test-timeout=120000 packages/labels/tests/callouts-route.test.js for pure planar matching, independent exact reference predicates, box placement, removal and unchanged-frame caching. Run node scripts/gpu-lock.mjs run --owner=labels-routes --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for actual SVG endpoint-to-label checks within 1 px on native WebGPU/WebGL2. Synthetic numeric fixtures are correctness controls, not an asset-backed demo.

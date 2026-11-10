@@ -5022,3 +5022,10 @@ Noise uses Margo's independent hash and gradient field, rather than Blender's pr
 
 
 Batch 207 job 4 size evidence: blender/nodes 0 to 10102 gzip bytes; ceiling 10406 B. These optional bytes keep the validated compiler, controls, animation and shader families together. A split would duplicate validation or add asynchronous graph boundaries. Blender root 4397 B; core plus stage 24209 B, unchanged.
+
+### Batch 261 routed callouts
+Optional labels/callouts-route reorders label slots and draws crossing-free angled elbows in a shared SVG. Default auto side, 16 px gap, 4 px padding, 8 px margin, currentColor, 1 px stroke, overflow true. Both sides, coincident sources, scaled nonzero boxes, still-frame caching and disposal are covered. Pure routeCalloutLeaders requires distinct port heights in one column and a bend column strictly between sources and ports. Labels may extend outside the viewport with overflow enabled; overflow false rejects insufficient space. Worst-case comparison work is O(n squared log n); total leader-length optimization, obstacle avoidance and multi-sided optimization are additional objectives. See [routing contract and proof](labels-callouts-route.md). No speed claim.
+
+Batch 261 job 4 entry size: callouts-route 0 -> 2450 B min+gzip, ceiling 2706 B. Core/stage remain 24,209 B.
+
+GPU label finish-phase limits: CSS borders currently enter the outer-rectangle sizing calculation, and aborting during Font.load waits for that shared load to settle. Repros and causes are in docs/known-bugs.md; both are tracked for the fix phase under lane rules 21/22.

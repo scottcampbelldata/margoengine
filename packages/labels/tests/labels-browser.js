@@ -4,6 +4,7 @@ import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
 import { Callouts } from '@margoengine/labels/callouts';
 import { DistanceLabels } from '@margoengine/labels/distance';
 import { ClusterLabels } from '@margoengine/labels/cluster';
+import { RoutedCallouts } from '@margoengine/labels/callouts-route';
 import { projectPoint } from '@margoengine/math/mat4';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
@@ -316,6 +317,35 @@ async function scenario(backend) {
   engine.removePlugin(clusterRenderer.name);
   clusterLayout.dispose();
   checks.push(`${backend}: count bubble projects at its centroid, hides members and splits at the zoom limit`);
+
+  const routing = new RoutedCallouts({ side: 'right' });
+  const routedRenderer = new LabelRenderer({ name: 'routes-check', layout: routing });
+  engine.use(routedRenderer);
+  const target = engine.camera.target;
+  const routedLabels = [target, [target[0] + 0.3, target[1] + 0.1, target[2]], target].map((position) =>
+    routedRenderer.add(tag('route'), { position }),
+  );
+  engine.render();
+  assert(routing.routes.length === 3 && routing.svg.querySelectorAll('polyline').length === 3, 'elbow routes missing');
+  const routeRoot = routing.svg.parentElement.getBoundingClientRect();
+  for (const route of routing.routes) {
+    const label = routedLabels[route.source],
+      labelBox = label.element.getBoundingClientRect();
+    const p = route.points[2];
+    assert(
+      Math.hypot(labelBox.left - routeRoot.left - p[0], (labelBox.top + labelBox.bottom) / 2 - routeRoot.top - p[1]) <=
+        1,
+      'elbow endpoint missed its reordered label box',
+    );
+    assert(route.points.length === 3 && label.onScreen, 'routed label was hidden or lost its elbow');
+  }
+  engine.render();
+  assert(routing.writes === 0, 'still elbow frame made SVG geometry writes');
+  engine.removePlugin(routedRenderer.name);
+  routing.dispose();
+  checks.push(
+    `${backend}: angled elbow SVGs terminate at reordered DOM label ports within 1 px and cache still frames`,
+  );
 
   // Dispose cleans the DOM.
   const elements = [label.element, farLabel.element, nearLabel.element, panel, tilted, note.element, callouts.svg];

@@ -6205,3 +6205,6 @@ Clusters remain in the optional lod/clusters entry. Parent simplification is own
 
 ### 5. Cinematic physical lens evidence (batch 216 job 1)
 The optional stage owns only physical parameter conversion; existing DOF owns all blur rendering. Both backends render a white diagnostic card at f/1 and f/16 with the same FOV. CPU tests cover fitted sensor axes, portrait views, tracked focus and validation before writes. No core, stage, projection hook or GPU shader changed; existing DOF radius/occlusion limitations remain.
+
+### 5. Batch 261 routed callout evidence
+The optional labels/callouts-route owns CPU planar assignment and exact orientation fallback, with SVG output through the existing label layout context. An explicit stack handles balanced angular subproblems; horizontal terminals occupy the opposite half-plane from the matched source segments. Independent exact binary-rational tests cover crossings, contacts, overlaps and degeneracy; the browser gate checks actual reordered DOM ports. No core/stage or GPU shader change. Finite nonzero measured boxes and column preconditions are explicit; no length-optimal or obstacle-routing claim.

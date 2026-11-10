@@ -54,6 +54,10 @@
     "./cluster": {
       "types": "./dist/cluster.d.ts",
       "import": "./dist/cluster.js"
+    },
+    "./callouts-route": {
+      "types": "./dist/callouts-route.d.ts",
+      "import": "./dist/callouts-route.js"
     }
   },
   "files": [

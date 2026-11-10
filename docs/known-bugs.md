@@ -4561,3 +4561,10 @@ Batch 216 job 1: no open physical-lens defect found. Invalid constructor setting
 
 
 - Batch 207 live-node quality follow-up: Noise uses an independent Margo hash/gradient ordering, so the same Blender settings produce different stochastic texels; socket curves are sampled per frame and interpolate linearly between samples. Reproduce by comparing the nodes fixture with Cycles noise or seeking halfway between non-linear keys. All requested node families and live controls are built; exact stochastic and subframe curve matching remain finish-phase quality work (also in private/handoffs/finish-later.md).
+
+### Batch 261 routed callouts
+No open correctness defect identified. The planar assignment replaces independent crossing-prone source/slot connections; a two-point fixture proves label reordering. Independent segment intersection/overlap checks cover integer, fractional, collinear, coincident, enormous and subnormal inputs. Browser tests check SVG-to-DOM endpoints and stable-frame writes on both native rendering backends.
+
+### Labels GPU finish-phase edge cases (batch 261)
+- In-flight font cancellation: start GPULabelLayer.create with a Font whose load promise is pending, then abort its signal. Creation stays pending until Font.load resolves because cancellation is checked only before/after loading. Make the caller's wait abortable while retaining shared font loading in the fix phase.
+- Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
