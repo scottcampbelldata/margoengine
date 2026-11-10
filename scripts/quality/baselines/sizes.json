@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14517096,
+  "total": 14519416,
   "history": [
     {
       "date": "2026-10-24",
@@ -7721,6 +7721,12 @@
       "commit": "d63578fe8",
       "reason": "landed with push-anyway: feat(water): add underwater fog, absorption, waterline and light shafts",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "39cd8a1cf",
+      "reason": "Batch 67 job 2: new water/scatter entry (WaterScatter, backlit crest subsurface scattering from Water's directional lights)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8961,6 +8967,7 @@
     "@margoengine/water/query": 4719,
     "@margoengine/water/reflector": 2660,
     "@margoengine/water/ripples": 3940,
+    "@margoengine/water/scatter": 2320,
     "@margoengine/water/underwater": 7161,
     "@margoengine/weather": 5230,
     "@margoengine/weather/audio": 1908,

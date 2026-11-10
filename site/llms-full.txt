@@ -8809,6 +8809,15 @@ water/bodies WaterBodies takes 1 to 64 bodies: closed outlines (3 to 4096 points
 
 Underwater options: absorption and scattering three channels 0..100 /m; anisotropy -0.99..0.99; shafts 0..10; steps integer 1..128; shaftDistance 0.1..10000 m; maxDistance 0.1..100000 m; shaftExtent 1..10000 m; resolution power of two 16..1024 (copied); waterline 0..64 px; refractiveIndex 1..2. The waterline is one probe plane under the camera per frame; the surface seen from below keeps Water's own shading; several views per frame share one uniform. Focusing is clamped to 0.1..10. Owned GPU memory: three rgba32float plus depth32float targets (viewport, resolution squared, 1x1).
 
+
+Review 3 T1: transitions/glsl preserves scalar equality and inequality results for vectors, matrices and nested structures. Typed comparison helpers are shared per translated type and evaluate operands once. GLSL ES 1.00 still excludes array and sampler comparisons, including containing structures. Existing source, token and nesting limits and native pixel comparison bars stay unchanged.
+
+### Water bodies (batch 67 job 1)
+water/bodies WaterBodies takes 1 to 64 bodies: closed outlines (3 to 4096 points, even-odd inside, self-intersections not checked) at one level, or river paths (2 to 4096 [x, level, z] points, width 0.01 to 10000 per point) on a uniform Catmull-Rom spline at 16 steps per span. The body map is corner-sampled rgba32float, 16 to 2048 texels on the longer side (default 256), with two texels of margin; past the margin the map clamps, so distances there read at most the margin. The CPU rasterization is brute force over texels and segments with a bounding-box skip and refuses more than 4e8 texel-segment visits. Shorelines are smooth at the map resolution, but the Water grid's triangles still carry level changes between bodies across one grid cell. The Water grid stays origin-centred and is shaded and discarded outside the bodies, so a large grid around a small lake costs its full vertex work. Overlaps: the later body covers the earlier one; there are no holes. Water's wave velocity is scaled by the body's wave share in WaveQuery; coastal flow is not body-aware.
+
+### Wave subsurface scattering (batch 67 job 2)
+water/scatter WaterScatter adds a backlit glow to one Water from its two directional lights. color is linear RGB 0 to 1 (default [0.04, 0.32, 0.24]), strength 0 to 100 (default 1, 0 is off), power 0.5 to 64 (default 4), distortion 0 to 1 (default 0.3). Thickness is a proxy (height above the still or body level over total wave amplitude, or crest), not a baked thickness map; it ignores point and spot lights and the water depth below the surface. It shades only: geometry, WaveQuery and SSR capture are unchanged. Optional entry, so the water root entry does not grow. One scatter per Water; attach after WaterBodies so crests are measured from each body's level and wave share.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -13775,6 +13784,7 @@ Batch 177 job 5: no open correctness defect in the checked live-data paths. Sour
 ### Fixed: water query browser check rewrote a tracked record (list 3 batch 66 job 5)
 
 packages/water/test/query.browser.mjs wrote docs/whitepaper/results/batch234-water-query-<mode>.json on every GPU run, so a landing's refresh found a tracked file changed and stopped. It now writes test-results/water-query-<mode>.json; the committed record stays as recorded. Regression: packages/water/test/results-path.test.js fails on any water browser check that writes under docs/.
+Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative delta, but with lerp=0 and delta=Number.MAX_VALUE, delta*60 overflows and 1**Infinity is NaN, publishing [NaN,NaN] instead of keeping the camera fixed. Repro: PixelCamera({width:16,height:16}), PixelFollow({camera,target:{x:30,y:40},lerp:0}), update(Number.MAX_VALUE). Cause: overflow in the smoothing exponent. Private failing regression: lane Q private/review-3-pixel-follow.test.js. Fix the smoothing calculation without narrowing accepted deltas; cover zero/unit lerp and extreme finite inputs. Awaiting the next review context.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

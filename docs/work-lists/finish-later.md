@@ -58,3 +58,4 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 66.5 | @margoengine/water | underwater: waterline uses one probe plane under the camera; sample a row across the near plane so a crest crossing the lens bends the line |
 | 66.5 | @margoengine/water | underwater: per-view uniform so split-screen views each get their own probe (today the last view's camera wins, as caustics) |
 | 66.5 | @margoengine/water | underwater: GPU cost of the 24-step shaft march at 1080p, and a half-resolution march option |
+| 67.2 | @margoengine/water | Scatter: a real thickness (depth to the bottom or a baked map) instead of the height proxy; point and spot lights; scatter in the SSR capture and the reflector; GPU time not measured. |

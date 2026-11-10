@@ -340,3 +340,11 @@ drawn only inside the bodies; the body map (signed distance, level, wave share, 
 CPU and read with the same bilinear sample by the surface shader, `WaveQuery` heights and `bodies.sample(x, z)`.
 Where bodies overlap the later one covers the earlier. The Water grid stays centred on the world origin: size it to
 cover `bodies.bounds`. Islands (holes), per-body foam and flow, and a grid that follows the bodies are not done yet.
+
+## Wave subsurface scattering
+
+`@margoengine/water/scatter` makes thin crests glow when the viewer looks toward one of the Water's directional
+lights, as sunlight does through a breaking wave. `WaterScatter.attach(engine, { surface })` takes optional `color`
+(linear RGB), `strength`, `power` (how tightly the glow gathers around the light) and `distortion` (how much the wave
+normal bends it); `set` changes them later. Attach it after `WaterBodies` so each body's level is used. It changes
+shading only.

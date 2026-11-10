@@ -4903,6 +4903,10 @@
       "types": "./dist/water/bodies.d.ts",
       "import": "./dist/water/bodies.js"
     },
+    "./water/scatter": {
+      "types": "./dist/water/scatter.d.ts",
+      "import": "./dist/water/scatter.js"
+    },
     "./water/reflector": {
       "types": "./dist/water/reflector.d.ts",
       "import": "./dist/water/reflector.js"
