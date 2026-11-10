@@ -1,0 +1,14 @@
+{
+  "title": "NASA TMR SA flat-plate skin friction, finest grid",
+  "url": "https://tmbwg.github.io/turbmodels/FlatPlate/SA/cf_plate.dat",
+  "reference": "https://tmbwg.github.io/turbmodels/flatplate_sa.html",
+  "license": "US government public domain",
+  "licenseReference": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  "sha256": "f2995d18cb4f5d603f63ecfe609044844ef45fb3af3a7373923048eb3d364577",
+  "zones": {
+    "CFL3D": 447,
+    "FUN3D": 447
+  },
+  "selected": "FUN3D",
+  "reduction": "None. Original bytes retained; demo selects FUN3D zone."
+}

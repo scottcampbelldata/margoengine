@@ -305,3 +305,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mcp: cover both HTTP protocol eras, modern per-request metadata, discovery, encoded/custom headers and distinct disconnect cancellation semantics.
 - @margoengine/cache: document cache/stream StreamingAssetCache, pull-driven bodies, consume/cancel before flush, EOF commit, failure behavior, budgets and service worker waitUntil.
 - margoengine: document the generated cache/stream alias and StreamingAssetCache lifecycle in the README phase.
+- @margoengine/sciviz: document optional pipeline registry, lazy demand, dirty/time propagation, AbortSignal, JSON restoration, resource ownership and NASA FUN3D demo after the build phase.
+
+- margoengine: document the optional sciviz/pipeline facade and its equivalence to @margoengine/sciviz/pipeline after the build phase.

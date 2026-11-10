@@ -2842,6 +2842,10 @@
       "types": "./dist/sciviz/atmosphere.d.ts",
       "import": "./dist/sciviz/atmosphere.js"
     },
+    "./sciviz/pipeline": {
+      "types": "./dist/sciviz/pipeline.d.ts",
+      "import": "./dist/sciviz/pipeline.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

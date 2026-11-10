@@ -4336,3 +4336,16 @@ Batch 267 job 3: no open HTTP transport defect found in the real-network correct
 Build-phase follow-up outside batch 267 HTTP: direct stdio/createMcpServer calls with concurrent tools/call messages reusing one id overwrite the running cancellation map, and the first finalizer can delete the second entry. Repro: send two pending calls with id 7, then notifications/cancelled for id 7. Cause: server.ts running.set/delete has no duplicate ownership check. HTTP legacy now rejects duplicate active ids before dispatch; direct/stdin ownership repair is deferred under lane rule 21.
 
 Outside batch 267: node scripts/gpu-package-tests.mjs --no-build planning rejects packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs as browser-driving files absent from registered scripts. Cause: the browser-file registry has no matching commands/helper classification for those two files. MCP leaves are registered; this pre-existing registry issue is deferred to its owners under lane rule 21.
+- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+
+### Batch 172 pipeline regression coverage
+
+Independent time-aware branches keep separate cached times; requesting one branch does not invalidate the other. Sparse parameter arrays reject before changing the graph so JSON restoration cannot silently substitute nulls. Regression: packages/sciviz/tests/pipeline.test.js. Operator cancellation and resource ownership limits are explicit in docs/sciviz-analysis.md.
+
+Fixed during batch 172 landing: formats-browser.mjs used the workspace current directory as the Vite root and returned HTTP failure for /examples/sciviz-formats.html under npm run test:browser --workspace @margoengine/sciviz. Both format and pipeline runners now resolve the repository root from their module URL. The unchanged both-backend format pixel checks, invoked from packages/sciviz, are the regression.
+
+Batch 172 landing also restores the exact approved version-guard ceilings from the sizes baseline history record for 57750c4d6. The history survived a merge while its item values reverted to ceilingBefore, causing fresh builds to fail the existing size assertions. No new growth allowance is introduced; the history supplies each before/after figure.
+
+The same baseline merge lost water 20817 B (batch-225), XR 9158 B (version-guard) and lazy compute/readback 31756 B (snorm-storage). Restore those exact retained approvals. Existing quality assertions reproduce all three failures on a fresh build and pass after the data repair; no source algorithm, test or tolerance changes.
+
+The final dependent umbrella test also found the already-landed exporters/materials entry absent from the generated umbrella map. Regenerate with scripts/umbrella.mjs, preserving the sciviz pipeline facade; tests/umbrella.test.js exercises both current generation and binding identity. No exporter source changes.

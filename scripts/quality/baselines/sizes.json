@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12591578,
+  "total": 12593664,
   "history": [
     {
       "date": "2026-10-24",
@@ -6145,6 +6145,51 @@
       "commit": "batch-208",
       "reason": "cache/stream new optional entry: absent to 3398 B gzip, complete pull-driven cache with cancellation and atomic EOF storage; splitting duplicates required storage semantics",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-172-job1",
+      "reason": "New optional scientific filter pipeline: absent -> 1830 B gzip, ceiling 2086 B. Lazy dirty/time-aware DAG, portable JSON and cancellation/resource ownership justify the bytes; splitting the scheduler would fragment graph ownership. Core/stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-172-landing",
+      "reason": "Restore the exact already-approved 57750c4d6 version-guard ceilings from its retained history.entries after their item values were lost in a merge. No newly authorized allowance and no source changes. Existing quality size assertions catch the mismatch.",
+      "grew": 25,
+      "restored": [
+        "@margoengine/audio",
+        "@margoengine/biomes/view",
+        "@margoengine/clustered/area",
+        "@margoengine/core",
+        "@margoengine/creative",
+        "@margoengine/environment/cube-camera",
+        "@margoengine/lines",
+        "@margoengine/physics2d",
+        "@margoengine/post",
+        "@margoengine/post/bloom",
+        "@margoengine/post/fxaa",
+        "@margoengine/post/smaa",
+        "@margoengine/post/anamorphic",
+        "@margoengine/post/blur",
+        "@margoengine/post/lens",
+        "@margoengine/scatter/tiles",
+        "@margoengine/scenery/scenes",
+        "@margoengine/sciviz/webgl2",
+        "@margoengine/shader/effects",
+        "@margoengine/taa/upscale",
+        "@margoengine/terrain/stream",
+        "@margoengine/text",
+        "@margoengine/transitions/mask",
+        "@margoengine/transitions/custom",
+        "@margoengine/controls"
+      ]
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-172-landing",
+      "reason": "Restore three further already-recorded item ceilings lost in the same merge: water 20185 to 20817 (batch-225), XR 8967 to 9158 (version-guard), lazy compute/readback 31741 to 31756 (snorm-storage). All source changes and allowances were approved and recorded previously; no new allowance.",
+      "grew": 3
     }
   ],
   "items": {
@@ -7266,6 +7311,7 @@
     "margoengine/bvh/parallel": 11405,
     "@margoengine/ecs/serialize": 4260,
     "@margoengine/mcp/http": 5128,
-    "@margoengine/cache/stream": 3654
+    "@margoengine/cache/stream": 3654,
+    "@margoengine/sciviz/pipeline": 2086
   }
 }

@@ -1,7 +1,9 @@
 // One real GPU leaf, two backends, all six writer-produced format variants.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
+process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const reports = [];
 for (const compat of [false, true]) {
   const context = await openBrowser({ startPath: '/examples/sciviz-formats.html', port: 'free', compat });

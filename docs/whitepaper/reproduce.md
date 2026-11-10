@@ -2889,3 +2889,6 @@ Batch 267 job 3: after build:packages, run node --test --test-timeout=90000 pack
 
 Final batch 267 CI wiring: test:browser:live, test:browser:live:compat and test:browser:assets are discoverable package GPU leaves. assets-browser uses committed CC0 fixtures with exact hash tests, so it performs no downloads while holding a GPU slot. assets-prepare.mjs remains the separate CPU/network reproduction of full catalogue downloads.
 Batch 208 job 1: build cache with npm run build --workspace=@margoengine/cache, run node --test --test-timeout=120000 packages/cache/test/stream.test.js, then node packages/cache/scripts/test-browser.js under a 300 s process-tree limit. Browser checks use real IndexedDB and the attributed SheenChair GLB; packages/cache/test-results/cache-browser.json records browser version, hashes and the prefix received before EOF. Cache checks do not render or compute on a GPU and do not occupy a GPU slot.
+## Batch 172 job 1
+
+Build packages, then run node --test --test-timeout=120000 packages/sciviz/tests/pipeline.test.js. Run node scripts/gpu-lock.mjs run --owner=sciviz-pipeline --wait-max=60 --max=3 -- node packages/sciviz/tests/pipeline-browser.mjs for the real NASA solution on both backends. Serve examples/sciviz-pipeline.html to change the cutoff and save the graph JSON. No benchmarks or README checks are required.

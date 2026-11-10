@@ -95,6 +95,10 @@
     "./atmosphere": {
       "types": "./dist/atmosphere.d.ts",
       "import": "./dist/atmosphere.js"
+    },
+    "./pipeline": {
+      "types": "./dist/pipeline.d.ts",
+      "import": "./dist/pipeline.js"
     }
   },
   "files": [
@@ -123,7 +127,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs && node tests/derive-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs && node tests/derive-browser.mjs && node tests/pipeline-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
     "build:flow": "node scripts/build-flow.mjs",
