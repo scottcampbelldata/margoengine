@@ -32,7 +32,7 @@ await runSuite(
               custom,
             });
             assert.deepEqual(r.errors, []);
-            images.push(decodePNG(await b.page.locator('canvas').screenshot()).data);
+            images.push((await decodePNG(await b.page.locator('canvas').screenshot())).data);
           }
           assert.deepEqual(
             images[0],

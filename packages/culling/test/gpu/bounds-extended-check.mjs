@@ -12,8 +12,8 @@ for (const kind of ['meshes', 'models', 'dynamic']) {
     await context.page.waitForFunction(() => window.ready, null, { timeout: 45000 });
     for (let i = 0; i < 4; i++) {
       const result = await context.page.evaluate((n) => window.check.step(n), i);
-      const a = decodePNG(await context.page.locator('#a').screenshot()),
-        b = decodePNG(await context.page.locator('#b').screenshot());
+      const a = await decodePNG(await context.page.locator('#a').screenshot()),
+        b = await decodePNG(await context.page.locator('#b').screenshot());
       assert.deepEqual(a.data, b.data, `${kind}, frame ${i}: pixels differ`);
       if (i === 0) assert.equal(result.drawn, 0, 'thin boxes outside the frustum must drop despite large spheres');
       if (i === 1 || i === 3) assert.ok(result.drawn >= 24, 'moving the camera or hiding the wall reveals every rod');

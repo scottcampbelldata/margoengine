@@ -33,6 +33,32 @@ const views: Record<string, new (buffer: ArrayBuffer, offset: number, length: nu
   BigUint64Array,
   DataView,
 };
+/** Base64 text of `bytes`; uses the built-in encoder where the runtime has one (Node 26, current browsers). */
+export function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(text);
+}
+/** Bytes of canonical padded base64 `text`; throws SyntaxError on anything else, as the built-in strict decoder does. */
+export function base64ToBytes(text: string): Uint8Array {
+  if (typeof Uint8Array.fromBase64 === 'function') return Uint8Array.fromBase64(text, { lastChunkHandling: 'strict' });
+  const clean = text.replace(/[\t\n\f\r ]+/g, '');
+  if (clean.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) throw new SyntaxError('Invalid base64 text');
+  const binary = atob(clean);
+  // Non-zero bits in the last chunk's padding are not canonical, which strict decoding refuses.
+  if (btoa(binary) !== clean) throw new SyntaxError('Invalid base64 text');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+/** Lower-case hexadecimal text of `bytes`; uses the built-in encoder where the runtime has one. */
+export function bytesToHex(bytes: Uint8Array): string {
+  if (typeof bytes.toHex === 'function') return bytes.toHex();
+  let text = '';
+  for (const byte of bytes) text += byte.toString(16).padStart(2, '0');
+  return text;
+}
 function invalid(): never {
   throw new TypeError('Invalid snapshot value; use portable data or register a named value codec');
 }
@@ -63,7 +89,7 @@ export function encodeGraph(root: unknown, codecs: readonly SnapshotValueCodec[]
     const read = (v: unknown) => token(v, depth + 1);
     const codec = codecs.find((c) => c.test(value));
     if (codec) node.push('x', codec.name, read(codec.encode(value)));
-    else if (value instanceof ArrayBuffer) node.push('b', new Uint8Array(value).toBase64());
+    else if (value instanceof ArrayBuffer) node.push('b', bytesToBase64(new Uint8Array(value)));
     else if (ArrayBuffer.isView(value)) {
       const name = value instanceof DataView ? 'DataView' : Object.getPrototypeOf(value).constructor.name;
       if (!Object.hasOwn(views, name)) return invalid();
@@ -134,7 +160,7 @@ export function decodeGraph(text: string, codecs: readonly SnapshotValueCodec[] 
     const next = (v: unknown) => read(v, depth + 1);
     let result: unknown;
     if (n[0] === 'b' && n.length === 2 && typeof n[1] === 'string')
-      result = Uint8Array.fromBase64(n[1], { lastChunkHandling: 'strict' }).buffer;
+      result = base64ToBytes(n[1]).buffer as ArrayBuffer;
     else if (
       n[0] === 'v' &&
       n.length === 5 &&

@@ -47,7 +47,7 @@ owns.
    (`npm view <name> time.modified repository.url`) and record anything worrying in the release notes.
 6. `npm run check:merge` passes, then `npm run publish:dry-run` and read the file lists.
 7. `npm run publish:rehearsal` (part of `publish:dry-run` and of the workflow) proves the release without making it. It
-   packs all 98 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
+   packs all 102 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
    are present, no test or private file, install script or local dependency spec, no maintainer path or email, every
    import declared. It then serves them from a stand-in registry on 127.0.0.1 that refuses every write, and in a clean
    temp project with an empty cache runs `npm install margoengine`, imports every entry in Node, type-checks every entry

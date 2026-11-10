@@ -76,6 +76,18 @@
       "javascript": { "globals": ["sandbox", "vfxPass", "vfxSamples"] }
     },
     {
+      "includes": ["packages/post/test/curvature-browser.mjs", "packages/sciviz/tests/pick-gpu-browser.mjs"],
+      "javascript": { "globals": ["Float16Array"] }
+    },
+    {
+      "includes": ["scripts/diagnose-ssgi-angle.mjs"],
+      "javascript": { "globals": ["targetProbe"] }
+    },
+    {
+      "includes": ["scripts/diagnose-ssgi-stream.mjs"],
+      "javascript": { "globals": ["glRec"] }
+    },
+    {
       "includes": [
         "packages/exporters/scripts/generate-unity-support.js",
         "packages/exporters/src/unity-support.generated.ts"

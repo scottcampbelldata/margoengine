@@ -12,7 +12,7 @@ import struct
 import urllib.request
 import array
 
-cache = pathlib.Path('private/batch173/job5')
+cache = pathlib.Path('test-results/batch173/job5')
 out = pathlib.Path('examples/assets/sciviz')
 cache.mkdir(parents=True, exist_ok=True)
 out.mkdir(parents=True, exist_ok=True)

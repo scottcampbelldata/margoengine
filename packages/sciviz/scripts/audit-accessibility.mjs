@@ -3,7 +3,7 @@ import { resolve, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 // Install the pinned audit tools into an isolated directory; no engine runtime dependency.
-const root = resolve(process.env.MARGO_A11Y_TOOLS ?? 'private/a11y-tools');
+const root = resolve(process.env.MARGO_A11Y_TOOLS ?? 'test-results/a11y-tools');
 const load = (p) => import(pathToFileURL(join(root, 'node_modules', p)).href);
 const [chromeLauncher, { default: puppeteer }, { startFlow }] = await Promise.all([
   load('chrome-launcher/dist/index.js'),

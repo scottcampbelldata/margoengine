@@ -20,8 +20,8 @@ for (const kind of ['core', 'static', 'models', 'dynamic']) {
     }
     for (let i = 0; i < 3; i++) {
       await context.page.evaluate((n) => window.check.step(n), i);
-      const a = decodePNG(await context.page.locator('#a').screenshot()),
-        b = decodePNG(await context.page.locator('#b').screenshot());
+      const a = await decodePNG(await context.page.locator('#a').screenshot()),
+        b = await decodePNG(await context.page.locator('#b').screenshot());
       assert.deepEqual(a.data, b.data, `${kind} step ${i}: sorting changed visible pixels`);
       console.log('sorted pixels', kind, i);
     }

@@ -3,8 +3,9 @@ import { packageDeclarations } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { copyLegal } from './package-legal.js';
@@ -16,6 +17,9 @@ const repository = fileURLToPath(new URL('..', import.meta.url)),
   root = resolve(repository, 'packages', name);
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 assert.equal(manifest.name, `@margoengine/${name}`);
+// A package may generate sources its bundle embeds (sciviz: the versions of its dependencies) in scripts/prebuild.mjs.
+const prebuild = resolve(root, 'scripts/prebuild.mjs');
+if (existsSync(prebuild)) await import(pathToFileURL(prebuild).href);
 const peers = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies });
 // Keep every declared entry coherent, including data-only subpaths that share
 // runtime identities with the root entry. A single-entry rebuild must not erase them.

@@ -9,7 +9,7 @@ test('every terrain EnginePlugin detaches through actual plugin ownership', () =
     checked += result.checked;
     assert.deepEqual(result.problems, [], file);
   }
-  assert.equal(checked, 11);
+  assert.equal(checked, 13); // every class in packages/terrain/src that implements EnginePlugin
 });
 test('terrain guard rejects misleading Engine fields named owner', () => {
   const source =

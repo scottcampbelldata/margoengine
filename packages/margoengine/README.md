@@ -56,8 +56,7 @@ install.
 
 | Package | Install | Why |
 | --- | --- | --- |
-| `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | The solver; `await Physics.load()` readies it once per app |
-| `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | The 2D solver; `await Physics2D.load()` readies it once per app |
+| `margoengine/physics`, `margoengine/physics2d` | `npm i @dimforge/rapier3d-compat` for 3D, `npm i @dimforge/rapier2d-compat` for 2D | The solvers; `await Physics.load()` or `await Physics2D.load()` readies one once per app |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 | `margoengine/ui/react` | `npm i react` | React bindings for the UI package |
 

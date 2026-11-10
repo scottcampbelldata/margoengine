@@ -12,7 +12,7 @@ import urllib.request
 import zipfile
 
 source = 'https://www.nasa.gov/wp-content/uploads/2025/11/mut-contours-cfl3d-dat.zip'
-cache = pathlib.Path('private/batch173/job6')
+cache = pathlib.Path('test-results/batch173/job6')
 cache.mkdir(parents=True, exist_ok=True)
 archive = cache / 'flatplate.zip'
 if not archive.exists():

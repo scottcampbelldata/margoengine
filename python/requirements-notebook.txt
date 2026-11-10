@@ -2,6 +2,7 @@
 # Install: python -m pip install -r python/requirements-notebook.txt (the notebook check's venv: npm run setup:python-test)
 # pywinpty (a Windows-only dependency of terminado) carries its platform marker: it has no build for macOS or Linux.
 anyio==4.15.1
+anywidget==0.11.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
 arrow==1.4.0
@@ -69,8 +70,10 @@ polars==2.1.0
 polars-runtime-32==2.1.0
 prometheus_client==0.26.0
 prompt_toolkit==3.0.53
+psygnal==0.16.1
 psutil==7.2.2
 pure_eval==0.2.4
+pyarrow==26.0.1
 pycparser==3.12
 Pygments==2.21.0
 pytest==9.1.1

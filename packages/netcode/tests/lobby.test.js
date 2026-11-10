@@ -34,7 +34,7 @@ const connection = () => ({
   },
 });
 
-test('lobby lists joinable metadata, filters, hides private/locked rooms and copies values', async () => {
+test('lobby lists joinable metadata, filters, hides private and locked rooms and copies values', async () => {
   using server = new RoomServer().define('match', Match);
   const room = await server.create('match'),
     lobby = new RoomLobby(server);

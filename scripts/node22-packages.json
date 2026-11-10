@@ -79,6 +79,7 @@
         "tests/margo-convert-pipeline.test.js"
       ]
     },
+    "@margoengine/inspector": "the remote relay (remote-relay.ts) is a Node server on node:http, node:crypto and node:os; the panels run in the browser",
     "@margoengine/blender": "compressMargo (@margoengine/blender/ktx2) re-encodes .margo textures in Node; decodeMargo checks files with no GPU"
   },
   "contributorNode": {
@@ -100,9 +101,12 @@
     "@margoengine/cutscene": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/dof": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/environment": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
+    "@margoengine/game": "the game kit re-exports packages that render with WebGPU and drive the DOM and Web Audio; runs in the browser",
+    "@margoengine/react-kit": "an install profile that re-exports React and Next.js packages; on Node it is only imported (SSR), which the end-user proof covers",
+    "@margoengine/viz": "an install profile that re-exports the visualization packages; on Node it is only imported (SSR), which the end-user proof covers",
+    "@margoengine/web": "an install profile that re-exports the web viewer packages; on Node it is only imported (SSR), which the end-user proof covers",
     "@margoengine/html": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/input": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
-    "@margoengine/inspector": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/labels": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/lines": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/lod": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",

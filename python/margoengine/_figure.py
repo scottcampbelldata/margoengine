@@ -26,6 +26,10 @@ __all__ = ["Figure", "COLORMAPS"]
 
 #: The built-in colour map names (see ``@margoengine/sciviz``).
 COLORMAPS = (
+    "lab-linear-blue-yellow",
+    "lab-diverging-blue-red",
+    "lab-cyclic-diamond",
+    "lab-isoluminant-hue",
     "aurora",
     "ember",
     "glacier",

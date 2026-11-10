@@ -307,7 +307,7 @@
   },
   "limits": "docs/limits.md, Batch 171 atmosphere on the globe",
   "research": "docs/clean-room.md, Batch 171 job 6",
-  "remaining": "Small quality follow-ups in private/handoffs/finish-later.md; explicit model limits are not hidden accuracy claims.",
+  "remaining": "Small quality follow-ups in the finish-later list (git-excluded, outside a clone); explicit model limits are not hidden accuracy claims.",
   "policy": "Fast gate only. No full verify, README examples, speed benchmark, core/stage/physics source change, force push or shared browser-helper edit.",
   "validatedBase": "df87a1f6dccc16cdfd07e0aa60a6f378fa051ebc",
   "sourceHashMethod": "UTF-8 with LF newlines; all owning sources unchanged across the final documentation/metadata rebase."

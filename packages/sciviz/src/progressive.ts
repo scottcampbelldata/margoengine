@@ -3,6 +3,7 @@ import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extensi
 import { SceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 import { fault } from '../../shared/errors.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Figure } from './figure.js';
 import { requireGPU, type Drawable, type GpuContext } from './render.js';
 import { ProgressivePolicy, type ProgressiveOptions, type ProgressiveState } from './progressive-policy.js';
@@ -65,6 +66,7 @@ export class ProgressiveRendering implements EnginePlugin {
   }
   /** @internal */
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'Progressive rendering');
     this.#engine = engine;
   }
   /** @internal */

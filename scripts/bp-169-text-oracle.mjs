@@ -34,7 +34,7 @@ try {
         },
       },
     ],
-    server: { port: 0, host: '127.0.0.1', fs: { allow: [root, external] } },
+    server: { port: 0, host: '127.0.0.1', fs: { allow: [root, external] }, watch: null },
   });
   await server.listen();
   browser = await launchBrowser({ headless: true });

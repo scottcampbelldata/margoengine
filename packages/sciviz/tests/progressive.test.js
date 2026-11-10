@@ -60,6 +60,7 @@ test('controller is an optional engine plugin with disposable ownership and no g
   const passes = [],
     renderer = { device: {}, samplingScale: 1, add() {}, remove() {} };
   const engine = {
+    gpu: renderer.device,
     hasPlugin: () => !!plugin,
     use(p) {
       plugin = p;

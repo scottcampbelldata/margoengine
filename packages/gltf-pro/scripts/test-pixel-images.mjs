@@ -44,7 +44,7 @@ await runSuite(
                 engine,
                 doc,
                 doc.buffers.map((b) => bytes(b.uri)),
-                [decodePNG(bytes(doc.images[0].uri))],
+                [await decodePNG(bytes(doc.images[0].uri))],
               )
             : await parseGLTFAsync(engine, doc);
           try {

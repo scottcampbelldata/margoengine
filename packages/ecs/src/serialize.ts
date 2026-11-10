@@ -1,5 +1,5 @@
 import type { ComponentStore, Entity, NumericArray, World } from './index.js';
-import { byteLimit, decodeGraph, encodeGraph, transform, type SnapshotOptions } from './serialize-codec.js';
+import { byteLimit, bytesToHex, decodeGraph, encodeGraph, transform, type SnapshotOptions } from './serialize-codec.js';
 export type { SnapshotOptions, SnapshotValueCodec } from './serialize-codec.js';
 
 /** Restore options. Entity mappings translate remote ids without resurrecting stale local handles. */
@@ -197,7 +197,7 @@ async function fingerprint(text: string, options: SnapshotOptions): Promise<stri
   options.signal?.throwIfAborted();
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text)));
   options.signal?.throwIfAborted();
-  return hash.toHex();
+  return bytesToHex(hash);
 }
 /** Create a baseline-checked binary delta, comparing fixed 256-character blocks using native string comparisons. */
 export async function createDelta(

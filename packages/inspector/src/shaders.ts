@@ -68,6 +68,8 @@ export function isWgslMaterial(material: unknown): material is WgslMaterialShape
 interface Watch {
   wgsl: string;
   modules: Map<GPUShaderModule, string>;
+  /** Each module's compiler messages, asked for as the module was created. */
+  infos: Map<GPUShaderModule, Promise<GPUCompilationInfo> | undefined>;
   scoped: Promise<string | null>[];
 }
 interface Hook {
@@ -76,6 +78,14 @@ interface Hook {
   pipeline: GPUDevice['createRenderPipeline'];
 }
 const hooks = new WeakMap<GPUDevice, Hook>();
+
+/** Asks `module` for its compiler messages; call it as the module is created, never later (a late request can stall). */
+function messages(module: GPUShaderModule): Promise<GPUCompilationInfo> | undefined {
+  // The device just ran createShaderModule(descriptor), so the request is made now and its promise kept.
+  const info = typeof module?.getCompilationInfo === 'function' ? module.getCompilationInfo() : undefined;
+  info?.catch(() => undefined);
+  return info;
+}
 
 /** Error scope around `call` when the device has them; the scope's message, or null. */
 function scoped<T>(device: GPUDevice, call: () => T, sink: Promise<string | null>[]): T {
@@ -110,8 +120,10 @@ function watch(device: GPUDevice, wgsl: string): () => Watch {
       if (!hits.length) return h.module.call(this, descriptor);
       const sink: Promise<string | null>[] = [],
         module = scoped(device, () => h.module.call(this, descriptor), sink);
+      const info = messages(module);
       for (const w of hits) {
         w.modules.set(module, descriptor.code);
+        w.infos.set(module, info);
         w.scoped.push(...sink);
       }
       return module;
@@ -128,7 +140,7 @@ function watch(device: GPUDevice, wgsl: string): () => Watch {
       return pipeline;
     };
   }
-  const w: Watch = { wgsl, modules: new Map(), scoped: [] },
+  const w: Watch = { wgsl, modules: new Map(), infos: new Map(), scoped: [] },
     owner = hook;
   owner.watches.add(w);
   return () => {
@@ -190,6 +202,7 @@ async function draw(
 /** The compiler's messages for each module in `modules` (with its text), placed in `wgsl`, and any scope errors. */
 async function diagnose(
   modules: Iterable<[GPUShaderModule, string]>,
+  infos: Map<GPUShaderModule, Promise<GPUCompilationInfo> | undefined>,
   scopes: Promise<string | null>[],
   wgsl: string,
 ): Promise<ShaderDiagnostic[]> {
@@ -200,7 +213,7 @@ async function diagnose(
       if (!seen.has(key)) seen.add(key), out.push(d);
     };
   for (const [module, code] of modules) {
-    const info = typeof module?.getCompilationInfo === 'function' ? await module.getCompilationInfo() : undefined;
+    const info = await infos.get(module);
     for (const m of info?.messages ?? []) {
       const [line, column] = place(code, wgsl, m.lineNum, m.linePos);
       add({ type: m.type, message: m.message, line, column });
@@ -268,6 +281,7 @@ export async function recompileShader(
       built.set(old, (codes = [...new Set(seen.modules.values())]));
     }
     const checks = new Map<GPUShaderModule, string>(),
+      infos = new Map<GPUShaderModule, Promise<GPUCompilationInfo> | undefined>(),
       scopes: Promise<string | null>[] = [];
     for (const code of codes ?? []) {
       const at = code.lastIndexOf(old.wgsl);
@@ -278,16 +292,19 @@ export async function recompileShader(
             ? '\nfn displace(i: Input) -> vec3f { return vec3f(0.0); }\n'
             : '',
         text = code.slice(0, at) + wgsl + code.slice(at + old.wgsl.length) + stub;
-      checks.set(
-        scoped(device, () => device.createShaderModule({ label: 'check-wgsl:inspector-shaders', code: text }), scopes),
-        text,
+      const module = scoped(
+        device,
+        () => device.createShaderModule({ label: 'check-wgsl:inspector-shaders', code: text }),
+        scopes,
       );
+      infos.set(module, messages(module));
+      checks.set(module, text);
     }
-    const found = await diagnose(checks, scopes, wgsl);
+    const found = await diagnose(checks, infos, scopes, wgsl);
     modules += checks.size;
     if (found.some((d) => d.type === 'error')) return { ok: false, modules, diagnostics: found };
     const drawn = await draw(device, mesh, next, wgsl, timeoutMs, settleMs),
-      after = await diagnose(drawn.modules, drawn.scoped, wgsl);
+      after = await diagnose(drawn.modules, drawn.infos, drawn.scoped, wgsl);
     modules += drawn.modules.size;
     if (drawn.modules.size) built.set(next, [...new Set(drawn.modules.values())]);
     const diagnostics = [...found, ...after.filter((d) => !found.some((f) => f.message === d.message))];

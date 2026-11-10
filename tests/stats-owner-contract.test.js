@@ -10,5 +10,5 @@ test('every stats EnginePlugin detaches through its registered scene', () => {
     checked += result.checked;
     assert.deepEqual(result.problems, [], file);
   }
-  assert.equal(checked, 4);
+  assert.equal(checked, 7); // FrameBeacon, PipelineCompiles, GeometryStats, GLStats, Stats, StatsPanels, FramePhases
 });

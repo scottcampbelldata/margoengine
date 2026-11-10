@@ -1,9 +1,10 @@
 import { Camera } from '@margoengine/core';
-import type { EnginePlugin, FrameGraph } from '@margoengine/core/extension';
+import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import type { Figure } from '@margoengine/sciviz';
 import { paintOverlays, swatches, textRuns } from './export.js';
 import { clearColorValue } from '../../shared/clear-color.js';
 import { fault, rangeError } from '../../shared/errors.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 
 /** One tile, top-left origin, straight RGBA in sRGB. The consumer owns its bytes. */
 export interface MediaTile {
@@ -94,7 +95,9 @@ export async function mediaProvenance(
 class TileClear implements EnginePlugin {
   readonly name = 'sciviz:media-clear';
   constructor(readonly tint: GPUColor) {}
-  setup(): void {}
+  setup(engine: Engine): void {
+    requireWebGPU(engine, 'Tiled export');
+  }
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: this.name,

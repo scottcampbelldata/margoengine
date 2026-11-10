@@ -19,7 +19,7 @@ await runSuite(
           const r = await b.page.evaluate((o) => window.check.show(o), { enabled, samples, step });
           assert.deepEqual(r.errors, []);
           results.push(r);
-          images.push(decodePNG(await b.page.locator('canvas').screenshot()).data);
+          images.push((await decodePNG(await b.page.locator('canvas').screenshot())).data);
         }
         assert.deepEqual(images[1], images[0], `same colour and shadows samples=${samples} step=${step}`);
         assert.equal(results[0].shadows, results[1].shadows);

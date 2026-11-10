@@ -1,6 +1,7 @@
 // Optional scene capture and an opaque-depth snapshot for scientific volume rays.
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Drawable, GpuContext } from './render.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
@@ -34,6 +35,7 @@ export class VolumeDepthCapture implements EnginePlugin {
     return capture;
   }
   setup(engine: Engine): void {
+    requireWebGPU(engine, 'Volume depth capture');
     this.#device = engine.gpu!;
   }
   registerPasses(graph: FrameGraph): void {

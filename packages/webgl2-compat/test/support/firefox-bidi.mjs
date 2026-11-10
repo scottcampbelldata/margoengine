@@ -65,7 +65,7 @@ export async function openBrowser({
     } finally {
       socket?.close();
       for (const entry of pending.values()) entry.reject(new Error('Firefox closed'));
-      if (child?.pid && child.exitCode === null) await bounded(endTree(child.pid), 10000, 'Firefox cleanup');
+      if (child?.pid && child.exitCode === null) await bounded(Promise.all([endTree(child.pid)]), 10000, 'Firefox cleanup');
       try {
         await stopServer?.();
       } finally {

@@ -4,7 +4,7 @@ import { World } from '../dist/index.js';
 import { GrowableWorld } from '../dist/growable.js';
 import { ObjectComponent, objectField } from '../dist/objects.js';
 import { WorldSerializer, createDelta, applyDelta } from '../dist/serialize.js';
-import { encodeGraph, decodeGraph } from '../src/serialize-codec.ts';
+import { encodeGraph, decodeGraph, bytesToBase64, base64ToBytes, bytesToHex } from '../src/serialize-codec.ts';
 
 function setup(WorldType = World, capacity = 8) {
   const world = new WorldType(capacity);
@@ -206,4 +206,49 @@ test('abort and expanded-size limits reject without touching target state', asyn
   const pre = new AbortController();
   pre.abort();
   await assert.rejects(createDelta(packet, packet, { signal: pre.signal }), (err) => err.name === 'AbortError');
+});
+
+// Regression: Node 22.12 has no Uint8Array toBase64, fromBase64 or toHex, so snapshots and fingerprints threw there.
+test('base64 and hex helpers give the same results with and without the built-in encoders', () => {
+  const proto = Uint8Array.prototype;
+  const saved = { toBase64: proto.toBase64, toHex: proto.toHex, fromBase64: Uint8Array.fromBase64 };
+  const bytes = Uint8Array.from({ length: 70_000 }, (_, i) => (i * 31 + 7) & 255);
+  const run = () => ({
+    text: bytesToBase64(bytes),
+    short: [0, 1, 2, 3].map((n) => bytesToBase64(bytes.subarray(0, n))),
+    back: base64ToBytes(bytesToBase64(bytes)),
+    spaced: base64ToBytes(' AQID\n BA==\t'),
+    hex: bytesToHex(Uint8Array.of(0, 15, 16, 255)),
+    bad: ['AQ', 'AQ=', 'AR==', 'A*==', 'AQID=', '=AQI'].map((text) => {
+      try {
+        base64ToBytes(text);
+        return 'accepted';
+      } catch (error) {
+        return error.name;
+      }
+    }),
+  });
+  try {
+    const native = run();
+    delete proto.toBase64;
+    delete proto.toHex;
+    delete Uint8Array.fromBase64;
+    const fallback = run();
+    assert.equal(typeof Uint8Array.fromBase64, 'undefined');
+    assert.deepEqual(fallback, native);
+    assert.equal(fallback.text, Buffer.from(bytes).toString('base64'));
+    assert.deepEqual(fallback.back, bytes);
+    assert.deepEqual([...fallback.spaced], [1, 2, 3, 4]);
+    assert.equal(fallback.hex, '000f10ff');
+    assert.deepEqual(fallback.bad, Array(6).fill('SyntaxError'));
+    const graph = { buffer: bytes.buffer, view: new Uint8Array(bytes.buffer, 5, 20) };
+    const copy = decodeGraph(encodeGraph(graph));
+    assert.deepEqual(new Uint8Array(copy.buffer), bytes);
+  } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) continue;
+      if (name === 'fromBase64') Uint8Array.fromBase64 = value;
+      else Object.defineProperty(proto, name, { value, writable: true, configurable: true });
+    }
+  }
 });
