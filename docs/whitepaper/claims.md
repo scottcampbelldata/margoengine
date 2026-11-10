@@ -3816,3 +3816,6 @@ The optional formats entry reads KSplat 0.1 levels 0/1/2 and SuperSplat compress
 ### Batch 218 job 2: transition preset library
 
 Eight clean-room presets support validated direction, edge softness, easing and treatment-specific parameters for frozen and live inputs. Proof: presets.test.js checks validation and owned-resource lifecycle; presets-browser.js independently computes gradient pixel expectations for all eight treatments, cardinal directions and 1x/4x. This is numerical correctness coverage, not a speed or physical paper simulation claim.
+
+### Batch 229 job 2: ground-clamped vectors through the RVT
+terrain/overlays supplies the requested metre-width polylines, filled polygons with holes and projected GeoJSON features with live updates. It paints the actual RVT and its steep/far fallback, and other materials can read the cached result. Cached imagery can sit below vectors. Evidence: overlays.test.js, overlays.browser.mjs, full terrain CPU/GPU suites and dependent CPU tests. The native fixture invalidates 20852 texels for first vector edits and 16548 for a width edit, against 262144 texels for all four whole levels; a still frame bakes zero. These are deterministic work counts without a timing or engine-speed claim. Limits and unclaimed options are in docs/terrain-overlays.md.

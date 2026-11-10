@@ -50,6 +50,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
 }
 
 export interface TerrainImageryOptions {
+    virtualTexture?: TerrainVirtualTexture;
     bounds?: ImageryBounds;
     maxLayers?: number;
     maxTiles?: number;
@@ -200,6 +201,15 @@ interface TerrainCapture {
     begin(): GPURenderPassEncoder;
 }
 
+interface TerrainDecal {
+    center: readonly [number, number];
+    size: readonly [number, number];
+    angle?: number;
+    layer?: number;
+    opacity?: number;
+    repeat?: number;
+}
+
 interface TerrainLayer {
     height: readonly [number, number];
     slope: readonly [number, number];
@@ -239,5 +249,43 @@ interface TerrainTextures {
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
     holes?: GPUTexture;
+}
+
+class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
+    readonly options: TerrainVirtualTextureOptions;
+    readonly name: string;
+    disposed: boolean;
+    owner?: Engine;
+    baked: number;
+    readonly texel: number;
+    readonly size: number;
+    readonly levels: number;
+    addSurface(effect: TerrainLighting): () => void;
+    refreshSurfaces(): void;
+    private constructor();
+    static attach(engine: EngineKernel, terrain: Terrain, options?: TerrainVirtualTextureOptions): TerrainVirtualTexture;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    bindings(): GPUBindGroupEntry[];
+    shader(source: string, group: number): string;
+    declarations(group: number, binding: number): string;
+    entries(binding: number): GPUBindGroupEntry[];
+    get texture(): GPUTexture | undefined;
+    invalidate(x0?: number, z0?: number, x1?: number, z1?: number): void;
+    addDecal(decal: TerrainDecal): number;
+    removeDecal(id: number): boolean;
+    road(points: readonly (readonly [number, number])[], width: number, decal?: Pick<TerrainDecal, 'layer' | 'opacity'>): number[];
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+interface TerrainVirtualTextureOptions {
+    texel?: number;
+    size?: number;
+    levels?: number;
+    steep?: number;
+    format?: 'rgba8unorm-srgb' | 'rgba16float';
+    decals?: (device: GPUDevice) => GPUTexture;
 }
 ```

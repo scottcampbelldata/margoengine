@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13339570,
+  "total": 13344699,
   "history": [
     {
       "date": "2026-10-24",
@@ -6793,6 +6793,12 @@
       "commit": "ac902a65b",
       "reason": "Batch 218 presets new entry 0 to 8723 B gzip. Keep the eight mappings and validated live and frozen factories in one optional entry; a split complicates the public workflow. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "46b67d860",
+      "reason": "Batch 229 job 2: overlays new 3805 B gzip, RVT 5302 to 6339 B for ordered vector and imagery providers plus identical steep/far fallback. Imagery 5985 to 6207 B; planet 7282 to 7291 B. One shared cache avoids a second renderer and extra terrain draws; core/stage stays 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7709,7 +7715,7 @@
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/query": 3420,
-    "@margoengine/terrain/rvt": 5527,
+    "@margoengine/terrain/rvt": 6595,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 12291,
     "@margoengine/text": 16597,
@@ -8030,6 +8036,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/transitions/presets": 8985
+    "@margoengine/transitions/presets": 8985,
+    "@margoengine/terrain/overlays": 4061
   }
 }

@@ -5,6 +5,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '
 import { MargoError } from '@margoengine/math/errors';
 import type { Terrain, TerrainLighting } from './index.js';
 import type { PlanetTerrain } from './planet.js';
+import type { TerrainVirtualTexture } from './rvt.js';
 
 /** Rectangle [minimum X, minimum Z, maximum X, maximum Z], or planet [west,south,east,north] in degrees. */
 export type ImageryBounds = readonly [number, number, number, number];
@@ -44,6 +45,8 @@ export interface ImageryLayerOptions {
 }
 /** Fixed collection options. */
 export interface TerrainImageryOptions {
+  /** Bake imagery through this borrowed clipmap RVT, before later surface providers such as vector overlays. Default none. */
+  virtualTexture?: TerrainVirtualTexture;
   /** Clipmap extent corresponding to the full tile pyramid. Default terrain origin/size. */ bounds?: ImageryBounds;
   /** Maximum layers, 1..8 (also subject to device resource limits). Default 4. */ maxLayers?: number;
   /** Resident tiles per layer, 4..256. Default 64. */ maxTiles?: number;
@@ -192,7 +195,8 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
   /** Whether resources and registration have been released. */ disposed = false;
   /** Most recent asynchronous load error; update() also rejects with it. No automatic retries. */ error?: unknown;
   readonly #layers: Layer[] = [];
-  readonly #options: Required<TerrainImageryOptions>;
+  readonly #options: Required<Omit<TerrainImageryOptions, 'virtualTexture'>>;
+  readonly #virtual?: TerrainVirtualTexture;
   readonly #planet: boolean;
   #device?: GPUDevice;
   #buffer?: GPUBuffer;
@@ -212,6 +216,11 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
     if (!terrain || typeof terrain.addLighting !== 'function')
       throw new TypeError('Invalid imagery terrain; pass Terrain or PlanetTerrain.');
     this.#planet = 'radius' in terrain;
+    this.#virtual = options.virtualTexture;
+    if (this.#virtual && (this.#planet || typeof this.#virtual.addSurface !== 'function'))
+      throw new TypeError(
+        'Imagery virtualTexture requires a clipmap RVT; use a clipmap terrain and live TerrainVirtualTexture.',
+      );
     const map = 'options' in terrain ? terrain.options : undefined;
     const origin = map?.origin ?? [0, 0];
     this.#options = {
@@ -365,7 +374,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
     });
     this.#sampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     for (const l of this.#layers) this.#createLayer(l);
-    this.#remove ??= this.terrain.addLighting(this);
+    this.#remove ??= this.#virtual ? this.#virtual.addSurface(this) : this.terrain.addLighting(this);
     this.#changed();
     this.#schedule();
   }
@@ -400,6 +409,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
   #changed(): void {
     this.#code.clear();
     this.#write();
+    this.#virtual?.refreshSurfaces();
   }
   #write(): void {
     if (!this.#device || !this.#buffer) return;
@@ -425,6 +435,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
       }
     });
     this.#device.queue.writeBuffer(this.#buffer, 0, values);
+    this.#virtual?.invalidate();
   }
   #schedule(): void {
     if (!this.#device || this.disposed) return;
@@ -574,7 +585,17 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
     if (cached) return cached;
     const marker = this.#planet ? 'let nl=clamp(dot(n,planet.light.xyz)' : 'let base=terrainColor(i.position,';
     let patched: string;
-    if (this.#planet) {
+    if (this.#virtual) {
+      if (!source.includes('return terrainSurfaceColor;'))
+        throw new MargoError(
+          'unsupported',
+          'Cached imagery needs the RVT surface hook; attach it through virtualTexture.',
+        );
+      patched = source.replace(
+        'return terrainSurfaceColor;',
+        'terrainSurfaceColor=terrainImagery(terrainSurfaceColor,vec3f(position.x,0.0,position.y));return terrainSurfaceColor;',
+      );
+    } else if (this.#planet) {
       if (!source.includes(marker))
         throw new MargoError(
           'unsupported',
@@ -614,6 +635,11 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
         }} `;
     });
     code += 'return result;}\n';
+    if (this.#virtual)
+      code = code.replace(
+        'let dx=dpdx(pyramid);let dy=dpdy(pyramid);let gx=dpdx(geographic);let gy=dpdy(geographic);',
+        `let gx=terrainDx.xz;let gy=terrainDy.xz;let dx=gx/vec2f(${span[0]},${span[1]});let dy=gy/vec2f(${span[0]},${span[1]});`,
+      );
     code += patched;
     this.#code.set(key, code);
     return code;

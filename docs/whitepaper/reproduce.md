@@ -3281,3 +3281,6 @@ Build packages, then node --test --test-timeout=120000 packages/splats/test/form
 ### Batch 218 job 2
 
 The transitions package GPU command documented for job 1 now also runs presets-browser.js: 27,648 gradient pixel comparisons cover eight treatments, four directions, three progress values and both sample counts per backend. CPU: node --test --test-timeout=60000 packages/transitions/test/*.test.js. No benchmarks or timing assertions are part of this evidence.
+
+### Batch 229 vector overlays
+Build with npm run build:packages. Run node --test --test-timeout=300000 packages/terrain/test/overlays.test.js and the terrain package CPU suite. Render with node scripts/gpu-lock.mjs run --owner=overlays-repro --wait-max=60 --max=4 -- node packages/terrain/test/overlays.browser.mjs; append --compat to repeat on the compatibility layer. test-results/terrain-overlays.json contains coverage probes, exact baseline/restored values, display references and bake work counts. The package test:gpu script includes both imagery and overlay regressions; run it separately on each backend in a shared slot. No wall-clock benchmark, full verify or README gate is used.

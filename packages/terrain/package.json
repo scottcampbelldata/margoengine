@@ -31,7 +31,7 @@
     "build": "node ../../scripts/build-optional.js terrain",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs && node packages/terrain/test/layers-pbr.browser.mjs && node packages/terrain/test/stream.browser.mjs && node packages/terrain/test/sculpt.browser.mjs && node packages/terrain/test/holes.browser.mjs && node packages/terrain/test/rvt.browser.mjs && node packages/terrain/test/displace.browser.mjs && node packages/terrain/test/deform.browser.mjs && node packages/terrain/test/blend.browser.mjs && node packages/terrain/test/compat.browser.mjs && node packages/terrain/test/planet.browser.mjs && node packages/terrain/test/imagery.browser.mjs"
+    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs && node packages/terrain/test/layers-pbr.browser.mjs && node packages/terrain/test/stream.browser.mjs && node packages/terrain/test/sculpt.browser.mjs && node packages/terrain/test/holes.browser.mjs && node packages/terrain/test/rvt.browser.mjs && node packages/terrain/test/displace.browser.mjs && node packages/terrain/test/deform.browser.mjs && node packages/terrain/test/blend.browser.mjs && node packages/terrain/test/compat.browser.mjs && node packages/terrain/test/planet.browser.mjs && node packages/terrain/test/imagery.browser.mjs && node packages/terrain/test/overlays.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -82,6 +82,10 @@
     "./imagery": {
       "types": "./dist/imagery.d.ts",
       "import": "./dist/imagery.js"
+    },
+    "./overlays": {
+      "types": "./dist/overlays.d.ts",
+      "import": "./dist/overlays.js"
     }
   },
   "files": [

@@ -20,6 +20,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Terrain, TerrainLighting } from './index.js';
+import { lightingLayout } from './lighting-layout.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number; COPY_DST: number };
@@ -70,6 +71,8 @@ const MAX_DECALS = 4096;
 // Terrain lighting group bindings 94 to 96: clear of shadows (1 to 31, effects from 40), clustered (4 to 30) and
 // layer materials (90 to 92).
 const BINDING = 94;
+const surface =
+  'fn terrainVirtualSurface(color:vec3f,position:vec2f,footprint:f32)->vec3f {var terrainSurfaceColor=color;return terrainSurfaceColor;}\n';
 const colorHead = 'fn terrainColor(position:vec3f,normal:vec3f)->vec3f {',
   gradients = 'let dx=dpdx(position);let dy=dpdy(position);',
   groundCall = 'let base=terrainColor(i.position,';
@@ -256,6 +259,34 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
   #uniform = new ArrayBuffer(0);
   #list = new Uint32Array(0);
   readonly #cacheCode = new Map<string, string>();
+  readonly #surfaces = new Set<TerrainLighting>();
+
+  /**
+   * Adds an ordered cache surface provider. Its shader decorates the bake's color and the reader's steep/far fallback;
+   * bindings use group 2 in the bake, group 1 in the reader. Remove it with the returned function.
+   */
+  addSurface(effect: TerrainLighting): () => void {
+    if (this.disposed || !effect || typeof effect.shader !== 'function' || typeof effect.bindings !== 'function')
+      throw new TypeError('Invalid virtual surface; pass a live provider with shader() and bindings().');
+    if (effect.owner && this.owner && effect.owner !== this.owner)
+      throw new MargoError('attached', 'Virtual surface belongs to another engine; attach it to the same engine.');
+    const used = new Set([...this.#entries, ...[...this.#surfaces].flatMap((s) => s.bindings())].map((b) => b.binding));
+    if (effect.bindings().some((b) => used.has(b.binding)))
+      throw new RangeError('Virtual surface binding collision; select distinct bindings for each provider.');
+    this.#surfaces.add(effect);
+    const changed = () => this.refreshSurfaces();
+    changed();
+    return () => {
+      if (this.#surfaces.delete(effect)) changed();
+    };
+  }
+
+  /** Rebuilds provider shader/layout state and the cache after a provider's declarations or binding set changes. */
+  refreshSurfaces(): void {
+    this.#pipelineSource = undefined;
+    this.#cacheCode.clear();
+    this.invalidate();
+  }
 
   private constructor(
     private readonly terrain: Terrain,
@@ -392,7 +423,9 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
 
   /** The group-1 entries the patched terrain shader reads. */
   bindings(): GPUBindGroupEntry[] {
-    return this.#entries;
+    return this.#surfaces.size
+      ? [...this.#entries, ...[...this.#surfaces].flatMap((s) => s.bindings())]
+      : this.#entries;
   }
 
   /** The terrain's lit shader reading its ground colour from the cache (bindings in `group`). */
@@ -405,10 +438,19 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
         'unsupported',
         'The terrain virtual texture needs the terrain lit shader without layer materials; attach it without TerrainMaterials',
       );
-    const code =
+    let code =
       reader(group, BINDING) +
       ground +
       splitTerrainColor(source).replace(groundCall, 'let base=terrainVirtualGround(i.position,');
+    if (this.#surfaces.size) {
+      code =
+        surface +
+        code.replace(
+          'terrainColorAt(position,normal),full)',
+          'terrainVirtualSurface(terrainColorAt(position,normal),position.xz,max(length(terrainDx.xz),length(terrainDy.xz))),full)',
+        );
+      for (const effect of this.#surfaces) code = effect.shader(code, group);
+    }
     if (this.#cacheCode.size >= 16) this.#cacheCode.clear();
     this.#cacheCode.set(key, code);
     return code;
@@ -550,9 +592,29 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     this.#frameValues.set([eye[0], eye[2], this.texel, n, this.levels, this.#steep, 0, 0]);
     device.queue.writeBuffer(this.#frame!, 0, this.#frameValues as Float32Array<ArrayBuffer>);
     if (this.#pipelineSource !== source.layout) {
-      const module = device.createShaderModule({ code: splitTerrainColor(source.code) + bake });
+      let code = splitTerrainColor(source.code) + bake;
+      if (this.#surfaces.size)
+        code =
+          surface +
+          code.replace(
+            'var c=terrainColorAt(vec3f(xz.x,height(xz),xz.y),normal);',
+            'var c=terrainVirtualSurface(terrainColorAt(vec3f(xz.x,height(xz),xz.y),normal),xz,terrainBake.texel);',
+          );
+      for (const effect of this.#surfaces) code = effect.shader(code, 2);
+      const module = device.createShaderModule({ code });
+      const layouts = [source.layout, this.#layout!];
+      if (this.#surfaces.size)
+        layouts.push(
+          device.createBindGroupLayout({
+            entries: lightingLayout(
+              code,
+              [...this.#surfaces].flatMap((s) => s.bindings()),
+              2,
+            ),
+          }),
+        );
       this.#pipeline = device.createRenderPipeline({
-        layout: device.createPipelineLayout({ bindGroupLayouts: [source.layout, this.#layout!] }),
+        layout: device.createPipelineLayout({ bindGroupLayouts: layouts }),
         vertex: { module, entryPoint: 'terrainBakeVertex' },
         fragment: { module, entryPoint: 'terrainBakeTexel', targets: [{ format: this.#format }] },
       });
@@ -632,6 +694,12 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       work.push([k, rects]);
     }
     if (!work.length) return;
+    const surfaceGroup = this.#surfaces.size
+      ? device.createBindGroup({
+          layout: this.#pipeline!.getBindGroupLayout(2),
+          entries: [...this.#surfaces].flatMap((s) => s.bindings()),
+        })
+      : undefined;
     device.queue.writeBuffer(this.#bake!, 0, uniform);
     if (listed) device.queue.writeBuffer(this.#listBuffer!, 0, list, 0, listed);
     for (const [k, rects] of work) {
@@ -641,6 +709,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       pass.setPipeline(this.#pipeline!);
       pass.setBindGroup(0, source.group);
       pass.setBindGroup(1, this.#group!, [256 * k]);
+      if (surfaceGroup) pass.setBindGroup(2, surfaceGroup);
       for (const [x, y, w, h] of rects) {
         pass.setScissorRect(x, y, w, h);
         pass.draw(3);
@@ -673,6 +742,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     this.#release();
     this.#cacheCode.clear();
     this.#decals.clear();
+    this.#surfaces.clear();
     this.owner = this.#device = undefined;
   }
   declare [Symbol.dispose]: () => void;

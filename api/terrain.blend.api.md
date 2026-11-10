@@ -133,6 +133,8 @@ class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     readonly texel: number;
     readonly size: number;
     readonly levels: number;
+    addSurface(effect: TerrainLighting): () => void;
+    refreshSurfaces(): void;
     private constructor();
     static attach(engine: EngineKernel, terrain: Terrain, options?: TerrainVirtualTextureOptions): TerrainVirtualTexture;
     setup(engine: Engine): void;

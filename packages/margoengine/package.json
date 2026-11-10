@@ -3642,6 +3642,10 @@
       "types": "./dist/terrain/imagery.d.ts",
       "import": "./dist/terrain/imagery.js"
     },
+    "./terrain/overlays": {
+      "types": "./dist/terrain/overlays.d.ts",
+      "import": "./dist/terrain/overlays.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

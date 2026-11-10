@@ -4575,3 +4575,6 @@ Batch 238 formats: no open format defect found by the malformed-input, real-data
 ### Batch 218 job 2
 
 The eight requested transition presets and their finite parameter contracts are built for frozen and live composition. Independent gradient pixel checks cover each preset in four cardinal directions, endpoints and intermediate eased progress at 1x/4x. No requested preset is deferred.
+
+### Batch 229 job 2: vector coverage evidence
+No open defect identified in the job: the new entry covers metre widths, polygon holes, projection, live updates, imagery ordering and exact restoration on both GPU backends. CPU tests reject coerced numeric strings and preserve old state after malformed/over-budget updates. A draft display-pixel classifier incorrectly assumed that PBR Neutral kept saturated primary channels at zero; the fixture now uses independently rendered primary references through the actual display transform, retaining exact color matching.
