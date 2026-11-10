@@ -6726,4 +6726,5 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 |---|---|---|---|
 | clustered `CubeProjectorLights` | WebGPU-only | Refuses in its own setup (`unsupported`, help link); it already refused through `ProjectorLights` with the parent's name | `packages/clustered/test/cube-projector.test.js` |
 | culling `FrontToBack`, `WebGL2Culling` | WebGPU-only | Refuse through `requireWebGPU` (`unsupported`, help link); before, `unsupported` without a link | `packages/culling/test/preview.test.js` |
+| materials `TransmissionLayers`, `NativeGlass` (internal) | WebGPU-only | `TransmissionLayers` refuses in its own setup (before, through `Transmission`); the native glass capture now refuses instead of registering two passes that skipped every frame | `packages/materials/tests/preview.test.js` |
 

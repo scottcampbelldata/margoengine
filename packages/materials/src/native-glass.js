@@ -2,6 +2,7 @@
 import { sceneTarget } from '../../shared/msaa.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { applyView } from '../../shared/view-rect.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 const captures = new WeakMap();
 const frames = new WeakMap();
 const shader = `@group(0) @binding(0) var source:texture_2d<f32>;
@@ -18,6 +19,7 @@ class NativeGlass {
     this.engine = engine;
   }
   setup(engine) {
+    requireWebGPU(engine, 'Native glass capture');
     this.device = engine.gpu;
   }
   registerPasses(graph) {

@@ -12,6 +12,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { Transmission, type TransmissionPassOptions } from './transmission.js';
 import { alphaBlend } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -148,6 +149,7 @@ fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {var o:MargoTransparent
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'TransmissionLayers is disposed; create a new instance');
+    requireWebGPU(engine, 'TransmissionLayers');
     this.transmission.setup(engine);
     this.engine = engine;
   }
