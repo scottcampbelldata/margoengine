@@ -4617,3 +4617,10 @@ Repro: node packages/worker/tests/browser-matrix.mjs (default Firefox). On this 
 No open defect found in the new volume/profile computations; boundary, transform, real scan and both-backend rendering regressions are in the points tests. Snapshot and resident-data limits are in docs/limits.md.
 
 - Incoming main 8ee384c7e retains nested merge markers in shared docs (repro: search ^<<<<<<<, ^======= and ^>>>>>>> in docs/clean-room.md); cause: prior lanes committed unresolved document merges. Outside points scope; preserved for the fix phase.
+
+
+
+### Fixed: batch 217 inherited API summary merge boundaries
+
+Concurrent main contained nested conflict markers in docs/api-surface.md. Scoped api:update refused it, and api:check failed its generated-summary comparison. A full api:update regenerates the summary from the built exports; no unrelated API implementation changed. scripts/api-report-scope.mjs already rejects marked summaries, and the normal api:check remains the regression gate.
+>>>>>>> 09e20fc48 (feat(cutscene): key viewport gizmo transforms at the playhead)

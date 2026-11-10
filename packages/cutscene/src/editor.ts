@@ -4,7 +4,7 @@
 import { EditHistory } from '@margoengine/inspector/history';
 import { MargoError } from '@margoengine/math/errors';
 import { Cutscene, EASING_NAMES, type CutsceneTrackType } from './cutscene.js';
-import { type CutsceneDocument, validateCutscene } from './document.js';
+import { type CutsceneDocument, type Track, validateCutscene } from './document.js';
 
 /** The `track` of the row that holds the document's markers. */
 export const MARKERS = '@markers';
@@ -189,6 +189,11 @@ export class TimelineModel {
       at = list.indexOf(fresh);
     });
     return { track, index: at };
+  }
+  /** Adds a whole track as one validated undo step. Duplicate ids or invalid fields throw without changing the document. */
+  addTrack(track: Track): void {
+    const fresh = JSON.parse(JSON.stringify(track)) as Track;
+    this.edit('Add track', true, () => { this.doc.tracks.push(fresh); });
   }
   /**
    * Moves items together by `delta` seconds, stopping at the ends of the timeline as a group.

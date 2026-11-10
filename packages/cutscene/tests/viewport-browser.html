@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>Cutscene viewport keying proof</title>
+<canvas width="600" height="400" style="width:600px;height:400px"></canvas><div id="timeline"></div>
+<script type="module">
+import {Engine,box} from '@margoengine/core';
+import {Inspector} from '@margoengine/inspector';
+import {TimelineEditor} from '../src/editor.ts';
+import {ViewportKeying} from '../src/viewport.ts';
+const engine=await Engine.create(document.querySelector('canvas'),{camera:{position:[0,4,8],target:[0,0,0]}});
+const mesh=engine.createMesh().setGeometry(box());mesh.name='hero';
+const inspector=Inspector.attach(engine);
+const editor=new TimelineEditor({format:'margo-cutscene',version:1,duration:10,tracks:[]},{parent:document.querySelector('#timeline')});
+const keying=await ViewportKeying.attach(engine,editor,inspector,{autoKey:true});
+engine.start();
+window.proof={engine,mesh,inspector,editor,keying};
+window.points=mode=>{
+  const controls=keying.gizmo.controls;controls.setMode(mode);engine.render();const frame=controls.frame(),o=frame.origin,r=frame.size,m=engine.camera.matrix;
+  const project=p=>{const q=[...p,1],v=[0,1,2,3].map(row=>q.reduce((sum,c,col)=>sum+c*m[col*4+row],0));return[(v[0]/v[3]+1)*300,(1-v[1]/v[3])*200];};
+  for(let i=0;i<36;i++){
+    const a=i/36*Math.PI*2,axis=frame.axes[0],from=mode==='rotate'?[o[0]+r*Math.cos(a),o[1],o[2]+r*Math.sin(a)]:o.map((v,j)=>v+axis[j]*r*(0.5+i/72)),to=mode==='rotate'?[o[0]+r*Math.cos(a+0.5),o[1],o[2]+r*Math.sin(a+0.5)]:from.map((v,j)=>v+axis[j]*r*.4),start=project(from);
+    if(controls.pick(...start)===(mode==='rotate'?'Y':'X'))return{start,end:project(to)};
+  }
+  throw Error('No visible gizmo handle '+mode+' '+JSON.stringify({frame,selected:inspector.selected===mesh,dragging:controls.dragging}));
+};
+window.ready=true;
+</script>

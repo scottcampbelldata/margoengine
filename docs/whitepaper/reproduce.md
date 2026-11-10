@@ -3319,3 +3319,10 @@ Compute landing-gate regressions: node --test --test-timeout=120000 tests/gpu-br
 
 ### Batch 228 job 1
 Build packages, then `node --test packages/points/tests/clip.test.js`. The existing Stanford scan fixture and independent scalar predicates prove profile/box membership. Run `node packages/points/scripts/test-browser.js` and the same command with `--compat`, through the shared GPU lock, for retained/excluded pixel and budget checks. No timing result is claimed.
+
+
+
+### Batch 217 job 2: viewport keying
+
+After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/viewport.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-viewport --wait-max=60 --max=2 -- node packages/cutscene/tests/viewport-browser.mjs. Repeat with MARGO_COMPAT=1 for the WebGL2 compatibility layer. This proof picks a real mesh, drags all three gizmo modes, verifies authored transform keys, replaces at one time and disposes the tool.
+>>>>>>> 09e20fc48 (feat(cutscene): key viewport gizmo transforms at the playhead)

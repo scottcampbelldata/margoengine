@@ -300,6 +300,7 @@ class TimelineModel {
     get rows(): TimelineRow[];
     addKey(track: string, time: number, fields?: Record<string, unknown>): ItemRef;
     addItem(track: string, item: Record<string, unknown>): ItemRef;
+    addTrack(track: Track): void;
     moveItems(items: readonly ItemRef[], delta: number): ItemRef[];
     setItem(ref: ItemRef, fields: Record<string, unknown>): boolean;
     updateItem(ref: ItemRef, fields: Record<string, unknown>): ItemRef | undefined;

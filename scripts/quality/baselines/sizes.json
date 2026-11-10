@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13410140,
+  "total": 13411786,
   "history": [
     {
       "date": "2026-10-24",
@@ -6888,6 +6888,12 @@
       "commit": "batch-228",
       "reason": "New optional points/clip entry: absent (0 B) to 7268 B gzip for survey volumes, profile extraction and complete renderable point records; 7524 B ceiling. Splitting would complicate one survey API without reducing the selected feature work. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-217-job-2",
+      "reason": "New optional cutscene/viewport authoring feature and validated editing support, leaving core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7101,6 +7107,7 @@
     "@margoengine/cutscene/render": 8171,
     "@margoengine/cutscene/shots": 3336,
     "@margoengine/cutscene/vfx": 1832,
+    "@margoengine/cutscene/viewport": 1646,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/bc": 3890,
     "@margoengine/decoders/bmp": 1774,

@@ -3862,3 +3862,10 @@ Claim: the optional compute/shape entry supplies concatenate, stack, pad, tile, 
 
 ### Batch 228 job 1: resident point survey tools
 The optional points/clip entry selects closed box and polygon volumes and extracts elevation profiles along horizontal polyline corridors. Evidence: packages/points/tests/clip.test.js independently checks Stanford scan membership, transforms, combinations, concavity, boundaries and profile mileage; features-browser.js checks retained/excluded point pixels and point budget on both backends. This matches the requested Potree survey computations; no claim of Potree's viewer UI, streamed-query scheduler or speed parity.
+
+
+
+### Batch 217 job 2: viewport keying
+
+The optional viewport entry closes the scene-pick, gizmo-manipulate and playhead-key row. Evidence: viewport.test.js covers insertion, replacement, creation, validation and undo; viewport-browser.mjs performs real canvas picking and translation/rotation/scale mouse drags, then checks keys and cleanup. The feature reuses the engine inspector, with no renderer or core additions. No performance or whole-editor superiority claim.
+>>>>>>> 09e20fc48 (feat(cutscene): key viewport gizmo transforms at the playhead)

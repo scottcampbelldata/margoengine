@@ -6255,3 +6255,9 @@ Batch 274 rebase registration repair: the existing splats formats-check.mjs was 
 
 ### 5. Batch 228 job 1: survey selection evidence
 The optional points/clip entry transforms local records into world space for centre-based box/polygon membership and horizontal profiles, then builds a normal PointCloud containing only selected records. Both WebGPU and the compatibility layer therefore use the established rendering/picking path and excluded points take no draw budget. CPU evidence covers closed boundaries, concavity, world transforms, HDR/packed colour preservation and real scan membership; the points browser suite checks colour, exclusion and budget on both backends. Queries are explicit snapshots over resident records; streaming orchestration and interactive survey UI remain consuming-application responsibilities.
+
+
+
+### Section 5 evidence: batch 217 viewport keying
+
+Viewport keying reads the existing transform store through core/extension and reuses InspectorGizmo for scene manipulation. Real browser proofs exercise selection plus all three transform modes on WebGPU and the WebGL2 compatibility layer. Keys preserve local quaternions without decomposition. No GPU math, shader, rendering backend or core implementation changed.
