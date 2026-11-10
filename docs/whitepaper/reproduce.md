@@ -3568,3 +3568,4 @@ The static 32x32 rank tile is generated clean room by `python scripts/prepare-sc
 
 ### Batch 195 job 1
 Build packages; run node --test --test-timeout=120000 packages/quality/test/demand.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch195 --max=3 --wait-max=60 -- node packages/quality/test/demand-browser.mjs. The browser fixture compares draw counters across idle frames, damped control activity and load completion on both backends. Fixtures are original analytic geometry, no external data.
+Batch 270 recurring suite: under the shared GPU lock run npm run test:gpu --workspace @margoengine/vfx, then npm run test:gpu:parity --workspace @margoengine/vfx. The dedicated command includes native and WebGL2 parity.mjs --all. The CPU registration regression is node --test --test-timeout=120000 packages/vfx/test/gpu-registration.test.js.

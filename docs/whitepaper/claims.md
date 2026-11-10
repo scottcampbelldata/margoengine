@@ -4115,3 +4115,4 @@ Optional sciviz/volume-quality provides conservative block skipping, spatial blu
 
 ### Batch 195 job 1: demand rendering
 quality/demand coalesces invalidations, follows control activity and explicit animation/load wake-ups, and queues no callback while idle. Proof: packages/quality/test/demand.test.js and demand-browser.mjs on WebGPU and WebGL2. Matches the documented demand invalidation behaviour of R3F and PlayCanvas for this row, plus independent animation holds and cancellation. No energy percentage or timing claim.
+Batch 270 parity evidence is now recurring: package test:gpu:parity includes --all native/compatibility runs, with CPU registration protection. Standalone and combined runs retain every existing numeric and pixel assertion.

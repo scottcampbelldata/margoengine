@@ -5614,3 +5614,4 @@ quality/demand renderOnDemand stops the continuous engine loop and schedules onl
 
 
 Demand entry size: new 0 to 928 B gzip, ceiling 1184 B. Core plus stage remains 24,209 B. The optional scheduler keeps cancellation, control events and animation ownership in one entry.
+The VFX GPU checks are split into test:gpu (the existing render checks) and test:gpu:parity (all five parity features, both backends). CI discovers both scripts; each parity backend runs once. Runtime sizes are unchanged.

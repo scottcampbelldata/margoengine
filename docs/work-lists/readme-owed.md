@@ -948,3 +948,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/quality and margoengine (batch 195 job 1): document /demand renderOnDemand, source events, update replacing onFrame, invalidate coalescing/counts, animation holds, loaded, idle clock, restore and disposal defaults; examples deferred.
 
 - @margoengine/vfx (batch 195 blocking manifest repair): recurring GPU command retains all parity cases; no public API/example change, README examples remain deferred.
+- @margoengine/vfx (batch 270 manifest correction): document separate test:gpu and test:gpu:parity commands and automatic CI discovery without duplicate execution; examples deferred.
