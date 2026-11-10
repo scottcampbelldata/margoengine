@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./sciviz-demo.css">
 </head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html">Moving wind</a><a href="./sciviz-lic.html">Wind texture</a><a href="./sciviz-tubes.html" aria-current="page">Wind paths</a></nav>
   <header><h1>North Atlantic wind paths</h1><p>Tubes and ribbons along instantaneous NOAA daily mean near-surface wind streamlines, January 1-8, 2024. Colour and exaggerated radius show measured speed. This horizontal field has zero streamwise curl: ribbons do not spin. These are numerical traces of a daily mean, not observed parcel paths or forecasts.</p></header>
@@ -23,5 +25,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-tubes.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

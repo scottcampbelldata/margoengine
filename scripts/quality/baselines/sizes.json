@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15323399,
+  "total": 15330151,
   "history": [
     {
       "date": "2026-10-24",
@@ -7903,6 +7903,12 @@
       "commit": "e68bbe3ce",
       "reason": "Batch 179 share: new optional entry 0 to 5033 B gzip, ceiling 5289 B for complete compressed links, inline HTML and iframe control. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch178-job5",
+      "reason": "Optional a11y before 0 -> 6233 B gzip; sciviz root 60026 -> 61010 B, spec 27106 -> 27127 B, format 7306 -> 7598 B. Complete source adapters, keyboard/table access, abortable Web Audio, per-instance themes and 24px pressed legend controls. Raise format ceiling 7562 -> 7826 and add a11y ceiling 6480. A split would duplicate row/source and lifetime ownership or require application glue, and save no core bytes. Core + stage remains 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8782,10 +8788,10 @@
     "@margoengine/sciviz/fallback": 2258,
     "@margoengine/sciviz/fits": 5164,
     "@margoengine/sciviz/flow": 9392,
-    "@margoengine/sciviz/format": 7562,
+    "@margoengine/sciviz/format": 7826,
     "@margoengine/sciviz/formats": 14262,
     "@margoengine/sciviz/geo": 4293,
-    "@margoengine/sciviz/geo-lod": 7509,
+    "@margoengine/sciviz/geo-lod": 7517,
     "@margoengine/sciviz/geo-time": 41056,
     "@margoengine/sciviz/geo-vector": 27662,
     "@margoengine/sciviz/glyph": 4644,
@@ -9326,6 +9332,7 @@
     "margoengine/web": 577,
     "@margoengine/sciviz/aggregate": 29019,
     "@margoengine/sciviz/views": 5042,
-    "@margoengine/sciviz/share": 5289
+    "@margoengine/sciviz/share": 5289,
+    "@margoengine/sciviz/a11y": 6480
   }
 }

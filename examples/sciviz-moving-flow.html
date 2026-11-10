@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./sciviz-demo.css">
 </head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-head.html">MRI head volume</a><a href="./sciviz-stars.html">Star catalogue</a><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html" aria-current="page">Moving wind</a></nav>
   <header><h1>Moving wind</h1><p>Particles carried through eight NOAA daily mean wind fields over the North Atlantic, January 1-8, 2024. Velocities interpolate in space and time. Fading trails show recent motion; these numerical trajectories through daily means are not observed parcel tracks or forecasts.</p></header>
@@ -26,5 +28,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-moving-flow.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

@@ -3651,6 +3651,10 @@
       "types": "./dist/sciviz/share.d.ts",
       "import": "./dist/sciviz/share.js"
     },
+    "./sciviz/a11y": {
+      "types": "./dist/sciviz/a11y.d.ts",
+      "import": "./dist/sciviz/a11y.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

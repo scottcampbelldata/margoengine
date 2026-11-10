@@ -1,8 +1,12 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vector publication | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css">
-<body><header><h1>3D figures as vectors</h1><p>OpenNeuro T1 isosurface and NASA TMR bump surface. The SVG contains depth-ordered paths.</p></header>
+<body>
+<main>
+<header><h1>3D figures as vectors</h1><p>OpenNeuro T1 isosurface and NASA TMR bump surface. The SVG contains depth-ordered paths.</p></header>
 <div class="controls"><label>Data <select id="dataset"><option value="head">OpenNeuro T1</option><option value="nasa">NASA TMR</option></select></label><button id="save" type="button">Save vector SVG</button></div>
-<div class="view"><canvas id="viewport" aria-label="Scientific surface"></canvas></div><p id="status" role="status">Loading data...</p><div id="output" aria-label="SVG publication preview"></div>
+<div class="view"><canvas id="viewport" aria-label="Scientific surface"></canvas></div><p id="status" role="status">Loading data...</p><div id="output" role="region" aria-label="SVG publication preview"></div>
 <footer>OpenNeuro ds000030, CC0, original intensities sampled every eighth 2 mm voxel. NASA TMR FUN3D bump x=0.3 slice, US government public domain, original nodes and scalar values. <a href="./assets/sciviz/head.json">MRI provenance</a>, <a href="./assets/sciviz/contour/source.json">NASA provenance</a>.</footer>
-<script type="module" src="./sciviz-export-vector.ts"></script></body></html>
+<script type="module" src="./sciviz-export-vector.ts"></script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

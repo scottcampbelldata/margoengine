@@ -4,6 +4,7 @@
 <style>
 body {margin:24px auto;padding:0 24px;max-width:1100px;font:16px/1.5 system-ui;color:#243c4d;background:#f7f9fa}section{background:white;padding:16px;margin:20px 0;border:1px solid #dae2e6}h2{font-size:18px} .plot{position:relative;width:100%;height:380px}canvas{display:block;width:100%;height:100%} .inset{width:300px;height:160px;border:1px solid #ccc;background:white}button,input{font:inherit;margin:4px}input[type=range]{max-width:30%}svg{max-width:100%}[data-chart-legend]{cursor:pointer}[data-chart-legend]:focus{outline:2px solid #277da8}
 </style>
+<main>
 <h1>Axes, data and interaction</h1>
 <p>NOAA GHCN Central Park daily temperatures, 2020, US public-domain data. <a href="./assets/sciviz/stats/source.json">Frozen source and hashes</a>. Click legend rows to hide a series; double-click or Shift+Enter to isolate. Hover shows original data across series with crosshair and spike lines. SVG downloads include axis chrome and insets.</p>
 <p id="status" role="status">Loading temperatures</p>
@@ -13,4 +14,6 @@ body {margin:24px auto;padding:0 24px;max-width:1100px;font:16px/1.5 system-ui;c
 <section><h2>RGB image trace from the measured daily maxima</h2><p>Rows are months, columns days 1 to 31. Color encodes measured temperature; gray means no calendar day.</p><div class="plot"><canvas id="image"></canvas></div></section>
 <section><h2>Hierarchical clustering of monthly daily maxima</h2><p>Size-weighted average linkage, Euclidean distances, days 1 to 28 in each of the twelve months. The row and column dendrograms describe the reordered cells.</p><div class="plot"><canvas id="cluster"></canvas></div></section>
 <div class="inset"><canvas id="inset"></canvas></div>
-<script type="module" src="./sciviz-chart-polish.ts"></script></html>
+<script type="module" src="./sciviz-chart-polish.ts"></script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</html>

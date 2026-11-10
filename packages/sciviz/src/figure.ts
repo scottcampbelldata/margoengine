@@ -25,7 +25,7 @@ import { Timeline, type TimelineFrame, type PlayOptions, type TimelineOptions } 
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
-import { publicationLabels, publicationOverlays, disposePublicationLabels } from './publication-labels.js';
+import { publicationLabels, publicationOverlays, disposePublicationLabels, trackFigureCanvas } from './publication-labels.js';
 
 import { projectPoint } from '@margoengine/math/mat4';
 import {
@@ -56,8 +56,8 @@ export interface FigureOptions extends AxesOptions {
   readonly mode?: '2d' | '3d';
   /** Space around a 2D chart's plot area. Default { top: 16, right: 24, bottom: 48, left: 64 } (right 96 with a colour bar). */
   readonly margin?: Margin;
-  /** `'dark'` (default) or `'light'` chrome. */
-  readonly theme?: 'dark' | 'light';
+  /** `'dark'` (default), `'light'`, or explicit chrome colours. */
+  readonly theme?: 'dark' | 'light' | Theme;
   /** Draw axes, grid and tick labels. Default true. */
   readonly axes?: boolean;
   /** Relative size of the plot box (x, y, z). Default [1, 1, 0.75]. */
@@ -475,8 +475,14 @@ export class Figure extends EventTarget {
   constructor(engine: EngineKernel, options: FigureOptions = {}, renderer?: SciRenderer) {
     super();
     const theme = options.theme ?? 'dark';
-    if (theme !== 'dark' && theme !== 'light')
-      throw typeError(`Figure theme must be 'dark' or 'light', got ${String(theme)}`, 'sciviz');
+    const colors = typeof theme === 'string' ? THEMES[theme] : theme;
+    if (!colors || typeof colors !== 'object')
+      throw typeError('Figure theme must be dark, light or a Theme; supply chrome colours', 'sciviz');
+    for (const key of ['background', 'axis', 'grid', 'text'] as const) {
+      if (typeof colors[key] !== 'string')
+        throw typeError(`Theme ${key} needs a colour string; supply #rrggbb`, 'sciviz');
+      hexRGB(colors[key], `Theme ${key}`);
+    }
     const aspect = options.aspect ?? [1, 1, 0.75];
     if (aspect.length !== 3 || !aspect.every((a) => a > 0 && Number.isFinite(a)))
       throw rangeError('Figure aspect must be three positive numbers', 'sciviz');
@@ -489,13 +495,14 @@ export class Figure extends EventTarget {
     const types = options.scale ?? {};
     this.#scales = [axisScale(types.x), axisScale(types.y), axisScale(types.z)];
     this.engine = engine;
-    this.theme = THEMES[theme];
+    this.theme = { ...colors };
     this.#options = options;
     this.renderer = renderer ?? new SciRenderer();
     (engine as unknown as Engine).use(this.renderer);
     if (options.axes ?? true) this.#axes = new Axes(engine, this.theme, options, () => this.#linesPlugin());
     this.#model = dataToScene(this.#bounds, aspect);
     const canvas = (engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
+    if (canvas) trackFigureCanvas(this, canvas);
     if (typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement)
       this.#interaction = new Interaction<PickResult>(canvas, this.theme, {
         error: (error) => this.dispatchEvent(new CustomEvent('pickerror', { detail: error })),
@@ -544,6 +551,38 @@ export class Figure extends EventTarget {
   /** Current data-to-plot axis mappings, for optional chart controllers. */
   get axisScales(): readonly [Scale, Scale, Scale] {
     return [...this.#scales];
+  }
+
+  /** Update owned chrome and export colours. Data colours are preserved. Defaults are copied per figure. */
+  async setTheme(theme: Theme, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    this.#check();
+    if (!theme || typeof theme !== 'object')
+      throw typeError('Theme needs chrome colours; supply a Theme object', 'sciviz');
+    for (const key of ['background', 'axis', 'grid', 'text'] as const) {
+      if (typeof theme[key] !== 'string')
+        throw typeError(`Theme ${key} needs a colour string; supply #rrggbb`, 'sciviz');
+      hexRGB(theme[key], `Theme ${key}`);
+    }
+    Object.assign(this.theme, theme);
+    (this.engine as unknown as Engine).scene.background = theme.background;
+    if (this.#legend) {
+      Object.assign(this.#legend.element.style, {
+        color: theme.text,
+        background: theme.background + 'd9',
+        borderColor: theme.grid,
+      });
+    }
+    for (const bar of this.#bars) {
+      bar.element.style.color = theme.text;
+      bar.element.style.textShadow = `0 0 3px ${theme.background}`;
+      bar.bar.style.borderColor = theme.axis;
+    }
+    this.#pending = this.#pending.then(async () => {
+      signal?.throwIfAborted();
+      await this.#axes?.update(this.#bounds, this.#model, this.#flat, this.#scales);
+    });
+    await this.#pending;
   }
 
   /** Replace axis chrome, or hide it for an optional chart controller. Waits for pending axis work. */

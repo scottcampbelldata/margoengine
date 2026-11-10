@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./sciviz-demo.css">
 </head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html">Moving wind</a><a href="./sciviz-lic.html" aria-current="page">Wind texture</a></nav>
   <header><h1>North Atlantic wind texture</h1><p>Dense line integral convolution of NOAA daily mean near-surface winds, January 1-8, 2024. Colour gives measured speed in m/s. Optional animation shows the direction of each day's steady field; it does not follow air parcels or represent elapsed physical time.</p></header>
@@ -25,5 +27,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-lic.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

@@ -266,6 +266,9 @@ interface VolumeClassification {
 }
 
 class VolumeLayer implements Drawable {
+    readValues(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<ArrayLike<number>>;
     get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly transparent = true;

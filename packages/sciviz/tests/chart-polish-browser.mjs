@@ -19,6 +19,14 @@ for (const compat of [false, true]) {
         p.x + ((l.positions[index * 3] - b[0]) * p.width) / (b[1] - b[0]),
         p.y + (1 - (l.positions[index * 3 + 1] - b[2]) / (b[3] - b[2])) * p.height,
       ];
+      const {attachAccessibility} = await import('/packages/sciviz/dist/a11y.js');
+      const accessible = attachAccessibility(figure);
+      await accessible.ready;
+      const rows = accessible.series.find(s => s.name === secondary.name);
+      const source = await fetch('/examples/assets/sciviz/stats/ghcn.json').then(r => r.json());
+      if (!rows || rows.count !== source.length || rows.datum(index).x !== Date.parse(source[index].date) || rows.datum(index).y !== 32 + 1.8 * source[index].tmin)
+        throw Error('Accessible secondary values lost exact original data units');
+      accessible.dispose();
       chart.setVisible(secondary, false);
       figure.render();
       const [x, y] = pixel(existing),
@@ -66,6 +74,11 @@ for (const compat of [false, true]) {
     assert.equal(report.imagePixels, 372);
     const legend = browser.page.locator('[data-sciviz-legend]').first().locator('[data-chart-legend]');
     assert.equal(await legend.count(), 2);
+    assert.equal(await browser.page.locator('[data-sciviz-legend]').first().getAttribute('role'), 'group');
+    for (const row of await legend.all()) {
+      const box = await row.boundingBox();
+      assert.ok(box.width >= 24 && box.height >= 24, 'Legend button needs a real 24px target');
+    }
     await legend.first().click();
     assert.equal(await browser.page.evaluate(() => window.chartPolishDemo.existing.line.visible), false);
     await legend.first().dblclick();

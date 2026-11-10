@@ -3,10 +3,14 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GPU picking | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css">
 <style>.views{display:grid;grid-template-columns:1fr 1fr;gap:16px}.views canvas{width:100%;height:420px}@media(max-width:700px){.views{grid-template-columns:1fr}}</style></head>
-<body><header><h1>Pick a star. Find a first hit.</h1><p>Hover over a view for the original source index and scalar value. Drag the CT to orbit.</p></header>
+<body>
+<main>
+<header><h1>Pick a star. Find a first hit.</h1><p>Hover over a view for the original source index and scalar value. Drag the CT to orbit.</p></header>
 <div class="views"><section><h2>One million 2MASS sources</h2><canvas id="stars" aria-label="2MASS right ascension and declination"></canvas><output id="star-hit">Move over a star.</output></section>
 <section><h2>TCIA CT-ORG, volume 0</h2><canvas id="ct" aria-label="CT-ORG volume with first-hit picking"></canvas><output id="ct-hit">Move over the volume.</output></section></div>
 <p id="status" role="status" data-webgpu-status>Loading attributed data...</p>
 <footer>2MASS via NASA/IPAC IRSA, public domain. TCIA CT-ORG: Rister, Yi, Shivakumar, Nobashi and Rubin (2019), CC BY 3.0, <a href="https://doi.org/10.7937/tcia.2019.tt7f4v7o">source and citation</a>. The CT retains a 64 x 64 x 19 subset of stored samples, calibrated to Hounsfield units. Coordinates here are sample indices. First classified hit uses per-step opacity 0.002; it is independent of the jittered colour render. <a href="?backend=webgl2">Use WebGL2 compatibility</a>.</footer>
 <script type="module">import('./sciviz-pick-gpu.ts').catch(error=>{document.querySelector('#status').textContent=error.message;console.error(error);});</script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body></html>

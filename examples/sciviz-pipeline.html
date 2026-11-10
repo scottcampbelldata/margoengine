@@ -2,11 +2,15 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>NASA solution pipeline | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
 <body>
+<main>
+
   <header><h1>NASA solution pipeline</h1><p>Skin friction along a flat plate, computed by NASA's unstructured FUN3D solver. Changing the minimum x reruns the subset and chart nodes; the source stays cached.</p></header>
   <div class="controls"><label>Minimum x <input id="minimum" type="range" min="0" max="1.8" step="0.05" value="0"></label><button id="save" type="button">Save graph JSON</button></div>
   <div class="view"><canvas id="viewport" aria-label="FUN3D skin friction coefficient along the plate"></canvas></div>
   <p id="status" role="status" data-webgpu-status>Loading NASA solution...</p>
   <footer>NASA Turbulence Modeling Resource, SA flat plate, FUN3D rev 32421, finest 545 by 385 grid. Public-domain US government data. These are published surface samples, not the full volume mesh. Steady solution: no time evolution is inferred. <a href="https://tmbwg.github.io/turbmodels/flatplate_sa.html">Source and numerical limitations</a>.</footer>
   <script type="module">import { needsWebGPU } from './needs-webgpu.js'; needsWebGPU('#viewport').then(ok => ok && import('./sciviz-pipeline.ts'));</script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

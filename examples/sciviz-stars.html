@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./sciviz-demo.css">
 </head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-head.html">MRI head volume</a><a href="./sciviz-stars.html" aria-current="page">Star catalogue</a><a href="./sciviz-wind.html">Wind field</a></nav>
   <header><h1>Star catalogue</h1><p>One million real sources from the 2MASS Point Source Catalog. The cloud plots sky position and near-infrared colour: right ascension, declination and J minus Ks magnitude. Height shows colour, with no distance estimate.</p></header>
@@ -28,5 +30,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-stars.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

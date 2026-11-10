@@ -579,7 +579,7 @@ async function captureFigure(figure: Figure, options: FigureSaveOptions, io: Val
   const camera = figure.engine.camera;
   const spec: FigureSpec = {
     version: 1,
-    options: await io.encode(state.options),
+    options: await io.encode({ ...state.options, theme: { ...figure.theme } }),
     camera: {
       position: [...camera.position],
       target: [...camera.target],

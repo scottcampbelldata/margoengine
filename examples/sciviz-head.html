@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./sciviz-demo.css">
 </head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-head.html" aria-current="page">MRI head volume</a><a href="./sciviz-stars.html">Star catalogue</a><a href="./sciviz-wind.html">Wind field</a></nav>
   <header><h1>MRI head volume</h1><p>A real T1-weighted head MRI from OpenNeuro. Look through the volume, move a slice, or extract a surface at an intensity threshold.</p></header>
@@ -24,5 +26,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-head.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

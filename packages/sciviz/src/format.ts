@@ -461,19 +461,24 @@ export class ChartPolish extends EventTarget {
   }
   #legendRows() {
     this.#bindLegend();
+    this.figure.legend?.element.setAttribute('role', 'group');
     const rows = this.figure.legend?.element.querySelectorAll('[role="listitem"]') ?? [];
     for (const row of rows) {
       const r = row as HTMLElement;
       r.tabIndex = 0;
       r.setAttribute('role', 'button');
       r.setAttribute('data-chart-legend', '');
+      r.style.minHeight = '24px';
+      r.style.minWidth = '24px';
     }
     for (const row of this.figure.legend?.element.querySelectorAll('[data-chart-legend]') ?? []) {
       const name = row.textContent ?? '',
         layers = this.figure.layers.filter((l) => 'name' in l && l.name === name),
         on = layers.some(visible);
       row.setAttribute('aria-pressed', String(on));
-      (row as HTMLElement).style.opacity = on ? '1' : '.4';
+      const style = (row as HTMLElement).style;
+      style.opacity = on ? '1' : '.4';
+      style.minHeight = style.minWidth = '24px';
     }
   }
   #legendClick(event: Event, isolate: boolean) {

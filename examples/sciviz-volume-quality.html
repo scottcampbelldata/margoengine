@@ -1,7 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Volume sampling quality | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"><style>#volume{width:100%;height:540px}#profile{width:100%;height:220px}</style></head><body>
+<main>
+
 <header><h1>Sampling the T1 scan</h1><p>OpenNeuro MRI with conservative empty-space skipping, spatial blue-noise jitter, adaptive steps and a refined first-hit isosurface. The interior probe samples the original field.</p></header>
 <p><label>View <select id="mode"><option value="iso">First-hit isosurface</option><option value="composite">Volume composite</option><option value="mip">Maximum intensity</option></select></label> <label>Isovalue <input id="iso" type="range" min="100" max="600" step="10" value="320"></label> <label><input id="skip" type="checkbox" checked> Skip empty blocks</label> <label><input id="jitter" type="checkbox" checked> Blue-noise jitter</label> <label><input id="adaptive" type="checkbox" checked> Adaptive steps</label></p>
 <canvas id="volume" aria-label="MRI with refined first-hit surface and interior line probe"></canvas><canvas id="profile" aria-label="Original T1 intensity along the probe"></canvas>
 <p id="status" data-webgpu-status role="status">Loading attributed MRI samples...</p>
 <footer>OpenNeuro ds000030, CC0. <a href="./assets/sciviz/head.json">Source and reduction record</a>. Educational image. Opaque surfaces terminate volume rays at their actual scene depth; moving scene depth invalidates progressive lighting per pixel.</footer>
-<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#volume').then(ok=>ok&&import('./sciviz-volume-quality.ts'));</script></body></html>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#volume').then(ok=>ok&&import('./sciviz-volume-quality.ts'));</script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

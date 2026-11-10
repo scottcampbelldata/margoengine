@@ -8,4 +8,5 @@
 <button id="reset">Reset view</button><p id="status" data-ready="false">Loading original observations...</p><canvas id="plot" aria-label="Spatially aggregated original observations"></canvas>
 <p class="sources">4,096 <a href="https://data.cityofnewyork.us/d/2yzn-sicd">NYC TLC 2015 trips</a>, public data under NYC Open Data terms. 300 CC0 and 300 CC BY 4.0 <a href="https://www.gbif.org/terms">GBIF records</a>; retained records include their dataset, publisher and attribution. These small original extracts load once. Every view then revisits the loaded rows; no points are sampled or fetched on zoom.</p>
 <p class="sources">Binary64 values are summed exactly before one final rounding. The separate scale check repeats original taxi coordinates into 100 million physical rows; it is not a claim of 100 million unique trips.</p>
-</main><script type="module" src="./sciviz-aggregate.ts"></script></body></html>
+</main><script type="module" src="./sciviz-aggregate.ts"></script><script type="module" src="./sciviz-accessibility.ts"></script>
+</body></html>

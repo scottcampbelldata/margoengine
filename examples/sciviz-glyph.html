@@ -1,7 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wind glyphs and displacement warp | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
-<body><header><h1>Wind direction and mesh displacement</h1><p>Instanced glyphs on NOAA wind samples. Vector and scalar warps on the original SEACAS Exodus displacement sample.</p></header>
+<body>
+<main>
+<header><h1>Wind direction and mesh displacement</h1><p>Instanced glyphs on NOAA wind samples. Vector and scalar warps on the original SEACAS Exodus displacement sample.</p></header>
 <div class="controls"><label>Glyph <select id="shape"><option>arrow</option><option>cone</option><option>sphere</option><option>cube</option><option>line</option></select></label><label>Displacement scale <input id="scale" type="range" min="0" max="40" value="20"></label><label>Warp <select id="warp"><option value="vector">Vector displacement</option><option value="scalar">Magnitude along Z</option></select></label></div>
 <div class="view"><canvas id="wind" aria-label="NOAA wind glyphs"></canvas></div><div class="view"><canvas id="displacement" aria-label="SEACAS displacement warp"></canvas></div>
 <p id="status" data-webgpu-status role="status">Loading NOAA and SEACAS data...</p>
 <footer>NOAA NCEP daily mean surface wind, 2024-01-01, US government public domain. SEACAS exomerge standard displacement test, time step 4, BSD-3-Clause. Warp scale exaggerates the supplied displacement; scalar mode uses its magnitude along Z. <a href="https://github.com/sandialabs/seacas">SEACAS</a>.</footer>
-<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#wind').then(ok=>ok&&import('./sciviz-glyph.ts'));</script></body></html>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#wind').then(ok=>ok&&import('./sciviz-glyph.ts'));</script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

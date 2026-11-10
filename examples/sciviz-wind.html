@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./sciviz-demo.css">
 </head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-head.html">MRI head volume</a><a href="./sciviz-stars.html">Star catalogue</a><a href="./sciviz-wind.html" aria-current="page">Wind field</a></nav>
   <header><h1>Wind field</h1><p>Eight daily wind fields over the North Atlantic, January 1-8, 2024. Streamlines trace each day's flow; arrows show its direction and speed. These are daily mean reanalysis fields, not particle trajectories.</p></header>
@@ -28,5 +30,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-wind.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

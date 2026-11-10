@@ -7,7 +7,7 @@ import { colorLookupWGSL, colorTextureData } from './color-lookup.js';
 // opaque. Clip planes cut the volume away; `mode: 'mip'` shows the maximum along each ray instead. Slices are planes
 // through the volume coloured by the same map.
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { f16Bits } from '../../shared/f16.js';
 import {
   extent,
@@ -326,6 +326,14 @@ export function transferTable(map: Colormap, opacity: VolumeLayerOptions['opacit
 
 /** A volume layer. Create it with `figure.volume(data, options)`. */
 export class VolumeLayer implements Drawable {
+  /** Scalar source in data units, borrowed on CPU or read from the GPU. No transfer-function conversion. */
+  async readValues(options: { readonly signal?: AbortSignal } = {}): Promise<ArrayLike<number>> {
+    options.signal?.throwIfAborted();
+    if (this.#disposed) throw fault('disposed', 'Volume disposed; read values before disposal', 'sciviz');
+    const values = isGpuArray(this.#data) ? await this.#data.read(options) : this.#data;
+    options.signal?.throwIfAborted();
+    return values;
+  }
   /** @internal Inventory for the optional monitor entry. */
   get memoryResources(): import('./resources.js').LayerResources {
     return {

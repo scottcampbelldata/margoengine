@@ -1,7 +1,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NASA structured datasets | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
-<body><header><h1>NASA TMR flat-plate grids</h1><p>The original 35 by 25 grid, through PLOT3D, VTK structured, rectilinear and multiblock readers. Colour shows the measured grid coordinate x, not a simulated flow field.</p></header>
+<body>
+<main>
+<header><h1>NASA TMR flat-plate grids</h1><p>The original 35 by 25 grid, through PLOT3D, VTK structured, rectilinear and multiblock readers. Colour shows the measured grid coordinate x, not a simulated flow field.</p></header>
 <div class="controls"><label>Dataset <select id="format"><option value="plot3d">Original PLOT3D 2D</option><option value="vts">VTK structured</option><option value="vtr">VTK rectilinear projection</option><option value="vtm">VTK multiblock</option></select></label></div>
 <div class="view"><canvas id="viewport" aria-label="NASA flat-plate mesh coloured by x coordinate"></canvas></div><p id="status" data-webgpu-status role="status">Loading NASA grid...</p>
 <footer>NASA Turbulence Modeling Resource, US government public domain. VTR uses the original coordinate lines, removing at most 2.01e-12 units of writer roundoff. VTS and PLOT3D retain the original coordinates. VTK files written by VTK 9.7.2. <a href="https://tmbwg.github.io/turbmodels/flatplate_grids.html">Source and grid description</a>.</footer>
-<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#viewport').then(ok=>ok&&import('./sciviz-datasets.ts'));</script></body></html>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#viewport').then(ok=>ok&&import('./sciviz-datasets.ts'));</script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

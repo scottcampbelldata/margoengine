@@ -1296,3 +1296,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 179 job 2): document /share compressed links and limits, pinned data, runtime bundler and standalone export, exact-origin iframe commands/events, lifecycle/cancellation and camera/time deep links.
 - margoengine (batch 179 job 2): document generated sciviz/share alias.
 - @margoengine/viz: document generated sciviz/share forwarding entry after build phase.
+- @margoengine/sciviz (batch 178 job 5): a11y attach/disposal, keyboard focus, native/custom complete table adapters, contrast/motion, explicit sonification, source precision and automated-audit limits.
+
+- margoengine and @margoengine/viz (batch 178 job 5): generated sciviz/a11y alias and explicit optional installation.

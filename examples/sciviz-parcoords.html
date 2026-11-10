@@ -4,4 +4,5 @@
 <p><button id="density">Show pixel density</button><button id="clear">Clear selection</button><button id="undo">Undo</button></p><p id="status" role="status">Loading public observations...</p>
 <section><canvas id="parallel" aria-label="Exoplanet parallel coordinates"></canvas><canvas id="matrix" aria-label="Exoplanet scatter-plot matrix"></canvas></section><div id="controls"></div>
 <p>Axes: orbital period (days), radius (Earth radii), and upper period uncertainty (days). Missing uncertainties interrupt adjacent segments. Colour in density mode is log(1 + line count), with one count per selected row per horizontal pixel. These are repeated observations only in the separate million-row scale test.</p><p><a href="https://exoplanetarchive.ipac.caltech.edu/docs/acknowledge.html">NASA Exoplanet Archive / NExScI / Caltech</a>, public scientific observations. The existing snapshot and its source hash are recorded in <a href="./assets/sciviz/stats/source.json">the data provenance record</a>.</p>
-</main><script type="module" src="./sciviz-parcoords.ts"></script></body></html>
+</main><script type="module" src="./sciviz-parcoords.ts"></script><script type="module" src="./sciviz-accessibility.ts"></script>
+</body></html>

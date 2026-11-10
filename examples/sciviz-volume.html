@@ -8,6 +8,8 @@
   <style>.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:0 0 16px}.controls label{display:flex;gap:8px;align-items:center;color:#d8e4f5}select{font:inherit;background:#263449;color:#edf2fa;border:1px solid #62718b;border-radius:6px;padding:4px 8px}output{min-width:5ch;font-variant-numeric:tabular-nums}</style>
 </head>
 <body>
+<main>
+
   <h1>Volume rendering, slices and GPU isosurfaces</h1>
   <p><code>@margoengine/sciviz</code> · A 160³ field generated on the GPU, ray-marched with a transfer function and gradient lighting. Pick a mode, cut it open with a clip plane, add a slice, or extract an isosurface with marching cubes on the GPU.</p>
   <div class="controls">
@@ -25,5 +27,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-volume.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

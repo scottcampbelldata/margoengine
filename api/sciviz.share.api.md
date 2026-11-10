@@ -272,6 +272,7 @@ class Figure extends EventTarget {
         readonly height: number;
     };
     get axisScales(): readonly [Scale, Scale, Scale];
+    setTheme(theme: Theme, signal?: AbortSignal): Promise<void>;
     setAxes(options: AxesOptions | false, signal?: AbortSignal): Promise<void>;
     setAxisScales(scales: readonly [Scale, Scale, Scale]): void;
     addChartLayer<L extends RectsLayer>(layer: L): L;
@@ -387,7 +388,7 @@ interface FigureLoadOptions extends SpecIOOptions {
 interface FigureOptions extends AxesOptions {
     readonly mode?: '2d' | '3d';
     readonly margin?: Margin;
-    readonly theme?: 'dark' | 'light';
+    readonly theme?: 'dark' | 'light' | Theme;
     readonly axes?: boolean;
     readonly aspect?: readonly [number, number, number];
     readonly limits?: Bounds | readonly [number, number, number, number];
@@ -786,6 +787,9 @@ interface StreamlinesLayerOptions extends FieldStyleOptions, StreamlineOptions {
 }
 
 class SurfaceLayer implements Drawable {
+    readValues(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<ArrayLike<number>>;
     get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly nx: number;
@@ -878,6 +882,9 @@ interface VolumeClassification {
 }
 
 class VolumeLayer implements Drawable {
+    readValues(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<ArrayLike<number>>;
     get memoryResources(): import('./resources.js').LayerResources;
     visible: boolean;
     readonly transparent = true;

@@ -2,6 +2,8 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>North Atlantic wind derivatives | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html">Moving wind</a><a href="./sciviz-lic.html">Wind texture</a><a href="./sciviz-tubes.html">Wind paths</a><a href="./sciviz-derive.html" aria-current="page">Wind derivatives</a></nav>
   <header><h1>North Atlantic wind derivatives</h1><p>Gradient-based diagnostics of NOAA daily mean near-surface winds, January 1-8, 2024. Q measures rotation relative to strain; lambda-2 is the middle eigenvalue of the strain and rotation tensor squares. A local negative lambda-2 value is a diagnostic, not an observed vortex.</p></header>
@@ -14,4 +16,6 @@
   <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
   <footer>NCEP-NCAR Reanalysis 1 from <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. US-government public domain. Native 2.5 degree samples, 100 W to 20 E, 20 N to 65 N, sigma 0.995. Raw east/north velocity in m/s is differentiated on a fixed Cartesian equirectangular grid centred at 42.5 N. This planar approximation omits spherical metric terms, latitude-dependent grid scale, vertical derivatives and subdaily variability. The singleton vertical axis assumes constant velocity with height; no vertical measurements are invented. Values and sign thresholds are not a full atmospheric vortex identification. Colour spans the displayed diagnostic's min/max each time; <a href="./assets/sciviz/README.md">sources, hashes and limits</a>.</footer>
   <script type="module">import { needsWebGPU } from './needs-webgpu.js'; needsWebGPU('#viewport').then(ok => ok && import('./sciviz-derive.ts'));</script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body></html>

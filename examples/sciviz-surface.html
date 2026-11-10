@@ -8,6 +8,8 @@
   <style>.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:0 0 16px}.controls label{display:flex;gap:8px;align-items:center;color:#d8e4f5}select{font:inherit;background:#263449;color:#edf2fa;border:1px solid #62718b;border-radius:6px;padding:4px 8px}</style>
 </head>
 <body>
+<main>
+
   <h1>A surface computed on the GPU, every frame</h1>
   <p><code>@margoengine/sciviz</code> + <code>@margoengine/compute</code> · A 256 × 256 height field of interfering waves, recomputed each frame by one fused GPU kernel and drawn by the surface plot straight from the same buffer: nothing goes back to the CPU. Contours mark even heights; drag to orbit, scroll to zoom.</p>
   <div class="controls">
@@ -22,5 +24,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-surface.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

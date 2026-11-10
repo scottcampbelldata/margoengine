@@ -1,7 +1,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Engineering data | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
-<body><header><h1>Engineering files, in the browser</h1><p>NASA's flat-plate grid and Sandia's can impact mesh, read directly from CGNS and Exodus II. NASA colour shows the x coordinate; the can shows equivalent plastic strain at the first stored time.</p></header>
+<body>
+<main>
+<header><h1>Engineering files, in the browser</h1><p>NASA's flat-plate grid and Sandia's can impact mesh, read directly from CGNS and Exodus II. NASA colour shows the x coordinate; the can shows equivalent plastic strain at the first stored time.</p></header>
 <div class="controls"><label>Dataset <select id="format"><option value="cgns">NASA TMR CGNS</option><option value="exodus">SEACAS Exodus II</option></select></label></div>
 <div class="view"><canvas id="viewport" aria-label="Engineering mesh and scalar field"></canvas></div><p id="status" data-webgpu-status role="status">Loading engineering data...</p>
 <footer>NASA TMR: public domain, converted losslessly from ADF using CGNS CGIO. SEACAS can: Sandia BSD data. <a href="https://tmbwg.github.io/turbmodels/flatplate_grids.html">NASA source</a> · <a href="https://sandialabs.github.io/seacas-docs/">Exodus documentation</a>. Dataset provenance and hashes are in packages/sciviz/tests/fixtures/engineering/source.json.</footer>
-<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#viewport').then(ok=>ok&&import('./sciviz-engineering.ts'));</script></body></html>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#viewport').then(ok=>ok&&import('./sciviz-engineering.ts'));</script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

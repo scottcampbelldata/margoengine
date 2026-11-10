@@ -2,9 +2,12 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live earthquake data | Margo Engine</title>
 <style>body{margin:24px auto;padding:0 24px;max-width:1100px;font:16px/1.5 system-ui;color:#243c4d;background:#f7f9fa}.plot{position:relative;width:100%;height:460px;background:white;border:1px solid #dae2e6}canvas{display:block;width:100%;height:100%}button{font:inherit;padding:7px 12px;margin:5px 4px 16px 0}svg{max-width:100%}[data-chart-legend]{cursor:pointer}</style>
+<main>
 <h1>Earthquakes as they arrive</h1>
 <p>USGS Earthquake Hazards Program, public-domain US government data. <a href="./assets/sciviz/stream/source.json">Snapshot, original feed and SHA-256</a>. Replay uses the frozen real observations in time order. Live mode polls the official feed every minute and applies observed revisions by event ID. Stop cancels the network request or interval.</p>
 <p>Both native traces have a 64-event rollover. The six-hour time window scrolls smoothly; hover and SVG retain original time and magnitude units.</p>
 <button id="next">Next 10 events</button><button id="replay">Replay snapshot</button><button id="live">Live USGS feed</button><button id="stop">Stop</button><button id="export">Download SVG</button>
 <p id="status" role="status">Loading USGS observations</p><div class="plot"><canvas id="viewport"></canvas></div>
-<script type="module" src="./sciviz-stream.ts"></script></html>
+<script type="module" src="./sciviz-stream.ts"></script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</html>

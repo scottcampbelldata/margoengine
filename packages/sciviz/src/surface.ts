@@ -118,6 +118,14 @@ fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
 
 /** A surface plot layer. Create it with `figure.surface(z, options)`. */
 export class SurfaceLayer implements Drawable {
+  /** Scalar source in data units, borrowed on CPU or read from the GPU. No normalization or quantization. */
+  async readValues(options: { readonly signal?: AbortSignal } = {}): Promise<ArrayLike<number>> {
+    options.signal?.throwIfAborted();
+    if (this.#disposed) throw fault('disposed', 'Surface disposed; read values before disposal', 'sciviz');
+    const values = isGpuArray(this.#data) ? await this.#data.read(options) : this.#data;
+    options.signal?.throwIfAborted();
+    return values;
+  }
   /** @internal Inventory for the optional monitor entry. Borrowed GPU input is included by identity. */
   get memoryResources(): import('./resources.js').LayerResources {
     return {

@@ -8,6 +8,8 @@
   <style>.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:0 0 16px}.controls label{display:flex;gap:8px;align-items:center;color:#d8e4f5}select{font:inherit;background:#263449;color:#edf2fa;border:1px solid #62718b;border-radius:6px;padding:4px 8px}</style>
 </head>
 <body>
+<main>
+
   <h1>Millions of points with level of detail</h1>
   <p><code>@margoengine/sciviz</code> + <code>@margoengine/compute</code> · A seeded Gaussian mixture sampled on the GPU, coloured by distance from its cluster centre. The point budget draws an even sample of the cloud each frame, so orbiting stays smooth at any size.</p>
   <div class="controls">
@@ -24,5 +26,7 @@
     import { needsWebGPU } from './needs-webgpu.js';
     needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-points.ts'));
   </script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>

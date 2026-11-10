@@ -1,9 +1,13 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LIGO publication export | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css">
-<body><header><h1>GW150914, ready for a paper</h1><p>Observed Hanford strain from LIGO's discovery figure, with a formula title and vector PDF export.</p></header>
+<body>
+<main>
+<header><h1>GW150914, ready for a paper</h1><p>Observed Hanford strain from LIGO's discovery figure, with a formula title and vector PDF export.</p></header>
 <div class="controls"><button id="pdf" type="button">Save PDF</button><button id="svg" type="button">Save SVG</button></div>
 <div class="view"><canvas id="viewport" aria-label="Observed LIGO Hanford strain versus time"></canvas></div>
 <p id="status" role="status">Loading LIGO data...</p><div id="formula" aria-label="Math subset examples"></div>
 <footer>LIGO Scientific Collaboration and Virgo Collaboration, GW150914 Figure 1 observed H1 strain, CC BY 4.0. Values are the complete published data, in units of 10⁻²¹. DejaVu Serif 2.37, Bitstream Vera license and public domain additions. <a href="./assets/sciviz/publication/source.json">Data and font provenance</a>.</footer>
-<script type="module" src="./sciviz-publication.ts"></script></body></html>
+<script type="module" src="./sciviz-publication.ts"></script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

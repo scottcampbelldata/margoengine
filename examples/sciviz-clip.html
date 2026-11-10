@@ -1,6 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clip and threshold | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"><style>.views{display:grid;grid-template-columns:1fr 1fr;gap:16px}.views canvas{width:100%;height:420px}@media(max-width:700px){.views{grid-template-columns:1fr}}</style></head>
-<body><header><h1>Clip and threshold scientific data</h1><p>Whole CT cells selected by calibrated Hounsfield units, beside an exact piecewise-linear cut of the published NASA FUN3D surface slice.</p></header>
+<body>
+<main>
+<header><h1>Clip and threshold scientific data</h1><p>Whole CT cells selected by calibrated Hounsfield units, beside an exact piecewise-linear cut of the published NASA FUN3D surface slice.</p></header>
 <div class="controls"><label>CT lower threshold (HU) <input id="threshold" type="range" min="150" max="1500" step="50" value="300"></label><span>CT colour: maximum vertex HU in each selected cell.</span></div>
 <div class="views"><section><h2>TCIA CT-ORG case 0</h2><canvas id="ct" aria-label="CT cells selected by Hounsfield unit threshold"></canvas></section><section><h2>NASA eddy viscosity cut at z = 0.08</h2><canvas id="nasa" aria-label="Clipped FUN3D eddy viscosity slice"></canvas></section></div><p id="status" data-webgpu-status role="status">Loading attributed data...</p>
 <footer>The CT view uses original samples at strides 8, 8, 4 from TCIA CT-ORG case 0, <a href="https://doi.org/10.7937/tcia.2019.tt7f4v7o">Rister et al., 2019</a>, <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>. A threshold is a scalar selection, not a validated anatomical segmentation. NASA FUN3D SA bump data is US government public domain. Source hashes, transformations and sampling bounds accompany both assets.</footer>
-<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#ct').then(ok=>ok&&import('./sciviz-clip.ts'));</script></body></html>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#ct').then(ok=>ok&&import('./sciviz-clip.ts'));</script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

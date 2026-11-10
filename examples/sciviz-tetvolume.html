@@ -1,7 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Direct tetrahedral volumes | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"><style>canvas{width:100%;height:430px}.views{display:grid;grid-template-columns:1fr 1fr;gap:20px}@media(max-width:800px){.views{grid-template-columns:1fr}}</style></head><body>
+<main>
+
 <header><h1>Walking through tetrahedra</h1><p>NASA TMR flat-plate eddy viscosity, directly reconstructed inside 6,048 tetrahedra and compared with a regular image resampled from those same cells.</p></header>
 <p><label>View <select id="mode"><option value="composite">Composite</option><option value="mip">Maximum intensity</option></select></label> <label>Density <input id="density" type="range" min="0.1" max="4" step="0.1" value="1"></label></p>
 <div class="views"><section><h2>Original tetrahedral cells</h2><canvas id="direct" aria-label="Direct tetrahedral ray casting of NASA TMR solution"></canvas></section><section><h2>Resampled regular image</h2><canvas id="reference" aria-label="Regular resampling of the same tetrahedral scalar field"></canvas></section></div>
 <p id="status" data-webgpu-status role="status">Loading NASA solution...</p>
 <footer>This is NASA's two-dimensional SA flat-plate solution, shown as a span-invariant volume, not a new 3D simulation. Original cell-centre samples become reconstruction nodes, height is exaggerated 12 times and the display span is 0.5. US Federal Government public-domain data, modified for this demo; no NASA endorsement. <a href="./assets/sciviz/tmr-tet.json">Source, transformations and hashes</a>.</footer>
-<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#direct').then(ok=>ok&&import('./sciviz-tetvolume.ts'));</script></body></html>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#direct').then(ok=>ok&&import('./sciviz-tetvolume.ts'));</script><script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
+</body></html>

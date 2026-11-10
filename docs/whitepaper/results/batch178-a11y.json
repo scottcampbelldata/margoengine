@@ -1,0 +1,326 @@
+{
+  "version": "13.6.0",
+  "browser": "Edg/157.0.4341.42",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "method": "Loaded-page accessibility snapshots after complete accessible data readiness; no audits disabled",
+  "reports": [
+    {
+      "page": "sciviz-a11y.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-aggregate.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-amr.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-annotate.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-astronomy.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-atmosphere.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-calc.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-chart-polish.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-charts-extra.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-cinematic.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-clip.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-cloud.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-colors.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-contour.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-contour2d.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-curvilinear.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-datasets.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-derive.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-engineering.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-export-vector.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-formats.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-geo-lod.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-geo-time.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-geo-vector.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-glyph.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-head.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-labels.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-lic.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-moving-flow.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-parcoords.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-pick-gpu.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-pipeline.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-pointcloud.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-points.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-probe.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-publication.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-query.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-share.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-stars.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-stats.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-stream.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-surface.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-tetvolume.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-tlc.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-transfer.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-tubes.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-views.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-volume-quality.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-volume.html",
+      "score": 1,
+      "failures": []
+    },
+    {
+      "page": "sciviz-wind.html",
+      "score": 1,
+      "failures": []
+    }
+  ],
+  "job": "batch178-job5",
+  "sizes": {
+    "index": {
+      "before": 60026,
+      "after": 61010
+    },
+    "a11y": {
+      "before": 0,
+      "after": 6233
+    },
+    "format": {
+      "before": 7306,
+      "after": 7598
+    },
+    "spec": {
+      "before": 27106,
+      "after": 27127
+    },
+    "coreStage": {
+      "before": 24209,
+      "after": 24209
+    }
+  },
+  "nativeCompat": [
+    {
+      "backend": "webgpu",
+      "ligo": 3441,
+      "weather": 366,
+      "camera": [
+        0,
+        10,
+        0
+      ],
+      "contexts": 1,
+      "closed": 1,
+      "scalarCount": 64,
+      "gpuCount": 16,
+      "exactAbort": true
+    },
+    {
+      "backend": "webgl2",
+      "ligo": 3441,
+      "weather": 366,
+      "camera": [
+        0,
+        10,
+        0
+      ],
+      "contexts": 1,
+      "closed": 1,
+      "scalarCount": 64,
+      "gpuCount": 16,
+      "exactAbort": true
+    }
+  ],
+  "limits": "Automated loaded-page scores are not manual screen-reader certification. Unsupported native layer kinds require application row adapters. Audio rejects above its configured event budget, never truncates.",
+  "rebasedGzip": {
+    "index": 61327,
+    "a11y": 6233,
+    "format": 7598,
+    "spec": 27443,
+    "coreStage": 24209
+  },
+  "auditIntegration": "Original 43-page complete run plus the 5 pages newly added on rebased main; all score 100 after complete source readiness. Final native/compatibility a11y test repeated after integration.",
+  "shareFixture": "sciviz-share.html is opened with an actual createShareURL link from the frozen LIGO figure, its required input."
+}

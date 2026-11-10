@@ -2,6 +2,8 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>NOAA wind files | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
 <body>
+<main>
+
   <!-- Margo engine ❤️ made for Margie -->
   <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-formats.html" aria-current="page">Wind files</a></nav>
   <header><h1>NOAA wind files</h1><p>The same 200 measured daily mean eastward wind samples, read from NetCDF classic, 64-bit offset and VTK files written by the format owners. January 1-8, 2024, 100 W to 90 W, 20 N to 30 N. The third axis is day index, not altitude. Interpolation between daily means is a drawing aid.</p></header>
@@ -10,5 +12,7 @@
   <p id="status" role="status" data-webgpu-status>Loading wind files...</p>
   <footer>NOAA PSL NCEP-NCAR Reanalysis 1. US-government public domain. Colour is eastward wind in m/s, including negative westward flow. Grid surfaces show the outside of the data cube; volumes show the interior. The files preserve all selected native samples, without resampling. <a href="./assets/sciviz/README.md">Source, hashes, writer versions and limitations</a>.</footer>
   <script type="module">import { needsWebGPU } from './needs-webgpu.js'; needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-formats.ts'));</script>
+<script type="module" src="./sciviz-accessibility.ts"></script>
+</main>
 </body>
 </html>
