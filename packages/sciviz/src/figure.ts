@@ -25,6 +25,7 @@ import { Timeline, type TimelineFrame, type PlayOptions, type TimelineOptions } 
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
+import { publicationLabels, disposePublicationLabels } from './publication-labels.js';
 import { projectPoint } from '@margoengine/math/mat4';
 import {
   dataToScene,
@@ -1374,6 +1375,7 @@ export class Figure extends EventTarget {
 
   #overlayRoots(): Element[] {
     return [
+      ...publicationLabels(this),
       ...(this.#axes?.elements() ?? []),
       ...[...this.#bars].map((b) => b.element),
       ...(this.#legend && !this.#legend.element.hidden ? [this.#legend.element] : []),
@@ -1631,6 +1633,7 @@ export class Figure extends EventTarget {
 
   /** Frees every layer, the axes and colour bars, and the engine when the figure created it. */
   dispose(): void {
+    disposePublicationLabels(this);
     if (this.#disposed) return;
     this.#disposed = true;
     for (const layer of [...this.#layers]) this.#free(layer);

@@ -7577,6 +7577,12 @@
       "commit": "batch-174-job2",
       "reason": "New optional sciviz/table 0 to 12324 B (ceiling 12694), decoders/snappy 0 to 1250 B (ceiling 1506). Complete scalar format readers, indexed filters and deterministic GPU bins share typed identity; splitting complicates use. Core + stage remains 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "4dd42884e",
+      "reason": "Batch 178 job 2: new optional math 0 to 4750 B and PDF 0 to 5434 B min+gzip; ceilings 5002 and 5700 B. Parser/layout and PDF object/graphics ownership stay together; splitting would fragment shared text outlining and export lifetimes. Core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8951,7 +8957,9 @@
     "@margoengine/sciviz/charts-extra": 7548,
     "@margoengine/compute/nn-extra": 21486,
     "@margoengine/decoders/snappy": 1506,
-    "@margoengine/sciviz/table": 12694
+    "@margoengine/sciviz/table": 12694,
+    "@margoengine/sciviz/math": 5002,
+    "@margoengine/sciviz/pdf": 5700
   },
-  "total": 14324916
+  "total": 14335618
 }

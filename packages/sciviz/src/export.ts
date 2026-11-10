@@ -72,6 +72,8 @@ export interface PaintedBar {
 
 /** @internal One text run on screen: its text, box (CSS pixels from the canvas's top-left) and style. */
 export interface TextRun {
+  /** @internal Optional outline prepared by the math entry. */
+  readonly math?: { readonly path: string; readonly width: number; readonly height: number };
   readonly text: string;
   readonly x: number;
   readonly y: number;
@@ -90,11 +92,33 @@ export function textRuns(roots: readonly Element[], origin: DOMRect): TextRun[] 
   const runs: TextRun[] = [];
   for (const root of roots) {
     if (!root.isConnected) continue;
+    for (const element of [root, ...root.querySelectorAll('[data-sciviz-math]')]) {
+      const value = element.getAttribute('data-sciviz-math');
+      if (!value || element.closest('[hidden]')) continue;
+      const style = getComputedStyle(element),
+        r = element.getBoundingClientRect();
+      if (!r.width || !r.height || style.visibility === 'hidden' || style.display === 'none') continue;
+      runs.push({
+        text: '',
+        x: r.left - origin.left,
+        y: r.top - origin.top,
+        width: r.width,
+        height: r.height,
+        font: '',
+        size: 0,
+        family: '',
+        weight: '',
+        color: style.color,
+        vertical: false,
+        math: JSON.parse(value),
+      });
+    }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = node.textContent?.trim();
       const parent = node.parentElement;
       if (!text || !parent) continue;
+      if (parent.closest('[data-sciviz-math]')) continue;
       const style = getComputedStyle(parent);
       if (style.visibility === 'hidden' || style.display === 'none' || parent.closest('[hidden]')) continue;
       const range = document.createRange();
@@ -187,6 +211,15 @@ export function paintOverlays(
   }
   g.textBaseline = 'middle';
   for (const run of runs) {
+    if (run.math) {
+      g.save();
+      g.translate(run.x, run.y);
+      g.scale(run.width / run.math.width, run.height / run.math.height);
+      g.fillStyle = run.color;
+      g.fill(new Path2D(run.math.path));
+      g.restore();
+      continue;
+    }
     g.font = run.font;
     g.fillStyle = run.color;
     if (run.vertical) {
@@ -212,6 +245,8 @@ const escape = (s: string): string =>
 export function svgText(runs: readonly TextRun[]): string {
   return runs
     .map((run) => {
+      if (run.math)
+        return `<svg x="${run.x}" y="${run.y}" width="${run.width}" height="${run.height}" viewBox="0 0 ${run.math.width} ${run.math.height}" preserveAspectRatio="none"><path d="${escape(run.math.path)}" fill="${escape(run.color)}"/></svg>`;
       const style = `font-family="${escape(run.family)}" font-size="${run.size}" font-weight="${escape(run.weight)}" fill="${escape(run.color)}"`;
       if (run.vertical) {
         const cx = run.x + run.width / 2,

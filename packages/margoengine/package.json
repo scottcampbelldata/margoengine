@@ -1047,6 +1047,10 @@
       "types": "./dist/decoders/lzfse.d.ts",
       "import": "./dist/decoders/lzfse.js"
     },
+    "./decoders/snappy": {
+      "types": "./dist/decoders/snappy.d.ts",
+      "import": "./dist/decoders/snappy.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"
@@ -3479,6 +3483,18 @@
       "types": "./dist/sciviz/charts-extra.d.ts",
       "import": "./dist/sciviz/charts-extra.js"
     },
+    "./sciviz/table": {
+      "types": "./dist/sciviz/table.d.ts",
+      "import": "./dist/sciviz/table.js"
+    },
+    "./sciviz/math": {
+      "types": "./dist/sciviz/math.d.ts",
+      "import": "./dist/sciviz/math.js"
+    },
+    "./sciviz/pdf": {
+      "types": "./dist/sciviz/pdf.d.ts",
+      "import": "./dist/sciviz/pdf.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -4998,14 +5014,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./decoders/snappy": {
-      "types": "./dist/decoders/snappy.d.ts",
-      "import": "./dist/decoders/snappy.js"
-    },
-    "./sciviz/table": {
-      "types": "./dist/sciviz/table.d.ts",
-      "import": "./dist/sciviz/table.js"
     }
   },
   "dependencies": {

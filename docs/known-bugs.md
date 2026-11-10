@@ -4927,3 +4927,5 @@ Batch 274 fix-phase API polish: Module.stateDict() and Tensor.read() in compute/
 The original fourteen packages were repaired by 68b55c2ed. The later umbrella package added tests/export-order.test.js without scripts.test, reproducing the same class: node --test tests/package-test-scripts.test.js reported the missing file. Its manifest now runs every tests/*.test.js file. Existing regression: tests/package-test-scripts.test.js, which failed before the manifest change.
 
 The rebased cube-projector alias was appended after the umbrella kits, failing the existing generated-manifest and package export-order checks. Running scripts/umbrella.mjs restores its owning package position without changing the export set.
+## Batch 178 PDF and math
+No open correctness defect in the documented TeX subset or figure-SVG PDF contract after CPU, both-backend browser and independent MuPDF checks. Font-specific math spacing and variant glyph assembly are accepted appearance differences, tracked in the private finish-phase handoff.

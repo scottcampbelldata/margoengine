@@ -1067,3 +1067,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 174 job 2): table readers, physical types/nulls, indexed range/set filters, GPU/CPU aggregates, linked chart binding, TLC demo and format/numerical limits.
 - @margoengine/decoders (batch 174 job 2): raw Snappy and bounded lazy columnar block codecs, cancellation and decoded-size limits.
+- @margoengine/sciviz (batch 178 job 2): document /pdf and /math, caller-owned font coverage, metadata/physical sizing, TeX subset, native MathML and shared PNG/SVG/PDF formula overlays, disposal and accepted layout differences; examples deferred.
+- margoengine (batch 178 job 2): document generated sciviz/math and sciviz/pdf aliases; examples deferred.

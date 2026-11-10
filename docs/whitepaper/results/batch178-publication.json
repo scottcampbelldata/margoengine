@@ -1,0 +1,144 @@
+[
+  {
+    "file": "ligo-webgl2.pdf",
+    "pages": 1,
+    "drawings": 12,
+    "images": 0,
+    "repaired": false,
+    "title": "GW150914 Hanford strain"
+  },
+  {
+    "file": "ligo-webgpu.pdf",
+    "pages": 1,
+    "drawings": 12,
+    "images": 0,
+    "repaired": false,
+    "title": "GW150914 Hanford strain"
+  },
+  {
+    "file": "matrix-webgl2.pdf",
+    "pages": 1,
+    "drawings": 1,
+    "images": 0,
+    "repaired": false,
+    "title": ""
+  },
+  {
+    "file": "matrix-webgpu.pdf",
+    "pages": 1,
+    "drawings": 1,
+    "images": 0,
+    "repaired": false,
+    "title": ""
+  },
+  {
+    "file": "mixed-webgl2.pdf",
+    "pages": 1,
+    "drawings": 3,
+    "images": 1,
+    "repaired": false,
+    "title": "",
+    "pixels": {
+      "gradientRed": [
+        253,
+        2,
+        0
+      ],
+      "gradientGreen": [
+        0,
+        254,
+        0
+      ],
+      "gradientBlue": [
+        0,
+        3,
+        251
+      ],
+      "clipInside": [
+        255,
+        128,
+        128
+      ],
+      "clipOutside": [
+        255,
+        255,
+        255
+      ],
+      "imageRed": [
+        255,
+        0,
+        0
+      ],
+      "imageGreen": [
+        0,
+        255,
+        0
+      ],
+      "imageBlue": [
+        0,
+        0,
+        255
+      ],
+      "imageAlpha": [
+        126,
+        126,
+        126
+      ]
+    }
+  },
+  {
+    "file": "mixed-webgpu.pdf",
+    "pages": 1,
+    "drawings": 3,
+    "images": 1,
+    "repaired": false,
+    "title": "",
+    "pixels": {
+      "gradientRed": [
+        253,
+        2,
+        0
+      ],
+      "gradientGreen": [
+        0,
+        254,
+        0
+      ],
+      "gradientBlue": [
+        0,
+        3,
+        251
+      ],
+      "clipInside": [
+        255,
+        128,
+        128
+      ],
+      "clipOutside": [
+        255,
+        255,
+        255
+      ],
+      "imageRed": [
+        255,
+        0,
+        0
+      ],
+      "imageGreen": [
+        0,
+        255,
+        0
+      ],
+      "imageBlue": [
+        0,
+        0,
+        255
+      ],
+      "imageAlpha": [
+        126,
+        126,
+        126
+      ]
+    }
+  }
+]

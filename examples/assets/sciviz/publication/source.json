@@ -1,0 +1,22 @@
+{
+  "strain": {
+    "source": "https://gwosc.org/GW150914data/P150914/fig1-observed-H.txt",
+    "title": "GW150914 observed H1 strain, Figure 1",
+    "authors": "LIGO Scientific Collaboration and Virgo Collaboration",
+    "license": "CC BY 4.0",
+    "licenseURL": "https://gwosc.org/about/",
+    "columns": [
+      "time in seconds",
+      "strain multiplied by 1e21"
+    ],
+    "processing": "None. Complete published Figure 1 data.",
+    "sha256": "3ce5475160fd6b39c41205c2055bfaf4e507981721a2eb4c5df0c99e2fa48d94"
+  },
+  "font": {
+    "source": "https://downloads.sourceforge.net/project/dejavu/dejavu/2.37/dejavu-fonts-ttf-2.37.zip",
+    "title": "DejaVu Serif 2.37",
+    "license": "Bitstream Vera license, DejaVu additions public domain; see LICENSE",
+    "processing": "Unmodified standard font binary.",
+    "sha256": "42d1edeb7952f31b1f96d767ed7030b08a39e0c372b0071641518864e2bffb51"
+  }
+}
