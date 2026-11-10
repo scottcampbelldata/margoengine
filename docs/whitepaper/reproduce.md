@@ -3521,3 +3521,4 @@ Batch 241 job 3: after npm run build:packages, run node --test packages/decoders
 
 ## Batch 185 array texture sampling
 After build:packages run node --test packages/shader/test/texture-array.test.js. Under a shared GPU lock run node packages/shader/test/texture-array-check.mjs, then the same command with --compat. The fixture has 32 distinct RGBA8 layers; each material pixel matches its encoded source, all computed RGBA values exactly equal sampling an independent 32x1 2D sRGB texture, and -1/4294967295u select the first/last layer. Post samples and the missing-source white array are checked too. No benchmark runs.
+Batch 191 job 2: node --test --test-timeout=120000 packages/post/test/mask.test.js after build. Pixel check: node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/mask-browser.mjs, then repeat with --compat. Original analytic two-tone scene and binary mask need no downloaded assets.

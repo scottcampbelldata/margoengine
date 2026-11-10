@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13868083,
+  "total": 13874345,
   "history": [
     {
       "date": "2026-10-24",
@@ -7298,6 +7298,12 @@
       "commit": "batch-185-job-4",
       "reason": "New optional shader/texture-array 0 to 3186 B gzip, ceiling 3442 B. Shared texture resource and node compiler retain one binding pair for all layers; splitting adds no saving. Shader root 18572 to 18613 B and serialization 19296 to 19489 B remain within ceilings. Core/stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-191-job-2",
+      "reason": "New optional post/mask: 0 to 6006 B gzip. The wrapper preserves shared capture ownership, custom stage views and coverage compositing; splitting would duplicate lifecycle and colour boundary logic. Core plus stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8622,6 +8628,7 @@
     "@margoengine/vfx/schedule": 1198,
     "@margoengine/decoders/lzfse": 2551,
     "@margoengine/voxel-edit/formats-extra": 5190,
-    "@margoengine/shader/texture-array": 3442
+    "@margoengine/shader/texture-array": 3442,
+    "@margoengine/post/mask": 6262
   }
 }

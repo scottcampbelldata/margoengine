@@ -28,7 +28,7 @@
   "scripts": {
     "test": "node --test test/*.test.js ../../tests/modern-scene-fade-lifecycle.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs && node packages/post/test/contact-shadows-browser.mjs && node packages/post/test/sss-browser.mjs && node packages/post/test/material-decals-browser.mjs && node packages/post/test/decals-cull-browser.mjs && node packages/post/test/ssr-rough-browser.mjs && node packages/post/test/ssgi-bounce-browser.mjs && node packages/post/test/anamorphic-browser.mjs && node packages/post/test/blur-browser.mjs && node packages/post/test/lens-browser.mjs && node packages/post/test/selective-bloom-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs && node packages/post/test/contact-shadows-browser.mjs && node packages/post/test/sss-browser.mjs && node packages/post/test/material-decals-browser.mjs && node packages/post/test/decals-cull-browser.mjs && node packages/post/test/ssr-rough-browser.mjs && node packages/post/test/ssgi-bounce-browser.mjs && node packages/post/test/anamorphic-browser.mjs && node packages/post/test/blur-browser.mjs && node packages/post/test/lens-browser.mjs && node packages/post/test/selective-bloom-browser.mjs && node packages/post/test/mask-browser.mjs",
     "test:gpu:looks": "cd ../.. && node scripts/post-looks-gpu-check.js"
   },
   "sideEffects": false,
@@ -136,6 +136,10 @@
     "./selective-bloom": {
       "types": "./dist/selective-bloom.d.ts",
       "import": "./dist/selective-bloom.js"
+    },
+    "./mask": {
+      "types": "./dist/mask.d.ts",
+      "import": "./dist/mask.js"
     }
   },
   "files": [

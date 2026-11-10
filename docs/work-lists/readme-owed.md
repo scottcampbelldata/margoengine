@@ -893,3 +893,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 241 job 3): document generated voxel-edit/formats-extra and decoders/lzfse aliases during the README phase.
 - @margoengine/shader (batch 185 job 4): textureArray source/layer/UV/level, all hosts, one binding pair, native/compatibility paths and codec restoration.
 - margoengine (batch 185 job 4): generated shader/texture-array alias.
+- @margoengine/post: document EffectMask ownership, external object-mask callbacks and ordering, coverage/id/inversion/opacity, output masking versus SelectiveBloom source masking, and custom effects.
