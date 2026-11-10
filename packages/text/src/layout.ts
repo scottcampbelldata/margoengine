@@ -94,6 +94,10 @@ export interface LayoutLine {
 
 /** Result of `layoutText`: positioned glyphs and lines. Lengths are in world units. */
 export interface TextLayout {
+  /** Optional cylinder radius from text/curve; zero is flat. */
+  curveRadius?: number;
+  /** Optional horizontal glyph subdivisions from text/curve. */
+  curveSegments?: number;
   /** Optional fragment clip [left, bottom, right, top], supplied by the fit entry. */
   clipRect?: readonly [number, number, number, number];
   /** The source string. */

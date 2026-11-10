@@ -42,6 +42,8 @@ interface LayoutLine {
 }
 
 interface TextLayout {
+    curveRadius?: number;
+    curveSegments?: number;
     clipRect?: readonly [number, number, number, number];
     text: string;
     glyphs: LayoutGlyph[];

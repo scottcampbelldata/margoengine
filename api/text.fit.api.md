@@ -187,6 +187,8 @@ type TextAlign = 'left' | 'center' | 'right' | 'justify';
 type TextDirection = 'ltr' | 'rtl' | 'auto';
 
 interface TextLayout {
+    curveRadius?: number;
+    curveSegments?: number;
     clipRect?: readonly [number, number, number, number];
     text: string;
     glyphs: LayoutGlyph[];

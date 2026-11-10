@@ -456,8 +456,8 @@ export class TextRenderer implements EnginePlugin {
       u[35] = text.billboard ? 1 : 0;
       f[36] = text.font.radius;
       f[37] = text.font.cutoff;
-      f[38] = 0;
-      f[39] = 0;
+      f[38] = layout.curveRadius ?? 0;
+      f[39] = layout.curveSegments ?? 1;
       let changed = false;
       f.set(layout.clipRect ?? [-3.4e38, -3.4e38, 3.4e38, 3.4e38], 40);
       for (let i = 0; i < 44; i++)
@@ -508,7 +508,7 @@ export class TextRenderer implements EnginePlugin {
       pass.setPipeline(this.pipeline(context.format, depthFormat, onTop, context.descriptor.multisample?.count ?? 1));
       for (const [, r] of list) {
         pass.setBindGroup(1, r.group);
-        pass.draw(6, r.count * r.uints[33]);
+        pass.draw(6 * r.floats[39], r.count * r.uints[33]);
         this.stats.drawCalls++;
       }
     }

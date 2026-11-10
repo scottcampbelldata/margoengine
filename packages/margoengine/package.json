@@ -3754,6 +3754,10 @@
       "types": "./dist/text/selection.d.ts",
       "import": "./dist/text/selection.js"
     },
+    "./text/curve": {
+      "types": "./dist/text/curve.d.ts",
+      "import": "./dist/text/curve.js"
+    },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
       "import": "./dist/tilemap.js"

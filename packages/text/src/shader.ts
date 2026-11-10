@@ -27,21 +27,31 @@ struct Out {
   let g = glyphs[ii % n];
   let kind = (block.info.z >> (2u * layer)) & 3u;
   // Two triangles: corners 0 (0,0), 1 (1,0), 2 (0,1), 3 (0,1), 4 (1,0), 5 (1,1).
-  let c = vec2f(f32((0x32u >> vi) & 1u), f32((0x2cu >> vi) & 1u));
+  let corner = vi % 6u;
+  let segments = max(u32(block.sdf.w), 1u);
+  let c = vec2f((f32(vi / 6u) + f32((0x32u >> corner) & 1u)) / f32(segments), f32((0x2cu >> corner) & 1u));
   var local = mix(g.rect.xy, g.rect.zw, c);
   if (kind == 0u) { local += block.params.zw; }
+  let clipLocal = local;
+  var depth = 0.0;
+  if (block.sdf.z != 0.0) {
+    let angle = local.x / block.sdf.z;
+    local.x = block.sdf.z * sin(angle);
+    let halfSin = sin(0.5 * angle);
+    depth = 2.0 * block.sdf.z * halfSin * halfSin;
+  }
   var world: vec4f;
   if ((block.info.w & 1u) != 0u) {
     let sx = length(block.model[0].xyz);
     let sy = length(block.model[1].xyz);
-    world = vec4f(block.model[3].xyz + frame.right.xyz * (local.x * sx) + frame.up.xyz * (local.y * sy), 1.0);
+    world = vec4f(block.model[3].xyz + frame.right.xyz * (local.x * sx) + frame.up.xyz * (local.y * sy) + cross(frame.right.xyz, frame.up.xyz) * (depth * sx), 1.0);
   } else {
-    world = block.model * vec4f(local, 0.0, 1.0);
+    world = block.model * vec4f(local, depth, 1.0);
   }
   var o: Out;
   o.clip = frame.viewProj * world;
   o.uv = vec2f(mix(g.uv.x, g.uv.z, c.x), mix(g.uv.w, g.uv.y, c.y));
-  o.local = local;
+  o.local = clipLocal;
   o.page = g.info.x;
   o.kind = kind | (g.info.y << 2u);
   return o;

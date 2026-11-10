@@ -3909,3 +3909,6 @@ The optional lod-sog entry adapts streamed SOG v1 into SplatLodSource, including
 ### Batch 196 stereo output
 
 Claim: cameras/stereo provides the four requested non-XR output layouts with parallel off-axis eye geometry, focus convergence and one scene update per pair. CPU proof: cameras/test/stereo.test.js (both depth conventions, vertical views, orthographic hooks, infinite focus and constructor configuration). GPU proof: stereo-browser.mjs compares each packing mode and eye swap to independent eyes, evaluates the published Dubois coefficients in linear RGB, checks stripe axis/parity, resize, reboot and disposal on WebGPU and WebGL2 compatibility. Sources and rival API rows are in docs/clean-room.md. No speed or hardware-optics calibration claim.
+
+### Batch 248 job 4: cylindrical and path text
+The optional curve entry covers Troika's documented signed cylinder radius plus horizontal glyph detail, and adds arc-length path frames with start offsets. Numeric proof lives in packages/text/tests/curve.test.js; the existing text browser suite verifies actual bent pixels in one draw and separately verifies path glyph draws on both backends. Path frames provide glyph alignment, while the cylinder deforms subdivided glyph geometry. This does not claim SVG parsing or arbitrary-path glyph warping.

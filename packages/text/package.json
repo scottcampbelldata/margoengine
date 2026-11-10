@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test --test-timeout=240000 tests/msdf.test.js tests/selection.test.js tests/fit.test.js tests/text.test.js tests/sdf.test.js tests/compose.test.js tests/rich.test.js tests/animate.test.js tests/extrude*.test.js",
+    "test": "npm run build && node --test --test-timeout=240000 tests/curve.test.js tests/msdf.test.js tests/selection.test.js tests/fit.test.js tests/text.test.js tests/sdf.test.js tests/compose.test.js tests/rich.test.js tests/animate.test.js tests/extrude*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },
@@ -58,6 +58,10 @@
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
+    },
+    "./curve": {
+      "types": "./dist/curve.d.ts",
+      "import": "./dist/curve.js"
     }
   },
   "files": [

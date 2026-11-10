@@ -725,3 +725,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/cameras | stereo: StereoRig, StereoOutput.render in an app loop, four modes, geometry, layers, swap, stripe parity, disposal and resize behaviour | batch-196 job 2 |
 | margoengine | cameras/stereo alias | batch-196 job 2 |
+
+- @margoengine/text (batch 248 job 4): document /curve CurvedText, signed radius, subdivisions, unwrapped caret coordinates, PathText frames/offset/closure, update and lifecycle.
+- margoengine (batch 248 job 4): document text/curve forwarding.

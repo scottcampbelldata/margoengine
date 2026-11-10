@@ -213,6 +213,8 @@ export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 export type TextDirection = 'ltr' | 'rtl' | 'auto';
 
 export interface TextLayout {
+    curveRadius?: number;
+    curveSegments?: number;
     clipRect?: readonly [number, number, number, number];
     text: string;
     glyphs: LayoutGlyph[];

@@ -285,6 +285,27 @@ window.runTextTests = async () => {
     'Real font multiline bidi selection must produce valid rectangles');
   report.checks.push('Selection rectangles span wrapped real-font text and bidi runs');
 
+  const { CurvedText, PathText } = await import('@margoengine/text/curve');
+  label.visible = false;
+  const curved = renderer.add(new CurvedText({ text: 'Margo curve', font, fontSize: 1.2,
+    curveRadius: Infinity, curveSegments: 12, anchorX: 'center', anchorY: 'middle' }));
+  const flatImage = await frame();
+  curved.curveRadius = 2.5;
+  image = await frame();
+  let curvedDifference = 0;
+  for (let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) if(Math.abs(flatImage.at(x,y)[0]-image.at(x,y)[0])>80) curvedDifference++;
+  assert(ink(image).count > 100 && curvedDifference > 100 && renderer.stats.drawCalls === 1,
+    `Subdivided cylinder must change actual pixels in one draw: ${curvedDifference}`);
+  curved.dispose();
+  const alongPath = new PathText({ text: 'Path text', font, fontSize: 0.8,
+    path: { length: 10, sample: d => ({ position: [d-2,0.3*Math.sin(d),0],
+      tangent: [1,0.3*Math.cos(d),0], normal: [-0.3*Math.cos(d),1,0] }) } }).addTo(renderer);
+  image = await frame();
+  assert(ink(image).count > 100 && renderer.stats.drawCalls === alongPath.texts.length, 'Path glyphs must render with their frames');
+  alongPath.dispose();
+  label.visible = true;
+  report.checks.push('Subdivided cylindrical text and arc-distance path glyphs render with original layout and styles');
+
   // Optional fitted text uses the same renderer; clipping must include every style layer.
   const { FittedText } = await import('@margoengine/text/fit');
   label.visible = false;
