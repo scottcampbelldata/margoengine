@@ -3665,6 +3665,38 @@ Finish sizes (min+gzip B): VFX root 31,435 (budget 32,070), base 11,191 (11,336)
 
 Repository gates additionally caught the handoff's fixed 100 ms cancellation-test sleep, the new error anchor's digits, and stale generated site text. The cancellation check now observes actual mapping-promise settlement and yields one MessageChannel task for unhandled-rejection reporting; removing the production cancellation handler still fails on both backends. The help anchor is `vfx-float`, matching the existing anchor-name rule, and error/help text is generated from its owning sources. The existing fixed-wait, error-page and llms regression tests pass without any baseline or rule change.
 
+## Batch 52: clustered
+
+Eight jobs in `@margoengine/clustered`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes E and I with one job
+(52.6) from the other machine, each in its own optional entry, option or hook, with no core or stage source changes.
+Rows left unfinished are in docs/work-lists/finish-later.md under 52.x; README examples owed are in
+docs/work-lists/readme-owed.md.
+
+| # | Job | Status | Commit | Entry | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Soft shadows for point and spot lights | DONE | d378e1a0b | clustered/shadows (`shadow.radius`, PCSS in LocalShadows) | shadows.test.js |
+| 2 | Clipmap terrain as a local shadow caster | DONE | b6b4b3e79 | clustered/shadows (`drawLocalShadow` hook) | shadows.test.js |
+| 3 | Sphere, disc and tube area lights | DONE | 8b26e59eb | clustered/shapes | shapes.test.js, ltc-edge.test.js |
+| 4 | Cached local shadow atlas | DONE | 3296cce94 | clustered/shadow-atlas | shadow-atlas.test.js |
+| 5 | Textured area lights | DONE | 1998ce4e5 | clustered/area-texture | area-texture.test.js, bindings.test.js |
+| 6 | Point light cookies | DONE | 4ea50d1f7 (other machine) | clustered/cube-projector | cube-projector.test.js |
+| 7 | Light linking and layers | DONE | cfbcc56a9 | clustered/layers | layers.test.js, clustered-light-images-gpu-check.js (GPU) |
+| 8 | Stochastic many light shading | DONE | 6d64a8732 | clustered/stochastic | stochastic.test.js |
+
+- **Built from:** papers and specs cited per row in docs/clean-room.md (clustered C10 to C20); 52.7 is Margo's own mask
+  design (no paper).
+- **Slips found and fixed while landing:** stochastic (52.8) and cube cookies (52.6) both declared lit-group binding 151;
+  cube cookies moved and packages/clustered/test/bindings.test.js now fails on any shared hook binding. Main then gave
+  cube cookies 152, so textured area lights took 153 and layers 154 (155 is the shadow atlas). Clean-room ids collided
+  twice on main (C17: textured lights and point/spot PCSS; C18: layers and custom casters); this commit renumbers lane
+  I's rows to C19 (textured lights) and C20 (layers). `scripts/clustered-light-images-gpu-check.js` lacked `await` on
+  `decodePNG`, so it never got past its first frame; fixed in 52.7.
+- **GPU evidence on the Mac:** the layers half of clustered-light-images-gpu-check.js passes (layer-1 light leaves a
+  layer-0 floor black, both-layer floor matches the unlayered light, max diff 0/255). The textured-light "split image"
+  half fails (the 16 x 8 image under a 2 x 1 light at 1.5 m reads its 1 x 1 mean); logged in finish-later.md under 52.5.
+- **Known limits:** docs/limits.md LIM-645, LIM-646, LIM-648, LIM-650, LIM-653 and LIM-654 and the other jobs' sections;
+  area and directional lights are not layered, core meshes are on layer 0 only.
+
 ## Batch 54: lightmap
 
 Eight jobs in `@margoengine/lightmap`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes F, J and K, each in

@@ -2419,7 +2419,7 @@ chain. It is an approximation: a one-colour image is exact (within half-float ro
 under a wide lobe is the filtered mean around one point, not the exact integral of the image under the lobe; the
 vector form factor ignores the horizon clip; level-0 texels are bilinear with clamped edges, and the chain is
 isotropic, so a lobe stretched along one axis of the light reads one blur for both. Built from the LTC paper's integral
-and the cosine footprint; the paper's own textured-light section could not be read (docs/clean-room.md, C17).
+and the cosine footprint; the paper's own textured-light section could not be read (docs/clean-room.md, C19).
 Proved on stand-ins: the CPU mirror (`packages/clustered/test/area-texture.test.js`) and a real-WebGPU frame check
 (`scripts/clustered-light-images-gpu-check.js`: one-colour image against the plain light within 2/255, a split image
 lights each side of the floor). No reference against a path tracer yet. Sizes: `npm run quality -- --gate=sizes`.
