@@ -2479,3 +2479,11 @@ FSM final/always proof: node --test --test-timeout=120000 packages/fsm/test/fina
 Build packages, then run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tiles-style --wait-max=60 --max=5 -- node packages/tiles/tests/tiles-browser.mjs`, then the same command with `--compat` on the browser script. The style case colours the first two features red and hides the other two based on the sample's structural metadata values. Input provenance is in examples/assets/3d-tiles/NOTICE.md. No benchmark or timing assertion is required.
 
 FSM invocation proof: node --test --test-timeout=120000 packages/fsm/test/invoke.test.js after building packages. All races use explicitly resolved promises, with no time-based assertions.
+
+### Batch 273 XR canvas regression
+
+After build:packages, run node --test
+packages/webgl2-compat/test/canvas-present.test.js. Under a shared GPU lock run
+node scripts/modern-xr-tests.js, then the same command with --compat, and
+node packages/webgl2-compat/test/xr-browser.mjs. Keep every stereo, package pass,
+depth, AR alpha, controller and lifecycle assertion unchanged.

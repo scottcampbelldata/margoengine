@@ -84,6 +84,9 @@ class SimulatedSession extends EventTarget implements XRNativeSession {
   }
 }
 class SimulatedBinding implements XRBinding {
+  // Projection images use the selected real device. The dedicated compatibility
+  // XR suite covers installXR and the browser's XRWebGLLayer framebuffer bridge.
+  static readonly webgl = !!(globalThis as { __margoCompat?: boolean }).__margoCompat;
   constructor(_session: XRNativeSession, gpu: GPUDevice) {
     device = gpu;
     device.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));

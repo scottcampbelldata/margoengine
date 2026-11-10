@@ -3474,3 +3474,13 @@ Optional fsm/invoke adds state-scoped tasks with unique ids. Stable nonfinal sta
 
 
 Batch 250 job 3: fsm/invoke 0 to 3609 B min+gzip, ceiling 3865 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+### Batch 273 XR canvas transitions
+
+Compatibility canvas output modes persist across XR/desktop device replacement.
+A bitmaprenderer receiving a page-backed XR source needs one reusable 2D
+offscreen copy; 2D outputs accept either source directly. No extra copy is added
+to the ordinary offscreen-to-bitmap route. These are simulated XR sessions on
+real GPU devices, not physical headset results. Core/stage source is unchanged.
+Measured min+gzip: compatibility root 105,568 B, device 105,626 B, XR 105,420 B,
+tiers 105,323 B. Existing optional ceilings pass. Core plus stage is 23,950 B.

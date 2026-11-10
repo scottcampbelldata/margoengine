@@ -3,7 +3,16 @@
 // engine (XR's own device) the line, points and terrain are missing, which is what this route fixes.
 import { Engine, box, PbrMaterial, Camera } from '@margoengine/core';
 import { XR, createXREngine } from '@margoengine/xr';
-import type { XRBinding, XRNativeFrame, XRNativeSession, XRProjectionLayer, XRSpace, XRSubImage, XRSystem, XRView } from '@margoengine/xr';
+import type {
+  XRBinding,
+  XRNativeFrame,
+  XRNativeSession,
+  XRProjectionLayer,
+  XRSpace,
+  XRSubImage,
+  XRSystem,
+  XRView,
+} from '@margoengine/xr';
 import { Lines, Line } from '@margoengine/lines';
 import { PointsPlugin, PointCloud } from '@margoengine/points';
 import { Terrain } from '@margoengine/terrain';
@@ -11,7 +20,8 @@ import { Bloom } from '@margoengine/post';
 
 const SIZE = 96;
 let device: GPUDevice, color: GPUTexture, depth: GPUTexture;
-const gpuErrors: string[] = [];
+const gpuErrors: string[] = [],
+  errors: string[] = [];
 /** Two eyes 0.2 apart at z = 3, looking down -z, with a WebGPU [0, 1] projection (near 0.1, far 100). */
 function eyes(): XRView[] {
   return ([-0.1, 0.1] as const).map((x, index) => {
@@ -22,7 +32,24 @@ function eyes(): XRView[] {
       f = 1 / Math.tan(Math.PI / 6);
     return {
       eye: index ? 'right' : 'left',
-      projectionMatrix: new Float32Array([f, 0, 0, 0, 0, f, 0, 0, 0, 0, far / (near - far), -1, 0, 0, (near * far) / (near - far), 0]),
+      projectionMatrix: new Float32Array([
+        f,
+        0,
+        0,
+        0,
+        0,
+        f,
+        0,
+        0,
+        0,
+        0,
+        far / (near - far),
+        -1,
+        0,
+        0,
+        (near * far) / (near - far),
+        0,
+      ]),
       transform: {
         matrix,
         inverse: { matrix: inverse },
@@ -60,6 +87,9 @@ class SimulatedSession extends EventTarget implements XRNativeSession {
   }
 }
 class SimulatedBinding implements XRBinding {
+  // Keep the simulated projection binding on the device selected by the harness.
+  // The installXR framebuffer bridge has its own native/compat stereo comparison.
+  static readonly webgl = !!(globalThis as { __margoCompat?: boolean }).__margoCompat;
   constructor(_session: XRNativeSession, gpu: GPUDevice) {
     device = gpu;
     device.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
@@ -87,7 +117,10 @@ class SimulatedBinding implements XRBinding {
   }
 }
 Object.defineProperty(globalThis, 'XRGPUBinding', { configurable: true, value: SimulatedBinding });
-const simulated: XRSystem = { isSessionSupported: async () => true, requestSession: async () => new SimulatedSession() };
+const simulated: XRSystem = {
+  isSessionSupported: async () => true,
+  requestSession: async () => new SimulatedSession(),
+};
 Object.defineProperty(navigator, 'xr', { configurable: true, value: simulated });
 
 /** RGBA bytes of `texture`'s layer `layer` (BGRA swapped when `bgra`). */
@@ -120,7 +153,11 @@ const ground = (pixels: Uint8Array): number => {
   for (let y = Math.floor((SIZE * 3) / 4); y < SIZE; y++)
     for (let x = 0; x < SIZE; x++) {
       const i = (y * SIZE + x) * 4;
-      if (Math.abs(pixels[i] - pixels[0]) + Math.abs(pixels[i + 1] - pixels[1]) + Math.abs(pixels[i + 2] - pixels[2]) > 12) n++;
+      if (
+        Math.abs(pixels[i] - pixels[0]) + Math.abs(pixels[i + 1] - pixels[1]) + Math.abs(pixels[i + 2] - pixels[2]) >
+        12
+      )
+        n++;
     }
   return n;
 };
@@ -130,7 +167,11 @@ const green = (r: number, g: number, b: number) => g > 120 && g > r * 2 && g > b
 
 /** A scene with a core box, a line, a point cloud, flat terrain and bloom. */
 function scene(engine: Awaited<ReturnType<typeof Engine.create>>): void {
-  engine.createMesh().setGeometry(box(0.6, 0.6, 0.6)).setMaterial(new PbrMaterial({ color: '#ff0000' })).setPosition([0, 0.5, 0]);
+  engine
+    .createMesh()
+    .setGeometry(box(0.6, 0.6, 0.6))
+    .setMaterial(new PbrMaterial({ color: '#ff0000' }))
+    .setPosition([0, 0.5, 0]);
   Lines.attach(engine).add(new Line({ positions: [-3, 1.2, 0, 3, 1.2, 0], colors: [0, 1, 0, 0, 1, 0], width: 6 }));
   const n = 400,
     positions = new Float32Array(n * 3),
@@ -139,7 +180,9 @@ function scene(engine: Awaited<ReturnType<typeof Engine.create>>): void {
     positions.set([-1.5 + (i % 20) * 0.15, -0.2 + Math.floor(i / 20) * 0.02, 0.5], i * 3);
     colours.set([0, 0, 1], i * 3);
   }
-  PointsPlugin.attach(engine).add(new PointCloud({ positions, colors: colours, material: { size: 4, shape: 'square' } }));
+  PointsPlugin.attach(engine).add(
+    new PointCloud({ positions, colors: colours, material: { size: 4, shape: 'square' } }),
+  );
   Terrain.attach(engine, {
     size: [64, 64],
     origin: [-32, -32],
@@ -150,7 +193,12 @@ function scene(engine: Awaited<ReturnType<typeof Engine.create>>): void {
       const heightmap = gpu.createTexture({ size: [4, 4], format: 'r32float', usage: 6 });
       gpu.queue.writeTexture({ texture: heightmap }, new Float32Array(16).fill(-0.5), { bytesPerRow: 16 }, [4, 4]);
       const layers = gpu.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
-      gpu.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(200), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+      gpu.queue.writeTexture(
+        { texture: layers },
+        new Uint8Array(16).fill(200),
+        { bytesPerRow: 4, rowsPerImage: 1 },
+        [1, 1, 4],
+      );
       const weight = gpu.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
       gpu.queue.writeTexture({ texture: weight }, new Uint8Array([255, 0, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
       return { heightmap, layers, weights: [weight, weight] };
@@ -175,7 +223,10 @@ function camera(view: XRView, near: number, far: number): Camera {
 async function frames(xr: XR, mode: 'immersive-vr' | 'immersive-ar', n = 4): Promise<void> {
   let seen = 0;
   await xr.requestSession(mode, { onFrame: () => void seen++ });
-  while (seen < n) await new Promise(requestAnimationFrame);
+  while (seen < n) {
+    if (gpuErrors.length || errors.length) throw new Error([...errors, ...gpuErrors].join('\n'));
+    await new Promise(requestAnimationFrame);
+  }
   await device.queue.onSubmittedWorkDone();
 }
 /** Background pixels of eye `layer` that the layer depth puts at the far plane, found by a depth test at 0.999. */
@@ -210,8 +261,7 @@ async function far(gpu: GPUDevice, layer: number): Promise<Uint8Array> {
 }
 
 async function run() {
-  const canvas = document.querySelector('canvas')!,
-    errors: string[] = [];
+  const canvas = document.querySelector('canvas')!;
   // 1. Through the engine: every pass in both eyes, equal to the same camera without XR.
   const engine = await createXREngine(canvas, { capacity: 16 });
   engine.onError = (error) => errors.push(String(error));
@@ -228,12 +278,31 @@ async function run() {
   const reference = gpu.createTexture({ size: [SIZE, SIZE], format, usage: 0x10 | 1 });
   // One reference render per eye, each compared with what XR drew for that eye.
   for (const [i, view] of eyes().entries()) {
-    engine.render({ views: [{ camera: camera(view, engine.camera.near, engine.camera.far), viewport: [0, 0, 1, 1], target: { color: reference }, id: `xr-${i}` }] });
+    engine.render({
+      views: [
+        {
+          camera: camera(view, engine.camera.near, engine.camera.far),
+          viewport: [0, 0, 1, 1],
+          target: { color: reference },
+          id: `xr-${i}`,
+        },
+      ],
+    });
     const expected = await read(gpu, reference, 0, format === 'bgra8unorm'),
       got = eyePixels[i];
     let differ = 0;
-    for (let p = 0; p < got.length; p += 4) if (got[p] !== expected[p] || got[p + 1] !== expected[p + 1] || got[p + 2] !== expected[p + 2]) differ++;
-    const eye = { differ, line: count(got, green), points: count(got, blue), box: count(got, red), terrain: ground(got), far: 0, farGround: 0, farBox: 0 };
+    for (let p = 0; p < got.length; p += 4)
+      if (got[p] !== expected[p] || got[p + 1] !== expected[p + 1] || got[p + 2] !== expected[p + 2]) differ++;
+    const eye = {
+      differ,
+      line: count(got, green),
+      points: count(got, blue),
+      box: count(got, red),
+      terrain: ground(got),
+      far: 0,
+      farGround: 0,
+      farBox: 0,
+    };
     // The far test passes where the layer depth is 1 (nothing drawn): the sky, never the ground or the box.
     for (let p = 0; p < SIZE * SIZE; p++) {
       if (!farPixels[i][p]) continue;
@@ -245,7 +314,8 @@ async function run() {
     if (differ) throw new Error(`Eye ${i}: ${differ} pixels differ from the same camera without XR`);
     if (eye.line < 20 || eye.points < 20 || eye.box < 20 || eye.terrain < (SIZE * SIZE) / 8)
       throw new Error(`Eye ${i} misses a pass: ${JSON.stringify(eye)}`);
-    if (eye.far < (SIZE * SIZE) / 8 || eye.farGround || eye.farBox) throw new Error(`Eye ${i} depth layer: ${JSON.stringify(eye)}`);
+    if (eye.far < (SIZE * SIZE) / 8 || eye.farGround || eye.farBox)
+      throw new Error(`Eye ${i} depth layer: ${JSON.stringify(eye)}`);
   }
   // The eyes differ: the box is 0.2 apart between them.
   if (eyePixels[0].every((v, i) => v === eyePixels[1][i])) throw new Error('Both eyes drew the same image');
@@ -280,7 +350,12 @@ async function run() {
   const separate = await XR.create(plain);
   await frames(separate, 'immersive-vr');
   const lost = await read(device, color, 0);
-  result.separate = { route: separate.route, line: count(lost, green), points: count(lost, blue), box: count(lost, red) };
+  result.separate = {
+    route: separate.route,
+    line: count(lost, green),
+    points: count(lost, blue),
+    box: count(lost, red),
+  };
   await separate.end();
   separate.dispose();
   plain.dispose();

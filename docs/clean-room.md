@@ -5086,3 +5086,24 @@ Combined design: a bounded Pratt interpreter with an explicit function/method al
 
 ## Batch 250 job 3: invoked promise tasks
 Before implementation compared Harel (1987) and Harel, Pnueli, Schmidt and Sherman (1987), citations above, on hierarchical lifetimes and communication; Barnett et al., *SCXML* (2015), https://www.w3.org/TR/scxml/#invoke (start after stabilization, cancel as final exit action); WHATWG editors, *DOM Standard* (2026), https://dom.spec.whatwg.org/#aborting-ongoing-activities (AbortSignal lifetime); Stately team, *Invoke* and *Promise actors* (accessed 2026-11-10), https://stately.ai/docs/invoke and https://dev.stately.ai/docs/promise-actors (public reference: output/error, cancellation and ignored late settlement). Combined clean-room design scopes one AbortController to each state entry, cancels in the actual exit hook, starts only stable states, and gates results by invocation identity. Promise races make cancellation observable even when a service ignores its signal. No companion or rival code read.
+
+### Batch 273 XR canvas transitions (2026-11-09)
+
+Standards compared: WHATWG contributors, *HTML Living Standard*, canvas context
+modes, drawImage and ImageBitmapRenderingContext (2026),
+https://html.spec.whatwg.org/multipage/canvas.html; Kai Ninomiya, Brandon Jones
+and Jim Blandy (editors), *WebGPU*, canvas configuration (2026),
+https://www.w3.org/TR/webgpu/#canvas-configuration; Brandon Jones, Manish
+Goregaokar and Rik Cabanier (editors), *WebXR Device API* (2026),
+https://www.w3.org/TR/webxr/; Rik Cabanier, *WebXR Layers API Level 1* (2026),
+https://www.w3.org/TR/webxrlayers-1/.
+
+The output canvas keeps the context mode selected by its first device. XR uses
+a page-backed GL source and desktop uses OffscreenCanvas; source type must not
+select a different output mode after device replacement. A 2D output draws
+either source directly. A bitmap output transfers an offscreen source directly
+and copies a page-backed source through a reusable offscreen 2D canvas first.
+Only a bitmap still backed by the device belongs in its context-loss retention
+set. Root simulated XR bindings identify the selected real device route; actual
+XRWebGLLayer bridging remains covered by the separate native/compat stereo test.
+No other engine source or companion implementation was read.

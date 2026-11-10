@@ -2914,3 +2914,12 @@ The optional tiles/style entry evaluates color, show and pointSize from feature 
 
 ### FSM invoked task lifetimes (batch 250 job 3)
 InvokeMachine starts promise services on stable entry, aborts on actual exit/disposal, and delivers done/error output without stale-generation events. Proof: packages/fsm/test/invoke.test.js covers resolve, reject, sync throw, payloads, re-entry, common ancestors, transient states, multiple tasks, external abort, preabort and handler rejection. Public reference: Stately promise actor lifetime and SCXML invoke cancellation; citations in docs/clean-room.md. This is promise-task parity for the batch row, not a full actor system claim.
+
+### Batch 273 XR presentation context transitions
+
+Claim: compatibility canvas presentation supports both XR-to-desktop and
+desktop-to-XR device source transitions without attempting to change the
+canvas's context mode. Proof: packages/webgl2-compat/test/canvas-present.test.js
+fails on the parent, passes with the repair, and checks three presentations in
+each order. Canonical GPU results are recorded with the landing check logs.
+No physical headset or speed claim is made.

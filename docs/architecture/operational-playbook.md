@@ -5424,3 +5424,14 @@ or full rival navigation parity beyond the batch row. No core/stage code changes
 ### Section 5 evidence: optional tile styling (batch 239 job 1)
 
 The streaming renderer now exposes a content decorator without importing its implementation. `tiles/style` evaluates property expressions on the CPU and writes existing optional-package PBR vertex colours, instance tint/matrix rows and point colour/size buffers. Show=false discards mesh surface fragments, degenerates hidden instance transforms and assigns hidden points zero size; alpha uses the native PBR blend path. Bindings retain authored arrays for restoration and declare added GPU buffer bytes to tile eviction accounting. The interpreter never executes supplied JavaScript. Evidence: packages/tiles/tests/style.test.js covers language evaluation, binding updates, invalid styles and restoration; the tiles browser fixture checks two visible red and two hidden features of the real CC0 structural metadata sample. Both rendering backends use the same binding path. No new rendering backend, core maths or speed claim.
+
+
+#### 5. Batch 273 XR canvas mode persistence
+
+Compatibility presentation preserves a canvas's first output mode across XR
+and desktop device configurations. Both transition directions have an owning
+unit regression in canvas-present.test.js, which fails on the old code. The
+root XR fixtures surface engine/GPU errors while waiting for frames, rather
+than waiting forever after XR ends on an error. Simulated stereo sessions are
+rendering/lifecycle evidence, not headset evidence; the dedicated compatibility
+XR test owns the XRWebGLLayer framebuffer comparison.

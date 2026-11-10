@@ -13,3 +13,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | tiles/style generated optional re-export | batch 239 job 1 |
 | @margoengine/fsm | invoke: InvokeMachine, one/many task ids, run(context,signal,data), done.invoke.id/output, error.invoke.id/error, invocations/settled, AbortSignal and using; FinalMachine stable extension receives entering data | batch-250 job 3 |
 | margoengine | Generated fsm/invoke alias | batch-250 job 3 |
+
+
+
+| @margoengine/webgl2-compat | Canvas output persistence when reconfiguring between page-backed XR and offscreen devices; supported XR preparation. | Batch 273 XR group |

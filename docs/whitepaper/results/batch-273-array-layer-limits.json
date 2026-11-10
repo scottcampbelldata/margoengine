@@ -160,7 +160,8 @@
   "noTimingClaim": true,
   "integration": {
     "fullComponentBase": "913d44282",
-    "finalMain": "0de0ad705",
+    "observedOriginAtMeasurement": "0de0ad705",
+    "finalMain": "d34cadf03",
     "preservedBothSharedDocs": true,
     "regeneratedGuidesAfterBuild": true,
     "checks": {
@@ -195,5 +196,6 @@
       "documentationLinks": true
     },
     "note": "The later main commit changes GPU queue observer ordering and its tests/docs. Package runtime source and APIs are unchanged by that integration; its affected tests and generated documentation checks pass."
-  }
+  },
+  "landingProvenance": "020ed463f was pushed on parent d34cadf03; the previously recorded ref was an observed origin, not the actual parent."
 }

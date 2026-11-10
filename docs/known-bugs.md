@@ -412,11 +412,9 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
   rasterization/orientation divergences still need numeric root-cause proof.
 
-- `react/test:browser`: `test-scene-browser.js:115` rejects the XR preparation
-  snapshot because neither `xrReady` nor an error containing `WebXR is unavailable`
-  is present. This is the full compatibility run, not the small preview.
-  Investigate the fixture's native-WebGPU XR assumptions and the actual
-  compatibility preparation error before changing its assertion or route.
+- Fixed `react/test:browser` XR preparation: the supported compatibility XR
+  route is installed by the fixture; its complete canonical compatibility suite
+  now passes, including simulated stereo pixels, controllers and teardown.
 
 The serial continuation preserves each completed result and resumes only
 unfinished suites. Additional full-layer failures are evidence for batch 273,
@@ -467,9 +465,11 @@ passes. The following additional failures remain with batch 273:
   compatShim loads/replaces it, so the synthetic delay does not wrap the later
   CompatDevice. Repro: voxel's slow-compile script with that environment;
   apply/observe the delay on the actual device in a separate harness repair.
-- `root/modern:test:xr:browser`: XR refuses the full layer until `installXR()`
-  supplies its route; the generic forced-backend fixture does not install it.
-  Review that setup together with the React XR preparation failure above.
+- Fixed `root/modern:test:xr:browser`: simulated bindings identify the selected
+  device and compatibility canvas presentation keeps its output context mode
+  when reconfigured between page-backed XR and offscreen devices. Root native
+  and compatibility stereo, package pass, depth and AR checks pass unchanged.
+  Regression: `packages/webgl2-compat/test/canvas-present.test.js`.
 
 All process-tree bounds and numerical assertions remain unchanged. Logs are
 preserved in lane-S's `.lane/compat-*.log` and `.lane/scope-compat-*.log`; the

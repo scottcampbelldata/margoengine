@@ -14,6 +14,8 @@ export class CompatCanvasContext {
   private texture: CompatTexture | null = null;
   private frameOpen = false;
   private output: ImageBitmapRenderingContext | CanvasRenderingContext2D | null = null;
+  /** A page-backed XR source copied into an already selected bitmaprenderer. */
+  private copy?: OffscreenCanvas;
   /** The device whose context backs the image the page canvas shows now, while it is an ImageBitmap of that context. */
   private shownBy: CompatDevice | null = null;
 
@@ -95,25 +97,33 @@ export class CompatCanvasContext {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
-    if (typeof (source as OffscreenCanvas).transferToImageBitmap === 'function') {
-      this.output ??= this.getContext.call(this.canvas, 'bitmaprenderer') as ImageBitmapRenderingContext | null;
-      const bitmap = (source as OffscreenCanvas).transferToImageBitmap();
-      if (this.output && 'transferFromImageBitmap' in this.output) {
-        this.output.transferFromImageBitmap(bitmap);
-        if (this.shownBy !== device) {
-          this.shownBy?.shown.delete(this);
-          device.shown.add(this);
-          this.shownBy = device;
-        }
-      } else device.validationError('The canvas already has another kind of context; the frame cannot be shown');
-    } else {
-      this.output ??= this.getContext.call(this.canvas, '2d') as CanvasRenderingContext2D | null;
-      const o = this.output as CanvasRenderingContext2D | null;
-      if (!o) device.validationError('The canvas already has another kind of context; the frame cannot be shown');
-      else {
-        o.clearRect(0, 0, t.width, t.height);
-        o.drawImage(source as HTMLCanvasElement, 0, 0);
+    const transferable = typeof (source as OffscreenCanvas).transferToImageBitmap === 'function';
+    // A canvas's mode cannot change on reconfiguration. XR devices use page-backed
+    // sources; desktop devices use OffscreenCanvas. Either source must reach the
+    // output selected by the first device, in either transition direction.
+    this.output ??= (this.getContext.call(this.canvas, transferable ? 'bitmaprenderer' : '2d') ??
+      this.getContext.call(this.canvas, transferable ? '2d' : 'bitmaprenderer')) as typeof this.output;
+    if (!this.output) {
+      device.validationError('The canvas already has another kind of context; the frame cannot be shown');
+      return;
+    }
+    if ('transferFromImageBitmap' in this.output) {
+      let image = source as OffscreenCanvas;
+      if (!transferable) {
+        image = this.copy ??= new OffscreenCanvas(t.width, t.height);
+        if (image.width !== t.width) image.width = t.width;
+        if (image.height !== t.height) image.height = t.height;
+        const copy = image.getContext('2d') as OffscreenCanvasRenderingContext2D;
+        copy.globalCompositeOperation = 'copy';
+        copy.drawImage(source, 0, 0);
       }
+      this.output.transferFromImageBitmap(image.transferToImageBitmap());
+      this.shownBy?.shown.delete(this);
+      this.shownBy = transferable ? device : null;
+      this.shownBy?.shown.add(this);
+    } else {
+      this.output.clearRect(0, 0, t.width, t.height);
+      this.output.drawImage(source, 0, 0);
     }
   }
 
