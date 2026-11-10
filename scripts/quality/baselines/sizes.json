@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13981336,
+  "total": 13982520,
   "history": [
     {
       "date": "2026-10-24",
@@ -7394,6 +7394,12 @@
       "commit": "batch-173-volume-quality",
       "reason": "Batch 173 job 4: conservative sampling/refined iso optional entry and root scene-depth ray termination. Before root 52045 B, cinematic 6006 B, labels 6292 B, quality absent; after {\"@margoengine/sciviz\":54985,\"@margoengine/sciviz/cinematic\":6442,\"@margoengine/sciviz/labels\":6529,\"@margoengine/sciviz/volume-quality\":8509}. Capture/snapshot stays in sciviz because ordinary volumes need the correctness fix by default. Optional quality sampling and precise history/counters retain one owner; splitting duplicates GPU state. Core + stage unchanged at 24209 B.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-195",
+      "reason": "New optional demand scheduler: 0 to 928 B gzip, 1184 B ceiling; lifecycle and animation ownership stay together. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8736,6 +8742,7 @@
     "leak @margoengine/materials/fur -> @margoengine/gltf-pro/model": 1,
     "@margoengine/post/halftone": 6556,
     "@margoengine/staging/accumulate-ambient": 10723,
-    "@margoengine/sciviz/volume-quality": 8765
+    "@margoengine/sciviz/volume-quality": 8765,
+    "@margoengine/quality/demand": 1184
   }
 }

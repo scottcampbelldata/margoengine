@@ -4831,3 +4831,7 @@ Fur follow-up integration, outside the completed shell-controls row: combining a
 
 
 - Fixed in batch 173 job 4: ordinary, fusion and cinematic rays now stop at actual opaque scene depth. volume-depth-browser.mjs covers half-volume analytical colour, opaque geometry moving after progressive saturation, layer insertion order and actual device reboot on both GPU backends.
+
+`quality/demand` (batch 195 job 1): no open defect found in coalescing, motion/load wake, nested animation and disposal tests; manual onFrame integration and explicit wake requirements are documented in limits.md.
+
+Fixed while landing batch 195 job 1: main 72642362b retained an old VFX test:gpu line beside its fuller replacement with no separator, so every manifest consumer rejected JSON. Remove the stale duplicate and retain all parity cases. Regression: tests/integration-json.test.js.

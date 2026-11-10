@@ -944,3 +944,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 173 job 4): document volume-quality defaults, block/opacity bounds, blue-noise provenance, adaptive/isosurface limits, invalidate(), exact scene-depth termination, source sharing, 56 B cinematic depth/count history and saturated-frame cost semantics; replace the old opaque-interior limitation during the README phase.
 - margoengine (batch 173 job 4): document optional sciviz/volume-quality alias in the README phase.
+
+- @margoengine/quality and margoengine (batch 195 job 1): document /demand renderOnDemand, source events, update replacing onFrame, invalidate coalescing/counts, animation holds, loaded, idle clock, restore and disposal defaults; examples deferred.
+
+- @margoengine/vfx (batch 195 blocking manifest repair): recurring GPU command retains all parity cases; no public API/example change, README examples remain deferred.

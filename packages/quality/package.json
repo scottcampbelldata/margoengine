@@ -41,6 +41,10 @@
     "./power": {
       "types": "./dist/power.d.ts",
       "import": "./dist/power.js"
+    },
+    "./demand": {
+      "types": "./dist/demand.d.ts",
+      "import": "./dist/demand.js"
     }
   },
   "files": [
@@ -57,7 +61,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs && node packages/quality/test/power-browser.mjs && node packages/quality/test/scene-owner-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs && node packages/quality/test/power-browser.mjs && node packages/quality/test/scene-owner-browser.mjs && node packages/quality/test/demand-browser.mjs",
     "prepack": "npm run build"
   }
 }
