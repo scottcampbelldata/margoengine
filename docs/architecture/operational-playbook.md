@@ -5374,3 +5374,19 @@ cases render fits and interrupt them on both WebGPU and the WebGL2 compatibility
 renderer, without validation errors. Existing gizmo, input and scene ownership
 GPU checks also pass. No new shader or hardware tier requirement is introduced.
 The evidence is correctness only; no wall-clock benchmark or speed claim was run.
+
+### Section 5 evidence: Chromium teardown moved to a browser host (2026-11-10)
+
+The process/stdio close recurrence is explained and worked around, not fixed in
+Margo: after `TerminateProcess` the browser's exit code is set within 65 ms and every
+owned pipe closes within 1 ms of its release, but Windows signals the process object
+only once the kernel has torn the process down: 65 ms to 1.2 s beside the batches,
+8.7 s beside verify, over 30 s in the failures (docs/known-bugs.md, "Open, outside
+Margo"). The suite's event loop was never blocked and Playwright started no helper
+program. `scripts/support/browser-host.mjs` now owns Playwright's browser server in
+a process of its own; a suite ends the browser through it, is acknowledged in
+milliseconds, disconnects and moves on, waiting for the proof of teardown only up to
+2,000 ms. Survivors past 120 s are recorded in
+`test-results/browser-host-survivors.log`. Evidence: the 40-cycle loop under load in
+docs/known-bugs.md, `tests/browser-host.test.js`, `tests/browser-teardown.test.js`.
+Missing: a run on the laptop and the Mac mini, and the cause of the kernel's delay.

@@ -2811,11 +2811,14 @@ draft has no package ceiling or final entry acceptance. No core/stage bytes,
 public integration, full fuzz, peak-memory or speed result is claimed.
 [Current scoped evidence](whitepaper/results/batch-134-scalar-refinement.json).
 
-Owned Chromium teardown requests native termination before releasing its owned
-stdio/CDP pipes, and releases those pipes before awaiting termination completion.
-Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
-5,000 ms process-list bound are unchanged. The controlled regression proves
-pipe-dependent completion, not a measured browser shutdown speed guarantee.
+Owned Chromium runs under a browser host process (`scripts/support/browser-host.mjs`,
+2026-11-10): the suite ends the browser through the host, is acknowledged as soon
+as every process has been told to end, and waits for the kernel's teardown of the
+ended processes only up to 2,000 ms, then moves on. The host waits up to 120 s more
+and records any survivor in `test-results/browser-host-survivors.log`. A GPU slot can
+therefore be released while the kernel is still freeing the ended browser's GPU
+allocations (measured 65 ms to 1.2 s beside the batches, 8.7 s beside verify). The
+30,000 ms shutdown budget and 5,000 ms process-list bound are unchanged.
 Batch 56 proof continuation keeps exact outside-view RGB equality and exact
 shadow-mask return statistics. The fixtures now use the supported view-clear and
 camera-up APIs; no core/stage code, sample count or numerical bar changes. Fog-all
@@ -2866,11 +2869,11 @@ Detached queue observers read immutable numbered status revisions. Older single-
 file records are still readable; observers need the new scripts for new revision
 records. Holder and waiter lock formats remain compatible with older clients.
 
-Owned Windows Chromium shutdown lists its processes before client disconnect,
-then retains concurrent native termination/client cleanup. A process-list read
-still has its five-second bound and shutdown retains the 30-second budget.
-The asynchronous-session regression in `tests/browser-teardown.test.js` proves
-ordering, not a GPU speed or universal driver-shutdown guarantee.
+Owned Chromium shutdown lists its processes before client disconnect, then ends
+them through the host. A process-list read still has its five-second bound and
+shutdown retains the 30-second budget. The regressions in
+`tests/browser-teardown.test.js` and `tests/browser-host.test.js` prove ordering and
+the bounded hand-off, not a GPU speed or universal driver-shutdown guarantee.
 
 Sciviz review validation records are regenerated as a pair from one built revision:
 `node examples/package-benchmarks/entry-sizes.mjs`, then
@@ -7027,32 +7030,13 @@ and executable skip/return patterns; `tests/python-venv.test.js` checks missing 
 flags unset. [The inventory](work-lists/missing-test-items.md) separates batch 160, held physics and
 remaining unverified real-file variants. Their proof gaps are not claimed fixed by the gate.
 
-### Earlier repair, recurrence still open: browser shutdown exceeded its deadline
+### Open, outside Margo, worked around 2026-11-10: Windows finishes tearing down an ended Chromium process late under GPU load
 
-- **Repro:** after a package build, run `node scripts/gpu-lock.mjs run --owner=codex-missing -- node packages/exporters/tests/capture-browser.mjs` with a process-tree limit. The required-input audit's 19-suite GPU run observed this at base `c1646e3ec` plus test-only edits, RTX A6000, Edge 157.0.4341.42.
-- **Observed:** all capture/render/GIF/JPEG/WebM assertions printed success, then `closeAll` threw `SHUTDOWN_TIMEOUT`, still open: browser, at its unchanged 30,000 ms deadline. The suite failed in 36 s; the other 18 selected suites, including real Jupyter notebooks, passed.
-- **Cause narrowed, not isolated:** shutdown awaits the wrapped browser close before closing the server. The owned Chromium wrapper waits for both `server.kill()` and the connected client's ordinary `close()` through `Promise.allSettled`; at least one browser teardown wait did not settle before the deadline. The failing run did not instrument the two promises independently, so it does not identify which one or establish a load-only explanation.
-- **Resolution:** lane-M fixed the owning Chromium shutdown path in `cff40d127`. Once a GPU slot became available, this lane reran capture successfully, including teardown (4 seconds); no browser/shutdown source changed here. Scott assigned this GPU teardown hang to batch 160 in lane-M (2026-11-09). This lane does not work on it or count the suite as passing. No retry, budget increase or assertion change was made. Logs remain in the lane's ignored `test-results/missing-items/gpu-packages.log`; the active [work list](work-lists/missing-test-items.md) records the owner.
-
-The teardown hunt at main `55e916e4a` adds opt-in `MARGO_TRACE_SHUTDOWN=1`
-timestamps for each server kill, client close, WGSL report wait, README page
-close, process exit and individual pipe close. The original batch 160 log
-`test-results/batch-160/gate18-readmes.log` did not isolate the inner wait.
-The batch 171 log `test-results/sciviz-fixes/derive-integrated-root.log` in
-lane-X isolates process/stdio close after native termination, but cannot explain
-why the latched event did not arrive. A passing control does not close this bug.
-Reproduce with the environment flag and one shared GPU slot, for example
-`node scripts/gpu-lock.mjs run --owner=teardown-hunt --max=1 --wait-max=60 -- node packages/sciviz/tests/sciviz-browser.mjs`.
-The single README control, all 25 sciviz README examples and the native and
-compatibility 30-check sciviz cases passed with every traced wait settled.
-In the final rebuilt native control beside verify, all pipes closed at
-00:46:27.784Z; browser exit arrived at 00:46:36.509Z. Process/stdio close
-settled after 7,974 ms and total browser cleanup after 9,691 ms, within its
-unchanged budget. This separates pending process exit from pending pipe closes;
-it does not establish why the older run exceeded the deadline.
-No root-cause fix or changed cleanup semantics is claimed. The 30,000 ms budget
-and all existing regressions remain intact; capture the missing event and native
-process/pipe state at the next recurrence before changing resource ownership.
+- **Repro:** browser suites under machine load (8 to 12 Codex lanes, 3 GPU slots busy, RTX A6000, Windows 11, Edge): `SHUTDOWN_TIMEOUT` naming `Chromium process/stdio close (<pid>)` after every check passed. Batch 171: `test-results/sciviz-fixes/derive-integrated-root.log` in lane-X; batch 160 (`check:readme-run`) and batch 234 the same. Never seen on a quiet machine (five quiet runs in lane-A, 2026-11-09). The earlier entries below (capture-browser, batch 160) were this.
+- **Cause, measured 2026-11-10 (lane-Q, 40 cycles of launch, GPU work and close beside the running lanes, `MARGO_TRACE_SHUTDOWN=1`, loop at `.lane/shutdown-loop.mjs` of that worktree):** after `TerminateProcess` the browser's exit code is set 50 to 65 ms later in every cycle, and every owned pipe (stdout, stderr, both CDP pipes) closes within 1 ms of its `destroy()`. The process object is signalled (Node's `exit`, then `close` 1 ms after) 65 ms to 1,172 ms later in those cycles, 8.7 s in lane-A's control beside `verify`, over 30 s in the failures. That gap is the kernel's teardown of the process after its threads are gone (its handle table and address space, which the GPU driver's cleanup is part of). The suite's event loop was never blocked (a 50 ms heartbeat saw no gap over 400 ms) and Playwright started no helper program (every child_process call was logged). Nothing in Margo runs during that time: it is Windows, Edge and the driver under load, which Margo cannot fix. Playwright's `BrowserServer.kill()` (observed as a black box) waits for that same signal and keeps its WebSocket server listening until it arrives, so an in-process server tied the suite to it.
+- **Workaround (the mechanism is gone, not the symptom):** `scripts/support/browser-host.mjs`. Playwright's browser server now runs in a host process of its own, which holds everything that waits on the browser process (its handle, its pipes, the WebSocket server, the temporary profile). The suite keeps the same connected browser as before. At close it reads Chromium's process list while connected, the host ends every process (`TerminateProcess` through its handle, each listed child by pid) and acknowledges at once (3 ms measured), the client disconnects (3 ms), and the suite waits for the host's proof that all are gone only up to `TEARDOWN_GRACE_MS` (2,000 ms). Past that the host carries on alone with the native waits, finishes Playwright's cleanup, and after `REAP_MS` (120 s) records any survivor in `test-results/browser-host-survivors.log` and ends. The 30,000 ms budget, the 5,000 ms process-list bound and every assertion are unchanged; no retry, no raised budget, no swallowed error (a host that dies fails the close with `HOST_GONE`).
+- **Evidence:** 40 cycles on the new path under the same load (2026-11-10 01:32 to 01:34): 0 timeouts, 0 leaks; close 347 ms median, 2,130 ms maximum; 5 cycles handed off at the grace, in which the kernel needed up to 9.3 s after the close to finish with the browser (cycles 33 to 35: 9,338, 4,950 and 5,230 ms), every browser, child and host process gone by then and no survivor file written; no Node process or pipe handle left in the suite. `tests/browser-host.test.js` (a real host process; a browser the kernel never finishes with is logged as a survivor at the bound, in the host) and `tests/browser-teardown.test.js` ("a browser process the kernel has not finished tearing down cannot hold the close past the grace"; the in-process design it replaces asserted `SHUTDOWN_TIMEOUT` for that case in its own test, and `tests/browser-host.test.js` runs it through `launchBrowser` against a real host whose browser never exits).
+- **Still open:** why the kernel takes over 30 s in that machine state is not Margo's to find or fix. A line in `test-results/browser-host-survivors.log` is the signal to look at the Edge version or the driver; the GPU slot is released while the kernel may still be freeing the ended browser's allocations (docs/limits.md).
 
 ### Fixed 2026-11-08: text extrusion API report
 

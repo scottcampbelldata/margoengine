@@ -1,9 +1,12 @@
 import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
-import { closeAll, endTree, waitSignaled, traceShutdown, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { closeAll, endTree, traceShutdown, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
+import { HOST_LOG, HOST_PATH, REAP_MS } from '../support/browser-host.mjs';
 
-const ownedBrowserServers = new WeakMap();
-const ownedProcessCloses = new WeakMap();
+/** The browser host (startHost) of each browser this module launched. */
+const ownedHosts = new WeakMap();
 
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
@@ -175,16 +178,6 @@ async function endChromium(browser, end) {
 /** How long an owned browser may take to list its processes at close before the helper route ends its tree instead. */
 export const LIST_PROCESSES_MS = 5_000;
 
-/** Whether `pid` is still running (Windows: its exit code is not set yet). */
-function running(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === 'EPERM';
-  }
-}
-
 /** The pids Chromium lists for itself (browser, renderers, GPU, utilities) over CDP. */
 async function chromiumPids(browser) {
   const session = await browser.newBrowserCDPSession();
@@ -203,68 +196,105 @@ async function listOwnedPids(browser, listMs) {
 }
 
 /**
- * Ends an owned Chromium and the processes it lists for itself, with no helper program: the browser process through
- * the handle Node holds (`TerminateProcess` on Windows), each listed child by its pid, then waits until the listed
- * children have exited. Some Edge utility processes outlive their browser by more than 10 s, so they are ended too.
- * Only a browser that does not list its processes within `listMs` falls back to `end` (taskkill /T and a handle wait),
- * and its browser process is still ended through its handle after that. A refused kill (the child's 'error' event,
- * which `kill()` raises synchronously) is thrown, never left as an unhandled event.
- * @param {import('node:child_process').ChildProcess} child
- * @param {{ newBrowserCDPSession?: () => Promise<{ send(method: string): Promise<any> }> }} browser
- * @param {{ end: (pid: number) => Promise<number[]>, listMs?: number, pids?: number[]|null, settle?: typeof waitSignaled|null, alive?: (pid: number) => boolean, kill?: (pid: number) => void }} options
+ * How long a close waits for the host's word that the ended processes are gone before it moves on without it. Not a
+ * budget: nothing fails when it runs out. The host keeps waiting (`REAP_MS`) and records any survivor in `HOST_LOG`.
+ * Measured exits after `TerminateProcess` on the dev PC: 65 ms to 1.2 s beside the batches, 8.7 s beside `verify`.
  */
-export async function stopOwned(
-  child,
-  browser,
-  { end, listMs = LIST_PROCESSES_MS, pids, settle = process.platform === 'win32' ? waitSignaled : null, alive = running, kill = (pid) => process.kill(pid, 'SIGKILL') },
-) {
-  const begun = Date.now();
-  const listed = pids === undefined ? await listOwnedPids(browser, listMs) : pids;
-  let remaining = [];
-  if (!listed) remaining = (await end(child.pid)) ?? [];
-  let failure;
-  const refused = (error) => (failure = error);
-  child.once('error', refused);
-  try {
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-  } finally {
-    child.removeListener('error', refused);
-  }
-  if (failure) throw failure;
-  let children = (listed ?? []).filter((pid) => pid !== child.pid);
-  for (const pid of children) {
-    try {
-      kill(pid);
-    } catch (error) {
-      if (error.code !== 'ESRCH') throw error;
-    }
-  }
-  // Windows can reuse a PID immediately. Check creation time before waiting so a
-  // replacement process cannot consume the old process's shutdown budget.
-  if (settle && children.length) {
-    remaining.push(...await settle(children, SHUTDOWN_BUDGET_MS - (Date.now() - begun), begun));
-  } else {
-    while ((children = children.filter(alive)).length) {
-      if (Date.now() - begun >= SHUTDOWN_BUDGET_MS) { remaining.push(...children); break; }
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-  }
-  if (remaining.length)
-    throw Object.assign(new Error(`Chromium processes did not exit: ${remaining.join(', ')}`), {
-      code: 'SHUTDOWN_TIMEOUT',
-      open: remaining.map((pid) => `Chromium process ${pid}`),
+export const TEARDOWN_GRACE_MS = 2_000;
+
+/**
+ * Starts a browser host (scripts/support/browser-host.mjs) with Playwright's launch `settings` and resolves once it
+ * reports the server's endpoint. The host owns every wait on the browser process (its handle, pipes, WebSocket server
+ * and temporary profile), so this process never waits on the kernel's teardown of a browser it has ended; see the
+ * host for the measurements. Resolves to `{ pid, wsEndpoint, process, end(children), finished(), release() }`:
+ * `end` tells the host to end the browser and its listed `children` (`null`: the whole tree by helper program) and
+ * resolves once each has been told to; `finished` resolves to the host's result (`survivors`); `release` lets this
+ * process end without the host. A host that ends before it answers rejects with code `HOST_GONE`.
+ */
+export async function startHost(settings, { spawnProcess = spawn, hostPath = HOST_PATH, env = process.env } = {}) {
+  const child = spawnProcess(process.execPath, [hostPath, JSON.stringify(settings)], {
+    stdio: ['pipe', 'pipe', 'inherit'],
+    windowsHide: true,
+    env,
+  });
+  const waiting = [];
+  let gone = null,
+    released = false;
+  const next = () =>
+    new Promise((resolve, reject) => {
+      if (gone) reject(gone);
+      else if (released) resolve(null);
+      else waiting.push({ resolve, reject });
     });
+  const fail = (reason) => {
+    gone = reason;
+    for (const waiter of waiting.splice(0)) waiter.reject(reason);
+  };
+  const lines = createInterface({ input: child.stdout });
+  lines.on('line', (line) => {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    waiting.shift()?.resolve(message);
+  });
+  // A host that is gone has ended its stdout; its process 'exit' can arrive before its last line has been read.
+  let ended = null;
+  child.once('exit', (code, signal) => (ended = signal ?? code));
+  lines.once('close', () => {
+    if (!released)
+      fail(Object.assign(new Error(`browser host ${child.pid} ended (${ended ?? 'stdout closed'}) before it answered`), { code: 'HOST_GONE' }));
+  });
+  child.once('error', (error) => fail(error));
+  const release = () => {
+    released = true;
+    for (const waiter of waiting.splice(0)) waiter.resolve(null);
+    lines.close();
+    child.stdin.destroy();
+    child.stdout.destroy();
+    child.unref();
+  };
+  let ready;
+  try {
+    ready = await next();
+  } catch (error) {
+    release();
+    throw error;
+  }
+  if (!ready?.ready) {
+    release();
+    throw new Error(ready?.error ?? 'browser host answered without an endpoint');
+  }
+  return {
+    pid: ready.pid,
+    wsEndpoint: ready.wsEndpoint,
+    process: child,
+    async end(children) {
+      child.stdin.write(`${JSON.stringify({ end: true, children })}\n`);
+      const answer = await next();
+      if (!answer?.terminated) throw new Error(`browser host ${child.pid} did not acknowledge the end: ${JSON.stringify(answer)}`);
+      return answer.terminated;
+    },
+    finished: next,
+    release,
+  };
 }
 
 /**
- * Makes `browser.close()` a bounded teardown (bug 70): it throws `SHUTDOWN_TIMEOUT` naming the browser if the close has
- * not finished within the shared budget (scripts/support/shutdown.mjs), instead of leaving a suite that has passed every
- * assertion hanging on its cleanup. A Chromium-family browser's processes are ended first (see `endChromium`); one this
- * module launched (`launchBrowser`) is ended through its own process handle (`stop`, default `stopOwned`).
+ * Makes `browser.close()` a bounded teardown (bug 70): it throws `SHUTDOWN_TIMEOUT` naming the step still open if the
+ * close has not finished within the shared budget (scripts/support/shutdown.mjs), instead of leaving a suite that has
+ * passed every assertion hanging on its cleanup. A Chromium-family browser's processes are ended first (see
+ * `endChromium`); one this module launched (`launchBrowser`) is ended through its host (`startHost`): the processes
+ * Chromium lists are read while the client is still connected, the host ends them all and acknowledges, the client
+ * disconnects, and the kernel's teardown of the ended processes is waited for only up to `graceMs`. Past that the
+ * host carries on alone (it records a survivor after `REAP_MS`) and the suite moves on: a browser process the kernel
+ * is still tearing down after `TerminateProcess` can hold nothing of the suite's any more.
  */
 export function withBoundedClose(
   browser,
-  { end = endTree, server = ownedBrowserServers.get(browser), platform = process.platform, stop = stopOwned, budgetMs = SHUTDOWN_BUDGET_MS } = {},
+  { end = endTree, host = ownedHosts.get(browser), graceMs = TEARDOWN_GRACE_MS, listMs = LIST_PROCESSES_MS, budgetMs = SHUTDOWN_BUDGET_MS, report = console.error } = {},
 ) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
@@ -273,59 +303,48 @@ export function withBoundedClose(
     browser[SHUTDOWN_STEPS] = pending;
     const step = async (name, run) => {
       pending.add(name);
-      try { return await traceShutdown(name, run); } finally { pending.delete(name); }
+      try {
+        return await traceShutdown(name, run);
+      } finally {
+        pending.delete(name);
+      }
     };
     return closeAll({
       budgetMs,
       browser: {
         [SHUTDOWN_STEPS]: pending,
         close: async () => {
-          if (server) {
-            const child = server.process?.();
-            // Listing needs a connected client. Finish this read before close() can
-            // disconnect its CDP session, then terminate and clean up concurrently.
-            const pids = platform === 'win32' && child?.pid && child.exitCode === null && child.signalCode === null
-              ? await step('Chromium process listing', () => listOwnedPids(browser, LIST_PROCESSES_MS)) : undefined;
-            // Windows driver kill uses synchronous taskkill: calling it on a live process blocks even
-            // the shutdown timer. End the owned process first, then finish driver cleanup.
-            const terminate = async () => {
-              if (platform === 'win32' && child?.pid) {
-                const running = child.exitCode === null && child.signalCode === null;
-                let onClose;
-                const tracked = ownedProcessCloses.get(server);
-                const closed = tracked ?? new Promise((resolve) => child.once('close', (onClose = resolve)));
-                try {
-                  // Ended through the process handle this Node process holds (TerminateProcess, via libuv) and the
-                  // pids Chromium lists, never through a helper program started at close time: taskkill.exe reads
-                  // the process table through WMI and PowerShell needs a console, both of which stall or fail on
-                  // this PC under load and around GPU driver resets. A helper that could not run reported nothing
-                  // killed, the browser kept running, and the close waited the whole budget. See `stopOwned`.
-                  // ChildProcess 'exit' does not close its stdio. Playwright's kill API is safe only
-                  // after 'close', which marks the driver process closed. Release every owned pipe,
-                  // including Chromium's two CDP pipes, then wait for 'close' (the process handle signalled).
-                  const pipes = child.stdio ?? [child.stdin, child.stdout, child.stderr];
-                  const openPipes = pipes.some((pipe) => pipe && !pipe.closed);
-                  let stopped;
-                  try {
-                    // Termination completion can depend on canceling pending pipe I/O. Request it,
-                    // release the pipes, then await it; waiting before release creates a circular wait.
-                    stopped = running ? step(`Chromium process termination (${child.pid}; children ${(pids ?? []).filter(pid => pid !== child.pid).join(', ')})`, () => stop(child, browser, { end, pids })) : undefined;
-                  } finally {
-                    for (const pipe of pipes) pipe?.destroy();
-                  }
-                  await stopped;
-                  if (tracked || running || openPipes) await step(`Chromium process/stdio close (${child.pid})`, () => closed);
-                } finally {
-                  if (onClose) child.removeListener('close', onClose);
-                }
-              }
-              await step('Playwright server kill', () => server.kill());
-            };
-            const results = await Promise.allSettled([
-              Promise.resolve().then(terminate),
-              Promise.resolve().then(() => step('Playwright client close', () => close(...args))),
-            ]);
-            for (const result of results) if (result.status === 'rejected') throw result.reason;
+          if (host) {
+            let outcome;
+            try {
+              // Listing needs a connected client: read it before close() can disconnect its CDP session.
+              const pids = await step('Chromium process listing', () => listOwnedPids(browser, listMs));
+              const children = pids ? pids.filter((pid) => pid !== host.pid) : null;
+              const results = await Promise.allSettled([
+                step(`Chromium process termination (${host.pid}; children ${children ? children.join(', ') || 'none' : 'unlisted, whole tree'})`, () =>
+                  host.end(children),
+                ),
+                step('Playwright client close', () => close(...args)),
+              ]);
+              for (const result of results) if (result.status === 'rejected') throw result.reason;
+              let timer;
+              outcome = await step(`Chromium process teardown (${host.pid})`, () =>
+                Promise.race([host.finished(), new Promise((resolve) => (timer = setTimeout(resolve, graceMs, null)))]),
+              );
+              clearTimeout(timer);
+            } finally {
+              // On every path: a host left referenced would hold the suite open after its last check.
+              host.release();
+            }
+            if (!outcome)
+              report(
+                `browser host ${host.process?.pid}: Chromium ${host.pid} was ended but the kernel had not finished tearing it down ${graceMs} ms later; the host waits up to ${REAP_MS} ms and records a survivor in ${HOST_LOG}`,
+              );
+            else if (outcome.survivors?.length)
+              throw Object.assign(new Error(`Chromium processes did not exit: ${outcome.survivors.join(', ')}`), {
+                code: 'SHUTDOWN_TIMEOUT',
+                open: outcome.survivors.map((pid) => `Chromium process ${pid}`),
+              });
             return;
           }
           // An end that fails (its CDP session refused, say) still closes the ordinary way, then throws: a browser left
@@ -377,6 +396,7 @@ export function launchFailureMessage(browser, error, { suite } = {}) {
  * clear line (see {@link skipSuite}). Options: `name` (force a browser), `needs` ('webgpu' | 'chromium' | 'none').
  * With nothing chosen on Windows and Edge missing, falls back to Playwright's Chromium as before.
  */
+
 export async function launchBrowser({
   name,
   needs = 'webgpu',
@@ -385,6 +405,7 @@ export async function launchBrowser({
   platform,
   argv,
   launchers = { chromium, firefox, webkit },
+  hosting = startHost,
   report = console.error,
   exit = process.exit,
   ...options
@@ -401,33 +422,25 @@ export async function launchBrowser({
         ...(channel ? { channel } : {}),
         ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
       };
-      // launchServer exposes explicit process ownership and an immediate kill API.
-      if (typeof launchers.chromium.launchServer === 'function') {
-        const server = await launchers.chromium.launchServer({...settings, host: '127.0.0.1'});
-        const child = server.process?.();
-        if (child && process.env.MARGO_TRACE_SHUTDOWN === '1') {
-          const record = (event) => console.error(`[chromium] ${JSON.stringify({
-            at: new Date().toISOString(), pid: child.pid, event,
-            exitCode: child.exitCode, signalCode: child.signalCode,
-            pipes: child.stdio?.map(pipe => pipe && ({
-              destroyed: pipe.destroyed, closed: pipe.closed, readable: pipe.readable, writable: pipe.writable,
-            })),
-          })}`);
-          child.once('exit', () => record('exit'));
-          child.once('close', () => record('close'));
-          child.stdio?.forEach((pipe, i) => pipe?.once('close', () => record(`pipe ${i} close`)));
-          record('launch');
-        }
-        if (child && child.exitCode === null && child.signalCode === null)
-          ownedProcessCloses.set(server, new Promise((resolve) => child.once('close', resolve)));
+      // A Chromium this module owns runs under a browser host of its own (scripts/support/browser-host.mjs), which holds
+      // the process and everything that waits on it; this process only connects to it.
+      if (hosting && typeof launchers.chromium.connect === 'function') {
+        const host = await hosting({ ...settings, host: '127.0.0.1' });
         let browser;
         try {
-          browser = await launchers.chromium.connect(server.wsEndpoint(), {timeout: 30_000});
+          browser = await launchers.chromium.connect(host.wsEndpoint, { timeout: 30_000 });
         } catch (error) {
-          await server.kill();
-          throw error;
+          let ending;
+          try {
+            await host.end(null);
+          } catch (endError) {
+            ending = endError;
+          } finally {
+            host.release();
+          }
+          throw ending ? new Error(`${error.message}; and ending its host failed: ${ending.message}`, { cause: error }) : error;
         }
-        ownedBrowserServers.set(browser, server);
+        ownedHosts.set(browser, host);
         return browser;
       }
       return await launchers.chromium.launch(settings);
@@ -443,3 +456,4 @@ export async function launchBrowser({
     return exit(LAUNCH_FAILED);
   }
 }
+

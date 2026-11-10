@@ -203,18 +203,28 @@ const attempt = async (env, launchers = { chromium: missing('chromium'), firefox
 
 test('Chromium uses an owned loopback launch server and terminates through its driver API', async () => {
   const closed = [];
-  const client = {close: async () => {closed.push('client');}};
-  const server = {wsEndpoint: () => 'ws://127.0.0.1:1234/owned',kill: async () => {closed.push('server');}};
+  const client = { close: async () => { closed.push('client'); } };
+  const hosted = [];
+  const host = {
+    pid: 10,
+    wsEndpoint: 'ws://127.0.0.1:1234/owned',
+    process: { pid: 999 },
+    end: async (children) => { closed.push(['host end', children]); return { browser: 10, children: children ?? [] }; },
+    finished: async () => ({ done: true, survivors: [], elapsedMs: 1 }),
+    release: () => closed.push('host released'),
+  };
   const browser = await launchBrowser({
-    env: {MARGO_BROWSER: 'chromium'},platform: 'linux',argv: [],needs: 'none',headless: true,
-    launchers: {chromium: {
+    env: { MARGO_BROWSER: 'chromium' }, platform: 'linux', argv: [], needs: 'none', headless: true,
+    launchers: { chromium: {
       launch: async () => assert.fail('a launch client cannot own forced process cleanup'),
-      launchServer: async options => {assert.equal(options.host,'127.0.0.1');assert.equal(options.headless,true);return server;},
-      connect: async (endpoint,options) => {assert.equal(endpoint,server.wsEndpoint());assert.equal(options.timeout,30000);return client;},
-    }},
-    report: message => assert.fail(message),exit: code => assert.fail(`launch failed ${code}`),
+      connect: async (endpoint, options) => { assert.equal(endpoint, host.wsEndpoint); assert.equal(options.timeout, 30000); return client; },
+    } },
+    hosting: async (options) => { assert.equal(options.host, '127.0.0.1'); assert.equal(options.headless, true); hosted.push(options); return host; },
+    report: (message) => assert.fail(message), exit: (code) => assert.fail(`launch failed ${code}`),
   });
-  await browser.close();assert.deepEqual(closed,['server','client']);
+  assert.equal(hosted.length, 1);
+  await browser.close();
+  assert.deepEqual(closed, [['host end', null], 'client', 'host released']);
 });
 
 test('webkit is Playwright WebKit: it has WebGPU, takes no Chromium switches, and is refused Chromium-only steps', async () => {

@@ -221,11 +221,14 @@ draft has no package ceiling or final entry acceptance. No core/stage bytes,
 public integration, full fuzz, peak-memory or speed result is claimed.
 [Current scoped evidence](whitepaper/results/batch-134-scalar-refinement.json).
 
-Owned Chromium teardown requests native termination before releasing its owned
-stdio/CDP pipes, and releases those pipes before awaiting termination completion.
-Driver cleanup still waits for process close; the 30,000 ms shutdown budget and
-5,000 ms process-list bound are unchanged. The controlled regression proves
-pipe-dependent completion, not a measured browser shutdown speed guarantee.
+Owned Chromium runs under a browser host process (`scripts/support/browser-host.mjs`,
+2026-11-10): the suite ends the browser through the host, is acknowledged as soon
+as every process has been told to end, and waits for the kernel's teardown of the
+ended processes only up to 2,000 ms, then moves on. The host waits up to 120 s more
+and records any survivor in `test-results/browser-host-survivors.log`. A GPU slot can
+therefore be released while the kernel is still freeing the ended browser's GPU
+allocations (measured 65 ms to 1.2 s beside the batches, 8.7 s beside verify). The
+30,000 ms shutdown budget and 5,000 ms process-list bound are unchanged.
 Batch 56 proof continuation keeps exact outside-view RGB equality and exact
 shadow-mask return statistics. The fixtures now use the supported view-clear and
 camera-up APIs; no core/stage code, sample count or numerical bar changes. Fog-all
@@ -276,11 +279,11 @@ Detached queue observers read immutable numbered status revisions. Older single-
 file records are still readable; observers need the new scripts for new revision
 records. Holder and waiter lock formats remain compatible with older clients.
 
-Owned Windows Chromium shutdown lists its processes before client disconnect,
-then retains concurrent native termination/client cleanup. A process-list read
-still has its five-second bound and shutdown retains the 30-second budget.
-The asynchronous-session regression in `tests/browser-teardown.test.js` proves
-ordering, not a GPU speed or universal driver-shutdown guarantee.
+Owned Chromium shutdown lists its processes before client disconnect, then ends
+them through the host. A process-list read still has its five-second bound and
+shutdown retains the 30-second budget. The regressions in
+`tests/browser-teardown.test.js` and `tests/browser-host.test.js` prove ordering and
+the bounded hand-off, not a GPU speed or universal driver-shutdown guarantee.
 
 Sciviz review validation records are regenerated as a pair from one built revision:
 `node examples/package-benchmarks/entry-sizes.mjs`, then
