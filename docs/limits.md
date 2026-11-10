@@ -6653,6 +6653,16 @@ Batch 162 lathe/tube angular reuse: per-call Float64 tables add 16 bytes per ang
 
 Batch 162 primitive angular reuse: sphere/cylinder/capsule/torus allocate a temporary Float64 sin/cos table of 16 bytes per angular column including the seam (at most 1,040 bytes per affected p-primitives builder). No cache survives a call. Geometry buffers and groups match the parent byte for byte on the same JavaScript runtime; cross-runtime transcendental bit identity is not promised. Operation counts are not a runtime or competitive speed claim. [Evidence](whitepaper/batch-162-workcounts.md).
 
+### Text measurement reuse and oracle scope (batch 169, 2026-11-10)
+
+`layoutText` reuses logical kerning only when visual neighbors retain their original
+source adjacency; shaped prefix advances remain raw until the same scaling and
+spacing operations run. A deterministic measurer is required within a call.
+Four Source Sans 3 advance widths equal Canvas, while external Troika 0.52.4
+selection widths differ by up to 8.900960288826809e-6 em. Numeric differences are
+retained; glyph pixels and full Unicode equivalence were not measured. This is not
+a runtime speed claim. [All values and commands](whitepaper/batch-169.md).
+
 ### UI layout measurement contract (batch 169, 2026-11-10)
 
 `arrange` retains content sizes by node and available inner width only during one

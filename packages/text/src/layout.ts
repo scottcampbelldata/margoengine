@@ -273,7 +273,8 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
   const all = graphemes(text),
     paragraphs: Item[][] = [[]],
     ends: number[] = [];
-  let kind = 0;
+  let kind = 0,
+    runAdvance = 0;
   for (const { cluster, index } of all) {
     if (cluster === '\n' || cluster === '\r\n' || cluster === '\r' || cluster === ' ') {
       ends.push(index);
@@ -288,16 +289,19 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
       const offset = run.cluster.length,
         joined = run.cluster + cluster;
       const count = (run.carets?.length ?? 0) + 1;
-      (run.carets ??= []).push([offset, measurer.advance(run.cluster) * fs + count * spacing]);
+      // Keep the raw previous advance so scaling and spacing retain their original arithmetic order.
+      (run.carets ??= []).push([offset, runAdvance * fs + count * spacing]);
       run.cluster = joined;
-      run.advance = measurer.advance(joined) * fs + count * spacing;
+      runAdvance = measurer.advance(joined);
+      run.advance = runAdvance * fs + count * spacing;
       continue;
     }
     kind = next;
+    runAdvance = measurer.advance(cluster);
     items.push({
       cluster,
       index,
-      advance: measurer.advance(cluster) * fs,
+      advance: runAdvance * fs,
       kern: 0,
       space: isWhitespace(cluster),
       bidi: bidiClass(cluster),
@@ -388,8 +392,16 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
       x += item.advance;
       if (next) {
         x += spacing;
+        // Reordering can create a new pair. Reuse only the original logical adjacency, in its logical direction.
         if (next.level === level && !item.space && !next.item.space && item.bidi === next.item.bidi)
-          x += level & 1 ? kern(next.item.cluster, item.cluster) : kern(item.cluster, next.item.cluster);
+          x +=
+            level & 1
+              ? next.item.index + next.item.cluster.length === item.index
+                ? next.item.kern
+                : kern(next.item.cluster, item.cluster)
+              : item.index + item.cluster.length === next.item.index
+                ? item.kern
+                : kern(item.cluster, next.item.cluster);
       }
     }
     const width = visual.length ? x : 0;
@@ -582,7 +594,8 @@ function reorder(levels: number[]): number[] {
 /** Caret position in local space for the UTF-16 offset `index` (clamped to the text). */
 export function caretRect(layout: TextLayout, index: number): { x: number; top: number; bottom: number; line: number } {
   if (!Number.isFinite(index)) throw new RangeError('Caret index must be finite');
-  if (!layout.lines.length) return { x: layout.bounds.left, top: layout.bounds.top, bottom: layout.bounds.bottom, line: 0 };
+  if (!layout.lines.length)
+    return { x: layout.bounds.left, top: layout.bounds.top, bottom: layout.bounds.bottom, line: 0 };
   index = Math.max(0, Math.min(layout.text.length, Math.round(index)));
   let lineIndex = layout.lines.findIndex((line) => index >= line.start && index < line.end);
   if (lineIndex < 0) lineIndex = layout.lines.findIndex((line) => index >= line.start && index <= line.end);

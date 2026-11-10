@@ -3300,6 +3300,15 @@ No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.
 
 `perf(geometry): reuse primitive angular columns` removes repeated trigonometric evaluations: 12,452 to 654 sin/cos calls for the sphere, capped cylinder, capsule and torus in one p-primitives iteration. Every geometry byte and group matches 13 parent snapshots. Per-call Float64 table trade-off and research: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun; no benchmark run or speed ratio claimed.
 
+### Batch 169 job 2: text measurement reuse (2026-11-10)
+
+`perf(text): reuse logical kerning and shaped prefix advances` reduces the pair
+fixture from 1198 to 599 callbacks and shaped prefixes from 35 to 18. The 35-case
+multilingual output stream remains 387896 identical bytes. Four Canvas widths
+match exactly; external Troika differences of 2.384e-7 to 8.901e-6 em remain
+explicitly recorded. [Methods and research](batch-169.md#job-2-text-layout-measurements).
+Timing pending the quiet rerun; no runtime speed claim.
+
 ### Batch 169 job 1: UI measurement reuse (2026-11-10)
 
 `perf(ui): memoize intrinsic layout per call` removes repeated intrinsic subtree

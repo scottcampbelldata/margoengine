@@ -425,6 +425,15 @@ all 100 neighborhood copies together. Parent-failing work-count regressions keep
 identical outputs. No new elapsed-time verdict is available; the existing
 `p-gpu-pick` row remains a loss. GPU point-by-point confirmation passes; elapsed timing remains deferred.
 
+## Batch 169 text layout work-count diagnosis
+
+The existing p-text extrusion row above remains unchanged; this job concerns the
+separate SDF layout path. Duplicate logical/visual pair measurements fell from
+1198 to 599 and shaped prefix measurements from 35 to 18 with identical layout
+bytes. Fix commit: `perf(text): reuse logical kerning and shaped prefix advances`.
+[Oracle values and cause](batch-169.md#job-2-text-layout-measurements).
+Timing pending the quiet rerun; no change to the extrusion row's speed verdict.
+
 ## Batch 169 UI work-count diagnosis
 
 UI has no like-for-like three.js flex layout row. Its Yoga comparison and call-scoped

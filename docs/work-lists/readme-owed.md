@@ -1544,3 +1544,6 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/ui batch 169 job 1: DONE in the measurement-reuse job; arrange custom-measurer example documents call-scoped stable-width measurements, edits and reentrancy, checked by check:readme-run. Other existing UI debt remains separately listed above.
 Batch 164 SSAO resolve: standalone SSAO example and resolve scheduling documented
 in the post README during the README phase (2026-11-10); all 28 runtime examples pass.
+
+
+- @margoengine/text batch 169 job 2: DONE; deterministic custom-measurer README example covers per-call pair/prefix reuse, checked by check:readme-run. Existing unrelated text README debts remain separate.

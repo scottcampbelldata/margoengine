@@ -197,6 +197,17 @@ edge differences. The independent trace confirms the weighted image loss, not an
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
 
+## Batch 169 text: work counts, 2026-11-10
+
+| Work | Before | After | Output | Status |
+| --- | --- | --- | --- | --- |
+| 600-character logical/visual pair measurement | 1198 kerning calls | 599 calls | 35 layouts, 387896 identical canonical bytes | `perf(text): reuse logical kerning and shaped prefix advances`; timing pending the quiet rerun |
+| 18-character shaped run | 35 advance calls | 18 calls | same carets and bounds | timing pending the quiet rerun |
+
+The [batch record](batch-169.md#job-2-text-layout-measurements) reports all four
+Canvas and Troika 0.52.4 advance-width comparisons, including the nonzero numeric
+differences and limited oracle scope. No rival timing or speed verdict is claimed.
+
 ## Batch 169 UI: work counts, 2026-11-10
 
 | Package | Work | Before | After | Black-box oracle | Status |

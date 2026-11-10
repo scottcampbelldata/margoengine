@@ -4716,6 +4716,15 @@ At the unchanged p-extrude resolutions, lathe revolution and tube radial sin/cos
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
 
+### Batch 169 text measurement work (2026-11-10)
+
+Text layout reuses already measured logical kerning and shaped prefix advances.
+The exact fixtures require 599 instead of 1198 pair calls and 18 instead of 35
+prefix calls with identical output bytes over 35 multilingual layouts.
+`packages/text/tests/layout-workcount.test.js` is the regression; [source references,
+oracle differences and commands](batch-169.md#job-2-text-layout-measurements).
+No timing, pixel-equivalence or complete shaping-conformance claim is made.
+
 ### Batch 169 UI measurement work (2026-11-10)
 
 One `arrange` call on the documented eight-parent row chain invokes the leaf

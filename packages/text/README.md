@@ -82,6 +82,25 @@ text.evictUnused();
 
 ## Shaping
 
+`layoutText` reuses a run's measured prefix for its caret and the logical kerning
+value when the same neighbors remain adjacent after visual ordering. Custom
+measurers must be deterministic during a call. There is no cache across calls,
+so changes to a measurer take effect on the next layout.
+
+```ts
+import { layoutText, type TextMeasurer } from '@margoengine/text';
+
+let pairCalls = 0;
+const measurer: TextMeasurer = {
+  advance: () => 0.5,
+  kerning: () => { pairCalls++; return 0; },
+  metrics: () => ({ ascent: 0.8, descent: 0.2 }),
+};
+const layout = layoutText('AVATAR', {}, measurer);
+console.log(layout.bounds.right - layout.bounds.left); // 3
+console.log(pairCalls); // 5, one call per adjacent pair
+```
+
 Arabic and Indic words draw as one shaped run, so the browser's shaper forms joined letters and conjuncts. Runs do not break
 across lines. `caretRect` and `hitTest` still move through a run by grapheme, measured from its prefixes. Set `ligatures: true`
 for the same on Latin words (fi, fl and whatever else the font forms).
