@@ -5996,3 +5996,26 @@ showed the path from the registry's WeakCells through `gl` to the disposed engin
 `WeakRef` to the device and an id into a per-device `WeakMap` of shared textures. Regression:
 packages/webgl2-compat/test/bind-group-release.test.js (fails with the old held value), and vfx-check under compat.
 
+### Fixed: ANGLE D3D11 on an AMD driver hung the GPU under the old flipped-blit present (2026-11-10, Beelink)
+
+Repro (Radeon 680M, Windows 11, AMD driver 32.0.21030.2001, Edge 157.0.4341.42): `node
+packages/materials/test/features-browser.mjs` failed its compat half 2 of 2 on 48ca54edd, at a different step each run
+("eye angle 0.6: 0,256", "white highlight at NaN", "hair shows: 0,0,0"): every pixel of the frame read 0, alpha too.
+Cause, from the browser's GPU log (edge://gpu after the run): `Renderer11::testDeviceLost: The D3D11 device was removed,
+HRESULT: 0x887A0006` (DXGI_ERROR_DEVICE_HUNG), then `The GPU process crashed! Exit code:
+RESULT_CODE_GPU_EXIT_ON_CONTEXT_LOST`. The scene's context was lost and its frames stayed empty; after the third GPU
+process restart the browser blocked WebGL for the page (`getContext('webgl2')` null: "WebGPU adapter unavailable").
+No Windows TDR event was logged; native WebGPU (Dawn D3D12) never hung. Measured with loops of 30 fresh devices, each a
+256x128 PBR sphere (65k triangles): hangs in 12 of 13 runs with the old present (a y-flipped `blitFramebuffer` and a
+colour-masked clear, both ANGLE D3D11 shader paths) while frames reached the page through `transferToImageBitmap` and
+the layer polled fence syncs. Removing any one ingredient stopped it: a 2D `drawImage` present 0 in 90 devices,
+`fenceSync` returning null 0 in 60, a 32x16 sphere 0 in 30, an unlit sphere 0 in 72; `gl.finish()` before each
+transfer, never calling `loseContext` or no `keepFrame` copy did not. A plain WebGL2 page with the same mesh, MSAA
+resolve, flip blit, fences and transfers did not hang in 240 contexts, so the trigger inside ANGLE or the driver is
+not isolated. Valid WebGL calls must not hang the device: below Margo. Not caused by the 2026-11-10 compat commits
+first suspected (compat source at 42d6e24ae^ hung the same). 450015cb1 ("present the canvas with a texel-fetch draw,
+not a flipped blit", for the NVIDIA uniform-block bug above) removes the old present, and with it the hang: 0 in 60
+devices, and the features test passes 2 of 2 on 000a11e1d. Regression: packages/webgl2-compat/test/device-churn-browser.mjs
+(in test:gpu; 30 fresh devices must each show their frame) fails at device 1 with compat source at 450015cb1^ on the
+Beelink and passes on main. Diagnostics kept outside the repository in lane M1's `.lane/diag` (raw-launch.mjs, wrap.js
+GL wrappers, feat.html, min.html).
