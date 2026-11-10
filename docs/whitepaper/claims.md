@@ -4097,3 +4097,4 @@ The optional @margoengine/sky/compat-clouds entry runs the existing volumetric c
 ### Batch 274 dense decomposition entry
 
 The optional compute/decomp entry supplies batched solve/inv/det, Cholesky, QR, SVD and symmetric eigenpairs. Reconstruction, orthogonality, analytic spectra, pivoted exact solutions and a tiny singular value are checked in packages/compute/tests/decomp-cases.js on CPU and both device backends. Arithmetic uses the same per-call SIMD Wasm kernel on all routes, producing f32 factors; GPU work is read back and uploaded. This establishes supported real-array correctness, not device-native acceleration or general floating-point error bounds. Kernel limits, abort granularity and input restrictions are recorded in docs/limits.md.
+Batch 270 parity evidence is now recurring: package test:gpu includes --all native/compatibility runs, with CPU registration protection. Standalone and combined runs retain every existing numeric and pixel assertion.

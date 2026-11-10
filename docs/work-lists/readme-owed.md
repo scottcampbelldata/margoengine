@@ -929,3 +929,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/vfx: document the existing parity GPU suite command after the build phase (batch 274 registration repair).
 - @margoengine/creative: document grass-terrain, orbit-atmosphere and paint-aniso GPU suite commands after the build phase (batch 274 registration repair).
 - @margoengine/kinematics-constraints: document the existing multi-goal GPU suite after the build phase (batch 274 registration repair).
+- @margoengine/vfx (batch 270 GPU registration): document the recurring --all parity coverage within test:gpu; examples remain deferred.

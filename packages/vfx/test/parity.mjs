@@ -4,6 +4,7 @@ if (process.argv.includes('--compat')) process.env.MARGO_COMPAT = '1';
 const context = await openBrowser({ startPath: '/packages/vfx/test/parity.html', port: 'free' });
 const { page } = context,
   pageErrors = [];
+const check = (name) => process.argv.includes('--all') || process.argv.includes('--' + name);
 page.on('pageerror', (e) => pageErrors.push(e.message));
 const near = (a, b) => assert.ok(Math.abs(a - b) < 2e-5, `${a} != ${b}`);
 try {
@@ -20,7 +21,7 @@ try {
   }
   near(r.results.rotated[0], 0);
   near(r.results.rotated[1], 1);
-  if (process.argv.includes('--shapes')) {
+  if (check('shapes')) {
     const r = await page.evaluate(() => window.checkShapes());
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
@@ -44,7 +45,7 @@ try {
       'ok shapes: 4096 births each, volume/shell moments, torus area correction, perimeter shares, grid occupancy, normals and exact reset',
     );
   }
-  if (process.argv.includes('--schedule')) {
+  if (check('schedule')) {
     const r = await page.evaluate(() => window.checkSchedule());
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
@@ -53,7 +54,7 @@ try {
     assert.deepEqual(r.warm, r.replay);
     console.log('ok schedule: prewarm equals five ordinary steps byte for byte, seeded bursts, exact reset');
   }
-  if (process.argv.includes('--json')) {
+  if (check('json')) {
     const r = await page.evaluate(() => window.checkJSON());
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
@@ -67,7 +68,7 @@ try {
   }
   assert.deepEqual(pageErrors, []);
   console.log('ok space: local/world, rigid rotation, velocity inheritance, eight spaced distance births');
-  if (process.argv.includes('--over-life')) {
+  if (check('over-life')) {
     const r = await page.evaluate(() => window.checkOverLife());
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
