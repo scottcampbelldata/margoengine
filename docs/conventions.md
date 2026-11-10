@@ -186,6 +186,54 @@ Baselines only shrink. When you fix a violation the gate fails until you lock it
 only suggest shrinking. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
 `test-results/quality.json`.
 
+## API lock
+
+Run `npm run api:check` after the final rebase. New or extended APIs need `npm run api:update` output in
+the same commit. Never edit `api/*.api.md` or `api/lock.json` by hand. Exports maps define coverage: every
+non-alias entry needs a TypeScript report with no unresolved exports. Missing manifests/exports require an
+explicit directory in `lock.json`'s `internal` list. TSDoc stays in hygiene and quality's zero-tsdoc API baseline.
+Current internal directories are shared TypeScript, the Rust-only kernel crate and the retired webgl directory
+containing licence/notice files. The latter two are explicit inventory exceptions, not user-facing JS packages.
+
+Day 0 locks every existing and future entry of core and stage. Every other reported package is in `watch`,
+the conservative fallback to the private tracker. Watch diffs print `would fail:` and pass compatibility;
+coverage failures still fail. After one green local CI run and no lane report of trouble, the coordinator
+can promote watch packages to locked, recording their date and batch in `ticked`. Day 1 is separate work.
+
+Removals, renames and changes to existing declarations, class/interface members, enum values, overloads,
+unexported types or global blocks break locks. So do added required parameters, optional-to-required changes
+and added `readonly`. New exports/members/overloads, trailing optional parameters, required-to-optional
+changes and local-to-exported type promotion are compatible. Imports and member order do not affect
+compatibility. Compatible textual differences still need `api:update` for locked/unlisted packages.
+This is conservative declaration-text analysis, not subtype inference or a runtime behavioral guarantee.
+
+Intentional breaks need Scott's yes and an `api/breaks.json` record: `entry` (full import specifier), `symbol`,
+`was` (SHA-1's first eight hex characters of the old LF-normalized, trimmed declaration block), `change`
+(`removed`, `renamed`, `signature`), `reason`, `date`, `approved` (`Scott YYYY-MM-DD`). Diagnostics print a
+record template with the exact hash. Members hash their member block; exports hash the whole declaration.
+Renames are conservatively removal plus addition. A changed old hash cannot reuse the approval.
+Update preflights the entire selection and writes no reports or surface when a locked break is unapproved.
+
+`tests/api-lock.test.js` proves classification, overload/depth handling, one-shot approval, watch warnings,
+coverage failures, zero TSDoc baseline and parsing every committed report. No runtime/GPU code changes.
+
+Clean-room research (public descriptions only; no source code or companion repositories read):
+
+- Tom Preston-Werner, *Semantic Versioning 2.0.0* (2013), [specification](https://semver.org/): separate
+  incompatible contracts from compatible additions.
+- Microsoft TypeScript team, *Declaration Merging* and *More on Functions* (living handbook, consulted 2026),
+  [merging](https://www.typescriptlang.org/docs/handbook/declaration-merging.html),
+  [functions](https://www.typescriptlang.org/docs/handbook/2/functions.html): name/kind grouping, overloads and optional parameters.
+- Rush Stack contributors, *The API report* (living documentation, consulted 2026),
+  [overview](https://api-extractor.com/pages/overview/demo_api_report/): committed, reviewable snapshots;
+  Margo implements its own parser without that dependency.
+- Lyuye Zhang, Chengwei Liu, Zhengzi Xu, Sen Chen, Lingling Fan, Bihuan Chen and Yang Liu,
+  *Has My Release Disobeyed Semantic Versioning? Static Detection Based on Semantic Differencing* (ASE 2022),
+  [paper](https://arxiv.org/abs/2209.00393): signature equality alone cannot prove behavior, so package tests remain necessary.
+- Steven Raemaekers, Arie van Deursen and Joost Visser, *Semantic Versioning versus Breaking Changes:
+  A Study of the Maven Repository* (SCAM 2014), [paper](https://doi.org/10.1109/SCAM.2014.30):
+  compare actual declarations rather than trust version labels.
+
 ## Browser suites end with `closeAll`
 
 A script that starts a browser must end it through `closeAll` from `scripts/support/shutdown.mjs` (bug 30, bug 70): the

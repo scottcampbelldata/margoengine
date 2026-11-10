@@ -1045,3 +1045,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/ui (review 2): describe Select popup ownership when closing and reopening within one turn, including disposal of the current popup.
 
 - @margoengine/exporters (batch 136 removal): remove obsolete bundled-Draco-encoder instructions and document the owned lazy artifact and external custom encoderPath compatibility during the README phase.
+- Tooling (API lock Day 0): document report coverage, locked/watch rollout and one-shot approved breaks in the README phase; examples deferred.

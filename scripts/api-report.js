@@ -35,6 +35,7 @@ import {
 import { createGlobalReports } from './api-report-globals.mjs';
 import { stalePackages } from './package-stamps.mjs';
 import { execFileSync } from 'node:child_process';
+import { assessChange, checkCoverage, classify, readLock } from './api-lock.mjs';
 
 // The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
 // name (C:\Users\\..., what os.tmpdir() gives) matched no package and every cross-package import line
@@ -369,6 +370,54 @@ const selectedReports = reports.flat().filter((item) => !entrySelector || item.e
 const expected = new Map(selectedReports.map((item) => [item.entry.report, item.text]));
 // A scoped run also sets every row's Gzip cell from entry-sizes.json, as the full run does: those cells need no build, and
 // a scoped check that kept them passed on 72 stale cells (f235e21f0).
+const lock = readLock(root);
+const breaks = JSON.parse(readFileSync(join(apiDir, 'breaks.json'), 'utf8'));
+const stored = new Map(
+  readdirSync(apiDir)
+    .filter((file) => file.endsWith('.api.md'))
+    .map((file) => [file, readFileSync(join(apiDir, file), 'utf8').replaceAll('\r\n', '\n')]),
+);
+const coverageReports = update ? (scopedPackage ? new Map([...stored, ...expected]) : expected) : stored;
+const lockProblems = checkCoverage(root, lock, coverageReports);
+// Watch mode must not hide a newly unresolved export in the generated build.
+for (const [file, text] of expected)
+  if (!/```ts\n/.test(text) || /\/\/ unresolved\b/.test(text))
+    lockProblems.push(`api/${file}: generated report has no TypeScript block or has an unresolved export`);
+const watchedFiles = new Set();
+const emptyReport = '```ts\n```\n';
+// Preflight the whole selection, including removed entries, before update can write anything.
+const selection = new Set([
+  ...expected.keys(),
+  ...[...stored.keys()].filter(
+    (file) =>
+      !scopedPackage ||
+      (entrySelector
+        ? expected.has(file)
+        : file === `${scopedPackage.dir}.api.md` || file.startsWith(`${scopedPackage.dir}.`)),
+  ),
+]);
+for (const file of selection) {
+  const old = stored.get(file),
+    text = expected.get(file);
+  if (old === text) continue;
+  const current = selectedReports.find((item) => item.entry.report === file);
+  const entry = current?.entry.specifier ?? old?.match(/^## API Report File for "([^"]+)"/m)?.[1];
+  if (!entry) {
+    lockProblems.push(`api/${file}: missing entry identity`);
+    continue;
+  }
+  const packageName =
+    current?.pkg.name ?? (entry.startsWith('@') ? entry.split('/').slice(0, 2).join('/') : entry.split('/')[0]);
+  const changes = classify(old ?? emptyReport, text ?? emptyReport);
+  const decision = assessChange(lock, breaks, packageName, entry, changes, update);
+  if (lock.watch.includes(packageName)) watchedFiles.add(file);
+  if (decision.lines.length) console.log(decision.lines.join('\n'));
+  if (decision.fail && update) lockProblems.push(...decision.lines);
+}
+if (lockProblems.length) {
+  console.error(lockProblems.join('\n'));
+  process.exit(1);
+}
 const summary = scopedPackage
   ? refreshSurfaceGzip(
       mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
@@ -396,7 +445,8 @@ if (update) {
   const problems = [];
   if (!scopedPackage) {
     const present = existsSync(apiDir) ? readdirSync(apiDir).filter((f) => f.endsWith('.api.md')) : [];
-    for (const file of present) if (!expected.has(file)) problems.push(`api/${file}: entry no longer exists`);
+    for (const file of present)
+      if (!expected.has(file) && !watchedFiles.has(file)) problems.push(`api/${file}: entry no longer exists`);
   }
   for (const [file, text] of expected) {
     const path = join(apiDir, file);
@@ -405,12 +455,16 @@ if (update) {
       continue;
     }
     const old = readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
-    if (old !== text) problems.push(`api/${file} changed:\n${diff(old, text)}`);
+    if (old !== text && !watchedFiles.has(file)) problems.push(`api/${file} changed:\n${diff(old, text)}`);
   }
   // Both modes compare the summary: the full check once skipped it, so a scoped update that wrote a wrong row passed.
   const surfacePath = join(root, 'docs', 'api-surface.md');
   const oldSurface = existsSync(surfacePath) ? readFileSync(surfacePath, 'utf8').replaceAll('\r\n', '\n') : '';
-  if (oldSurface !== summary) problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
+  if (oldSurface !== summary) {
+    if (watchedFiles.size && !problems.length)
+      console.log('would fail: docs/api-surface.md changed with watched reports; run api:update');
+    else problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
+  }
   if (problems.length) {
     console.error(problems.join('\n\n'));
     const updateCommand = scopedPackage

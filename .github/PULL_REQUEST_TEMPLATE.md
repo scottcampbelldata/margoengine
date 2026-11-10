@@ -9,4 +9,5 @@
 - [ ] `npm run lint`
 - [ ] `npm run typecheck`
 - [ ] `npm run test:all`
-- [ ] `npm run api:check` (or the API report is updated and the change is explained above)
+- [ ] `npm run api:check` after final rebase; new or extended APIs include `api:update` output in this commit
+- [ ] Locked API breaks have Scott's approval in `api/breaks.json` (see `docs/conventions.md#api-lock`); reports and lock.json were not edited by hand
