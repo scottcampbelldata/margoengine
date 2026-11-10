@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14498952,
+  "total": 14499911,
   "history": [
     {
       "date": "2026-10-24",
@@ -7691,6 +7691,12 @@
       "commit": "032ec8480",
       "reason": "landed with push-anyway: feat(inspector): live WGSL editing for WgslMaterial meshes (new entry @margoengine/inspector/shaders)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "ef35e7070",
+      "reason": "landed with push-anyway: feat(clustered): cache shadow atlas faces, redraw only what moved",
+      "grew": 1
     }
   ],
   "items": {
@@ -7845,7 +7851,7 @@
     "@margoengine/clustered/ies": 4268,
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
-    "@margoengine/clustered/shadow-atlas": 14979,
+    "@margoengine/clustered/shadow-atlas": 15938,
     "@margoengine/clustered/shadows": 12954,
     "@margoengine/clustered/shapes": 12255,
     "@margoengine/clustered/stochastic": 2513,

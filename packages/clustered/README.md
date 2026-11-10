@@ -422,6 +422,11 @@ cascades retain their responses. Bias and resolution control acne and detached
 edges; this filter does not model area-light penumbrae (area lights' own shadows do, below). Device restoration
 recreates the maps and caster bindings; disposal releases owned resources.
 
+`ShadowAtlas` (from `@margoengine/clustered/shadow-atlas`) packs the same maps into one depth image with tiles sized
+by screen coverage, and caches them per face: a tile stays where it is while its size holds, and a face re-renders
+only when its light or tile changes or a caster whose bounds reach that face moves, shows, hides, is added or is
+removed. `stats.layers` counts the faces drawn last frame.
+
 Without `ClusteredOptions.shadows`, the original shader, four lighting bindings
 and allocation path remain exact. Opted-in effects add bindings 16-18 in the
 existing lighting group (group 2 for glTF Pro); group 3 remains the independent

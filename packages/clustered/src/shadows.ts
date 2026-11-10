@@ -409,8 +409,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   protected mapResolution(_kind: string, _index: number, width: number, height: number): readonly [number, number] {
     return [width, height];
   }
-  /** @internal Publish map placements; true invalidates all cached faces. */
-  protected placeMaps(_context: Context, _layers: number): boolean { return false; }
+  /** @internal Publish map placements; marks in `dirty` each layer whose placement changed. */
+  protected placeMaps(_context: Context, _layers: number, _dirty: Uint8Array): void {}
   /** @internal Pixel origin of an atlas face. */
   protected mapOrigin(_layer: number): readonly [number, number] { return [0, 0]; }
   private engine?: Engine;
@@ -460,6 +460,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private cameraLayers = 0;
   private readonly list: Draw[] = [];
   private readonly planes = new Float64Array(24);
+  /** World spheres (x, y, z, radius) a caster change reached this frame: old and new bounds of what moved. */
+  private readonly touched: Float32Array[] = [];
+  /** Atlas mode: draws a depth-0 (far) triangle over one tile, clearing it without touching the others. */
+  private clearTile?: GPURenderPipeline;
   private layers = 0;
   private changed = true;
   private disposed = false;
@@ -520,12 +524,13 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       throw new MargoError('attached', 'Duplicate shadow caster; add each caster once');
     const r: Source = { source: runtime, dynamic };
     this.sources.push(r);
-    this.invalidate();
+    // The atlas finds the faces an added or removed caster reaches from its bounds; the array re-renders every layer.
+    if (!this.atlasMode) this.invalidate();
     return () => {
       const index = this.sources.indexOf(r);
       if (index >= 0) {
         this.sources.splice(index, 1);
-        this.invalidate();
+        if (!this.atlasMode) this.invalidate();
       }
     };
   }
@@ -612,14 +617,17 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.lights.shadow = this;
   }
   private allocate(layers: number): void {
-    this.map?.destroy();
+    // The atlas is one layer whatever the face count: more faces keep it and the tiles already drawn in it.
+    const keep = this.atlasMode && !!this.map;
+    if (!keep) this.map?.destroy();
     const size = this.options.resolution ?? 512;
     this.layers = layers;
-    this.map = this.device!.createTexture({
-      size: [size, size, this.atlasMode ? 1 : layers],
-      format: 'depth32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
+    if (!keep)
+      this.map = this.device!.createTexture({
+        size: [size, size, this.atlasMode ? 1 : layers],
+        format: 'depth32float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
     this.layerViews = Array.from({ length: layers }, (_, baseArrayLayer) =>
       this.map!.createView({ dimension: '2d', baseArrayLayer: this.atlasMode ? 0 : baseArrayLayer, arrayLayerCount: 1 }),
     );
@@ -636,7 +644,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       });
     }
     this.bind();
-    this.changed = true;
+    if (!keep) this.changed = true;
   }
   private bind(): void {
     this.entries = [
@@ -823,9 +831,12 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         ? frameFloats(this.sunShadows, this.areaShadows, this.softShadows)
         : 4 + MAX_LIGHTS * 4 + pointLayers * 16,
     );
-    // Casters: any change re-renders every layer (ponytail: per-light caster bounds would limit it to the lights it reaches).
-    const engine = this.engine!;
-    let casters = this.changed;
+    // Casters: any change re-renders every layer; in atlas mode only the layers a changed caster's bounds reach.
+    const engine = this.engine!,
+      touched = this.touched;
+    let casters = this.changed,
+      everything = this.changed;
+    touched.length = 0;
     for (const records of this.draws.values()) for (const d of records.values()) d.seen = false;
     const list = this.list;
     list.length = 0;
@@ -856,7 +867,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         primitives = r.source.shadowPrimitives;
         if (r.version !== r.source.shadowVersion) {
           r.version = r.source.shadowVersion;
-          casters = true;
+          casters = everything = true;
         }
       }
       for (const p of primitives) {
@@ -887,6 +898,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         // ponytail: displaced casters redraw every frame (live scale and bias live in a GPU buffer); compare their
         // values on the CPU if many static displaced casters make that costly.
         if (p.displacement || p.opacity) moved = true;
+        // A new caster has no old bounds (count -1 until first seen); its new bounds below are enough.
+        if (moved && d.count !== -1) touched.push(Float32Array.from(d.sphere));
         if (moved) {
           casters = true;
           d.matrix.set(node.matrix);
@@ -896,12 +909,14 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           d.stale = true;
         }
         worldSphere(d.sphere, inst || p.displacement ? undefined : p.bounds, node.matrix);
+        if (moved || r.dynamic) touched.push(Float32Array.from(d.sphere));
         if (visible && p.count && (!inst || inst.count)) list.push(d);
       }
     }
     for (const [node, records] of this.draws) {
       for (const [index, d] of records)
         if (!d.seen) {
+          touched.push(Float32Array.from(d.sphere));
           d.uniform.destroy();
           records.delete(index);
           casters = true;
@@ -909,11 +924,23 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       if (!records.size) this.draws.delete(node);
     }
     if (casters) {
-      this.dirtyLayers.fill(1, 0, layers);
+      if (this.atlasMode && !everything) {
+        // Cached atlas faces: re-render a face only when a changed caster's old or new bounds reach its frustum.
+        for (let l = 0; l < layers; l++) {
+          if (this.dirtyLayers[l]) continue;
+          frustumPlanes(this.matrices, l * 64, this.planes);
+          for (const sphere of touched)
+            if (!outside(this.planes, sphere)) {
+              this.dirtyLayers[l] = 1;
+              break;
+            }
+        }
+      } else this.dirtyLayers.fill(1, 0, layers);
       // Layers out of use now hold stale depth for whichever directional or area light takes them next.
       this.signatures.fill(NaN, layers * SIGNATURE);
     }
-    if (this.placeMaps(c, layers)) this.dirtyLayers.fill(1, 0, layers);
+    touched.length = 0;
+    this.placeMaps(c, layers, this.dirtyLayers);
     this.changed = false;
     this.stats.layers = this.stats.draws = 0;
     let any = false;
@@ -922,7 +949,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.stats.cacheHits++;
       return;
     }
-    if (this.atlasMode) this.dirtyLayers.fill(1, 0, layers);
+    // Atlas mode: a full redraw clears the whole atlas once; a partial one clears each redrawn tile alone.
+    let full = true;
+    for (let l = 0; l < layers; l++) if (!this.dirtyLayers[l]) full = false;
+    const clearTile = this.atlasMode && !full ? this.tilePipeline(c.device) : undefined;
     // The view matches the buffer: the point and spot layers, or every layer once directional or area maps grew it.
     const upload = this.matrices.subarray(0, this.cameraLayers * 64) as Float32Array<ArrayBuffer>;
     c.device.queue.writeBuffer(this.cameras!, 0, upload, 0, layers * 64);
@@ -944,7 +974,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.dirtyLayers[l] = 0;
       this.stats.layers++;
       this.depthAttachment.view = this.layerViews[l];
-      this.depthAttachment.depthLoadOp = this.atlasMode && l > 0 ? 'load' : 'clear';
+      this.depthAttachment.depthLoadOp = this.atlasMode && (l > 0 || !full) ? 'load' : 'clear';
       const pass = c.encoder.beginRenderPass(this.depthPass);
       this.offset[0] = l * 256;
       frustumPlanes(this.matrices, l * 64, planes);
@@ -954,6 +984,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           const [x, y] = this.mapOrigin(l), height = this.viewports[l * 2 + 1];
           pass.setViewport(x, y, width, height, 0, 1);
           if (this.atlasMode) pass.setScissorRect(x, y, width, height);
+        }
+        if (clearTile) {
+          pass.setPipeline(clearTile);
+          pass.draw(3);
         }
         pass.setBindGroup(0, this.cameraGroup!, this.offset);
         for (const d of list) {
@@ -979,6 +1013,20 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       }
       pass.end();
     }
+  }
+  /** The atlas tile-clearing pipeline: one full-viewport triangle at depth 0 (far, reversed depth), depth test off. */
+  private tilePipeline(device: GPUDevice): GPURenderPipeline {
+    return (this.clearTile ??= device.createRenderPipeline({
+      label: 'clustered shadow atlas tile clear',
+      layout: 'auto',
+      vertex: {
+        module: device.createShaderModule({
+          code: '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(vec2f(f32((i<<1u)&2u),f32(i&2u))*2.0-1.0,0.0,1.0);}',
+        }),
+        entryPoint: 'vertex',
+      },
+      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'always' },
+    }));
   }
   /** Matrices and frame data of the directional and area lights' layers; marks the layers whose camera changed. */
   private extras(
@@ -1232,6 +1280,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.layerViews = [];
     this.entries = [];
     this.pipelines.clear();
+    this.clearTile = undefined;
     this.layers = 0;
     this.slots.fill(NaN);
     this.signatures.fill(NaN);

@@ -19,7 +19,7 @@ class InspectTiles extends TiledNavMesh {
 }
 
 test('borderSize allocates empty world-grid padding while preserving the world lattice and polygons', async () => {
-  await mkdir('test-results', { recursive: true });
+  await mkdir(new URL('../../../test-results/', import.meta.url), { recursive: true });
   const path = new URL('../../../test-results/batch252-border-pipeline.mjs', import.meta.url);
   await writeFile(path, await bundleBytes(fileURLToPath(new URL('../src/pipeline.ts', import.meta.url))));
   const { validate, gridOf, voxelise } = await import(path.href),

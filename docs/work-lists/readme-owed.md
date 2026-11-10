@@ -1177,3 +1177,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/environment | exr-tiled: run the `parseTiledEXR` example (levels: all) under check:readme-run; fixture `/texture-mips.exr` still to provide. | Batch 51 job 2 |
 | @margoengine/inspector | shaders: ShaderEditor.attach with a WgslMaterial mesh, recompileShader result and diagnostics, undo | batch-107 job 2 |
+
+- @margoengine/clustered (batch 52 job 4): document ShadowAtlas per-face caching (stable tiles, which changes redraw which faces); examples deferred.

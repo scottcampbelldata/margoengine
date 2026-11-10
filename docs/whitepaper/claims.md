@@ -4219,6 +4219,9 @@ The optional sciviz/link store resolves global, union and intersect view brushes
 ### Batch 186 job 2: one image, per-light screen demand
 ShadowAtlas packs every logical shadow face into one depth image, selects point/spot resolution by viewport coverage and preserves directional/area shadow composition. CPU tests prove packing, memory/work counts and live camera-driven viewports; scripts/clustered-shadow-atlas-gpu.mjs checks blocked/clear production-shader probes for point/spot lights and combined rectangle/sphere shadows on both backends. The documented PlayCanvas shadow-atlas row is implemented. No speed, exact projected-sphere bound or incremental-update claim. Limits and accepted redraw trade-offs are in limits.md.
 
+### Batch 52 job 4: cached atlas faces, update only what moved
+ShadowAtlas re-renders only the faces whose light, tile or reaching casters changed, and keeps tiles in place while their size class holds. packages/clustered/test/shadow-atlas.test.js counts the redrawn faces (7 on the first frame, 0 when still, 1 for a box moved under a point light where every face redrew before, 1 for a hidden, shown, added or removed box, 1 for an added light) and checks that a partial redraw loads the atlas and clears only its tile. scripts/clustered-shadow-atlas-gpu.mjs renders a dark floor and tall box under low bright lights from close on a real GPU: the atlas at 512 texels a face matches LocalShadows at 512 (mean under 5% of the shadow darkening, worst at most 64 of 255), a still frame redraws no face and draws the identical picture, and a moved box redraws fewer than all faces. This is a work-count claim, not a speed claim.
+
 
 
 ## Batch 136: optional clean-room Draco encoding

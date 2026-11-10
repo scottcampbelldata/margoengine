@@ -62,7 +62,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     protected get atlasMode(): boolean;
     protected prepare(_context: Context): void;
     protected mapResolution(_kind: string, _index: number, width: number, height: number): readonly [number, number];
-    protected placeMaps(_context: Context, _layers: number): boolean;
+    protected placeMaps(_context: Context, _layers: number, _dirty: Uint8Array): void;
     protected mapOrigin(_layer: number): readonly [number, number];
     constructor(options: LocalShadowOptions);
     get owner(): Engine | undefined;
