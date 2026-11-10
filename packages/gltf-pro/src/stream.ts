@@ -1,6 +1,6 @@
 import { margoError } from '../../shared/errors.js';
 import type { GLTFPrimitive } from '../../shared/gltf.js';
-import { GLB_BIN, GLB_JSON, GLB_MAGIC } from '../../shared/glb.js';
+import { GLB_BIN, GLB_JSON, GLB_MAGIC, checkBinChunk } from '../../shared/glb.js';
 import { COMPONENT_BYTES } from '../../shared/accessor.js';
 // Network and decode half of @margoengine/gltf-pro/progressive. Runs in dist/workers/progressive.js, or on the main
 // thread where Worker is unavailable. HTTP range requests fetch each primitive's accessor bytes in the priority order
@@ -26,7 +26,8 @@ import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import type { GLTFDocument, GLTFStreamSource } from './asset.js';
 
-export type StreamError = { name: string; message: string };
+/** An error as it crosses to the main thread; `code` keeps a MargoError's code. */
+export type StreamError = { name: string; message: string; code?: string };
 export type StreamMessage =
   | { type: 'fallback' }
   | { type: 'doc'; doc: GLTFDocument }
@@ -99,10 +100,10 @@ function gaps(list: number[], lo: number, hi: number): [number, number][] {
   return out;
 }
 const covered = (list: number[], lo: number, hi: number) => !gaps(list, lo, hi).length;
-const error = (e: unknown): StreamError => ({
-  name: (e as { name?: string } | null)?.name ?? 'Error',
-  message: e instanceof Error ? e.message : String(e),
-});
+const error = (e: unknown): StreamError => {
+  const { name = 'Error', code } = (e ?? {}) as { name?: string; code?: unknown };
+  return { name, message: e instanceof Error ? e.message : String(e), ...(typeof code === 'string' ? { code } : {}) };
+};
 
 export class GLTFStream {
   private order?: number[];
@@ -343,19 +344,23 @@ export class GLTFStream {
     const glb = this.sources[0],
       external = new Map<string, number>();
     let binStart = 0,
-      binLength = 0;
+      binLength = 0,
+      binDeclared = 0;
     if (glb) {
       const d = glb.data!,
         v = new DataView(d.buffer),
         at = 20 + v.getUint32(12, true);
       if (at + 8 <= d.length && covered(glb.got, at, at + 8) && v.getUint32(at + 4, true) === GLB_BIN) {
         binStart = at + 8;
-        binLength = Math.min(v.getUint32(at, true), d.length - binStart);
+        // The header's length, not the bytes received so far: a ranged load may not hold the whole chunk yet.
+        binDeclared = v.getUint32(at, true);
+        binLength = Math.min(binDeclared, d.length - binStart);
       }
     }
     const views = (doc.buffers ?? []).map((def, i) => {
       if (def?.uri === undefined) {
         if (i === 0 && glb && binLength) {
+          checkBinChunk(binDeclared, def.byteLength);
           this.map.push({ source: 0, offset: binStart });
           return glb.data!.subarray(binStart, binStart + binLength);
         }

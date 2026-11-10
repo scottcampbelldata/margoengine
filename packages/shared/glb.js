@@ -1,6 +1,6 @@
 // Binary glTF (GLB) container, from the glTF 2.0 specification section 4.4: the gltf and gltf-pro loaders, gltf-pro's
 // streamed loader and the exporters writer, splitter and joiner share these constants and one chunk walker.
-import { typeError } from './errors.js';
+import { fault, typeError } from './errors.js';
 
 /** 'glTF' magic, JSON chunk type and BIN chunk type, little-endian. */
 export const GLB_MAGIC = 0x46546c67,
@@ -8,6 +8,19 @@ export const GLB_MAGIC = 0x46546c67,
   GLB_BIN = 0x004e4942;
 
 const bad = (problem) => typeError(`GLB ${problem}; pass a whole glTF 2.0 GLB file`, 'failed');
+
+/**
+ * Rejects a BIN chunk of `chunkLength` bytes that is more than 3 bytes longer than buffer 0's `byteLength`: glTF 2.0
+ * section 4.4.3.3 allows only the padding to a 4-byte boundary, and the Khronos glTF Validator flags anything longer.
+ * A `byteLength` that is not a safe integer is left to the caller's own buffer checks.
+ */
+export function checkBinChunk(chunkLength, byteLength) {
+  if (Number.isSafeInteger(byteLength) && chunkLength > byteLength + 3)
+    throw fault(
+      'failed',
+      `GLB BIN chunk holds ${chunkLength} bytes, more than buffer 0's byteLength ${byteLength} plus 3 padding bytes; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
+    );
+}
 
 /** True when `bytes` start with the GLB magic. */
 export const isGLB = (bytes) =>

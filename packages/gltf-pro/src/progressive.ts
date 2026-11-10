@@ -3,6 +3,7 @@ import type { GLTFPrimitive } from '../../shared/gltf.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { canUseWorker } from '../../shared/worker.js';
+import { margoError } from '../../shared/errors.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import { worldRadius } from '../../shared/sphere.js';
 import {
@@ -71,10 +72,13 @@ const workerURL = () => new URL(/* @vite-ignore */ './workers/progressive.js?no-
 const CHUNK = 1 << 20,
   sourceKeys = ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'] as const;
 const errors: Record<string, ErrorConstructor> = { TypeError, RangeError, SyntaxError };
-const revive = (e: { name: string; message: string } | undefined) =>
-  new (Object.hasOwn(errors, e?.name ?? '') ? errors[e!.name] : Error)(
-    typeof e?.message === 'string' ? e.message : 'Progressive glTF worker sent an invalid message',
-  );
+// A coded MargoError keeps its name and code across the message, so `error.code` reads as on a plain loadGLTF.
+const revive = (e: { name: string; message: string; code?: string } | undefined) => {
+  const message = typeof e?.message === 'string' ? e.message : 'Progressive glTF worker sent an invalid message';
+  if (e?.name === 'MargoError' && typeof e.code === 'string')
+    return margoError(e.code as Parameters<typeof margoError>[0], message);
+  return new (Object.hasOwn(errors, e?.name ?? '') ? errors[e!.name] : Error)(message);
+};
 // A primitive's stand-in until its data arrives: the box of its POSITION accessor's min/max, in gltf-pro's 80-byte layout.
 function box(
   doc: GLTFDocument,

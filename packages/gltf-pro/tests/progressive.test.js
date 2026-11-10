@@ -78,6 +78,10 @@ const files = {
     doc.bufferViews.push({ buffer: 0, byteOffset: -(1 << 20), byteLength: 64 }); // before the GLB's first byte
     doc.images = [{ bufferView: doc.bufferViews.length - 1, mimeType: 'image/png' }];
   }),
+  // A BIN chunk 4 bytes longer than buffer 0 declares (GLB allows 3 bytes of padding).
+  '/over-padded.glb': editedGLB((doc) => {
+    doc.buffers[0].byteLength -= 4;
+  }),
   // A buffer that declares 4 GiB.
   '/huge-buffer.glb': editedGLB((doc) => {
     doc.buffers[0].byteLength = 2 ** 32;
@@ -558,6 +562,25 @@ test('progressive: an accessor past the end of its buffer rejects instead of wai
         /^RangeError: glTF mesh 0 primitive 0: POSITION \(accessor \d+\): Invalid glTF bufferView bounds(;.*)?$/,
       );
   }));
+
+// Rust engine finding A008: a BIN chunk past buffer 0's byteLength plus 3 padding bytes is not valid glTF 2.0.
+// The stream used to send only name and message, so the error reached the caller without its code.
+test('progressive: a BIN chunk more than 3 bytes longer than buffer 0 rejects with the coded error', async () => {
+  for (const worker of [false, true])
+    await withGlobals(worker, async () => {
+      for (const path of ['/over-padded.glb', '/plain/over-padded.glb'])
+        await rejectsInTime(
+          (await gpuEngine()).engine,
+          base + path,
+          (error) =>
+            error.name === 'MargoError' &&
+            error.code === 'failed' &&
+            /^GLB BIN chunk holds \d+ bytes, more than buffer 0's byteLength \d+ plus 3 padding bytes/.test(
+              error.message,
+            ),
+        );
+    });
+});
 
 // Review finding (bug 42 d): fetch follows redirects, and the final URL of an external buffer was never checked, so a
 // server could redirect a model's buffer out of its directory. Every hop now passes the same URL policy.

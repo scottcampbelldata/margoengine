@@ -19,7 +19,7 @@ import type {
   GLTFTextureInfo,
   GLTFMaterial,
 } from '../../shared/gltf.js';
-import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
+import { GLB_BIN, checkBinChunk, glbChunks, isGLB } from '../../shared/glb.js';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 export type { GLTFDocument } from '../../shared/gltf.js';
 import { withMaterials } from './default-materials.js';
@@ -513,6 +513,8 @@ export class GLTFAsset {
             : undefined;
       if (!data || length > data.length)
         throw new RangeError('Truncated glTF buffer; download the file again, it is incomplete');
+      // loadAsset passes the BIN chunk in as buffer 0's input as well as `binary`.
+      if (i === 0 && binary && (input === binary || data === binary)) checkBinChunk(binary.length, length);
       total += data.byteLength;
       if (total > maxBytes) throw overBudget('glTF buffers exceed byte budget', maxBytes);
       return data.subarray(0, length);

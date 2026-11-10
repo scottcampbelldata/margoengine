@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14765437,
+  "total": 14765787,
   "history": [
     {
       "date": "2026-10-24",
@@ -8249,6 +8249,12 @@
       "commit": "7b5fea95f",
       "reason": "MASK base colour maps keep cut-out coverage per mip level (shared/alpha-mips.js compute chain); usdz worker bundles gltf-pro",
       "grew": 7
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d70738bb7",
+      "reason": "GLB BIN chunk padding check (glTF 2.0 4.4.3.3, validator parity) with a coded error",
+      "grew": 1
     }
   ],
   "items": {
@@ -8640,7 +8646,7 @@
     "@margoengine/geometry/tessellate": 1491,
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
-    "@margoengine/gltf": 7210,
+    "@margoengine/gltf": 7560,
     "@margoengine/gltf-pro": 86524,
     "@margoengine/gltf-pro dist/workers/gltf.js": 36850,
     "@margoengine/gltf-pro dist/workers/progressive.js": 16713,

@@ -8,7 +8,7 @@ import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
 import { rejectLFSPointer } from '../../shared/lfs.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
-import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
+import { GLB_BIN, checkBinChunk, glbChunks, isGLB } from '../../shared/glb.js';
 import { entry, integer, readAccessor } from './accessor.js';
 
 const limit = 64 * 1024 * 1024;
@@ -50,7 +50,13 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
   rejectLFSPointer(data, 'The glTF input');
   if (data.length > limit) throw new RangeError('GLB exceeds 64 MiB; load a smaller file or split it');
   const chunks = glbChunks(data);
-  return { doc: json(text(chunks[0].data)), binary: chunks[1]?.type === GLB_BIN ? chunks[1].data : undefined };
+  const doc = json(text(chunks[0].data)),
+    binary = chunks[1]?.type === GLB_BIN ? chunks[1].data : undefined,
+    first = doc.buffers?.[0];
+  // Buffer 0 without a uri is the BIN chunk.
+  if (binary && first && typeof first === 'object' && first.uri === undefined)
+    checkBinChunk(binary.length, first.byteLength);
+  return { doc, binary };
 }
 function embedded(uri: string): Uint8Array {
   const match = /^data:application\/(?:octet-stream|gltf-buffer);base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);

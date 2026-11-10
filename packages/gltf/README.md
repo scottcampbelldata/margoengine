@@ -193,6 +193,12 @@ its models. `loadGLTF` and `loadAuto` check every .gltf, .glb, external .bin and
 the bytes or text it is given; a pointer rejects with a `MargoError` (code `failed`) that names the URL and links to
 https://margoengine.com/errors#git-lfs. Run `git lfs pull` where the files are served, then reload.
 
+### GLB padding
+
+A GLB's BIN chunk may be up to 3 bytes longer than buffer 0's `byteLength`, to pad it to 4 bytes (glTF 2.0 section
+4.4.3.3). `parseGLTF`, `parseGLTFAsync` and `loadGLTF` refuse a longer chunk, as the Khronos glTF Validator does, with a `MargoError` (code `failed`)
+that gives both lengths and links to https://margoengine.com/errors#failed. Export the file again.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
