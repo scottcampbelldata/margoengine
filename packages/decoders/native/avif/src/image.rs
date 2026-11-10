@@ -376,12 +376,12 @@ fn rgb_planes(
         }
         // Centered chroma except the explicitly co-sited axes. Clamp only at image edges.
         let fx = if color.sub_x {
-            (x as f64 - if color.position == 2 { 0.0 } else { 0.5 }) / 2.0
+            (x as f64 - if color.position == 0 { 0.5 } else { 0.0 }) / 2.0
         } else {
             x as f64
         };
         let fy = if color.sub_y {
-            (y as f64 - if color.position == 0 { 0.5 } else { 0.0 }) / 2.0
+            (y as f64 - if color.position == 2 { 0.0 } else { 0.5 }) / 2.0
         } else {
             y as f64
         };
@@ -529,6 +529,69 @@ fn mirror(image: &mut Image, axis: u8) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn chroma_positions_interpolate_each_axis_at_its_declared_location() {
+        // AV1 color_config semantics: CSP_VERTICAL is x=0, y=1/2 in luma units.
+        // Independent 4x4 10-bit fixture: U varies only in x, V only in y.
+        let planes = [
+            ImagePlane {
+                width: 4,
+                height: 4,
+                data: vec![512; 16],
+            },
+            ImagePlane {
+                width: 2,
+                height: 2,
+                data: vec![384, 640, 384, 640],
+            },
+            ImagePlane {
+                width: 2,
+                height: 2,
+                data: vec![384, 384, 640, 640],
+            },
+        ];
+        // Exact hand-derived bilinear samples, including clamped image edges.
+        let centered = [384.0, 448.0, 576.0, 640.0];
+        let colocated = [384.0, 512.0, 640.0, 640.0];
+        for (position, horizontal, vertical) in [
+            (0, centered, centered),
+            (1, colocated, centered),
+            (2, colocated, colocated),
+        ] {
+            let color = Color {
+                depth: 10,
+                monochrome: false,
+                primaries: 1,
+                transfer: 1,
+                matrix: 1,
+                full_range: true,
+                sub_x: true,
+                sub_y: true,
+                position,
+                separate_uv_delta_q: false,
+            };
+            let image = rgb_planes(4, 4, &color, &planes, &[]).unwrap();
+            for y in 0..4 {
+                for x in 0..4 {
+                    let luma = 512.0 / 1023.0;
+                    let cb = (horizontal[x] - 512.0) / 1023.0;
+                    let cr = (vertical[y] - 512.0) / 1023.0;
+                    // H.273 BT.709 coefficients, independent of the sampling implementation.
+                    let r = luma + 1.5748 * cr;
+                    let b = luma + 1.8556 * cb;
+                    let g = (luma - 0.2126 * r - 0.0722 * b) / 0.7152;
+                    let expected =
+                        [r, g, b, 1.0].map(|v: f64| (v.clamp(0.0, 1.0) * 65535.0 + 0.5) as u16);
+                    assert_eq!(
+                        &image.rgba[(y * 4 + x) * 4..(y * 4 + x + 1) * 4],
+                        &expected,
+                        "position {position}, pixel ({x}, {y})"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn real_mono_retains_precision_and_all_items_validate() {
         for (bytes, expected) in [

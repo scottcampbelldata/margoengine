@@ -8356,3 +8356,6 @@ Beatriz Cordero, Veronica Gomez, Ana E. Platero-Prats, Marc Reves, Jorge Echever
 
 ## AVIF review M1 (2026-11-10)
 Compared de Rivaz/Haughton, AV1 Bitstream and Decoding Process Specification (2018, errata 2023), https://aomediacodec.github.io/av1-spec/ with Concolato/Podborski/Chang, AV1 Codec ISO Media File Format Binding v1.3.0 (2024), https://aomediacodec.github.io/av1-isobmff/v1.3.0.html sections 2.3.4 and 2.4. Sample bounds supply the final unsized OBU length; configOBUs keep explicit sizes. Original derived fixtures and exact RGBA proof are described in docs/avif-review-fixes.md. No external source code read or copied.
+
+## AVIF review M2 (2026-11-10)
+Compared the AV1 color_config semantics (de Rivaz/Haughton, 2018, errata 2023, https://aomediacodec.github.io/av1-spec/#color-config-semantics) with the matching chroma_sample_position field in AV1-ISOBMFF (Concolato/Podborski/Chang, 2024, https://aomediacodec.github.io/av1-isobmff/v1.3.0.html#semantics-1). Position 1 means x=0 and y=1/2 in luma coordinates. Separate authored chroma ramps test both axes at all three supported positions, with exact RGBA16 expectations; see docs/avif-review-fixes.md. No other implementation code read or copied.

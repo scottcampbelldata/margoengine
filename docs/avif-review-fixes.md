@@ -35,3 +35,14 @@ declarations so the existing regressions can run. This follows Ecma TC39,
 https://tc39.es/ecma262/2025/#sec-module-semantics-static-semantics-early-errors.
 No navmesh runtime or assertions changed. Missing local game/web workspace links
 were also restored inside this worktree's node_modules; no manifest changed.
+
+## M2: CSP_VERTICAL chroma axes
+
+Confirmed against AV1 color_config semantics. Position 1 is horizontally co-sited
+at zero and vertically centered at half a luma sample. Corrected both offsets;
+position 0 keeps the decoder's centered default and position 2 remains co-sited
+on both axes. The Rust test constructs a 4x4 10-bit 4:2:0 plane fixture with an
+independent U horizontal ramp and V vertical ramp. Hand-derived interpolated
+values and BT.709 equations check every RGBA16 pixel exactly at positions 0, 1
+and 2, including edge clamping. Before the fix position 1 at (1, 0) produced blue
+25192 instead of 32800. No GPU path, public TypeScript API or import graph changes.

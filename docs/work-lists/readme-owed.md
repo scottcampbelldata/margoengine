@@ -1389,3 +1389,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/stage (decoder/stage review M3): document basic glTF selection, advanced gltf-pro features, animation peers, paused player and feature-specific missing-package errors; update the optional peer list and stage/gltf table during the README phase.
 
 - @margoengine/exporters (decoder/stage review L1): document coded refusal of unrepresentable float quantization ranges and the bits-0/rescale remedies during the README phase.
+
+- @margoengine/decoders (AVIF review M2): document CSP_VERTICAL horizontal co-siting and vertical centering after the build phase.
