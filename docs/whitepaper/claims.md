@@ -4644,3 +4644,7 @@ Sciviz notebook/share source imports and its manifest have no compatibility-laye
 
 ### J6 product viewer
 On the recorded RTX A6000, the public product scene combines gltf-pro, materials, environment, staging, post, DOF, tonemap, TAA, selection, ViewCube and React. Four RGBA8 probes and four draws survive actual device replacement, match across native and both ANGLE paths and dispose with zero tracked ownership. The implicit-footprint emitter regression is independently reproduced with an oblique mip fixture. No full-image, HDR-bit, speed or other-GPU claim. Methods: ../integration-product.md; proof: results/integration-j6-product.json and results/integration-j6-product-diagnosis.json.
+
+### Review 5 biased sampling
+
+On RTX A6000, 20 oblique bias/offset/filter probes (1280 f32 words) match native WebGPU bits on ANGLE D3D11 and Vulkan. This is a fixture-specific result, not a universal filtering guarantee. Methods and reproduction: [bias sampling](../review5-compat-bias.md).

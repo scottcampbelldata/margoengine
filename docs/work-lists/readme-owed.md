@@ -1513,3 +1513,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/ui: describe CurvedPanel and layoutPanels (ui/curved) with an example during the README phase (batch 132 audit).
 
 - @margoengine/exporters: cover clean-room Basis SIMD requirements, linked CSP/load errors, per-call load recovery and the external encoderPath override in README examples during the README phase.
+
+- @margoengine/webgl2-compat: add bias/offset footprint regression coverage and test:gpu:bias reproduction to examples in the README phase; the incorrect mip-blending prose is corrected by review5 now.

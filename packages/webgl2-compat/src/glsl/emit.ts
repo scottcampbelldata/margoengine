@@ -2024,7 +2024,7 @@ export class StageEmitter {
         // Implicit sampling must retain the hardware footprint: a Euclidean derivative estimate can choose a
         // different mip from the native sampler (J6 ToyCar normal map), changing every later lighting pass.
         const exactMip =
-          name !== 'textureSample' &&
+          (name === 'textureSampleLevel' || name === 'textureSampleGrad') &&
           tt.shape === 'sampled' &&
           (tt.dimension !== 'cube' || name === 'textureSampleLevel');
         const t = this.combined(texArg, rest[0], exactMip, undefined, exactMip, exactMip);
@@ -2038,8 +2038,6 @@ export class StageEmitter {
         let fn = 'texture';
         if (name === 'textureSampleBias') {
           extra = `, ${v(rest[i++])}`;
-          parameterExtra = ', float b';
-          localExtra = ', b';
         }
         if (name === 'textureSampleLevel') {
           fn = 'textureLod';
@@ -2069,14 +2067,12 @@ export class StageEmitter {
           const lod =
             fn === 'textureLod'
               ? ''
-              : `vec${n} x = ${dx} * ${scale}; vec${n} y = ${dy} * ${scale}; float l = 0.5 * log2(max(max(dot(x, x), dot(y, y)), 1e-30))${name === 'textureSampleBias' ? ' + b' : ''}; `;
+              : `vec${n} x = ${dx} * ${scale}; vec${n} y = ${dy} * ${scale}; float l = 0.5 * log2(max(max(dot(x, x), dot(y, y)), 1e-30)); `;
           const coordType = arrayed ? 'vec3' : `vec${n}`;
           const sample = (level: string) =>
             offset ? `textureLodOffset(t, p, ${level}, ${offset})` : `textureLod(t, p, ${level})`;
           const hardware = offset
-            ? name === 'textureSampleBias'
-              ? `textureOffset(t, p, ${offset}${localExtra})`
-              : `${fn}Offset(t, p${localExtra}, ${offset})`
+            ? `${fn}Offset(t, p${localExtra}, ${offset})`
             : `${fn}(t, p${localExtra})`;
           // Pass already-emitted argument values once. Re-emitting IR can consume a discard hoist twice;
           // expanding coordinates in derivatives duplicates effects. The helper also stays inside lazy operands.

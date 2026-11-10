@@ -7211,3 +7211,7 @@ Sources: Evan You and Vite contributors, *Dependency Pre-Bundling* and *Dep Opti
 (living documentation, accessed 2026-11-10), https://vite.dev/guide/dep-pre-bundling and
 https://vite.dev/config/dep-optimization-options; React team, *react-dom/test-utils Deprecation Warnings*
 (living documentation, accessed 2026-11-10), https://react.dev/warnings/react-dom-test-utils.
+
+### Review 5: biased implicit sampler footprints (2026-11-10)
+
+webgl2-compat keeps hardware implicit LOD for biased and unbiased sampling. The 20-probe oblique fixture compares 1280 f32 words exactly against native WebGPU on each of ANGLE D3D11 and Vulkan on RTX A6000. Explicit level/gradient interpolation retains its independent oracle. CPU coverage includes all supported sampled dimensions and offsets. Other GPUs and arbitrary filtering states are not certified by this fixture. Methods, sources and reproduction: [review5-compat-bias.md](../review5-compat-bias.md).

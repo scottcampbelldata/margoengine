@@ -385,9 +385,10 @@ does not check throws `WGSLError`.
 For isotropic samplers whose minification and magnification filters match and whose
 LOD clamps are integers (the default clamps are 0 and 32), linear mip filtering
 blends two integer-level hardware samples in the shader. This preserves small mip
-weights that some WebGL drivers compress away. It covers 1D, 2D, array and 3D
-sampling, and explicit-LOD cube sampling. Other sampler states and implicit cube
-sampling retain hardware filtering. The translated texture's optional `mipFilter`
+weights that some WebGL drivers compress away. It covers explicit LOD and gradient
+sampling of 1D, 2D, array and 3D textures, and explicit-LOD cube sampling. Implicit
+sampling, including bias sampling, and other sampler states retain hardware
+filtering and footprint selection. The translated texture's optional `mipFilter`
 uniform is a `vec3` containing the enable flag and the sampler's minimum/maximum
 LOD; the compatibility device supplies it automatically, along with `levels` and
 `size`. No additional texture unit is used.

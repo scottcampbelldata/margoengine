@@ -6570,3 +6570,7 @@ Sciviz notebook/share library entries use the installed backend when prepareBack
 
 ## J6 product integration
 The eleven optional product-viewer packages, including PostStack, compose with React ownership, exact RGBA8 restoration and shared cross-backend probes on RTX A6000 native WebGPU, ANGLE D3D11 and ANGLE Vulkan. Four draws and zero tracked teardown allocations are checked. webgl2-compat preserves hardware implicit footprint selection; explicit mip interpolation remains separate. Intermediate HDR bits and whole images are not promised equal. See [product methods and stored-bit proof](integration-product.md). No backend-specific probes or speed claim.
+
+## Review 5 biased implicit sampling
+
+Biased and unbiased implicit texture requests retain hardware filtering and footprint selection. Shader mip interpolation covers explicit levels and gradients only. Exact native bits are proven for the committed 20-probe bias fixture on RTX A6000, ANGLE D3D11 and Vulkan; no universal GPU filtering claim. See [methods and reproduction](review5-compat-bias.md).

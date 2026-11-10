@@ -3932,3 +3932,7 @@ common infrastructure and everything outside the claim.
 
 ### J6 product viewer and sampler diagnosis
 Run npm run build:packages, npm run test:integration:browser -- --scene=product and npm run check:examples-types -- --projects=integration-product. Run node scripts/integration-product-trace.mjs for before/after restoration pass-centre bytes on native WebGPU and ANGLE D3D11/Vulkan; it writes test-results/integration-product-trace.json and retains every scene assertion. Run node packages/webgl2-compat/test/features-browser.mjs for implicitFootprint and the unchanged explicit mip/argument checks. The old emitter can be reproduced by removing only name !== 'textureSample' from exactMip in packages/webgl2-compat/src/glsl/emit.ts and rebuilding the compatibility package; the new CPU and GPU regressions then fail. Restore that condition and rebuild before use. Numeric evidence and limits: ../integration-product.md and results/integration-j6-product-diagnosis.json.
+
+### Review 5 biased sampling
+
+Build packages, run the webgl2-compat CPU suite, then run its registered test:gpu:bias under the shared GPU lock with a five-minute hard limit. Exact commands, native-browser separation and research: [bias sampling](../review5-compat-bias.md). The test writes all hardware details and compared bits to test-results/review5-bias-bits.json.
