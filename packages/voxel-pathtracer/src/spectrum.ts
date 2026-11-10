@@ -19,15 +19,33 @@ export function cauchyB(ior: number, abbe: number): number {
   return abbe > 0 ? (ior - 1) / (abbe * (1 / (F * F) - 1 / (C * C))) : 0;
 }
 
-const lobe = (x: number, mu: number, s1: number, s2: number) => {
-  const t = (x - mu) / (x < mu ? s1 : s2);
-  return Math.exp(-0.5 * t * t);
-};
-const xyzBar = (l: number) => [
-  1.056 * lobe(l, 599.8, 37.9, 31.0) + 0.362 * lobe(l, 442.0, 16.0, 26.7) - 0.065 * lobe(l, 501.1, 20.4, 26.2),
-  0.821 * lobe(l, 568.8, 46.9, 40.5) + 0.286 * lobe(l, 530.9, 16.3, 31.1),
-  1.217 * lobe(l, 437.0, 11.8, 36.0) + 0.681 * lobe(l, 459.0, 26.0, 13.8),
+// Wyman, Sloan and Shirley 2013, Table 1 and eq. 4: weight, mean (nm), and the inverse widths below and above the
+// mean, exactly as published (Listing 1 multiplies by them), per lobe of x, y and z.
+const CMF: readonly (readonly (readonly [number, number, number, number])[])[] = [
+  [
+    [0.362, 442.0, 0.0624, 0.0374],
+    [1.056, 599.8, 0.0264, 0.0323],
+    [-0.065, 501.1, 0.049, 0.0382],
+  ],
+  [
+    [0.821, 568.8, 0.0213, 0.0247],
+    [0.286, 530.9, 0.0613, 0.0322],
+  ],
+  [
+    [1.217, 437.0, 0.0845, 0.0278],
+    [0.681, 459.0, 0.0385, 0.0725],
+  ],
 ];
+/** The CIE 1931 colour matching functions x, y, z at `l` nanometres (the fit above). */
+export const xyzBar = (l: number): number[] =>
+  CMF.map((lobes) =>
+    lobes.reduce((sum, [w, mu, below, above]) => {
+      const t = (l - mu) * (l < mu ? below : above);
+      return sum + w * Math.exp(-0.5 * t * t);
+    }, 0),
+  );
+const wgslCmf = (lobes: (typeof CMF)[number]) =>
+  lobes.map(([w, mu, below, above]) => `${w}*cmfLobe(l,${num(mu)},${below},${above})`).join('+');
 // XYZ to linear sRGB (D65), rows.
 const M = [3.2406, -1.5372, -0.4986, -0.9689, 1.8758, 0.0415, 0.0557, -0.204, 1.057];
 const rgbBar = (l: number) => {
@@ -57,11 +75,11 @@ export const SPECTRUM: string = /* wgsl */ `
 const LAMBDA_MIN=${num(LAMBDA_MIN)};
 const LAMBDA_MAX=${num(LAMBDA_MAX)};
 const LAMBDA_D=${D};
-fn cmfLobe(x:f32,mu:f32,s1:f32,s2:f32)->f32 {let t=(x-mu)/select(s2,s1,x<mu);return exp(-0.5*t*t);}
+fn cmfLobe(x:f32,mu:f32,k1:f32,k2:f32)->f32 {let t=(x-mu)*select(k2,k1,x<mu);return exp(-0.5*t*t);}
 fn spectralRgb(l:f32)->vec3f {
- let x=1.056*cmfLobe(l,599.8,37.9,31.0)+0.362*cmfLobe(l,442.0,16.0,26.7)-0.065*cmfLobe(l,501.1,20.4,26.2);
- let y=0.821*cmfLobe(l,568.8,46.9,40.5)+0.286*cmfLobe(l,530.9,16.3,31.1);
- let z=1.217*cmfLobe(l,437.0,11.8,36.0)+0.681*cmfLobe(l,459.0,26.0,13.8);
+ let x=${wgslCmf(CMF[0])};
+ let y=${wgslCmf(CMF[1])};
+ let z=${wgslCmf(CMF[2])};
  let rgb=vec3f(${M[0]}*x+${M[1]}*y+${M[2]}*z,${M[3]}*x+${M[4]}*y+${M[5]}*z,${M[6]}*x+${M[7]}*y+${M[8]}*z);
  return rgb/vec3f(${NORM.map((v) => v.toPrecision(9)).join(',')});
 }
