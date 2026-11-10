@@ -172,6 +172,7 @@ interface CreateFigureOptions extends FigureOptions {
 }
 
 interface CustomLayer {
+    readonly dimensions?: '2d' | '3d';
     readonly bounds: Bounds;
     setModel(model: Float32Array): void;
     dispose(): void;

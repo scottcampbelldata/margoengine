@@ -7612,6 +7612,12 @@
       "date": "2026-11-10",
       "commit": "batch173-job6",
       "reason": "Batch 173 job 6: optional sciviz/tetvolume absent to 6322 B min+gzip, ceiling 6578 B. Direct barycentric ray casting, validated reciprocal adjacency, stackless spatial entry/re-entry, point/cell fields, shared classification/depth, bounded physical metrics and CPU replay form one coherent optional owner. Splitting would duplicate topology and GPU lifecycle. Core + stage remains 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-174-job3",
+      "reason": "New optional sciviz/parcoords: 0 to 8860 B min+gzip, ceiling 9126 B. GPU column instancing, linked matrix/brushes and integer pixel density share one snapshot; splitting would complicate row/scale identity. Figure root 56484 B stays within its existing ceiling; core/stage source unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8998,7 +9004,8 @@
     "@margoengine/sciviz/pointcloud": 21685,
     "@margoengine/sciviz/format": 7562,
     "@margoengine/sciviz/categorical": 22371,
-    "@margoengine/sciviz/tetvolume": 6578
+    "@margoengine/sciviz/tetvolume": 6578,
+    "@margoengine/sciviz/parcoords": 9126
   },
-  "total": 14485995
+  "total": 14495121
 }

@@ -428,3 +428,6 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 
 - Batch 175 job 2: quiet-machine pointcloud streaming and picking on full large remote sources still owed. Build-phase proof uses 1-billion-point metadata with 2 loaded points/20 attribute bytes, and original USGS archived 188,887 points/2,266,644 attribute bytes; no wall-clock assertions or speed budgets ran.
 - Batch 173 job 6: quiet-machine CPU adjacency/BVH construction and direct tetrahedral GPU throughput on the 6048-cell NASA subset and larger conforming meshes. Retain exact mesh/field, cell work and optical-depth equivalence; compare with the same CellLocator image. No timing proof or exclusive GPU use during build phase.
+
+
+- Batch 174 job 3: quiet-machine 2M parallel-row/matrix and density timing plus web-library comparison still owed. Deterministic proofs: 24MB column storage, 4,000,003 line instances, 24-byte three-axis order writes and 6M density votes. Compatibility atomic density currently uses 245 CPU chunks; investigate a GPU route during speed/fix work without changing count semantics.

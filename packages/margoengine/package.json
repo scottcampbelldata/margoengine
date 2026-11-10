@@ -3535,6 +3535,10 @@
       "types": "./dist/sciviz/tetvolume.d.ts",
       "import": "./dist/sciviz/tetvolume.js"
     },
+    "./sciviz/parcoords": {
+      "types": "./dist/sciviz/parcoords.d.ts",
+      "import": "./dist/sciviz/parcoords.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

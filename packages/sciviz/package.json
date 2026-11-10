@@ -223,6 +223,10 @@
     "./tetvolume": {
       "types": "./dist/tetvolume.d.ts",
       "import": "./dist/tetvolume.js"
+    },
+    "./parcoords": {
+      "types": "./dist/parcoords.d.ts",
+      "import": "./dist/parcoords.js"
     }
   },
   "files": [
@@ -272,6 +276,7 @@
     "test:browser:table": "node scripts/browser-root.mjs tests/table-browser.mjs",
     "test:browser:pdf": "node scripts/browser-root.mjs tests/pdf-browser.mjs",
     "test:browser:pointcloud": "node scripts/browser-root.mjs tests/pointcloud-browser.mjs",
-    "test:browser:chart-polish": "node scripts/browser-root.mjs tests/chart-polish-browser.mjs"
+    "test:browser:chart-polish": "node scripts/browser-root.mjs tests/chart-polish-browser.mjs",
+    "test:browser:parcoords": "node scripts/browser-root.mjs tests/parcoords-browser.mjs"
   }
 }

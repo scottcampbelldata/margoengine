@@ -270,6 +270,8 @@ export interface HeatmapLayerOptions {
 /** Any figure layer. */
 /** A layer an optional entry builds (`@margoengine/sciviz/bricks`): it draws itself and reports its data bounds. */
 export interface CustomLayer {
+  /** Plot dimensionality. Default '3d'; optional chart layers declare '2d'. */
+  readonly dimensions?: '2d' | '3d';
   /** Data bounds of the layer. */
   readonly bounds: Bounds;
   /** The figure's data-to-scene transform. */
@@ -849,7 +851,10 @@ export class Figure extends EventTarget {
   /** Adds a layer built by an optional entry; it joins the figure's bounds and `remove()`. */
   addLayer<L extends CustomLayer>(layer: L): L {
     this.#check();
-    this.#need3d('This layer');
+    if (layer.dimensions !== undefined && layer.dimensions !== '2d' && layer.dimensions !== '3d')
+      throw typeError('Custom layer dimensions must be 2d or 3d', 'sciviz');
+    if (layer.dimensions === '2d') this.#need2d('This layer');
+    else this.#need3d('This layer');
     this.#linear('This layer');
     return this.#add(layer);
   }

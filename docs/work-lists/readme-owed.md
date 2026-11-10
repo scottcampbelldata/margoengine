@@ -1128,3 +1128,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: retain the common browser-root launcher for the engineering and pointcloud fixtures when documenting package test commands.
 - @margoengine/sciviz: document /tetvolume, conforming VTK tetrahedra, opposite-vertex adjacency, point/cell scalars, referenceStep and unit scaling, shared source controls, clipping/depth, immutable masks, lifecycle, accuracy and the declared NASA 2D extension.
 - margoengine: document the generated /sciviz/tetvolume alias in the scientific-volume section.
+
+- @margoengine/sciviz (batch 174 job 3): parcoords/matrix creation, shared row keys/scales, reorder/flip/axis and cell brushes, exact pixel density and its CPU/compatibility route, limits, disposal and the 2d CustomLayer declaration.
