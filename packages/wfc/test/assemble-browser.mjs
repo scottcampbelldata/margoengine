@@ -33,6 +33,7 @@ try {
     const { buildSocketTiles } = await import('/packages/wfc/dist/sockets.js');
     const { buildTileset, parseTilesetXML } = await import('/packages/wfc/dist/tileset.js');
     const { ConstrainedWFC } = await import('/packages/wfc/dist/constraints.js');
+    const { Overlapping3DModel } = await import('/packages/wfc/dist/overlapping3d.js');
     const { install, uninstall } = await import('/packages/webgl2-compat/dist/index.js');
     const out = [];
     for (const route of ['webgpu', 'webgl2-compat']) {
@@ -47,6 +48,16 @@ try {
       const expanded = buildTileset(definitions);
       const solved = new ConstrainedWFC([2, 1, 2], expanded).solve({ seed: 1 });
       if (expanded.length !== 8 || solved.length !== 4) throw new Error('XML symmetry solve failed');
+      const voxels = new Overlapping3DModel({ width: 2, height: 2, depth: 2, data: [0, 1, 1, 0, 1, 0, 0, 1] }).solve(
+        4,
+        4,
+        4,
+        { periodic: true, pins: [{ position: [0, 0, 0], value: 0 }] },
+      );
+      for (let z = 0; z < 4; z++)
+        for (let y = 0; y < 4; y++)
+          for (let x = 0; x < 4; x++)
+            if (voxels[x + 4 * (y + 4 * z)] !== (x + y + z) % 2) throw new Error('3D overlap seam failed');
       const canvas = document.createElement('canvas');
       canvas.width = 128;
       canvas.height = 128;

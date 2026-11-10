@@ -253,3 +253,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/webgl2-compat | Shipped Firefox BiDi matrix, environment-only executable, cross-browser oracle scope and native-adapter refusals. | Batch273 job2 |
 | margoengine | Retained XR AR extras alias after concurrent manifest integration. | Batch273 landing blocker |
+- @margoengine/wfc: document /overlapping3d sample layout, N, input/output wrapping, rotations/reflections, pins, default budgets, stats, limits and synchronous cancellation (batch 237 job 3).
+- margoengine: document generated wfc/overlapping3d alias (batch 237 job 3).
+>>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)

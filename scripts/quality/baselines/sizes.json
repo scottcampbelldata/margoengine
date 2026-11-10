@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12486928,
+  "total": 12490372,
   "history": [
     {
       "date": "2026-10-24",
@@ -6055,6 +6055,12 @@
       "commit": "996e1760c",
       "reason": "Batch 249 reactive: new optional incremental cache entry, 0 -> 1228 B gzip; queued events and mutation-safe visits.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-237",
+      "reason": "New optional wfc/overlapping3d 0 -> 3188 B min+gzip plus 256 B headroom; cubic extraction, slab adjacency and bounded graph search remain lazy to this entry.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7158,6 +7164,7 @@
     "leak @margoengine/inspector/animation -> @margoengine/lines": 1,
     "@margoengine/wfc/tileset": 2142,
     "@margoengine/splines/query": 3870,
-    "@margoengine/ecs/reactive": 1484
+    "@margoengine/ecs/reactive": 1484,
+    "@margoengine/wfc/overlapping3d": 3444
   }
 }

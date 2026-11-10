@@ -3942,6 +3942,10 @@
       "types": "./dist/wfc/tileset.d.ts",
       "import": "./dist/wfc/tileset.js"
     },
+    "./wfc/overlapping3d": {
+      "types": "./dist/wfc/overlapping3d.d.ts",
+      "import": "./dist/wfc/overlapping3d.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"

@@ -53,6 +53,10 @@
     "./tileset": {
       "types": "./dist/tileset.d.ts",
       "import": "./dist/tileset.js"
+    },
+    "./overlapping3d": {
+      "types": "./dist/overlapping3d.d.ts",
+      "import": "./dist/overlapping3d.js"
     }
   },
   "files": [
