@@ -1564,7 +1564,7 @@ Tail gain zero omits it. Total IR includes the computed onset plus tail. Integer
 mono/stereo; static geometry changes need recreation. Default/range table is in the package README.
 Pure Node geometry and real Edge convolution beside WebGPU/WebGL2 use generated stand-ins;
 real measured rooms, other browsers, listening quality and timing remain unmeasured. LIM-591.
-Reflections entry: 3,227 B gzip, budget 3,483 B.
+Reflections entry: 3,252 B gzip, budget 3,483 B.
 
 ## 2D soft shadows (batch 55)
 
@@ -1636,7 +1636,7 @@ membership may prevent the requested loudness, and the after report exposes the 
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
 Loudness entry: 2,106 B gzip, budget 2,362 B.
-Mixer root entry: 7,121 B gzip, budget 7,340 B. At the original loudness landing, core plus stage measured 23,837 B gzip.
+Mixer root entry: 7,143 B gzip, budget 7,340 B. At the original loudness landing, core plus stage measured 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)

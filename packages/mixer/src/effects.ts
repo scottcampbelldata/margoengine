@@ -87,7 +87,10 @@ function biquad(context: BaseAudioContext, band: EqBand, index: string): BiquadF
   const node = context.createBiquadFilter();
   node.type = type;
   node.frequency.value = num(band.frequency, `${index} frequency`, 10, context.sampleRate / 2, 1000);
-  node.Q.value = num(band.q, `${index} q`, -40, 1000, defaultQ(type));
+  // The same q ranges as biquadCoefficients: for bandpass, notch, allpass and peaking alpha = sin(w0) / 2q has no
+  // filter of the kind at q <= 0 (division by zero, or poles outside the unit circle), and resonance stops at 100 dB.
+  const resonance = type === 'lowpass' || type === 'highpass';
+  node.Q.value = num(band.q, `${index} q`, resonance ? -40 : 0.001, resonance ? 100 : 1000, defaultQ(type));
   node.gain.value = num(band.gain, `${index} gain`, -40, 40, 0);
   return node;
 }

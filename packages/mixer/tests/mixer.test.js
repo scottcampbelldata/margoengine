@@ -298,6 +298,10 @@ test('effect settings are validated and mapped to node parameters', () => {
     [{ type: 'eq', bands: [] }, RangeError],
     [{ type: 'eq', bands: [{ frequency: 1e9 }] }, RangeError],
     [{ type: 'eq', bands: [{ frequency: 'low' }] }, TypeError],
+    // A q the reference biquadCoefficients refuses: alpha = sin(w0) / 2q has no bandpass or notch at q <= 0.
+    [{ type: 'filter', filter: 'bandpass', frequency: 1000, q: 0 }, RangeError],
+    [{ type: 'eq', bands: [{ type: 'notch', frequency: 1000, q: -2 }] }, RangeError],
+    [{ type: 'filter', filter: 'lowpass', frequency: 1000, q: 500 }, RangeError],
     [{ type: 'compressor', ratio: 99 }, RangeError],
     [{ type: 'limiter', ceiling: 3 }, RangeError],
     [{ type: 'delay', time: -1 }, RangeError],
