@@ -6555,3 +6555,19 @@ https://doc.babylonjs.com/setup/support/webGL2/ . Both implementations suppress
 opaque meshes behind other opaque surfaces. Margo takes the CPU-depth option
 explicitly allowed by the job, avoiding asynchronous query latency. No rival
 source or companion repository was read or copied.
+## Batch 205: FBX texture bridge and BMP (2026-11-10)
+
+Written from format descriptions, without reading any rival or companion implementation.
+Compared Autodesk's embedded/external media rules with the image container standards: decode into
+straight RGBA8 rows, preserve orientation/alpha, encode PNG for the existing GLB pipeline.
+- Autodesk, *Embedding Textures*, FBX SDK Programmer's Guide (2012): https://download.autodesk.com/global/docs/fbxsdk2012/en_us/files/GUID-6DBABC7D-2CFF-49FE-9F92-74F57E8395F-6.htm
+- Microsoft, *Bitmap Header Types*, *Bitmap Storage* and *Bitmap Compression* (Win32 documentation, accessed 2026-11-10): https://learn.microsoft.com/en-us/windows/win32/gdi/bitmap-header-types , https://learn.microsoft.com/en-us/windows/win32/gdi/bitmap-storage , https://learn.microsoft.com/en-us/windows/win32/gdi/bitmap-compression
+- Microsoft, *Programming Guide for DDS* (Direct3D documentation, accessed 2026-11-10): https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide
+- Truevision, *TGA File Format Specification 2.0* (1991): https://www.loc.gov/preservation/digital/formats/fdd/fdd000180.shtml
+- Aldus Corporation, *TIFF Revision 6.0* (1992): https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf
+
+Existing TGA/TIFF/DDS decoders own their algorithms. The new BMP entry handles palette, packed RGB,
+bitfield and RLE forms; file buffers and dimensions are checked before allocation/read. Integration
+tests compare every texel of embedded and external images, test PBR hook ordering and damaged input.
+Tests use original standard-layout fixtures and the existing independently authored FBX scene.
+No external asset or implementation file was added. No new demo is introduced.

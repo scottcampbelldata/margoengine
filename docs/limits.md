@@ -4618,3 +4618,21 @@ scales with occluder triangles and covered software cells; no speed claim is mad
 Batch 223 job 1 size: culling/webgl2 new entry, 0 to 2442 B gzip. Its CPU depth
 and upload code stay together because both implement this one optional feature.
 Core plus stage remains 24,209 B gzip (under 25,000); no frozen code changed.
+### FBX optional texture formats (batch 205)
+
+`@margoengine/fbx/textures` exports `textures`, passed in `FBXOptions.extensions`. It routes embedded
+and external TGA, DDS, TIFF/TIF and BMP through decoder entries, lazily, then encodes PNG. Default
+FBX byte and pixel budgets still apply. DDS material images must be 2D; only the base mip is embedded
+in GLB, whose runtime generates its mips. Float TIFF/DDS values clamp to 0..1 and encode to sRGB PNG. The decoder entries define
+format support; damaged recognized inputs reject instead of silently dropping a texture. Unknown
+formats and missing files retain the existing missing-texture record. Multiple image hooks are tried
+in extension order, and the first successful conversion wins.
+
+`@margoengine/decoders/bmp` exports `parseBMP`, `BMPOptions`, `DecodedBMP`. Default maxPixels is
+67,108,864. OS/2 core and Windows 40/52/56/108/124-byte DIB headers, indexed 1/4/8-bit, RGB 16/24/32-bit,
+RGB/alpha bitfields, RLE4/RLE8 and top-down uncompressed rows are supported. BI_RGB 32-bit spare bytes
+are opaque. JPEG/PNG-in-BMP, OS/2 v2 compression and embedded colour-profile transforms are not supported.
+
+The texture-rgba decoder entry shares the existing textureFileToRGBA implementation with decoders/image, without container/transcoder imports. BMP and texture bridge defaults do not add a core/stage feature.
+
+Batch 205 min+gzip entry sizes: fbx/textures 586 B (new, ceiling 751 B), decoders/bmp 1,518 B (new, ceiling 1,774 B), decoders/texture-rgba 4,446 B (new, ceiling 4,702 B). The FBX worker grows from 83,143 B (ceiling 85,638 B) to 97,769 B (ceiling 100,703 B), buying all four image decoders in the classic worker. Splitting classic-worker codec delivery would add a second asset loader/protocol for this small optional feature. Core plus stage remains 16,769 B.

@@ -4462,3 +4462,6 @@ Batch 210 job 2: no open playback defect found by the loop, endpoint, event, pro
 
 
 Batch 207 object actions: generated dependency-graph instances still use export-frame world placement (objects.py keeps these as roots); animating the generating collection/pivot does not yet resample instance transforms. Repro: animate a collection-instancing empty and export with object_animation=True; ordinary mesh/empty object actions and hierarchy are covered.
+Batch 205 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=decoders` fails during plan construction because packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs are not registered in the runner; direct changed-package commands cover this job. Owning runner registration waits for its lane/fix phase.
+
+Fixed within batch 205: FBX previously selected only the first image hook, so an image converter later in extensions was unreachable. The reader now tries registered converters in order; packages/fbx/test/textures.test.js covers PBR plus textures in either order.

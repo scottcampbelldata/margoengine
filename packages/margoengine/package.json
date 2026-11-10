@@ -894,6 +894,14 @@
       "types": "./dist/decoders/draco-points.d.ts",
       "import": "./dist/decoders/draco-points.js"
     },
+    "./decoders/bmp": {
+      "types": "./dist/decoders/bmp.d.ts",
+      "import": "./dist/decoders/bmp.js"
+    },
+    "./decoders/texture-rgba": {
+      "types": "./dist/decoders/texture-rgba.d.ts",
+      "import": "./dist/decoders/texture-rgba.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"
@@ -1221,6 +1229,10 @@
     "./fbx/pbr": {
       "types": "./dist/fbx/pbr.d.ts",
       "import": "./dist/fbx/pbr.js"
+    },
+    "./fbx/textures": {
+      "types": "./dist/fbx/textures.d.ts",
+      "import": "./dist/fbx/textures.js"
     },
     "./fsm": {
       "types": "./dist/fsm.d.ts",

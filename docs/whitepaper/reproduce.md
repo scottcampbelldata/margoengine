@@ -3072,3 +3072,7 @@ reduction, immediate reveal after moving a wall and disabling culling. Data is
 Cesium Box (2017), CC BY 4.0, recorded in THIRD-PARTY-NOTICES.md. CPU contracts:
 `node --test --test-timeout=120000 packages/culling/test/webgl2.test.js`.
 No timing assertions or benchmarks run during the build phase.
+### FBX texture bridge (batch 205)
+
+After `npm run build:packages`, run `node --test --test-timeout=60000 packages/fbx/test/textures.test.js packages/decoders/tests/bmp.test.js`.
+Each bridge test independently decodes the produced GLB's PNG and compares every RGBA byte.

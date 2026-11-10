@@ -3588,3 +3588,11 @@ backends. Camera motion and a camera inside the crowd also match. This establish
 opaque mesh occlusion comparable to the documented Babylon WebGL2 query behaviour,
 with conservative full-cell coverage instead of asynchronous queries. It does not
 claim universal hidden-object rejection or a speed advantage. See clean-room.md.
+### FBX texture formats (batch 205)
+
+The optional textures entry preserves TGA, DDS, TIFF and BMP material images through the existing
+GLB PBR path. Proof: `packages/fbx/test/textures.test.js` compares exact decoded PNG pixels for
+embedded and fetched versions of all four formats, including BC1 DDS; tests hook composition in
+both orders and rejection of recognized damaged input. `packages/decoders/tests/bmp.test.js` checks
+row direction/padding, indexed pixels, RGB/alpha masks, OS/2, RLE escapes and invalid bounds.
+This proves the requested format routing; it makes no claim of arbitrary vendor extensions.

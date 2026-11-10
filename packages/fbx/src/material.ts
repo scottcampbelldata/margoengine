@@ -30,7 +30,7 @@ export async function attachMaterials(
     }
   };
   const hook = ctx.extensions.find((extension) => extension.material),
-    converter = ctx.extensions.find((extension) => extension.image),
+    converters = ctx.extensions.filter((extension) => extension.image),
     /** What each texture could not find, for the material's record. */
     lost = new Map<FBXNode, string>();
   const texture = async (source: FBXNode): Promise<TextureData | undefined> => {
@@ -84,7 +84,11 @@ export async function attachMaterials(
         bytes.length > 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71,
       jpeg = image.length > 3 && image[0] === 255 && image[1] === 216 && image[2] === 255;
     if (!isPNG(image) && !jpeg) {
-      const converted = await converter?.image?.(image);
+      let converted: Uint8Array | undefined;
+      for (const converter of converters) {
+        converted = await converter.image?.(image);
+        if (converted) break;
+      }
       if (!converted) {
         lost.set(source, objectName(source));
         return undefined;

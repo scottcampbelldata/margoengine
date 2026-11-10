@@ -430,3 +430,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/culling: document /webgl2 WebGL2Culling and SoftwareDepthBuffer, resolution, conservative coverage, per-view buffers, toggling and disposal (batch 223 job 1).
 
 - margoengine: document the generated culling/webgl2 alias (batch 223 job 1); no README examples were written during the build phase.
+- @margoengine/fbx (batch 205 textures): document textures extension, decoder formats, PBR composition, worker support and limits; examples deferred.
+- @margoengine/decoders (batch 205 BMP): document parseBMP formats, maxPixels, alpha and unsupported compression; examples deferred.
+- @margoengine/decoders (batch 205 texture-rgba): document the raw texture conversion entry; examples deferred.
+- margoengine (batch 205): document generated fbx/textures, decoders/bmp and decoders/texture-rgba aliases; examples deferred.

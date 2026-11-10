@@ -2218,6 +2218,10 @@ Batch 207 object actions: local hierarchy is checked against Blender evaluated w
 Batch 209 headless/tiles: optional capture crops a copied view-projection in clip space and reads bounded WebGPU tiles. CPU coverage includes cancellation and alpha-aware linear accumulation. tiles-gpu.mjs checks exact full-frame equivalence, four-sample coverage, canvas restoration and output wider than the real GPU limit; WebGL2 refusal is explicit. Nonlocal or temporal effects remain outside tiled still correctness. No core or stage code changes.
 
 Batch 208 cache browser evidence now includes prefetch and throttle in native window/service worker realms and exact offline RangeCache bytes from a replacement worker instance. Tests scope registration changes to their origin and use respondWith/waitUntil for lifetime. The existing test:browser command owns this storage-only proof; no GPU slot or rendering backend check is needed. Real throughput remains in the deferred speed-phase list.
+Batch 205 textures: exact embedded/external TGA, DDS, TIFF and BMP pixels are checked in CPU conversion tests.
+`packages/fbx/test/textures-browser.mjs` renders all four on the page and in the FBX worker through the real PBR pipeline and reads back red pixels
+on WebGPU and the WebGL2 compatibility layer. Raw DDS pixel conversion has its own decoder entry to avoid
+pulling unrelated Basis/KTX2/image decoders into the classic FBX worker. No core/stage or shader math changes.
 
 Batch 208 cache/decoded adds a 4,540 B gzip ceiling (4,284 B measured, previously absent) for a coherent typed-result cache over the existing transactional storage. Browser proof uses real shipped Draco/KTX2 workers and the attributed Box/Rib_N assets, then verifies all array hashes and metadata across reload without a second decode. CPU tests cover key partitions, cancellation, storage failure and eviction; this path does not submit GPU work.
 

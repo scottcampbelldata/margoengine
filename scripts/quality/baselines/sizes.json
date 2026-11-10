@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12888931,
+  "total": 12911223,
   "history": [
     {
       "date": "2026-10-24",
@@ -6410,6 +6410,12 @@
       "commit": "batch-223-job-1",
       "reason": "New optional culling/webgl2 entry 0 to 2442 B gzip, full-cell CPU depth and per-view compaction; one cohesive feature avoids duplicated depth code. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "6ab64e777",
+      "reason": "Batch 205 optional FBX textures (586 B), BMP (1518 B) and raw RGBA (4446 B) entries; FBX worker 83143 to 97769 B adds four texture decoders without a second classic-worker asset protocol",
+      "grew": 4
     }
   ],
   "items": {
@@ -6700,7 +6706,7 @@
     "@margoengine/exporters/usdz-anim": 20969,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 22144,
-    "@margoengine/fbx dist/workers/fbx.js": 85638,
+    "@margoengine/fbx dist/workers/fbx.js": 100703,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
     "@margoengine/fbx/export": 8525,
@@ -7585,6 +7591,9 @@
     "@margoengine/ui/i18n": 1936,
     "@margoengine/voxel-pathtracer/mesh-pbr": 38350,
     "@margoengine/road/intersections": 2421,
-    "@margoengine/culling/webgl2": 2698
+    "@margoengine/culling/webgl2": 2698,
+    "@margoengine/fbx/textures": 751,
+    "@margoengine/decoders/bmp": 1774,
+    "@margoengine/decoders/texture-rgba": 4702
   }
 }

@@ -9,10 +9,11 @@ import { animationLayers } from './layers.js';
 import { nurbsCurves } from './curves.js';
 import { deformers } from './deformers.js';
 import { pbrMaterials } from './pbr.js';
+import { textures } from './textures.js';
 import { sceneExtras } from './scene-extras.js';
 const budget = 64 * 1024 * 1024; // convertFBX's input budget
 // Functions cannot cross to a worker, so the page sends names and the worker holds every entry.
-const known: readonly FBXExtension[] = [sceneExtras, animationLayers, pbrMaterials, nurbsCurves, deformers];
+const known: readonly FBXExtension[] = [sceneExtras, animationLayers, pbrMaterials, nurbsCurves, deformers, textures];
 type FBXJob = {
   url?: string;
   input?: ArrayBuffer;

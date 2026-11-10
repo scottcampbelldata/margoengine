@@ -134,6 +134,14 @@
     "./draco-points": {
       "types": "./dist/draco-points.d.ts",
       "import": "./dist/draco-points.js"
+    },
+    "./bmp": {
+      "types": "./dist/bmp.d.ts",
+      "import": "./dist/bmp.js"
+    },
+    "./texture-rgba": {
+      "types": "./dist/texture-rgba.d.ts",
+      "import": "./dist/texture-rgba.js"
     }
   },
   "files": [
