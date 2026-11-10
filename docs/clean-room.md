@@ -8232,3 +8232,27 @@ Map keys are validated and normalized before upload, with number/bigint aliases 
 The empty-product review also covers Col2Im, AffineGrid, ROI outputs and FeatureVectorizer: zero elements terminate before traversal of metadata rows or interpolation grids. The regression passes a billion-row, zero-width batch through Col2Im and FeatureVectorizer and checks exact empty shapes, without a timing assertion. This is the same row-major tensor product invariant from the ONNX IR and the work-count reasoning already cited above; no benchmark or reduced nonempty workload was introduced.
 ## Batch 179 notebook bridge (2026-11-10)
 Compared Trevor Manz, Nezar Abdennur and Nils Gehlenborg, anywidget: reusable widgets for interactive analysis and visualization in computational notebooks (2024), https://doi.org/10.21105/joss.06939 ; Trevor Manz, Nils Gehlenborg and Nezar Abdennur, Any notebook served: authoring and sharing reusable interactive widgets (2024), https://doi.org/10.25080/NRPV2311 ; Fritz Lekschas and Trevor Manz, Jupyter Scatter: Interactive Exploration of Large-Scale Datasets (2024), https://arxiv.org/abs/2406.14397 ; Jupyter contributors, Messaging in Jupyter, protocol 5.5 (2026), https://jupyter-client.readthedocs.io/en/stable/messaging.html ; anywidget contributors, Anywidget Front-End Module specification (2026), https://anywidget.dev/en/afm/ ; Apache Arrow contributors, Arrow Columnar Format (2026), https://arrow.apache.org/docs/format/Columnar.html . The papers motivate a portable AFM and bidirectional state, the messaging standard supplies binary attachments, and Arrow specifies offsets, validity and contiguous numeric buffers. Combine them with Margo's existing portable FigureSpec and SHA-256 rather than a Python rendering implementation or a new transport. Source-offset tests prove borrowing; null/chunk/endian tests prove explicit conversion. Public host guidance: marimo contributors, AnyWidget (2026), https://docs.marimo.io/api/inputs/anywidget/ ; Posit contributors, Jupyter Widgets (2026), https://quarto.org/docs/interactive/widgets/jupyter.html . No rival, companion or external implementation source was read or copied. Existing OpenNeuro CC0 and NASA Exoplanet public assets retain their recorded sources and licences.
+
+## Batch 274 job 6: signed int8 contractions (2026-11-10)
+
+Clean-room implementation in packages/compute/src/quant.ts, without reading any
+companion implementation or rival source. Research compared affine integer MACs,
+per-channel quantization and the published operator contract:
+- Benoit Jacob, Skirmantas Kligys, Bo Chen, Menglong Zhu, Matthew Tang, Andrew Howard,
+  Hartwig Adam and Dmitry Kalenichenko (2018), Quantization and Training of Neural
+  Networks for Efficient Integer-Arithmetic-Only Inference, CVPR.
+  https://arxiv.org/abs/1712.05877 . Used affine scale/zero-point reconstruction,
+  zero-point subtraction before integer contraction and accumulator-domain bias.
+- Raghuraman Krishnamoorthi (2018), Quantizing deep convolutional networks for
+  efficient inference: A whitepaper. https://arxiv.org/abs/1806.08342 . Combined
+  per-channel weight scales with per-tensor activations for convolution.
+- ONNX contributors (operator v10, documentation consulted 2026), QLinearConv and
+  QLinearMatMul. https://onnx.ai/onnx/operators/onnx__QLinearConv.html and
+  https://onnx.ai/onnx/operators/onnx__QLinearMatMul.html . Used broadcast/vector
+  matmul, grouped spatial contraction, bias units, affine real-zero padding and
+  nearest-even output rounding. Signed int8 is this job's scope, not all ONNX types.
+
+The original implementation combines packed signed bytes, exact int32 contraction,
+f32 output rescaling and independent float64 reference/error-propagation tests.
+The rescale uses f32 rather than claiming Jacob's fixed-point-only epilogue.
+Details, limits and reproducible checks: docs/compute-quant.md. No speed result.

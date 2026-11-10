@@ -4478,3 +4478,12 @@ Density pixel comparison evidence is frozen in results/batch181-density.json: ac
 ## Batch 274 job 5: optional ONNX supported profile
 Claim: compute/onnx loads protobuf ONNX graphs and executes its supported kernels using isolated lazy Rust SIMD Wasm, with exact 64-bit tensor storage, lexical control flow and owned results. Proof: onnx.test.js, onnx-operators.test.js, onnx-kernel.test.js and onnx-reference.test.js; onnx-browser.mjs runs the unchanged MNIST published reference and 96 pinned external analytic comparisons in Chromium. Named unsupported operators reject during loading with a coded domain/operator/opset error. Coverage and accepted PROBIT/post-transform differences are in clean-room.md and limits.md. This is the supported profile authorized for landing, not full ONNX catalogue equivalence, GPU inference or a speed claim.
 - Batch 179 notebook bridge: typed optional AFM /notebook and a thin Python anywidget wrapper load the web FigureSpec with hash-checked binary NumPy/Arrow attachments. CPU tests prove exact byte offsets, borrowed aligned storage, nullable/chunk/endian conversion, explicit precision rejection and late-load disposal. notebook-browser renders existing OpenNeuro and Exoplanet data on native and compatibility backends, checks two-way camera/selection, portable reload, replacement and offline zero-HTTP HTML. sciviz-jupyter-browser uses a real kernel for both datasets and both state directions. The standard AFM enables the documented host integration; separately exercised VS Code/Colab/marimo sessions are not claimed. No end-to-end zero-copy or timing claim.
+
+## Batch 274 job 6: signed int8 inference
+
+The optional @margoengine/compute/quant entry provides packed int8 broadcast matmul
+and grouped/dilated Conv2d on TS CPU, WebGPU and the existing WebGL2 compute layer.
+Proof: packages/compute/tests/quant.test.js and quant-browser.mjs share an independent
+float64 oracle, exact small dyadic byte results and the error bounds documented in
+docs/compute-quant.md. This is correctness evidence only, not a latency, universal
+accuracy or integer-only epilogue claim. Research is recorded in docs/clean-room.md.

@@ -5029,3 +5029,7 @@ Batch 181 gate observation: `node scripts/gpu-package-tests.mjs --no-build --onl
 - Batch 180 job 5 visual review: add two named heatmaps to a default Figure, then remove the first. Figure.#updateLegend sets element.hidden=true when only one remains, but Legend's inline display:grid overrides the browser's hidden rule, leaving both old legend rows visible. Repro: select several field reductions in examples/sciviz-temporal.html; evidence test-results/sciviz-temporal-webgpu.png. Numerical fields and exported pixels without overlays are correct. Small existing legend presentation gap deferred under rules 21/22; fix the owning legend visibility and add its DOM/browser regression in the fix phase.
 
 Batch 181 job 4 fixed before landing: density scatter replacement must retain the source's original visibility across native updateData cloud replacement, including when the replacement is hidden and disposed before its next frame. Cause: capturing the new cloud's logical replacement visibility overwrote the original source visibility, and disposal could still address the old cloud. Regression: packages/sciviz/tests/density.test.js, hidden replacement before/after preparation. All source votes and analytical counts are unaffected.
+
+Batch 274 job 6: no open correctness defect found in signed int8 matmul/Conv2d.
+Conservative accumulator limits and f32 rescale error bounds are documented in
+docs/compute-quant.md; independent float-reference cases cover CPU and both GPU backends.

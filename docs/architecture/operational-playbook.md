@@ -6872,3 +6872,16 @@ Batch 181 density: optional sciviz/density bins every projected finite source po
 ### Section 5 evidence: batch 274 ONNX supported profile
 The optional compute/onnx entry owns a separate lazy Rust SIMD Wasm module per model; core/stage and existing device dispatch are unchanged. Node/native tests cover analytic kernels, exact integer storage, resource reclamation, cancellation and lexical graphs; Chromium runs the published MNIST reference plus 96 pinned analytic comparisons. ONNX does not request a GPU device; existing compute GPU routes are checked separately on native WebGPU and compatibility. Unsupported operators fail during load with coded operator/opset diagnostics. Deferred groups and precision/opset review are explicit in limits.md; no device-native inference or speed claim.
 Batch 179 notebook evidence (section 5): /notebook owns the AFM lifecycle and model camera/selection events. /spec owns hash-checked named binary attachment decoding and the existing aggregate allocation/cancellation limits. Python owns buffer adaptation and hands all drawing to the web. Native and compatibility GPU tests render the real OpenNeuro T1 and Arrow Exoplanet payloads, test two-way state and replacement/disposal, and navigate offline files with HTTP blocked. A real JupyterLab kernel checks binary comm and both event directions. No core/stage or backend maths changes. Session acceptance for other notebook hosts is still missing; no rendering or speed claim extends beyond these checks.
+
+### Section 5 evidence: batch 274 job 6 int8 inference
+
+The optional compute/quant entry packs four signed bytes per word. Native WebGPU
+and the existing WebGL2 layer execute the same int32 MAC kernels, including
+nonzero zero points, per-channel weights, depthwise/groups and affine real-zero
+padding. CPU TypeScript implements the same contraction and f32 requantization.
+Each output word has one writer; packed results chain without CPU readback.
+The common independent float64 oracle checks 1,574 cases per backend against
+explicit quantization/error-propagation bounds (docs/compute-quant.md). Validation
+rejects potential accumulator overflow and invalid f32 multipliers before dispatch.
+Core, stage and protected browser lifecycle files are unchanged. No speed evidence
+or Wasm speed claim is introduced.

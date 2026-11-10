@@ -6307,3 +6307,23 @@ Batch 274 job 5 measured ONNX entry: 0 to 10139 B min+gzip, new ceiling 10444 B;
 - Batch 179 notebook: optional /notebook AFM plus a thin local Python anywidget wrapper. Defaults: 480 CSS pixels (100..4000), auto backend, 256 MiB aggregate decode budget, empty 3D spec and plot limits [0,1,0,1,0,1]. SHA-256 binary attachments borrow aligned little-endian numeric views; dtype/offset conversions, comm framing, recorder snapshots and GPU uploads can copy. Null/multi-chunk Arrow converts explicitly; int64 outside +/-2^53 rejects. Borrowed mutations need refresh(). No Python renderer or runtime CDN. Static HTML retains interaction but no live Python callbacks. Actual GPU evidence covers both backends and offline files; actual kernel evidence covers JupyterLab. Other AFM hosts use the same standard contract; interactive VS Code/Colab/marimo acceptance remains separately owed. No speed claim.
 
 - Batch 179 notebook sizes: new /notebook 0 to 1831 B min+gzip, ceiling 2095 B. The view lifecycle stays together; splitting duplicates cancellation/model ownership. /spec with binary attachment support is 27550 B (existing ceiling 27920 B). Core + stage stays 24209 B. The local Python wheel includes a bundled AFM and codecs; its built file size is recorded in local build output, not part of the tiny optional entry measurement.
+
+## Compute quantized inference (batch 274 job 6)
+
+`@margoengine/compute/quant` uses signed int8 packed four per word. Matmul supports
+vector promotion and broadcast batches, per-row activation and per-column weight
+parameters shared across batches. Conv2d uses NCHW/OIHW, per-tensor activations,
+per-output-channel weights, groups/depthwise, stride, dilation and explicit or same
+padding. Output parameters are per tensor. Int32 accumulator overflow is rejected
+conservatively, including bias. Dimensions and index products must fit signed
+32-bit indexing and device storage/dispatch limits. Nearest-even f32 requantization
+is lossy and saturates. Float-reference error bounds, scale representability and
+finite-output assumptions are in docs/compute-quant.md. No latency or model-wide
+accuracy claim; uint8, training and integer-only requantization are outside this
+signed-int8 entry. Core and stage receive no changes.
+
+The new optional /quant entry measures 3,927 B minified gzip (previously absent,
+0 B), with a 4,183 B quality ceiling. The bytes provide both backends, packed
+storage and validation in one optional module; splitting would add loading and
+API complexity without reducing core/stage. The core + stage root remains
+24,209 B gzip in this build, below its unchanged 25,000 B ceiling.

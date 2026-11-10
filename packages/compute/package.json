@@ -95,6 +95,10 @@
     "./onnx": {
       "types": "./dist/onnx.d.ts",
       "import": "./dist/onnx.js"
+    },
+    "./quant": {
+      "types": "./dist/quant.d.ts",
+      "import": "./dist/quant.js"
     }
   },
   "files": [
@@ -129,6 +133,7 @@
     "test:browser:cpu-wasm": "cd ../.. && node packages/compute/tests/cpu-wasm-browser.mjs",
     "test:browser:nn-extra": "cd ../.. && node packages/compute/tests/nn-extra-browser.mjs",
     "build:onnx": "node scripts/build-onnx.mjs",
-    "test:browser:onnx-wasm": "cd ../.. && node packages/compute/tests/onnx-browser.mjs"
+    "test:browser:onnx-wasm": "cd ../.. && node packages/compute/tests/onnx-browser.mjs",
+    "test:browser:quant": "cd ../.. && node packages/compute/tests/quant-browser.mjs"
   }
 }

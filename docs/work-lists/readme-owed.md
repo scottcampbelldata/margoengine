@@ -1326,3 +1326,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: document /notebook AFM, named binary spec attachments, camera/selection traits and static export after build phase.
 - margoengine and @margoengine/viz: document generated sciviz/notebook forwarding entries after build phase.
 - Python margoengine: document NotebookFigure, local notebook extra, private wheel build, NumPy/Arrow borrowing, refresh and host/static HTML integration after build phase.
+
+- @margoengine/compute (batch 274 job 6): document /quant upload, per-channel affine int8 parameters, broadcast matmul, grouped Conv2d, packed lifetime, bias units, cancellation and float-reference error bounds.

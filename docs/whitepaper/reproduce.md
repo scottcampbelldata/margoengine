@@ -3848,3 +3848,14 @@ Density pixel-only rival reproduction: install regl-scatterplot@1.16.0, @deck.gl
 
 Batch 274 job 5 ONNX: after build:packages, run node --test --test-timeout=120000 packages/compute/tests/onnx*.test.js and node packages/compute/tests/onnx-browser.mjs. Native kernel: cargo test --locked --manifest-path packages/compute/onnx-kernel/Cargo.toml. Browser ONNX is CPU Wasm and takes no GPU slot. The pinned references require no external runtime to reproduce; clean-room.md records the optional external reference regeneration, provenance and versions.
 Batch 179 notebook: follow docs/guides/sciviz-notebooks.md. Build sciviz and run node python/build-notebook.mjs; prepare the existing Python test venv with anywidget and pyarrow; execute python/tests/notebook-fixtures.py. Run notebook*.test.js with experimental module mocks and python/tests/test_notebook.py. Run packages/sciviz/tests/notebook-browser.mjs and python/tests/sciviz-jupyter-browser.mjs under the shared GPU lock with hard hold limits. Local artifacts are test-results/sciviz-notebook/{webgpu,webgl2}.json, the offline pages/screenshots and test-results/sciviz-jupyter/jupyterlab.png. No benchmark is run.
+
+## Batch 274 job 6: quantized contractions
+
+Build with npm run build:packages. CPU: node --test --test-timeout=120000
+packages/compute/tests/quant.test.js. GPU: node scripts/gpu-lock.mjs run
+--owner=quant-reproduce --max=4 --wait-max=60 -- node
+packages/compute/tests/quant-browser.mjs. The browser script checks native WebGPU
+and forced WebGL2 sequentially, using 1,574 shared float-reference checks each and
+a WGSL compilation guard. The analytical sine-valued fixtures are original test
+data, not a third-party model or demo. Error formulas and all defaults are in
+docs/compute-quant.md; no timing benchmark is part of this check.

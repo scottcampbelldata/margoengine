@@ -7937,6 +7937,12 @@
       "commit": "batch-179-notebook",
       "reason": "New optional AFM notebook entry 0 to 1831 B gzip, ceiling 2095 B. Named hash-checked binary buffers, per-view cancellation/disposal and two-way camera/selection share one view owner; splitting duplicates that lifecycle. Existing spec entry 27550 B remains under its 27920 B ceiling. Core plus stage stays 24209 B. Python frontend is bundled locally, never loaded by core/stage.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "97ecaf26f",
+      "reason": "Batch 274 job 6 adds optional signed int8 inference: entry absent (0 B) to 3927 B gzip, 4183 B ceiling; packed CPU/WebGPU matmul and grouped Conv2d share validation and exact int32 MACs. Splitting this small optional entry would add API and loading complexity without reducing core or stage.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9366,7 +9372,8 @@
     "margoengine/web": 577,
     "@margoengine/sciviz/density": 5071,
     "@margoengine/compute/onnx": 10444,
-    "@margoengine/sciviz/notebook": 2095
+    "@margoengine/sciviz/notebook": 2095,
+    "@margoengine/compute/quant": 4183
   },
-  "total": 15356831
+  "total": 15361014
 }
