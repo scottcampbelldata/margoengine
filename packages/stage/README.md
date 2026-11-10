@@ -35,6 +35,44 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
 
+### Options and defaults
+
+`createStage(target, options)` takes every [core engine option](../core/README.md) (`backend`, `camera`, `capacity`,
+`fallback`, `features`, `exactSize`, `signal`, `startupWarning`, `startupTimeout`, `powerPreference`) and four of its own:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `controls` | `true` | Attach CAD camera controls to the canvas; `false` leaves the camera to you. |
+| `autoStart` | `true` | Start the frame loop at once; `false` renders only when you call `app.engine.render()`. |
+| `label` | `'Interactive 3D scene'` | Accessible label of a canvas the stage creates. |
+| `onError` | none | Receives engine errors, such as a lost WebGL2 context. |
+
+Mesh options (`box`, `sphere`, `mesh`): `color` `'#4f46e5'`, `roughness` 0.5, `metalness` 0, `doubleSided` true, `position`,
+`rotation` and `scale` unset (origin, no rotation, scale 1), `parent` none (a root mesh), `name` `''`, `scene` the default
+scene. `box` adds `size` `[1, 1, 1]`; `sphere` adds `radius` 1 and `segments` 32 (an integer from 3 to 256).
+
+```ts
+import {createStage, Camera, box} from 'margoengine';
+
+const app = await createStage('#scene', {
+  controls: false,
+  autoStart: false,
+  label: 'A crate on a plate',
+  onError: (error) => console.error(error),
+});
+const plate = app.box({size: [4, 0.2, 4], color: '#c8c8c8', name: 'plate'});
+const crate = app.mesh(box(1, 1, 1), {parent: plate, position: [0, 0.6, 0], color: '#c0792b'});
+const ball = app.sphere({radius: 0.4, segments: 24, position: [1.2, 0.5, 0]});
+const stop = app.onTick((delta) => { crate.rotation.y += delta; });
+app.use({name: 'example-plugin', setup() {}});
+app.fit([plate, crate, ball]);
+app.engine.render();
+stop();
+console.log(app.signal.aborted, app.engine.camera instanceof Camera);
+app.dispose();
+console.log(app.signal.aborted);
+```
+
 ## CAD camera controls
 
 `createStage` attaches `CADCameraControls` unless `controls: false`: left drag orbits the pivot, middle, right or

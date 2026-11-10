@@ -113,8 +113,8 @@ package is added only after recording the base install. No symlink to workspace 
 
 Reproduce: build packages; run `node scripts/kit-install-check.mjs`; then run
 `node scripts/gpu-lock.mjs run --owner=kit-check --wait-max=60 --max=4 --gpu=packed-kit-first-frames -- node scripts/kit-browser-check.mjs`.
-The packed-install CPU check is part of local CI's verify. Lanes run the fast gate only. README examples are owed
-in [readme-owed.md](../work-lists/readme-owed.md) during the build phase.
+The packed-install CPU check is part of local CI's verify. Each kit README holds one example that
+`npm run check:readme-run -- --packages=game,web,viz,react-kit` runs as written.
 
 ## Contents
 

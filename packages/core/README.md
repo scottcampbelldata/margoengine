@@ -56,6 +56,10 @@ engine.start();
 | `fallback` | none | Builds the non-WebGPU renderer, for example `webglRenderer` from `@margoengine/webgl2-compat/preview`. |
 | `features` | `[]` | Extra WebGPU features to request when the adapter offers them, such as `['timestamp-query']`. |
 | `exactSize` | `false` | `[width, height]` or `true`: pixel-exact backbuffer with no pixel-ratio scaling and no MSAA ([Pixel-perfect rendering](#pixel-perfect-rendering)). |
+| `signal` | none | An `AbortSignal` that cancels creation; it rejects with the signal's reason and never falls back ([Startup that never finishes](#startup-that-never-finishes)). |
+| `startupWarning` | `8000` | Milliseconds a startup step may take before one `console.warn` names it. |
+| `startupTimeout` | `30000` | Milliseconds before a startup step that never settles rejects with a `timeout` error. |
+| `powerPreference` | unset | `'low-power'` or `'high-performance'`; unset asks for `'high-performance'`, and for nothing on Windows ([Choosing the GPU](#choosing-the-gpu)). |
 
 `delta` is in seconds. The built-in loop clamps a long frame to `engine.maxDelta` (default `0.1`; keep it at 1 or less, since `render` rejects a larger delta with a RangeError), and when the page becomes visible again after a background tab its first frame steps `0`, so animation and physics resume where they paused instead of jumping.
 
@@ -121,6 +125,34 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
   plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is
   drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
 - Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
+
+## Camera, geometry, materials and picking
+
+Every setting has a default, so `new Camera()`, `box()` and `new PbrMaterial()` are valid as they stand.
+
+| Call | Settings and defaults |
+| --- | --- |
+| `new Camera(options)` or the `camera` engine option | `fov` 60 (degrees), `position` `[0, 2, 5]`, `target` `[0, 0, 0]`, `near` 0.1, `far` 1000. `up` defaults to `[0, 1, 0]`. |
+| `box(width, height, depth)` | 1 world unit each, centred on the origin; a size that is not finite and positive throws `RangeError`. |
+| `new PbrMaterial(options)` | `color` `'#4f46e5'`, `roughness` 0.5, `metalness` 0, `doubleSided` true. |
+| `engine.pick(x, y)` | CSS pixels; resolves to the mesh under that point, or `null`. |
+
+```ts
+import { Camera, Engine, PbrMaterial, box } from '@margoengine/core';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {
+  camera: { fov: 50, position: [0, 3, 8], target: [0, 1, 0], near: 0.1, far: 200 },
+});
+const crate = engine.createMesh()
+  .setGeometry(box(2, 1, 1))
+  .setMaterial(new PbrMaterial({ color: '#c0792b', roughness: 0.8, metalness: 0, doubleSided: false }));
+crate.position.set(0, 0.5, 0);
+engine.render();
+const hit = await engine.pick(canvas.clientWidth / 2, canvas.clientHeight / 2); // a Mesh or null
+console.log(hit === crate, engine.camera instanceof Camera);
+engine.dispose();
+```
 
 ## Bulk poses and instance rows (extension)
 
