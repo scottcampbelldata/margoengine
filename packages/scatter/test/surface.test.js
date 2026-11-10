@@ -99,3 +99,23 @@ test('surface scatter refuses malformed and overflowing options, cancellation an
   tooFar[13] = 3e38;
   assert.throws(() => scatterSurface(data, 1, { matrix: tooFar, offset: 3e38, scale: [1, 1] }), RangeError);
 });
+
+test('a mirroring matrix keeps a mesh without vertex normals facing out (R5)', () => {
+  // Face +Y triangle mirrored in x: still faces +Y. The face normal of the mirrored positions points down (the winding
+  // reverses), which put every instance upside down and its root under the surface.
+  const tri = (normals) => ({
+    positions: new Float32Array([0, 0, 0, 0, 0, 1, 1, 0, 0]),
+    normals: new Float32Array(normals),
+    uvs: new Float32Array([0, 0, 0, 1, 1, 0]),
+    indices: new Uint32Array([0, 1, 2]),
+  });
+  const matrix = [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  for (const normals of [[0, 1, 0, 0, 1, 0, 0, 1, 0], []]) {
+    const r = scatterSurface(tri(normals), 4, { matrix, yaw: [0, 0], offset: 0.5 });
+    for (let i = 0; i < 4; i++) {
+      assert.deepEqual(Array.from(r.normals.subarray(i * 3, i * 3 + 3)).map((v) => v + 0), [0, 1, 0]);
+      assert.equal(r.transforms[i * 16 + 13], 0.5, 'root half a unit above the surface');
+      assert.ok(r.transforms[i * 16 + 5] > 0.99, 'instance +Y up');
+    }
+  }
+});

@@ -71,13 +71,19 @@ export function scatterSurface(
     throw new RangeError(
       'Use finite ordered scale/yaw ranges, positive f32 scales, align from 0 to 1 and a finite f32 offset.',
     );
-  let source = data;
+  let source = data,
+    // A mirroring matrix reverses the winding, so a face normal taken from world positions points inward; the
+    // inverse transpose of the source face normal (what vertex normals get) is the negated cross product.
+    flip = false;
   if (options.matrix) {
     const m = options.matrix;
     if (m.length !== 16 || Array.from(m).some((v) => !Number.isFinite(v)) || m[3] || m[7] || m[11] || m[15] !== 1)
       throw new RangeError('Use a finite affine source matrix with last row 0, 0, 0, 1.');
     const inverse = invertMatrix(m);
     if (!inverse) throw new RangeError('Use an invertible source matrix for surface scattering.');
+    flip =
+      !data.normals.length &&
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0;
     const positions = new Float32Array(data.positions.length),
       normals = new Float32Array(data.normals.length);
     for (let i = 0; i < positions.length; i += 3) {
@@ -116,7 +122,7 @@ export function scatterSurface(
   for (let i = 0; i < count; i++) {
     if (!(i % 1024)) signal?.throwIfAborted();
     sample = sampler.sample(sample);
-    const n = sample.normal,
+    const n = flip ? sample.normal.map((v) => -v) : sample.normal,
       axisLength = Math.hypot(n[0], n[2]),
       half = Math.acos(Math.max(-1, Math.min(1, n[1]))) * align * 0.5;
     const turn = Math.sin(half),

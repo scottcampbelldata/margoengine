@@ -31,7 +31,8 @@ export interface ScatterLODs {
 }
 
 const SOURCE = 'scatterLODs takes a core Geometry with triangles; pass the near mesh you would give Scatter';
-const STRIDE = 20;
+const STRIDE = 20,
+  NORMAL = 4;
 
 /**
  * Builds the three LOD rings `Scatter` draws from one mesh. Loads `@margoengine/lod/auto` and `@margoengine/mesh-edit`
@@ -64,7 +65,11 @@ export async function scatterLODs(source: Geometry, options: ScatterLODOptions =
   if (count > 200_000)
     throw rangeError('scatterLODs takes up to 200000 vertices; split the mesh or decimate it offline first', 'scatter');
   const packed = new Float32Array(count * STRIDE);
-  for (let i = 0; i < count; i++) packed.set(source.vertices.subarray(i * 6, i * 6 + 6), i * STRIDE);
+  // gltf-pro's packed layout (lod/auto): position at 0, normal at 4 (float 3 is padding).
+  for (let i = 0; i < count; i++) {
+    packed.set(source.vertices.subarray(i * 6, i * 6 + 3), i * STRIDE);
+    packed.set(source.vertices.subarray(i * 6 + 3, i * 6 + 6), i * STRIDE + NORMAL);
+  }
   const levels = await simplifyAttributes({ vertices: packed, indices: source.indices }, ratios, {
     signal: options.signal,
   });
@@ -77,7 +82,7 @@ export async function scatterLODs(source: Geometry, options: ScatterLODOptions =
       normals = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       positions.set(vertices.subarray(i * STRIDE, i * STRIDE + 3), i * 3);
-      normals.set(vertices.subarray(i * STRIDE + 3, i * STRIDE + 6), i * 3);
+      normals.set(vertices.subarray(i * STRIDE + NORMAL, i * STRIDE + NORMAL + 3), i * 3);
     }
     meshes.push(new Geometry(positions, normals, indices));
     deviation.push(farthest(source.vertices, positions, indices));

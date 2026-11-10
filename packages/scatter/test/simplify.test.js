@@ -63,6 +63,69 @@ test('scatterLODs: hard edges stay hard on a cube', async () => {
   assert.deepEqual(deviation, [0, 0, 0]);
 });
 
+test('scatterLODs: a hard roof ridge keeps each panel normal on its own side (lod/auto reads normals at offset 4)', async () => {
+  // Two 10 x 10 panels meeting at x = 0, split vertices whose normals differ only in x. R5: scatter packed the normal
+  // at offset 3, so lod/auto saw (ny, nz, 0), could not tell the panels apart and moved 30 of 597 corners across.
+  const N = 10,
+    s = Math.sin(0.5),
+    c = Math.cos(0.5),
+    p = [],
+    n = [],
+    idx = [];
+  for (const side of [-1, 1]) {
+    const base = p.length / 3;
+    for (let i = 0; i <= N; i++)
+      for (let j = 0; j <= N; j++) {
+        const u = (i / N) * side;
+        p.push(u * c, -Math.abs(u) * s, j / N);
+        n.push(side * s, c, 0);
+      }
+    for (let i = 0; i < N; i++)
+      for (let j = 0; j < N; j++) {
+        const a = base + i * (N + 1) + j,
+          b = a + N + 1;
+        if (side > 0) idx.push(a, a + 1, b, a + 1, b + 1, b);
+        else idx.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+  }
+  const { meshes } = await scatterLODs(new Geometry(p, n, idx), { ratios: [0.5, 0.2] });
+  for (const ring of meshes) {
+    const V = ring.vertices,
+      I = ring.indices;
+    let wrong = 0;
+    for (let t = 0; t < I.length; t += 3) {
+      const [a, b, d] = [I[t] * 6, I[t + 1] * 6, I[t + 2] * 6],
+        fx = (V[b + 1] - V[a + 1]) * (V[d + 2] - V[a + 2]) - (V[b + 2] - V[a + 2]) * (V[d + 1] - V[a + 1]);
+      for (const o of [a, b, d]) if (Math.abs(fx) > 1e-9 && Math.sign(V[o + 3]) !== Math.sign(fx)) wrong++;
+    }
+    assert.equal(wrong, 0);
+  }
+});
+
+test('scatterLODs: a flat-shaded mesh keeps unit normals in every ring', async () => {
+  const src = sphere(12, 24),
+    p = [],
+    n = [],
+    idx = [];
+  for (let t = 0; t < src.indices.length; t += 3) {
+    const at = (k) => Array.from(src.vertices.subarray(src.indices[t + k] * 6, src.indices[t + k] * 6 + 3)),
+      [A, B, C] = [at(0), at(1), at(2)],
+      u = B.map((v, k) => v - A[k]),
+      w = C.map((v, k) => v - A[k]),
+      f = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
+      l = Math.hypot(...f);
+    for (const q of [A, B, C]) {
+      idx.push(p.length / 3);
+      p.push(...q);
+      n.push(...f.map((v) => v / l));
+    }
+  }
+  const { meshes } = await scatterLODs(new Geometry(p, n, idx));
+  for (const ring of meshes)
+    for (let i = 0; i < ring.vertices.length; i += 6)
+      assert.ok(Math.abs(Math.hypot(...ring.vertices.subarray(i + 3, i + 6)) - 1) < 1e-3, `normal ${i / 6} is unit`);
+});
+
 test('scatterLODs: the rings drive a Scatter', async () => {
   const { meshes } = await scatterLODs(sphere(12, 24));
   assert.doesNotThrow(() => new Scatter(meshes, { count: 16 }));
