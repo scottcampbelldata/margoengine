@@ -914,6 +914,10 @@
       "types": "./dist/ecs/relation-query.d.ts",
       "import": "./dist/ecs/relation-query.js"
     },
+    "./ecs/reactive": {
+      "types": "./dist/ecs/reactive.d.ts",
+      "import": "./dist/ecs/reactive.js"
+    },
     "./environment": {
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"

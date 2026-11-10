@@ -3289,6 +3289,8 @@ Batch 249 job 1: ecs/objects stores arbitrary JS values beside numeric fields an
 
 The optional xr/ar-extra entry supports native DOM overlays, image/marker tracking, detected triangle meshes and persistent anchor save/restore/delete. CPU coverage includes copied snapshots, pose-only movement, removal, callback disposal, abort and concurrent anchor ownership. Stereo rendering compares detected standard Box meshes on both routes and backends; browser stand-ins exercise negotiated module APIs. These software tests do not prove real marker detection, mapping accuracy or persistence across device restarts.
 
+
+
 Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pairs with component filters and exposes target entity ids and component rows. Proof: packages/ecs/test/relation-query.test.js; no performance claim.
 
 Batch 225 job 1: optional splines/kinds exactly implements centripetal/chordal/uniform Catmull-Rom geometry and analytic derivatives through third order, curvature and torsion for all existing spline kinds. Proof: packages/splines/test/kinds.test.js compares the independent published interpolation pyramid, known (t,t^2,t^3) derivatives, global scaling, repeated knots and periodic seams. No global intersection-free or speed claim.
@@ -3328,3 +3330,5 @@ All six Gumin symmetry classes, oriented neighbor references and tileset XML are
 WebGL2 compatibility SNORM compute storage no longer requires a non-renderable framebuffer attachment. Native signed-byte storage returns exact expected quantized channel bytes for all three supported SNORM formats across 2D, array and 3D mip views, preserving masked texels. Proof: packages/webgl2-compat/test/snorm-storage-browser.mjs, which fails with incomplete framebuffer errors before repair. Source standards and limits are in clean-room.md and limits.md.
 
 Batch 225 job 2: optional spline queries give analytic cubic bounds/extrema, three plane roots, even-multiplicity contacts, forward 3D rays, curve crossings and continuous overlap spans. Proof: packages/splines/test/query.test.js tests known extrema and roots, tangencies, skew curves, ray separation, repeated joins, reversed/partial overlap and explicit bounded-work failure. No unbounded completeness, exact-arithmetic or speed claim.
+
+Batch 249 job 3: ecs/reactive maintains component query matches by affected-entity updates with independent enter/exit notifications. Deterministic work-count and lifecycle proof: packages/ecs/test/reactive.test.js. No wall-clock speed claim.

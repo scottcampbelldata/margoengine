@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12485444,
+  "total": 12486928,
   "history": [
     {
       "date": "2026-10-24",
@@ -6043,6 +6043,18 @@
       "commit": "batch-225",
       "reason": "Water root ceiling 20185 -> 20817 B for measured 20210 B gzip after the already-landed core version guard. Keeping version-skew prevention is worth the optional bytes; splitting cannot avoid the required engine identity check. No water or core source changes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "28b15ccca",
+      "reason": "Batch 249 relation-query: new optional pair joins, 0 -> 1023 B gzip; source and target rows.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "996e1760c",
+      "reason": "Batch 249 reactive: new optional incremental cache entry, 0 -> 1228 B gzip; queued events and mutation-safe visits.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7145,6 +7157,7 @@
     "@margoengine/inspector/animation": 3147,
     "leak @margoengine/inspector/animation -> @margoengine/lines": 1,
     "@margoengine/wfc/tileset": 2142,
-    "@margoengine/splines/query": 3870
+    "@margoengine/splines/query": 3870,
+    "@margoengine/ecs/reactive": 1484
   }
 }

@@ -2775,6 +2775,8 @@ Batch 249 job 1: build packages then node --test --test-timeout=120000 packages/
 
 After build:packages run `node --test packages/xr/tests/ar-extra.test.js`, then the registered xr test:gpu:ar-extra through the shared GPU lock. It injects native module stand-ins into Margo's stereo fixture, displays a detected mesh derived from the licensed Khronos/Cesium Box, verifies DOM selection suppression, image scores/observations and anchor save/restore/delete, and writes test-results/xr-ar-extra-browser.json. Native device tracking and storage proof remain job 1's hardware gap.
 
+
+
 Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-query.test.js after building packages; original synthetic tuple/lifecycle fixtures.
 
 Batch 225 job 1: npm run build --workspace @margoengine/splines, then node --test --test-timeout=120000 packages/splines/test/kinds.test.js. Mathematical references and combined design are in docs/clean-room.md. Pure CPU evaluation has no backend-specific GPU test.
@@ -2834,3 +2836,5 @@ SNORM storage repair: build packages, then run node packages/webgl2-compat/test/
 Size reproduction: on 2873b6acb and the repair, build packages and evaluate bundleSplit from scripts/measure-size.js on packages/webgl2-compat/dist/index.js with /^(runtime|readback)-/, then gzipSync its lazy and base byte arrays. The recorded parent-source substitution uses the same current package dependency graph for both emissions; no timing comparison is involved. See results/snorm-storage-sizes.json.
 
 Batch 225 job 2: npm run build --workspace @margoengine/splines, then node --test --test-timeout=120000 packages/splines/test/query.test.js. CPU polynomial fixtures are independent of arc lookup resolution and rendering backend; references are in docs/clean-room.md.
+
+Batch 249 job 3: build then node --test --test-timeout=120000 packages/ecs/test/reactive.test.js. Work counts assert no rescan with no timing assertion or GPU requirement.

@@ -4067,6 +4067,8 @@ ecs/objects entry: 1324 B min+gzip (new entry, previous 0 B); core + stage remai
 
 - xr/ar-extra: 0 to 3033 B gzip, ceiling 3289 B for the new optional DOM, image, mesh and persistent anchor entry. Core + stage remains 23950 B.
 
+
+
 Batch 249 relation-query: each result is a source plus one target per required relation term. Wildcards return every pair combination, so results may exceed world.capacity. Queries snapshot pairs and recheck live membership/rows before visits; new pairs wait until the next iteration. Optional source rows use -1. Target with terms are required and their rows flatten in term order. This is direct pair matching; traversal remains in Relation.
 ecs/relation-query: 1023 B min+gzip, new optional entry previously 0 B; ceiling 1279 B. Core plus stage unchanged at 23950 B.
 
@@ -4179,3 +4181,7 @@ Batch 225 job 2: splines/query provides splineBounds, splineExtrema, intersectSp
 Batch 225 /query: new optional entry 0 -> 3614 B gzip (ceiling 0 -> 3870 B); geometry operations belong together to share polynomial calculations. Core + stage remains 24209 B gzip, below 25000 B; root sources untouched.
 
 Batch 225 gate correction: unchanged water root measures 20210 B gzip after main core-version guard, against prior ceiling 20185 B; optional ceiling becomes 20817 B using standard headroom. Version-skew prevention stays intact; no water/core/stage source changed.
+
+
+Batch 249 reactive: required/excluded shape changes update one entity per query. Cache order is packed. Optional rows resolve on visit. subscribe defaults to future transitions; initial:true immediately visits existing matches. flush delivers chronological queued transitions, including enter then exit in one window, at the caller chosen system boundary; listener mutations wait until next flush. Unsubscribed listeners receive nothing further. stop detaches and clears without exit callbacks. Field writes do not change membership.
+ecs/reactive: 1228 B min+gzip, new optional entry previously 0 B; ceiling 1484 B. Core plus stage unchanged at 23950 B. ComponentStore also permits mixed fields in typed query/tracker APIs.

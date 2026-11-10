@@ -7,6 +7,8 @@ export type ArrayConstructor = { new (length: number): NumericArray };
 export type Schema = Record<string, ArrayConstructor>;
 /** Entity id: `generation * stride + slot`, a non-negative integer up to `0xffffffff`. Stale ids fail `World.alive`. */
 export type Entity = number;
+/** Membership and lifetime common to numeric, tag and mixed-reference stores. */
+export type ComponentStore = Component<Record<never, never>>;
 const capacityLimit = 1_000_000;
 /** Told about every row change of a component, after it happened. Push one onto {@link Component.observers}. */
 export interface ComponentObserver {
@@ -191,6 +193,10 @@ export class World {
     const slot = entity % this.stride;
     return !!this.live[slot] && Math.floor(entity / this.stride) === this.generations[slot];
   }
+  /** True only while the entity is being destroyed; avoids transient teardown matches. */
+  destroying(entity: Entity): boolean {
+    return this.alive(entity) && this.live[entity % this.stride] === 2;
+  }
   /**
    * Assert that `entity` is alive.
    * @throws MargoError `'state'` when the entity is stale or destroyed.
@@ -257,7 +263,7 @@ export class World {
    * @throws TypeError when `components` is empty or holds a component of another world.
    * @throws RangeError when `output` is too small for the matches.
    */
-  query(components: readonly Component[], output: Uint32Array): number {
+  query(components: readonly ComponentStore[], output: Uint32Array): number {
     if (!components.length || components.some((component) => component.world !== this))
       throw new TypeError('Query needs components of this world');
     let source = components[0];

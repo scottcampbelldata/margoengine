@@ -246,3 +246,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated xr/performance alias for the existing XR performance API. | snorm-storage landing repair |
 
 - @margoengine/splines (batch 225 query): analytic bounds/extrema, plane equation and ray units, isolated/overlap results, precision, maxWork and all cubic kinds; margoengine/splines/query mirrors the entry.
+
+
+- @margoengine/ecs (batch 249 job 3): ReactiveQuery cache, rows, subscribe/flush boundaries, initial replay, disposal, and World.destroying teardown semantics.
+- margoengine (batch 249 job 3): generated ecs/reactive alias.

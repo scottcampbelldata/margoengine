@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" />
-import type { Component, ComponentObserver, Entity, World } from './index.js';
+import type { ComponentStore as Component, ComponentObserver, Entity, World } from './index.js';
 
 /** Packed entities with an index by slot: a slot holds at most one entity per set, however often it is reused. */
 class EntitySet {

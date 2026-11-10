@@ -45,6 +45,9 @@ interface ComponentObserver {
     onRemove(entity: Entity): void;
 }
 
+// used as Component
+type ComponentStore = Component<Record<never, never>>;
+
 type Entity = number;
 
 type NumericArray = Float32Array | Float64Array | Int32Array | Uint32Array | Uint8Array;
@@ -59,6 +62,7 @@ class World {
     protected release(from: number, to: number): void;
     protected grow(): void;
     alive(entity: Entity): boolean;
+    destroying(entity: Entity): boolean;
     check(entity: Entity): void;
     create(): Entity;
     destroy(entity: Entity): void;
@@ -70,6 +74,6 @@ class World {
     }): void;
     component<S extends Schema>(schema: S): Component<S>;
     tag(): Component<Record<never, never>>;
-    query(components: readonly Component[], output: Uint32Array): number;
+    query(components: readonly ComponentStore[], output: Uint32Array): number;
 }
 ```

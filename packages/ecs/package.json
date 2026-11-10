@@ -57,6 +57,10 @@
     "./relation-query": {
       "types": "./dist/relation-query.d.ts",
       "import": "./dist/relation-query.js"
+    },
+    "./reactive": {
+      "types": "./dist/reactive.d.ts",
+      "import": "./dist/reactive.js"
     }
   },
   "files": [

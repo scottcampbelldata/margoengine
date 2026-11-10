@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import type { Component, Entity, World } from './index.js';
+import type { ComponentStore as Component, Entity, World } from './index.js';
 
 /** Terms of a {@link Query}. Tags from `world.tag()` work in all three lists. */
 export interface QueryTerms {

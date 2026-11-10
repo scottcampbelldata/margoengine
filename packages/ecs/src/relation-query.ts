@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import type { Component, Entity, World } from './index.js';
+import type { ComponentStore as Component, Entity, World } from './index.js';
 import type { Relation } from './relations.js';
 
 /** A required pair and optional required components on its target. */
