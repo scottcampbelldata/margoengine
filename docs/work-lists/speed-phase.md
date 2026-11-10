@@ -398,3 +398,6 @@ Batch 208: quiet-machine real-network throttle throughput, burst behavior and pr
 
 - Batch 173 job 3: time plain VolumeLayer, unlit cinematic wrapper, local spherical AO, directional volume shadows and progressive HG paths on the same constant-field and real EMDB/TCIA scenes in the quiet speed phase. Keep the exact work-count fixture in cinematic-browser.mjs; unlit/AO/shadow counts 169400/4235000/5590200 scalar fetches. Include the wrapper's extra integration/display passes and 48 B per pixel targets. No wall-clock speed claim during build phase.
 - Batch 274 decomp: quiet timing comparison of native scalar and Rust SIMD dense decompositions remains owed. Deterministic proof now checks identical scalar-order inner products: floor(n/2) f64x2 product instructions plus n%2 scalar products versus n scalar products, with the same additions. No speed or throughput number is published.
+
+
+- Batch 173 job 4: quiet speed-phase timings owed for fixed versus block-skipped/adaptive volume sampling and explicit float32 isosurface refinement on constant, sparse and CC0 T1 fields. Compare identical fields/classifiers; include depth capture/snapshot, opacity-envelope rebuild and min/max preparation work. Correctness images are already exact in the defined fixtures; no build-phase wall-clock benchmark.

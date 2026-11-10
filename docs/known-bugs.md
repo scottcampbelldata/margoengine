@@ -4769,7 +4769,6 @@ The post/compute graph editor gap is built in shader/editor-pass. No open defect
 Batch 194 job 3 reobserved the existing physical-composition compatibility limit above: the extra MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js run fails the extended/transmissive plus all-lighting pipelines at MAX_TEXTURE_IMAGE_UNITS(16). The direct shader fixture, gltf-pro/src/shader.ts, shared/pbr-hooks.js and compatibility GLSL emitter are text-identical after line-ending normalization to this job's parent; it never calls PBRModel.draw or installs a material adapter. Primary cause and fix-phase owner remain the already recorded sampler-layout/resource plan; new model hatching and the material-layer draw regression pass both backends. No test or limit changed.
 
 
-- Batch 173 job 3: opaque geometry strictly inside a volume does not terminate the ordinary or cinematic ray at scene depth. Repro: insert an opaque plane halfway through a constant-opacity box; samples behind it still contribute. Cause: volume paths test only their rasterized proxy (ordinary) or overlay (cinematic), not per-pixel scene-depth ray distance. Job 4 owns the scene-depth regression and implementation.
 
 - Voxel-net native Deno host: native WebSocket has no ping/pong observation hook. After clientTimeout without application input, the existing authoritative server can close an otherwise reachable idle client. Repro: join via serveVoxelDeno then stop client.update longer than clientTimeout. Cause: Deno handles control pongs internally and exposes only application message activity. Follow-up: native-provider liveness integration without inventing byte counters. Keep client.update running meanwhile.
 
@@ -4829,3 +4828,6 @@ Batch 184 fur: fixed the new coarsest-stack sampling defect before landing. Samp
 Batch 184 generated aliases: umbrella regeneration also supplies the missing post/mask alias for the already landed post entry; it is a generated facade and manifest mapping only.
 
 Fur follow-up integration, outside the completed shell-controls row: combining an inherited displacementMap with FurMaterial and Shadows applies that map in beauty but not the custom caster, because the custom caster takes precedence over the ordinary map displacement. Fur also has no custom TAA velocity hook yet; TAA currently assumes a texture-displacement layout when that hook is absent, so the optional TAA combination is unsupported until its adapter is composed. Repro: createFur with displacementMap plus Shadows, or attach TAA while advancing wind time. Preserve shell controls and the existing exact-reset regressions while composing those optional hooks in the fix phase.
+
+
+- Fixed in batch 173 job 4: ordinary, fusion and cinematic rays now stop at actual opaque scene depth. volume-depth-browser.mjs covers half-volume analytical colour, opaque geometry moving after progressive saturation, layer insertion order and actual device reboot on both GPU backends.

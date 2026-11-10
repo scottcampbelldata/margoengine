@@ -19,6 +19,7 @@ import {
   type DataSource,
 } from './layer.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
+import { volumeDepthWGSL } from './volume-depth.js';
 import type { Colormap } from './colormaps.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; COPY_SRC: number };
@@ -103,6 +104,7 @@ const volumeShader = /* Shader notes kept outside the uploaded source:
  * Opacity was defined per voxel; correct it for the step length (1 - (1 - a)^(step / voxel)).
  * The gradient points up the data; the surface faces the other way.
  */ /* wgsl */ `${frameWGSL}
+${volumeDepthWGSL}
 struct Volume { model: mat4x4f, toBox: mat4x4f, normalModel: mat4x4f, dims: vec4f, params: vec4f, planes: array<vec4f, 4>, classification: vec4f, spacing: vec4f }
 @group(1) @binding(0) var<uniform> volume: Volume;
 @group(1) @binding(1) var data: texture_3d<f32>;
@@ -150,7 +152,11 @@ fn kept(p: vec3f) -> bool {
   let t0 = (vec3f(0.0) - origin) * inv;
   let t1 = (vec3f(1.0) - origin) * inv;
   let enter = max(max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z)), 0.0);
-  let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
+  var exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
+  let opaque=opaquePoint(in.clip.xy,ndc);
+  if(opaque.w>0.0) {
+    let p=(volume.toBox*opaque).xyz; exit=min(exit,dot(p-origin,dir));
+  }
   if (exit <= enter) { discard; }
   let voxel = 1.0 / max(max(volume.dims.x, volume.dims.y), volume.dims.z);
   let stride = max(voxel / volume.params.x, (exit - enter) / 2048.0);
@@ -162,6 +168,7 @@ fn kept(p: vec3f) -> bool {
   let texel = 1.0 / volume.dims.xyz;
   let toEye = -normalize((volume.normalModel * vec4f(dir, 0.0)).xyz);
   for (var i = 0u; i < count; i++) {
+    if(t>=exit) {break;}
     let p = origin + dir * t;
     t += stride;
     if (!kept(p)) { continue; }
@@ -296,6 +303,8 @@ export class VolumeLayer implements Drawable {
   visible = true;
   /** Blended over opaque layers. */
   readonly transparent = true;
+  /** @internal */
+  readonly needsSceneDepth = true;
   /** Grid size [nx, ny, nz]. */
   readonly dims: readonly [number, number, number];
   /** Data bounds of the box. */
@@ -324,6 +333,7 @@ export class VolumeLayer implements Drawable {
   readonly #opacity: VolumeLayerOptions['opacity'];
   readonly #values = new Float32Array(80);
   #classification: VolumeClassification | undefined;
+  #table = new Uint8Array(0);
   #model = new Float32Array(16);
   #figure: Float32Array = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   readonly #slices = new Set<SliceLayer>();
@@ -417,12 +427,8 @@ export class VolumeLayer implements Drawable {
       format: classification ? 'rgba8unorm' : 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
-    device.queue.writeTexture(
-      { texture: this.#transfer },
-      classification?.rgba ?? transferTable(this.colormap, this.#opacity),
-      { bytesPerRow: size[0] * 4 },
-      size,
-    );
+    this.#table = new Uint8Array(classification?.rgba ?? transferTable(this.colormap, this.#opacity));
+    device.queue.writeTexture({ texture: this.#transfer }, this.#table, { bytesPerRow: size[0] * 4 }, size);
     this.#sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
@@ -497,16 +503,17 @@ export class VolumeLayer implements Drawable {
       format: value ? 'rgba8unorm' : 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
-    device.queue.writeTexture(
-      { texture },
-      this.#classification?.rgba ?? transferTable(this.colormap, this.#opacity),
-      { bytesPerRow: size[0] * 4 },
-      size,
-    );
+    this.#table = new Uint8Array(this.#classification?.rgba ?? transferTable(this.colormap, this.#opacity));
+    device.queue.writeTexture({ texture }, this.#table, { bytesPerRow: size[0] * 4 }, size);
     this.#transfer?.destroy();
     this.#transfer = texture;
     this.#bind();
     for (const slice of this.#slices) slice.restore();
+  }
+
+  /** @internal Snapshot of the uploaded classifier for conservative optional opacity bounds. */
+  classificationData(): { readonly size: readonly [number, number]; readonly rgba: Uint8Array } {
+    return { size: this.#classification?.size ?? [256, 1], rgba: new Uint8Array(this.#table) };
   }
 
   /** @internal Classification uniforms shared with slices. */
@@ -662,7 +669,9 @@ export class VolumeLayer implements Drawable {
       const module = renderer.device!.createShaderModule({ code: volumeShader, label: 'sciviz volume' });
       return {
         label: 'sciviz volume',
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!] }),
+        layout: renderer.device!.createPipelineLayout({
+          bindGroupLayouts: [renderer.frameLayout!, this.#layout!, renderer.depthLayout!],
+        }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
@@ -688,6 +697,7 @@ export class VolumeLayer implements Drawable {
     });
     pass.setPipeline(pipeline);
     pass.setBindGroup(1, this.#group!);
+    pass.setBindGroup(2, renderer.depthGroup!);
     pass.draw(36);
   }
 

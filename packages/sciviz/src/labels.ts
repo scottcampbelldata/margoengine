@@ -6,6 +6,7 @@ import type { Bounds } from './layer.js';
 import type { Figure } from './figure.js';
 import type { TransferRGBA } from './transfer.js';
 import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
+import { volumeDepthWGSL } from './volume-depth.js';
 import { fusionShader } from './labels-shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -234,6 +235,8 @@ export class FusionLayer implements Drawable {
   readonly bounds: Bounds;
   /** Volume layers composite after opaque layers. */
   readonly transparent = true;
+  /** @internal */
+  readonly needsSceneDepth = true;
   /** Whether this volume draws. Default true. */
   visible = true;
   readonly #renderer: SciRenderer;
@@ -395,11 +398,13 @@ export class FusionLayer implements Drawable {
     if (this.#disposed) return;
     const pipeline = renderer.pipeline(`fusion|${this.#key}`, context, (target) => {
       const module = renderer.device!.createShaderModule({
-        code: frameWGSL + fusionShader(this.#sources.map((s) => s.input)),
+        code: frameWGSL + volumeDepthWGSL + fusionShader(this.#sources.map((s) => s.input)),
         label: 'sciviz fusion',
       });
       return {
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!] }),
+        layout: renderer.device!.createPipelineLayout({
+          bindGroupLayouts: [renderer.frameLayout!, this.#layout!, renderer.depthLayout!],
+        }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
@@ -421,6 +426,7 @@ export class FusionLayer implements Drawable {
     });
     pass.setPipeline(pipeline);
     pass.setBindGroup(1, this.#group!);
+    pass.setBindGroup(2, renderer.depthGroup!);
     pass.draw(3);
   }
   #release(): void {

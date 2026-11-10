@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13969107,
+  "total": 13981336,
   "history": [
     {
       "date": "2026-10-24",
@@ -7388,6 +7388,12 @@
       "commit": "1ff43b9fd",
       "reason": "Batch272-new-ambient-visibility-entry-10410B-ceiling10723B-existing-accumulate9767B-below9945B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-173-volume-quality",
+      "reason": "Batch 173 job 4: conservative sampling/refined iso optional entry and root scene-depth ray termination. Before root 52045 B, cinematic 6006 B, labels 6292 B, quality absent; after {\"@margoengine/sciviz\":54985,\"@margoengine/sciviz/cinematic\":6442,\"@margoengine/sciviz/labels\":6529,\"@margoengine/sciviz/volume-quality\":8509}. Capture/snapshot stays in sciviz because ordinary volumes need the correctness fix by default. Optional quality sampling and precise history/counters retain one owner; splitting duplicates GPU state. Core + stage unchanged at 24209 B.",
+      "grew": 3
     }
   ],
   "items": {
@@ -8206,11 +8212,11 @@
     "@margoengine/scenery/scenes": 19404,
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
-    "@margoengine/sciviz": 53607,
+    "@margoengine/sciviz": 56635,
     "@margoengine/sciviz/atmosphere": 33055,
     "@margoengine/sciviz/bricks": 27589,
     "@margoengine/sciviz/calc": 6978,
-    "@margoengine/sciviz/cinematic": 6262,
+    "@margoengine/sciviz/cinematic": 6698,
     "@margoengine/sciviz/clip": 5396,
     "@margoengine/sciviz/colormaps": 17381,
     "@margoengine/sciviz/contour": 3323,
@@ -8729,6 +8735,7 @@
     "@margoengine/materials/fur": 3400,
     "leak @margoengine/materials/fur -> @margoengine/gltf-pro/model": 1,
     "@margoengine/post/halftone": 6556,
-    "@margoengine/staging/accumulate-ambient": 10723
+    "@margoengine/staging/accumulate-ambient": 10723,
+    "@margoengine/sciviz/volume-quality": 8765
   }
 }

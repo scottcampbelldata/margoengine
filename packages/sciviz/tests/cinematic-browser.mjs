@@ -101,9 +101,9 @@ for (const compat of [false, true]) {
       c.configure(pathOptions);
       for (let i = 0; i < 16; i++) f.engine.render();
       const early = await pixels();
-      for (let i = 0; i < 256; i++) f.engine.render();
-      const pathPixels = await pixels(),
-        pathCost = await c.cost(),
+      for (let i = 0; i < 256 && c.samples < 256; i++) f.engine.render();
+      const pathCost = await c.cost(),
+        pathPixels = await pixels(),
         samples = c.samples;
       let error = 0,
         earlyError = 0,
@@ -129,8 +129,8 @@ for (const compat of [false, true]) {
       });
       c.configure({ pathTracing: { bounces: 32, albedo: 1, samples: 128 }, ambient: [1, 1, 1], light: [0, 0, 0] });
       for (let i = 0; i < 128; i++) f.engine.render();
-      const multiplePixels = await pixels(),
-        multipleCost = await c.cost();
+      const multipleCost = await c.cost(),
+        multiplePixels = await pixels();
       let multipleMean = 0;
       for (let y = 26; y < 38; y++)
         for (let x = 26; x < 38; x++) multipleMean += multiplePixels[(y * 64 + x) * 4] / 144;

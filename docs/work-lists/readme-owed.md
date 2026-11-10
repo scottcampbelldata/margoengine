@@ -940,3 +940,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/staging (batch 272 job 2): cover accumulate-ambient weighted disk lights, ambient sky share, normalized visibility, slab/footprint limits, live edits and convergence; examples deferred.
 - margoengine (batch 272 job 2): cover staging/accumulate-ambient and regenerated post/pixelate forwarding; examples deferred.
+
+
+- @margoengine/sciviz (batch 173 job 4): document volume-quality defaults, block/opacity bounds, blue-noise provenance, adaptive/isosurface limits, invalidate(), exact scene-depth termination, source sharing, 56 B cinematic depth/count history and saturated-frame cost semantics; replace the old opaque-interior limitation during the README phase.
+- margoengine (batch 173 job 4): document optional sciviz/volume-quality alias in the README phase.

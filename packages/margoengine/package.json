@@ -3366,6 +3366,10 @@
       "types": "./dist/sciviz/webgl2.d.ts",
       "import": "./dist/sciviz/webgl2.js"
     },
+    "./sciviz/volume-quality": {
+      "types": "./dist/sciviz/volume-quality.d.ts",
+      "import": "./dist/sciviz/volume-quality.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

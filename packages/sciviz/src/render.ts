@@ -8,6 +8,7 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { fault } from '../../shared/errors.js';
+import { VolumeDepthCapture, VolumeDepthSnapshot } from './volume-depth.js';
 import type { FallbackBackend } from './fallback-types.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; VERTEX: number; INDIRECT: number };
@@ -29,6 +30,8 @@ export interface Drawable {
   readonly transparent: boolean;
   /** False skips the layer. */
   visible: boolean;
+  /** @internal Ray integration consumes a snapshot of opaque scene depth. */
+  readonly needsSceneDepth?: boolean;
   /** Rebuilds device-owned resources after replacement. */
   restore(): void | Promise<void>;
   /** Scene-space point for sorting transparent layers. */
@@ -79,6 +82,14 @@ export class SciRenderer implements EnginePlugin {
   /** @internal */ device: GPUDevice | undefined;
   /** @internal */ frameLayout: GPUBindGroupLayout | undefined;
   /** @internal */ frameGroup: GPUBindGroup | undefined;
+  /** @internal Group 2 for volume ray termination. */
+  depthLayout: GPUBindGroupLayout | undefined;
+  /** @internal Current opaque depth snapshot. */
+  depthGroup: GPUBindGroup | undefined;
+  /** @internal Current opaque depth texture for pre-pass volume integration. */
+  depthView: GPUTextureView | undefined;
+  #depthCapture: VolumeDepthCapture | undefined;
+  readonly #depthSnapshot = new VolumeDepthSnapshot();
   #frameBuffer: GPUBuffer | undefined;
   readonly #frame = new Float32Array(40);
   readonly #inverse = new Float32Array(16);
@@ -130,6 +141,12 @@ export class SciRenderer implements EnginePlugin {
   #create(device: GPUDevice): void {
     this.device = device;
     this.#pipelines.clear();
+    this.#depthSnapshot.dispose();
+    this.depthGroup = undefined;
+    this.depthView = undefined;
+    this.depthLayout = device.createBindGroupLayout({
+      entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } }],
+    });
     this.#frameBuffer = device.createBuffer({
       size: this.#frame.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -179,11 +196,16 @@ export class SciRenderer implements EnginePlugin {
   /** @internal Adds a layer. */
   add(drawable: Drawable): void {
     this.#drawables.add(drawable);
+    if (drawable.needsSceneDepth && this.#engine && this.device) {
+      this.#depthCapture ??= VolumeDepthCapture.attach(this.#engine);
+      this.#depthCapture.members.add(drawable);
+    }
   }
 
   /** @internal Removes a layer (without disposing it). */
   remove(drawable: Drawable): void {
     this.#drawables.delete(drawable);
+    this.#depthCapture?.forget(drawable);
   }
 
   /** @internal A render pipeline for the frame's colour format, depth format and samples, cached by `key`. */
@@ -234,13 +256,14 @@ export class SciRenderer implements EnginePlugin {
       36,
     );
     this.device!.queue.writeBuffer(this.#frameBuffer!, 0, f);
-    for (const d of visible) d.prepare?.(context, this);
+    const depth = visible.some((d) => d.needsSceneDepth);
+    for (const d of visible) if (!depth || !d.transparent) d.prepare?.(context, this);
     const pass = this.#pass;
     pass.colorAttachments[0].view = context.color;
     pass.depthStencilAttachment.view = context.depth;
     if (context.descriptor.depthStencil!.format.includes('stencil')) pass.depthStencilAttachment.stencilReadOnly = true;
     else delete pass.depthStencilAttachment.stencilReadOnly;
-    const encoder = context.encoder.beginRenderPass(pass);
+    let encoder = context.encoder.beginRenderPass(pass);
     applyView(encoder, context);
     encoder.setBindGroup(0, this.frameGroup!);
     const eye = camera.position,
@@ -249,6 +272,18 @@ export class SciRenderer implements EnginePlugin {
         return Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]);
       };
     for (const d of visible) if (!d.transparent) d.draw(encoder, context, this);
+    if (depth) {
+      encoder.end();
+      this.depthView = this.#depthSnapshot.update(context);
+      this.depthGroup = this.device!.createBindGroup({
+        layout: this.depthLayout!,
+        entries: [{ binding: 0, resource: this.depthView }],
+      });
+      for (const d of visible) if (d.transparent) d.prepare?.(context, this);
+      encoder = context.encoder.beginRenderPass(pass);
+      applyView(encoder, context);
+      encoder.setBindGroup(0, this.frameGroup!);
+    }
     for (const d of visible.filter((x) => x.transparent).sort((a, b) => distance(b) - distance(a)))
       d.draw(encoder, context, this);
     encoder.end();
@@ -261,6 +296,7 @@ export class SciRenderer implements EnginePlugin {
     for (const d of this.#drawables) d.dispose();
     this.#drawables.clear();
     this.#frameBuffer?.destroy();
+    this.#depthSnapshot.dispose();
     this.#clearCompute();
     this.#pipelines.clear();
     const engine = this.#engine;

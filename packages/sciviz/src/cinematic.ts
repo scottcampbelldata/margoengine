@@ -40,7 +40,7 @@ export interface CinematicOptions {
   /** Distant light radiance, default [0.7,0.7,0.7]. */
   readonly light?: readonly [number, number, number];
 }
-/** Exact shader work in the most recently integrated frame, excluding the display pass. */
+/** Exact shader work in the most recent transport pass, excluding the display pass. */
 export interface CinematicCost {
   /** Number of scalar 3D texture samples, including gradient classification. */
   readonly scalarSamples: number;
@@ -50,7 +50,7 @@ export interface CinematicCost {
   readonly ambientRays: number;
   /** Number of real scattering events. */
   readonly collisions: number;
-  /** Number of integrated pixels. */
+  /** Number of dispatched viewport pixels. */
   readonly pixels: number;
 }
 function checked(options: CinematicOptions): CinematicOptions {
@@ -102,11 +102,13 @@ export class CinematicVolume implements Drawable {
   visible = true;
   /** Volume colour blends over opaque layers. */
   readonly transparent = true;
+  /** @internal */
+  readonly needsSceneDepth = true;
   /** Data bounds inherited from the source. */
   get bounds(): VolumeLayer['bounds'] {
     return this.#volume.bounds;
   }
-  /** Number of samples accumulated with the current camera, transform, classifier and options. */
+  /** Camera-stable submitted frames, capped at the sample target; scene depth resets per-pixel histories. */
   get samples(): number {
     return this.#samples;
   }
@@ -115,6 +117,9 @@ export class CinematicVolume implements Drawable {
   readonly #wasVisible: boolean;
   #options: CinematicOptions;
   #samples = 0;
+  #frame = 0;
+  #lastPath = false;
+  #history: GPUTexture[] = [];
   #signature = '';
   #source: GPUTexture | undefined;
   #transfer: GPUTexture | undefined;
@@ -150,6 +155,7 @@ export class CinematicVolume implements Drawable {
   /** Discard accumulation, for example after updating externally owned GPU data. */
   reset(): void {
     this.#samples = 0;
+    this.#frame = 0;
     this.#signature = '';
   }
   /** @internal */
@@ -169,6 +175,8 @@ export class CinematicVolume implements Drawable {
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
         { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
+        { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
+        { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
       ],
     });
     this.#displayLayout = d.createBindGroupLayout({
@@ -178,7 +186,11 @@ export class CinematicVolume implements Drawable {
     this.#pipeline = d.createRenderPipeline({
       layout: d.createPipelineLayout({ bindGroupLayouts: [this.#layout] }),
       vertex: { module, entryPoint: 'vertex' },
-      fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rgba32float' }, { format: 'rgba32uint' }] },
+      fragment: {
+        module,
+        entryPoint: 'fragment',
+        targets: [{ format: 'rgba32float' }, { format: 'rg32uint' }, { format: 'rg32float' }],
+      },
       primitive: { topology: 'triangle-list' },
     });
     this.reset();
@@ -186,6 +198,8 @@ export class CinematicVolume implements Drawable {
   #releaseImages(): void {
     for (const t of this.#images) t.destroy();
     this.#images = [];
+    for (const t of this.#history) t.destroy();
+    this.#history = [];
     this.#cost?.destroy();
     this.#cost = undefined;
     this.#width = 0;
@@ -221,7 +235,8 @@ export class CinematicVolume implements Drawable {
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
       };
       this.#images = [0, 1].map(() => d.createTexture({ ...desc, format: 'rgba32float' }));
-      this.#cost = d.createTexture({ ...desc, format: 'rgba32uint' });
+      this.#cost = d.createTexture({ ...desc, format: 'rg32uint' });
+      this.#history = [0, 1].map(() => d.createTexture({ ...desc, format: 'rg32float' }));
       this.reset();
     }
     const resources = volume.resources();
@@ -238,7 +253,7 @@ export class CinematicVolume implements Drawable {
     const voxel = Math.min(...volume.dims.map((n, a) => Math.hypot(...volume.model.slice(a * 4, a * 4 + 3)) / (n - 1)));
     if (!(voxel > 0) || !Number.isFinite(voxel))
       throw rangeError('Cinematic volume transform must be invertible', 'sciviz');
-    v.set([volume.quality, volume.density, voxel, 0], 60);
+    v.set([volume.quality, volume.density, voxel, o.pathTracing ? (o.pathTracing.samples ?? 4096) : 1], 60);
     const ao = o.ambientOcclusion,
       pt = o.pathTracing;
     v.set(ao ? [ao.directions ?? 8, ao.radius ?? 8, ao.steps ?? 8, 0] : [0, 0, 0, 0], 64);
@@ -253,10 +268,11 @@ export class CinematicVolume implements Drawable {
     const signature = Array.from(new Uint32Array(v.buffer)).join(',');
     if (signature !== this.#signature) {
       this.#samples = 0;
+      this.#frame = 0;
       this.#signature = signature;
     }
-    if (pt && this.#samples >= (pt.samples ?? 4096)) return;
-    v[72] = pt ? this.#samples : 0;
+    v[72] = pt ? this.#frame : 0;
+    this.#lastPath = !!pt;
     d.queue.writeBuffer(this.#uniform, 0, v);
     const index = 1 - this.#index;
     const group = d.createBindGroup({
@@ -267,12 +283,15 @@ export class CinematicVolume implements Drawable {
         { binding: 2, resource: resources.transfer.createView() },
         { binding: 3, resource: resources.sampler },
         { binding: 4, resource: this.#images[this.#index].createView() },
+        { binding: 5, resource: this.#renderer.depthView! },
+        { binding: 6, resource: this.#history[this.#index].createView() },
       ],
     });
     const pass = context.encoder.beginRenderPass({
       colorAttachments: [
         { view: this.#images[index].createView(), loadOp: 'clear', storeOp: 'store' },
         { view: this.#cost!.createView(), loadOp: 'clear', storeOp: 'store' },
+        { view: this.#history[index].createView(), loadOp: 'clear', storeOp: 'store' },
       ],
     });
     pass.setPipeline(this.#pipeline);
@@ -280,7 +299,8 @@ export class CinematicVolume implements Drawable {
     pass.draw(3);
     pass.end();
     this.#index = index;
-    this.#samples = pt ? this.#samples + 1 : 1;
+    this.#samples = pt ? Math.min(this.#samples + 1, pt.samples ?? 4096) : 1;
+    this.#frame = (this.#frame + 1) % 16777216;
     this.#displayGroup = d.createBindGroup({
       layout: this.#displayLayout,
       entries: [{ binding: 0, resource: this.#images[index].createView() }],
@@ -326,7 +346,8 @@ export class CinematicVolume implements Drawable {
     const d = this.#renderer.device!,
       width = this.#width,
       height = this.#height,
-      row = Math.ceil((width * 16) / 256) * 256;
+      row = Math.ceil((width * 8) / 256) * 256,
+      path = this.#lastPath;
     const buffer = d.createBuffer({ size: row * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     try {
       const encoder = d.createCommandEncoder();
@@ -354,7 +375,14 @@ export class CinematicVolume implements Drawable {
       const values = new Uint32Array(buffer.getMappedRange()),
         sums = [0, 0, 0, 0];
       for (let y = 0; y < height; y++)
-        for (let x = 0; x < width; x++) for (let k = 0; k < 4; k++) sums[k] += values[(y * row) / 4 + x * 4 + k];
+        for (let x = 0; x < width; x++) {
+          const i = (y * row) / 4 + x * 2,
+            packed = values[i + 1];
+          sums[0] += values[i];
+          sums[1] += packed & (path ? 63 : 4095);
+          if (path) sums[3] += packed >>> 6;
+          else sums[2] += packed >>> 12;
+        }
       return {
         scalarSamples: sums[0],
         shadowRays: sums[1],

@@ -12,6 +12,9 @@ struct Lighting {
 @group(0) @binding(2) var transfer: texture_2d<f32>;
 @group(0) @binding(3) var linearSampler: sampler;
 @group(0) @binding(4) var previous: texture_2d<f32>;
+@group(0) @binding(5) var opaqueDepth:texture_2d<f32>;
+@group(0) @binding(6) var history:texture_2d<f32>;
+var<private> primaryLimit:f32;
 struct Out { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
 @vertex fn vertex(@builtin(vertex_index) i: u32) -> Out {
   let p = array<vec2f,3>(vec2f(-1.0,-1.0),vec2f(3.0,-1.0),vec2f(-1.0,3.0));
@@ -95,7 +98,7 @@ fn scatter(direction: vec3f) -> vec3f {
   return xaxis*local.x+cross(direction,xaxis)*local.y+direction*local.z;
 }
 fn march(origin: vec3f, direction: vec3f) -> vec4f {
-  let d=boxDirection(direction); let hit=interval(origin,d);
+  let d=boxDirection(direction); var hit=interval(origin,d);hit.y=min(hit.y,primaryLimit);
   if (hit.y<=hit.x) { return vec4f(0.0); }
   let n=min(2048u,u32(ceil((hit.y-hit.x)/u.march.z*u.march.x)));
   let ds=(hit.y-hit.x)/f32(max(1u,n));
@@ -112,7 +115,7 @@ fn march(origin: vec3f, direction: vec3f) -> vec4f {
 fn trace(origin: vec3f, direction: vec3f) -> vec4f {
   var p=origin; var d=direction; var throughput=vec3f(1.0); var radiance=vec3f(0.0); var alpha=0.0;
   for (var bounce=0u;bounce<u32(u.transport.z);bounce++) {
-    let bd=boxDirection(d); let hit=interval(p,bd);
+    let bd=boxDirection(d); var hit=interval(p,bd);if(bounce==0u){hit.y=min(hit.y,primaryLimit);}
     if (hit.y<=hit.x) { if (bounce>0u) { radiance+=throughput*u.ambient.rgb; } break; }
     let n=min(2048u,u32(ceil((hit.y-hit.x)/u.march.z*u.march.x)));
     let ds=(hit.y-hit.x)/f32(max(n,1u)); let threshold=-log(random()); var tau=0.0;
@@ -136,20 +139,28 @@ fn trace(origin: vec3f, direction: vec3f) -> vec4f {
   }
   return vec4f(radiance,alpha);
 }
-struct Result { @location(0) colour: vec4f, @location(1) work: vec4u }
+struct Result { @location(0) colour: vec4f, @location(1) work: vec2u, @location(2) history:vec2f }
 @fragment fn fragment(in: Out) -> Result {
   cost=vec4u(0u);
+  let pixel=vec2i(in.position.xy);let z=textureLoad(opaqueDepth,pixel,0).r;
+  let oldHistory=textureLoad(history,pixel,0).rg;
+  let samples=select(0.0,oldHistory.x,oldHistory.y==z && u.transport.x>0.0 && u.viewport.w>0.5);
+  var out:Result;
+  if(samples>=u.march.w){out.colour=textureLoad(previous,pixel,0);out.work=vec2u(0u);out.history=oldHistory;return out;}
   rng=u32(in.position.x)+u32(in.position.y)*u32(u.viewport.x)+u32(u.transport.x)*747796405u+bitcast<u32>(u.viewport.z);
   let a=u.inverse*vec4f(in.ndc,1.0,1.0); let b=u.inverse*vec4f(in.ndc,0.000001,1.0);
   let world=a.xyz/a.w; let direction=normalize(b.xyz/b.w-world);
   let origin=(u.toBox*vec4f(world,1.0)).xyz;
+  primaryLimit=1e30;
+  if(z>0.0){let p=u.inverse*vec4f(in.ndc,z,1.0);primaryLimit=max(0.0,dot(p.xyz/p.w-world,direction));}
   var c=vec4f(0.0);
   if (u.viewport.w>0.5) { c=trace(origin,direction); } else { c=march(origin,direction); }
-  if (u.transport.x>0.0) {
+  if (samples>0.0) {
     let old=textureLoad(previous,vec2i(in.position.xy),0);
-    c=old+(c-old)/(u.transport.x+1.0);
+    c=old+(c-old)/(samples+1.0);
   }
-  var out:Result; out.colour=c; out.work=cost; return out;
+  out.colour=c;out.work=vec2u(cost.x,select(cost.y|(cost.z<<12u),cost.y|(cost.w<<6u),u.viewport.w>0.5));
+  out.history=vec2f(samples+1.0,z); return out;
 }`;
 
 export const cinematicDisplay = /* wgsl */ `

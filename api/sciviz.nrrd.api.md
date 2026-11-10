@@ -131,6 +131,7 @@ type DragMode = 'orbit' | 'pan' | 'box' | 'lasso';
 interface Drawable {
     readonly transparent: boolean;
     visible: boolean;
+    readonly needsSceneDepth?: boolean;
     restore(): void | Promise<void>;
     center(): readonly [number, number, number];
     prepare?(context: GpuContext, renderer: SciRenderer): void;
@@ -465,6 +466,9 @@ class SciRenderer implements EnginePlugin {
     device: GPUDevice | undefined;
     frameLayout: GPUBindGroupLayout | undefined;
     frameGroup: GPUBindGroup | undefined;
+    depthLayout: GPUBindGroupLayout | undefined;
+    depthGroup: GPUBindGroup | undefined;
+    depthView: GPUTextureView | undefined;
     compute(): Promise<ComputeContext>;
     static attach(engine: EngineKernel, options?: {
         readonly order?: number;
@@ -606,6 +610,7 @@ interface VolumeClassification {
 class VolumeLayer implements Drawable {
     visible: boolean;
     readonly transparent = true;
+    readonly needsSceneDepth = true;
     readonly dims: readonly [number, number, number];
     readonly bounds: Bounds;
     readonly range: readonly [number, number];
@@ -618,6 +623,10 @@ class VolumeLayer implements Drawable {
     get clip(): readonly ClipPlane[];
     set clip(planes: readonly ClipPlane[]);
     setClassification(value?: VolumeClassification): void;
+    classificationData(): {
+        readonly size: readonly [number, number];
+        readonly rgba: Uint8Array;
+    };
     classificationUniforms(): readonly number[];
     restore(): void;
     setModel(figure: Float32Array): void;

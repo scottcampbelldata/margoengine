@@ -92,6 +92,8 @@ ${functions}
     if (abs(direction[a]) < 1e-20) { if (origin[a] < volume.lo[a] || origin[a] > volume.hi[a]) { discard; } }
     else { let t0 = (volume.lo[a] - origin[a]) / direction[a]; let t1 = (volume.hi[a] - origin[a]) / direction[a]; enter = max(enter, min(t0, t1)); exit = min(exit, max(t0, t1)); }
   }
+  let opaque=opaquePoint(in.clip.xy,in.ndc);
+  if(opaque.w>0.0){let p=(volume.toData*opaque).xyz;exit=min(exit,dot(p-origin,direction));}
   if (exit <= enter) { discard; }
   var rate = 0.0;
   for (var i = 0u; i < ${sources.length}u; i++) { let s = volume.sources[i]; rate = max(rate, length((s.toUnit * vec4f(direction, 0.0)).xyz * (s.dims.xyz - 1.0))); }
