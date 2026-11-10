@@ -4209,6 +4209,15 @@ Batch 220 job 1: import Matrix4, Vector3, Quaternion, Ray, Plane, Box3 and Color
 Batch 220 job 1 size: math/compat 0 to 9929 B min+gzip, ceiling 10227 B. The entry includes seven interoperable opt-in classes and avoids weakening the original Vector3 1600 B test; splitting would require multiple porting imports. Original math root and seven per-type measurements are unchanged. Core + stage remains 24209 B, below 25000 B.
 # Batch 204 optional exporter optimization
 
+Optional `/materials`: `exportMaterialGLB` adds glTF-shaped KHR material payloads
+and per-primitive named variants to data scenes. New entry 17,967 B minified gzip,
+ceiling 18,507 B. The writer finalization hook changes the exporters root from
+36,213 B to 36,242 B gzip and `/gltf` from 17,108 B to 17,131 B; both remain within
+their existing ceilings. Core and stage are untouched. Extension textures use the
+existing PNG/JPEG contract and must reference emitted UV sets 0..3. Physical
+parameter ranges follow the caller's glTF extension schema; finite JSON trees
+are enforced. Variants require hierarchy mode. [Details](exporter-materials.md).
+
 `@margoengine/exporters/optimize-extra` is a separate optional entry, 6,214 B minified gzip (new entry, previously absent; size ceiling 6,470 B). Core and stage sources are unchanged. It removes keys only when the stored Float32 LINEAR trajectory agrees, preserves STEP transitions and leaves CUBICSPLINE channels unchanged. Static mesh batches use `EXT_mesh_gpu_instancing` (required), default minimum two, grouped by parent and reflection sign. Animated, skinned, morphed, metadata-bearing and shared multi-scene nodes are retained. Empty transform leaves are pruned; hierarchy with remaining children is retained. Unknown index-bearing extensions disable index compaction and instancing conservatively. Application-specific extension rewriting is outside this pass. Inputs use the existing GLB reader's accessor validation and resource rules; cancellation is checked between samplers and batches. No speed claim is made.
 
 

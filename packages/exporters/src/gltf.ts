@@ -163,7 +163,7 @@ class Writer {
     { attributes: Record<string, number>; targets?: Record<string, number>[] }
   >();
   private readonly materialCache = new Map<Mat, number>();
-  private readonly materialSources = new Map<object, { index: number; material: Mat }>();
+  readonly materialSources = new Map<object, { index: number; material: Mat }>();
   private readonly meshCache = new Map<Geo, Map<Mat | null, number>>();
   private readonly namedMeshes = new Map<
     object,
@@ -250,7 +250,11 @@ class Writer {
       if (owner.colors)
         attributes.COLOR_0 = this.floatAccessor(owner.colors, owner.colorSize, owner.colorSize === 3 ? 'VEC3' : 'VEC4');
       if (owner.colors1)
-        attributes.COLOR_1 = this.floatAccessor(owner.colors1, owner.colors1Size!, owner.colors1Size === 3 ? 'VEC3' : 'VEC4');
+        attributes.COLOR_1 = this.floatAccessor(
+          owner.colors1,
+          owner.colors1Size!,
+          owner.colors1Size === 3 ? 'VEC3' : 'VEC4',
+        );
       if (owner.joints) {
         const data = owner.joints;
         attributes.JOINTS_0 = this.list('accessors', {
@@ -327,7 +331,7 @@ class Writer {
     return index;
   }
 
-  private material(mat: Mat): number {
+  material(mat: Mat): number {
     let index = this.materialCache.get(mat);
     if (index !== undefined) return index;
     const pbr: Record<string, unknown> = {
@@ -964,10 +968,16 @@ export function exportGLB(source: ExportSource, options: GLBOptions = {}): Uint8
 }
 
 /** @internal {@link exportGLB}, running `prepare` on the collected nodes before they are written (Roblox splits meshes). */
-export function writeGLB(source: ExportSource, options: GLBOptions, prepare?: (roots: Node[]) => void): Uint8Array {
+export function writeGLB(
+  source: ExportSource,
+  options: GLBOptions,
+  prepare?: (roots: Node[]) => void,
+  finish?: (writer: Writer) => void,
+): Uint8Array {
   const maxBinary = limit(options.maxBinaryBytes, 'maxBinaryBytes'),
     maxFile = limit(options.maxBytes, 'maxBytes'),
     writer = document(source, options, new Writer(maxBinary, maxFile), prepare);
+  finish?.(writer);
   const json = JSON.stringify(writer.json),
     jsonLength = align4(utf8Length(json)),
     binLength = writer.length,

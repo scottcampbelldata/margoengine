@@ -3346,6 +3346,12 @@ The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPi
 - Batch 220 job 1: math/compat supplies all 17 requested porting methods on seven familiar classes, with original per-type bundles unchanged. Proof: packages/math/test/methods.test.js and existing math.test.js small-import assertions. Six Euler orders, native/separate camera round trips on both depth conventions, ray/segment constraints, closed triangle/plane contacts, degenerate inputs and explicit color spaces are covered. This is mathematical correctness evidence, not a timing claim.
 # Batch 204 optional optimization
 
+The optional exporters `/materials` entry writes data-scene KHR material payloads,
+texture maps and primitive-local variants, including shared default meshes with
+different alternatives and alternate-only image resources. Regression and
+Khronos validator evidence: `packages/exporters/tests/materials-entry.test.js`.
+Sources and boundaries: [material record](../exporter-materials.md).
+
 `@margoengine/exporters/optimize-extra` adds independently controlled redundant animation-key reduction, unused resource pruning and static sibling GPU instancing. The regression suite checks linear and STEP behavior, quaternion signs, morph-weight layout, resource reachability, exact instance TRS, multi-scene protection, opaque extension retention, cancellation and input immutability. The existing Khronos Box fixture supplies real licensed geometry; output validator errors remain zero. This is behavior evidence, with no measured speed claim or assertion that every asset shrinks.
 
 

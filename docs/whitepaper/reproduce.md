@@ -2858,6 +2858,10 @@ After build:packages, run node --test --test-timeout=120000 packages/ui/tests/fo
 Batch 220 job 1: build packages, then node --test --test-timeout=120000 packages/math/test/*.test.js. methods.test.js imports math/compat and checks analytic independent results; math.test.js retains unchanged small-import assertions. CPU-only mathematics; this package defines no GPU test. Sources and API contract comparison are in docs/clean-room.md.
 # Batch 204 exporter optimization
 
+Material extension evidence: after building, run
+`node --test --test-timeout=90000 packages/exporters/tests/materials-entry.test.js`.
+It reads the existing Khronos BoxTextured fixture and validates the written GLBs.
+
 After building packages, run `node --test --test-timeout=90000 packages/exporters/tests/optimize-extra.test.js` for deterministic key, resource and instance counts, geometry from the existing Khronos Box fixture, and Khronos validator checks. The exporters browser suite runs through the shared GPU lock; `MARGO_COMPAT=1` selects its WebGL2 compatibility path. `packages/exporters/tests/capture-browser.mjs` accepts the same compatibility flag. No wall-clock benchmark is part of this evidence.
 
 Batch 267 job 2: run node --test --test-timeout=90000 packages/mcp/tests/assets.test.js. Run node packages/mcp/tests/assets-prepare.mjs outside any GPU lock (downloads real CC0 metadata and data, stores licence manifests). Then node scripts/gpu-lock.mjs run --owner=assets-proof --max=5 --wait-max=60 -- node packages/mcp/tests/assets-browser.mjs. Fixtures cover Khronos Triangle, Poly Haven WoodenTable_02, venice_sunset HDRI and aerial_rocks_04 texture, plus the current ambientCG bricks result/zip. The saved fixtures.json records exact selected ids/variants and hashes; files are served locally for GPU checks.
