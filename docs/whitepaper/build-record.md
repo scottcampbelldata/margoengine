@@ -3634,6 +3634,37 @@ Finish sizes (min+gzip B): VFX root 31,435 (budget 32,070), base 11,191 (11,336)
 
 Repository gates additionally caught the handoff's fixed 100 ms cancellation-test sleep, the new error anchor's digits, and stale generated site text. The cancellation check now observes actual mapping-promise settlement and yields one MessageChannel task for unhandled-rejection reporting; removing the production cancellation handler still fails on both backends. The help anchor is `vfx-float`, matching the existing anchor-name rule, and error/help text is generated from its owning sources. The existing fixed-wait, error-page and llms regression tests pass without any baseline or rule change.
 
+## Batch 54: lightmap
+
+Eight jobs in `@margoengine/lightmap`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes F, J and K, each in
+its own optional entry or option, with no core or stage source changes (core 21,775 B and stage 3,222 B gzip, under 25,000).
+Rows the build phase left unfinished are in docs/work-lists/finish-later.md under 54.x; README examples are owed in
+docs/work-lists/readme-owed.md.
+
+| # | Job | Status | Commit | Entry | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | General triangle mesh baking | DONE | 55e916e4a | lightmap/mesh | mesh.test.js, entries.test.js |
+| 2 | GPU progressive baking | DONE | f69633f63 | lightmap/gpu | gpu.test.js (GPU), imported.test.js |
+| 3 | Lightmap use in materials | DONE | 8b16594bd | lightmap/apply | apply.test.js, gpu.browser.mjs (GPU) |
+| 4 | Denoising | DONE | c560f2c2f | lightmap/denoise | denoise.test.js |
+| 5 | Full path traced bounces | DONE | 167513dd2 | lightmap/global (`bounceMode: 'path'`) | global-path.test.js |
+| 6 | Directional lightmaps | DONE | 2b71b4cca | lightmap/directional | directional.test.js |
+| 7 | Bake probes for moving objects | DONE | 7ec92dd59 | lightmap/probes | probes.test.js |
+| 8 | Rough glass and dispersion caustics | DONE | 42c1cbdac | lightmap/refracted (options) | rough.test.js, refracted.test.js |
+
+- **Built from:** papers and specs only, cited per row in docs/clean-room.md (lightmap L7 to L14): Hasselgren,
+  Akenine-Moller and Ohlsson 2005 (conservative rasterization); Sloan 2008 (SH tricks, directional split and 16/17);
+  Ramamoorthi and Hanrahan 2001 (irradiance SH); Heitz 2018 (GGX visible normals) and Wyman, Sloan and Shirley 2013
+  (CIE fit) for rough glass and dispersion; the GPU, denoise, path and apply rows (L9, L10, L11, L14) cite their own sources. Not read: Pineda 1988,
+  Habel and Wimmer 2010, Greger et al. 1998, Walter et al. 2007, Heitz et al. 2016 (each named in its row).
+- **Slips found and fixed while landing:** rebasing 54.7 onto 54.2 broke its build (`indicesOf` moved from mesh-bake.ts
+  to texels.ts); fixed in the 54.7 commit before it landed. Two lightmap clean-room rows were both numbered L9 on main
+  (54.2 and 54.7); 54.8 renumbered probes to L12 and took L13, after J's L10 (denoise) and L11 (path bounces).
+- **Entry sizes (gzip B, sizes.json at 3bad37308):** root 4,053; mesh 3,272; gpu 7,965; apply 2,634; denoise 3,520; global 8,007;
+  directional 4,471; probes 3,273; refracted 9,015 (7,846 before 54.8).
+- **Known limits:** docs/limits.md, "Lightmap irradiance probes" and "Lightmap rough glass, dispersion and bounce
+  caustics" (and the other jobs' sections); rough glass is single-scattering, so very rough glass is too dark.
+
 ## Batch 55: lighting2d
 
 Six optional 2D lighting entries, built in order on the dev PC, with no core or stage changes.

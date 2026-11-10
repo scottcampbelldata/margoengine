@@ -10,7 +10,7 @@ For the second account. Start now.
 | D | lighting | 51 | environment | 3 | list 2 (Mac) |
 | D | lighting | 52 | clustered | 8 | list 2 (Mac) |
 | D | lighting | 53 | clustered | 2 | list 2 (Mac) |
-| D | lighting | 54 | lightmap | 8 | list 2 (Mac) |
+| D | lighting | 54 | lightmap | 8 | done |
 | D | lighting | 55 | lighting2d | 6 | done |
 | D | lighting | 56 | staging | 7 | done |
 | E | post and effects | 70 | post | 8 | done |
