@@ -6412,3 +6412,25 @@ Stage glTF review M3: addGLTF uses the basic loader for plain opaque constant-co
 Draco encoder review L1: quantized float attributes require a finite float32 range, finite inverse and inverse-times-range, and a nonzero reconstruction step. Unrepresentable transforms reject with code unsupported before returning a stream; use bits 0 or rescale. Both extreme-range regressions and raw-float round trips run in draco-native.test.js. See [draco-float-ranges.md](draco-float-ranges.md).
 
 AVIF review M2 (2026-11-10): chroma position 1 uses horizontal co-siting and vertical centering; positions 0 and 2 keep their existing centered/co-sited behavior. All 16 pixels of an authored 10-bit 4:2:0 ramp are checked exactly at each position in the native regression; see docs/avif-review-fixes.md.
+
+## Batch 137 encoder limits
+
+The clean-room ETC1S/UASTC encoder replaces the bundled prebuilt encoder, with the
+same public settings and a single lazy SIMD Wasm module. ETC1S uses shared endpoint
+and selector codebooks; all nineteen UASTC modes participate at level 2 and above.
+RDO reuses valid previous blocks over a bounded 256-block dictionary; lambda zero
+preserves the unconditioned stream. Zstandard literals use at most eleven-bit
+canonical Huffman codes, four streams for large literal sections and at most
+128 KiB per frame block. Source pixels and fitted blocks are unchanged by entropy
+coding. No throughput or peak-memory parity is claimed during the deferred phase.
+
+On the unchanged full three-role CC0 corpus, all 66 PSNR and 42 valid 11x11 Gaussian
+SSIM mip comparisons pass at or below the old complete-file byte budgets. Exact
+settings, source and artifact hashes: whitepaper/results/batch-137-quality-r10.json.
+The comparison tunes rate by ETC1S quality or UASTC RDO; it does not establish a
+universal quality guarantee on other textures. Measured optional ktx2 bundle: 422537 raw / 147879 gzip B, from round 9's
+395263 / 138922 B. The distinct lazy Wasm asset is 291861 raw / 91747 gzip B,
+from 271457 / 84726 B. Bundle and file figures are not additive. These added
+bytes buy lossless literal coding and quality parity; splitting would require
+another codec ABI and fetch. Existing optional size ceilings suffice. Core plus
+stage remains 24209 gzip B, below 25000 B.

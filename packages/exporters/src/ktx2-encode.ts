@@ -99,6 +99,12 @@ function grownToBlocks(image: RGBAImage): RGBAImage {
   return { width: W, height: H, data: out };
 }
 
+/** Shared image preparation for the bundled encoder and custom encoderPath. */
+export function imageForBasisJob(job: BasisJob): RGBAImage {
+  const image = job.source instanceof Uint8Array ? readImage(job.source) : job.source;
+  return job.wholeBlocks ? grownToBlocks(image) : image;
+}
+
 /**
  * The encoder's data format descriptor leaves two things to the file's use. `bytesPlane` holds the size of a block, one
  * entry for each ETC1S slice (colour, and alpha when there is any) and one for UASTC, as KTX-Software's validator
@@ -119,8 +125,7 @@ export function encodeBasis(module: BasisEncoderModule, job: BasisJob): BasisRes
     module.initializeBasis();
     started.add(module);
   }
-  const read = job.source instanceof Uint8Array ? readImage(job.source) : job.source,
-    { width, height, data } = job.wholeBlocks ? grownToBlocks(read) : read,
+  const { width, height, data } = imageForBasisJob(job),
     pixels = data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
     encoder = new module.BasisEncoder();
   try {

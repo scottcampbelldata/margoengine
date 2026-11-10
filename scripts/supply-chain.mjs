@@ -72,17 +72,6 @@ export const BUNDLED = [
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
   {
-    package: '@margoengine/exporters',
-    component: 'Basis Universal encoder (Binomial)',
-    licence: 'Apache-2.0',
-    files: 'dist/basis-encoder/basis_encoder.wasm, dist/basis-encoder/basis_encoder.js',
-    source:
-      'packages/exporters/vendor/basis-encoder: Basis Universal v1_50_0_2 official encoder, https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build',
-    modified:
-      'the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line',
-    notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
-  },
-  {
     package: '@margoengine/decoders',
     component: 'jxl-oxide JPEG XL decoder (Wonwoo Choi)',
     licence: 'MIT OR Apache-2.0',
@@ -679,10 +668,6 @@ ${table(
     \`jxl_oxide_wasm_bg.wasm\` (sha256 \`3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69\`) and
     \`jxl_oxide_wasm.js\` (\`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7\`). The crates inside it are named in
     \`dist/THIRD-PARTY-NOTICE.md\`.
-  - Basis Universal v1_50_0_2 WebGL encoder from
-    https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build (checked 2026-11-06):
-    \`basis_encoder.wasm\` (\`dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a\`) and
-    \`basis_encoder.js\` (\`2c0aa2a648b6fc6006e116074a1dd075d6aaf1adb34d4bfd9818acd79e96537e\`, before the build's static-embind step).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
   (LGPL-3.0) are installed as an optional dependency of Next.js for \`examples/next\`, and
   \`scripts/optimize-demo-assets.js\` and \`scripts/build-scifi-helmet.mjs\` use sharp to resize textures. \`margo-convert

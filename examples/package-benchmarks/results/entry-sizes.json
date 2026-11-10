@@ -1,5 +1,5 @@
 {
-  "commit": "06a742f2c",
+  "commit": "192267b0c",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1396,12 +1396,12 @@
         "gzip": 3401
       },
       "./draco": {
-        "raw": 234413,
-        "gzip": 91248
+        "raw": 234984,
+        "gzip": 91481
       },
       "./ktx2": {
-        "raw": 2489125,
-        "gzip": 984752
+        "raw": 422537,
+        "gzip": 147879
       },
       "./meshopt": {
         "raw": 21580,
@@ -2172,6 +2172,10 @@
       "./compute/onnx": {
         "raw": 39,
         "gzip": 59
+      },
+      "./compute/quant": {
+        "raw": 40,
+        "gzip": 60
       },
       "./controls/transitions": {
         "raw": 47,
@@ -8924,16 +8928,16 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 172010,
-        "gzip": 61345
+        "raw": 176744,
+        "gzip": 62821
       },
       "./bricks": {
         "raw": 70532,
-        "gzip": 28776
+        "gzip": 28775
       },
       "./colormaps": {
-        "raw": 49132,
-        "gzip": 22069
+        "raw": 49377,
+        "gzip": 22193
       },
       "./formats": {
         "raw": 37198,
@@ -8945,11 +8949,11 @@
       },
       "./graph": {
         "raw": 56820,
-        "gzip": 24306
+        "gzip": 24304
       },
       "./grids": {
         "raw": 61388,
-        "gzip": 26305
+        "gzip": 26303
       },
       "./maths": {
         "raw": 21403,
@@ -8969,11 +8973,11 @@
       },
       "./flow": {
         "raw": 24464,
-        "gzip": 9217
+        "gzip": 9216
       },
       "./lic": {
         "raw": 58472,
-        "gzip": 25230
+        "gzip": 25228
       },
       "./tubes": {
         "raw": 6076,
@@ -8985,7 +8989,7 @@
       },
       "./vtk": {
         "raw": 16633,
-        "gzip": 6490
+        "gzip": 6488
       },
       "./derive": {
         "raw": 10109,
@@ -9112,12 +9116,12 @@
         "gzip": 22061
       },
       "./format": {
-        "raw": 19778,
-        "gzip": 7598
+        "raw": 20498,
+        "gzip": 7838
       },
       "./categorical": {
         "raw": 50511,
-        "gzip": 22726
+        "gzip": 22722
       },
       "./tetvolume": {
         "raw": 16083,
@@ -9148,8 +9152,8 @@
         "gzip": 7093
       },
       "./stream": {
-        "raw": 11373,
-        "gzip": 4262
+        "raw": 11382,
+        "gzip": 4261
       },
       "./fits": {
         "raw": 11349,
@@ -9176,16 +9180,16 @@
         "gzip": 7424
       },
       "./provenance": {
-        "raw": 65811,
-        "gzip": 27076
+        "raw": 65841,
+        "gzip": 27082
       },
       "./amr": {
         "raw": 81455,
-        "gzip": 30067
+        "gzip": 30068
       },
       "./aggregate": {
-        "raw": 65116,
-        "gzip": 28201
+        "raw": 65223,
+        "gzip": 28260
       },
       "./views": {
         "raw": 12521,
@@ -9196,8 +9200,8 @@
         "gzip": 5033
       },
       "./a11y": {
-        "raw": 15309,
-        "gzip": 6233
+        "raw": 15580,
+        "gzip": 6343
       },
       "./progressive": {
         "raw": 13541,
@@ -9231,9 +9235,17 @@
         "raw": 36375,
         "gzip": 13801
       },
+      "./themes": {
+        "raw": 43272,
+        "gzip": 19428
+      },
       "./workers": {
         "raw": 3645,
         "gzip": 1589
+      },
+      "./tensor": {
+        "raw": 65232,
+        "gzip": 27621
       },
       "dist/workers/readers.js": {
         "raw": 117675,
@@ -12049,6 +12061,22 @@
         "raw": 45,
         "gzip": 65
       },
+      "./sciviz/series": {
+        "raw": 40,
+        "gzip": 60
+      },
+      "./sciviz/themes": {
+        "raw": 40,
+        "gzip": 60
+      },
+      "./sciviz/workers": {
+        "raw": 41,
+        "gzip": 61
+      },
+      "./sciviz/tensor": {
+        "raw": 40,
+        "gzip": 60
+      },
       "./selection": {
         "raw": 36,
         "gzip": 56
@@ -14830,12 +14858,12 @@
         "gzip": 2253
       },
       "./auto": {
-        "raw": 11823,
-        "gzip": 3923
+        "raw": 12010,
+        "gzip": 3989
       },
       "dist/workers/scene.js": {
-        "raw": 7038,
-        "gzip": 2796
+        "raw": 7171,
+        "gzip": 2835
       }
     },
     "@margoengine/xr": {
@@ -14886,6 +14914,11 @@
     }
   },
   "lazyFiles": {
+    "packages/sciviz/dist/workers/readers.js": {
+      "raw": 116841,
+      "gzip": 41409,
+      "brotli": 36255
+    },
     "packages/compute/dist/onnx-kernel.wasm": {
       "raw": 753589,
       "gzip": 270831,
@@ -14917,9 +14950,9 @@
       "brotli": 15516
     },
     "packages/worker/dist/workers/scene.js": {
-      "raw": 6974,
-      "gzip": 2775,
-      "brotli": 2485
+      "raw": 7107,
+      "gzip": 2815,
+      "brotli": 2524
     },
     "packages/sciviz/dist/flow.wasm": {
       "raw": 7916,
@@ -15117,24 +15150,19 @@
       "brotli": 25700
     },
     "packages/exporters/dist/encoder.worker.js": {
-      "raw": 24674,
-      "gzip": 10246,
-      "brotli": 9128
+      "raw": 34404,
+      "gzip": 13750,
+      "brotli": 12227
+    },
+    "packages/exporters/dist/basis-encoder/margo_basis_encoder.wasm": {
+      "raw": 291861,
+      "gzip": 91747,
+      "brotli": 72262
     },
     "packages/exporters/dist/draco-native-encoder.wasm": {
-      "raw": 160900,
-      "gzip": 59962,
-      "brotli": 49143
-    },
-    "packages/exporters/dist/basis-encoder/basis_encoder.js": {
-      "raw": 113970,
-      "gzip": 29986,
-      "brotli": 26347
-    },
-    "packages/exporters/dist/basis-encoder/basis_encoder.wasm": {
-      "raw": 1735264,
-      "gzip": 667572,
-      "brotli": 512349
+      "raw": 161173,
+      "gzip": 60119,
+      "brotli": 49154
     },
     "packages/environment/dist/loaders.js": {
       "raw": 26168,
@@ -15255,11 +15283,6 @@
       "raw": 4335248,
       "gzip": 1644912,
       "brotli": 1196116
-    },
-    "packages/sciviz/dist/workers/readers.js": {
-      "raw": 116841,
-      "gzip": 41409,
-      "brotli": 36255
     }
   },
   "splits": {

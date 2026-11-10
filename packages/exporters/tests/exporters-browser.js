@@ -241,6 +241,68 @@ window.runExporterTests = async () => {
     ),
     'KTX2 abort',
   );
+  // The own encoder's files must also decode through Margo's production GPU
+  // path, including alpha, both block formats and every mip. Compare stored
+  // texel bytes against the independent transcoder, before any display curve.
+  assert(gpu, 'encoder upload regression needs the native or compatibility GPU device');
+  const { KTX2GPUDecoder } = await import('@margoengine/decoders/ktx2-gpu');
+  const gpuDecoder = new KTX2GPUDecoder({ device: gpu });
+  const cpuDecoder = new KTX2Decoder({ target: 'rgba8' });
+  report.encoderGPU = [];
+  try {
+    for (const mode of ['etc1s', 'uastc']) {
+      for (const role of ['color', 'data', 'normal']) {
+        const bytes = await encodeKTX2(jpeg, {
+          mode,
+          colorSpace: role === 'color' ? 'srgb' : 'linear',
+          normalMap: role === 'normal',
+        });
+        const expected = await cpuDecoder.transcode(bytes.slice());
+        const texture = await gpuDecoder.createTexture(bytes, { usage: GPUTextureUsage.COPY_SRC });
+        let checked = 0;
+        try {
+          assert(texture.mipLevelCount === expected.mipmaps.length, `${mode}/${role} mip count`);
+          for (let level = 0; level < expected.mipmaps.length; level++) {
+            const mip = expected.mipmaps[level];
+            const stride = Math.ceil((mip.width * 4) / 256) * 256;
+            const read = gpu.createBuffer({
+              size: stride * mip.height,
+              usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+            });
+            try {
+              const encoder = gpu.createCommandEncoder();
+              encoder.copyTextureToBuffer({ texture, mipLevel: level }, { buffer: read, bytesPerRow: stride }, [
+                mip.width,
+                mip.height,
+              ]);
+              gpu.queue.submit([encoder.finish()]);
+              await read.mapAsync(GPUMapMode.READ);
+              const actual = new Uint8Array(read.getMappedRange());
+              for (let y = 0; y < mip.height; y++)
+                for (let x = 0; x < mip.width * 4; x++) {
+                  assert(
+                    actual[y * stride + x] === mip.data[y * mip.width * 4 + x],
+                    `${mode}/${role}/${level}: texel ${x},${y}`,
+                  );
+                  checked++;
+                }
+              read.unmap();
+            } finally {
+              read.destroy();
+            }
+          }
+        } finally {
+          texture.destroy();
+        }
+        report.encoderGPU.push({ mode, role, levels: expected.mipmaps.length, exactBytes: checked });
+      }
+    }
+  } finally {
+    cpuDecoder.dispose();
+    gpuDecoder.dispose();
+  }
+  checks.push('Own ETC1S/UASTC color, data and normal files upload and decode every mip exactly on the GPU');
+
   // Errors keep their type across the worker, as the same failures have in Node.
   const refused = await encodeKTX2(new Uint8Array([1, 2, 3, 4])).catch((error) => error);
   assert(refused instanceof TypeError, `KTX2 bad bytes gave ${refused?.name}`);

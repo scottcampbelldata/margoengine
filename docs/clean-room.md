@@ -8359,3 +8359,154 @@ Compared de Rivaz/Haughton, AV1 Bitstream and Decoding Process Specification (20
 
 ## AVIF review M2 (2026-11-10)
 Compared the AV1 color_config semantics (de Rivaz/Haughton, 2018, errata 2023, https://aomediacodec.github.io/av1-spec/#color-config-semantics) with the matching chroma_sample_position field in AV1-ISOBMFF (Concolato/Podborski/Chang, 2024, https://aomediacodec.github.io/av1-isobmff/v1.3.0.html#semantics-1). Position 1 means x=0 and y=1/2 in luma coordinates. Separate authored chroma ramps test both axes at all three supported positions, with exact RGBA16 expectations; see docs/avif-review-fixes.md. No other implementation code read or copied.
+
+## Batch 137 encoder research and provenance (2026-11-10)
+
+Sources compared before implementation, without reading their companion code:
+
+| Source | Authors, year | Reading scope | Use |
+| --- | --- | --- | --- |
+| [UASTC LDR 4x4 Texture Specification](https://github.com/BinomialLLC/basis_universal/wiki/UASTC-LDR-4x4-Texture-Specification) | Richard Geldreich / Binomial, 2020, retrieved 2026-11-10 | Mode layouts, endpoint ranges, partition maps, anchors, interpolation and weight tables inspected; not read in full | All 19 block modes, exact wire layout and reconstruction |
+| [.basis File Format and ETC1S Texture Video Specification 1.03](https://github.com/BinomialLLC/basis_universal/wiki/.basis-File-Format-and-ETC1S-Texture-Video-Specification) | Binomial, version 1.03, retrieved 2026-11-10 | ETC1S blocks and sections 6-11 inspected; not read in full | Canonical Huffman metadata, endpoint/selector codebooks and slice prediction |
+| [Khronos Data Format Specification 1.4.0](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.pdf) | Andrew Garrard, editor, 2025 | Relevant ETC1S, ASTC and UASTC sections inspected by the planner; not read in full | Nonmonotonic endpoint dequantization, partitions and interpolation |
+| [KTX File Format Specification](https://github.khronos.org/KTX-Specification/ktxspec.v2.html) | Mark Callow, editor, 2026 draft retrieved 2026-11-10 | Container, descriptor and BasisLZ appendices inspected; not read in full | KTX2 metadata, levels, shared global data and image descriptors |
+| [iPACKMAN: High-Quality, Low-Complexity Texture Compression for Mobile Phones](https://fileadmin.cs.lth.se/graphics/research/papers/ipackman2005/ipackman2005.pdf) | Jacob Strom and Tomas Akenine-Moller, 2005 | Abstract and block representation/optimization discussion inspected; not read in full | ETC base colors and intensity fitting |
+| [Adaptive Scalable Texture Compression](https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/nystad12_astc.pdf) | Jorn Nystad, Anders Lassen, Andy Pomianowski, Sean Ellis and Tom Olson, 2012 | Abstract and endpoint/weight/partition discussion inspected; not read in full | Compare partition candidates, fit endpoint pairs and refine weights |
+| [Lossless Compression of Already Compressed Textures](https://www.jacobstrom.com/publications/StromWennerstenHPG2011.pdf) | Jacob Strom and Per Wennersten, 2011 | Selected sections inspected by the planner; not read in full | Compare compressed-parameter prediction with raw block coding |
+| [Image Quality Assessment: From Error Visibility to Structural Similarity](https://ece.uwaterloo.ca/~z70wang/publications/ssim.pdf) | Zhou Wang, Alan Bovik, Hamid Sheikh and Eero Simoncelli, 2004 | Abstract and SSIM equations inspected; not read in full | Independent PSNR and Gaussian-window SSIM quality protocol |
+
+The draft combines exact standard-defined block representations with independent
+PCA seeds, least-squares endpoint refinement and discrete decoded-codepoint
+search. Specification lookup tables are normative format data; no implementation
+file was copied. ETC1S fitting evaluates the exact clamped pixel reconstruction.
+Matching the wire format alone does not prove rival encoding quality or bitrate.
+
+Process incident: after the initial draft was written, a documentation search
+unexpectedly returned third-party transcoder wrapper binding/marshalling text.
+No encoder algorithm exposure was identified. The original implementer froze the
+pre-exposure draft at private checkpoint 45e8170c5, recorded hashes and tool-call
+ordering privately, and made no further codec edits. The planner's isolated
+context did not receive that output and continues from specifications, Margo-owned
+API/tests/draft code and opaque external binaries. This record does not claim
+that the overall conversation was free of incidental implementation text.
+The draft remains unlanded until complete-job acceptance and provenance review.
+
+The isolated encoder continuation additionally uses Yann Collet and Murray
+Kucherawy (editor), [Zstandard Compression and the application/zstd Media Type,
+RFC 8878](https://www.rfc-editor.org/rfc/rfc8878.html), February 2021. Relevant
+frame, compressed-block and FSE sections plus predefined tables were inspected;
+the full RFC was not read. The own feature implements LZ sequences, predefined
+FSE coding, literal sections and incompressible-block fallback in the same Rust
+crate. Opaque Node and Margo decompression check the exact reconstructed bytes;
+no reference implementation source or companion code was consulted by that
+isolated implementer.
+
+Round 2 uses Philip A. Chou, Tom Lookabaugh and Robert M. Gray,
+[Entropy-Constrained Vector Quantization](https://web.stanford.edu/class/ee398a/handouts/papers/Chou%20-%20EC%20VQ.pdf)
+(1989), section III inspected, not read in full. Alternate assignment and
+reproduction updates while retaining the incumbent. The current distortion
+step uses exact clamped-palette moments, all eight intensity tables and two
+independent shared books; actual encoded bytes remain the matched-rate test.
+This is bounded alternating VQ, not a claim of full entropy-constrained VQ.
+Strom/Wennersten (2011), selected sections re-inspected, motivates retaining
+reconstructed-domain error when changing parameter assignments. The fresh
+round-2 implementer received only the incident summary, not the exposed text.
+No third-party implementation or companion source was opened. A pooled
+coarse-slice regression fails on the frozen candidate; exact tree searches
+are independently checked against exhaustive endpoint reconstruction.
+
+The capped continuation evaluated rounds 2 through 5 without reducing the
+three-role 1024x1024 CC0 corpus, mip chains or PSNR/SSIM bars. Rounds 3-5 add
+an estimated selector-index entropy penalty from Chou et al. section III,
+contrast-dependent penalty scaling motivated by Wang et al. section III, and
+independent-fit seeds for bounded endpoint/selector reassignment. Wang et al.
+abstract and normalization discussion were re-inspected; the whole paper was
+not read. The heuristic retains exact clamped-palette distortion and checks
+actual encoded bytes, but is not an exact SSIM optimizer or a full Huffman
+rate model. A final joint search retains each block's incumbent weighted SSE
+and uses only the current books. Exhaustive objective tests cover endpoint
+and entropy-biased selector tree bounds, including zero rate weight. The
+shared selector search also includes constant vectors where capacity allows;
+this is general book coverage, not a final-mip special case.
+A separate normative-spec RLE packing probe reconstructed identical mip bytes
+but increased the colour/data files from 197057/169158 to 197835/169373 B;
+it was removed. Only the published format specification was opened, never
+implementation source. The fresh isolated context and earlier containment
+history remain unchanged. No throughput measurement or quality waiver.
+
+
+Batch 137 authorized rounds 6-8 (2026-11-10): the fresh continuation received
+only the incident summary, Margo-owned drafts, specifications and paper links;
+it never received the exposed implementation result. It opened the exact
+Wang/Bovik/Sheikh/Simoncelli 2004 PDF, Chou/Lookabaugh/Gray 1989 PDF and
+Strom/Wennersten 2011 PDF listed above, inspecting selected distortion,
+normalization, rate and prediction discussion, not reading any in full.
+No third-party implementation, companion source or implementation search was
+opened. Opaque old encoder/transcoder binaries ran only outside the repository.
+Round 6 combines contrast-normalized per-channel search and local structural
+scoring with an incumbent RGB SSE constraint (Wang et al., equations 9-13).
+Round 7 compares first-use, lexicographic and Morton endpoint index orders by
+complete serialized Huffman payload, including prediction/history and headers
+(Chou et al., rate-distortion assignment; Strom/Wennersten, parameter prediction).
+This is exact comparison of those wire candidates, not an optimal entropy coder.
+Round 8 retains one independent reproduction opportunity per mip and checks
+its gain over every affected valid 11x11 Gaussian window before accepting it.
+Deterministic repeated search states are not re-evaluated. Own regression tests
+cover distortion/books, window behavior, mip allocation and lossless relabelling.
+All ETC1S rows pass; UASTC sRGB color still loses due to the weighted search
+objective's blue/green tradeoff. The explicit cap stopped implementation work;
+no quality waiver, complete replacement, new speed claim or prebuilt removal.
+
+
+Batch 137 round 9 (2026-11-10, explicitly resumed by Scott): a wide paper
+search compared Nystad, Lassen, Pomianowski, Ellis and Olson,
+[Adaptive Scalable Texture Compression](https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/nystad12_astc.pdf)
+(2012), sections 2, 4 and 5 inspected; Wang, Bovik, Sheikh and Simoncelli,
+[Image Quality Assessment: From Error Visibility to Structural Similarity](https://utw10503.utweb.utexas.edu/publications/2004/zwang_ssim_ieeeip2004.pdf)
+(2004), structural-normalization and SSIM equations inspected; and Griffin
+and Olano, [Evaluating Texture Compression Masking Effects using Objective Image Quality Assessment Metrics](https://www.nist.gov/publications/evaluating-texture-compression-masking-effects-using-objective-image-quality-assessment)
+(2015), NIST abstract inspected only. None was read in full. No companion
+code or other implementation source was opened. The fresh context received
+only the earlier incident summary and Margo-owned implementation, never the
+exposed text. Old encoder/transcoder binaries remain opaque, outside the repo.
+
+Nystad et al. section 5 uses equally weighted colors for PSNR comparisons.
+Wang et al. distinguishes squared error from local structural similarity;
+Griffin and Olano additionally distinguishes texture errors from rendered
+masking. Therefore the existing texture PSNR and Gaussian SSIM bars both
+remain mandatory, with no rendered-masking waiver. The candidate now separates
+sRGB transfer metadata/linear-light mip filtering from UASTC's equal-component
+fit and RDO objective. This preserves all existing public options; there is no
+public perceptual-weight selector to remove. ETC1S's separate search and the
+frozen Rust/Wasm artifact are unchanged. A synthetic chromatic regression
+fails with the former objective (RGB SSE 97115) and passes with equal fitting.
+
+## Batch 137 round 10: lossless literal coding (2026-11-10)
+
+Research first compared Nystad, Lassen, Pomianowski, Ellis and Olson (2012),
+*Adaptive Scalable Texture Compression*, sections 4 and 5,
+https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/nystad12_astc.pdf;
+Wang, Bovik, Sheikh and Simoncelli (2004), *Image Quality Assessment: From Error
+Visibility to Structural Similarity*, equations 13-17,
+https://ece.uwaterloo.ca/~z70wang/publications/ssim.pdf; and Chou, Lookabaugh and
+Gray (1989), *Entropy-Constrained Vector Quantization*, sections II-III,
+https://web.stanford.edu/class/ee398a/handouts/papers/Chou%20-%20EC%20VQ.pdf.
+Griffin and Olano (2015), *Evaluating Texture Compression Masking Effects using
+Objective Image Quality Assessment Metrics*, NIST abstract only,
+https://www.nist.gov/publications/evaluating-texture-compression-masking-effects-using-objective-image-quality-assessment,
+distinguishes texture metrics from rendered masking; this job retains Scott's
+texture bars. These sources were read only in the stated sections, not in full.
+
+The unconditioned data row passed both bars but exceeded its byte budget. Finer
+RDO alone still failed. A Node built-in Zstandard black-box probe demonstrated
+lossless rate headroom; no implementation was inspected. The implementation
+combines the merge construction described in David A. Huffman (1952), *A Method
+for the Construction of Minimum-Redundancy Codes*, publication scan metadata,
+https://compression.ru/download/articles/huff/huffman_1952_minimum-redundancy-codes.pdf,
+with Yann Collet and Murray Kucherawy (2021), *RFC 8878: Zstandard Compression and
+the application/zstd Media Type*, sections 3.1.1.3.1, 4.1.1 and 4.2, read in full,
+https://www.rfc-editor.org/rfc/rfc8878.html. No companion source was read. The
+bounded eleven-bit tree smooths rare frequency counts when needed; FSE weight
+descriptions and reverse streams follow the normative RFC. The existing Margo
+Zstandard decoder supplied independent in-repository interoperability checks.
+No RDO objective, fitting code, corpus or quality assertion changed in round 10.

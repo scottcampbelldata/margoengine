@@ -6,6 +6,7 @@ import { encodeDracoMesh, type DracoEncoderModule, type DracoJob } from './draco
 import { boxed, type EncoderRequest, type Factory, type ModuleBox } from './encoder-host.js';
 import { encodeNativeMesh, loadNativeEncoder, type NativeDracoEncoder } from './draco-native-encode.js';
 import { encodeBasis, type BasisEncoderModule, type BasisJob } from './ktx2-encode.js';
+import { encodeNativeBasis, loadNativeBasis, type NativeBasis } from './basis-native.js';
 
 declare const self: {
   onmessage: ((event: MessageEvent<EncoderRequest & { id: number }>) => void) | null;
@@ -34,6 +35,7 @@ const startDraco = async ({ wrapperURL, wasmURL }: EncoderRequest): Promise<Modu
 };
 
 let basis: Promise<ModuleBox<BasisEncoderModule>> | undefined;
+let nativeBasis: Promise<NativeBasis> | undefined;
 const startBasis = async ({ wrapperURL, wasmURL }: EncoderRequest): Promise<ModuleBox<BasisEncoderModule>> => {
   self.importScripts(wrapperURL);
   if (!self.BASIS)
@@ -54,6 +56,10 @@ self.onmessage = async ({ data }) => {
       draco ??= startDraco(data);
       const { module } = await draco,
         result = encodeDracoMesh(module, data.job as DracoJob);
+      self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
+    } else if (data.kind === 'basis-native') {
+      nativeBasis ??= loadNativeBasis(new URL(data.wasmURL));
+      const result = encodeNativeBasis(await nativeBasis, data.job as BasisJob);
       self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
     } else if (data.kind === 'basis') {
       basis ??= startBasis(data);

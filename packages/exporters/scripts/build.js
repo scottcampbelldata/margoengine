@@ -1,12 +1,11 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
-import { staticEmbind } from '../../../scripts/static-embind.js';
 
 // Plain TypeScript emit keeps one module per exporter, so a consumer bundler drops the formats it does not import.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -52,19 +51,10 @@ await build({
     },
   },
 });
-// The remaining prebuilt Basis encoder is CommonJS for Node's Emscripten loader.
-for (const folder of ['basis-encoder']) {
-  await mkdir(resolve(root, 'dist', folder), { recursive: true });
-  for (const file of await readdir(resolve(root, 'vendor', folder)))
-    await copyFile(resolve(root, 'vendor', folder, file), resolve(root, 'dist', folder, file));
-  await writeFile(resolve(root, 'dist', folder, 'package.json'), '{ "type": "commonjs" }\n');
-}
-// The Basis encoder's embind wrappers would need 'unsafe-eval'; ship the closure form instead (scripts/static-embind.js).
-const basis = resolve(root, 'dist/basis-encoder/basis_encoder.js');
-await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_encoder.js'));
-await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(root, 'dist/THIRD-PARTY-NOTICE.md'));
-await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(root, 'dist/LICENSE-Apache-2.0.txt'));
+// One lazy clean-room Basis feature, with no third-party encoder wrapper.
+await mkdir(resolve(root, 'dist/basis-encoder'), { recursive: true });
 await copyFile(resolve(root, 'src/draco-native-encoder.wasm'), resolve(root, 'dist/draco-native-encoder.wasm'));
+await copyFile(resolve(root, 'native/basis/margo_basis_encoder.wasm'), resolve(root, 'dist/basis-encoder/margo_basis_encoder.wasm'));
 await packageDeclarations(root);
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);

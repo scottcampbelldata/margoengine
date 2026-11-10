@@ -451,3 +451,5 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 # Batch 175 job 6: reader worker timings owed
 
 On a quiet machine after Scott resumes speed work, record worker startup, loading and parsing times per format and input byte size for the existing head.nrrd, zstat1.nii.gz, CT_small.dcm, NOAA wind-classic.nc, wind.vti, wind.vtk and the equivalent NOAA Zarr store. Compare output-identical direct and worker reads and record snapshot/transfer bytes. Only consider a feature-local Rust/Wasm inflater after a permitted paired A/B demonstrates a gain; the existing inflater remains unchanged. The correctness suites do not measure or assert speed.
+
+Batch 137 Basis encoder: quiet-machine encoder throughput, first-call/load cost and peak-memory comparisons against the pinned old prebuilt are owed after the build phase. Retain identical ETC1S/UASTC settings, mip chains, RDO inputs and matched-rate quality corpus. No benchmark, paired wall-clock A/B, timing-only assertion or exclusive GPU run was performed during the build phase. Deterministic work counts and gzip bytes are separate acceptance evidence, not a throughput claim.

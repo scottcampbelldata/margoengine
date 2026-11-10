@@ -413,27 +413,19 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/exporters',
+    file: 'packages/exporters/dist/basis-encoder/margo_basis_encoder.wasm',
+    label: 'basis-encoder/margo_basis_encoder.wasm',
+    kind: 'Rust SIMD ETC1S/UASTC encoder',
+    measure: 'file',
+    when: 'First default encodeKTX2 or compressTextures call from the optional ktx2 entry',
+  },
+  {
+    package: '@margoengine/exporters',
     file: 'packages/exporters/dist/draco-native-encoder.wasm',
     label: 'draco-native-encoder.wasm',
     kind: 'Clean-room Draco encoder Wasm',
     measure: 'file',
     when: 'First compressDraco call; one lazy SIMD module in its browser worker or the Node process',
-  },
-  {
-    package: '@margoengine/exporters',
-    file: 'packages/exporters/dist/basis-encoder/basis_encoder.js',
-    label: 'basis-encoder/basis_encoder.js',
-    kind: 'Basis encoder glue',
-    measure: 'file',
-    when: 'First `compressTextures()` or `encodeKTX2()`, with the encoder worker above in a browser; `encoderPath` serves it from elsewhere',
-  },
-  {
-    package: '@margoengine/exporters',
-    file: 'packages/exporters/dist/basis-encoder/basis_encoder.wasm',
-    label: 'basis-encoder/basis_encoder.wasm',
-    kind: 'Wasm',
-    measure: 'file',
-    when: 'With the Basis encoder glue above',
   },
   // The environment's image decoders (EXR, Radiance HDR, UltraHDR): the root re-exports them, and an app that names
   // none of them gets them as a chunk on its first URL load.

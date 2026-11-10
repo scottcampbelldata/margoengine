@@ -1,5 +1,5 @@
 // encodeKTX2 and compressTextures: pixels or a GLB in, Basis Universal KTX2 out, so a texture stays compressed on the GPU
-// as well as on the wire. The encoder is Binomial's own Wasm, loaded on the first call, so an app that never compresses
+// as well as on the wire. The clean-room Rust/Wasm encoder loads on the first call, so an app that never compresses
 // never fetches it.
 import { encoderFile, inProcess, inWorker, loadInNode, type EncoderRequest, type ModuleBox } from './encoder-host.js';
 import { joinGLB, splitGLB } from './glb.js';
@@ -20,7 +20,7 @@ export interface KTX2EncoderOptions {
   uastcLevel?: number;
   /** UASTC rate-distortion pass, from 0, off, to 10. Higher is smaller on the wire and further from the source. Default 0. */
   uastcRDO?: number;
-  /** Folder holding basis_encoder.js and basis_encoder.wasm. Defaults to the copy bundled with this package. */
+  /** Optional compatibility override holding external basis_encoder.js and basis_encoder.wasm. Unset uses Margo's lazy encoder. */
   encoderPath?: string;
   /** Stops the encode. A browser ends the worker at once; Node stops between images. */
   signal?: AbortSignal;
@@ -88,28 +88,35 @@ const settingsOf = ({ quality = 128, effort = 2, uastcLevel = 2, uastcRDO = 0 }:
   };
 };
 
-let local: Promise<ModuleBox<BasisEncoderModule>> | undefined;
+let native: Promise<import('./basis-native.js').NativeBasis> | undefined;
 
 // Basis prints each encode's statistics otherwise.
 const silent = { print() {}, printErr() {} };
 
 async function encode(jobs: BasisJob[], options: KTX2EncoderOptions): Promise<BasisResult[]> {
+  if (options.encoderPath === undefined) {
+    const wasm = new URL('./basis-encoder/margo_basis_encoder.wasm', import.meta.url);
+    if (typeof Worker === 'undefined') {
+      const implementation = await import('./basis-native.js');
+      native ??= implementation.loadNativeBasis(wasm);
+      const api = await native;
+      return inProcess(jobs, (job) => implementation.encodeNativeBasis(api, job), options.signal);
+    }
+    return inWorker<BasisResult>(
+      jobs.map((job) => ({ kind: 'basis-native', wrapperURL: '', wasmURL: wasm.href, job })),
+      (request) => {
+        const { source } = request.job as BasisJob;
+        return [(source instanceof Uint8Array ? source : source.data).buffer as ArrayBuffer];
+      },
+      options.signal,
+    );
+  }
   const { encoderPath, signal } = options,
-    // Whole file names, so a bundler can see and copy each one.
-    wrapper =
-      encoderPath === undefined
-        ? new URL('./basis-encoder/basis_encoder.js', import.meta.url)
-        : encoderFile(encoderPath, 'basis_encoder.js'),
-    wasm =
-      encoderPath === undefined
-        ? new URL('./basis-encoder/basis_encoder.wasm', import.meta.url)
-        : encoderFile(encoderPath, 'basis_encoder.wasm');
+    wrapper = encoderFile(encoderPath, 'basis_encoder.js'),
+    wasm = encoderFile(encoderPath, 'basis_encoder.wasm');
   if (typeof Worker === 'undefined') {
     const start = (): Promise<ModuleBox<BasisEncoderModule>> => loadInNode<BasisEncoderModule>(wrapper, wasm, silent),
-      [{ module }, { encodeBasis }] = await Promise.all([
-        encoderPath === undefined ? (local ??= start()) : start(),
-        import('./ktx2-encode.js'),
-      ]);
+      [{ module }, { encodeBasis }] = await Promise.all([start(), import('./ktx2-encode.js')]);
     return inProcess(jobs, (job) => encodeBasis(module, job), signal);
   }
   return inWorker<BasisResult>(
@@ -318,7 +325,11 @@ export async function compressTextures(
           return { source, image, bytes: imageBytes(json, parts.bin, image) };
         }),
         stored = images.filter(({ bytes }) => bytes),
-        { source: imageIndex, image, bytes } = stored.find(({ bytes }) => isPNGOrJPEG(bytes!)) ?? stored[0] ?? images[0];
+        {
+          source: imageIndex,
+          image,
+          bytes,
+        } = stored.find(({ bytes }) => isPNGOrJPEG(bytes!)) ?? stored[0] ?? images[0];
       const readable = bytes && (isPNGOrJPEG(bytes) || (await canDecode(bytes)));
       if (!bytes) skip('external-image');
       else if (!readable) skip('not-png-or-jpeg');

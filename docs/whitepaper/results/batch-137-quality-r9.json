@@ -1,0 +1,935 @@
+{
+  "status": "UNLANDED: color objective repaired; sampled UASTC data base row still fails, no quality waiver",
+  "baseMain": "bd92fa67b20c89d0d83ca44dbd38a5bd756bb0af",
+  "files": [
+    {
+      "path": "packages/exporters/native/basis/margo_basis_encoder.wasm",
+      "sha256": "487d238efff7c6052f7c55b995d40bf1dd8dd7f88714a661b3650ec8a567b282"
+    },
+    {
+      "path": "packages/exporters/src/basis-native.ts",
+      "sha256": "ce996829ebf3d77a69a727d74bc830622a8ec6eea7683f644e3f3399f9b01f0e"
+    },
+    {
+      "path": "packages/exporters/tests/basis-native.test.js",
+      "sha256": "cddc90a8dc2f56952870387ff1c59e39fdce80a6f82f50d7aabe06c0b2e4a3aa"
+    },
+    {
+      "path": ".review/b137/matched-uastc-r9.mjs",
+      "sha256": "e6f3a7fb61d502b6b6fd1cad3da6429f62cd5b2b8fb2d7a3d9757f49b23b9322"
+    },
+    {
+      "path": ".review/b137/matched-uastc-r9-equal-probe.mjs",
+      "sha256": "72fd1924e7503cb14b1ffe86bcf15545665fecd38b34a50733a2cd837c957056"
+    }
+  ],
+  "size": {
+    "status": "unlanded candidate, entry bundle plus lazy native asset; legacy assets retained",
+    "entry": {
+      "raw": 395263,
+      "gzip": 138922
+    },
+    "nativeAsset": {
+      "raw": 271457,
+      "gzip": 84726,
+      "sha256": "487d238efff7c6052f7c55b995d40bf1dd8dd7f88714a661b3650ec8a567b282"
+    }
+  },
+  "checks": {
+    "exportersCPU": {
+      "pass": 563,
+      "fail": 0,
+      "skipped": 0
+    },
+    "nativeKTX2Subset": {
+      "pass": 30,
+      "fail": 0
+    },
+    "regressionOldWeighting": {
+      "expectedFailure": true,
+      "rgbSSE": 97115
+    },
+    "fullFastGate": "not run: complete-job quality fails",
+    "dependentCPU": "not run",
+    "finalGPU": "not run",
+    "lint": {
+      "pass": true,
+      "upstreamWarnings": 203
+    },
+    "diffCheck": "pass"
+  },
+  "acceptance": {
+    "status": "Round 9 exact unchanged full-source matched-size acceptance",
+    "complete": true,
+    "pass": false,
+    "records": [
+      {
+        "mode": "etc1s",
+        "role": "color",
+        "path": ".review/b137/matched-etc1s-r8-color.json",
+        "bytes": 197232,
+        "oldBytes": 197467,
+        "quality": 43,
+        "base": {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 28.52565632752221,
+          "oldPSNR": 27.70196557221834,
+          "ssim": 0.8036435230339981,
+          "oldSSIM": 0.7792697597824122
+        },
+        "losingPSNR": [],
+        "losingSSIM": [],
+        "pass": true
+      },
+      {
+        "mode": "etc1s",
+        "role": "data",
+        "path": ".review/b137/matched-etc1s-r8-data.json",
+        "bytes": 168819,
+        "oldBytes": 169631,
+        "quality": 41,
+        "base": {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 34.6885776235785,
+          "oldPSNR": 34.54619009181982,
+          "ssim": 0.8781117056709604,
+          "oldSSIM": 0.8748488762316039
+        },
+        "losingPSNR": [],
+        "losingSSIM": [],
+        "pass": true
+      },
+      {
+        "mode": "etc1s",
+        "role": "normal",
+        "path": ".review/b137/matched-etc1s-r8-normal.json",
+        "bytes": 240734,
+        "oldBytes": 240860,
+        "quality": 69,
+        "base": {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 23.428976795090023,
+          "oldPSNR": 23.375207478373184,
+          "ssim": 0.6397092248094662,
+          "oldSSIM": 0.6366668981537642
+        },
+        "losingPSNR": [],
+        "losingSSIM": [],
+        "pass": true
+      },
+      {
+        "mode": "uastc",
+        "role": "color",
+        "path": ".review/b137/matched-uastc-r9-equal-probe-color.json",
+        "bytes": 1398674,
+        "oldBytes": 1398686,
+        "quality": 128,
+        "lambda": 0,
+        "base": {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 39.233918927442744,
+          "oldPSNR": 38.79510619696849,
+          "ssim": 0.9818006553184161,
+          "oldSSIM": 0.9802027584010213
+        },
+        "losingPSNR": [],
+        "losingSSIM": [],
+        "pass": true
+      },
+      {
+        "mode": "uastc",
+        "role": "data",
+        "path": ".review/b137/matched-uastc-r9-data.json",
+        "bytes": 1266487,
+        "oldBytes": 1306710,
+        "quality": 128,
+        "lambda": 0.25,
+        "base": {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 43.23172529078545,
+          "oldPSNR": 44.02724294789043,
+          "ssim": 0.9725413286967641,
+          "oldSSIM": 0.9801035987485953
+        },
+        "losingPSNR": [
+          1024
+        ],
+        "losingSSIM": [
+          1024
+        ],
+        "pass": false
+      },
+      {
+        "mode": "uastc",
+        "role": "normal",
+        "path": ".review/b137/matched-uastc-r9-normal.json",
+        "bytes": 1353512,
+        "oldBytes": 1359760,
+        "quality": 128,
+        "lambda": 0.5,
+        "base": {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 32.2618726344405,
+          "oldPSNR": 31.86626661275813,
+          "ssim": 0.9213155717188289,
+          "oldSSIM": 0.9200084015570135
+        },
+        "losingPSNR": [],
+        "losingSSIM": [],
+        "pass": true
+      }
+    ]
+  },
+  "records": [
+    {
+      "mode": "etc1s",
+      "measuredRound": 8,
+      "role": "color",
+      "path": "packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_diff_1k.jpg",
+      "sourceSHA256": "708373b2af7fd07ac8de1500556006aaf904c41a99985a849cacc78874f38eac",
+      "options": {
+        "srgb": true,
+        "normalMap": false,
+        "mipmaps": true
+      },
+      "quality": 43,
+      "bytes": 197232,
+      "oldBytes": 197467,
+      "points": [
+        {
+          "quality": 43,
+          "bytes": 197232
+        },
+        {
+          "quality": 54,
+          "bytes": 209415
+        },
+        {
+          "quality": 48,
+          "bytes": 202874
+        },
+        {
+          "quality": 45,
+          "bytes": 199626
+        },
+        {
+          "quality": 44,
+          "bytes": 198411
+        }
+      ],
+      "levels": [
+        {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 28.52565632752221,
+          "oldPSNR": 27.70196557221834,
+          "ssim": 0.8036435230339981,
+          "oldSSIM": 0.7792697597824122
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "psnr": 28.3109984975557,
+          "oldPSNR": 27.347262741740998,
+          "ssim": 0.8026168559970771,
+          "oldSSIM": 0.7750181757897847
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "psnr": 28.264359437364895,
+          "oldPSNR": 27.241837121420463,
+          "ssim": 0.8106557028787332,
+          "oldSSIM": 0.7836777636896932
+        },
+        {
+          "width": 128,
+          "height": 128,
+          "psnr": 27.964886934366913,
+          "oldPSNR": 26.92026351937702,
+          "ssim": 0.818325507448248,
+          "oldSSIM": 0.7943054998973693
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "psnr": 27.73156569175487,
+          "oldPSNR": 26.364912869007124,
+          "ssim": 0.8231594662253993,
+          "oldSSIM": 0.7957191816233772
+        },
+        {
+          "width": 32,
+          "height": 32,
+          "psnr": 27.100409429575567,
+          "oldPSNR": 25.916771612122215,
+          "ssim": 0.8038017694015057,
+          "oldSSIM": 0.7645175343730383
+        },
+        {
+          "width": 16,
+          "height": 16,
+          "psnr": 27.578354572747248,
+          "oldPSNR": 26.590036654173204,
+          "ssim": 0.8146108369961675,
+          "oldSSIM": 0.8089973344761577
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "psnr": 30.405447385530554,
+          "oldPSNR": 29.115766325522205,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 4,
+          "height": 4,
+          "psnr": 37.176204142550866,
+          "oldPSNR": 31.64720349886979,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 2,
+          "height": 2,
+          "psnr": 41.932916025795166,
+          "oldPSNR": 33.76387763203856,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "psnr": 49.891716199235915,
+          "oldPSNR": 49.891716199235915,
+          "ssim": null,
+          "oldSSIM": null
+        }
+      ]
+    },
+    {
+      "mode": "etc1s",
+      "measuredRound": 8,
+      "role": "data",
+      "path": "packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_arm_1k.jpg",
+      "sourceSHA256": "de3ffa2b107d3b9144979a1f683028c74ec86823b2b8eefe16bf5bb9a655ad0c",
+      "options": {
+        "srgb": false,
+        "normalMap": false,
+        "mipmaps": true
+      },
+      "quality": 41,
+      "bytes": 168819,
+      "oldBytes": 169631,
+      "points": [
+        {
+          "quality": 41,
+          "bytes": 168819
+        },
+        {
+          "quality": 53,
+          "bytes": 181323
+        },
+        {
+          "quality": 47,
+          "bytes": 175144
+        },
+        {
+          "quality": 44,
+          "bytes": 171834
+        },
+        {
+          "quality": 42,
+          "bytes": 169974
+        }
+      ],
+      "levels": [
+        {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 34.6885776235785,
+          "oldPSNR": 34.54619009181982,
+          "ssim": 0.8781117056709604,
+          "oldSSIM": 0.8748488762316039
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "psnr": 31.711017486849332,
+          "oldPSNR": 31.262833848908855,
+          "ssim": 0.8033785791759828,
+          "oldSSIM": 0.7869769268978007
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "psnr": 30.1811134461421,
+          "oldPSNR": 29.64386959394409,
+          "ssim": 0.7584922933399675,
+          "oldSSIM": 0.7316855236556307
+        },
+        {
+          "width": 128,
+          "height": 128,
+          "psnr": 29.462952597058553,
+          "oldPSNR": 28.89745105369217,
+          "ssim": 0.7330654614813813,
+          "oldSSIM": 0.6995239593831372
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "psnr": 29.104204456892823,
+          "oldPSNR": 28.53214047373903,
+          "ssim": 0.7040913995269181,
+          "oldSSIM": 0.666210678597194
+        },
+        {
+          "width": 32,
+          "height": 32,
+          "psnr": 28.78540815085621,
+          "oldPSNR": 28.13012507656007,
+          "ssim": 0.6742792256797818,
+          "oldSSIM": 0.6141638675142372
+        },
+        {
+          "width": 16,
+          "height": 16,
+          "psnr": 29.81453839354451,
+          "oldPSNR": 28.874030722952067,
+          "ssim": 0.6584406196149701,
+          "oldSSIM": 0.5598073987490505
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "psnr": 32.11982764014773,
+          "oldPSNR": 31.706055357347136,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 4,
+          "height": 4,
+          "psnr": 36.05019895737187,
+          "oldPSNR": 35.32900504177049,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 2,
+          "height": 2,
+          "psnr": 45.49838926093329,
+          "oldPSNR": 45.49838926093329,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "psnr": 52.90201615587573,
+          "oldPSNR": 49.891716199235915,
+          "ssim": null,
+          "oldSSIM": null
+        }
+      ]
+    },
+    {
+      "mode": "etc1s",
+      "measuredRound": 8,
+      "role": "normal",
+      "path": "packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_nor_gl_1k.jpg",
+      "sourceSHA256": "6df5263ba6c30e9343ee324d87078b926024d710b0b349025083600369df8d25",
+      "options": {
+        "srgb": false,
+        "normalMap": true,
+        "mipmaps": true
+      },
+      "quality": 69,
+      "bytes": 240734,
+      "oldBytes": 240860,
+      "points": [
+        {
+          "quality": 69,
+          "bytes": 240734
+        },
+        {
+          "quality": 83,
+          "bytes": 253811
+        },
+        {
+          "quality": 76,
+          "bytes": 247242
+        },
+        {
+          "quality": 72,
+          "bytes": 243323
+        },
+        {
+          "quality": 70,
+          "bytes": 241540
+        }
+      ],
+      "levels": [
+        {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 23.428976795090023,
+          "oldPSNR": 23.375207478373184,
+          "ssim": 0.6397092248094662,
+          "oldSSIM": 0.6366668981537642
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "psnr": 23.774177895714395,
+          "oldPSNR": 23.612318219980843,
+          "ssim": 0.6365207816394362,
+          "oldSSIM": 0.6179258566161638
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "psnr": 24.87562993829705,
+          "oldPSNR": 24.663980117353628,
+          "ssim": 0.6395895435857234,
+          "oldSSIM": 0.6110172973975039
+        },
+        {
+          "width": 128,
+          "height": 128,
+          "psnr": 26.052421892473294,
+          "oldPSNR": 25.742041851446853,
+          "ssim": 0.6558474010604591,
+          "oldSSIM": 0.6133887409163199
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "psnr": 27.2825631646189,
+          "oldPSNR": 26.85048140958894,
+          "ssim": 0.6765618524736335,
+          "oldSSIM": 0.6275615642822524
+        },
+        {
+          "width": 32,
+          "height": 32,
+          "psnr": 28.36522031454426,
+          "oldPSNR": 27.796827861518672,
+          "ssim": 0.727538671022108,
+          "oldSSIM": 0.6659954087582586
+        },
+        {
+          "width": 16,
+          "height": 16,
+          "psnr": 28.89744578287924,
+          "oldPSNR": 28.19305543924788,
+          "ssim": 0.7257552389632979,
+          "oldSSIM": 0.6443673633077641
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "psnr": 29.758076583656102,
+          "oldPSNR": 28.140087521470797,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 4,
+          "height": 4,
+          "psnr": 33.6334490663788,
+          "oldPSNR": 29.784477545318182,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 2,
+          "height": 2,
+          "psnr": 40.11448014634744,
+          "oldPSNR": 32.44878636800915,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "psnr": 45.91231611251554,
+          "oldPSNR": 45.91231611251554,
+          "ssim": null,
+          "oldSSIM": null
+        }
+      ]
+    },
+    {
+      "mode": "uastc",
+      "measuredRound": 9,
+      "role": "color",
+      "path": "packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_diff_1k.jpg",
+      "sourceSHA256": "708373b2af7fd07ac8de1500556006aaf904c41a99985a849cacc78874f38eac",
+      "options": {
+        "srgb": true,
+        "normalMap": false,
+        "mipmaps": true
+      },
+      "quality": 128,
+      "lambda": 0,
+      "bytes": 1398674,
+      "oldBytes": 1398686,
+      "points": [
+        {
+          "lambda": 0,
+          "bytes": 1398674
+        }
+      ],
+      "levels": [
+        {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 39.233918927442744,
+          "oldPSNR": 38.79510619696849,
+          "ssim": 0.9818006553184161,
+          "oldSSIM": 0.9802027584010213
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "psnr": 38.93361192359235,
+          "oldPSNR": 35.07332695620083,
+          "ssim": 0.9813216566568036,
+          "oldSSIM": 0.9599532647423272
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "psnr": 38.75896304601011,
+          "oldPSNR": 34.74228708351769,
+          "ssim": 0.981893822683972,
+          "oldSSIM": 0.959906744649384
+        },
+        {
+          "width": 128,
+          "height": 128,
+          "psnr": 38.39715510817338,
+          "oldPSNR": 34.39659926441769,
+          "ssim": 0.9824355715945057,
+          "oldSSIM": 0.9606117777804549
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "psnr": 38.056411276048,
+          "oldPSNR": 33.89623813882031,
+          "ssim": 0.9828723238049809,
+          "oldSSIM": 0.9620804298567736
+        },
+        {
+          "width": 32,
+          "height": 32,
+          "psnr": 37.511671949043404,
+          "oldPSNR": 33.54949287608382,
+          "ssim": 0.9814991741698722,
+          "oldSSIM": 0.9592892476552638
+        },
+        {
+          "width": 16,
+          "height": 16,
+          "psnr": 37.96438689548693,
+          "oldPSNR": 32.93146457857135,
+          "ssim": 0.9808288105319519,
+          "oldSSIM": 0.9544851597701998
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "psnr": 39.496335759408204,
+          "oldPSNR": 34.29676453451561,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 4,
+          "height": 4,
+          "psnr": 42.794777501957995,
+          "oldPSNR": 36.69545135767952,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 2,
+          "height": 2,
+          "psnr": 54.15140352195873,
+          "oldPSNR": 42.29503775233961,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "psnr": null,
+          "oldPSNR": 52.90201615587573,
+          "ssim": null,
+          "oldSSIM": null
+        }
+      ]
+    },
+    {
+      "mode": "uastc",
+      "measuredRound": 9,
+      "role": "data",
+      "path": "packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_arm_1k.jpg",
+      "sourceSHA256": "de3ffa2b107d3b9144979a1f683028c74ec86823b2b8eefe16bf5bb9a655ad0c",
+      "options": {
+        "srgb": false,
+        "normalMap": false,
+        "mipmaps": true
+      },
+      "quality": 128,
+      "lambda": 0.25,
+      "bytes": 1266487,
+      "oldBytes": 1306710,
+      "points": [
+        {
+          "lambda": 0,
+          "bytes": 1372366
+        },
+        {
+          "lambda": 0.125,
+          "bytes": 1350333
+        },
+        {
+          "lambda": 0.25,
+          "bytes": 1266487
+        }
+      ],
+      "levels": [
+        {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 43.23172529078545,
+          "oldPSNR": 44.02724294789043,
+          "ssim": 0.9725413286967641,
+          "oldSSIM": 0.9801035987485953
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "psnr": 41.760907138284615,
+          "oldPSNR": 40.939316108192074,
+          "ssim": 0.9687841476371158,
+          "oldSSIM": 0.9644623718332851
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "psnr": 41.3147958395342,
+          "oldPSNR": 39.723166675954054,
+          "ssim": 0.9709629283137051,
+          "oldSSIM": 0.9606549113467014
+        },
+        {
+          "width": 128,
+          "height": 128,
+          "psnr": 41.041111954426654,
+          "oldPSNR": 38.838017902335025,
+          "ssim": 0.9763055175015504,
+          "oldSSIM": 0.9603075012326078
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "psnr": 40.681917318993975,
+          "oldPSNR": 38.26336318887948,
+          "ssim": 0.9779190457315764,
+          "oldSSIM": 0.9552882733391527
+        },
+        {
+          "width": 32,
+          "height": 32,
+          "psnr": 40.19331798817649,
+          "oldPSNR": 37.677599293301945,
+          "ssim": 0.9787040468278786,
+          "oldSSIM": 0.9515699153437488
+        },
+        {
+          "width": 16,
+          "height": 16,
+          "psnr": 40.81966067010857,
+          "oldPSNR": 37.82672514915738,
+          "ssim": 0.9738602521601961,
+          "oldSSIM": 0.9508037294214738
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "psnr": 42.57532498834205,
+          "oldPSNR": 38.14212811266819,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 4,
+          "height": 4,
+          "psnr": 46.078308730710155,
+          "oldPSNR": 40.31923600344541,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 2,
+          "height": 2,
+          "psnr": null,
+          "oldPSNR": 47.46133571237297,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "psnr": null,
+          "oldPSNR": 49.891716199235915,
+          "ssim": null,
+          "oldSSIM": null
+        }
+      ]
+    },
+    {
+      "mode": "uastc",
+      "measuredRound": 9,
+      "role": "normal",
+      "path": "packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_nor_gl_1k.jpg",
+      "sourceSHA256": "6df5263ba6c30e9343ee324d87078b926024d710b0b349025083600369df8d25",
+      "options": {
+        "srgb": false,
+        "normalMap": true,
+        "mipmaps": true
+      },
+      "quality": 128,
+      "lambda": 0.5,
+      "bytes": 1353512,
+      "oldBytes": 1359760,
+      "points": [
+        {
+          "lambda": 0,
+          "bytes": 1396776
+        },
+        {
+          "lambda": 0.125,
+          "bytes": 1394369
+        },
+        {
+          "lambda": 0.25,
+          "bytes": 1387154
+        },
+        {
+          "lambda": 0.5,
+          "bytes": 1353512
+        }
+      ],
+      "levels": [
+        {
+          "width": 1024,
+          "height": 1024,
+          "psnr": 32.2618726344405,
+          "oldPSNR": 31.86626661275813,
+          "ssim": 0.9213155717188289,
+          "oldSSIM": 0.9200084015570135
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "psnr": 33.512314400823385,
+          "oldPSNR": 31.022741927826765,
+          "ssim": 0.9448106357139494,
+          "oldSSIM": 0.9226703672264313
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "psnr": 34.84919984829912,
+          "oldPSNR": 31.70851651941071,
+          "ssim": 0.954178648776265,
+          "oldSSIM": 0.9266002258381002
+        },
+        {
+          "width": 128,
+          "height": 128,
+          "psnr": 36.04374078546421,
+          "oldPSNR": 32.373035994991724,
+          "ssim": 0.9617851274665026,
+          "oldSSIM": 0.9306316864730917
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "psnr": 37.27699648527774,
+          "oldPSNR": 32.962145993700965,
+          "ssim": 0.9664389174075962,
+          "oldSSIM": 0.9380982940016181
+        },
+        {
+          "width": 32,
+          "height": 32,
+          "psnr": 38.27277448096473,
+          "oldPSNR": 33.40906926301843,
+          "ssim": 0.9684401485019755,
+          "oldSSIM": 0.9461149250431227
+        },
+        {
+          "width": 16,
+          "height": 16,
+          "psnr": 39.189172375746324,
+          "oldPSNR": 33.72003304103694,
+          "ssim": 0.973452045950383,
+          "oldSSIM": 0.9505487075110252
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "psnr": 39.33518596249534,
+          "oldPSNR": 33.077183764506024,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 4,
+          "height": 4,
+          "psnr": 45.1659799295465,
+          "oldPSNR": 34.42397682197391,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 2,
+          "height": 2,
+          "psnr": 58.92261606915535,
+          "oldPSNR": 34.42012498596174,
+          "ssim": null,
+          "oldSSIM": null
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "psnr": null,
+          "oldPSNR": 34.84021641603685,
+          "ssim": null,
+          "oldSSIM": null
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "ETC1S reuses round-8 evidence with unchanged fitting, wrapper and binary behavior for ETC1S; not rerun.",
+    "Color probe forces the internal UASTC metric to zero, equivalent to the final wrapper path at RDO 0.",
+    "Data/normal use the final wrapper; full-input SHA256 memoization avoids repeating deterministic UASTC fitting across RDO points.",
+    "Data lambda 0.125 exceeds the byte budget; 0.25 fits and fails quality. Finer RDO points and unconditioned distortion are not measured.",
+    "No proof that all possible data RDO settings fail, no speed claim, legacy prebuilts retained."
+  ]
+}

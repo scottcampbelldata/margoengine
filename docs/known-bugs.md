@@ -5092,3 +5092,12 @@ The sciviz GPU gate encountered the known ANGLE D3D11 MSAA resolve defect docume
 Batch 176 job 5: no open defect found in the declared tensor/OLS/Cartesian tracking contract. Device precision, degenerate-axis ambiguity, raw indefinite fits and analysis/preprocessing limits are recorded in limits.md.
 
 Batch 176 job 6: no open defect found in the declared first-model molecular sphere/stick contract. Unknown-element fallbacks, geometric bond inference and unsupported assembly/ribbon formats are explicit in limits.md.
+
+### Batch 137 quality gap closed
+
+The former 1024 UASTC data loss was caused by forcing a stronger lossy RDO setting
+to compensate for raw Zstandard literals. Finer RDO alone still lost quality.
+RFC 8878 Huffman literals preserve the fitted bytes while reducing the required
+rate conditioning. At RDO 0.09375: 1,305,680 / 1,306,710 B, PSNR 44.380795263 /
+44.027242948 dB and SSIM 0.981507121 / 0.980103599. Every mip row passes.
+See whitepaper/results/batch-137-quality-r10.json and basis-zstd.test.js.

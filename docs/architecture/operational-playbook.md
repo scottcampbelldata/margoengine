@@ -7044,3 +7044,19 @@ C2-007 Water depth-copy evidence (section 5): inside a 4x scene capture Water co
 ## Draco float range review (section 5 evidence, 2026-11-10)
 
 The optional exporter Rust/Wasm transform builder rejects nonrepresentable float32 range/inverse/reconstruction-step values before exposing output. A dedicated Wasm status becomes the coded unsupported diagnostic with bits-0/rescale guidance. The tiny and overflow range regressions run at sequential and topology-selected speeds; bits 0 retains exact floats through both decoders. Existing portable-transform, topology, memory and repeated-lifetime checks remain. No GPU math or core/stage entry changes. Sources, cause and limits are in [draco-float-ranges.md](../draco-float-ranges.md).
+
+## Section 5 evidence: batch 137 clean-room ETC1S/UASTC encoder
+
+The optional exporters/ktx2 entry loads one Rust SIMD Wasm feature lazily. The
+TypeScript API, custom encoderPath route, browser worker cancellation, alpha,
+color/data/normal semantics, mip chains, effort, quality and RDO remain supported.
+Core, stage and the rendering backends are unchanged. The final Zstandard encoder
+adds canonical Huffman literals with FSE-compressed weights from RFC 8878. This
+losslessly saves 56,883 B on the unconditioned full data chain; RDO 0.09375 then
+fits the old byte budget with all quality rows passing. No metric or bar changed.
+Evidence and artifact hashes: whitepaper/results/batch-137-quality-r10.json.
+The prior round-9 record remains historical. Regression basis-zstd.test.js fails
+the former raw-literal codec and checks exact independent and Margo round trips.
+Final fast-gate and dual-backend exporter GPU results are recorded with the job.
+Throughput and peak-memory comparisons remain owed in the deferred speed phase;
+no wall-clock performance claim is made. Legacy bundled encoder files are removed.

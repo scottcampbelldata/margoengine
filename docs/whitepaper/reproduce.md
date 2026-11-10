@@ -3883,3 +3883,30 @@ After npm run build:packages, run node --test --test-timeout=120000 packages/sci
 
 ### Batch 176 molecules
 Run `node --test --test-timeout=120000 packages/loaders/tests/mmcif.test.js packages/sciviz/tests/molecule.test.js` after build:packages. Run `node scripts/gpu-lock.mjs run --owner=molecule-reproduction --max=7 --wait-max=60 -- node packages/sciviz/tests/molecule-browser.mjs` for the native and compatibility GPU cases. Open examples/sciviz-molecule.html for the three real-data views and click a surface to identify its residue. The byte-preserved RCSB downloads and exact SHA-256 values are in packages/sciviz/tests/fixtures/molecule/source.json. The PDB reader remains @margoengine/loaders/pdb; mmCIF enters through @margoengine/loaders/mmcif. Do not infer timings from these correctness checks.
+
+## Batch 137 quality and interoperability
+
+After build:packages, run node --test --test-timeout=120000
+packages/exporters/tests/basis-native.test.js packages/exporters/tests/basis-zstd.test.js
+packages/exporters/tests/ktx2.test.js. The deterministic literal byte budget fails
+without Huffman coding; native Zstandard and Margo must recover every byte across
+84 alphabet/length combinations, plus existing cross-frame cases.
+
+Run packages/exporters/scripts/basis-quality.mjs with the outside oracle path prefix followed by
+encoder/basis_encoder.cjs, encoder/basis_encoder.wasm,
+oracle-built/basis_transcoder.js and oracle-built/basis_transcoder.wasm, followed
+by an output JSON path. For the pinned lane artifacts the prefix is
+C:/Development/Projects/margoengine-lane-M-basis134- (suffixes encoder and
+oracle-built name sibling folders). These pinned prebuilt modules run only as opaque black boxes
+outside this repository. The script uses the full CC0 terrain Aerial Rocks 02
+fixtures, all eleven mips, equal RGB PSNR and Wang et al. 2004 valid 11x11 Gaussian
+SSIM (sigma 1.5, K1 .01, K2 .03), at the recorded matched-rate settings. The native
+reference mips use the declared linear-light/data/normalized-normal semantics.
+The optional third argument selects etc1s or uastc; the fourth selects a role.
+
+Final evidence: results/batch-137-quality-r10.json. Round 8 ETC1S fits and round 9
+color/normal UASTC fits are retained with exact unchanged-path provenance; all
+UASTC Zstandard packing reran, and lossless raw equality binds the retained metrics.
+The final data output is measured directly through the independent transcoder.
+GPU: node scripts/gpu-package-tests.mjs --no-build --only=exporters, shared lock,
+both backends. No verify, README gate or throughput benchmark is needed here.
