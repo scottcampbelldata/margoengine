@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { expect } from '@playwright/test';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
-import { killTree, notebookHasKernel, serverPort, startKernel, step } from './jupyter-steps.mjs';
+import { killTree, notebookHasKernel, waitForServerPort, startKernel, step } from './jupyter-steps.mjs';
 import { venvDir, venvTools } from './venv.mjs';
 
 const root = resolve(import.meta.dirname, '../..'), folder = join(root, 'test-results/sciviz-jupyter');
@@ -27,10 +28,8 @@ let log = '', browser;
 server.stdout.on('data', d => log += d); server.stderr.on('data', d => log += d);
 const deadline = setTimeout(() => { killTree(server.pid); killTree(process.pid); }, 240000);
 try {
-  const base = await step('start JupyterLab', 60000, async () => {
-    while (!serverPort(log)) { if (server.exitCode !== null) throw new Error(log); await new Promise(r => setTimeout(r, 100)); }
-    return `http://127.0.0.1:${serverPort(log)}`;
-  });
+  const port = await waitForServerPort(server, () => log, AbortSignal.timeout(60000));
+  const base = `http://127.0.0.1:${port}`;
   browser = await launchBrowser({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
   const errors = [];
@@ -60,14 +59,12 @@ try {
     mri.engine.camera.position = [4.4, 2, 2]; mri.controls.dispatchEvent(new Event('change'));
     exo.setSelection({ region: { rect: [0, 0, 400, 300] }, points: [{ layer: exo.layers[0], indices: new Uint32Array([1, 3]) }] });
   });
-  await step('receive browser events in Python', 30000, async () => {
-    for (;;) {
-      try {
-        if (JSON.parse(readFileSync(join(folder, 'camera.json'))).position[0] === 4.4 && readFileSync(join(folder, 'selection.json'), 'utf8') === '[1, 3]') return;
-      } catch (e) { if (e.code !== 'ENOENT') throw e; }
-      await new Promise(r => setTimeout(r, 50));
-    }
-  });
+  await expect.poll(() => {
+    try {
+      return JSON.parse(readFileSync(join(folder, 'camera.json'))).position[0] === 4.4 && readFileSync(join(folder, 'selection.json'), 'utf8') === '[1, 3]';
+    } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    return false;
+  }, { message: 'receive browser events in Python', timeout: 30000 }).toBe(true);
   await run('assert not mri.error and not exo.error\nassert len(mri.buffers["b0"]) == 88 * 128 * 128 * 2');
   await page.screenshot({ path: join(folder, 'jupyterlab.png'), fullPage: true });
   assert.deepEqual(errors, []);

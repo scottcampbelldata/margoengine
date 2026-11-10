@@ -3,8 +3,48 @@
 // the server and browser were left running.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import test from 'node:test';
-import { killTree, notebookHasKernel, StepTimeout, serverPort, step } from '../python/tests/jupyter-steps.mjs';
+import { killTree, notebookHasKernel, StepTimeout, serverPort, waitForServerPort, step } from '../python/tests/jupyter-steps.mjs';
+
+test('server readiness follows split output events and cleans up every listener', { timeout: 5000 }, async () => {
+  for (const stream of ['stdout', 'stderr']) {
+    const server = Object.assign(new EventEmitter(), {
+      stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, signalCode: null,
+    });
+    let log = '';
+    const waiting = waitForServerPort(server, () => log, AbortSignal.timeout(3000));
+    log = 'http://127.0.0.1:';
+    server[stream].emit('data');
+    log += '8914/lab';
+    server[stream].emit('data');
+    assert.equal(await waiting, 8914);
+    assert.equal(server.stdout.listenerCount('data'), 0);
+    assert.equal(server.stderr.listenerCount('data'), 0);
+    assert.equal(server.listenerCount('exit'), 0);
+    assert.equal(server.listenerCount('error'), 0);
+    assert.equal(await waitForServerPort(server, () => log, AbortSignal.timeout(3000)), 8914);
+  }
+});
+
+test('server readiness rejects exit, signal exit, spawn errors and cancellation', { timeout: 5000 }, async () => {
+  for (const mode of ['exit', 'signal', 'error', 'abort', 'already-exited', 'already-aborted']) {
+    const server = Object.assign(new EventEmitter(), {
+      stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, signalCode: null,
+    });
+    const controller = new AbortController();
+    const error = new Error('startup failed');
+    if (mode === 'already-exited') server.exitCode = 1;
+    if (mode === 'already-aborted') controller.abort(error);
+    const waiting = waitForServerPort(server, () => 'startup log', controller.signal);
+    if (mode === 'exit') { server.exitCode = 1; server.emit('exit', 1, null); }
+    if (mode === 'signal') { server.signalCode = 'SIGTERM'; server.emit('exit', null, 'SIGTERM'); }
+    if (mode === 'error') server.emit('error', error);
+    if (mode === 'abort') controller.abort(error);
+    await assert.rejects(waiting, /startup (failed|log)/);
+    for (const emitter of [server, server.stdout, server.stderr]) assert.deepEqual(emitter.eventNames(), []);
+  }
+});
 
 // A JupyterLab or Notebook 7 app as window.jupyterapp shows it, with one notebook in the main area.
 const app = (path, context) => ({

@@ -1406,3 +1406,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/materials: Node pixel-backed extension maps.
 - @margoengine/rigging: MToon maps from retained Node pixels.
 - @margoengine/react: independent retained-pixel copies for cached model mounts.
+- Python notebook test harness: document event-driven server readiness and bounded camera/selection output polling in the README phase.

@@ -1,7 +1,5 @@
 # Known bugs and unverified features
 
-Lane A sweep, outside the compiler-delay repair: `node --test tests/check-fixed-waits.test.js` fails on `python/tests/sciviz-jupyter-browser.mjs` lines 31/68 from 5329898ca. Both sleeps poll readiness inside bounded `step` calls, but the scanner recognises only self-scheduled bounded polls, not these loop-based polls. Keep the detector and assertions unchanged; the Python producer or check owner must reconcile them in the fix phase. No compiler-delay source is named by the failure.
-
 Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
 

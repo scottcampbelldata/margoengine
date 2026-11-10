@@ -78,3 +78,31 @@ export function serverPort(log) {
   const port = /http:\/\/127\.0\.0\.1:(\d+)\/(?:lab|tree)\b/.exec(log)?.[1];
   return port && Number(port);
 }
+
+/** Waits for the server's actual port announcement, or fails on exit, spawn error or deadline. */
+export function waitForServerPort(server, readLog, signal) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      server.stdout.off('data', check);
+      server.stderr.off('data', check);
+      server.off('exit', exited);
+      server.off('error', failed);
+      signal.removeEventListener('abort', aborted);
+    };
+    const failed = (error) => { cleanup(); reject(error); };
+    const exited = () => failed(new Error(`Jupyter server exited before announcing its port:\n${readLog()}`));
+    const aborted = () => failed(signal.reason);
+    const check = () => {
+      const port = serverPort(readLog());
+      if (port) { cleanup(); resolve(port); }
+    };
+    server.stdout.on('data', check);
+    server.stderr.on('data', check);
+    server.once('exit', exited);
+    server.once('error', failed);
+    signal.addEventListener('abort', aborted, { once: true });
+    if (signal.aborted) aborted();
+    else if (server.exitCode !== null || server.signalCode !== null) exited();
+    else check();
+  });
+}
