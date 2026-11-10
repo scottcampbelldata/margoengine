@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13911356,
+  "total": 13920374,
   "history": [
     {
       "date": "2026-10-24",
@@ -7334,6 +7334,12 @@
       "commit": "57d8d3296",
       "reason": "Batch 192: taa/upscale ceiling 7303 to 7593 B for shared motion hooks and viewport presentation (7377 B measured); new taa/upscale-velocity 18598 B within a 19045 B ceiling includes existing per-object velocity renderer, upscaler and independent view histories. Splitting would add loading/state coordination and duplicate resolve contracts; root entries stay independent.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-191-job-3",
+      "reason": "New optional post/pixelate: 0 to 8755 B gzip. The full normal-capture owner and geometric cell sampler belong together; splitting would require a second plugin for default normal highlights. Core plus stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8665,6 +8671,7 @@
     "margoengine/creative/planet-atmosphere": 329,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/post/pixelate": 9018
   }
 }

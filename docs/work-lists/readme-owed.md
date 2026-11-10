@@ -910,3 +910,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 240 job 3): document the voxel/wind alias in the README phase.
 - @margoengine/taa (batch 192): document /upscale-velocity, TAAUpscaleVelocity options/defaults, per-view targets and scissor, custom sources, reset/disposal/restoration, transparent limits, velocity.expectedDepth and TAA.reset(viewId); examples deferred.
 - margoengine (batch 192): document generated taa/upscale-velocity alias; examples deferred.
+
+- @margoengine/post: document Pixelate defaults, LDR stack order, pixel-size/edge controls, optional model normal capture, supplied normal textures and disposal.

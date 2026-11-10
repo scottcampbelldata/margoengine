@@ -349,13 +349,10 @@ export class SceneTargets implements EnginePlugin {
     this.width = this.height = 0;
   }
   onDeviceRestored(engine: Engine): void {
-    this.sets = [];
-    this.textures = [];
-    this.views = [];
-    this.depthTexture = this.depthView = undefined;
+    this.release();
+    this.pipeline = undefined;
     this.pipelineKey = '';
     this.base = undefined;
-    this.width = this.height = 0;
     this.setup(engine);
   }
   /** Releases the textures and stops drawing added models' captures. */
