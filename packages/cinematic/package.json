@@ -57,6 +57,10 @@
     "./physical-lens": {
       "types": "./dist/physical-lens.d.ts",
       "import": "./dist/physical-lens.js"
+    },
+    "./ortho": {
+      "types": "./dist/ortho.d.ts",
+      "import": "./dist/ortho.js"
     }
   },
   "files": [
@@ -78,7 +82,7 @@
     "build": "node ../../scripts/build-optional.js cinematic",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/cinematic/test/browser-check.mjs && node packages/cinematic/test/physical-lens-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/cinematic/test/browser-check.mjs && node packages/cinematic/test/physical-lens-browser.mjs && node packages/cinematic/test/ortho-browser.mjs"
   },
   "devDependencies": {
     "@margoengine/cameras": "^1.0.0",

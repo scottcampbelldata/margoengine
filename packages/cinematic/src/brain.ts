@@ -20,6 +20,8 @@ export interface CameraPose {
   roll: number;
   /** Distance to the plane of focus; 0 means no stage has set one. Default 0. */
   focusDistance: number;
+  /** Full orthographic world height; undefined selects perspective. Default undefined. */
+  orthographicHeight?: number;
 }
 
 /** What a stage knows about the view it works for. */
@@ -53,6 +55,8 @@ export interface VirtualCameraOptions {
   up?: Vec3;
   /** Vertical field of view in degrees. Default 60. */
   fov?: number;
+  /** Full orthographic world height. Use cinematic/ortho output to drive CameraProjection. Default undefined. */
+  orthographicHeight?: number;
   /** Radians. Default 0. */
   roll?: number;
   /** Run in order every update. Default none. */
@@ -136,11 +140,14 @@ export function createPose({
   up = [0, 1, 0],
   fov = 60,
   roll = 0,
-}: Pick<VirtualCameraOptions, 'position' | 'target' | 'up' | 'fov' | 'roll'> = {}): CameraPose {
+  orthographicHeight,
+}: Pick<VirtualCameraOptions, 'position' | 'target' | 'up' | 'fov' | 'roll' | 'orthographicHeight'> = {}): CameraPose {
   finite3(position, 'camera position');
   finite3(target, 'camera target');
   finite3(up, 'camera up');
   checkFov(fov);
+  if (orthographicHeight !== undefined && !(orthographicHeight > 0 && Number.isFinite(orthographicHeight)))
+    throw new RangeError('Invalid orthographic height; pass a finite world height above 0');
   if (!Number.isFinite(roll)) throw new RangeError('Invalid camera roll; pass finite radians');
   return {
     position: new Float64Array(position),
@@ -149,6 +156,7 @@ export function createPose({
     fov,
     roll,
     focusDistance: 0,
+    orthographicHeight,
   };
 }
 
@@ -160,6 +168,7 @@ export function copyPose(to: CameraPose, from: CameraPose): CameraPose {
   to.fov = from.fov;
   to.roll = from.roll;
   to.focusDistance = from.focusDistance;
+  to.orthographicHeight = from.orthographicHeight;
   return to;
 }
 
@@ -318,6 +327,9 @@ function blendPose(out: CameraPose, to: CameraPose, u: number, style: 'direct' |
       out.target[i] = out.position[i] + armA[i];
     }
   out.fov += (to.fov - out.fov) * u;
+  // Mixed projection modes switch at the endpoint. Two orthographic views blend their full visible world height.
+  if (out.orthographicHeight !== undefined && to.orthographicHeight !== undefined)
+    out.orthographicHeight += (to.orthographicHeight - out.orthographicHeight) * u;
   out.roll += (to.roll - out.roll) * u;
   // A camera with no focus takes the other's rather than racing from 0.
   if (!out.focusDistance) out.focusDistance = to.focusDistance;
@@ -494,7 +506,8 @@ export class CameraBrain implements EnginePlugin {
     for (let i = 1; i < this.layers.length; i++) {
       const layer = this.layers[i],
         u = layer.ease(layer.elapsed / layer.duration);
-      if (!Number.isFinite(u)) throw new RangeError('Invalid camera blend ease; return a number for every value of 0..1');
+      if (!Number.isFinite(u))
+        throw new RangeError('Invalid camera blend ease; return a number for every value of 0..1');
       blendPose(this.pose, layer.camera.pose, u, layer.style);
     }
     this.context.aspect = aspect;

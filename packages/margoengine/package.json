@@ -566,6 +566,10 @@
       "types": "./dist/cinematic/physical-lens.d.ts",
       "import": "./dist/cinematic/physical-lens.js"
     },
+    "./cinematic/ortho": {
+      "types": "./dist/cinematic/ortho.d.ts",
+      "import": "./dist/cinematic/ortho.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"

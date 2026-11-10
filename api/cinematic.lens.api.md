@@ -49,6 +49,7 @@ interface CameraPose {
     fov: number;
     roll: number;
     focusDistance: number;
+    orthographicHeight?: number;
 }
 
 type CameraStage = ((pose: CameraPose, delta: number, context: StageContext) => void) | {

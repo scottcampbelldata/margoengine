@@ -52,5 +52,6 @@ interface CameraPose {
     fov: number;
     roll: number;
     focusDistance: number;
+    orthographicHeight?: number;
 }
 ```

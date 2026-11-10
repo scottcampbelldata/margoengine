@@ -66,6 +66,7 @@ export interface CameraPose {
     fov: number;
     roll: number;
     focusDistance: number;
+    orthographicHeight?: number;
 }
 
 export type CameraStage = ((pose: CameraPose, delta: number, context: StageContext) => void) | {
@@ -97,13 +98,14 @@ export interface VirtualCameraOptions {
     target?: Vec3;
     up?: Vec3;
     fov?: number;
+    orthographicHeight?: number;
     roll?: number;
     stages?: readonly CameraStage[];
 }
 
 export function copyPose(to: CameraPose, from: CameraPose): CameraPose;
 
-export function createPose({ position, target, up, fov, roll }?: Pick<VirtualCameraOptions, 'position' | 'target' | 'up' | 'fov' | 'roll'>): CameraPose;
+export function createPose({ position, target, up, fov, roll, orthographicHeight }?: Pick<VirtualCameraOptions, 'position' | 'target' | 'up' | 'fov' | 'roll' | 'orthographicHeight'>): CameraPose;
 
 export const rigStage: (rig: {
     update(delta: number): void;
