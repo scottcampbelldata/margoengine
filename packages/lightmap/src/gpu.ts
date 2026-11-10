@@ -384,7 +384,11 @@ export class GPULightmapBaker {
   async step(passes = 1): Promise<void> {
     if (this.#disposed) throw new MargoError('state', 'GPULightmapBaker is disposed; create a new one');
     inRange(passes, 1, 64, 'GPULightmapBaker step passes');
-    if (!this.samples) return;
+    // A mesh whose UV1 covers no texel still counts its passes, so read() works and a bake loop ends.
+    if (!this.samples) {
+      this.#passes += passes;
+      return;
+    }
     const s = this.#settings,
       groups = Math.ceil(this.samples / WORKGROUP),
       x = Math.min(groups, 32768),

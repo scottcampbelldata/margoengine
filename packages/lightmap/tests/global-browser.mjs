@@ -1,5 +1,6 @@
 // Draw the global baker's back-face visibility regression on either rendering backend.
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { bakeGlobalLightmap } from '../dist/global.js';
@@ -18,6 +19,8 @@ const floor = [-0.25, 0, -0.25, -0.25, 0, 0.25, 0.25, 0, 0.25, 0.25, 0, -0.25],
   }, options),
   record = (b) => ({ width: b.width, height: b.height, lightmap: Array.from(b.textures.lightmap),
     lightmapScale: b.lightmapScale, radiometry: b.radiometry, uv: Array.from(b.uv.slice(0, 8)) }),
+  // The package scripts run from packages/lightmap; the server serves the current directory, /packages and /tests.
+  _root = process.chdir(fileURLToPath(new URL('../../../', import.meta.url))),
   browser = await openBrowser({ port: 'free', startPath: '/tests/modern-extension.html' }),
   errors = [];
 browser.page.on('pageerror', e => errors.push(e.message));

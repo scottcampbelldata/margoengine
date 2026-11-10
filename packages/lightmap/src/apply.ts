@@ -155,9 +155,19 @@ function application(texture: Texture, scale: number, off: () => void, mesh?: Ma
     if (done) return;
     done = true;
     off();
+    // The texture is this application's own: free its GPU copy (a GPU baker's borrowed texture stays the baker's).
+    texture.dispose();
   };
   return { texture, scale, ...(mesh ? { mesh } : {}), dispose, [Symbol.dispose]: dispose };
 }
+
+/** One application's lightmap on one material, and what the material held before it. */
+interface Layer {
+  readonly texture: Texture;
+  before: readonly [Material['lightMap'], number, Material['lightMapResponse']];
+}
+/** Live applications per material, oldest first, so they can be disposed in any order. */
+const layers = new WeakMap<Material, Layer[]>();
 
 function onMaterials(
   materials: readonly Material[],
@@ -165,25 +175,40 @@ function onMaterials(
   intensity: number,
   response: 'multiply' | 'lambertian',
 ): LightmapApplication {
-  const { texture, intensity: own } = lightmapTexture(baked),
-    value = own * intensity,
-    before = materials.map((m) => [m.lightMap, m.lightMapIntensity, m.lightMapResponse] as const);
   // Check every material first (the response setter refuses unlit shading), so a refusal leaves all unchanged.
   for (const m of materials)
     if (response === 'lambertian' && !['standard', 'lambert', 'phong'].includes(m.shading))
       bad(
         `applyLightmap 'lambertian' needs lit shading, not '${m.shading}'; use standard, lambert or phong, or 'multiply'`,
       );
-  for (const m of materials) {
+  const { texture, intensity: own } = lightmapTexture(baked),
+    value = own * intensity,
+    mine = materials.map(
+      (m): Layer => ({ texture, before: [m.lightMap, m.lightMapIntensity, m.lightMapResponse] as const }),
+    );
+  materials.forEach((m, i) => {
     m.lightMapResponse = 'multiply';
     m.lightMapIntensity = value;
     m.lightMapResponse = response;
     m.lightMap = texture;
-  }
+    let stack = layers.get(m);
+    if (!stack) layers.set(m, (stack = []));
+    stack.push(mine[i]);
+  });
   return application(texture, response === 'lambertian' ? value / Math.PI : value, () =>
     materials.forEach((m, i) => {
+      const stack = layers.get(m)!,
+        layer = mine[i],
+        at = stack.indexOf(layer);
+      if (at < 0) return;
+      stack.splice(at, 1);
+      // A later application is still on: it restores what this one found, so this one's lightmap never returns.
+      if (at < stack.length) {
+        stack[at].before = layer.before;
+        return;
+      }
       if (m.lightMap !== texture) return;
-      const [map, previous, kind] = before[i];
+      const [map, previous, kind] = layer.before;
       m.lightMap = map;
       m.lightMapResponse = 'multiply';
       m.lightMapIntensity = previous;

@@ -55,7 +55,38 @@ test('a later lightMap is not undone by disposing an older application', () => {
   first.dispose();
   assert.equal(material.lightMap, second.texture);
   second.dispose();
-  assert.equal(material.lightMap, first.texture, 'the second gives back what it found');
+  // R5: the second used to give back what it found, the first (already disposed) application's lightmap.
+  assert.deepEqual(
+    [material.lightMap, material.lightMapIntensity, material.lightMapResponse],
+    [null, 1, 'multiply'],
+    'disposing both in any order gives back the material as it was',
+  );
+  // Newest first restores each step; a manual lightMap set after an application is never undone.
+  const a = applyLightmap(material, atlas),
+    b = applyLightmap(material, meshBake);
+  b.dispose();
+  assert.equal(material.lightMap, a.texture);
+  a.dispose();
+  assert.equal(material.lightMap, null);
+  const c = applyLightmap(material, atlas),
+    own = lightmapTexture(meshBake).texture;
+  material.lightMap = own;
+  c.dispose();
+  assert.equal(material.lightMap, own);
+});
+
+test('dispose frees the GPU copy of the texture an application made', () => {
+  const material = new LambertMaterial(),
+    app = applyLightmap(material, atlas);
+  let freed = 0;
+  const free = app.texture.dispose.bind(app.texture);
+  app.texture.dispose = () => {
+    freed++;
+    free();
+  };
+  app.dispose();
+  app.dispose();
+  assert.equal(freed, 1);
 });
 
 test('bad input is refused before any material changes', () => {

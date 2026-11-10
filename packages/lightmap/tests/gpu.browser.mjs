@@ -171,6 +171,19 @@ try {
       () => 'ran',
       (e) => e.message,
     );
+    // 6. A mesh whose UV1 covers no texel (as bakeMeshLightmap: a blank 4 x 4 map) finishes instead of looping.
+    const sliver = { positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 1]), uv1: new Float32Array(6).fill(0.5) };
+    let progress = 0;
+    out.uncovered = await bakeMeshLightmapGPU(device, sliver, {
+      width: 4,
+      passes: 8,
+      passesPerStep: 2,
+      signal: AbortSignal.timeout(5000),
+      onProgress: () => progress++,
+    }).then(
+      (m) => ({ width: m.width, height: m.height, samples: m.samples, peak: Math.max(...m.lightmap), progress }),
+      (e) => ({ error: e.name, progress }),
+    );
     return out;
   });
   assert.deepEqual(errors, []);
@@ -187,6 +200,7 @@ try {
   assert.ok(r.bounce.worst < 0.06 && Math.abs(r.bounce.mean) < 0.01, JSON.stringify(r.bounce));
   assert.equal(r.refused, 'TypeError');
   assert.match(r.disposed, /disposed/);
+  assert.deepEqual(r.uncovered, { width: 4, height: 4, samples: 0, peak: 0, progress: 4 }, 'uncovered mesh bake ends');
   console.log('lightmap GPU bake: ok', JSON.stringify(r));
 
   // ./apply: one lightmap drawn on a materials mesh, a loaded glTF-pro model, a core mesh and from the live GPU baker,
