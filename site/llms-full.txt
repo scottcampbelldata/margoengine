@@ -9446,6 +9446,8 @@ The eleven optional product-viewer packages, including PostStack, compose with R
 
 Biased and unbiased implicit texture requests retain hardware filtering and footprint selection. Shader mip interpolation covers explicit levels and gradients only. Exact native bits are proven for the committed 20-probe bias fixture on RTX A6000, ANGLE D3D11 and Vulkan; no universal GPU filtering claim. See [methods and reproduction](review5-compat-bias.md).
 
+Notebook/share backend ownership (review5, 2026-11-10): the isolated sciviz entries use the installed backend in auto mode and require prepareBackend for explicit WebGL2. The forwarding margoengine and viz entries have the same contract; Python and offline bundled runtimes retain their existing lazy setup. See docs/guides/sciviz-notebooks.md.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
