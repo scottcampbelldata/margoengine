@@ -3698,3 +3698,5 @@ Optional structures builds closed bridge slabs, terrain-founded supports and arc
 
 ### Batch 261 GPU label correctness
 The optional GPU label entry batches 100,000 single-glyph labels into one instanced draw. WebGPU, native WebGL2 and compatibility WebGL2 render a 32 px Margo control at 87 by 30 raster pixels from both 5 and 50 world units; a coincident 100k collection retains one label with 99,999 exact comparisons. This is deterministic correctness/work evidence, not a throughput claim or complete rival API match. Reproduce with packages/labels/scripts/test-browser.js; see docs/labels-gpu.md.
+
+API-index aggregate consistency (batch 206): the normal root test suite checks that every package row, including margoengine, contributes to the summary counts; full api:check compares row contents with compiled declarations. Proof: tests/api-report-scope.test.js and scripts/api-report.js. No API compatibility guarantee is inferred from aggregate counts.

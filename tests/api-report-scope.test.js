@@ -63,3 +63,15 @@ test('scoped API updates reject unresolved boundaries before they can split the 
       assert.throws(() => mergeScopedApiSurface(text, replacement), /unresolved merge boundary.*npm run api:update/);
   }
 });
+import { readFileSync } from 'node:fs';
+test('committed API totals include every package table row and the umbrella exports', () => {
+  const text = readFileSync(new URL('../docs/api-surface.md', import.meta.url), 'utf8');
+  const summary = text.match(/^(\d+) packages, (\d+) entries, (\d+) exported names\.$/m);
+  assert.ok(summary);
+  const rows = text.split(/\r?\n/).filter((line) => /^\| (?:@margoengine\/[^|]+|margoengine) \|/.test(line));
+  assert.ok(rows.some((row) => row.startsWith('| margoengine |')));
+  const counts = rows.flatMap((row) =>
+    [...row.split('|')[2].matchAll(/`[^`]+`\s+(\d+)/g)].map((match) => Number(match[1])),
+  );
+  assert.deepEqual(summary.slice(1).map(Number), [rows.length, counts.length, counts.reduce((a, b) => a + b, 0)]);
+});
