@@ -19,6 +19,7 @@ import {
   sampleFiles,
   collectExamples,
   companionFiles,
+  loadedByAnother,
   usesMinimalGLTF,
   writePageExample,
 } from '../scripts/run-readme-examples.mjs';
@@ -321,6 +322,13 @@ test('named page and worker sources are written together, including the emitted 
       ({ id }) => id === 'worker/readme-margoengine-worker-b56e85',
     );
     assert.match(collected.files['scene-worker.ts'], /receiveCanvas\(\)/);
+    // Regression (2026-11-10): the worker's own block ran alone as a page, waited 30 s for a canvas no page sent, hit
+    // the 20 s example limit and failed the worker run. It runs only inside the page example that loads it.
+    const ofWorker = collectExamples(workspacePackages()).filter(({ name }) => name === 'worker');
+    assert.ok(ofWorker.some(({ id }) => id === 'worker/readme-margoengine-worker-b56e85'));
+    assert.equal(ofWorker.some(({ code }) => /^\s*\/\/\s*scene-worker\.ts/.test(code)), false);
+    assert.equal(loadedByAnother(worker, [{ code }, { code: worker }]), true);
+    assert.equal(loadedByAnother(code, [{ code }, { code: worker }]), false);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

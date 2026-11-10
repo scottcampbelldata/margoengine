@@ -1417,6 +1417,8 @@ Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinish
 
 ## Checks
 
+- check:readme-run: after an example hits its 20 s limit, closing the owned browser throws `browser host <pid> did not acknowledge the end: null` from scripts/lib/browser.mjs (2026-11-10, lane U). Repro: before the companion fix, `npm run check:readme-run -- --packages=worker` on unchanged main. The worker's own README block ran alone and timed out; the shutdown error then hid the per-example report. Cause in the browser host's end handshake after a hung page, not yet traced; owner of scripts/lib/browser.mjs.
+
 ### SSAO's orthographic picture moves with the eye
 
 - **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the

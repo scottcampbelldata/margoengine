@@ -83,7 +83,11 @@ export function collectExamples(packages) {
       const entries = readmeEntries(markdown),
         ids = exampleIds(name, document, entries);
       const files = companionFiles(entries);
-      return entries.map(({ code }, index) => ({ id: ids[index], name, code, files }));
+      // A named block another block loads (a worker's script) runs inside that example, never as a page of its own:
+      // alone it would wait for a page that never comes.
+      return entries
+        .map(({ code }, index) => ({ id: ids[index], name, code, files }))
+        .filter(({ code }) => !loadedByAnother(code, entries));
     }),
   );
 }
@@ -107,6 +111,14 @@ export function companionFiles(entries) {
       return name ? [[name, code]] : [];
     }),
   );
+}
+
+/** True when this block is a named source that another block of the same README refers to by its emitted JS name. */
+export function loadedByAnother(code, entries) {
+  const name = /^\s*\/\/\s*([\w-]+\.(?:tsx?|[cm]?js))\s*\r?\n/.exec(code)?.[1];
+  if (!name) return false;
+  const script = `./${name.replace(/\.tsx?$/, '.js')}`;
+  return entries.some((entry) => entry.code !== code && entry.code.includes(script));
 }
 
 /** The basic loader, directly or through Stage, needs a static fixture; the pro loader retains its animated sample. */
