@@ -643,6 +643,10 @@
       "types": "./dist/clustered/area-texture.d.ts",
       "import": "./dist/clustered/area-texture.js"
     },
+    "./clustered/layers": {
+      "types": "./dist/clustered/layers.d.ts",
+      "import": "./dist/clustered/layers.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"

@@ -670,7 +670,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-653). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-654). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2423,6 +2423,20 @@ and the cosine footprint; the paper's own textured-light section could not be re
 Proved on stand-ins: the CPU mirror (`packages/clustered/test/area-texture.test.js`) and a real-WebGPU frame check
 (`scripts/clustered-light-images-gpu-check.js`: one-colour image against the plain light within 2/255, a split image
 lights each side of the floor). No reference against a path tracer yet. Sizes: `npm run quality -- --gate=sizes`.
+
+### LIM-654: light linking and layers
+
+Optional `@margoengine/clustered/layers` (`LightLayers`): a 32-bit layer mask on each clustered point or spot light
+(`setLayers`, default 1, layer 0) and on each receiver added through `LightLayers.add` (default 1); a light shades a
+receiver when the masks share a bit. Enforced: masks are integers from 0 to 2^32 - 1 and at most 1,024 light masks, one
+per clustered light (`RangeError`); a receiver once (`TypeError`). The light masks live in a storage buffer (binding
+154); the receiver's mask is a constant in its own shader, so a receiver's layers cost no per-object data, and a change
+of a receiver's layers recompiles its shader. By design: core meshes are on layer 0 only (core has no per-mesh slot for
+a mask), and area and directional lights are not layered. With every mask 1 the hook is off and the shaders and GPU work
+are unchanged. Proved on stand-ins: the CPU mirror (`packages/clustered/test/layers.test.js`: the mask truth table, the
+shader rewrite, binding 154 only while needed) and the real-WebGPU `scripts/clustered-light-images-gpu-check.js` (a
+layer-1 light leaves a layer-0 floor black, a layer-0 light leaves a layer-1 floor black, a floor on both layers matches
+the unlayered light within 2/255). Sizes: `npm run quality -- --gate=sizes`.
 
 ### Product-floor capture audit (batch 56)
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14538187,
+  "total": 14540535,
   "history": [
     {
       "date": "2026-10-24",
@@ -7757,6 +7757,12 @@
       "commit": "5f3cfd574",
       "reason": "Batch 67 job 3: new water/rain entry (WaterRain, weather-driven rain drop rings and Ripples splashes)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "51dd602eb",
+      "reason": "new entry @margoengine/clustered/layers (light linking and layers, batch 52 job 7)",
+      "grew": 1
     }
   ],
   "items": {
@@ -7910,6 +7916,7 @@
     "@margoengine/clustered/directional": 2535,
     "@margoengine/clustered/flicker": 845,
     "@margoengine/clustered/ies": 4268,
+    "@margoengine/clustered/layers": 2348,
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
     "@margoengine/clustered/shadow-atlas": 15938,

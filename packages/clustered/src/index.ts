@@ -138,7 +138,7 @@ export interface ClusteredDirectional {
   shadowLights?(): readonly DirectionalShadowLight[];
 }
 /**
- * A per-light factor of the point and spot loop (`Clustered.ies`, `Clustered.projector`): WGSL declarations, their
+ * A per-light factor of the point and spot loop (`Clustered.ies`, `.projector`, `.layers`): WGSL declarations, their
  * bindings and `term`, an f32 or vec3f expression in the loop's `index`, `light`, `l` and `position`.
  */
 export interface ClusteredLightTerm {
@@ -213,8 +213,9 @@ export class Clustered implements EnginePlugin {
   private projectorHook?: ClusteredLightTerm;
   private shapesHook?: ClusteredShapes;
   private stochasticHook?: ClusteredStochastic;
+  private layersHook?: ClusteredLightTerm;
   private listValue: readonly (PointLight | SpotLight)[] = Object.freeze([]);
-  /** This frame's binding parts: own entries, then the shadow, area, directional, IES, projector, shapes and stochastic hooks' (or undefined). */
+  /** This frame's binding parts: own entries, then the shadow, area, directional, IES, projector, shapes, stochastic and layers hooks' (or undefined). */
   private readonly parts: (GPUBindGroupEntry[] | undefined)[] = [];
   /** Joined bindings without (0) and with (1) shadows: the parts they were joined from, then the result last. */
   private readonly joined: ((GPUBindGroupEntry[] | undefined)[] | undefined)[] = [];
@@ -282,6 +283,14 @@ export class Clustered implements EnginePlugin {
   }
   set stochastic(hook: ClusteredStochastic | undefined) {
     this.stochasticHook = hook;
+    this.reset();
+  }
+  /** Layer masks that link point and spot lights to receivers (`@margoengine/clustered/layers`). */
+  get layers(): ClusteredLightTerm | undefined {
+    return this.layersHook;
+  }
+  set layers(hook: ClusteredLightTerm | undefined) {
+    this.layersHook = hook;
     this.reset();
   }
   /** The point and spot lights last given to `setLights`, in order (a frozen copy of the list; the light objects are the caller's). */
@@ -490,12 +499,16 @@ export class Clustered implements EnginePlugin {
     parts[5] = this.projectorHook?.bindings();
     parts[6] = this.shapesHook?.bindings();
     parts[7] = shadows && (this.shadowHook || this.localShadows) ? this.stochasticHook?.bindings() : undefined;
-    if (!parts[1] && !parts[2] && !parts[3] && !parts[4] && !parts[5] && !parts[6] && !parts[7]) return own;
+    parts[8] = this.layersHook?.bindings();
+    const count = parts.length;
+    let any = false;
+    for (let i = 1; i < count; i++) any ||= !!parts[i];
+    if (!any) return own;
     let joined = this.joined[+shadows],
       same = !!joined;
-    for (let i = 0; same && i < 8; i++) same = joined![i] === parts[i];
+    for (let i = 0; same && i < count; i++) same = joined![i] === parts[i];
     if (!same) this.joined[+shadows] = joined = [...parts, parts.flatMap((part) => part ?? [])];
-    return joined![8]!;
+    return joined![count]!;
   }
   /** gltf-pro lighting hooks in bind group `group`; `shadows: false` leaves out local-light shadows (see `add`). */
   pbr(group: number, shadows = true): { declarations: string; light: string; finish?: (code: string) => string } {
@@ -515,7 +528,7 @@ export class Clustered implements EnginePlugin {
   private sampling(group: number, shadows: boolean, receive = false): string {
     const more = {
       directional: this.directionalHook,
-      terms: [this.iesHook, this.projectorHook].filter((hook) => hook !== undefined),
+      terms: [this.iesHook, this.projectorHook, this.layersHook].filter((hook) => hook !== undefined),
       shapes: this.shapesHook,
     };
     return shadows

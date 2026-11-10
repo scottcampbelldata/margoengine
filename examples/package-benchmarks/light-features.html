@@ -16,14 +16,15 @@ import {IESLights,parseIES} from '/packages/clustered/dist/ies.js';
 import {ProjectorLights} from '/packages/clustered/dist/projector.js';
 import {AreaLights} from '/packages/clustered/dist/area.js';
 import {AreaLightTextures} from '/packages/clustered/dist/area-texture.js';
+import {LightLayers} from '/packages/clustered/dist/layers.js';
 import {HemisphereLight} from '/packages/environment/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,5,4],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=0;
 const grey=[0.6,0.6,0.6];
 const lights=Clustered.attach(engine),suns=DirectionalLights.attach(engine,{lights}),ies=IESLights.attach(engine,{lights}),projectors=ProjectorLights.attach(engine,{lights});
-const area=AreaLights.attach(engine,{lights}),areaTextures=AreaLightTextures.attach(engine,{area});
-const floor=createMesh(engine,planeGeometry(40,40),new Material({shading:'lambert',color:grey}));floor.root.setQuaternion([-Math.SQRT1_2,0,0,Math.SQRT1_2]);lights.add(floor);
+const area=AreaLights.attach(engine,{lights}),areaTextures=AreaLightTextures.attach(engine,{area}),layers=LightLayers.attach(engine,{lights});
+const floor=createMesh(engine,planeGeometry(40,40),new Material({shading:'lambert',color:grey}));floor.root.setQuaternion([-Math.SQRT1_2,0,0,Math.SQRT1_2]);let removeFloor=lights.add(floor),floorLayers=null;
 const ball=createMesh(engine,sphereGeometry(1,96,48),new Material({shading:'lambert',color:grey}));ball.root.setPosition([-1.2,1,0]);
 const cube=engine.createMesh().setGeometry(box(1.2,1.2,1.2));cube.setMaterial(new PbrMaterial({color:grey,roughness:1,metalness:0}));cube.position.set(1.4,0.6,0);
 let hemisphere=null,removeHemisphere=[];
@@ -31,7 +32,7 @@ const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();}
 const inverse=new Float32Array(16),workspace=new Float64Array(52);
 const transform=(m,v)=>[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);
 window.check={
-  // scene: {clustered, area (rectangle lights), areaTexture ({width,height,data:[...],colorSpace} or null), directional, ies (LM-63 text or null), projector ({width,height,data:[...]} or null), hemisphere ({sky,ground,intensity} or null), objects}.
+  // scene: {clustered, area (rectangle lights), areaTexture ({width,height,data:[...],colorSpace} or null), layers ({lights:[masks],floor:mask} or null: the floor through layers.add), directional, ies (LM-63 text or null), projector ({width,height,data:[...]} or null), hemisphere ({sky,ground,intensity} or null), objects}.
   async render(scene){
     device.pushErrorScope('validation');
     floor.root.visible=scene.objects!=='shapes';ball.root.visible=cube.visible=scene.objects==='shapes';
@@ -40,6 +41,9 @@ window.check={
     projectors.setProjectors(scene.projector?[{...scene.projector,data:new Uint8Array(scene.projector.data)}]:[]);
     area.setLights(scene.area??[]);
     areaTextures.setTextures(scene.areaTexture?[{image:{...scene.areaTexture,data:new Uint8Array(scene.areaTexture.data)},colorSpace:scene.areaTexture.colorSpace}]:[]);
+    layers.setLayers(scene.layers?.lights??[]);
+    const want=scene.layers?.floor??null;
+    if(want!==floorLayers){removeFloor();removeFloor=want===null?lights.add(floor):layers.add(floor,{layers:want});floorLayers=want;}
     if(hemisphere){for(const r of removeHemisphere)r();engine.removePlugin(hemisphere.name);hemisphere=null;removeHemisphere=[];}
     if(scene.hemisphere){hemisphere=HemisphereLight.attach(engine,scene.hemisphere);removeHemisphere=[hemisphere.add(ball)];}
     for(let i=0;i<3;i++)await frame();

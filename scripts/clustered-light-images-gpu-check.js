@@ -3,7 +3,10 @@
 // 1. textured area lights (@margoengine/clustered/area-texture): a white rectangle light carrying a one-colour image k
 //    draws the same pixels, within 2/255, as the plain light of colour k (the shader compiles and the filtered image
 //    multiplies both lobes), and an image red on its left half and green on its right lights the floor red on the
-//    light's left side and green on its right (the image's orientation on the rectangle).
+//    light's left side and green on its right (the image's orientation on the rectangle);
+// 2. light layers (@margoengine/clustered/layers): the point light on layer 1 (mask 2) leaves a floor on layer 0 black
+//    and a floor on layer 1 only black under a layer-0 light, and lights a floor on layers 0 and 1 exactly as the
+//    unlayered light does (within 2/255: the mask is a 0 or 1 factor).
 // Frames go to test-results/clustered-light-images-*.png; nothing is recorded. Run: node
 // scripts/clustered-light-images-gpu-check.js (takes the GPU lock, after npm run build:packages).
 import assert from 'node:assert/strict';
@@ -37,7 +40,7 @@ try {
     const result = await page.evaluate((s) => window.check.render(s), scene);
     assert.equal(result.error, null, name);
     assert.deepEqual(result.errors, [], name);
-    const img = decodePNG(
+    const img = await decodePNG(
       await page.locator('canvas').screenshot({ path: `test-results/clustered-light-images-${name}.png` }),
     );
     return grid.map(([x, y]) => {
@@ -85,6 +88,29 @@ try {
   console.log(JSON.stringify({ check: 'area-texture split', red, green, wrong: wrong.length }));
   assert.ok(red >= 10 && green >= 10, `split image: ${red} red and ${green} green samples`);
   assert.deepEqual(wrong.slice(0, 5), [], 'the left of the image lights the left of the floor');
+
+  // 2. Layers: a point light 2 m above the floor; bulbPlain is the unlayered picture.
+  const coloured = [{ position: [0, 2, 0], range: 0, decay: 2, intensity: 6, color: k }],
+    bulbPlain = await shot('layers-plain', { clustered: coloured }),
+    offSet = await shot('layers-off-set', { clustered: coloured, layers: { lights: [2], floor: 1 } }),
+    offLight = await shot('layers-off-light', { clustered: coloured, layers: { lights: [1], floor: 2 } }),
+    hero = await shot('layers-hero', { clustered: coloured, layers: { lights: [2], floor: 3 } });
+  let shaded = 0,
+    darkSet = 0,
+    darkLight = 0;
+  worst = 0;
+  rays.forEach((ray, i) => {
+    if (!onFloor(ray) || Math.max(...bulbPlain[i]) <= 20) return;
+    shaded++;
+    if (Math.max(...offSet[i]) <= 2) darkSet++;
+    if (Math.max(...offLight[i]) <= 2) darkLight++;
+    worst = Math.max(worst, ...bulbPlain[i].map((v, c) => Math.abs(v - hero[i][c])));
+  });
+  console.log(JSON.stringify({ check: 'layers', shaded, darkSet, darkLight, maxDiff: worst }));
+  assert.ok(shaded >= 60, `layers: only ${shaded} lit samples`);
+  assert.equal(darkSet, shaded, 'a layer-1 light leaves the layer-0 floor dark');
+  assert.equal(darkLight, shaded, 'a layer-0 light leaves a layer-1 floor dark');
+  assert.ok(worst <= 2, `a floor on both layers differs from the unlayered light by ${worst}/255`);
   assert.deepEqual(pageErrors, []);
 } finally {
   await browser?.close();
