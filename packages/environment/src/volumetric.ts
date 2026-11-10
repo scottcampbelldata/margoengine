@@ -56,6 +56,12 @@ export interface VolumetricFogOptions {
   anisotropy?: number;
   /** Isotropic ambient radiance scattered by the fog, linear RGB (default: the engine's ambient, `lighting.radiance[3]`, as grey). */
   ambient?: Vec3;
+  /**
+   * Multiple scattering: the distance in metres over which light already scattered by the fog can scatter again before it
+   * leaves (about the size of the fog bank; default 0 = single scattering only). Thick fog then glows and brightens, also
+   * looking away from the sun; the shaders and the uniform are what they were without the option while it is 0.
+   */
+  multipleScattering?: number;
   /** Density noise 0..1 (default 0: smooth fog). */
   noise?: number;
   /** Noise feature size in metres (default 8). */
@@ -99,7 +105,15 @@ fn sliceDepth(s:f32)->f32 {let x=s/volume.grid.z;return volume.shape.x*x*x;}
 // per-slice analytic, energy-conserving integration (S - S T) / sigma after Hillaire 2015, "Physically Based and
 // Unified Volumetric Rendering in Frostbite". Noise weights 1.3333 / 0.6667, lacunarity 2.11, the offset and the four
 // stratified shadow samples are Margo tuning.
-const compute = (lights: string | undefined, shadows: string | undefined, medium?: string) =>
+// Multiple scattering (option): orders two and up summed as a geometric series with isotropic phase, after Hillaire 2020,
+// "A Scalable and Production Ready Sky and Atmosphere Rendering Technique" (EGSR, section 5.5: F_ms = 1 / (1 - f_ms)).
+// Here f_ms = albedo * (1 - exp(-sigma R)): the share of light scattered at a froxel that is scattered again within the
+// distance R (Beer-Lambert) and not absorbed. Each order then adds f_ms times the last, so orders two and up add the
+// isotropic first-order source (ambient plus the shadowed sun times 1 / 4 pi = 0.0795775) times f_ms / (1 - f_ms). The
+// 0.95 cap on f_ms (at most 19 times the isotropic source) is Margo tuning: it keeps white fog of unbounded depth finite.
+const multiple =
+  'let ms=min(volume.scatter.rgb*(1.0-exp(-sigma*volume.sun.w)),vec3f(0.95));light+=(volume.ambient.rgb+sun*0.0795775)*ms/(1.0-ms);';
+const compute = (lights: string | undefined, shadows: string | undefined, medium?: string, ms?: boolean) =>
   struct +
   (lights ?? '') +
   (shadows ?? '') +
@@ -155,7 +169,7 @@ ${/* @__PURE__ */ clusterCell('p')}
   let p=n+d*(sliceDepth(f32(id.z)+0.5+volume.jitter.z)/dot(d,volume.plane.xyz));
   var sigma=volume.shape.y*exp(-volume.shape.z*max(p.y-volume.shape.w,0.0));
   if(volume.sunColor.w>0.0){let x=(p-volume.wind.xyz)*volume.ambient.w;sigma*=max(0.0,1.0+volume.sunColor.w*(1.3333*noise(x)+0.6667*noise(x*2.11+vec3f(23.7,-11.3,5.9))-1.0));}
-  var light=volume.ambient.rgb;
+  var light=volume.ambient.rgb;${ms ? 'var sun=vec3f(0);' : ''}
   if(any(volume.sunColor.rgb>vec3f(0))){
     var lit=1.0;
     ${
@@ -164,8 +178,8 @@ ${/* @__PURE__ */ clusterCell('p')}
     lit=0.0;for(var k=0u;k<4u;k++){lit+=0.25*sunShadow(n+d*(sliceDepth(f32(id.z)+(f32(k)+0.5+volume.jitter.z)*0.25)/dot(d,volume.plane.xyz)));}`
         : ''
     }
-    light+=volume.sunColor.rgb*phase(dot(-volume.sun.xyz,v),volume.scatter.w)*lit;
-  }
+    light+=volume.sunColor.rgb*phase(dot(-volume.sun.xyz,v),volume.scatter.w)*lit;${ms ? 'sun=volume.sunColor.rgb*lit;' : ''}
+  }${ms ? multiple : ''}
   ${lights ? 'light+=localLight(uv*volume.screen.xy+volume.screen.zw,p,v,volume.scatter.w);' : ''}
   ${medium ? 'let local=fogMedium(p);var value=vec4f((sigma*volume.scatter.rgb+local.rgb)*light,sigma+local.a);' : 'var value=vec4f(sigma*volume.scatter.rgb*light,sigma);'}
   if(volume.grid.w>0.0){
@@ -367,6 +381,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       [o.heightFalloff, 0, 0, 1e3],
       [o.height, 0, -1e9, 1e9],
       [o.anisotropy, 0.5, -0.95, 0.95],
+      [o.multipleScattering, 0, 0, 1e7],
       [o.noise, 0, 0, 1],
       [o.noiseScale, 8, 1e-3, 1e6],
       [o.range, 100, 1e-3, 1e7],
@@ -523,9 +538,10 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     const lights = o.lights?.pbr(1).declarations,
       shadows = o.shadows?.pbr(lights ? 2 : 1).declarations,
       medium = o.volumes?.medium(1 + +!!lights + +!!shadows),
-      key = (lights ?? '') + '\0' + (shadows ?? '') + (medium === undefined ? '' : '\0' + medium);
+      ms = (o.multipleScattering ?? 0) > 0,
+      key = (lights ?? '') + '\0' + (shadows ?? '') + (medium === undefined ? '' : '\0' + medium) + (ms ? '\0ms' : '');
     if (key !== this.computeKey || !this.inject) {
-      const module = device.createShaderModule({ code: compute(lights, shadows, medium) });
+      const module = device.createShaderModule({ code: compute(lights, shadows, medium, ms) });
       this.inject = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'inject' } });
       this.integrateStep = device.createComputePipeline({
         layout: 'auto',
@@ -562,7 +578,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       this.injectGroups = injectGroups;
       this.integrateGroups = integrateGroups;
     }
-    // Uniform: matrices, near planes, grid, density shape, scattering, sun, ambient, noise, jitter, screen.
+    // Uniform: matrices, near planes, grid, density shape, scattering, sun (w: multiple scattering), ambient, noise, jitter, screen.
     const m = c.camera.matrix,
       v = this.values,
       w = Math.hypot(m[3] - m[2], m[7] - m[6], m[11] - m[10]),
@@ -578,6 +594,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     v[47] = o.height ?? 0;
     v.set(o.color ?? [1, 1, 1], 48);
     v[51] = o.anisotropy ?? 0.5;
+    v[55] = o.multipleScattering ?? 0;
     const lighting = this.engine!.lighting,
       direction = lighting.direction,
       radiance = lighting.radiance,

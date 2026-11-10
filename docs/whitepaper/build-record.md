@@ -3220,6 +3220,37 @@ untouched (23,590 B gzip together after the batch).
   not fogged; sphere probes are centred where they are created; the GPU cost of every job's option is not timed;
   nothing was run on another machine.
 
+## Lane D batch 51: environment (part 2)
+
+Three jobs for `@margoengine/environment` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+untouched.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Capture custom pipelines in probes | DONE | 050760f80 | `LightProbes.addCapture` in `@margoengine/environment/probes` | LIM-644 |
+| 2 | More EXR compression types | DONE (partial) | c60f12635 | `@margoengine/environment/exr-tiled` | LIM-647 |
+| 3 | Multiple scattering in fog | DONE | this commit | `multipleScattering` in `@margoengine/environment/volumetric` | LIM-652 |
+
+- **Built from:** `docs/clean-room.md` rows E41 to E43: the engine's own frame graph and pass context (probe capture
+  hook), the OpenEXR file layout for tiles and levels (tiled EXR), and Hillaire 2020 section 5.5's geometric series
+  for multiple scattering (not re-read in full for this job; see E43). Nothing from another engine was read.
+- **Proved (real GPU, this Mac, Chromium on Metal):** `npm run test:probe-capture:browser` (terrain and sky replayed
+  into probe faces) and `npm run test:fog-transparent:browser`, whose new section compares every froxel of a
+  16 x 12 x 32 volume with the closed form for single and multiple scattering (within 1.4e-3 and 1.1e-3, bound 2e-3).
+  Tiled EXR is CPU only: 31 reference-library fixtures repackaged as tiles decode bit-exactly
+  (`tests/exr-tiled.test.js`). With `multipleScattering` at 0 the fog's shaders and uniform are unchanged
+  (`volumetric.test.js`).
+- **Job 2 and /exr-codecs:** another machine's a331427a0 (`@margoengine/environment/exr-codecs`) decodes PXR24, B44
+  and DWA through a prebuilt OpenEXR worker and reads only the full-resolution level of tiled files; job 2's
+  `/exr-tiled` stays as the clean-room, synchronous reader of every mip and rip level.
+- **Not done (docs/work-lists/finish-later.md):** clean-room PXR24, B44 and DWA decoding (no byte-level public
+  spec), so those codecs in tiled mip levels; multi-part and deep EXR; water and VFX in probe captures (job 1); fog
+  multiple scattering into shadowed froxels and from clustered lights (job 3).
+- **Bugs fixed on the way:** none in the batch's own code beyond its tests; the job 1 README example used a
+  placeholder identifier and was rewritten to run. On main: the react bindings and instances browser checks and three
+  GPU lock tests (five slots), folded into the manager's main fix.
+- **Limits and unmeasured:** rows in `docs/limits.md`; no job's GPU cost is timed; nothing was run on another machine.
+
 ## Lane I batch 63: biomes
 
 Six jobs for `@margoengine/biomes` on the Beelink (lane I, work list 3): three new optional entries, one skipped, one

@@ -192,6 +192,57 @@ window.runTests = async () => {
   await device.queue.onSubmittedWorkDone();
   assert(draws === 2 && effect.hook === undefined && errors.length === 0, `after remove: ${draws} draws, ${errors}`);
   report.checks.push('the remover gives the draw back');
+
+  // 3. Multiple scattering (`multipleScattering`): uniform white-lit fog, no shadows, isotropic phase. Each froxel's
+  // source per unit extinction is albedo * (ambient + sun / 4 pi) / (1 - f) with f = min(albedo (1 - exp(-sigma R)),
+  // 0.95), and the integration telescopes, so the stored light is that times 1 - exp(-optical depth) in every froxel.
+  runtime.lighting.direction.set([0.3, 0.8, 0.5, 1]);
+  runtime.lighting.radiance.set([2, 1.8, 1.6, 0]);
+  Object.assign(fog.options, { heightFalloff: 0, anisotropy: 0, temporal: 0 });
+  const sigma = fog.options.density,
+    albedo = fog.options.color,
+    ambient = fog.options.ambient,
+    sunColor = [2, 1.8, 1.6];
+  const scattered = async (distance) => {
+    fog.options.multipleScattering = distance;
+    engine.render();
+    await device.queue.onSubmittedWorkDone();
+    const read = await readTexture(device, fog.texture),
+      f = albedo.map((c) => Math.min(c * (1 - Math.exp(-sigma * distance)), 0.95));
+    let worst = 0;
+    for (let k = 0; k < grid[2]; k++)
+      for (let j = 0; j < grid[1]; j++)
+        for (let i = 0; i < grid[0]; i++) {
+          const texel = read.at(k, i, j),
+            opacity = 1 - Math.exp(-texel[3]);
+          for (let c = 0; c < 3; c++) {
+            const expected = ((albedo[c] * (ambient[c] + sunColor[c] / (4 * Math.PI))) / (1 - f[c])) * opacity;
+            worst = Math.max(worst, Math.abs(texel[c] - expected) / expected);
+          }
+        }
+    return { read, worst, f };
+  };
+  const single = await scattered(0),
+    thick = await scattered(25);
+  // rgba16float keeps 11 significant bits (relative step 4.9e-4): the froxel source, its extinction and the stored sum
+  // are each rounded once, and the optical depth the check reads back once more, so four steps bound it (under 2e-3).
+  assert(single.worst < 2e-3, `single scattering differs from the closed form by ${single.worst}`);
+  assert(thick.worst < 2e-3, `multiple scattering differs from the closed form by ${thick.worst}`);
+  const near = single.read.at(grid[2] - 1, 8, 6),
+    far = thick.read.at(grid[2] - 1, 8, 6),
+    gain = [0, 1, 2].map((c) => far[c] / near[c]);
+  assert(
+    gain.every((g, c) => Math.abs(g - 1 / (1 - thick.f[c])) < 2e-3 * g) && Math.min(...gain) > 2,
+    `multiple scattering brightens thick fog by ${gain}, f ${thick.f}`,
+  );
+  report.multipleScattering = { singleWorst: single.worst, multipleWorst: thick.worst, gain };
+  report.checks.push(
+    `multiple scattering matches the closed form albedo (ambient + sun / 4 pi) / (1 - f) in all ${grid.join(' x ')} froxels within 2e-3 and brightens thick fog ${gain.map((g) => g.toFixed(2)).join(', ')} times`,
+  );
+  fog.options.multipleScattering = 0;
+  engine.render();
+  await device.queue.onSubmittedWorkDone();
+  assert(errors.length === 0, `multiple scattering: GPU errors ${errors.join('; ')}`);
   report.hardware = hardware(runtime.adapter ?? (await navigator.gpu.requestAdapter()));
   fog.dispose();
   engine.dispose();

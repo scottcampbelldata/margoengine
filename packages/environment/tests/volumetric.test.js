@@ -331,6 +331,35 @@ test('refuses to fog twice: environment Fog or sky fog switched on', () => {
   );
 });
 
+test('multipleScattering: off leaves the froxel shader and uniform as they were; on adds the series and its distance', () => {
+  const plain = rig({ options: { temporal: 0 } }),
+    off = rig({ options: { temporal: 0, multipleScattering: 0 } }),
+    on = rig({ options: { temporal: 0, multipleScattering: 30 } });
+  const inject = (r) => {
+    const log = r.record(() => r.frame(0));
+    return [log.find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code, uniformWrites(log, r.fog)[0]];
+  };
+  const [base, baseUniform] = inject(plain),
+    [same, sameUniform] = inject(off),
+    [code, uniform] = inject(on);
+  assert.equal(same, base, 'multipleScattering 0 compiles the same shader');
+  assert.deepEqual([...sameUniform], [...baseUniform], 'and writes the same uniform');
+  assert.doesNotMatch(base, /ms\/\(1\.0-ms\)/);
+  assert.equal(baseUniform[55], 0);
+  assert.match(code, /var sun=vec3f\(0\);/);
+  assert.match(code, /sun=volume\.sunColor\.rgb\*lit;/);
+  assert.match(
+    code,
+    /let ms=min\(volume\.scatter\.rgb\*\(1\.0-exp\(-sigma\*volume\.sun\.w\)\),vec3f\(0\.95\)\);light\+=\(volume\.ambient\.rgb\+sun\*0\.0795775\)\*ms\/\(1\.0-ms\);/,
+  );
+  assert.equal(uniform[55], 30, 'sun.w carries the distance');
+  // Switching it live rebuilds the froxel pipelines once.
+  on.fog.options.multipleScattering = 0;
+  const log = on.record(() => on.frame(1));
+  assert.equal(log.filter((e) => e[0] === 'computePipeline').length, 2);
+  assert.equal(log.find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code, base);
+});
+
 test('validation, grid changes, device restore and dispose', () => {
   for (const bad of [
     { density: -1 },
@@ -341,6 +370,8 @@ test('validation, grid changes, device restore and dispose', () => {
     { color: [2, 0, 0] },
     { noise: 2 },
     { range: 0 },
+    { multipleScattering: -1 },
+    { multipleScattering: Number.NaN },
     { depth: 1 },
     { lights: {} },
   ])

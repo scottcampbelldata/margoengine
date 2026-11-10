@@ -46,6 +46,7 @@ export interface VolumetricFogOptions {
     color?: Vec3;
     anisotropy?: number;
     ambient?: Vec3;
+    multipleScattering?: number;
     noise?: number;
     noiseScale?: number;
     wind?: Vec3;
