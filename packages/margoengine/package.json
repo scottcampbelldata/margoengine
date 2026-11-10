@@ -2526,6 +2526,10 @@
       "types": "./dist/points/pick.d.ts",
       "import": "./dist/points/pick.js"
     },
+    "./points/clip": {
+      "types": "./dist/points/clip.d.ts",
+      "import": "./dist/points/clip.js"
+    },
     "./post": {
       "types": "./dist/post.d.ts",
       "import": "./dist/post.js"

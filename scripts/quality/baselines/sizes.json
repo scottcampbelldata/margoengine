@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13402616,
+  "total": 13410140,
   "history": [
     {
       "date": "2026-10-24",
@@ -6882,6 +6882,12 @@
       "commit": "batch-274",
       "reason": "Batch 274 job 1: new optional compute/shape entry, 0 to 3480 B gzip, ceiling 3736 B. Six array building operations compose existing gather/scatter; splitting would duplicate shape validation and index construction. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-228",
+      "reason": "New optional points/clip entry: absent (0 B) to 7268 B gzip for survey volumes, profile extraction and complete renderable point records; 7524 B ceiling. Splitting would complicate one survey API without reducing the selected feature work. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7511,6 +7517,7 @@
     "@margoengine/pixel/render3d": 3866,
     "@margoengine/pixel/scale": 3367,
     "@margoengine/points": 24863,
+    "@margoengine/points/clip": 7524,
     "@margoengine/points/copc": 15633,
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 14148,

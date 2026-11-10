@@ -3316,3 +3316,6 @@ Build packages, run node --test --test-timeout=120000 packages/mixer/tests/*.tes
 After npm run build:packages, run node --test --test-timeout=40000 packages/compute/tests/shape.test.js. Run node scripts/gpu-lock.mjs run --owner=shape-repro --wait-max=60 --max=3 -- node packages/compute/tests/shape-browser.mjs for the same 30 exact cases on native WebGPU and WebGL2 compatibility. Fixtures are explicit standard examples and independent logical-index references. No benchmark or timing-only assertions.
 
 Compute landing-gate regressions: node --test --test-timeout=120000 tests/gpu-browser-registration.test.js tests/parallel-check.test.js packages/compute/tests/maths.test.js ; the full compute browser runner also runs with --compat and retains all precise-error, invalid-shader and supported workgroup-size assertions. Unsupported workgroup sizes must reject against the real device limit. Build output must remain stable for a browser run because optional CPU chunks load lazily.
+
+### Batch 228 job 1
+Build packages, then `node --test packages/points/tests/clip.test.js`. The existing Stanford scan fixture and independent scalar predicates prove profile/box membership. Run `node packages/points/scripts/test-browser.js` and the same command with `--compat`, through the shared GPU lock, for retained/excluded pixel and budget checks. No timing result is claimed.

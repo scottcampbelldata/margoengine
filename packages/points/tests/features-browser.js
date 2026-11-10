@@ -148,7 +148,12 @@ async function surfelDepth() {
     n = 60,
     positions = square(n),
     material = { size: 8 / n, sizeUnits: 'world' };
-  const back = plugin.add(new PointCloud({ positions: positions.map((v, i) => (i % 3 === 2 ? v - 1 : v)), material: { ...material, color: [0, 0, 1] } }));
+  const back = plugin.add(
+    new PointCloud({
+      positions: positions.map((v, i) => (i % 3 === 2 ? v - 1 : v)),
+      material: { ...material, color: [0, 0, 1] },
+    }),
+  );
   const front = plugin.add(new PointCloud({ positions, material: { ...material, color: [1, 0, 0] } }));
   const hidden = (await frame()).at(128, 128);
   assert(hidden[0] > 200 && hidden[2] < 30, `the front surface hides the back one: ${hidden}`);
@@ -245,7 +250,14 @@ async function gpuPicking() {
         material: { size: 2, sizeUnits: 'world', shading: 'sphere', maxPixelSize: 256 },
       }),
     ),
-    hidden = points.add(new PointCloud({ positions: [3, -3, 0], colors: new Uint8Array([9, 9, 9, 0]), colorComponents: 4, material: { size: 24 } }));
+    hidden = points.add(
+      new PointCloud({
+        positions: [3, -3, 0],
+        colors: new Uint8Array([9, 9, 9, 0]),
+        colorComponents: 4,
+        material: { size: 24 },
+      }),
+    );
   const wall = engine
     .createMesh()
     .setGeometry(box(1, 1, 1))
@@ -355,7 +367,12 @@ async function mipmaps() {
   const smooth = { map, size: 7, mapFilter: 'linear' };
   points.add(new PointCloud({ positions: [-3, 0, 0], material: smooth }));
   points.add(new PointCloud({ positions: [-1, 0, 0], material: { ...smooth, mipmaps: false } }));
-  points.add(new SpriteBatch({ material: { map, mipmaps: true, transparent: false }, sprites: [{ position: [1, 0, 0], size: 0.4 }] }));
+  points.add(
+    new SpriteBatch({
+      material: { map, mipmaps: true, transparent: false },
+      sprites: [{ position: [1, 0, 0], size: 0.4 }],
+    }),
+  );
   points.add(new SpriteBatch({ material: { map, transparent: false }, sprites: [{ position: [3, 0, 0], size: 0.4 }] }));
   const image = await frame(),
     // The spread of brightness across a point: small for an even grey, large for raw texels.
@@ -378,14 +395,63 @@ async function mipmaps() {
   // Linear grey: the average of black and white is 50 percent light, about 188 in sRGB.
   assert(Math.abs(pointMips.low - 188) < 12, `the average is taken in linear light: ${pointMips.low}`);
   assert(spriteMips.range < 10, `a sprite with mips is even: ${JSON.stringify(spriteMips)}`);
-  assert(pointRaw.range > 40 || Math.abs(pointRaw.low - 188) > 12, `without mips it aliases: ${JSON.stringify(pointRaw)}`);
-  assert(spriteRaw.range > 40 || Math.abs(spriteRaw.low - 188) > 12, `without mips it aliases: ${JSON.stringify(spriteRaw)}`);
+  assert(
+    pointRaw.range > 40 || Math.abs(pointRaw.low - 188) > 12,
+    `without mips it aliases: ${JSON.stringify(pointRaw)}`,
+  );
+  assert(
+    spriteRaw.range > 40 || Math.abs(spriteRaw.low - 188) > 12,
+    `without mips it aliases: ${JSON.stringify(spriteRaw)}`,
+  );
   await end();
   return `Mips smooth a fine map on small points and sprites (spread ${pointMips.range} and ${spriteMips.range} against ${pointRaw.range} and ${spriteRaw.range})`;
 }
 
+async function clipVolumes() {
+  const { PointCloud } = await import('../dist/index.js');
+  const { createClippedCloud, boxClipVolume, polygonClipVolume } = await import('../dist/clip.js');
+  const { engine, frame, end } = await rig();
+  const points = PointsPlugin.attach(engine);
+  const source = new PointCloud({
+    positions: [-2, 0, 0, 0, 0, 0, 2, 0, 0],
+    colors: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    material: { size: 24 },
+  });
+  const left = createClippedCloud(source, { volumes: [boxClipVolume([-3, -1, -1], [-1, 1, 1])] });
+  const right = createClippedCloud(source, {
+    volumes: [
+      polygonClipVolume([
+        [1, -1],
+        [3, -1],
+        [3, 1],
+        [1, 1],
+      ]),
+    ],
+  });
+  points.add(left.cloud);
+  points.add(right.cloud);
+  const image = await frame();
+  assert(image.at(84, 128)[0] > 200, 'box keeps red point');
+  assert(image.at(172, 128)[2] > 200, 'polygon keeps blue point');
+  assert(!lit(image.at(128, 128)), 'excluded green point never draws');
+  assert(points.stats.pointsDrawn === 2, 'clipped points consume no budget');
+  await end();
+  return 'Box and polygon extraction draws only retained records, preserving colours and budget';
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform, gpuPicking, hdrColors, mipmaps]) checks.push(await check());
+  for (const check of [
+    adaptiveSize,
+    surfels,
+    surfelDepth,
+    potree,
+    octreeTransform,
+    gpuPicking,
+    hdrColors,
+    mipmaps,
+    clipVolumes,
+  ])
+    checks.push(await check());
   return checks;
 };

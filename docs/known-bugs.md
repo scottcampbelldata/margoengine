@@ -4612,3 +4612,8 @@ Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing 
 Batch 212 analyser: repaired bus insertion deleting internal output taps and shared-document merge markers, both covered by regression tests. No open tested defect.
 ### Batch 274 gate environment: Firefox worker matrix
 Repro: node packages/worker/tests/browser-matrix.mjs (default Firefox). On this Windows host the existing Playwright firefox-1555 executable fails to spawn with UNKNOWN before any page or engine code runs. Cause is the browser launch environment, not a worker assertion; the executable is present. Chromium runs the same unchanged worker/mode, buffer-transfer, red-pixel and disposal assertions through the registered script. Firefox launch diagnosis remains owed.
+
+### Batch 228 job 1 survey tools
+No open defect found in the new volume/profile computations; boundary, transform, real scan and both-backend rendering regressions are in the points tests. Snapshot and resident-data limits are in docs/limits.md.
+
+- Incoming main 8ee384c7e retains nested merge markers in shared docs (repro: search ^<<<<<<<, ^======= and ^>>>>>>> in docs/clean-room.md); cause: prior lanes committed unresolved document merges. Outside points scope; preserved for the fix phase.

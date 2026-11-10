@@ -679,3 +679,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: include the pre-existing clustered/shapes alias found missing by umbrella regeneration after the batch 274 rebase.
 
 - @margoengine/splats: document the existing formats-check GPU script on native and compatibility backends, registered by batch 274 to repair the global plan gate.
+
+- @margoengine/points (batch 228 job 1): document /clip volumes, renderable extraction, explicit world matrices, centre clipping, snapshot updates and polyline profile records.
+
+- margoengine (batch 228 job 1): cover generated points/clip alias alongside the scoped optional entry.

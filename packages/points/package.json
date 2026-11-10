@@ -66,6 +66,10 @@
     "./pick": {
       "types": "./dist/pick.d.ts",
       "import": "./dist/pick.js"
+    },
+    "./clip": {
+      "types": "./dist/clip.d.ts",
+      "import": "./dist/clip.js"
     }
   },
   "files": [
