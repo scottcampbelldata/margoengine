@@ -861,3 +861,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/tonemap: document exportCube, saving .cube text, size/title defaults, display-linear domain, HueGrade coverage, avoiding double grading and finite-grid error (batch 193 job 2).
 - margoengine: expose tonemap/export-cube in the optional entry index (batch 193 job 2).
+
+
+- @margoengine/toon (batch 194 job 3): document /hatch-models ModelHatching, shared live controls, material/glTF attachment, linear ink, primary-sun tone, adapter ownership, disposal, tiers and display-hook limits; examples deferred.
+- @margoengine/gltf-pro (batch 194 job 3): document synchronous material-draw layer encoding under PBRDrawRun and the per-layer batch boundary; examples deferred.
+- margoengine (batch 194 job 3): document generated toon/hatch-models alias; examples deferred.

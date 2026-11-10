@@ -8,23 +8,9 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export const HATCH_BINDING = 146;
 
-export class Hatching implements EnginePlugin {
+export class Hatching extends HatchStyle implements EnginePlugin {
     readonly name = "toon:hatch";
     static attach(engine: EngineKernel, options?: HatchingOptions): Hatching;
-    constructor({ style, spacing, width, layers, angle, ink }?: HatchingOptions);
-    set(options: HatchingOptions): void;
-    get style(): 'hatch' | 'halftone';
-    set style(style: 'hatch' | 'halftone');
-    get spacing(): number;
-    set spacing(spacing: number);
-    get width(): number;
-    set width(width: number);
-    get layers(): number;
-    set layers(layers: number);
-    get angle(): number;
-    set angle(angle: number);
-    get ink(): readonly [number, number, number];
-    set ink(ink: readonly [number, number, number]);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
@@ -39,5 +25,25 @@ export interface HatchingOptions {
     layers?: number;
     angle?: number;
     ink?: readonly [number, number, number];
+}
+
+// Not exported from this entry, but used by the exports above:
+
+class HatchStyle {
+    constructor({ style, spacing, width, layers, angle, ink }?: HatchingOptions);
+    set(options: HatchingOptions): void;
+    get style(): 'hatch' | 'halftone';
+    set style(style: 'hatch' | 'halftone');
+    get spacing(): number;
+    set spacing(spacing: number);
+    get width(): number;
+    set width(width: number);
+    get layers(): number;
+    set layers(layers: number);
+    get angle(): number;
+    set angle(angle: number);
+    get ink(): readonly [number, number, number];
+    set ink(ink: readonly [number, number, number]);
+    protected hatchValues(): Float32Array;
 }
 ```

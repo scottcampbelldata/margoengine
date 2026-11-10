@@ -3475,7 +3475,12 @@ export class PBRModel implements EnginePlugin {
     const materialAdapter = currentMaterialDraw(this);
     if (materialAdapter) {
       const parameters: Parameters<PBRModel['draw']> = [c, mode, color, depth, phase, external, carry];
-      runMaterialDraw(this, materialAdapter, parameters, () => this.draw(...parameters));
+      runMaterialDraw(this, materialAdapter, parameters, () => {
+        this.draw(...parameters);
+        // Adapter records are borrowed only for this synchronous draw. Encode deferred run batches while those
+        // records and their binding context are still installed, before the adapter restores them or draws a layer.
+        if (carry?.pending.length) flushBatches(carry);
+      });
       return;
     }
     // A run's later draws of a one-primitive model that joins an instanced batch skip the set-up below (joinRun).

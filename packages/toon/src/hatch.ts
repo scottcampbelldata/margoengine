@@ -12,64 +12,8 @@ declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** Group 0 binding of the hatching parameters on core meshes (docs/shader-contracts.md). */
 export const HATCH_BINDING = 146;
 
-/** Options of {@link Hatching}; each is live as the property of the same name. */
-export interface HatchingOptions {
-  /** `'hatch'`: pen strokes, a layer more for each step darker; `'halftone'`: one dot a cell. Default `'hatch'`. */
-  style?: 'hatch' | 'halftone';
-  /** Line or dot spacing in screen pixels, 2-64. Default 8. */
-  spacing?: number;
-  /** Stroke width in screen pixels for `'hatch'`, 0.5 up to `spacing`. Default 1.5. */
-  width?: number;
-  /** Stroke layers for `'hatch'`, an integer 1-4, each turned 180 / layers degrees from the last. Default 3. */
-  layers?: number;
-  /** Angle of the first strokes (or of the dot grid) in degrees. Default 45. */
-  angle?: number;
-  /** Ink colour, linear RGB 0..1, drawn unlit over the surface. Default [0, 0, 0]. */
-  ink?: readonly [number, number, number];
-}
-
-// Uniform: x style (0 hatch, 1 halftone), y spacing, z width, w layers; then angle (radians) and ink.
-const hatchWGSL = (binding: number): string => `struct Hatch {shape:vec4f,angle:vec4f,ink:vec4f}
-@group(0) @binding(${binding}) var<uniform> hatch:Hatch;
-fn hatchInk(pixel:vec2f,light:f32)->f32{
-  let s=hatch.shape.y;
-  if(hatch.shape.x>0.5){
-    let a=hatch.angle.x;let r=mat2x2f(cos(a),sin(a),-sin(a),cos(a))*pixel/s;let d=length(fract(r)-0.5)*s;
-    let radius=s*sqrt(clamp(1.0-light,0.0,1.0)/3.14159265);
-    return clamp(radius-d+0.5,0.0,1.0);
-  }
-  let n=hatch.shape.w;var ink=0.0;
-  for(var k=0.0;k<n;k+=1.0){
-    if(light>=(n-k)/(n+1.0)){break;}
-    let a=hatch.angle.x+k*3.14159265/n;let t=dot(pixel,vec2f(cos(a),sin(a)))/s;let d=abs(fract(t)-0.5)*s;
-    ink=max(ink,clamp(hatch.shape.z*0.5-d+0.5,0.0,1.0));
-  }
-  return ink;
-}
-`;
-
-function checked(o: Required<HatchingOptions>): void {
-  if (o.style !== 'hatch' && o.style !== 'halftone')
-    throw new RangeError("Hatching style must be 'hatch' or 'halftone'");
-  if (
-    !Number.isFinite(o.spacing) ||
-    o.spacing < 2 ||
-    o.spacing > 64 ||
-    !Number.isFinite(o.width) ||
-    o.width < 0.5 ||
-    o.width > o.spacing ||
-    !Number.isSafeInteger(o.layers) ||
-    o.layers < 1 ||
-    o.layers > 4 ||
-    !Number.isFinite(o.angle) ||
-    !Array.isArray(o.ink) ||
-    o.ink.length !== 3 ||
-    o.ink.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1)
-  )
-    throw new RangeError(
-      'Invalid Hatching options; use spacing 2-64 px, width 0.5 px to spacing, integer layers 1-4, a finite angle and ink RGB 0..1',
-    );
-}
+import { HatchStyle, hatchWGSL, type HatchingOptions } from './hatch-style.js';
+export type { HatchingOptions } from './hatch-style.js';
 
 /**
  * Pen hatching or halftone dots in place of flat bands on core meshes: the diffuse light level decides the inked share
@@ -78,71 +22,16 @@ function checked(o: Required<HatchingOptions>): void {
  * @throws RangeError when an option is out of range; MargoError `'unsupported'` on a WebGL engine, `'disposed'` after
  * `dispose()`.
  */
-export class Hatching implements EnginePlugin {
+export class Hatching extends HatchStyle implements EnginePlugin {
   readonly name = 'toon:hatch';
-  private options: Required<HatchingOptions>;
   private buffer?: GPUBuffer;
   private engine?: Engine;
-  private readonly values = new Float32Array(12);
   private readonly shaders = new Map<string, string>();
   private disposed = false;
   static attach(engine: EngineKernel, options?: HatchingOptions): Hatching {
     const effect = new Hatching(options);
     engineRuntime(engine).use(effect);
     return effect;
-  }
-  constructor({
-    style = 'hatch',
-    spacing = 8,
-    width = 1.5,
-    layers = 3,
-    angle = 45,
-    ink = [0, 0, 0],
-  }: HatchingOptions = {}) {
-    this.options = { style, spacing, width, layers, angle, ink: [ink[0], ink[1], ink[2]] };
-    checked({ ...this.options, ink });
-  }
-  /** Sets any of the options; the others keep their values. @throws RangeError as the constructor. */
-  set(options: HatchingOptions): void {
-    const next = { ...this.options, ...options };
-    checked(next);
-    this.options = { ...next, ink: [next.ink[0], next.ink[1], next.ink[2]] };
-  }
-  get style(): 'hatch' | 'halftone' {
-    return this.options.style;
-  }
-  set style(style: 'hatch' | 'halftone') {
-    this.set({ style });
-  }
-  get spacing(): number {
-    return this.options.spacing;
-  }
-  set spacing(spacing: number) {
-    this.set({ spacing });
-  }
-  get width(): number {
-    return this.options.width;
-  }
-  set width(width: number) {
-    this.set({ width });
-  }
-  get layers(): number {
-    return this.options.layers;
-  }
-  set layers(layers: number) {
-    this.set({ layers });
-  }
-  get angle(): number {
-    return this.options.angle;
-  }
-  set angle(angle: number) {
-    this.set({ angle });
-  }
-  get ink(): readonly [number, number, number] {
-    return this.options.ink;
-  }
-  set ink(ink: readonly [number, number, number]) {
-    this.set({ ink });
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -178,21 +67,7 @@ export class Hatching implements EnginePlugin {
           this.shaders.set(c.shader, shader);
         }
         c.shader = shader;
-        const o = this.options,
-          v = this.values;
-        v.set([
-          +(o.style === 'halftone'),
-          o.spacing,
-          o.width,
-          o.layers,
-          (o.angle * Math.PI) / 180,
-          0,
-          0,
-          0,
-          ...o.ink,
-          0,
-        ]);
-        c.device.queue.writeBuffer(this.buffer, 0, v as Float32Array<ArrayBuffer>);
+        c.device.queue.writeBuffer(this.buffer, 0, this.hatchValues() as Float32Array<ArrayBuffer>);
         c.bindings.push({ binding: HATCH_BINDING, resource: { buffer: this.buffer } });
       },
     });

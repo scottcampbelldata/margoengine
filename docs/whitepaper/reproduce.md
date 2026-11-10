@@ -3491,3 +3491,6 @@ Batch 191 job 1: build packages, then node --test --test-timeout=120000 packages
 
 
 - Batch 193 grade export: build packages; node --test --test-timeout=120000 packages/tonemap/tests/export-cube.test.js; node scripts/gpu-lock.mjs run --owner=codex-batch193 --max=2 --wait-max=60 -- node packages/tonemap/tests/export-cube-browser.mjs. Tests compare parsed exports with live Grade/HueGrade WGSL float targets on both backends; no screenshot quantization or timing assertion.
+
+### Batch 194 job 3
+Run node --test --test-timeout=60000 packages/toon/test/*.test.js packages/gltf-pro/tests/material-draw-run.test.js after build:packages. Run toon test:gpu through gpu-lock in shared mode, repeat with MARGO_COMPAT=1, as described in toon-parity.md. hatch-models.browser.mjs checks independent stripe/dot interior positions and restored real-avatar pixels. The owner-package fix also runs gltf-pro shader, extension, materials, viewer, volume and spec/gloss GPU suites on both backends; dependents receive CPU tests only. No speed-phase commands.

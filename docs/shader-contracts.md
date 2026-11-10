@@ -64,3 +64,5 @@ Terrain color patches share one mesh-ID varying and one per-pixel block; inside 
 the terrain's own values, so lighting patches applied before or after it (and the SSAO, SSR and HDR-capture rewrites of
 the fragment's tail) shade it unchanged. Wet ones allocate distinct bindings from 40 and name their functions per mesh.
 Scatter keeps TAA's camera reference when replacing the core vertex stage.
+
+ModelHatching (@margoengine/toon/hatch-models) reserves group 2 binding 146, separate from the same pattern's core group 0 binding. It composes the original material shader and bindings, preserves the pattern uniform in surface for auxiliary layouts, and mixes linear ink before display processing. PBRDrawRun must encode any pending batches inside a material adapter call.draw before the adapter changes/restores borrowed records. Regression: packages/gltf-pro/tests/material-draw-run.test.js.

@@ -2706,6 +2706,10 @@
       "types": "./dist/post/material-decals.d.ts",
       "import": "./dist/post/material-decals.js"
     },
+    "./post/selective-bloom": {
+      "types": "./dist/post/selective-bloom.d.ts",
+      "import": "./dist/post/selective-bloom.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
@@ -3965,6 +3969,10 @@
     "./toon/screen-outline": {
       "types": "./dist/toon/screen-outline.d.ts",
       "import": "./dist/toon/screen-outline.js"
+    },
+    "./toon/hatch-models": {
+      "types": "./dist/toon/hatch-models.d.ts",
+      "import": "./dist/toon/hatch-models.js"
     },
     "./toon/hatch": {
       "types": "./dist/toon/hatch.d.ts",

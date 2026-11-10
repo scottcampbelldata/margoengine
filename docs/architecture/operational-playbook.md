@@ -2229,6 +2229,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 Batch 193 export-cube: the CPU bake evaluates the live Grade uniform snapshot, including both stages of curve lookup. Five grade configurations compare against native and full-compatibility WGSL at 729 lattice nodes within 0.000003 (packages/tonemap/tests/export-cube-browser.mjs). No GPU readback or new rendering pass is needed by the exporter. Off-lattice interpolation error depends on the authored grade and export resolution; no general bound is claimed.
 
+Batch 194 job 3 adds model/material hatching through optional material-draw adapters, sharing validated pattern controls and WGSL with the core effect. Linear ink precedes tone/display/output hooks. The blocking gltf-pro bug deferred run batches beyond the adapter record lifetime; each explicit adapter layer now encodes before its synchronous draw returns. CPU regression fails without the change. Independent native/compatibility pixel masks and real Fox restoration prove model coverage; gltf-pro own GPU suites and dependent CPU suites cover the owner fix. No core/stage or speed change claimed. Primary-sun tone and screen-fixed strokes remain the documented pattern limits. See toon-parity.md.
+
 Batch 240 job 2 reuses core geometry batching and frustum culling for optional voxel object blocks, with no backend or core change. Exact CPU/GPU instance and draw counts cover two visible and one distant loaded placement, plus node graph/source lifetime, edits, streaming and disposal.
 
 
