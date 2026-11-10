@@ -1,4 +1,5 @@
 import type { VoxelTraceFeature } from './compose-types.js';
+import { MeshLightingBuilder } from './mesh-light-build.js';
 import { PBRMeshBuilder } from './mesh-pbr-build.js';
 import { meshPBRSource } from './mesh-pbr-shader.js';
 export type { TracePBRTexture, TracePBRMaterial, TracePBRMesh, PBRMeshTraceScene } from './mesh-pbr-types.js';
@@ -7,5 +8,5 @@ export type { TraceGLTFOptions, TraceGLTFGeometry, TraceLoadedGLTF } from './mes
 
 /** Full mesh material channels for ComposedVoxelPathTracer; replaces triangleMeshes(). */
 export function meshPBR(): VoxelTraceFeature {
-  return Object.freeze({id: 'mesh', source: meshPBRSource, geometry: () => new PBRMeshBuilder()});
+  return Object.freeze({id: 'mesh', source: meshPBRSource, geometry: () => new MeshLightingBuilder(new PBRMeshBuilder())});
 }

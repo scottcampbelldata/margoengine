@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12969048,
+  "total": 12983204,
   "history": [
     {
       "date": "2026-10-24",
@@ -7432,7 +7432,7 @@
     "@margoengine/voxel-pathtracer/compose": 1589,
     "@margoengine/voxel-pathtracer/guiding": 2791,
     "@margoengine/voxel-pathtracer/media": 2210,
-    "@margoengine/voxel-pathtracer/mesh": 33913,
+    "@margoengine/voxel-pathtracer/mesh": 41562,
     "@margoengine/voxel-pathtracer/restir": 2190,
     "@margoengine/voxel-pathtracer/sky": 468,
     "@margoengine/voxel-pathtracer/spectral": 1471,
@@ -7648,7 +7648,7 @@
     "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1,
     "@margoengine/headless/tiles": 2466,
     "@margoengine/ui/i18n": 1936,
-    "@margoengine/voxel-pathtracer/mesh-pbr": 38350,
+    "@margoengine/voxel-pathtracer/mesh-pbr": 44857,
     "@margoengine/road/intersections": 2421,
     "@margoengine/culling/webgl2": 2698,
     "@margoengine/fbx/textures": 751,

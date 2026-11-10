@@ -88,6 +88,7 @@ export function traceSceneFromGLTF(model: TraceLoadedGLTF, options?: TraceGLTFOp
 // Not exported from this entry, but used by the exports above:
 
 interface MeshTraceScene extends VoxelTraceScene {
+    spotLights?: readonly TraceSpotLight[];
     meshes: readonly TraceTriangleMesh[];
     meshInstances?: readonly TraceMeshInstance[];
 }
@@ -128,6 +129,15 @@ interface TraceFog {
 interface TraceGeometryBuilder {
     build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
     dispose(): void;
+}
+
+interface TraceIESProfile {
+    readonly verticalAngles: Float32Array;
+    readonly horizontalAngles: Float32Array;
+    readonly candela: Float32Array;
+    readonly tiltAngles?: Float32Array;
+    readonly tiltMultipliers?: Float32Array;
+    readonly lampGeometry?: number;
 }
 
 interface TraceInstance {
@@ -195,6 +205,19 @@ interface TracePhysicalSky {
     turbidity?: number;
     intensity?: number;
     horizonBelow?: boolean;
+}
+
+interface TraceSpotLight {
+    position: TraceVec3;
+    direction?: TraceVec3;
+    up?: TraceVec3;
+    color?: TraceVec3;
+    intensity?: number;
+    innerConeAngle?: number;
+    outerConeAngle?: number;
+    range?: number;
+    ies?: TraceIESProfile;
+    tiltDegrees?: number;
 }
 
 interface TraceTexture {

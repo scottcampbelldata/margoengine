@@ -3104,3 +3104,12 @@ Build packages and serve the repository through its Vite dev server; open `/exam
 ## Batch 210 job 3: categorical tracks
 Build packages, then node --test --test-timeout=30000 packages/animation/tests/discrete.test.js packages/animation/tests/mixer.test.js packages/animation/tests/playback.test.js. Under a shared GPU lock run node packages/animation/tests/discrete-browser.mjs, then with --compat; also run mixer-browser.mjs on each backend because the mixer scheduler changed. The discrete driver uses the existing credited Khronos Fox, samples 0/0.49/0.5/0.99/1, checks real drawn/background pixels plus DOM text, and restores originals. Read discrete unit/lifetime before logs for regression failures. No benchmark or README execution.
 Batch 239 job 4: build:packages, then node --test --test-timeout=120000 packages/tiles/tests/*.test.js packages/points/tests/*.test.js packages/splats/test/*.test.js. Run packages/tiles/tests/tiles-browser.mjs under a shared GPU lock, normally and with --compat; its fade case checks real-model replacement pixels, outgoing retention/eviction, exact half/zero point coverage, the real Gaussian cube and original-ID synthetic sorted masks. Owners also run packages/points/scripts/test-browser.js and packages/splats/test/gpu/check.mjs on both backends. No speed measurement is run during the build phase.
+
+
+
+
+
+### Batch 243 mesh light sampling
+Build the package with npm run build --workspace=@margoengine/voxel-pathtracer, then run node --test packages/voxel-pathtracer/tests/mesh-lights.test.js. The browser fixture is node packages/voxel-pathtracer/tests/mesh-lights-browser.mjs under the named shared GPU lock with a six-minute lease; it renders WebGPU and WebGL2/Vulkan, retaining errors, finite output and unchanged analytic bounds in test-results/voxel-pathtracer-mesh-lights.json. The area reference integrates the square using independent 160x160 midpoint quadrature; the emitter has zero reflecting albedo so the reference includes exactly its emitted direct transport. Spot and IES references use Lambert cosine, inverse square, cone and finite-range terms. Both package and dependent CPU tests remain required.
+
+Batch 243 continuation: mesh-lights-browser.mjs now prints numbered create, ready-wait, image, complete and dispose phases while retaining all original assertions, samples and deadlines. The canonical two-backend receipt is batch243-mesh-lights-20261109.json. Historical timeout attribution remains open; a passing continuation is not proof of a specific repair.

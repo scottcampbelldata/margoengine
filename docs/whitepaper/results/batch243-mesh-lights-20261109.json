@@ -1,0 +1,284 @@
+{
+  "status": "passed",
+  "canonical": [
+    {
+      "compat": false,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "result": {
+        "rows": [
+          {
+            "name": "spot matches independent Lambert cosine inverse-square cone and finite-range irradiance",
+            "maximumError": 1.1650789509709547e-05,
+            "meanError": 4.813091545258132e-06,
+            "bound": 0.0001,
+            "samples": 1,
+            "first": [
+              0.895080029964447,
+              0.22377000749111176,
+              0.05594250187277794
+            ],
+            "expected": [
+              0.8950690180590807,
+              0.22376725451477017,
+              0.05594181362869254
+            ],
+            "finite": true
+          },
+          {
+            "name": "absolute IES candela matches independently specified spot intensity",
+            "maximumError": 1.154344544629371e-05,
+            "meanError": 4.944480614704934e-06,
+            "bound": 0.0001,
+            "samples": 1,
+            "first": [
+              0.895197331905365,
+              0.22379933297634125,
+              0.05594983324408531
+            ],
+            "expected": [
+              0.8951860120138363,
+              0.22379650300345907,
+              0.05594912575086477
+            ],
+            "finite": true
+          },
+          {
+            "name": "mesh blocks spot and IES paths",
+            "maximumError": 0,
+            "meanError": 0,
+            "bound": 1e-07,
+            "samples": 1,
+            "first": [
+              0,
+              0,
+              0
+            ],
+            "expected": [
+              0,
+              0,
+              0
+            ],
+            "finite": true
+          },
+          {
+            "name": "two emissive triangles agree with independent rectangular area integral including reciprocal MIS",
+            "maximumError": 2.76440661716032e-05,
+            "meanError": -1.3441688990225185e-07,
+            "bound": 0.0002,
+            "samples": 4096,
+            "first": [
+              0.10050182789564133,
+              0.02512545697391033,
+              0.00502508832141757
+            ],
+            "expected": [
+              0.10051233616598275,
+              0.025128084041495687,
+              0.005025616808299138
+            ],
+            "finite": true
+          },
+          {
+            "name": "PBR alpha holes contribute no mesh-emitter radiance",
+            "maximumError": 0,
+            "meanError": 0,
+            "bound": 1e-07,
+            "samples": 16,
+            "first": [
+              0,
+              0,
+              0
+            ],
+            "expected": [
+              0,
+              0,
+              0
+            ],
+            "finite": true
+          },
+          {
+            "name": "textured PBR mesh emitter matches independently decoded flat radiance",
+            "maximumError": 1.1175870895385742e-08,
+            "meanError": 2.3768128206332526e-09,
+            "bound": 1e-05,
+            "samples": 16,
+            "first": [
+              0.021032510325312614,
+              0.02467263489961624,
+              0
+            ],
+            "expected": [
+              0.021032506600022316,
+              0.02467263489961624,
+              0
+            ],
+            "finite": true
+          }
+        ],
+        "errors": [],
+        "messages": []
+      }
+    },
+    {
+      "compat": true,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+        "webgpu": null,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [
+          "--use-angle=vulkan"
+        ],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "result": {
+        "rows": [
+          {
+            "name": "spot matches independent Lambert cosine inverse-square cone and finite-range irradiance",
+            "maximumError": 1.1650789509709547e-05,
+            "meanError": 4.799645575587121e-06,
+            "bound": 0.0001,
+            "samples": 1,
+            "first": [
+              0.895080029964447,
+              0.22377000749111176,
+              0.05594250187277794
+            ],
+            "expected": [
+              0.8950690180590807,
+              0.22376725451477017,
+              0.05594181362869254
+            ],
+            "finite": true
+          },
+          {
+            "name": "absolute IES candela matches independently specified spot intensity",
+            "maximumError": 1.154344544629371e-05,
+            "meanError": 4.92125575800046e-06,
+            "bound": 0.0001,
+            "samples": 1,
+            "first": [
+              0.895197331905365,
+              0.22379933297634125,
+              0.05594983324408531
+            ],
+            "expected": [
+              0.8951860120138363,
+              0.22379650300345907,
+              0.05594912575086477
+            ],
+            "finite": true
+          },
+          {
+            "name": "mesh blocks spot and IES paths",
+            "maximumError": 0,
+            "meanError": 0,
+            "bound": 1e-07,
+            "samples": 1,
+            "first": [
+              0,
+              0,
+              0
+            ],
+            "expected": [
+              0,
+              0,
+              0
+            ],
+            "finite": true
+          },
+          {
+            "name": "two emissive triangles agree with independent rectangular area integral including reciprocal MIS",
+            "maximumError": 2.762916501040935e-05,
+            "meanError": -1.3481949289023665e-07,
+            "bound": 0.0002,
+            "samples": 4096,
+            "first": [
+              0.10050182789564133,
+              0.02512545697391033,
+              0.00502508832141757
+            ],
+            "expected": [
+              0.10051233616598275,
+              0.025128084041495687,
+              0.005025616808299138
+            ],
+            "finite": true
+          },
+          {
+            "name": "PBR alpha holes contribute no mesh-emitter radiance",
+            "maximumError": 0,
+            "meanError": 0,
+            "bound": 1e-07,
+            "samples": 16,
+            "first": [
+              0,
+              0,
+              0
+            ],
+            "expected": [
+              0,
+              0,
+              0
+            ],
+            "finite": true
+          },
+          {
+            "name": "textured PBR mesh emitter matches independently decoded flat radiance",
+            "maximumError": 1.6763806343078613e-08,
+            "meanError": 6.383440146843593e-09,
+            "bound": 1e-05,
+            "samples": 16,
+            "first": [
+              0.021032510325312614,
+              0.024672646075487137,
+              0
+            ],
+            "expected": [
+              0.021032504737377167,
+              0.02467263489961624,
+              0
+            ],
+            "finite": true
+          }
+        ],
+        "errors": [],
+        "messages": []
+      }
+    }
+  ],
+  "diagnostics": {
+    "compatibilityOnly": "all six cases complete with GL compile/link/draw/readback begin/end instrumentation",
+    "chromiumShaderDiskCacheDisabled": "all six cases complete",
+    "nativeThenCompatibility": "all six cases pass on each backend at unchanged bounds and 120000 ms per-image AbortSignal"
+  },
+  "historicalFailure": {
+    "kind": "compatibility renderImage AbortSignal timeout",
+    "limitMs": 120000,
+    "cause": "not isolated; not reproduced in the rebased diagnostics or canonical suite",
+    "shutdownFixAttribution": "excluded: 919fdc09e was already an ancestor of the failing job checkpoint"
+  },
+  "runtimeChangeForHistoricalFailure": false,
+  "testChange": "retain per-render create, readiness, image, completion and disposal phase messages"
+}

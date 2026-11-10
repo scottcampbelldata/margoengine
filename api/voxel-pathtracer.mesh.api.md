@@ -42,8 +42,22 @@ export interface MeshTraceImage extends VoxelTraceImage {
 }
 
 export interface MeshTraceScene extends VoxelTraceScene {
+    spotLights?: readonly TraceSpotLight[];
     meshes: readonly TraceTriangleMesh[];
     meshInstances?: readonly TraceMeshInstance[];
+}
+
+export interface TraceIESParseOptions {
+    tilt?: string;
+}
+
+export interface TraceIESProfile {
+    readonly verticalAngles: Float32Array;
+    readonly horizontalAngles: Float32Array;
+    readonly candela: Float32Array;
+    readonly tiltAngles?: Float32Array;
+    readonly tiltMultipliers?: Float32Array;
+    readonly lampGeometry?: number;
 }
 
 export interface TraceMeshInstance {
@@ -61,6 +75,19 @@ export interface TraceMeshStats {
     readonly reusedMeshBlases: number;
 }
 
+export interface TraceSpotLight {
+    position: TraceVec3;
+    direction?: TraceVec3;
+    up?: TraceVec3;
+    color?: TraceVec3;
+    intensity?: number;
+    innerConeAngle?: number;
+    outerConeAngle?: number;
+    range?: number;
+    ies?: TraceIESProfile;
+    tiltDegrees?: number;
+}
+
 export interface TraceTriangleMesh {
     id: string;
     positions: Float32Array;
@@ -69,6 +96,8 @@ export interface TraceTriangleMesh {
     uvs?: Float32Array;
     material: number;
 }
+
+export function parseTraceIES(text: string, options?: TraceIESParseOptions): TraceIESProfile;
 
 export function triangleMeshes(): VoxelTraceFeature;
 

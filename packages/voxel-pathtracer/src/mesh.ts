@@ -9,7 +9,11 @@ import type {
   VoxelTraceImage,
   TraceVec3,
 } from '@margoengine/voxel-pathtracer';
-import { TraceMeshBuilder } from './mesh-instances.js';
+import { MeshLightingBuilder } from './mesh-light-build.js';
+import type { TraceSpotLight } from './mesh-lights.js';
+export type { TraceSpotLight } from './mesh-lights.js';
+export { parseTraceIES } from './mesh-ies.js';
+export type { TraceIESProfile, TraceIESParseOptions } from './mesh-ies.js';
 import { meshSource } from './mesh-shader.js';
 import { traceMeshStats, type TraceMeshStats, type VoxelTraceFeature } from './compose-types.js';
 export type { TraceMeshStats } from './compose-types.js';
@@ -19,7 +23,7 @@ export function triangleMeshes(): VoxelTraceFeature {
   return Object.freeze({
     id: 'mesh',
     source: meshSource,
-    geometry: () => new TraceMeshBuilder(),
+    geometry: () => new MeshLightingBuilder(),
   });
 }
 
@@ -51,6 +55,8 @@ export interface TraceMeshInstance {
 
 /** Triangles and voxels share all paths, lights and the environment. */
 export interface MeshTraceScene extends VoxelTraceScene {
+  /** Delta spot/IES lights, sampled once per scattering vertex. Default empty. */
+  spotLights?: readonly TraceSpotLight[];
   /** Geometry definitions. Without meshInstances, each is drawn once in world space. */
   meshes: readonly TraceTriangleMesh[];
   /** Explicit placements over shared object-space BLAS. Default undefined draws each mesh once; [] draws none.
@@ -136,8 +142,8 @@ class TriangleTracer extends VoxelPathTracer {
 export class MeshPathTracer {
   #tracer: TriangleTracer;
   #updates: Promise<unknown> = Promise.resolve();
-  #builder: TraceMeshBuilder;
-  private constructor(tracer: TriangleTracer, builder: TraceMeshBuilder) {
+  #builder: MeshLightingBuilder;
+  private constructor(tracer: TriangleTracer, builder: MeshLightingBuilder) {
     this.#tracer = tracer;
     this.#builder = builder;
   }
@@ -149,7 +155,7 @@ export class MeshPathTracer {
     const { signal, scene: input, ...rest } = options;
     signal?.throwIfAborted();
     const scene = copyScene(input);
-    const builder = new TraceMeshBuilder();
+    const builder = new MeshLightingBuilder();
     const geometry = await builder.build(scene, signal);
     signal?.throwIfAborted();
     return new MeshPathTracer(TriangleTracer.attach(engine, { ...rest, scene, geometry }), builder);

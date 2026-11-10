@@ -123,6 +123,7 @@ export function meshPBRSource(input: string): string {
     '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;');
   edit('let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,p,m);');
   edit('let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,p,m);');
+  edit('return material(h.value).emission;', 'if(!pbrVisible(h,dot(triangleNormal(h),wo)<0.0)){return vec3f(0.0);}return pbrMaterial(h,p,material(h.value)).emission;');
   edit('fn triangleBase(', PBR + '\nfn triangleBase(');
   return source;
 }

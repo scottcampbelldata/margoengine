@@ -462,3 +462,11 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/points: cover optional live PointsMaterial.ditherFade coverage intervals and unchanged alpha/depth defaults.
 - @margoengine/splats: cover setDitherFade original-order content ranges, lazy four-byte masks, global sorting, quantization and device restoration.
 - margoengine: cover the generated tiles/fade alias.
+
+
+
+
+
+- @margoengine/voxel-pathtracer (batch 243 job 2): document emissive-triangle NEE/MIS and MeshTraceScene.spotLights, candela units, cone/range defaults, Type C IES parsing, external tilt ownership and PBR texture/alpha sampling; examples deferred by rule 20.
+
+- margoengine (batch 243 job 2 dependent gate): generated audio/sprites and xr/hands aliases now match current package exports; README work remains deferred by rule 20.

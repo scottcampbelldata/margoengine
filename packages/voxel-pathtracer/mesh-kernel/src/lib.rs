@@ -676,3 +676,66 @@ mod tests {
         }
     }
 }
+
+// World-area emitter table for the existing two-level packet. All offsets remain
+// relative to the geometry root; per-placement lookup matches reordered BLAS faces.
+fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
+    if input.len() < 1025 { return Err(1); }
+    let n=input[0] as usize;
+    if n<16 || input.len()!=1025+n { return Err(1); }
+    let emission=&input[1..1025];let g=&input[1025..];
+    if g[1]!=0 || g[9]!=0x4d494e53 { return Err(1); }
+    let mut out=g.to_vec();let header=out.len();out.extend([0;8]);out[12]=header as u32;
+    let mut lights:Vec<[u32;24]>=Vec::new();let mut lookups=Vec::new();let mut total=0.0f64;
+    for i in 0..g[4] as usize {
+        let instance=g[5] as usize+i*32;
+        let head=g[instance+24] as usize;let start=head+g[head+1] as usize;
+        let count=g[head+2] as usize;let table=out.len();out.resize(table+count,0);out[instance+30]=table as u32;
+        for j in 0..count {
+            let tri=start+j*16;let material=g[tri+3] as usize;
+            let r=g[instance+29] as usize;
+            let (rgb,two_sided)=if r!=0 {
+                (std::array::from_fn::<_,3,_>(|a|f32::from_bits(g[r+8+a]) as f64*f32::from_bits(g[r+11]) as f64),g[r+2]!=0)
+            } else {
+                if material>=256 { return Err(1); }
+                (std::array::from_fn::<_,3,_>(|a|f32::from_bits(emission[material*4+a]) as f64),true)
+            };
+            let power=rgb[0]*0.2126+rgb[1]*0.7152+rgb[2]*0.0722;
+            if power<=0.0 {continue;}
+            let points: [[f64;3];3]=std::array::from_fn(|v|std::array::from_fn(|a| {
+                let row=instance+a*4;
+                (0..3).map(|b|f32::from_bits(g[row+b]) as f64*f32::from_bits(g[tri+v*4+b]) as f64).sum::<f64>()+f32::from_bits(g[row+3]) as f64
+            }));
+            let edge=|v:usize|std::array::from_fn::<_,3,_>(|a|points[v][a]-points[0][a]);
+            let a=edge(1);let b=edge(2);
+            let cross=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+            let length=cross.iter().map(|v|v*v).sum::<f64>().sqrt();let area=(length*0.5) as f32;
+            if area==0.0 {continue;}
+            let mut record=[0;24];for v in 0..3 {for a in 0..3 {record[v*4+a]=(points[v][a] as f32).to_bits();}}
+            let normal: [f64;3]=std::array::from_fn(|a|(0..3).map(|b|f32::from_bits(g[instance+12+b*4+a]) as f64*f32::from_bits(g[tri+12+b]) as f64).sum());
+            let norm=normal.iter().map(|v|v*v).sum::<f64>().sqrt();
+            for a in 0..3 {record[12+a]=((normal[a]/norm) as f32).to_bits();}
+            record[7]=area.to_bits();record[15]=u32::from(two_sided);record[16]=tri as u32;record[17]=head as u32;record[18]=instance as u32;record[19]=material as u32;
+            total+=area as f64*power;
+            if !total.is_finite() {return Err(2);}
+            lights.push(record);lookups.push((table+j,total));
+        }
+    }
+    let records=out.len();let mut previous=0.0f32;
+    let count=lights.len();
+    for (i,(record,(lookup,sum))) in lights.iter_mut().zip(lookups).enumerate() {
+        let cdf=if i+1==count {1.0} else {(sum/total) as f32};
+        record[3]=cdf.to_bits();record[20]=(cdf-previous).to_bits();previous=cdf;
+        out[lookup]=(records+i*24) as u32;
+        out.extend(*record);
+    }
+    out[header]=count as u32;out[header+1]=records as u32;
+    if out.len()>(128<<20)/4 {return Err(3);}
+    Ok(out)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn build_lights(ptr:*const u32,len:usize)->u32 {
+    match light_packet(unsafe {std::slice::from_raw_parts(ptr,len)}) {
+        Ok(words)=>{OUTPUT.with(|out|*out.borrow_mut()=words);0},Err(code)=>code
+    }
+}

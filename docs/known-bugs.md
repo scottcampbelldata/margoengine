@@ -4473,3 +4473,9 @@ Batch 206 capture regression: scripts/modern-usdz-tests.js used to read the rigg
 Batch 259 editor: moving only a rendered canvas left its accessibility mirror in the old parent and produced page overflow after viewport changes. The optional editor now moves/restores the adjacent mirror with its canvas, uses a positioned preview container and preserves the original sibling location. editor.test.js covers early/late mirror creation and repeated cleanup; editor-browser.mjs covers desktop-to-320px resizing, invalid-draft save rejection and real download/open.
 
 Batch 210 job 3: repaired default-loop zero-duration actions dropping one-key state, sparse categorical values bypassing Array.some validation, numeric result-buffer coercion, and restoration into a disposed model Mesh. Repros and regressions are in packages/animation/tests/discrete.test.js; before logs are test-results/batch210-discrete-{unit,lifetime}-before.log. No additional open categorical-track defect found by the typed sampling, editing, binding, weighted-action, disposal and real-Fox visibility/text checks.
+
+
+
+
+
+Batch 243 job 2 historical compatibility timeout: the earlier renderImage call rejected at its unchanged 120000 ms AbortSignal, without per-case phase evidence. The rebased canonical native-then-compatibility suite and separate instrumented/cache-disabled compatibility diagnostics now pass every original case and bound. Cause remains unisolated; the shutdown fix was already in the failed checkpoint. Phase messages are retained for the next natural reproduction. No runtime repair or timing waiver is claimed; follow-up remains in private finish-later tracking under rule 22.

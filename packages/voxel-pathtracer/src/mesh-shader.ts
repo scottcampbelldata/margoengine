@@ -1,3 +1,4 @@
+import { meshLightingSource } from './mesh-light-shader.js';
 import { MargoError } from '@margoengine/math/errors';
 
 // Clean room from Woop/Benthin/Wald's ray-space shear (JCGT 2013),
@@ -223,5 +224,5 @@ export function meshSource(input: string): string {
     'else if(h.inst!=NONE){v=f32(h.inst+1u)*256.0+f32(h.value&255u);}',
     'else if(h.inst==TRIANGLE){v=-f32(scene[triangleBase(h)+15u]+select(0u,scene[h.mesh+25u],h.mesh!=0u)+4u);}else if(h.inst!=NONE){v=f32(h.inst+1u)*256.0+f32(h.value&255u);}',
   );
-  return source;
+  return meshLightingSource(source);
 }

@@ -7,6 +7,7 @@ export interface MeshKernel {
   release(p: number, n: number): void;
   build_mesh(p: number, n: number): number;
   build_instances(p: number, n: number): number;
+  build_lights(p: number, n: number): number;
   equal_words(p: number, n: number): number;
   output_ptr(): number;
   output_len(): number;

@@ -1,0 +1,49 @@
+<!doctype html><html><meta charset="utf-8"><title>Mesh emitter and IES correctness</title><canvas width="16" height="16"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {MeshPathTracer,parseTraceIES} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+import {meshPBR} from '/packages/voxel-pathtracer/dist/mesh-pbr.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,1],target:[0,0,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],rows=[];
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);device.createShaderModule=d=>{const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(v=>v.type==='error').map(v=>v.message))));return m;};
+ const extent=.01;engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/(extent*aspect);out[5]=1/extent;out[10]=.01;out[14]=1;out[15]=1;};engine.render();
+ const quad=(id,z,material,scale=2)=>({id,material,positions:new Float32Array([-scale,-scale,z,scale,-scale,z,scale,scale,z,-scale,scale,z]),indices:new Uint32Array([0,1,2,0,2,3]),uvs:new Float32Array([0,0,1,0,1,1,0,1])});
+ const scene=()=>({revision:1,models:[],instances:[],materials:[{id:1,type:'diffuse',color:[.8,.4,.2]},{id:2,type:'emit',color:[0,0,0],emissionColor:[10,5,2]}],meshes:[quad('receiver',0,1)],environment:{ground:false,skyIntensity:0,sunIntensity:0}});
+ let renderId=0;
+ const render=async(s,samples=1,pbr=false)=>{
+  const id=++renderId;const phase=name=>console.log('mesh lights phase',id,name,samples,pbr);phase('create');
+  const t=pbr?await ComposedVoxelPathTracer.create(engine,{scene:s,features:[meshPBR()],denoise:false,maxBounces:2}):await MeshPathTracer.create(engine,{scene:s,denoise:false,maxBounces:2});
+  try{phase('ready-wait');await t.ready;phase('image');const image=await t.renderImage({width:8,height:8,samples,jitter:false,seed:24302,aovs:true,signal:AbortSignal.timeout(120000)});phase('complete');return image;}finally{phase('dispose');t.dispose();}
+ };
+ const positions=()=>Array.from({length:64},(_,i)=>[(i%8+.5)/8*2*extent-extent,extent-(Math.floor(i/8)+.5)/8*2*extent]);
+ const check=(name,image,expected,bound)=>{let error=0,meanError=0;for(let i=0;i<image.color.length;i++){error=Math.max(error,Math.abs(image.color[i]-expected[i]));meanError+=image.color[i]-expected[i];}rows.push({name,maximumError:error,meanError:meanError/image.color.length,bound,samples:image.samples,first:Array.from(image.color.slice(0,3)),expected:Array.from(expected.slice(0,3)),finite:image.color.every(Number.isFinite)});};
+ try{
+  let s=scene();s.spotLights=[{position:[0,0,2],direction:[0,0,-1],color:[1,.5,.25],intensity:16,range:4}];
+  const iesExpected=positions().flatMap(([x,y])=>{const r2=x*x+y*y+4,cos=2/Math.sqrt(r2),range=(1-(Math.sqrt(r2)/4)**4)**2;return [.8,.4,.2].map((a,c)=>a/Math.PI*16*[1,.5,.25][c]*range*cos/r2);});
+  const expected=iesExpected.map((v,i)=>{const [x,y]=positions()[Math.floor(i/3)],cos=2/Math.sqrt(x*x+y*y+4),cone=Math.min(1,Math.max(0,(cos-Math.SQRT1_2)/(1-Math.SQRT1_2)));return v*cone*cone;});
+  check('spot matches independent Lambert cosine inverse-square cone and finite-range irradiance',await render(s),expected,1e-4);
+  s=scene();const ies=parseTraceIES('IESNA:LM-63-2002\n[TEST] Margo analytic isotropic candela\nTILT=NONE\n1 100 1 2 1 1 2 0 0 0 1 1 1\n0 180\n0\n16 16\n');s.spotLights=[{position:[0,0,2],direction:[0,0,-1],color:[1,.5,.25],range:4,ies}];
+  check('absolute IES candela matches independently specified spot intensity',await render(s),iesExpected,1e-4);
+  s.meshes.push(quad('shadow',1.5,1,.5));check('mesh blocks spot and IES paths',await render(s),new Float32Array(192),1e-7);
+  s=scene();s.meshes.push(quad('emitter',2,2,.2));
+  // Independent area integral, midpoint quadrature over the complete square.
+  const integrate=(x,y)=>{let sum=0;const n=160,step=.4/n;for(let j=0;j<n;j++)for(let i=0;i<n;i++){const dx=-.2+(i+.5)*step-x,dy=-.2+(j+.5)*step-y;sum+=4/(dx*dx+dy*dy+4)**2*step*step;}return sum;};
+  const areaExpected=positions().flatMap(([x,y])=>{const e=integrate(x,y)/Math.PI;return [.8,.4,.2].map((a,c)=>a*[10,5,2][c]*e);});
+  check('two emissive triangles agree with independent rectangular area integral including reciprocal MIS',await render(s,4096),areaExpected,2e-4);
+  // PBR zero-alpha emitter must be absent from both direct proposals and path hits.
+  s.pbrMaterials=[{id:1,metallicFactor:0,baseColorFactor:[.8,.4,.2,1]},{id:2,metallicFactor:0,doubleSided:true,emissiveFactor:[10,5,2],alphaMode:'MASK',baseColorFactor:[1,1,1,0]}];
+  check('PBR alpha holes contribute no mesh-emitter radiance',await render(s,16,true),new Float32Array(192),1e-7);
+  // Independently decode emissive RGB, then compare the sampled textured emitter
+  // against the identical flat-radiance material using the same sample sequence.
+  s.pbrMaterials[1].baseColorFactor[3]=1;s.pbrMaterials[1].emissiveTexture={width:1,height:1,data:new Uint8Array([128,255,0,255])};
+  const flat=structuredClone(s);delete flat.pbrMaterials[1].emissiveTexture;const linear=((128/255+.055)/1.055)**2.4;flat.pbrMaterials[1].emissiveFactor=[10*linear,5,0];
+  const reference=await render(flat,16,true);
+  check('textured PBR mesh emitter matches independently decoded flat radiance',await render(s,16,true),reference.color,1e-5);
+  await Promise.all(reports);return {rows,errors,messages};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>
