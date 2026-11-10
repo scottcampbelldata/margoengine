@@ -7571,6 +7571,12 @@
       "commit": "batch-271-targets-depth",
       "reason": "New optional depth, MSAA and mip render targets: 0 to 3398 B gzip. Per-surface depth, 4x resolve with a 2D volume scratch and the area-filtered mip pass share one target lifecycle. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-174-job2",
+      "reason": "New optional sciviz/table 0 to 12324 B (ceiling 12694), decoders/snappy 0 to 1250 B (ceiling 1506). Complete scalar format readers, indexed filters and deterministic GPU bins share typed identity; splitting complicates use. Core + stage remains 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8943,7 +8949,9 @@
     "@margoengine/clustered/cube-projector": 4716,
     "@margoengine/sciviz/geo-lod": 7517,
     "@margoengine/sciviz/charts-extra": 7548,
-    "@margoengine/compute/nn-extra": 21486
+    "@margoengine/compute/nn-extra": 21486,
+    "@margoengine/decoders/snappy": 1506,
+    "@margoengine/sciviz/table": 12694
   },
-  "total": 14310716
+  "total": 14324916
 }

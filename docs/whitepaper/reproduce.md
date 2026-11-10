@@ -3695,3 +3695,10 @@ Batch 271 job 1: build packages, then `node --test --test-timeout=30000 packages
 ### Batch 1 job 2: umbrella test discovery
 
 Run node --test --test-timeout=90000 tests/package-test-scripts.test.js and npm test --workspace packages/margoengine -- --test-timeout=90000. Removing scripts.test from packages/margoengine/package.json reproduces the missing tests/export-order.test.js report. No GPU or timing test is required for this manifest-only change.
+
+
+
+
+## Batch 174 job 2: tables
+
+After building packages, run `node --test --test-timeout=120000 packages/sciviz/tests/table.test.js packages/decoders/tests/snappy.test.js`. Then run `node scripts/gpu-lock.mjs run --owner=table-proof --max=10 --wait-max=60 -- node packages/sciviz/tests/table-browser.mjs` shared. It tests both backends and prints counts, work and all sums; it has no timing threshold. Open `/examples/sciviz-tlc.html` through the normal Vite server to inspect distance-filtered charts. Standard fixtures regenerate with PyArrow 26.0.1 via `python packages/sciviz/scripts/generate-table-fixtures.py`; the downloaded original stays in this lane's ignored test-results/batch174 folder. No foreign implementation is copied.

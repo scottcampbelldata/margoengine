@@ -4998,6 +4998,14 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./decoders/snappy": {
+      "types": "./dist/decoders/snappy.d.ts",
+      "import": "./dist/decoders/snappy.js"
+    },
+    "./sciviz/table": {
+      "types": "./dist/sciviz/table.d.ts",
+      "import": "./dist/sciviz/table.js"
     }
   },
   "dependencies": {

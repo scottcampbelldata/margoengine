@@ -6631,3 +6631,8 @@ Creative /targets-depth owns per-surface depth textures, the 4x colour and volum
 ### Section 5 evidence: batch 1 package test discovery
 
 The all-package discovery regression also catches packages that add their first test without scripts.test. It found the umbrella export-order test missing from npm test; the owning package manifest now uses the complete quoted glob. tests/package-test-scripts.test.js fails without this change. Local CI already includes this class check through the root CPU suite; no new gate is needed. No rendering path changed.
+
+
+### Section 5 evidence: typed table GPU aggregation (batch 174 job 2)
+
+The optional sciviz/table entry classifies rows and applies immutable filter snapshots on the CPU, then dispatches one independent invocation per 256-row tile through ComputeContext. Each invocation owns its bin counters and numeric accumulators. No global float atomic, race-dependent sum or per-bin repeated scan exists. Bounded chunks return partial counts/sums/min/max for a float64 host merge; the same order defines the CPU fallback. Tests cover actual WebGPU and the WebGL2 compatibility device, including rendered filtered histogram/heatmap pixels and 10,000,000 physical rows, exact independent per-bin comparisons, 39 dispatches and 1,250,016 partial bins. No timing assertions or exclusive lock. Existing renderer/core/stage implementations are unchanged. File-format fixtures come from an opaque PyArrow writer; CRC, truncation, null, integer precision and allocation-limit checks are CPU regressions. Limits and deferred timing are in limits.md and work-lists/speed-phase.md.

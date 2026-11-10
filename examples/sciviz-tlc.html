@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TLC linked tables | Margo Engine</title>
+<style>body{margin:0;background:#101621;color:#e9eef5;font:16px system-ui}main{max-width:1200px;margin:auto;padding:24px}h1{font-size:28px}section{display:grid;grid-template-columns:1fr 1fr;gap:16px}.plot{height:390px;min-width:0}label{display:block;margin:16px 0}input{width:260px}a{color:#9ed4ff}button{padding:8px 14px}#status{min-height:24px}@media(max-width:700px){section{grid-template-columns:1fr}}</style></head>
+<body><main><h1>NYC taxi trips, linked by typed columns</h1>
+<p>4,096 observed green taxi trips from January 2024. The distance filter updates both charts. Fares include corrections and refunds in the source data.</p>
+<label>Maximum trip distance: <output id="distance">20</output> miles <input id="range" type="range" min="1" max="20" value="20" step="0.5"></label>
+<p id="status" role="status">Loading public TLC observations...</p>
+<section><canvas id="histogram" class="plot" aria-label="Filtered trip distance histogram"></canvas><canvas id="heatmap" class="plot" aria-label="Filtered distance against fare heatmap"></canvas></section>
+<p><a href="https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page">NYC TLC Trip Record Data</a>, public data under NYC Open Data terms. Only the four displayed/filter columns and first 4,096 source rows are included. The separate 10-million-row correctness test repeats these observations and says so.</p>
+</main><script type="module" src="./sciviz-tlc.ts"></script></body></html>

@@ -171,6 +171,10 @@
     "./charts-extra": {
       "types": "./dist/charts-extra.d.ts",
       "import": "./dist/charts-extra.js"
+    },
+    "./table": {
+      "types": "./dist/table.d.ts",
+      "import": "./dist/table.js"
     }
   },
   "files": [
@@ -216,6 +220,7 @@
     "test:browser:stats": "node scripts/browser-root.mjs tests/stats-browser.mjs",
     "test:browser:omezarr": "node scripts/browser-root.mjs tests/omezarr-browser.mjs",
     "test:browser:fallback": "node tests/fallback-browser.mjs",
-    "test:browser:charts-extra": "node scripts/browser-root.mjs tests/charts-extra-browser.mjs"
+    "test:browser:charts-extra": "node scripts/browser-root.mjs tests/charts-extra-browser.mjs",
+    "test:browser:table": "node tests/table-browser.mjs"
   }
 }

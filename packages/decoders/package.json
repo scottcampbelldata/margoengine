@@ -164,6 +164,10 @@
     "./lzfse": {
       "types": "./dist/lzfse.d.ts",
       "import": "./dist/lzfse.js"
+    },
+    "./snappy": {
+      "types": "./dist/snappy.d.ts",
+      "import": "./dist/snappy.js"
     }
   },
   "files": [

@@ -1062,3 +1062,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/sprites (review 2): clarify that remove removes individually added meshes; removeSkeleton owns slot attachment removal.
+
+
+
+- @margoengine/sciviz (batch 174 job 2): table readers, physical types/nulls, indexed range/set filters, GPU/CPU aggregates, linked chart binding, TLC demo and format/numerical limits.
+- @margoengine/decoders (batch 174 job 2): raw Snappy and bounded lazy columnar block codecs, cancellation and decoded-size limits.

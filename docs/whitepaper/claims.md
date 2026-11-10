@@ -4243,3 +4243,10 @@ Batch 271 job 1: creative/targets-depth renders cube, array and 3D targets with 
 ### Batch 1 job 2: package test discovery
 
 Claim: the umbrella package npm test reaches every current tests/*.test.js file. Proof: tests/package-test-scripts.test.js detects the missing command before the manifest repair, and the package npm test runs its export-order regression afterward. No rendering or speed claim is made.
+
+
+
+
+## Batch 174 job 2: columnar cross-filter
+
+Claim: independent optional `sciviz/table` reads flat scalar CSV, Arrow IPC and Parquet columns with nulls and exact 64-bit physical integers; dimensions maintain indexed range/set masks, and filtered GPU count/sum/mean/min/max feed histogram/bar/heatmap layers. Proof: `packages/sciviz/tests/table.test.js`, standard-writer fixtures, `table-browser.mjs` and `examples/sciviz-tlc.html`. The browser test uses 10,000,000 physical rows (repeated TLC observations), selects 9,670,406 rows and compares every statistic to an independent row predicate/tile reference on both backends. A boundary move visits 36,621 rows, not the full table. Sums are defined f32 tile sums with float64 host merge, not exact-real sums. Research, accepted format limits, sizes and reproduction are recorded separately. This is a correctness/work-count claim, no speed ranking.

@@ -5884,3 +5884,18 @@ Depth target entry: before 0 B, after 3398 B gzip, optional ceiling 3654 B. Text
 ### Batch 1 package test discovery
 
 The umbrella npm test command discovers tests/*.test.js, matching its current test directory and the repository coverage invariant. This manifest-only repair changes no runtime entry, API or size ceiling; other test extensions and nested directories are outside that existing invariant.
+
+
+
+
+## Typed tables and cross-filter (batch 174 job 2)
+
+`@margoengine/sciviz/table` is an independent optional entry, 12,324 B min+gzip from 0 B, ceiling 12,694 B. `@margoengine/decoders/snappy` is 1,250 B from 0 B, ceiling 1,506 B. The bytes buy scalar CSV/Arrow/Parquet readers, null/int64 preservation, indexed filters and deterministic aggregation; splitting the table API would complicate shared column and filter identity. Core + stage stays 24,209 B.
+
+Tables borrow immutable equal-length typed columns. Dictionary strings use Uint32 indices; validity is a separate bitmap. Integer and time values retain signed/unsigned 64-bit storage. Wide decimal and opaque binary scalars are lossless dictionary strings (unscaled decimal with its scale, or hex). Readers accept flat scalar tables, not nested/repeated arrays, tensors, encrypted/external Parquet chunks, obsolete LZO/Hadoop LZ4 or Arrow view layouts. Flatten nested sources before reading. Arrow files and streams support dictionaries, replacement/delta dictionaries and LZ4-frame/Zstd buffer compression. Parquet supports flat row groups, v1/v2 pages, plain, dictionary, RLE, delta binary/length/prefix and byte-stream-split encodings, six modern codecs and page CRC. The readers default to 100,000,000 rows and 536,870,912 input/decoded-block bytes; overrides are explicit. Streaming/range reads belong to the separate large-series job.
+
+Range filters are [lower, upper); set filters use exact typed equality, including explicit null. Dimensions intersect; a cleared dimension passes nulls. Every dimension builds its own index once. Boundary/set changes touch only changed row spans/postings and changed bitmap words; first-time indexing and switching filter kinds are full-index operations. Duplicate row values are retained.
+
+Aggregation supports up to 4,096 1D/2D bins per call, final upper edge included. Host classification uses numeric column values; supplied GPU context performs all count, valid-count, sum, minimum and maximum tile reductions. Mean uses the merged sum/valid count. Rows without a valid coordinate do not enter bins. Null/nonfinite values do not enter numeric statistics. Counts are exact Uint32. Numeric inputs round to f32, each tile adds in fixed source order, and host totals merge in float64; this is not exact-real or float64-input summation. A tile's sum error relative to its f32 inputs follows gamma(255) times its absolute input sum, before host rounding. Rescale values if f32 inputs/tile sums overflow. Empty numeric bins return NaN. CPU fallback follows the same tile order. No timing or rival-throughput claim is made.
+
+The 10,000,000-row correctness proof repeats the 4,096 licensed TLC observations, selects 9,670,406 rows and compares every bin statistic with an independent exhaustive reference on WebGPU and WebGL2 compatibility. The linked demo selects 2,211 observations below two miles and changes both rendered charts.
