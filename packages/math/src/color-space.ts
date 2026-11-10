@@ -1,4 +1,5 @@
-import { LinearToSRGB, SRGBToLinear, linearP3ToLinearSRGB, linearSRGBToLinearP3 } from './color.js';
+import { linearP3ToLinearSRGB, linearSRGBToLinearP3 } from './color.js';
+import { encodeSRGB, decodeSRGB } from './srgb.js';
 import type { ColorSpace, NumberArray } from './types.js';
 
 /** Encoded sRGB, the colour space of CSS hex colours and most images. */
@@ -35,10 +36,10 @@ export function convertColor<T extends NumberArray = number[]>(
   const target = out ?? ([0, 0, 0] as unknown as T),
     v = [rgb[0], rgb[1], rgb[2]];
   if (from !== to) {
-    if (isEncoded(from)) for (let k = 0; k < 3; k++) v[k] = SRGBToLinear(v[k]);
+    if (isEncoded(from)) for (let k = 0; k < 3; k++) v[k] = decodeSRGB(v[k]);
     if (isP3(from)) linearP3ToLinearSRGB(v, v);
     if (isP3(to)) linearSRGBToLinearP3(v, v);
-    if (isEncoded(to)) for (let k = 0; k < 3; k++) v[k] = LinearToSRGB(v[k]);
+    if (isEncoded(to)) for (let k = 0; k < 3; k++) v[k] = encodeSRGB(v[k]);
   }
   for (let k = 0; k < 3; k++) target[offset + k] = v[k];
   return target;

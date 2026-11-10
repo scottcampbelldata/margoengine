@@ -3,7 +3,21 @@ import type { EulerOrder, MatrixLike, NumberArray, Vec3Like, Vec4Like } from './
 const DEGREES = Math.PI / 180;
 
 let scratch: Float64Array | undefined;
-const axisIndex = (order: string, i: number): number => order.charCodeAt(i) - 88; // 'X' = 88
+// Axis indices (0 = x, 1 = y, 2 = z) of the first, middle and last rotation of each order.
+const ORDER_AXES: Record<string, readonly [number, number, number] | undefined> = {
+  XYZ: [0, 1, 2],
+  XZY: [0, 2, 1],
+  YXZ: [1, 0, 2],
+  YZX: [1, 2, 0],
+  ZXY: [2, 0, 1],
+  ZYX: [2, 1, 0],
+};
+/** @throws RangeError for an order that is not one of the six (as Quaternion.setFromEuler). */
+const orderAxes = (order: string): readonly [number, number, number] => {
+  const axes = Object.hasOwn(ORDER_AXES, order) ? ORDER_AXES[order] : undefined;
+  if (!axes) throw new RangeError(`Invalid Euler order ${order}; use XYZ, XZY, YXZ, YZX, ZXY or ZYX`);
+  return axes;
+};
 
 /**
  * Intrinsic Euler angles in radians. The default 'XYZ' order matches core `mesh.rotation`
@@ -40,14 +54,13 @@ export class Euler {
    * matrix (unscaled; it is not normalized) and sets `this.order = order`. The middle angle comes back in
    * [-π/2, π/2], the outer two in [-π, π]. The last angle is read first and the first angle is then solved from it,
    * so the triple reproduces the matrix even next to a gimbal pole; at an exact pole the last angle is 0.
+   * @throws RangeError for an order that is not one of the six.
    */
   setFromRotationMatrix(m: MatrixLike, order: EulerOrder = this.order): this {
     const e = m.elements,
       n = e.length === 9 ? 3 : 4,
       // Axes of the first, middle and last rotation: R = R_a * R_b * R_c.
-      a = axisIndex(order, 0),
-      b = axisIndex(order, 1),
-      c = axisIndex(order, 2),
+      [a, b, c] = orderAxes(order),
       // +1 when (a, b, c) is a cyclic shift of (X, Y, Z), so that axis a x axis b = +axis c; -1 otherwise.
       sign = (b - a + 3) % 3 === 1 ? 1 : -1,
       at = (row: number, column: number): number => e[column * n + row];
@@ -76,6 +89,7 @@ export class Euler {
   /**
    * Angles in `order` (default: the receiver's order) of the unit quaternion `q`, read through its rotation matrix
    * exactly as {@link Euler.setFromRotationMatrix}. Does not modify `q`; `q` and `-q` give the same angles.
+   * @throws RangeError for an order that is not one of the six.
    */
   setFromQuaternion(q: Vec4Like, order: EulerOrder = this.order): this {
     const { x, y, z, w } = q,
@@ -125,7 +139,7 @@ export class Euler {
 /**
  * Quaternion `[x, y, z, w]` of intrinsic Euler angles given in degrees, applied in `order` (the {@link Euler}
  * convention). For angles saved in degrees, as editors and file formats usually keep them.
- * @throws RangeError for a non-finite angle.
+ * @throws RangeError for a non-finite angle or an unknown order.
  */
 export function degreesToQuaternion(
   degrees: ArrayLike<number>,
@@ -133,10 +147,11 @@ export function degreesToQuaternion(
 ): [number, number, number, number] {
   const [x, y, z] = [0, 1, 2].map((i) => degrees[i] * DEGREES);
   if (![x, y, z].every(Number.isFinite)) throw new RangeError('Euler angles must be three finite degree values');
+  const axes = orderAxes(order);
   // q = q * axis(angle) for each axis of order, as Quaternion.setFromEuler.
   let q: [number, number, number, number] = [0, 0, 0, 1];
   for (let i = 0; i < 3; i++) {
-    const axis = axisIndex(order, i),
+    const axis = axes[i],
       half = [x, y, z][axis] / 2,
       s = Math.sin(half),
       b = [0, 0, 0, Math.cos(half)];
@@ -154,7 +169,7 @@ export function degreesToQuaternion(
 /**
  * Intrinsic Euler angles in degrees, in `order`, of quaternion `[x, y, z, w]` (normalized first). At a gimbal
  * singularity the result is still a valid angle set for the same orientation.
- * @throws RangeError for a non-finite or zero quaternion.
+ * @throws RangeError for a non-finite or zero quaternion, or an unknown order.
  */
 export function quaternionToDegrees(
   quaternion: ArrayLike<number>,

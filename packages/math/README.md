@@ -163,7 +163,7 @@ degrees. Both throw `RangeError` for non-finite input.
 palette editors do: hue rotation in degrees through HSL, contrast about 0.5, added brightness, then a multiply by
 white blended toward `tint`. The result is not clamped.
 
-Shared types and errors (type-only, 0 runtime bytes for the types): every Margo package takes its tuple and colour types from here (`Vec2`, `Vec3`, `Vec4`, `Quat`, `MutableVec2`, `MutableVec3`, `Mat4`, `ColorInput`, `HeightField`, the `*Like` shapes), and throws `MargoError` (`code`: `disposed`, `attached`, `state`, `unsupported`, `failed`) for everything that is not an argument `TypeError`/`RangeError`; see [docs/conventions.md](../../docs/conventions.md). `@margoengine/math/mesh` has `meshWorldMatrix(engine, mesh)`, the live world matrix of a visible core mesh (or null), which lines, points and text re-export; it is the one entry that imports `@margoengine/core/extension` at runtime.
+Shared types and errors (type-only, 0 runtime bytes for the types): every Margo package takes its tuple and colour types from here (`Vec2`, `Vec3`, `Vec4`, `Quat`, `MutableVec2`, `MutableVec3`, `Mat4`, `ColorInput`, `HeightField`, the `*Like` shapes), and throws `MargoError` (`code`: `disposed`, `attached`, `state`, `unsupported`, `failed`, `timeout`, `version`) for everything that is not an argument `TypeError`/`RangeError`; see [docs/conventions.md](../../docs/conventions.md). `@margoengine/math/mesh` has `meshWorldMatrix(engine, mesh)`, the live world matrix of a visible core mesh (or null), which lines, points and text re-export; it is the one entry that imports `@margoengine/core/extension` at runtime.
 
 Billboards (`@margoengine/math/billboard`, Crocotile-style object billboards; the mesh's front faces its local +Z):
 `billboardRotation(cameraWorld, position, {mode, lockY, snap, parent})` returns the `[x, y, z, w]` rotation that turns
@@ -200,15 +200,17 @@ const p3 = convertColor([1, 0, 0], SRGBColorSpace, DisplayP3ColorSpace); // abou
 const back = convertColor(p3, DisplayP3ColorSpace, SRGBColorSpace); // about [1, 0, 0]
 ```
 
-Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project` and `unproject` as methods (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
+Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). The classes do not validate their numbers, so NaN propagates; the array helpers, `OBB`, `billboardRotation`, the Euler order and the degree functions throw `RangeError`. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()`, `hsl()` (hue as a number of degrees or with `deg`, `grad`, `rad` or `turn`) and `color()`, but not named colors. `SRGBToLinear` and `LinearToSRGB` continue their linear segment below 0 (bit for bit as the copies they replaced); `Color` and `convertColor` mirror the curve there, as the CSS Color 4 sample code does, so an out-of-gamut channel converts as browsers convert it. `Plane` methods accept a normal of any length (`normalize()` makes `distanceToPoint` a true distance). Not included: Matrix2, `Vector3.project` and `unproject` on the base `Vector3` (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, or the `compat` entry below, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Porting and curves: `@margoengine/math/compat` has subclasses of `Matrix4`, `Vector3`, `Quaternion`, `Plane`, `Ray`, `Box3` and `Color` with the extra methods ported code expects (such as `Matrix4.makeBasis`, `extractRotation`, `makeShear`; `Vector3.applyEuler`, `project`, `unproject`; `Ray.distanceSqToSegment`; `Box3.intersectsTriangle`; `Color.getStyle`, `offsetHSL`, `lerpHSL`), so the base entries keep their size. `@margoengine/math/curve` has `Curve` and `CurveSet` (editable keyed curves: linear, step, smoothstep or cubic with natural, flat or wrap ends) and the `Interpolant` classes over sampled data; `CurveSet.type` is the mode last set on the whole set.
+
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/math
 
 ## Speed
 
-Every class here assigns its fields in the constructor and declares none before it (`useDefineForClassFields: false`). A number field declared first would start as `undefined`, and V8 would then allocate on each write of a fraction: 10,000 `quaternion.setFromEuler(euler)` calls take 0.29 ms this way and took 0.48 ms before, so reuse one `Euler` and one `Quaternion` in a loop:
+Every class here assigns its fields in the constructor and declares none before it (`useDefineForClassFields: false`). A number field declared first would start as `undefined`, and V8 would then allocate on each write of a fraction: 10,000 `quaternion.setFromEuler(euler)` calls took 0.29 ms this way and 0.48 ms before on the machine that measured it (a one-off measurement; no benchmark script in the repository repeats it), so reuse one `Euler` and one `Quaternion` in a loop:
 
 ```ts
 import { Euler, Quaternion } from '@margoengine/math';

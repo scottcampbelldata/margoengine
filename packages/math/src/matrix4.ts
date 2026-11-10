@@ -364,7 +364,10 @@ export class Matrix4 {
     e[10] = zz;
     return this;
   }
-  /** Off-axis perspective projection. `zeroToOne` (default, WebGPU) maps depth to [0, 1]; pass false for WebGL [-1, 1]. */
+  /**
+   * Off-axis perspective projection, forward Z. `zeroToOne` (default, the WebGPU clip range) maps near to 0 and far to
+   * 1; pass false for WebGL [-1, 1]. Margo core's cameras are reversed-Z (near at 1), so this is not their matrix.
+   */
   makePerspective(
     left: number,
     right: number,

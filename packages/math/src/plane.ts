@@ -66,16 +66,19 @@ export class Plane {
     return this.distanceToPoint(sphere.center) - sphere.radius;
   }
   projectPoint<T extends Vec3Like>(p: Vec3Like, out: T): T {
-    const d = this.distanceToPoint(p);
+    // Divide by |n|^2 so a plane whose normal is not unit length still projects onto itself.
+    const d = this.distanceToPoint(p) / (this.normal.lengthSq() || 1);
     out.x = p.x - this.normal.x * d;
     out.y = p.y - this.normal.y * d;
     out.z = p.z - this.normal.z * d;
     return out;
   }
+  /** The point on the plane nearest the origin: -n c / |n|^2 (any normal length). */
   coplanarPoint<T extends Vec3Like>(out: T): T {
-    out.x = -this.normal.x * this.constant;
-    out.y = -this.normal.y * this.constant;
-    out.z = -this.normal.z * this.constant;
+    const s = -this.constant / (this.normal.lengthSq() || 1);
+    out.x = this.normal.x * s;
+    out.y = this.normal.y * s;
+    out.z = this.normal.z * s;
     return out;
   }
   intersectsBox(box: PlaneIntersectable): boolean {
@@ -88,10 +91,11 @@ export class Plane {
   applyMatrix4(m: MatrixLike): this {
     const e = m.elements,
       n = this.normal;
-    // Reference point on the plane, transformed as a point.
-    const px = -n.x * this.constant,
-      py = -n.y * this.constant,
-      pz = -n.z * this.constant;
+    // Reference point on the plane (-n c / |n|^2, any normal length), transformed as a point.
+    const s = -this.constant / (n.lengthSq() || 1);
+    const px = n.x * s,
+      py = n.y * s,
+      pz = n.z * s;
     const qx = e[0] * px + e[4] * py + e[8] * pz + e[12],
       qy = e[1] * px + e[5] * py + e[9] * pz + e[13],
       qz = e[2] * px + e[6] * py + e[10] * pz + e[14];

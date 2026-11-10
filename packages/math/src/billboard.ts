@@ -41,6 +41,11 @@ const axes = (m: Mat4, name: string): [MutableVec3, MutableVec3, MutableVec3] =>
     y = unit(m[4], m[5], m[6]),
     z = unit(m[8], m[9], m[10]);
   if (!x || !y || !z) throw new RangeError(`${name} matrix has a zero axis; pass a rotation (and scale) world matrix`);
+  // A mirror (negative determinant) has no rotation quaternion: basis() would return one of length ~0.7.
+  if (x[0] * (y[1] * z[2] - y[2] * z[1]) + y[0] * (z[1] * x[2] - z[2] * x[1]) + z[0] * (x[1] * y[2] - x[2] * y[1]) <= 0)
+    throw new RangeError(
+      `${name} matrix mirrors (negative determinant); a billboard needs a rotation (and scale) matrix`,
+    );
   return [x, y, z];
 };
 const yawQuaternion = (angle: number): Q => [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)];

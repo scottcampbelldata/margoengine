@@ -4,6 +4,7 @@ import { Quaternion as BaseQuaternion } from './quaternion.js';
 import { Plane as BasePlane } from './plane.js';
 import { Ray as BaseRay } from './ray.js';
 import { Box3 as BaseBox3 } from './box3.js';
+import { Triangle } from './triangle.js';
 import { Color as BaseColor } from './color.js';
 import type { ColorLike } from './color.js';
 import type { MatrixLike, Vec3Like, EulerOrder, ColorSpace } from './types.js';
@@ -205,22 +206,9 @@ export class Box3 extends BaseBox3 {
   override clone(): Box3 {
     return new Box3().copy(this);
   }
-  /** Closed triangle overlap using all 13 separating axes. Degenerate triangles reduce to segments or points. */
+  /** Closed triangle overlap using all 13 separating axes (Triangle.intersectsBox). Degenerate triangles reduce to segments or points. */
   intersectsTriangle(triangle: { a: Vec3Like; b: Vec3Like; c: Vec3Like }): boolean {
-    if (this.isEmpty()) return false;
-    const center = this.getCenter(new Vector3()),
-      half = this.getSize(new Vector3()).multiplyScalar(0.5);
-    const vertices = [triangle.a, triangle.b, triangle.c].map((p) => new Vector3().subVectors(p, center));
-    const edges = vertices.map((v, i) => new Vector3().subVectors(vertices[(i + 1) % 3], v));
-    const axes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
-    const tests = [...axes, new Vector3().crossVectors(edges[0], edges[1])];
-    for (const edge of edges) for (const axis of axes) tests.push(new Vector3().crossVectors(edge, axis));
-    for (const axis of tests) {
-      const projections = vertices.map((v) => v.dot(axis));
-      const radius = half.x * Math.abs(axis.x) + half.y * Math.abs(axis.y) + half.z * Math.abs(axis.z);
-      if (Math.min(...projections) > radius || Math.max(...projections) < -radius) return false;
-    }
-    return true;
+    return Triangle.prototype.intersectsBox.call(triangle as Triangle, this);
   }
 }
 

@@ -157,16 +157,24 @@ export class Quaternion {
   }
   /** Angle in radians of the rotation between this and `q` (both unit), in [0, π]; `q` and `-q` give the same. */
   angleTo(q: Vec4Like): number {
-    return 2 * Math.acos(Math.min(1, Math.abs(this.dot(q))));
+    // 2 atan2(|vector part|, |scalar part|) of conj(this) * q: unlike acos of the dot product, which reads 0 for any
+    // angle under ~1.5e-8 rad, it keeps full precision near 0 and near pi.
+    const { x, y, z, w } = this,
+      vx = w * q.x - q.w * x - (y * q.z - z * q.y),
+      vy = w * q.y - q.w * y - (z * q.x - x * q.z),
+      vz = w * q.z - q.w * z - (x * q.y - y * q.x);
+    return 2 * Math.atan2(Math.hypot(vx, vy, vz), Math.abs(this.dot(q)));
   }
   /** Rotates toward `q` by at most `step` radians; never overshoots, and lands exactly on `q` once within reach. */
   rotateTowards(q: Vec4Like, step: number): this {
     const angle = this.angleTo(q);
-    return angle === 0 ? this : this.slerp(q, Math.min(1, step / angle));
+    return angle === 0 ? this.copy(q) : this.slerp(q, Math.min(1, step / angle));
   }
   /**
    * Spherical linear interpolation along the shortest arc (Shoemake, SIGGRAPH 1985): t = 0 keeps this exactly,
-   * t = 1 copies `q` exactly, `t` outside [0, 1] extrapolates along the same great circle. Not re-normalized.
+   * t = 1 copies `q` exactly, `t` outside [0, 1] extrapolates along the same great circle. Not re-normalized. When `q`
+   * lies in the other hemisphere (dot < 0) the path runs toward `-q`, so t = 0.999999 is near `-q` while t = 1 is `q`:
+   * the same rotation with every component negated.
    */
   slerp(q: Vec4Like, t: number): this {
     if (t === 0) return this;

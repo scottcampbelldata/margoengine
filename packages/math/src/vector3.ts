@@ -144,8 +144,10 @@ export class Vector3 {
   lengthSq(): number {
     return this.x * this.x + this.y * this.y + this.z * this.z;
   }
+  /** sqrt(lengthSq) when that is exact enough; Math.hypot when the square overflows or underflows (|v| past ~1e154 or under ~1e-145). */
   length(): number {
-    return Math.sqrt(this.lengthSq());
+    const l2 = this.lengthSq();
+    return l2 > 1e-290 && l2 < Infinity ? Math.sqrt(l2) : Math.hypot(this.x, this.y, this.z);
   }
   manhattanLength(): number {
     return Math.abs(this.x) + Math.abs(this.y) + Math.abs(this.z);

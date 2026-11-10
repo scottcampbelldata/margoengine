@@ -199,7 +199,9 @@ export const createScreenPoint = (): ScreenPoint => ({ x: 0, y: 0, depth: 0, w: 
 
 /**
  * Projects a world point with a column-major view-projection matrix (Margo Engine `camera.matrix`) to CSS pixels.
- * WebGPU clip space is reversed-Z with z in 0..w (near maps to w); WebGL2 clip space has z in -w..w.
+ * WebGPU clip space is reversed-Z with z in 0..w (near maps to w), as Margo core's cameras build it; WebGL2 clip space
+ * has z in -w..w. A forward-Z 0..w matrix, such as `Matrix4.makePerspective` with `zeroToOne`, is neither: with
+ * `'webgpu'` its depth comes out reversed (1 at near, 0 at far), so use `1 - depth` for it.
  */
 export function projectPoint(
   matrix: ArrayLike<number>,

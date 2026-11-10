@@ -35,7 +35,8 @@ export class Spherical {
       return this;
     }
     this.theta = Math.atan2(x, z);
-    this.phi = Math.acos(Math.max(-1, Math.min(1, y / this.radius)));
+    // atan2 rather than acos(y / r): acos loses the angle near the poles (acos(1 - 1e-18) is 0, not 1e-9).
+    this.phi = Math.atan2(Math.hypot(x, z), y);
     return this;
   }
 }

@@ -40,11 +40,22 @@ export const radToDeg = (radians: number): number => radians * RAD2DEG;
 export const euclideanModulo = (n: number, m: number): number => ((n % m) + m) % m;
 /** True for a positive integer power of two (1, 2, 4, ...). */
 export const isPowerOfTwo = (value: number): boolean =>
-  Number.isInteger(value) && value > 0 && Math.log2(value) % 1 === 0;
+  Number.isInteger(value) && value > 0 && 2 ** Math.round(Math.log2(value)) === value;
+// Math.log2 rounds (log2(2^50 + 1) is exactly 50), so each result is checked against `value` and moved one step.
 /** Smallest power of two >= `value` (expects value > 0; 0 gives 0, negative gives NaN). */
-export const ceilPowerOfTwo = (value: number): number => 2 ** Math.ceil(Math.log2(value));
+export const ceilPowerOfTwo = (value: number): number => {
+  let p = 2 ** Math.ceil(Math.log2(value));
+  if (p < value) p *= 2;
+  else if (p / 2 >= value) p /= 2;
+  return p;
+};
 /** Largest power of two <= `value` (expects value > 0; 0 gives 0, negative gives NaN). */
-export const floorPowerOfTwo = (value: number): number => 2 ** Math.floor(Math.log2(value));
+export const floorPowerOfTwo = (value: number): number => {
+  let p = 2 ** Math.floor(Math.log2(value));
+  if (p > value) p /= 2;
+  else if (p * 2 <= value) p *= 2;
+  return p;
+};
 
 // One mulberry32 output (Tommy Ettinger, 2017, public domain) from a state already advanced by its Weyl increment:
 // two multiply-xorshift rounds, then the unsigned 32-bit result over 2^32, so values lie in [0, 1).

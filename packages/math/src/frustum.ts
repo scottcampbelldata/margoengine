@@ -35,7 +35,11 @@ export class Frustum {
     return new Frustum().copy(this);
   }
 
-  /** Extracts planes from a view-projection matrix. `zeroToOne` (default) is WebGPU depth [0, 1], including core's reversed-Z; false is WebGL [-1, 1]. */
+  /**
+   * Extracts planes from a view-projection matrix (Gribb and Hartmann 2001: row 4 plus or minus row 1, 2 or 3; for a
+   * [0, 1] depth range the z > 0 plane is row 3 alone). `zeroToOne` (default) is WebGPU depth [0, 1], including core's
+   * reversed-Z; false is WebGL [-1, 1].
+   */
   setFromProjectionMatrix(m: MatrixLike, zeroToOne = true): this {
     const e = m.elements;
     for (let i = 0; i < 6; i++) {

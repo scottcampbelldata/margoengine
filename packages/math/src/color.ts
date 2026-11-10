@@ -1,4 +1,5 @@
 import type { ColorInput, ColorSpace, NumberArray } from './types.js';
+import { SRGBToLinear, LinearToSRGB, decodeSRGB, encodeSRGB } from './srgb.js';
 
 export type { ColorInput } from './types.js';
 
@@ -15,10 +16,7 @@ export interface HSL {
   l: number;
 }
 
-/** sRGB transfer function, decoded (display value to linear light). */
-export const SRGBToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-/** sRGB transfer function, encoded (linear light to display value). */
-export const LinearToSRGB = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+export { SRGBToLinear, LinearToSRGB };
 
 function invert3(m: readonly number[]): number[] {
   const [a, b, c, d, e, f, g, h, i] = m,
@@ -102,7 +100,7 @@ export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<numb
 /** Components `r, g, b` in `colorSpace` as linear sRGB at `out[offset..]`. */
 function toLinear(r: number, g: number, b: number, colorSpace: ColorSpace, out: NumberArray, offset: number): void {
   const encoded = colorSpace === 'srgb' || colorSpace === 'display-p3',
-    v = encoded ? [SRGBToLinear(r), SRGBToLinear(g), SRGBToLinear(b)] : [r, g, b];
+    v = encoded ? [decodeSRGB(r), decodeSRGB(g), decodeSRGB(b)] : [r, g, b];
   if (colorSpace === 'display-p3' || colorSpace === 'display-p3-linear') apply3(P3_TO_SRGB, v, out, offset);
   else {
     out[offset] = v[0];
@@ -231,7 +229,7 @@ export class Color {
     if (colorSpace === 'display-p3' || colorSpace === 'display-p3-linear')
       apply3(SRGB_TO_P3, [this.r, this.g, this.b], v, 0);
     const encode = colorSpace === 'srgb' || colorSpace === 'display-p3';
-    for (let k = 0; k < 3; k++) target[k] = encode ? LinearToSRGB(v[k]) : v[k];
+    for (let k = 0; k < 3; k++) target[k] = encode ? encodeSRGB(v[k]) : v[k];
     return target;
   }
   setHex(hex: number, colorSpace: ColorSpace = 'srgb'): this {
@@ -264,7 +262,11 @@ export class Color {
           const channel = (i: number): number => unit(parts[i].endsWith('%') ? numbers[i] / 100 : numbers[i] / 255);
           return this.setRGB(channel(0), channel(1), channel(2), colorSpace);
         }
-        return this.setHSL(numbers[0] / 360, numbers[1] / 100, numbers[2] / 100, colorSpace);
+        // A CSS <hue> is a number (degrees) or an <angle>: deg, grad (400 a turn), rad or turn.
+        const hue = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(deg|grad|rad|turn)?$/i.exec(parts[0]);
+        if (!hue) throw new TypeError(`Invalid hue '${parts[0]}'; use a number or deg, grad, rad or turn`);
+        const turns = { deg: 360, grad: 400, rad: 2 * Math.PI, turn: 1 }[(hue[1] ?? 'deg').toLowerCase() as 'deg'];
+        return this.setHSL(numbers[0] / turns, numbers[1] / 100, numbers[2] / 100, colorSpace);
       }
     }
     throw new TypeError(`Invalid color '${style}'; use hex, rgb() or hsl()`);
@@ -285,15 +287,15 @@ export class Color {
     return this.copy(c).convertLinearToSRGB();
   }
   convertSRGBToLinear(): this {
-    this.r = SRGBToLinear(this.r);
-    this.g = SRGBToLinear(this.g);
-    this.b = SRGBToLinear(this.b);
+    this.r = decodeSRGB(this.r);
+    this.g = decodeSRGB(this.g);
+    this.b = decodeSRGB(this.b);
     return this;
   }
   convertLinearToSRGB(): this {
-    this.r = LinearToSRGB(this.r);
-    this.g = LinearToSRGB(this.g);
-    this.b = LinearToSRGB(this.b);
+    this.r = encodeSRGB(this.r);
+    this.g = encodeSRGB(this.g);
+    this.b = encodeSRGB(this.b);
     return this;
   }
 

@@ -378,6 +378,7 @@ export class CurveSet {
     this.interpolation = modeOf(type);
     for (const curve of this.list) curve.type = type;
   }
+  /** The mode last set on the whole set (at construction, the first channel's); a channel changed alone through `get(i)` is not reflected. */
   get type(): CurveType {
     return this.interpolation;
   }

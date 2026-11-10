@@ -1699,6 +1699,19 @@ carry the same citation as a one-line comment in the code.
 | P46 | Core display curve: Khronos PBR Neutral (F90 0.04, Ks 0.76, Kd 0.15, f = x - x^2 / (4 F90) below 2 F90), then the sRGB encoding | core/src/shaders.ts | **Read in full (batch 132 audit, 2026-11-10):** Khronos PBR Neutral specification (KhronosGroup/ToneMapping, PBR_Neutral/README.md, specification text only); glTF 2.0 Appendix B in its 2021 revision (separable Smith G, `c_diff = lerp(baseColor, black, metallic)`), which the code follows; the current revision of that appendix uses the height-correlated Smith G instead, so P1 cites the 2021 text. sRGB transfer constants (0.0031308, 12.92, 1.055, 2.4) checked against CSS Color 4 sample code; IEC 61966-2-1 itself not read (paywalled) |
 | P42 | Default ambient strength | core/src/engine.ts | Margo-own: Margo design choice |
 
+### math
+
+Batch 132 audit (lane N, 2026-11-10). "Read" means the PDF or specification text was fetched and the cited section read.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| MA1 | Irradiance SH: real basis bands 0-2, cosine lobe per band (pi, 2 pi / 3, pi / 4) | math/src/sh.ts | **Read in full:** Ramamoorthi and Hanrahan, "An Efficient Representation for Irradiance Environment Maps", SIGGRAPH 2001 (graphics.stanford.edu copy), eq. 3, 6, 12; code constants agree to the paper's 6 digits and to the closed forms within 9e-16. Sloan 2008 (SH3.rotate) not re-read |
+| MA2 | OBB-OBB separating axis test, 15 axes in A's frame, cosines padded by epsilon | math/src/obb.ts | **Read:** Gottschalk, Lin and Manocha, "OBBTree", SIGGRAPH 1996, section 4 (UNC copy); the code's edge-axis terms match the paper's worked A1 x B2 case. The epsilon (default 1e-6) is the usual guard for near-parallel edges, not from this paper (Ericson 2005, 4.4.1, book not to hand) |
+| MA3 | Frustum planes from a view-projection matrix, [0, 1] and [-1, 1] depth | math/src/frustum.ts | **Read in full:** Gribb and Hartmann, "Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix", 2001 (gamedevs.org copy): D3D near = row 3, OpenGL near = row 4 + row 3; reversed-Z swaps which depth plane is near |
+| MA4 | sRGB transfer, Display P3 matrices, hsl() and <hue> | math/src/srgb.ts, color.ts, color-space.ts | **Read:** CSS Color 4 (sample code lin_sRGB / gam_sRGB, sections on sRGB, display-p3 and hsl()); P3 and sRGB matrices re-derived from the primaries and D65. Angle units (deg, grad, rad, turn) from CSS Values 4, not re-read |
+| MA5 | Euler angles from a rotation matrix, all six orders; quaternion from matrix (Shepperd); slerp | math/src/euler.ts, quat.ts, quat-core.ts, quaternion.ts | **Not read** (Shoemake 1985 and 1994, Shepperd 1978: not openly available). Checked numerically instead: 120,000 round trips incl. 1e-12 from a pole, worst 1.1e-15 rad; Shepperd near pi 6e-16 |
+| MA6 | Ray-triangle (Moller-Trumbore), AABB transform (Arvo 1990), triangle-box SAT (13 axes), natural cubic spline | math/src/ray.ts, box3.ts, triangle.ts, curve.ts | **Not read** this pass (the Moller-Trumbore PDF held no extractable text, BK4; Arvo is in Graphics Gems; Akenine-Moller 2001 not fetched). Checked numerically: Box3.applyMatrix4 against the 8 transformed corners 5e-16; natural ends f'' ~ 0 |
+
 ### creative
 
 | id | formula | file | source |

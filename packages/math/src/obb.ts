@@ -183,7 +183,8 @@ export class OBB {
     return sphere.radius >= 0 && this.distanceToPoint(sphere.center) <= sphere.radius;
   }
   /**
-   * Separating-axis test over the 15 candidate axes (3 face normals of each box and the 9 edge cross products).
+   * Separating-axis test over the 15 candidate axes (3 face normals of each box and the 9 edge cross products), in the
+   * reduced form of Gottschalk, Lin and Manocha, "OBBTree", SIGGRAPH 1996, section 4 (B placed in A's frame by R, T).
    * `epsilon` pads the axis cosines so near-parallel edges, whose cross product is almost zero, cannot report a false
    * separation. @throws RangeError for a negative or non-finite `epsilon`.
    */
