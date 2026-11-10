@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Material, MapSlot } from '@margoengine/materials';
 import { fault, typeError } from '../../shared/errors.js';
 import type { Json } from './server.js';
@@ -22,6 +22,10 @@ export class AssetInstaller implements Disposable {
     private readonly engine: EngineKernel,
     private readonly options: AssetInstallerOptions = {},
   ) {}
+  // From the scene the plugin was attached to, not whichever scene is active when the page is cleaned up.
+  private detach(plugin: EnginePlugin): void {
+    this.engine.sceneOf(plugin)?.removePlugin(plugin.name);
+  }
   /** Loads a model, environment or material map and installs it. The callback can be passed directly to addAsset. */
   readonly load = async (args: Record<string, unknown>, signal: AbortSignal): Promise<Json> => {
     const active = AbortSignal.any([this.lifetime.signal, signal]);
@@ -32,10 +36,10 @@ export class AssetInstaller implements Disposable {
       const { loadGLTF } = await import('@margoengine/gltf-pro');
       const model = await loadGLTF(this.engine, args.url, { signal: active });
       if (active.aborted) {
-        this.engine.removePlugin(model.name);
+        this.detach(model);
         active.throwIfAborted();
       }
-      this.cleanup.push(() => this.engine.removePlugin(model.name));
+      this.cleanup.push(() => this.detach(model));
       return { kind: 'model', id: model.root.id, plugin: model.name };
     }
     if (args.kind === 'hdri') {
@@ -53,17 +57,17 @@ export class AssetInstaller implements Disposable {
       try {
         lighting = EnvironmentLighting.attach(this.engine, environment, { name: `${name}:lighting` });
       } catch (error) {
-        this.engine.removePlugin(environment.name);
+        this.detach(environment);
         throw error;
       }
       if (active.aborted) {
-        this.engine.removePlugin(lighting.name);
-        this.engine.removePlugin(environment.name);
+        this.detach(lighting);
+        this.detach(environment);
         active.throwIfAborted();
       }
       const cleanup = () => {
-        this.engine.removePlugin(lighting.name);
-        this.engine.removePlugin(environment.name);
+        this.detach(lighting);
+        this.detach(environment);
       };
       this.environmentCleanup?.();
       this.environmentCleanup = cleanup;
