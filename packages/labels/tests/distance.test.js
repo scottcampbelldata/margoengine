@@ -68,6 +68,24 @@ test('renderer uses layout scaling without distanceScale; fades restore, limits 
   assert.equal(element.style.opacity, '0.5');
   renderer.dispose();
 });
+test('a removed label drops its policy whether or not the policy fades opacity (review 5)', () => {
+  // The cleanup only walked labels with a managed opacity, so a scale-only policy kept its removed label alive.
+  const engine = fakeEngine(Camera),
+    distance = new DistanceLabels(),
+    renderer = new LabelRenderer({ layout: distance });
+  renderer.setup(engine);
+  renderer.registerPasses(engine.graph);
+  const faded = renderer.add(engine.document.createElement('div'), { position: [0, 0, 0] }),
+    scaled = renderer.add(engine.document.createElement('div'), { position: [0, 0, 0] });
+  distance.set(faded, policy).set(scaled, { scale: policy.scale });
+  engine.frame();
+  faded.remove();
+  scaled.remove();
+  engine.frame();
+  assert.equal(distance.delete(faded), false);
+  assert.equal(distance.delete(scaled), false, 'the scale-only policy still held the removed label');
+  renderer.dispose();
+});
 test('nested declutter sees distance-scaled rectangles, after the distance filter', () => {
   const engine = fakeEngine(Camera),
     declutter = new Declutter(),

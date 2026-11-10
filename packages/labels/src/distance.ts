@@ -131,7 +131,8 @@ export class DistanceLabels implements LabelLayout {
       } else this.restore(label);
       shown.push(label);
     }
-    for (const label of this.styles.keys())
+    // Labels removed from the renderer: restore their opacity and drop their policy (scale-only policies too).
+    for (const label of new Set([...this.styles.keys(), ...this.policies.keys()]))
       if (label.owner === null) {
         this.restore(label);
         this.policies.delete(label);
