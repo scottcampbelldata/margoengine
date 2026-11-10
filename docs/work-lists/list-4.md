@@ -5,9 +5,9 @@ prompts are in `list-4-prompts.md`.
 
 | Stream | Work | Batch | Package | Jobs | Status |
 | --- | --- | --- | --- | --- | --- |
-| K | Apple proofs first | 121 | proof audit | 4 | todo |
-| L | review | R5 | list 2 and 3 packages | 22 | todo |
-| M | research audit | 132 | every package except sciviz (still building on the dev PC) | 6 | todo |
+| K | Apple proofs first | 121 | proof audit | 4 | running (Mac) |
+| L | review | R5 | list 2 and 3 packages | 22 | running (Mac) |
+| M | research audit | 132 | every package except sciviz (still building on the dev PC) | 6 | running (Mac) |
 
 Why the Mac: it is the only Apple machine, so batch 121's proofs that only pass on real Safari, WebKit, Metal and
 Quick Look start here. Batch 132 splits by package across the Mac's streams; never take a package another stream
