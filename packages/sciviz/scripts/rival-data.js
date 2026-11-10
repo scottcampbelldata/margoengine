@@ -25,14 +25,14 @@ export function sampleDistance() {
 }
 
 /** The volume and the sum of its values. */
-export function fillVolume() {
-  const data = new Float32Array(N * N * N);
-  const c = (N - 1) / 2;
+export function fillVolume(n = N) {
+  const data = new Float32Array(n * n * n);
+  const c = (n - 1) / 2;
   let sum = 0;
-  for (let z = 0; z < N; z++) {
-    for (let y = 0; y < N; y++) {
-      const slice = N * (y + N * z);
-      for (let x = 0; x < N; x++) {
+  for (let z = 0; z < n; z++) {
+    for (let y = 0; y < n; y++) {
+      const slice = n * (y + n * z);
+      for (let x = 0; x < n; x++) {
         const value = Math.max(0, 1 - Math.hypot(x - c, y - c, z - c) / c);
         data[slice + x] = value;
         sum += value;

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sciviz against web rivals · Margo Engine</title>
+  <meta name="description" content="Features, real-data scenes, closed-form accuracy checks and open losses of Margo's scientific visualization package next to VTK.js, Plotly.js, deck.gl, ECharts-GL, regl-scatterplot and Cosmograph.">
+  <link rel="canonical" href="https://margoengine.com/sciviz/compare">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" href="../favicon.ico" sizes="32x32">
+  <link rel="preload" href="../fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <a class="brand" href="../" translate="no">Margo Engine</a>
+    <nav aria-label="Primary">
+      <a href="../#start">Get started</a>
+      <a href="../catalog/">Catalog</a>
+      <a href="../whitepaper/engine.html">Whitepaper</a>
+    </nav>
+  </header>
+
+  <main id="main" class="sizes">
+<section class="sizes-intro" aria-labelledby="page-title">
+<h1 id="page-title">Scientific visualization against the web rivals</h1>
+<p>Batch 182, 2026-11-10. This page compares <code>@margoengine/sciviz</code> with the scientific and charting libraries people use on the web today. It has four parts: features, measured scenes, accuracy against closed-form answers, and losses. Nothing here is a speed claim. Every timed number waits for the quiet-machine run (see "Losses and pending timing"). The public page is site/sciviz/compare.html (<code>site/sciviz/compare.html</code>).</p>
+</section>
+<section aria-labelledby="how-to-read-the-feature-rows">
+<h2 id="how-to-read-the-feature-rows">How to read the feature rows</h2>
+<ul>
+<li>Margo cells name the test file or README section that proves the feature. Paths are relative to <code>packages/sciviz/</code>.</li>
+<li>Rival cells say what the rival's public documentation lists, with the URL, the version and the date it was read. We never read rival source code. Six rivals were also installed and run as black boxes; their pinned versions are in <code>scripts/sciviz-compare/manifest.mjs</code>.</li>
+<li>"Desktop tools" (ParaView, VisIt, 3D Slicer, yt) show what scientists expect from experience. They are an expectation, not a score, and they are not rivals of a web library.</li>
+<li>"Not found" means we found no feature, export or test with that name in Margo. It does not mean the work is impossible. Those gaps are listed at the end.</li>
+</ul>
+<p>Rival documentation read on 2026-11-10: VTK.js 38.0.5 (<a href="https://kitware.github.io/vtk-js/docs/">API docs</a>), Plotly.js 4.2.0 (<a href="https://plotly.com/javascript/reference/">reference</a>), deck.gl 9.4.1 (<a href="https://deck.gl/docs/api-reference/layers">layers</a>), ECharts 6.1.0 and ECharts-GL 2.1.0 (<a href="https://echarts.apache.org/en/feature.html">features</a>), regl-scatterplot 1.16.0 (<a href="https://github.com/flekschas/regl-scatterplot">README</a>), Cosmograph 2.5.1 (<a href="https://cosmograph.app/docs-lib/api/interfaces/CosmographConfig/">config reference</a>), Neuroglancer (<a href="https://neuroglancer-docs.web.app/datasource/index.html">data sources</a>), Bokeh (<a href="https://docs.bokeh.org/en/latest/docs/user_guide/interaction/linking.html">linking</a>), Vega-Lite (<a href="https://vega.github.io/vega-lite/docs/selection.html">selections</a>, <a href="https://vega.github.io/vega-lite/docs/transform.html">transforms</a>), ParaView Glance (<a href="https://kitware.github.io/glance/doc/readers.html">readers</a>). Unversioned rows are the documentation current on that date.</p>
+</section>
+<section aria-labelledby="feature-rows">
+<h2 id="feature-rows">Feature rows</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Row, Margo (evidence), Web rivals (their docs), Desktop tools (expectation), "><table>
+<thead><tr><th scope="col">Row</th><th scope="col">Margo (evidence)</th><th scope="col">Web rivals (their docs)</th><th scope="col">Desktop tools (expectation)</th><th scope="col"></th></tr></thead>
+<tbody>
+<tr><th scope="row">Chart types</th><td>scatter, line, bar, histogram, heatmap, surface, contour, error bars, box, violin, area, density, parallel coordinates, polar, ternary, Sankey and more (<code>tests/charts.test.js</code>, <code>tests/stats.test.js</code>, <code>tests/charts-extra.test.js</code>, <code>tests/parcoords.test.js</code>, <code>tests/contour2d.test.js</code>). SPLOM exists in <code>src/parcoords.ts</code> with no test yet</td><td>Plotly lists 40+ trace types; ECharts 20+ series; Vega-Lite composes marks with transforms</td><td>Matplotlib-style breadth</td><td></td></tr>
+<tr><th scope="row">3D scalar volume</th><td>1D and 2D transfer functions, pre-integration, label maps, MIP, ambient occlusion, shadows, GPU and CPU isosurfaces (<code>tests/transfer.test.js</code>, <code>tests/labels.test.js</code>, <code>tests/cinematic.test.js</code>, <code>tests/fallback.test.js</code>)</td><td>VTK.js volume mapper: composite, additive, MIP, MinIP; Plotly volume and isosurface traces</td><td>ParaView and Slicer: all of these plus multi-volume</td><td></td></tr>
+<tr><th scope="row">Vector and tensor</th><td>quiver, RK4 streamlines, particles and pathlines, LIC, tubes and ribbons, tensor glyphs, DTI fibre tracking (README "Vector fields", <code>tests/flow.test.js</code>, <code>tests/lic.test.js</code>, <code>tests/tubes.test.js</code>, <code>tests/tensor.test.js</code>, <code>tests/tensor-real.test.js</code>)</td><td>Plotly cone and streamtube traces; VTK.js glyph mapper</td><td>ParaView stream tracer, LIC, tensor glyphs</td><td></td></tr>
+<tr><th scope="row">Volume scale</th><td>bricked level-of-detail volumes, OME-Zarr multiscale, N5, precomputed chunks (README "Bricked volumes", <code>tests/bricks.test.js</code>, <code>tests/omezarr.test.js</code>)</td><td>Neuroglancer reads precomputed, N5 and OME-Zarr chunked sources</td><td>Out-of-core readers</td><td></td></tr>
+<tr><th scope="row">Grid types</th><td>image, structured, rectilinear, curvilinear, unstructured, polydata, multiblock, polyhedra, higher-order cells, AMR (<code>tests/grids.test.js</code>, <code>tests/datasets.test.js</code>, <code>tests/datasets-elements.test.js</code>, <code>tests/amr.test.js</code>)</td><td>VTK.js documents ImageData and PolyData</td><td>ParaView: every VTK data type</td><td></td></tr>
+<tr><th scope="row">Formats</th><td>NRRD, NIfTI, DICOM, Zarr, VTK legacy and XML, NetCDF classic, HDF5, CGNS, Xdmf, Exodus, OpenFOAM, EnSight, FITS, MRC, OME-TIFF, Arrow, Parquet, CSV (<code>tests/nrrd.test.js</code>, <code>tests/formats.test.js</code>, <code>tests/climate-formats.test.js</code>, <code>tests/hdf5.test.js</code>, <code>tests/engineering.test.js</code>, <code>tests/astronomy.test.js</code>, <code>tests/table.test.js</code>). Zarr Blosc and Zstandard are not supported (README "Medical and array formats")</td><td>ParaView Glance lists its readers through ITK and VTK.js</td><td>ParaView and VisIt read hundreds of formats</td><td></td></tr>
+<tr><th scope="row">Scale</th><td>point budget option, exact binary64 aggregation, additive point octree (README "Figures", <code>tests/aggregate.test.js</code>, <code>tests/pointcloud.test.js</code>)</td><td>deck.gl performance guide, regl-scatterplot and Cosmograph document million-scale rendering</td><td>Datashader-style aggregation</td><td></td></tr>
+<tr><th scope="row">Interaction</th><td>hover, pick, box and lasso, linked selection across figures, cross-filter, annotations, measurement (README "Picking, tooltips and selection", <code>tests/pick.test.js</code>, <code>tests/link.test.js</code>, <code>tests/annotate.test.js</code>)</td><td>Bokeh linked brushing; Vega-Lite union and intersect selections</td><td>Linked views and rulers</td><td></td></tr>
+<tr><th scope="row">Analysis filters</th><td>contour, clip, probe, calculator, gradient, glyph in a re-executing pipeline (<code>tests/datasets.test.js</code>, <code>tests/contour.test.js</code>, <code>tests/clip.test.js</code>, <code>tests/probe.test.js</code>, <code>tests/calc.test.js</code>, <code>tests/glyph.test.js</code>). Threshold, plot over line, integrate, resample, warp and connectivity: not found</td><td>Vega-Lite table transforms; VTK.js has few grid filters</td><td>ParaView: all of these</td><td></td></tr>
+<tr><th scope="row">Multi-view</th><td>linked cameras, comparative grids, orthogonal slice views (<code>tests/views.test.js</code>)</td><td>Vega-Lite concatenation with shared scales</td><td>Slicer and ParaView linked views</td><td></td></tr>
+<tr><th scope="row">Publication</th><td>PNG with physical size, SVG, vector 3D, PDF, TeX labels, video (<code>tests/export-media.test.js</code>, <code>tests/export-vector.test.js</code>, <code>tests/pdf.test.js</code>, <code>tests/math.test.js</code>; video in <code>tests/export-media-browser.mjs</code>)</td><td>Plotly static export (3D rasterized), Bokeh SVG and PNG export</td><td>Vector and raster export</td><td></td></tr>
+<tr><th scope="row">Accessibility</th><td>ARIA summaries, keyboard data navigation, sonification (<code>tests/a11y.test.js</code>)</td><td>ECharts ARIA descriptions and decals; Vega-Lite ARIA on SVG</td><td>Little</td><td></td></tr>
+<tr><th scope="row">Notebook</th><td>Jupyter widget through anywidget (<code>tests/notebook.test.js</code>, <code>python/</code>)</td><td>Plotly, Bokeh, pydeck, Altair widgets</td><td>Jupyter</td><td></td></tr>
+<tr><th scope="row">Sharing</th><td>versioned figure spec, URL state, standalone HTML, provenance (<code>tests/spec.test.js</code>, <code>tests/share.test.js</code>, <code>tests/provenance.test.js</code>)</td><td>Neuroglancer URL state; Glance standalone HTML</td><td>State files</td><td></td></tr>
+<tr><th scope="row">Geo and time</th><td>tile level of detail, vector tiles, time-dynamic layers, CF conventions, projections (README "Geographic layers", <code>tests/geo-lod.test.js</code>, <code>tests/geo-vector.test.js</code>, <code>tests/geo-time.test.js</code>, <code>tests/cf.test.js</code>, <code>tests/projections.test.js</code>)</td><td>deck.gl tile and geo layers; CesiumJS globe</td><td>GIS tools</td><td></td></tr>
+<tr><th scope="row">Platform</th><td>WebGPU first, native WebGL2 path, GPU picking, progressive rendering (README "A first WebGPU figure", "Native WebGL2 drawing", <code>tests/webgl2.test.js</code>, <code>tests/pick-gpu.test.js</code>, <code>tests/progressive.test.js</code>)</td><td>WebGL2 throughout; deck.gl documents partial WebGPU</td><td>Native GPU</td><td></td></tr>
+</tbody></table></div>
+</section>
+<section aria-labelledby="measured-scenes">
+<h2 id="measured-scenes">Measured scenes</h2>
+<p><code>npm run sciviz:compare</code> runs each case in one headless page: Margo and one rival draw the same data at 256 x 256 pixels with the same camera, background and colour. Six rivals are installed outside this repository under the engine-bench folder (<code>MARGO_ENGINE_BENCH</code> overrides it). Only their documented public APIs are called.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Scene, Rival, Real data, Scales in the timed run, "><table>
+<thead><tr><th scope="col">Scene</th><th scope="col">Rival</th><th scope="col">Real data</th><th scope="col">Scales in the timed run</th><th scope="col"></th></tr></thead>
+<tbody>
+<tr><th scope="row">volume</th><td>VTK.js</td><td>MRI head (<code>examples/assets/sciviz/head.nrrd</code>), one shared nearest-neighbour cube</td><td>64, 128, 256, 512 voxels per axis</td><td></td></tr>
+<tr><th scope="row">isosurface</th><td>VTK.js</td><td>the same MRI cube, level 0.5</td><td>32, 64, 128, 256 voxels per axis</td><td></td></tr>
+<tr><th scope="row">scatter</th><td>Plotly, deck.gl, ECharts-GL, regl-scatterplot</td><td>NYC TLC taxi trips (<code>limits/taxi.csv</code>), distance against fare</td><td>1,024 to 16,777,216 points</td><td></td></tr>
+<tr><th scope="row">line</th><td>Plotly, ECharts-GL</td><td>the same taxi rows as one polyline</td><td>1,024 to 1,048,576 vertices</td><td></td></tr>
+<tr><th scope="row">heatmap</th><td>Plotly</td><td>taxi rows binned on both sides from one shared count grid</td><td>32 to 1,024 cells per axis</td><td></td></tr>
+<tr><th scope="row">streamlines</th><td>VTK.js</td><td>NOAA daily mean winds (<code>wind.bin</code>)</td><td>8 to 512 seeds per axis</td><td></td></tr>
+<tr><th scope="row">graph</th><td>Cosmograph</td><td>OpenAlex citation graph (<code>tests/fixtures/graph-gpu/openalex.json</code>)</td><td>1 to 256 copies</td><td></td></tr>
+<tr><th scope="row">tiles</th><td>deck.gl</td><td>the repository's geo level-of-detail tiles</td><td>zoom 1 to 6</td><td></td></tr>
+</tbody></table></div>
+<p>Rows past the source size repeat the source rows and say so in the JSON (<code>replicated: true</code>); nothing is synthesized or resized silently. Each run records the commit, GPU, browser, driver and CPU load, the image difference of the last pair, exact repeat-frame equality on both sides, public GPU API call counts per frame and memory where the library exposes it.</p>
+</section>
+<section aria-labelledby="smoke-results-one-run-no-timing">
+<h3 id="smoke-results-one-run-no-timing">Smoke results (one run, no timing)</h3>
+<p>The smoke on 2026-11-10 (RTX A6000, Edge 157 headless, the batch 182 tree before its commit, so the record says <code>dirty: true</code>) ran every scene once at its first scale with <code>--runs=1</code>. No clock was read. Every case drew a non-empty image and repeated it byte for byte on both sides. The raw records are in results/batch182-smoke.json (<code>docs/whitepaper/results/batch182-smoke.json</code>).</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Scene, Rival, Mean RGB difference (0 to 255), Pixels over 8 levels, Margo draws / passes per frame, Rival draws per frame, "><table>
+<thead><tr><th scope="col">Scene</th><th scope="col">Rival</th><th scope="col">Mean RGB difference (0 to 255)</th><th scope="col">Pixels over 8 levels</th><th scope="col">Margo draws / passes per frame</th><th scope="col">Rival draws per frame</th><th scope="col"></th></tr></thead>
+<tbody>
+<tr><th scope="row">volume (64)</th><td>vtk</td><td>0.34</td><td>0.8 %</td><td>5 / 9</td><td>1</td><td></td></tr>
+<tr><th scope="row">isosurface (32)</th><td>vtk</td><td>2.60</td><td>4.3 %</td><td>1 / 3</td><td>1</td><td></td></tr>
+<tr><th scope="row">scatter (1024)</th><td>plotly</td><td>1.26</td><td>3.3 %</td><td>1 / 3</td><td>1</td><td></td></tr>
+<tr><th scope="row">scatter (1024)</th><td>deck</td><td>0.97</td><td>3.3 %</td><td>1 / 3</td><td>1</td><td></td></tr>
+<tr><th scope="row">scatter (1024)</th><td>echarts</td><td>1.34</td><td>4.1 %</td><td>1 / 3</td><td>1</td><td></td></tr>
+<tr><th scope="row">scatter (1024)</th><td>regl</td><td>1.15</td><td>3.3 %</td><td>1 / 3</td><td>2</td><td></td></tr>
+<tr><th scope="row">line (1024)</th><td>plotly</td><td>1.03</td><td>4.5 %</td><td>1 / 3</td><td>none (PNG or SVG path)</td><td></td></tr>
+<tr><th scope="row">line (1024)</th><td>echarts</td><td>1.81</td><td>6.1 %</td><td>1 / 3</td><td>1</td><td></td></tr>
+<tr><th scope="row">heatmap (32)</th><td>plotly</td><td>0.01</td><td>0.0 %</td><td>1 / 3</td><td>none (PNG or SVG path)</td><td></td></tr>
+<tr><th scope="row">streamlines (8)</th><td>vtk</td><td>4.46</td><td>15.1 %</td><td>1 / 3</td><td>1</td><td></td></tr>
+<tr><th scope="row">graph (1)</th><td>cosmograph</td><td>23.06</td><td>34.9 %</td><td>2 / 3</td><td>3</td><td></td></tr>
+<tr><th scope="row">tiles (1)</th><td>deck</td><td>4.71</td><td>23.3 %</td><td>4 / 3</td><td>4</td><td></td></tr>
+</tbody></table></div>
+<p>Image differences are observations, not pass marks. They come from different antialiasing, point and line rasterization, interpolation and storage precision. They are not used to accept or reject a run. The graph row has the largest difference: Cosmograph draws links dimmer than the shared colour at width 1 and adds an attribution overlay outside its canvas; the node layout matches.</p>
+</section>
+<section aria-labelledby="explicit-differences-in-work">
+<h3 id="explicit-differences-in-work">Explicit differences in work</h3>
+<ul>
+<li><strong>Volume:</strong> Margo captures scene depth and composes the volume with opaque geometry through its multisample frame graph: 9 render passes, 5 draws, 3 buffer writes per frame against one VTK.js draw. This supports clipping volumes against geometry and stays. Margo stores normalized scalars as half floats; VTK.js receives float32.</li>
+<li><strong>Plotly:</strong> both sides go through PNG export and decode in that pairing, because Plotly's static image route is its documented capture path.</li>
+<li><strong>Cosmograph:</strong> it keeps its own animation loop; two idle animation frames record its draws with no frame requested (<code>work.idleTwoAnimationFrames</code> in the JSON). That work also runs during Margo's samples.</li>
+<li><strong>ECharts-GL and regl-scatterplot</strong> run on WebGL1 contexts; deck.gl, VTK.js and Cosmograph on WebGL2; Margo on WebGPU.</li>
+</ul>
+</section>
+<section aria-labelledby="accuracy-against-closed-form-answers">
+<h2 id="accuracy-against-closed-form-answers">Accuracy against closed-form answers</h2>
+<p>All four run in the normal sciviz CPU tests. Each runs at two resolutions and requires the error to fall by more than three times when the spacing halves (second order gives four), and the fine error to stay below the grid spacing squared.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference, Margo result, Test, "><table>
+<thead><tr><th scope="col">Reference</th><th scope="col">Margo result</th><th scope="col">Test</th><th scope="col"></th></tr></thead>
+<tbody>
+<tr><th scope="row">Beer-Lambert: pre-integrated opacity of constant extinction and linear colour</th><td>alpha within 1/510, colours within 0.0021 of the analytic integral</td><td><code>tests/transfer.test.js</code> "preintegration matches constant optical depth"</td><td></td></tr>
+<tr><th scope="row">Sphere r = 0.7 isosurface, area 4 pi r^2 and volume 4/3 pi r^3</th><td>relative error 0.25 % then 0.062 % (area), 0.47 % then 0.12 % (volume) at 33 and 65 samples per axis</td><td><code>tests/analytic-references.test.js</code></td><td></td></tr>
+<tr><th scope="row">ABC flow streamline (A = sqrt 3, B = sqrt 2, C = 1), against a float64 RK4 of the analytic field</th><td>end-point distance 0.0053 then 0.0013 after one time unit</td><td><code>tests/analytic-references.test.js</code></td><td></td></tr>
+<tr><th scope="row">Isoline of x^2 + y^2 = 0.25</th><td>largest radial error 0.00094 then 0.00024, one closed line</td><td><code>tests/analytic-references.test.js</code></td><td></td></tr>
+</tbody></table></div>
+<p>Rival accuracy rows are not measured: running these references through the rivals needs their own extraction APIs and is listed as open work.</p>
+</section>
+<section aria-labelledby="losses-and-pending-timing">
+<h2 id="losses-and-pending-timing">Losses and pending timing</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Loss, Cause, Plan, "><table>
+<thead><tr><th scope="col">Loss</th><th scope="col">Cause</th><th scope="col">Plan</th><th scope="col"></th></tr></thead>
+<tbody>
+<tr><th scope="row">Volume-64 frame slower than VTK.js 38.0.5 (1.500 against 1.300 ms, busy machine, diagnostic, perf history entry 102, known-bugs)</th><td>The historical scene used unequal sampling and lighting; Margo also does depth capture and composition (above). Two matrix allocations per frame were removed with an exact work-count test</td><td>Quiet rerun of legacy-64 and the isotropic 64 and 128 controls (sciviz-rivals.md (<code>docs/sciviz-rivals.md</code>)); a loss on the like-for-like control is fixed as a bug</td><td></td></tr>
+<tr><th scope="row">Every other scene</th><td>Not timed yet</td><td>Quiet run: <code>--runs=7</code>, every scale, sweeps to the 16.7 ms frame and to failure; every loss lands in this table</td><td></td></tr>
+</tbody></table></div>
+<p>Timing pending the quiet rerun. The quiet run publishes every sample, both minima and the environment, losses included.</p>
+</section>
+<section aria-labelledby="not-found-in-margo-today">
+<h2 id="not-found-in-margo-today">Not found in Margo today</h2>
+<p>MinIP, multi-component and general multi-volume compositing, the threshold, plot-over-line, integrate, resample, warp and connectivity filters, Zarr Blosc and Zstandard, and a SPLOM test. These are listed in docs/known-bugs.md under "Sciviz comparison gaps".</p>
+</section>
+<section aria-labelledby="reproduce">
+<h2 id="reproduce">Reproduce</h2>
+<pre tabindex="0"><code>npm run build:packages
+npm run sciviz:compare -- --runs=1            # smoke: installs the rivals outside the repo, no clock
+npm run sciviz:compare -- --list              # every case and scale
+node --test packages/sciviz/tests/analytic-references.test.js packages/sciviz/tests/transfer.test.js</code></pre>
+<p>The timed run needs the active speed phase (<code>MARGO_SPEED_PHASE=active</code>) and takes the GPU alone; see reproduce.md (<code>docs/whitepaper/reproduce.md</code>).</p>
+</section>
+  </main>
+
+  <footer>
+    <p>Built with precision, named with love. For Margie.</p>
+    <p><a href="../catalog/">Catalog</a></p>
+  </footer>
+</body>
+</html>

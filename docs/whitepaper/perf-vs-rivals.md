@@ -217,3 +217,12 @@ differences and limited oracle scope. No rival timing or speed verdict is claime
 Cause, accepted measurement-contract difference, the like-for-like explicit-size rows
 and exact reproduction commands are in [batch-169.md](batch-169.md). No rival timing
 was run and no speed ratio is claimed.
+
+## Batch 182 volume controls
+
+The historical volume-64 loss is retained. Its anisotropic normalized/world stride and lighting differ. [The clean-room controls](../sciviz-rivals.md) add unshaded isotropic 64/128 cubes, exact repeated images and public GPU API counts. Volume preparation removes two temporary 16-float matrices per frame with exact uniform-byte regression coverage. Fix: this batch 182 volume job commit. Timing pending the quiet rerun; no updated winner is claimed.
+
+
+## Batch 182 sciviz scenes
+
+Eight scenes against six rivals, same data, pixels, camera and colour ([sciviz-vs-rivals](sciviz-vs-rivals.md)). Smoke only: no timing row is published yet. Explicit work differences (Margo volume depth composition, Plotly PNG export on both sides, Cosmograph's own animation loop) are recorded per scene. Timing pending the quiet rerun.

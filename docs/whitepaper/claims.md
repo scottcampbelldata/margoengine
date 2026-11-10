@@ -4741,3 +4741,12 @@ run separately on native WebGPU and WebGL2 compatibility, at 1x/4x and after an
 odd-size resize. Native and ANGLE Vulkan pass; default ANGLE D3D11 varies even
 between unchanged historical-control frames and is not certified byte-stable.
 [Sources and checks](reproduce.md#batch-164-ssao-resolve-work).
+
+## Batch 182 volume allocation claim
+
+VolumeLayer.prepare reuses its existing 80-float uniform storage for inverse/normal matrices, removing two 16-float allocations per call. packages/sciviz/tests/volume-workcount.test.js fails on the parent (8 versus 0 allocations across four prepares), checks identical uniform bytes and restoration. [Rival controls](../sciviz-rivals.md) make no speed or inter-engine pixel-equivalence claim.
+
+
+## Batch 182 sciviz comparison
+
+Every batch 182 scene draws a non-empty image that repeats byte for byte on Margo and on its rival (smoke, `--runs=1`, [results/batch182-smoke.json](results/batch182-smoke.json)). Four closed-form references converge at second order (`packages/sciviz/tests/analytic-references.test.js`, `packages/sciviz/tests/transfer.test.js`). The feature rows cite a test or README section per Margo cell ([sciviz-vs-rivals](sciviz-vs-rivals.md)). No speed claim: timing pending the quiet rerun.

@@ -1,4 +1,4 @@
-// One headless page: Figure.volume and VTK.js 38 take turns on the same 64-cube.
+// One headless page: Figure.volume and external VTK.js take turns on the same generated cube.
 // Public VTK.js API (kitware.github.io/vtk-js, Volume, ImageData, Camera, VolumeMapper):
 // the Volume profile, ImageData scalars, color and opacity transfer functions, sample distance.
 // This file does not read VTK.js source.
@@ -11,7 +11,8 @@ import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
 import vtkVolume from '@kitware/vtk.js/Rendering/Core/Volume';
 import vtkVolumeMapper from '@kitware/vtk.js/Rendering/Core/VolumeMapper';
 import { Figure, colormap } from '@margoengine/sciviz';
-import { BACKGROUND, N, ROUNDS, SIZE, fillVolume, sampleDistance, sceneSpacing } from './rival-data.js';
+import { BACKGROUND, SIZE, fillVolume, sampleDistance, sceneSpacing } from './rival-data.js';
+import { sampleFrame, samePixels } from './rival-contract.js';
 
 const waitStart = () =>
   new Promise((resolve) => {
@@ -49,10 +50,12 @@ const painted = (pixels) => {
   return ink / count;
 };
 
-const imageStats = (pixels) => {
+const imageStats = async (pixels) => {
   let sum = 0;
   for (let i = 0; i < pixels.length; i += 4) sum += pixels[i] + pixels[i + 1] + pixels[i + 2];
-  return { sum, width: SIZE, ink: painted(pixels) };
+  const digest = await crypto.subtle.digest('SHA-256', pixels);
+  const sha256 = [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return { sum, width: SIZE, ink: painted(pixels), sha256 };
 };
 
 const compare = (a, b) => {
@@ -78,13 +81,22 @@ const requireFrame = (name, canvas, pixels) => {
 
 const run = async () => {
   await waitStart();
-  const { data, sum } = fillVolume();
-  const spacing = sceneSpacing();
-  const distance = sampleDistance();
+  const { runs, scene, smoke } = window.__rivalOptions;
+  const legacy = scene === 'legacy-64';
+  const N = scene === 'isotropic-128' ? 128 : 64;
+  const { data, sum } = fillVolume(N);
+  const spacing = legacy ? sceneSpacing() : [2 / (N - 1), 2 / (N - 1), 2 / (N - 1)];
+  // Normalized box stride is 1/(N*quality), hence world stride 2/(N*quality).
+  const distance = legacy ? sampleDistance() : 2 / (N * 1.5);
   const margoCanvas = document.querySelector('#margo');
-  const fig = await Figure.create(margoCanvas, { axes: false, controls: false });
+  const fig = await Figure.create(margoCanvas, {
+    axes: false,
+    controls: false,
+    aspect: legacy ? [1, 1, 0.75] : [1, 1, 1],
+  });
   fig.engine.stop();
-  fig.volume(data, { dims: [N, N, N], range: [0, 1] });
+  fig.volume(data, { dims: [N, N, N], range: [0, 1], shading: legacy });
+  await fig.ready();
 
   const host = document.querySelector('#vtk');
   const full = vtkFullScreenRenderWindow.newInstance({
@@ -100,7 +112,7 @@ const run = async () => {
   // Rows are the I, J, K directions (ImageData docs). Unit axes: data x to world +x,
   // data y to world -z, data z to world +y. Spacing carries the figure's aspect.
   image.setDirection(1, 0, 0, 0, 0, -1, 0, 1, 0);
-  image.setOrigin(-1, -0.75, 1);
+  image.setOrigin(-1, legacy ? -0.75 : -1, 1);
   if (image.computeTransforms) image.computeTransforms();
   const scalars = vtkDataArray.newInstance({ name: 'scalars', values: data, numberOfComponents: 1 });
   image.getPointData().setScalars(scalars);
@@ -114,8 +126,9 @@ const run = async () => {
   const colors = vtkColorTransferFunction.newInstance();
   const opacity = vtkPiecewiseFunction.newInstance();
   const map = colormap('aurora');
-  for (let k = 0; k <= 8; k++) {
-    const t = k / 8;
+  const transferSegments = legacy ? 8 : 255;
+  for (let k = 0; k <= transferSegments; k++) {
+    const t = k / transferSegments;
     const rgb = map.sample(t);
     colors.addRGBPoint(t, rgb[0], rgb[1], rgb[2]);
     opacity.addPoint(t, t * t);
@@ -123,9 +136,9 @@ const run = async () => {
   const property = actor.getProperty();
   property.setRGBTransferFunction(0, colors);
   property.setScalarOpacity(0, opacity);
-  property.setScalarOpacityUnitDistance(0, (spacing[0] + spacing[1] + spacing[2]) / 3);
+  property.setScalarOpacityUnitDistance(0, legacy ? (spacing[0] + spacing[1] + spacing[2]) / 3 : 2 / N);
   property.setInterpolationTypeToLinear();
-  property.setShade(true);
+  property.setShade(legacy);
   renderer.addVolume(actor);
   const camera = renderer.getActiveCamera();
   camera.setPositionAndFocalPoint([2.6, 1.7, 2.9], [0, 0, 0]);
@@ -137,28 +150,39 @@ const run = async () => {
   const vtkCanvas = host.querySelector('canvas');
   if (!vtkCanvas) throw new Error('VTK.js render window has no canvas');
 
-  const frameMargo = async () => {
-    const t0 = performance.now();
-    fig.render();
-    const pixels = requireFrame('margo', margoCanvas, await readPixels(margoCanvas));
-    return { pixels, ms: performance.now() - t0 };
-  };
-  const frameVtk = async () => {
-    const t0 = performance.now();
-    renderWindow.render();
-    const pixels = requireFrame('vtk', vtkCanvas, await readPixels(vtkCanvas));
-    return { pixels, ms: performance.now() - t0 };
-  };
+  const frameMargo = () =>
+    sampleFrame(
+      smoke,
+      async () => {
+        fig.render();
+        return requireFrame('margo', margoCanvas, await readPixels(margoCanvas));
+      },
+      window.__rivalCounts,
+    );
+  const frameVtk = () =>
+    sampleFrame(
+      smoke,
+      async () => {
+        renderWindow.render();
+        return requireFrame('vtk', vtkCanvas, await readPixels(vtkCanvas));
+      },
+      window.__rivalCounts,
+    );
 
+  let warmA;
+  let warmB;
   for (let i = 0; i < 2; i++) {
-    await frameMargo();
-    await frameVtk();
+    warmA = await frameMargo();
+    warmB = await frameVtk();
   }
+  if (!smoke) window.__stopRivalCounters();
   const roundsA = [];
   const roundsB = [];
   let lastA;
   let lastB;
-  for (let i = 0; i < ROUNDS; i++) {
+  const workA = [];
+  const workB = [];
+  for (let i = 0; i < runs; i++) {
     if (i % 2 === 0) {
       lastA = await frameMargo();
       roundsA.push(lastA.ms);
@@ -170,23 +194,48 @@ const run = async () => {
       lastA = await frameMargo();
       roundsA.push(lastA.ms);
     }
+    workA.push(lastA.work);
+    workB.push(lastB.work);
   }
+  samePixels(lastA.pixels, (await frameMargo()).pixels);
+  samePixels(lastB.pixels, (await frameVtk()).pixels);
   const delta = compare(lastA.pixels, lastB.pixels);
   window.__rival = {
+    scene,
+    smoke,
+    runs,
     sum,
+    repeatIdentical: true,
+    workA: smoke ? workA : [warmA.work],
+    workB: smoke ? workB : [warmB.work],
+    workMeasurement: smoke ? 'smoke frames' : 'last untimed warmup; counters removed before timing',
+    workload: {
+      dimensions: [N, N, N],
+      pixels: SIZE * SIZE,
+      shading: legacy,
+      quality: 1.5,
+      transferPoints: transferSegments + 1,
+      worldStride: distance,
+      differences: legacy
+        ? ['anisotropic stride differs by ray direction', 'lighting models differ']
+        : [
+            'half-float versus float scalar storage',
+            'jitter and boundary interpolation',
+            'transfer filtering and output encoding',
+          ],
+    },
     bounds: image.getBounds(),
     sampleDistance: distance,
     spacing,
-    margo: imageStats(lastA.pixels),
-    vtk: imageStats(lastB.pixels),
+    margo: await imageStats(lastA.pixels),
+    vtk: await imageStats(lastB.pixels),
     delta,
-    minA: Math.min(...roundsA),
-    minB: Math.min(...roundsB),
-    roundsA,
-    roundsB,
+    ...(smoke ? {} : { minA: Math.min(...roundsA), minB: Math.min(...roundsB), roundsA, roundsB }),
   };
-  fig.dispose();
-  full.delete();
+  window.__disposeRival = () => {
+    fig.dispose();
+    full.delete();
+  };
 };
 
 run().catch((error) => {

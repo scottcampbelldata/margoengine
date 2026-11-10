@@ -1,0 +1,1593 @@
+{
+  "schema": "margo-sciviz-compare-smoke/1",
+  "note": "Smoke, --runs=1: no clock read, no timing. Image differences are observations, not pass marks.",
+  "commit": "fb8ac941da7a6aaee731e85a02b0ef46d4f5df58",
+  "dirty": true,
+  "machine": {
+    "platform": "win32",
+    "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
+    "cpuLoadFraction": 0.4282782458627823,
+    "driver": "NVIDIA RTX A6000, 617.42"
+  },
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "versions": {
+    "vtk": "38.0.5",
+    "plotly": "4.2.0",
+    "deck": "9.4.1",
+    "echarts": "2.1.0",
+    "regl": "1.16.0",
+    "cosmograph": "2.5.1"
+  },
+  "cases": [
+    {
+      "id": "volume",
+      "rival": "vtk",
+      "scale": 64,
+      "source": "/examples/assets/sciviz/head.nrrd",
+      "inputs": {
+        "sourceDims": [
+          88,
+          128,
+          128
+        ],
+        "resampling": "shared nearest-neighbor cube",
+        "values": 262144,
+        "edges": null
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 0.3394521077473958,
+          "maximum": 57,
+          "far8": 0.0082244873046875,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 6278,
+        "rivalInk": 6488,
+        "margoSHA256": "db852611482273027d8bf6636f3942bbfd85e12c9c9efdc084cb9ec2f24b0d93",
+        "rivalSHA256": "3f64cc96d8bb36145caa82ab11c7f135a6de7a75949816d52f472281da682f68"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 1,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 3,
+          "webgpu.beginRenderPass": 9,
+          "webgpu.setBindGroup": 8,
+          "webgpu.draw": 5,
+          "webgpu.submit": 1,
+          "webgl2.texImage2D": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawArrays": 0,
+          "webgl2.texSubImage3D": 0,
+          "webgl2.bufferData": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.texImage2D": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawArrays": 1,
+          "webgl2.texSubImage3D": 0,
+          "webgl2.bufferData": 0
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.texImage2D": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawArrays": 0,
+          "webgl2.texSubImage3D": 0,
+          "webgl2.bufferData": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 525632,
+          "jsDataBytes": 1050048,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "voxels": 262144,
+            "cells": 250047
+          },
+          "layers": [
+            {
+              "gpuBytes": 525632,
+              "jsDataBytes": 1050048,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "C",
+              "counts": {
+                "voxels": 262144,
+                "cells": 250047
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "vertices": 0,
+          "triangles": 0,
+          "lines": 0,
+          "reason": "No public live GPU allocation inventory; mesh counts use public output APIs"
+        }
+      },
+      "cpuLoadFraction": 0.4282782458627823
+    },
+    {
+      "id": "isosurface",
+      "rival": "vtk",
+      "scale": 32,
+      "source": "/examples/assets/sciviz/head.nrrd",
+      "inputs": {
+        "sourceDims": [
+          88,
+          128,
+          128
+        ],
+        "resampling": "shared nearest-neighbor cube",
+        "values": 32768,
+        "edges": null
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 2.603520711263021,
+          "maximum": 227,
+          "far8": 0.0431671142578125,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 1141,
+        "rivalInk": 2020,
+        "margoSHA256": "5f740e7effb4b8b30f0dfdf6cf840feec0842c5b83037c9d425a99d54281c334",
+        "rivalSHA256": "099bbe7c648332074bc43426008084112cf3edc548991b990295aa12bce05a09"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 3,
+          "webgpu.submit": 1,
+          "webgpu.createTexture": 0,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawElements": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.submit": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawElements": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.submit": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawElements": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 374928,
+          "jsDataBytes": 131280,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "voxels": 32768,
+            "cells": 29791
+          },
+          "layers": [
+            {
+              "gpuBytes": 374928,
+              "jsDataBytes": 131280,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "V",
+              "counts": {
+                "voxels": 32768,
+                "cells": 29791
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "vertices": 1522,
+          "triangles": 2368,
+          "lines": 0,
+          "reason": "No public live GPU allocation inventory; mesh counts use public output APIs"
+        }
+      },
+      "cpuLoadFraction": 0.881576766403303
+    },
+    {
+      "id": "scatter",
+      "rival": "plotly",
+      "scale": 1024,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 0,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "PNG export and decode on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 1.257080078125,
+          "maximum": 133,
+          "far8": 0.03326416015625,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 2224,
+        "rivalInk": 1992,
+        "margoSHA256": "0524f36dad863c534e969680baa1bbe967c59c809413328cf04dff36d9e14272",
+        "rivalSHA256": "da820d5dcda2d44e63ba319907e972aa3e43645607f57707573dbecf1365b96a"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 1,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 2,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.texSubImage2D": 0,
+          "webgl1.useProgram": 0,
+          "webgl1.drawArrays": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.texImage2D": 3,
+          "webgl1.bufferData": 15,
+          "webgl1.texSubImage2D": 6,
+          "webgl1.useProgram": 1,
+          "webgl1.drawArrays": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.texSubImage2D": 0,
+          "webgl1.useProgram": 0,
+          "webgl1.drawArrays": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 16608,
+          "jsDataBytes": 21088,
+          "jsArrayBytesEstimate": 16,
+          "counts": {
+            "points": 1024
+          },
+          "layers": [
+            {
+              "gpuBytes": 16608,
+              "jsDataBytes": 21088,
+              "jsArrayBytesEstimate": 16,
+              "id": 1,
+              "name": "scatter",
+              "counts": {
+                "points": 1024
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.8770331608467906
+    },
+    {
+      "id": "scatter",
+      "rival": "deck",
+      "scale": 1024,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 0,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 0.9737040201822916,
+          "maximum": 70,
+          "far8": 0.033233642578125,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 2224,
+        "rivalInk": 2150,
+        "margoSHA256": "0524f36dad863c534e969680baa1bbe967c59c809413328cf04dff36d9e14272",
+        "rivalSHA256": "65ec980892f2e13bc360a2b43e359bd0fe2cca7ff697cd83f20fc490b1f4d5a0"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 1,
+          "webgl2.bufferData": 0,
+          "webgl2.bufferSubData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawArraysInstanced": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.bufferSubData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawArraysInstanced": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.bufferSubData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawArraysInstanced": 1
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 16608,
+          "jsDataBytes": 21088,
+          "jsArrayBytesEstimate": 16,
+          "counts": {
+            "points": 1024
+          },
+          "layers": [
+            {
+              "gpuBytes": 16608,
+              "jsDataBytes": 21088,
+              "jsArrayBytesEstimate": 16,
+              "id": 1,
+              "name": "scatter",
+              "counts": {
+                "points": 1024
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.7991972808793752
+    },
+    {
+      "id": "scatter",
+      "rival": "echarts",
+      "scale": 1024,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 0,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 1.3375498453776042,
+          "maximum": 173,
+          "far8": 0.041473388671875,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 2224,
+        "rivalInk": 2946,
+        "margoSHA256": "0524f36dad863c534e969680baa1bbe967c59c809413328cf04dff36d9e14272",
+        "rivalSHA256": "835a9a9158fa07817a8f3d2aa135febe13c81cdd7eb445f5406ca3b9d8d706b4"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 1,
+          "webgl1.useProgram": 0,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.drawArrays": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.useProgram": 1,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.drawArrays": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.useProgram": 0,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.drawArrays": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 16608,
+          "jsDataBytes": 21088,
+          "jsArrayBytesEstimate": 16,
+          "counts": {
+            "points": 1024
+          },
+          "layers": [
+            {
+              "gpuBytes": 16608,
+              "jsDataBytes": 21088,
+              "jsArrayBytesEstimate": 16,
+              "id": 1,
+              "name": "scatter",
+              "counts": {
+                "points": 1024
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.5356695869837297
+    },
+    {
+      "id": "scatter",
+      "rival": "regl",
+      "scale": 1024,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 0,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 1.1544901529947917,
+          "maximum": 165,
+          "far8": 0.03326416015625,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 2224,
+        "rivalInk": 1799,
+        "margoSHA256": "0524f36dad863c534e969680baa1bbe967c59c809413328cf04dff36d9e14272",
+        "rivalSHA256": "55a5e82b21998f94a729dd6b67b4939eafb0d63cf5f77ece4ad59527514eff2a"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 1,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.useProgram": 0,
+          "webgl1.drawArrays": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.useProgram": 2,
+          "webgl1.drawArrays": 2
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.useProgram": 0,
+          "webgl1.drawArrays": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 16608,
+          "jsDataBytes": 21088,
+          "jsArrayBytesEstimate": 16,
+          "counts": {
+            "points": 1024
+          },
+          "layers": [
+            {
+              "gpuBytes": 16608,
+              "jsDataBytes": 21088,
+              "jsArrayBytesEstimate": 16,
+              "id": 1,
+              "name": "scatter",
+              "counts": {
+                "points": 1024
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.515713458268717
+    },
+    {
+      "id": "line",
+      "rival": "plotly",
+      "scale": 1024,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 0,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "PNG export and decode on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 1.0332845052083333,
+          "maximum": 142,
+          "far8": 0.0450286865234375,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 6717,
+        "rivalInk": 6256,
+        "margoSHA256": "29016a8bdced21cdc30ccd3725882dfd943670edcc223be149c968330b2b0b6a",
+        "rivalSHA256": "4ea87ee839f32544b8451e408f5c257e2d014f6de99d223b76edd0ffe3c5c791"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 1,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 2,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.useProgram": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.texImage2D": 5,
+          "webgl1.bufferData": 11,
+          "webgl1.useProgram": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.texImage2D": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.useProgram": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 16624,
+          "jsDataBytes": 29248,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "points": 1024,
+            "edges": 1023
+          },
+          "layers": [
+            {
+              "gpuBytes": 16624,
+              "jsDataBytes": 29248,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "line",
+              "counts": {
+                "points": 1024,
+                "edges": 1023
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.6451609147221834
+    },
+    {
+      "id": "line",
+      "rival": "echarts",
+      "scale": 1024,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 0,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 1.809661865234375,
+          "maximum": 160,
+          "far8": 0.0605926513671875,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 6717,
+        "rivalInk": 6831,
+        "margoSHA256": "29016a8bdced21cdc30ccd3725882dfd943670edcc223be149c968330b2b0b6a",
+        "rivalSHA256": "60ec7d9150dcbbab973da96325f321335ea035bcac1a40901f615d61f89b53ba"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 1,
+          "webgl1.useProgram": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.drawArrays": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.useProgram": 1,
+          "webgl1.bufferData": 0,
+          "webgl1.drawArrays": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl1.useProgram": 0,
+          "webgl1.bufferData": 0,
+          "webgl1.drawArrays": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 16624,
+          "jsDataBytes": 29248,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "points": 1024,
+            "edges": 1023
+          },
+          "layers": [
+            {
+              "gpuBytes": 16624,
+              "jsDataBytes": 29248,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "line",
+              "counts": {
+                "points": 1024,
+                "edges": 1023
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.7941611860275002
+    },
+    {
+      "id": "heatmap",
+      "rival": "plotly",
+      "scale": 32,
+      "source": "/examples/assets/sciviz/limits/taxi.csv",
+      "inputs": {
+        "sourceRows": 1024,
+        "replicated": false,
+        "points": 1024,
+        "values": 1024,
+        "edges": null,
+        "coordinates": {
+          "x": [
+            0,
+            32.9
+          ],
+          "y": [
+            -3.8,
+            160.3
+          ],
+          "normalized": [
+            -1,
+            1
+          ]
+        }
+      },
+      "operation": "PNG export and decode on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 0.008138020833333334,
+          "maximum": 4,
+          "far8": 0,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 65536,
+        "rivalInk": 65536,
+        "margoSHA256": "102176545cd4a93f6bebdab9f53ea2ce5be4c2d237228008ee5e149e0e85635a",
+        "rivalSHA256": "519aa3f7bf4853e52923f2cd7bef0ae34c0cd8581ea933b2e894d921494007a5"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 1,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.createTexture": 0,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 2
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 20560,
+          "jsDataBytes": 24720,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "cells": 1024
+          },
+          "layers": [
+            {
+              "gpuBytes": 20560,
+              "jsDataBytes": 24720,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "heatmap",
+              "counts": {
+                "cells": 1024
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.7036262925623471
+    },
+    {
+      "id": "streamlines",
+      "rival": "vtk",
+      "scale": 8,
+      "source": "/examples/assets/sciviz/wind.bin",
+      "inputs": {
+        "edges": null
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 4.459554036458333,
+          "maximum": 210,
+          "far8": 0.150604248046875,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 17930,
+        "rivalInk": 18174,
+        "margoSHA256": "1be3859d213a5ae877286d6430e32972a075a9e4c7a97183c3af61e3c38222cd",
+        "rivalSHA256": "293d19c1ee3d285811a19728ca8c2d97440d11de24a7d11ad656b38e3c6ac002"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 2,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 1,
+          "webgpu.submit": 1,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawElements": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawElements": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.drawElements": 0
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 1086512,
+          "jsDataBytes": 2444688,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "points": 67892,
+            "edges": 33946
+          },
+          "layers": [
+            {
+              "gpuBytes": 1086512,
+              "jsDataBytes": 2444688,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "line",
+              "counts": {
+                "points": 67892,
+                "edges": 33946
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "vertices": 34010,
+          "triangles": 0,
+          "lines": 64,
+          "reason": "No public live GPU allocation inventory; mesh counts use public output APIs"
+        }
+      },
+      "cpuLoadFraction": 0.5054179818424392
+    },
+    {
+      "id": "graph",
+      "rival": "cosmograph",
+      "scale": 1,
+      "source": "/packages/sciviz/tests/fixtures/graph-gpu/openalex.json",
+      "inputs": {
+        "copies": 1,
+        "sourceNodes": 80,
+        "edges": 109
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 23.06304423014323,
+          "maximum": 210,
+          "far8": 0.34912109375,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 23049,
+        "rivalInk": 19628,
+        "margoSHA256": "9002d2e5a1cd1b441577a27bf036f1ba257e38cac45a55c63a5cf783a9d81876",
+        "rivalSHA256": "c866786bcd652827c53148ad1e18b7364197d96a035fa5eaa0e060667be481b5"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 3,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 2,
+          "webgpu.draw": 2,
+          "webgpu.submit": 1,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.bufferSubData": 5,
+          "webgl2.useProgram": 3,
+          "webgl2.drawArraysInstanced": 1,
+          "webgl2.drawElements": 1,
+          "webgl2.drawArrays": 1
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.bufferSubData": 5,
+          "webgl2.useProgram": 3,
+          "webgl2.drawArraysInstanced": 1,
+          "webgl2.drawElements": 1,
+          "webgl2.drawArrays": 1
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.bufferSubData": 10,
+          "webgl2.useProgram": 6,
+          "webgl2.drawArraysInstanced": 2,
+          "webgl2.drawElements": 2,
+          "webgl2.drawArrays": 2
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 3296,
+          "jsDataBytes": 2328,
+          "jsArrayBytesEstimate": 0,
+          "counts": {
+            "points": 80,
+            "edges": 109
+          },
+          "layers": [
+            {
+              "gpuBytes": 3296,
+              "jsDataBytes": 2328,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "f",
+              "counts": {
+                "points": 80,
+                "edges": 109
+              },
+              "inventoryAvailable": true
+            }
+          ],
+          "unreportedLayers": 0
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "stats": {
+            "pointsCount": 80,
+            "linksCount": 109,
+            "pointsSummary": [
+              {
+                "column_name": "id",
+                "column_type": "VARCHAR",
+                "min": "0",
+                "max": "9",
+                "approx_unique": 77,
+                "avg": null,
+                "std": null,
+                "q25": null,
+                "q50": null,
+                "q75": null,
+                "count": 80,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "x",
+                "column_type": "DOUBLE",
+                "min": "-0.8999999761581421",
+                "max": "0.8999999761581421",
+                "approx_unique": 44,
+                "avg": "0.0",
+                "std": "0.6404112651414949",
+                "q25": "-0.6363961100578308",
+                "q50": "-5.551115123125783e-17",
+                "q75": "0.6363961100578308",
+                "count": 80,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "y",
+                "column_type": "DOUBLE",
+                "min": "-0.8999999761581421",
+                "max": "0.8999999761581421",
+                "approx_unique": 42,
+                "avg": "0.0",
+                "std": "0.6404112651414952",
+                "q25": "-0.6363961100578308",
+                "q50": "0.0",
+                "q75": "0.6363961100578308",
+                "count": 80,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "idx",
+                "column_type": "BIGINT",
+                "min": "0",
+                "max": "79",
+                "approx_unique": 77,
+                "avg": "39.5",
+                "std": "23.2379000772445",
+                "q25": "20",
+                "q50": "40",
+                "q75": "60",
+                "count": 80,
+                "null_percentage": 0
+              }
+            ],
+            "linksSummary": [
+              {
+                "column_name": "rowid",
+                "column_type": "BIGINT",
+                "min": "0",
+                "max": "108",
+                "approx_unique": 107,
+                "avg": "54.0",
+                "std": "31.609597698589372",
+                "q25": "27",
+                "q50": "54",
+                "q75": "81",
+                "count": 109,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "source",
+                "column_type": "VARCHAR",
+                "min": "11",
+                "max": "9",
+                "approx_unique": 39,
+                "avg": null,
+                "std": null,
+                "q25": null,
+                "q50": null,
+                "q75": null,
+                "count": 109,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "target",
+                "column_type": "VARCHAR",
+                "min": "0",
+                "max": "9",
+                "approx_unique": 30,
+                "avg": null,
+                "std": null,
+                "q25": null,
+                "q50": null,
+                "q75": null,
+                "count": 109,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "sourceidx",
+                "column_type": "BIGINT",
+                "min": "4",
+                "max": "76",
+                "approx_unique": 38,
+                "avg": "38.91743119266055",
+                "std": "20.621423793377005",
+                "q25": "23",
+                "q50": "39",
+                "q75": "53",
+                "count": 109,
+                "null_percentage": 0
+              },
+              {
+                "column_name": "targetidx",
+                "column_type": "BIGINT",
+                "min": "0",
+                "max": "77",
+                "approx_unique": 32,
+                "avg": "19.678899082568808",
+                "std": "22.039056549488976",
+                "q25": "3",
+                "q50": "5",
+                "q75": "35",
+                "count": 109,
+                "null_percentage": 0
+              }
+            ]
+          },
+          "cameraCorners": [
+            -1,
+            -1,
+            1,
+            1
+          ],
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.5385712624045743
+    },
+    {
+      "id": "tiles",
+      "rival": "deck",
+      "scale": 1,
+      "source": "/examples/assets/sciviz/geo-lod/{z}-{x}-{y}.png",
+      "inputs": {
+        "edges": null
+      },
+      "operation": "render and RGBA canvas copy on both sides",
+      "image": {
+        "width": 256,
+        "height": 256,
+        "difference": {
+          "pixels": 65536,
+          "mean": 4.7098134358723955,
+          "maximum": 72,
+          "far8": 0.233001708984375,
+          "identical": false
+        },
+        "stable": {
+          "a": true,
+          "b": true
+        },
+        "margoInk": 65536,
+        "rivalInk": 65536,
+        "margoSHA256": "d7ec1853857b8b40d9e2dca6607da2afbe174b72a24bbd1bdf394cbcf9c670e2",
+        "rivalSHA256": "430f5c8a0129f18ff066d5514fb2b50f5106a5b70935da83f5bc9f6ea5763e76"
+      },
+      "work": {
+        "margo": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 6,
+          "webgpu.beginRenderPass": 3,
+          "webgpu.setBindGroup": 5,
+          "webgpu.draw": 4,
+          "webgpu.submit": 1,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.bufferSubData": 0,
+          "webgl2.drawElements": 0
+        },
+        "rival": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.bufferSubData": 0,
+          "webgl2.drawElements": 4
+        },
+        "idleTwoAnimationFrames": {
+          "webgpu.createBuffer": 0,
+          "webgpu.createBindGroup": 0,
+          "webgpu.createTexture": 0,
+          "webgpu.writeTexture": 0,
+          "webgpu.writeBuffer": 0,
+          "webgpu.beginRenderPass": 0,
+          "webgpu.setBindGroup": 0,
+          "webgpu.draw": 0,
+          "webgpu.submit": 0,
+          "webgl2.texSubImage2D": 0,
+          "webgl2.bufferData": 0,
+          "webgl2.useProgram": 0,
+          "webgl2.bufferSubData": 0,
+          "webgl2.drawElements": 4
+        }
+      },
+      "memory": {
+        "margo": {
+          "gpuBytes": 0,
+          "jsDataBytes": 0,
+          "jsArrayBytesEstimate": 0,
+          "counts": {},
+          "layers": [
+            {
+              "gpuBytes": 0,
+              "jsDataBytes": 0,
+              "jsArrayBytesEstimate": 0,
+              "id": 1,
+              "name": "g",
+              "counts": {},
+              "inventoryAvailable": false
+            }
+          ],
+          "unreportedLayers": 1
+        },
+        "rival": {
+          "gpuBytes": null,
+          "jsDataBytes": null,
+          "reason": "No public live allocation inventory"
+        }
+      },
+      "cpuLoadFraction": 0.5509892492546753
+    }
+  ]
+}

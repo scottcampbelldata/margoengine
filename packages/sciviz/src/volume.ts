@@ -390,6 +390,8 @@ export class VolumeLayer implements Drawable {
   #group: GPUBindGroup | undefined;
   readonly #opacity: VolumeLayerOptions['opacity'];
   readonly #values = new Float32Array(80);
+  readonly #toBox = this.#values.subarray(16, 32);
+  readonly #normal = this.#values.subarray(32, 48);
   #classification: VolumeClassification | undefined;
   #table = new Uint8Array(0);
   #model = new Float32Array(16);
@@ -717,14 +719,14 @@ export class VolumeLayer implements Drawable {
     const v = this.#values,
       m = this.#model;
     v.set(m, 0);
-    const toBox = new Float32Array(16);
+    const toBox = this.#toBox;
+    toBox.fill(0);
     invertMatrix(m, toBox);
-    v.set(toBox, 16);
     // Normals: inverse transpose of the box-to-scene linear part.
-    const n = new Float32Array(16);
+    const n = this.#normal;
+    n.fill(0);
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) n[c * 4 + r] = toBox[r * 4 + c];
     n[15] = 1;
-    v.set(n, 32);
     v.set([this.dims[0], this.dims[1], this.dims[2], this.#clip.length], 48);
     v.set(
       [

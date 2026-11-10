@@ -459,3 +459,12 @@ Batch 137 Basis encoder: quiet-machine encoder throughput, first-call/load cost 
 - Batch 169 job 1 ui: time the five `scripts/bp-169-ui-oracle.mjs` cases against external Yoga 3.2.1 tonight; include rectangle application and distinguish initial/unchanged/edited layouts. Deterministic nested leaf callbacks reduced 24 to 2 with exact layout bytes; values-only oracle passes. No wall-clock result yet. Remaining jobs text, mesh-edit, splines, terrain, wfc and procedural stay open.
 
 - Batch 169 job 2 text: time the unchanged layout fixtures and Canvas/Troika oracle work after the quiet window opens; logical pair calls 1198 to 599 and prefix advances 35 to 18, identical bytes. Do not compare complete rival SDF generation to pure Margo layout.
+
+## Batch 182 volume quiet rerun
+
+Build-ready controls and external-install commands: [sciviz-rivals](../sciviz-rivals.md). Preserve legacy-64, isotropic-64 and isotropic-128, every image, sample and GPU count. Smoke uses --runs=1 with no elapsed times. Quiet run uses active speed phase, exclusive GPU access and --runs=7; historical loss remains open.
+
+
+## Batch 182 sciviz comparison quiet run
+
+`MARGO_SPEED_PHASE=active npm run sciviz:compare -- --runs=7` on the quiet machine: all 12 cases at every scale (volume 64 to 512, isosurface 32 to 256, scatter 1,024 to 16,777,216 points on four rivals, line to 1,048,576, heatmap to 1,024 per axis, streamlines 8 to 512 seeds, graph 1 to 256 copies, tiles zoom 1 to 6). Record load to first frame, per-round minima, the scale where a frame passes 16.7 ms and the first failure, memory and image differences. Publish every sample and loss in sciviz-vs-rivals.md and the losses table.

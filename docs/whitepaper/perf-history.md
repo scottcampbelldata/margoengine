@@ -3379,3 +3379,12 @@ and do not replace steady-state timing attribution. No speed verdict changed; ba
 - Not done: morph weights still go up per primitive (a span would need a staging copy for custom writers, which must
   keep receiving the caller's own weight views); listed in finish-later.
 - Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-mixer,p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).
+
+## Batch 182 volume harness and preparation work count (2026-11-10)
+
+The [volume comparison](../sciviz-rivals.md) adds --runs=1 without clocks, full 64/128 isotropic controls, repeat-byte checks and API counts. The parent performs eight float-matrix allocations across four prepares; the new implementation performs zero with byte-identical uniform values, including singular transforms and restoration. GPU scene/depth work is retained and documented. No elapsed-time result; timing pending the quiet rerun.
+
+
+## Batch 182 sciviz rival harness (2026-11-10)
+
+`npm run sciviz:compare` covers volume, isosurface, scatter, line, heatmap, streamlines, graph and tiles against VTK.js 38.0.5, Plotly.js 4.2.0, deck.gl 9.4.1, ECharts-GL 2.1.0, regl-scatterplot 1.16.0 and Cosmograph 2.5.1, installed outside the repository. The smoke records image differences, repeat equality and public API counts only ([sciviz-vs-rivals](sciviz-vs-rivals.md)). No elapsed-time result; timing pending the quiet rerun.

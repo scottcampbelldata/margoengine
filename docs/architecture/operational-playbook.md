@@ -2465,6 +2465,11 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 182 volume: [clean-room controls](../sciviz-rivals.md) expose public GPU counts and exact repeated frames without smoke timing. The allocation regression removes two transient matrices per prepare with identical uniform bytes, including singular transforms and restoration. Scene-depth capture and multisample composition remain supported and counted; equal shader work and quiet rival timing remain unproven.
+
+Batch 182 comparison: [sciviz-vs-rivals](../whitepaper/sciviz-vs-rivals.md) adds eight black-box rival scenes with exact repeat checks and API counts, and closed-form accuracy references (sphere isosurface, ABC streamline, isoline, pre-integrated Beer-Lambert) with second-order convergence. Rival timing and rival accuracy rows remain unproven until the quiet run.
+
+
 ### Batch 175 job 4: original time series and spectral units
 
 The optional series entry shares the existing Arrow/Parquet scalar decoders, retaining only format state between progressive batches. Exact scientific selection visits owned binary64 observations, independently of the line display reduction. M4 raster checks include independent integer-column pixel coverage and viewport neighbours. FFT/STFT use compute/fft; normalization before f32 upload and binary64 PSD readback preserves tiny GWOSC strain power. CPU analytic tones, original-data format equivalence and two-backend real-data render/selection/cancellation/resize checks are in series.test.js and series-browser.mjs. Fractional antialiasing is outside M4's pixel model, all loaded original observations remain resident for exact selection, and throughput timing remains owed in speed-phase.md. No core or stage rendering changes. See docs/sciviz-series.md for sources, limits and evidence.

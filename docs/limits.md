@@ -6672,3 +6672,10 @@ width constraints require two callbacks, versus Yoga 3.2.1's one; fully explicit
 grow/shrink fixtures require zero callbacks on either side and yield equal
 rectangles. [Evidence and reproducible scope](whitepaper/batch-169.md). No cross-call
 cache, competitive timing result or full CSS/Yoga conformance is claimed.
+
+## Batch 182 volume comparison limits
+
+The [volume controls](sciviz-rivals.md) record full 64/128 cubes at 256 x 256. The historical shaded anisotropic row differs in step and lighting. Isotropic controls share inputs and nominal integration distance but retain half-float/float storage, jitter, interpolation and output differences. Margo retains opaque-depth capture/composition work. Exact repeated frames are required independently; cross-engine image differences are reported, not asserted equivalent. Timing pending the quiet rerun.
+
+
+The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)) draws every scene at 256 x 256. Rows past a source table repeat its rows and are labelled replicated; the volume scenes share one nearest-neighbour resample of the MRI head. Image differences are observations, never pass marks. Cosmograph keeps its own animation loop, which also runs during Margo's samples. The analytic references converge at second order (sphere area error 0.062 %, volume 0.12 %, ABC streamline 0.0013, isoline 0.00024 at 65 samples per axis). Timing pending the quiet rerun.

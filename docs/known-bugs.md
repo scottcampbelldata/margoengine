@@ -2152,6 +2152,22 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   symptom.
 
 
+## Sciviz comparison gaps
+
+Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)). Each is a missing
+feature that a web rival or desktop tool documents, with no export, README section or test in `@margoengine/sciviz`.
+Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
+
+- **No MinIP volume mode.** VTK.js documents minimum intensity projection; sciviz volumes offer composite and MIP.
+- **No multi-component or general multi-volume compositing.** Label maps fuse over one scalar volume only.
+- **Missing grid filters:** threshold, plot over line, integrate, resample, warp and connectivity are not in the
+  batch 172 pipeline.
+- **Zarr Blosc and Zstandard codecs are refused** (README "Medical and array formats").
+- **SPLOM has no test.** `scatterMatrix` in `src/parcoords.ts` is exported without a test of its own.
+- **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
+- **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
+  for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.
+
 ## Performance losses still open
 
 Measured but not fixed. Their history, sources and rerun commands are in
@@ -2170,8 +2186,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   1.300 ms, one 256 x 256 frame plus the pixel read, paired turns, per-round minimum, busy machine, diagnostic. The
   rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). Mean absolute channel difference of the last pair is 1.801.
   Repro: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`
-  after the sciviz build. The rival is installed outside the repository. Cause not yet found. Publishing the number
-  does not close it.
+  after the sciviz build and only in the active quiet speed phase. The rival stays outside the repository.
+  Batch 182 diagnoses unequal anisotropic stepping/lighting and extra Margo depth/capture work; its separate
+  isotropic controls record full workloads. Two per-frame matrix allocations are removed with exact uniform-byte
+  regression coverage. The elapsed-time loss remains open; [controls and reproduction](sciviz-rivals.md).
 - **A degree-3 cloud of 1,692,538 splats does not attach** (`@margoengine/splats`, perf history entry 103): the
   published truck at iteration 7,000. SH is 16 coefficients per channel as float32 (192 bytes a splat, about 310 MiB).
   `Splats.attach` refuses that buffer because the device's `maxStorageBufferBindingSize` stays at the WebGPU minimum

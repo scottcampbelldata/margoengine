@@ -4046,3 +4046,12 @@ After building packages, run node scripts/parity-task-profile.mjs for one comple
 operation of each of eight CPU-only catalog tasks. It writes function-sample counts
 and outputs, with no elapsed metrics. [Commands, limits and remaining matrix
 failures](parity-diagnoses.md). The historical speed ledger is unchanged.
+
+## Batch 182 volume comparison
+
+Follow [the complete external-install and three-scene commands](../sciviz-rivals.md). --runs=1 records no elapsed times. Quiet runs require the active speed phase and exclusive GPU access; retain images and every sample. The allocation/byte oracle is packages/sciviz/tests/volume-workcount.test.js.
+
+
+## Batch 182 sciviz comparison
+
+`npm run build:packages`, then `npm run sciviz:compare -- --runs=1` (installs the six rivals under engine-bench/batch-182 if missing; no clock). `--list` prints every case and scale, `--cases=volume/vtk,graph/cosmograph` picks cases, `--output=` moves the records (default test-results/bp-182/compare). The timed run needs `MARGO_SPEED_PHASE=active` and `--runs=7`, takes the GPU alone and walks every scale. Accuracy: `node --test packages/sciviz/tests/analytic-references.test.js`.

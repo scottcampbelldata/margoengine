@@ -127,6 +127,7 @@
     "packages/react-kit"
   ],
   "scripts": {
+    "sciviz:compare": "node scripts/sciviz-compare.mjs",
     "catalog": "node scripts/serve-catalog.js",
     "dev:examples": "node scripts/dev-examples.mjs",
     "dev:sandbox": "vite examples/gameplay-sandbox",

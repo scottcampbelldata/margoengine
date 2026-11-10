@@ -464,3 +464,7 @@ Rows 12.1 and 12.3 (`p-mixer`) stay slower until the quiet rerun. Each uploaded 
 every frame and each palette of a model went up alone. The palettes of an Animation now share one array and swap with
 the cached copy (0 copies over 30 frames on a real GPU queue, 60 before), and one write uploads a RobotExpressive
 copy's bones (2 before), the same bytes; perf-history "Batch 161 job 3". Timing pending the quiet rerun.
+
+## Batch 182 scientific volume scope
+
+[VTK.js controls](../sciviz-rivals.md) retain the historical loss and document its sampling/lighting mismatch. Work-count proof removes two matrix allocations per VolumeLayer.prepare with identical uniform bytes. This is a VTK.js row, not a three.js comparison. Timing pending the quiet rerun; no new speed result.

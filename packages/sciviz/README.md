@@ -1212,3 +1212,78 @@ console.log(tube.positions.length / 3, ribbon.indices.length / 3, layer.triangle
 [North Atlantic wind paths](../../examples/sciviz-tubes.html) shows tubes and ribbons on the same frozen
 public-domain NOAA daily mean winds as the wind and LIC pages. Radius and colour encode measured speed;
 the horizontal field has zero streamwise curl. Width is explicitly exaggerated and is not a measured diameter.
+
+## Comparison with web rivals
+
+`npm run sciviz:compare` (repository root) draws eight scenes on real data (MRI volume and
+isosurface, NYC taxi scatter, line and heatmap, NOAA wind streamlines, an OpenAlex citation
+graph and map tiles) next to VTK.js, Plotly.js, deck.gl, ECharts-GL, regl-scatterplot and
+Cosmograph. The rivals are installed outside this repository and called only through their
+public APIs. `--runs=1` is a clock-free smoke: every image must be non-empty and repeat byte
+for byte. Features, accuracy against closed-form answers and losses are in
+[the comparison](../../docs/whitepaper/sciviz-vs-rivals.md). No speed claim is made until the
+quiet-machine run.
+
+## Reproducible volume comparison
+
+The [clean-room rival harness](../../docs/sciviz-rivals.md) keeps the historical shaded
+volume-64 scene and adds isotropic unshaded 64-cube and 128-cube controls. A one-run
+smoke checks complete, nonempty images, exact repeated frame bytes and public GPU
+call counts without collecting elapsed times. VTK.js is installed outside this repository.
+The comparison documents differences in storage, interpolation and scene-depth work;
+it makes no equal-pixel or speed claim.
+
+Volume preparation reuses matrix storage inside its existing uniform array. The
+work-count regression checks exact uniform bytes across shears, reflections, singular
+transforms, clip/mode changes and device restoration. This removes two temporary
+16-float allocations per volume per frame; the uploads and ray marcher are unchanged.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const figure = await Figure.create(document.querySelector('canvas')!, {
+  axes: false, controls: false, aspect: [1, 1, 1],
+});
+figure.engine.stop();
+const data = Float32Array.from({ length: 64 ** 3 }, (_, i) => {
+  const x = i % 64 - 31.5;
+  const y = Math.floor(i / 64) % 64 - 31.5;
+  const z = Math.floor(i / 4096) - 31.5;
+  return Math.max(0, 1 - Math.hypot(x, y, z) / 31.5);
+});
+figure.volume(data, { dims: [64, 64, 64], range: [0, 1], shading: false });
+await figure.ready();
+figure.render();
+figure.dispose();
+```
+
+### Optional frame comparison helpers
+
+`@margoengine/sciviz/bench` imports no renderer or rival and reads no clock on
+import. `pairedFrames` takes caller-owned asynchronous render/read adapters; defaults
+are one pair, two warmup pairs and `timing: false`. Pairs alternate order and retain
+copied images. Explicit `timing: true` collects every frame/read sample and both
+minima. The command harness keeps speed-phase and GPU admission policy outside the
+portable helper. `imageDifference` compares complete equal-sized RGBA8 frames:
+RGB MAE, maximum channel error, fraction over eight mean RGB levels, and exact
+RGBA equality. It applies no image masks, resampling or pass/fail tolerance.
+
+```ts
+import { pairedFrames } from '@margoengine/sciviz/bench';
+
+const renderer = {
+  async frame(signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    return { width: 1, height: 1, rgba: new Uint8Array([34, 203, 238, 255]) };
+  },
+};
+const comparison = await pairedFrames(renderer, renderer, { runs: 1 });
+console.log(comparison.difference.identical); // true; no timing samples collected
+```
+
+The adapters own their renderers and disposal. A frame method must finish GPU work
+and return copied pixels before resolving. Pass an `AbortSignal` to stop before or
+after each awaited frame; failures propagate without retries. Runs are 1..100 and
+warmup pairs 0..20. Aborting also rejects a pending frame wait if the adapter ignores its signal;
+underlying work and disposal remain the adapter owner's responsibility. The
+command harness supplies browser and process limits.

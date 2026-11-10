@@ -24,6 +24,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./bench": {
+      "types": "./dist/bench.d.ts",
+      "import": "./dist/bench.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
