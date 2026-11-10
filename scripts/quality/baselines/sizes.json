@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13345397,
+  "total": 13348917,
   "history": [
     {
       "date": "2026-10-24",
@@ -6805,6 +6805,12 @@
       "commit": "batch-247-job2",
       "reason": "Scott optional-size ruling: GI 9670 to 10348 B gzip (ceiling 9961 to 10659 B) for painted diffuse faces, exact temporal interval reuse and owner-safe disposal. SDF 2667 to 2911 B remains within 2923 B. A split would separate the synchronous trace and bounce contract and add API plumbing. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e8661721a",
+      "reason": "batch 54 job 4: new @margoengine/lightmap/denoise entry (edge-avoiding a-trous denoiser)",
+      "grew": 1
     }
   ],
   "items": {
@@ -7239,6 +7245,7 @@
     "@margoengine/lighting2d/sdf": 2923,
     "@margoengine/lighting2d/soft": 6392,
     "@margoengine/lightmap": 4053,
+    "@margoengine/lightmap/denoise": 3520,
     "@margoengine/lightmap/directional": 4471,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/gpu": 7965,
@@ -7719,6 +7726,7 @@
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/imagery": 6241,
     "@margoengine/terrain/layers-pbr": 2819,
+    "@margoengine/terrain/overlays": 4061,
     "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/rvt": 6595,
@@ -7762,6 +7770,7 @@
     "@margoengine/transitions/custom": 5466,
     "@margoengine/transitions/live": 4988,
     "@margoengine/transitions/mask": 5713,
+    "@margoengine/transitions/presets": 8985,
     "@margoengine/tween": 5759,
     "@margoengine/tween/async": 3656,
     "@margoengine/tween/control": 3970,
@@ -8041,8 +8050,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/transitions/presets": 8985,
-    "@margoengine/terrain/overlays": 4061
+    "margoengine/web": 577
   }
 }

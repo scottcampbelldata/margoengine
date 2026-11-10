@@ -181,14 +181,14 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 48 entry points
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 11 entry points
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 10 entry points
-- [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 10 entry points
+- [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 11 entry points
 - [@margoengine/tiles API](https://margoengine.com/llms/api/tiles.md): 12 entry points
 - [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 14 entry points
 - [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 14 entry points
 - [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 12 entry points
 - [@margoengine/clustered API](https://margoengine.com/llms/api/clustered.md): 11 entry points
 - [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 9 entry points
-- [@margoengine/lightmap API](https://margoengine.com/llms/api/lightmap.md): 8 entry points
+- [@margoengine/lightmap API](https://margoengine.com/llms/api/lightmap.md): 9 entry points
 - [@margoengine/sky API](https://margoengine.com/llms/api/sky.md): 20 entry points
 - [@margoengine/weather API](https://margoengine.com/llms/api/weather.md): 8 entry points
 - [@margoengine/toon API](https://margoengine.com/llms/api/toon.md): 3 entry points
@@ -211,8 +211,8 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 4 entry points
 - [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 3 entry points
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 3 entry points
-- [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 4 entry points
-- [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 12 entry points
+- [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 5 entry points
+- [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 13 entry points
 - [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 29 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 21 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 11 entry points
@@ -324,6 +324,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Skeletal JSON import](https://margoengine.com/llms/docs/skeletal-json.md): Batch 245 job 4 uses the existing sprites skeletal rig. The optional `@margoengine/sprites/spine` entry provides `parseSpineJSON`…
 - [Start here](https://margoengine.com/llms/docs/start-here.md): You will find the page that matches what you want to do. Every guide is short, has code you can copy, and has been run in a real browser.
 - [Draped terrain imagery](https://margoengine.com/llms/docs/terrain-imagery.md): `@margoengine/terrain/imagery` exports `TerrainImagery`, `xyzImagery`, `wmtsImagery` and their fully typed settings. Attach a collection…
+- [Ground-clamped vector overlays](https://margoengine.com/llms/docs/terrain-overlays.md): `@margoengine/terrain/overlays` exports `TerrainOverlays`, its metre-based position/style types, and GeoJSON import options. Attach the…
 - [Test-page bug review](https://margoengine.com/llms/docs/testpage-bugs.md): Implementation is preserved in separate commits and rebased onto origin/main 31bd81d60. Corrective verify and all remaining GPU/README…
 - [Test-page bug research and clean-room decisions](https://margoengine.com/llms/docs/testpage-research.md): The live brief added the research-first ruling during this local run. This audit records the source comparison before landing the local…
 - [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was rewritten by feature group: 195 features, 169 COVERED, 5 PARTIAL, 10 MISSING, plus 11 NOT PLANNED by…

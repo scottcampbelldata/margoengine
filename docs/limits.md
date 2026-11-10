@@ -3454,6 +3454,16 @@ reaches probes only through its lightmap (one mesh), so one bounce beyond the li
 emissive surfaces and area lights are not sampled. Probes have no visibility weighting (light can leak through thin
 walls between probes), and `@margoengine/environment`'s `LightProbes` cannot load the baked coefficients yet.
 
+## Lightmap denoising (batch 54)
+
+`@margoengine/lightmap/denoise` runs on the CPU, at most 16,777,216 texels (8,192 a side) per call, 1 to 8 a-trous
+passes of 25 taps each. It is not energy conserving (a weighted mean per texel, as Dammertz et al. 2010 note). Charts
+are filtered separately: neighbouring quads in the world are not neighbours in the atlas, so quad charts a few texels
+wide get little smoothing. Without a supplied `variance` the noise is estimated per texel from its neighbours (median
+absolute deviation); smooth gradients count partly as noise and are smoothed slightly, and a lone bright texel (a
+firefly) is averaged into its neighbours but not clamped. The quad atlas path reads the 8-bit lightmap, so its input
+carries 8-bit quantisation; the mesh path reads the float `irradiance`.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.

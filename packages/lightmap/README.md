@@ -166,6 +166,24 @@ the native atlas with physical irradiance in its lightmap, the irradiance and hi
 that account for every emitted watt (deposited, escaped, absorbed, truncated, unrefracted, blocked). Receivers are
 opaque; there is no diffuse bounce, rough glass or dispersion.
 
+## Denoising: `@margoengine/lightmap/denoise`
+
+`denoiseLightmap(atlas, quads)` (for `bakeLightmap` and `bakeGlobalLightmap`), `denoiseMeshLightmap(baked, mesh)` (for
+`bakeMeshLightmap`) and `denoiseTexels({ width, height, color, chart, normals, positions, variance })` (any Float32 RGB
+texels) filter Monte Carlo noise out of a bake, so fewer AO and bounce rays give clean light. Each returns new arrays.
+
+- **Filter.** The edge-avoiding a-trous wavelet transform (Dammertz et al. 2010): `iterations` (default 5) passes of a
+  5 x 5 B3 spline kernel whose taps spread 2^i texels apart. Each tap is weighted by luminance difference against the
+  texel's noise (Schied et al. 2017, `sigmaLuminance` default 4), normal agreement max(0, n.n)^`normalPower` (default
+  128) and distance off the receiver's tangent plane (`sigmaPlane`, default 1). The noise variance shrinks with each
+  pass (filtered with the squared weights).
+- **Noise.** Without a `variance`, each texel's noise is a median absolute deviation of its 5 x 5 neighbours'
+  differences, so a shadow edge with less than half the window across it is not mistaken for noise. Noise-free
+  texels stay as they are.
+- **Charts.** Texels mix only inside their chart: each quad of an atlas, each UV island of a mesh (triangles joined at
+  corners with the same UV1 and position). Atlas gutters and mesh dilation are refilled from the filtered light.
+- **Limits.** CPU only; no firefly clamp; charts are filtered on their own, so a small quad's chart (a voxel face of
+  4 x 4 texels) gets little smoothing; the atlas path filters the RGBA8 lightmap decoded with `lightmapScale`.
 
 ## Cycles reference measurement
 

@@ -350,7 +350,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/environment`](packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
+| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global) caustics (./refracted) and an edge-avoiding a-trous denoiser (./denoise). |
 | [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/weather`](packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
@@ -6044,6 +6044,16 @@ reaches probes only through its lightmap (one mesh), so one bounce beyond the li
 emissive surfaces and area lights are not sampled. Probes have no visibility weighting (light can leak through thin
 walls between probes), and `@margoengine/environment`'s `LightProbes` cannot load the baked coefficients yet.
 
+## Lightmap denoising (batch 54)
+
+`@margoengine/lightmap/denoise` runs on the CPU, at most 16,777,216 texels (8,192 a side) per call, 1 to 8 a-trous
+passes of 25 taps each. It is not energy conserving (a weighted mean per texel, as Dammertz et al. 2010 note). Charts
+are filtered separately: neighbouring quads in the world are not neighbours in the atlas, so quad charts a few texels
+wide get little smoothing. Without a supplied `variance` the noise is estimated per texel from its neighbours (median
+absolute deviation); smooth gradients count partly as noise and are smoothed slightly, and a lone bright texel (a
+firefly) is averaged into its neighbours but not clamped. The quad atlas path reads the 8-bit lightmap, so its input
+carries 8-bit quantisation; the mesh path reads the float `irradiance`.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.
@@ -7352,7 +7362,7 @@ so dense seams/instances may need higher caps. Raising a cap cannot create avail
 The 4,096-corner polygon, hierarchy depth, animation/key/sample limits and GLB uint32 format
 limits are unchanged. Imported meshes are never decimated or truncated to meet these caps.
 
-Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker is 98,112 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage stays 16,769 B.
+Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker finished at 98,163 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage is 24,209 B; 16,769 B was the separately reported particlesOnly build.
 
 The large configuration also reaches GLTFAsset attachment and worker prepareGLTF: the converted GLB uses outputBytes and nodes as its downstream caps. Ordinary attachment retains the pre-existing 64 MiB glTF cap. The 2,500,002-vertex test produces a buffer above 64 MiB and attaches both directly and from prepared worker output.
 
@@ -7632,6 +7642,27 @@ GPU label finish-phase limits: CSS borders currently enter the outer-rectangle s
 ### Immediate debug and arc lines (batch 227 job 3)
 @margoengine/lines/debug exports DebugLines, ArcLine and arcPositions. DebugLines drawLine/drawLines/drawArc queue for the next rendered frame and clear on the following rendered frame, including zero delta. Picks never consume queued commands; extra views/targets reuse the active frame. Equal width/depth styles share one LineBatch draw (subject to device buffer splits), with endpoint colour gradients. Default width 1 CSS px, colour white, depthTest true; maximum queued segments defaults to 1,000,000 and is configurable up to 67,108,864. Debug segments retain the batch renderer's square ends and have no picking, dashes or joins. Persistent ArcLine uses ordinary Line materials and picking.
 Arc coordinates are XYZ in engine units. Default 64 segments, permitted 2..8192; planar midpoint height defaults to chord length/4, up +Y and tilt 0 radians. Great-circle arcs default to height 0 and center [0,0,0], interpolate endpoint radii linearly, and use radial midpoint height. Coincident directions and antipodes are deterministic; an endpoint at the center rejects. These are spherical paths, not ellipsoid/geographic projections. Endpoint float32 positions are exact copies. Entry gzip 9,549 B, ceiling 9,836 B; other line entries and core plus stage (24,209 B) are unchanged. No speed measurement or claim.
+
+### Splat interchange formats (batch 238)
+splats/formats reads KSplat 0.1 compression 0/1/2, multiple sections and capacities, full and partial spatial buckets and SH degrees 0 to 2 (the supported writer's maximum). It promotes mixed section degrees with neutral missing higher bands. SuperSplat compressed binary little-endian PLY supports 256-record chunks, position/scale 11-10-11 words, smallest-three rotations, old full-range or current per-chunk RGB, and uchar SH through degree 3. Count is capped at 3,000,000, PLY header at 64 KiB; malformed schemas, lengths and bucket ranges reject before reading attributes. These are synchronous CPU readers; no worker or reduced peak-memory claim. Standard Gaussian PLY export defaults to binary little-endian and optionally writes ASCII, including normals (zero), every SH coefficient, log scales, wxyz rotations and opacity logits. Exact opacity 0/1 writes limiting IEEE infinity logits. Colour and SH use the existing display/linear first-order mapping; quaternions are normalized and covariances use the existing Float32 floor, matching other Margo readers. GPU rendering uses the existing Splats pipeline unchanged.
+
+Batch 238 formats entry size: absent (0 B) before, 20,239 B min+gzip after. It includes shared Gaussian attribute conversion, covariance eigen decomposition and all three named format operations; separate import paths would add packaging without reducing the full capability. Named exports remain tree-shakable. Core plus stage stays 24,209 B gzip; progressive stays 30,891 B.
+
+
+### Batch 218 transition presets
+
+The optional transitions/presets entry supplies slide, push, zoom, iris, cube, page-curl, swirl and fade-through-color. transitionPresetWGSL returns the custom WGSL function contract without GPU work; createPresetTransition and createLivePresetTransition validate then attach frozen or live versions. Parameters: direction [1,0] normalized from any finite nonzero 2-vector, softness 0.02 in [0,0.5], center [0.5,0.5] in the unit square, color opaque black in normalized RGBA, strength 1 in (0,8] for zoom/swirl, easing linear (also quadratic ease-in, quadratic ease-out, cubic Hermite ease-in-out). These easing names describe polynomial remapping, not CSS keyword cubic Bezier values. Direction affects translated and rotated geometric treatments; isotropic zoom/iris/swirl remain center-based. Softness affects reveal/boundary coverage; fade and continuous distortions have no reveal edge. Cube is an analytic two-face rotation, with background color outside the projected cube. Curl rolls the image around a fixed radius 0.15 UV cylinder with shaded reverse side, not physical paper simulation. Exact endpoints, trusted-code assumptions, captures, output formats, cancellation and ownership follow the custom/live entries.
+
+Batch 218 job 2 presets is 8723 B gzip (new entry, before 0 B), with a ceiling of 8985 B. The single optional entry keeps pure mappings and both validated factories together; splitting it would force callers to coordinate separate shader and attachment APIs without a quality gain. Core + stage remains 24209 B.
+
+### Batch 229 job 2: vector overlays
+Optional terrain/overlays is 3805 B gzip; RVT 6339 B (5302 before providers), imagery 6207 B (5985 before cached imagery), and planet 7291 B (7282 before generic group selection). Core + stage remains 24209 B. See [terrain overlays](terrain-overlays.md) for horizontal XZ metre widths, round strokes, even-odd fills/holes, explicit GeoJSON projection and antimeridian cutting. Defaults are 4096 primitives / 65536 segments, with upper limits 65536 / 1048576 and device storage limits; one header, three vec4 records per primitive and one per segment. Cache readers and steep/far fallback share coverage. No spatial hierarchy, geodesic globe strokes, dash patterns or selectable joins are claimed.
+### Painted GI and temporal intervals (batch 247 job 2)
+`GILighting2D.temporal` defaults true; false recomputes all intervals, and resetHistory() forces the next rebuild. Identical frames retain spatial/angular cascade and finite-bounce surface buffers, and their compute invocations return before tracing. Source and emission RGBA comparisons are exact on GPU. Any alpha, color, emission, source transform, cutoff or gain change invalidates painted intervals. Analytic geometry, emitters, lights (including nested masks), layer, cascade options, view camera and output dimensions are compared on CPU. No old radiance is blended into changed input. A camera move rebuilds rather than reprojecting; ambient is applied at presentation and needs no interval rebuild. Device replacement and changing painted/no-painted mode discard all GI history. One SDFScene2D snapshot per command encoder serves multiple consumers; submit a manually managed frame before starting another. GI borrows the painted scene and textures.
+Painted occupied cells have four outward surface slots; internal faces are inactive. Each exposed face gathers 32 cosine-weighted directions per requested bounce from the preceding order, at its midpoint offset .001 source pixels into empty space. Painted RGB clamps to [0,1] for reflectance and multiplies the configured albedo; emission retains HDR. Finite bounce orders 0..4, source resolution, interval reach and angular quadrature limits still apply. GI is now covered by the named opaque visibility, energy, finite-bounce, painted-input and temporal correctness fixtures; no general physical-exactness, converged transport, continuous vector-outline or frame-rate claim is made. Historical README exceptions and no-history language await the README phase.
+SDF adds 32 B/pixel exact RGBA history and a 16 B change flag to its previous 48 B/pixel transform storage (80 B/pixel plus 48 B fixed uniforms/flag). Painted GI surface buffers use 192 B/source pixel (two persistent fields and immutable zero order, four vec4 faces each), plus analytic patch geometry and cascade storage. Analytic surface fields use 96 B/patch including zero order, replacing the earlier 64 B/patch. Changed-input comparisons and distance generation still run every frame; presentation traces the near connectors. Reuse avoids surface gathers and upper-cascade interval traces, not every GPU operation.
+
+Batch 247 job 2 sizes: SDF 2,667 to 2,911 B min+gzip, inside its 2,923 B ceiling; GI 9,670 to 10,348 B, ceiling raised 9,961 to 10,659 B under Scott's optional-size ruling. The bytes buy painted diffuse face transport, exact temporal change detection/reuse and owning-scene disposal. Splitting the trace/bounce contract into another entry would add synchronous adapters without removing that work. Core plus stage remains 24,209 B with no source changes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -12205,6 +12236,18 @@ No open correctness defect identified. The planar assignment replaces independen
 ### Labels GPU finish-phase edge cases (batch 261)
 - In-flight font cancellation: start GPULabelLayer.create with a Font whose load promise is pending, then abort its signal. Creation stays pending until Font.load resolves because cancellation is checked only before/after loading. Make the caller's wait abortable while retaining shared font loading in the fix phase.
 - Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
+
+Batch 238 formats: no open format defect found by the malformed-input, real-data getter, SH and PLY round-trip checks. Existing transformed-bitmap alpha precision follow-up above remains outside these CPU entries.
+
+
+### Batch 218 job 2
+
+The eight requested transition presets and their finite parameter contracts are built for frozen and live composition. Independent gradient pixel checks cover each preset in four cardinal directions, endpoints and intermediate eased progress at 1x/4x. No requested preset is deferred.
+
+### Batch 229 job 2: vector coverage evidence
+No open defect identified in the job: the new entry covers metre widths, polygon holes, projection, live updates, imagery ordering and exact restoration on both GPU backends. CPU tests reject coerced numeric strings and preserve old state after malformed/over-budget updates. A draft display-pixel classifier incorrectly assumed that PBR Neutral kept saturated primary channels at zero; the fixture now uses independently rendered primary references through the actual display transform, retaining exact color matching.
+### Fixed: GI owning-scene disposal; completed painted/temporal coverage (batch 247 job 2)
+GILighting2D previously removed a plugin by name on its saved engine, which can name another active scene. It now resolves its own registration with sceneOf(this) before removal and leaves detached or same-name plugins alone. sdf.test.js contains a regression that fails on the former dispatch. Painted surfaces now carry reflected radiance for every finite bounce order, and exact change detection guards persistent intervals; gi-history-regressions.js compares against independently authored analytic faces, checks cached GPU data remains untouched on static frames, and rejects stale history after scene edits. Earlier GI visibility/energy repairs remain tested without changed tolerances. Historical README correctness exceptions are explicitly owed, with no README edits during build phase.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -1750,6 +1750,10 @@
       "types": "./dist/lightmap/probes.d.ts",
       "import": "./dist/lightmap/probes.js"
     },
+    "./lightmap/denoise": {
+      "types": "./dist/lightmap/denoise.d.ts",
+      "import": "./dist/lightmap/denoise.js"
+    },
     "./lines": {
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"
