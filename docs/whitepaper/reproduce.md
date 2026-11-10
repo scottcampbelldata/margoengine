@@ -3212,3 +3212,5 @@ Direct readbacks verify all record fields, stable order, source ranges and
 argument words; every route also compares sorted and original canvas pixels.
 CPU contracts run in `packages/culling/test/sort.test.js`. No wall-clock A/B,
 benchmark or timing-only assertion runs during the build phase.
+### Batch 266 input helpers
+After build:packages, run node --test --test-timeout=60000 packages/react/tests/controls-extra.test.js. For actual pixels run node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-controls-extra-browser.mjs, then the same command with --compat appended to the inner script. The existing CC-BY-4.0 Cesium Box fixture exercises keyboard, native scroll, product drag, spring snap-back and unmount disposal.

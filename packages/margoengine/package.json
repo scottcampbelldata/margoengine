@@ -2782,6 +2782,10 @@
       "types": "./dist/react/textures.d.ts",
       "import": "./dist/react/textures.js"
     },
+    "./react/controls-extra": {
+      "types": "./dist/react/controls-extra.d.ts",
+      "import": "./dist/react/controls-extra.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

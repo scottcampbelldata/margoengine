@@ -30,6 +30,22 @@ async function rig(options = {}) {
   const control = new PresentationControls(engine, mesh, options);
   return { el, engine, mesh, control };
 }
+test('presentation: product groups pick live descendants and reject unrelated meshes', async () => {
+  const { el, engine, mesh, control } = await rig();
+  control.dispose();
+  const root = engine.createMesh(), nested = engine.createMesh().setParent(root);
+  mesh.setParent(nested);
+  const product = new PresentationControls(engine, root);
+  pointer(el, 'pointerdown', 400, 300);
+  assert.equal(el.captured.size, 1);
+  pointer(el, 'pointermove', 460, 330); product.update(0.1);
+  assert.ok(product.angles.every(v => v > 0));
+  pointer(el, 'pointerup', 460, 330);
+  mesh.setParent(null); product.reset(true);
+  pointer(el, 'pointerdown', 400, 300);
+  assert.equal(el.captured.size, 0);
+  product.dispose(); engine.dispose();
+});
 test('presentation: only the product starts a drag unless global is set, pointer ownership and cancellation', async () => {
   const { el, engine, control } = await rig();
   const events = [];

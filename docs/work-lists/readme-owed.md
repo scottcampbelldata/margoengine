@@ -556,3 +556,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/culling: document /sort FrontToBack, InstanceSorter, SortedInstances, stable equal-depth keys, registration/removal, toggles, opaque-only input and buffer flags (batch 223 job 3).
 - margoengine: document the generated culling/sort alias (batch 223 job 3).
+- @margoengine/react: controls-extra KeyboardControls/useKeyboardControls, ScrollControls/useScroll/Scroll (mesh and HTML), PresentationControls, optional controls peer and cleanup.
+- margoengine: react/controls-extra umbrella alias and native SpringOptions naming.
+- @margoengine/controls: PresentationControls accepts geometry-free product roots and picks their live nested descendants.

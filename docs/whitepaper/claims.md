@@ -3742,3 +3742,5 @@ Direct GPU records and argument words match the CPU reference for empty, odd,
 padded and multi-workgroup capacities with a transformed model node. Pixel
 comparison covers all four drawing routes and runtime disable. This establishes
 ordering and image behaviour, not a measured frame-time or fragment-work gain.
+### Batch 266: optional React input helpers
+Keyboard action selectors, polling/subscriptions, overlapping key aliases, focus cleanup, native damped scrolling with range/curve/visible and HTML or mesh content, and spring-driven presentation groups are available from react/controls-extra. Proof: packages/react/tests/controls-extra.test.js and scripts/test-controls-extra-browser.mjs in that package. Rendering stays with existing Margo packages; no new core/stage code or speed claim.

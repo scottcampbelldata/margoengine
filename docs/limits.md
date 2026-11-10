@@ -4915,3 +4915,9 @@ registered model resources on removal. Cleanup happens before a later frame,
 after the prior frame's command submission; existing view uploads stay distinct.
 
 Batch 223 job 3 minified gzip: /sort is new, 0 to 14060 B. /webgl2 stays 3028 B while exposing storage/copy access to its argument buffer. /bounds stays 19447 B. The sort entry shares one network implementation across drawing routes and reuses the existing static culler; a split would duplicate resource state and complicate import/use. Core plus stage remains 24,209 B. firstInstance prefixes are included in capacity; their indirect word and draw offset are preserved, along with every other indirect word.
+### React input helpers (batch 266)
+The optional react/controls-extra entry owns keyboard listeners, a native HTML scroll area and a product group. It loads controls/presentation lazily. Defaults match the owning controls package: pages 1, distance 1, damping 0.2 seconds, maxSpeed Infinity, epsilon 0.00001; presentation speed/zoom 1, snap/global false, spring stiffness 170 and damping 26. Scroll delta is nonnegative; the owning controller retains its signed delta. Mesh scrolling uses perspective world extent at the camera target, or the custom orthographic projection extent. HTML scrolling uses CSS viewport pixels. Presentation accepts native SpringOptions through spring; no additional spring runtime is bundled.
+
+Input helper entry measured at 4,310 B gzip (4,156 B before sticky HTML and projection-aware mesh scrolling); its recorded optional ceiling is 4,412 B. Core plus stage remains 24,209 B gzip, below 25,000 B.
+
+Batch 266 product picking: controls/presentation 6,772 -> 6,857 B gzip, within its 7,028 B ceiling. The hierarchy scan runs only at pointer press, reuses the existing BVH picker and supports geometry-free presentation roots.

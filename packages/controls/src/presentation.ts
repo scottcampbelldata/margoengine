@@ -149,7 +149,12 @@ export class PresentationControls extends Controls {
       const p = this.local(e),
         r = ray(rollFrame(this.camera), p.x, p.y, this.element.clientWidth, this.element.clientHeight);
       this.picker.set(r.origin, r.direction);
-      if (!this.picker.intersectObjects(this.engine!, [this.object]).length) return;
+      const runtime = engineRuntime(this.engine!), root = meshRuntime(this.object).id;
+      const products = [...runtime.meshes.values()].filter((mesh) => {
+        for (let id = mesh.id; id !== -1; id = runtime.store.parents[id]) if (id === root) return true;
+        return false;
+      });
+      if (!this.picker.intersectObjects(this.engine!, products).length) return;
     }
     this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, pitch: this.pitch.target, yaw: this.yaw.target };
     this.capture(e.pointerId);

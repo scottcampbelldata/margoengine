@@ -6139,3 +6139,6 @@ picking/shadows. Only package-owned code changed; no core/stage hooks were added
 Sorting lifecycle CPU tests also pin per-owner release across all views and a
 fresh allocation if the same owner is later encoded again. The GPU fixtures
 exercise enable/disable transitions while cullers continue to update their lists.
+Batch 266 section 5 evidence: React controls-extra adds no rendering math. Its shared-lock browser proof runs keyboard and native scroll input plus spring group rotation and snap-back on native WebGPU and WebGL2 compatibility, with the existing Cesium Box licensed fixture. HTML scrolling is hosted in a sticky zero-height overlay so native scroll does not apply the damped translation twice.
+
+Batch 266 additional correctness: scroll mesh extent reads an installed camera projection for orthographic cameras, with a deterministic 4-world-unit fixture. Product-local pointer presses include live descendants in the existing controls BVH pick, with a detached-mesh regression. No rendering backend or core math changed.

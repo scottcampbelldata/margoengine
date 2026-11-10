@@ -35,7 +35,8 @@
     "test:browser:instances": "cd ../.. && node packages/react/scripts/test-instances-browser.mjs",
     "test:browser:priority": "node scripts/test-priority-browser.mjs",
     "test:browser:performance": "node scripts/test-performance-browser.mjs",
-    "test:browser:textures": "node scripts/test-textures-browser.mjs"
+    "test:browser:textures": "node scripts/test-textures-browser.mjs",
+    "test:browser:controls-extra": "node scripts/test-controls-extra-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -213,6 +214,11 @@
       "types": "./dist/textures.d.ts",
       "react-server": "./dist/rsc/textures.js",
       "import": "./dist/textures.js"
+    },
+    "./controls-extra": {
+      "types": "./dist/controls-extra.d.ts",
+      "react-server": "./dist/rsc/controls-extra.js",
+      "import": "./dist/controls-extra.js"
     }
   },
   "files": [

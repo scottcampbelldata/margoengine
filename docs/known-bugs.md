@@ -4521,3 +4521,9 @@ Batch 246 job 3: no open plane-rendering defect found by the matrix, depth and r
 
 ### Batch 261 distance layout
 No open correctness defect identified. Regression covers layout scale reaching DOM transforms without distanceScale, boundary visibility, stable-frame writes and opacity restoration; GPU browser checks cover real DOM extents and recovery on both native rendering backends.
+
+Batch 266 input helpers: alias-release and modifier-change regressions are covered in controls-extra.test.js; no additional known defect found in this job.
+
+Batch 266 gate finding: gpu-package-tests plan rejects unregistered browser support files in headless, webgl2-compat and worker before React selection. Cause: global loose-browser discovery precedes --only filtering. React registered scripts run directly under shared locks for this job; owning lanes retain planner registration work.
+
+Batch 266 fixed: PresentationControls tested only the root mesh, so local dragging a React group never started. The owning controls entry now tests live descendants, excluding detached or unrelated meshes; controls/tests/presentation.test.js and the local-drag browser fixture cover the cause.
