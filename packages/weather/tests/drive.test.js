@@ -83,6 +83,8 @@ test('attach runs it before each frame; bad options throw by name; dispose ends 
   const plugins = [];
   const engine = {
     use: (p) => (plugins.push(p), p.setup(engine)),
+    // One scene: the engine stands for it. The drive leaves through the scene it joined.
+    sceneOf: (p) => (plugins.includes(p) ? engine : undefined),
     removePlugin: (name) =>
       plugins.splice(
         plugins.findIndex((p) => p.name === name),

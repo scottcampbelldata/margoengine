@@ -602,6 +602,9 @@ test('VoxelStreamer.attach follows the engine camera: a path ends with no holes;
         plugins.set(plugin.name, plugin);
         return this;
       },
+      sceneOf(plugin) {
+        return plugins.get(plugin.name) === plugin ? this : undefined;
+      },
       removePlugin(name) {
         const plugin = plugins.get(name);
         plugins.delete(name);
@@ -707,4 +710,36 @@ test('VoxelStreamer arguments: types, ranges, one streamer per world, Web Worker
   assert.throws(() => (one.distance = 100), RangeError);
   await one.dispose();
   await new VoxelStreamer({ world }).dispose(); // the world is free again
+});
+
+test('VoxelStreamer.dispose removes its plugin from the scene it joined, never the active one', async (t) => {
+  // Before the fix dispose called engine.removePlugin(name), which acts on the active scene: a streamer attached to a
+  // second scene kept running there and a same-name plugin of the active scene was removed instead.
+  useWorkers(t);
+  const joined = new Map(),
+    own = [],
+    active = [],
+    engine = {
+      camera: { position: [0, 20, 0] },
+      onError: (error) => assert.fail(error),
+      use(plugin) {
+        plugin.setup(this);
+        joined.set(plugin.name, plugin);
+        return this;
+      },
+      sceneOf: (plugin) =>
+        joined.get(plugin.name) === plugin ? { removePlugin: (name) => own.push(name) } : undefined,
+      removePlugin: (name) => active.push(name),
+    };
+  const streamer = VoxelStreamer.attach(engine, {
+    world: new VoxelWorld({ blocks }),
+    store: new MemoryChunkStore(),
+    generator: { seed: 4 },
+    distance: 1,
+    verticalDistance: 1,
+    workers: 1,
+  });
+  await streamer.dispose();
+  assert.deepEqual({ own, active }, { own: [...joined.keys()], active: [] });
+  assert.equal(own.length, 1);
 });

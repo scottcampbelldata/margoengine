@@ -3154,6 +3154,24 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   symptom.
 
 
+### plugin scene owner (physics)
+
+Open, physics on hold (list 5 batch I1). Repro: `scene.use(world)` for a world from packages/physics/src/physics.ts,
+packages/physics/src/next/physics.ts or packages/physics2d/src/physics.ts, or attach a ragdoll from
+packages/ragdoll/src/ragdoll.ts, to a second scene; make another scene active; dispose it. The plugin stays
+registered in its own scene and a plugin of the same name in the active scene is removed instead. Cause: each dispose
+calls `engine.removePlugin(this.name)` with one argument, which acts on the active scene (ragdoll also tests
+`engine.plugins.get(this.name) === this` against the active scene). Fix when physics reopens:
+`engine.sceneOf(this)?.removePlugin(this.name)`. The hygiene check scripts/support/plugin-scene-owner.mjs lets exactly
+these four calls through by file and call text in its OPEN list; drop each row with its fix.
+
+### plugin scene owner (sciviz)
+
+Open, sciviz held out of list 5 (dev PC owns it). Same cause and repro as above in two sites the check found:
+packages/sciviz/src/progressive.ts (`ProgressiveRendering.dispose`) and packages/sciviz/src/render.ts. (axes, media-tiles
+and pointcloud were fixed on main by 69eb1e69f.) The OPEN list in scripts/support/plugin-scene-owner.mjs names these two
+calls; drop each row with its fix.
+
 ## Sciviz comparison gaps
 
 Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)). Each is a missing

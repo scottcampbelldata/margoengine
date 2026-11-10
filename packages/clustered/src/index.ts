@@ -773,7 +773,7 @@ export class Clustered implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     for (const remove of this.receivers.values()) remove();
     this.receivers.clear();
     this.localShadows?.dispose();

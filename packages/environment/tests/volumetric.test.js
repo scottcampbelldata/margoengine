@@ -222,7 +222,7 @@ test("contract with clustered and shadows: the froxel light loop repeats cluster
     { legacyTerms } = await import('../../shared/light-terms.js');
   const gpu = mockGPU(),
     lights = new Clustered({ grid: [4, 3, 2] });
-  lights.setup({ gpu: gpu.device, removePlugin() {} });
+  lights.setup({ gpu: gpu.device, sceneOf() {}, removePlugin() {} });
   const clustered = lights.pbr(1).declarations,
     cascades = new Shadows().pbr(2).declarations;
   const { frame, record } = rig({
@@ -272,7 +272,7 @@ test("froxel lights take each light's decay, cone and unlimited range from clust
     { legacyTerms, decayTerms } = await import('../../shared/light-terms.js');
   const gpu = mockGPU(),
     lights = new Clustered({ grid: [4, 3, 2] });
-  lights.setup({ gpu: gpu.device, removePlugin() {} });
+  lights.setup({ gpu: gpu.device, sceneOf() {}, removePlugin() {} });
   const local = () => {
     const { frame, record } = rig({ options: { lights: { pbr: (g) => lights.pbr(g), bindings: () => [] } } }),
       code = record(() => frame(0)).find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;

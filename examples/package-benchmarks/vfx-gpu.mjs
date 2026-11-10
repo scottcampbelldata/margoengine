@@ -133,7 +133,14 @@ async function setup({ a, b, size: [width, height], scene }, samples) {
         depthStencilAttachment: { view: depthView, depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: 0 },
       })
       .end();
-  const engine = { gpu: device, stats: { drawCalls: 0 }, removePlugin() {} };
+  const engine = {
+    gpu: device,
+    stats: { drawCalls: 0 },
+    removePlugin() {},
+    sceneOf() {
+      return this;
+    },
+  };
   const island = (capacity) => ({
     capacity,
     initialCount: capacity,

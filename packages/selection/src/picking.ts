@@ -1010,7 +1010,7 @@ export class Picking implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     if (this.original && this.context) this.context.draw = this.original;
     this.original = undefined;
     this.release();

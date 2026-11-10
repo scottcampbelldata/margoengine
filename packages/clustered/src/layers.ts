@@ -224,7 +224,7 @@ export class LightLayers implements EnginePlugin, ClusteredLightTerm {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     for (const { remove } of [...this.receivers.values()]) remove();
     this.release();
     this.engine = this.device = undefined;

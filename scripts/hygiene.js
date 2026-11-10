@@ -42,6 +42,7 @@ import { assertCitedResultsTracked } from './support/cited-results.mjs';
 import { assertNoConflictMarkers } from './support/conflict-markers.mjs';
 import { changedDeclarations, declarationStamps, missingDeclaration } from './support/declaration-snapshot.mjs';
 import { assertLockInSync } from './support/lock-sync.mjs';
+import { assertPluginsLeaveOwnScene } from './support/plugin-scene-owner.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
 import { countMissingHelp, countNoFix } from './support/throw-messages.js';
 import { assertWgslReturns } from './support/wgsl-returns.mjs';
@@ -68,6 +69,8 @@ assertWgslReturns(root);
 // Every browser test file must have a script check:gpu-packages runs; its plan throws otherwise. Checked here because
 // the fast gate runs hygiene on every push and the plan would only fail later, in local CI's full check.
 gpuPlan();
+// A plugin leaves the scene it was attached to, never the active one (the whole class, docs/integration-fixtures.md).
+assertPluginsLeaveOwnScene(root);
 const quick = process.argv.includes('--verify');
 const strict = process.argv.includes('--strict');
 const slash = (p) => p.replaceAll('\\', '/');

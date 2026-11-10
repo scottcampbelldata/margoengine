@@ -11,7 +11,8 @@ for (const Type of [HeightLighting2D, EmissiveLighting2D]) {
     const engine = {
       backend: 'webgpu', gpu: {},
       frameGraph: { add(pass) { callback = pass.execute; } },
-      removePlugin(name) { removed = name; },
+      // The scene the plugin joined; dispose leaves through it, never the active scene.
+      sceneOf: (plugin) => (plugin.name === 'probe' ? { removePlugin(name) { removed = name; } } : undefined),
     };
     const plugin = new Type({ name: 'probe', target: 'target' });
     plugin.setup(engine);

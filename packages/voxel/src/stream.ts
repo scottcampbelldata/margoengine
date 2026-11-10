@@ -1,6 +1,6 @@
 // Chunk stores and the streamer (design: packages/voxel/DESIGN.md, `./stream`): where unloaded chunks are saved and
 // found again (records are encodeChunk bytes), and VoxelStreamer, which loads and unloads chunks around viewers.
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { JobPool } from '../../shared/worker-pool.js';
@@ -325,7 +325,7 @@ export class VoxelStreamer {
   #terrain: NoiseTerrainOptions | undefined;
   #camera: { readonly position: Vec3 } | undefined;
   #engine: EngineKernel | undefined;
-  #plugin = '';
+  #plugin?: EnginePlugin;
   #view = '\0'; // viewer chunks of the current ring
   #centres: number[] = [];
   #ring = new Map<string, Spot>();
@@ -360,10 +360,16 @@ export class VoxelStreamer {
       name = `voxel-streamer-${++plugins}`;
     streamer.#camera = engine.camera;
     streamer.#engine = engine;
-    streamer.#plugin = name;
     streamer.onError = (error) => engine.onError(error);
     try {
-      engine.use({ name, setup() {}, onPreUpdate: () => streamer.update(), dispose: () => void streamer.dispose() });
+      const plugin: EnginePlugin = {
+        name,
+        setup() {},
+        onPreUpdate: () => streamer.update(),
+        dispose: () => void streamer.dispose(),
+      };
+      streamer.#plugin = plugin;
+      engine.use(plugin);
     } catch (error) {
       void streamer.dispose();
       throw error;
@@ -538,7 +544,8 @@ export class VoxelStreamer {
     this.#ready.clear();
     this.#pool?.dispose();
     this.#closing = this.#save();
-    this.#engine?.removePlugin(this.#plugin);
+    // From the scene it joined, not the active one.
+    if (this.#plugin) this.#engine?.sceneOf(this.#plugin)?.removePlugin(this.#plugin.name);
     return this.#closing;
   }
   [Symbol.dispose](): void {

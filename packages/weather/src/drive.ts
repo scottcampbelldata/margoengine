@@ -131,6 +131,12 @@ export function validateDrive(o: DriveOptions): void {
     throw new TypeError('WeatherDrive fog needs a numeric density; pass an environment Fog');
 }
 
+// The engine calls the drive makes: it leaves the scene it joined (`sceneOf`), never the active one. An engine
+// (EngineKernel) has it; setup keeps its published parameter type.
+interface DriveEngine {
+  sceneOf?(plugin: object): { removePlugin(name: string): void } | undefined;
+}
+
 /**
  * Writes a weather's state into the sky, clouds, fog, rain and hail each frame. `WeatherDrive.attach(engine, options)`
  * runs it as an engine plugin (and steps the weather); without an engine call `update(delta)` yourself.
@@ -141,7 +147,7 @@ export function validateDrive(o: DriveOptions): void {
 export class WeatherDrive {
   readonly name: string = 'weather-drive';
   private disposed = false;
-  private engine?: { removePlugin(name: string): void };
+  private engine?: DriveEngine;
   private last?: DriveSettings;
 
   constructor(readonly options: DriveOptions) {
@@ -191,7 +197,7 @@ export class WeatherDrive {
   /** Engine plugin hooks. */
   setup(engine: { removePlugin(name: string): void }): void {
     if (this.disposed) throw new MargoError('disposed', 'WeatherDrive is disposed; attach a new WeatherDrive');
-    this.engine = engine;
+    this.engine = engine as DriveEngine;
   }
   onPreUpdate(delta: number): void {
     this.update(delta);
@@ -201,7 +207,7 @@ export class WeatherDrive {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf?.(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   [Symbol.dispose](): void {

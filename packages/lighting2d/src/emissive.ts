@@ -579,7 +579,7 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#sprites.clear();
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = null;
     this.#release();
   }

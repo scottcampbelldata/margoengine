@@ -117,6 +117,8 @@ function setup(options = {}, { textures = new BlockTextures(), blocks = defaultB
         plugins.set(plugin.name, plugin);
         return engine;
       },
+      // One scene: the engine stands for it. A plugin leaves through the scene it joined.
+      sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
       removePlugin(name) {
         const plugin = plugins.get(name);
         if (!plugin) return;
@@ -1628,4 +1630,16 @@ test('alpha to coverage takes a sharpened cutout edge', async () => {
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
   assert.ok(source.includes('(s.base.a-0.5)/max(fwidth(s.base.a),0.0001)+0.5,MODE==2u'));
+});
+
+test('VoxelRenderer.dispose leaves the scene the renderer joined, never the active one', () => {
+  // Before the fix dispose called engine.removePlugin(name), which acts on the active scene: a renderer attached to a
+  // second scene stayed there and a same-name plugin of the active scene was removed instead.
+  const { engine, renderer } = setup();
+  const own = [],
+    active = [];
+  engine.sceneOf = (plugin) => (plugin.name === renderer.name ? { removePlugin: (name) => own.push(name) } : undefined);
+  engine.removePlugin = (name) => active.push(name);
+  renderer.dispose();
+  assert.deepEqual({ own, active }, { own: [renderer.name], active: [] });
 });

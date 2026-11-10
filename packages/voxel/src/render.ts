@@ -1146,7 +1146,7 @@ export class VoxelRenderer implements EnginePlugin {
     for (const callback of this.#disposeListeners) callback();
     this.#disposeListeners.clear();
     this.#capture = undefined;
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     if (this.#ownMesher) this.#mesher.dispose();
     else for (const key of this.#meshing.keys()) this.#mesher.cancel(key);
     this.#release();

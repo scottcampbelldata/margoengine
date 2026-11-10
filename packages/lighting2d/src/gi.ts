@@ -893,9 +893,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#release();
-    const owner = this.#engine?.sceneOf?.(this);
-    if (owner) owner.removePlugin(this.name);
-    else if (this.#engine && !this.#engine.sceneOf) this.#engine.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = undefined;
   }
   [Symbol.dispose](): void {

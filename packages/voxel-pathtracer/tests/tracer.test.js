@@ -904,3 +904,15 @@ test('area lights are clustered RectAreaLights, packed as a corner and two edges
   assert.deepEqual(f.slice(24, 28), [0, 1, 0, 2]);
   tracer.dispose();
 });
+
+test('dispose leaves the scene the tracer joined, never the active one', async () => {
+  // Before the fix dispose called engine.removePlugin(name), which acts on the active scene: a tracer attached to a
+  // second scene stayed there and a same-name plugin of the active scene was removed instead.
+  const { tracer, engine } = await ready();
+  const own = [],
+    active = [];
+  engine.sceneOf = (plugin) => (plugin === tracer ? { removePlugin: (name) => own.push(name) } : undefined);
+  engine.removePlugin = (name) => active.push(name);
+  tracer.dispose();
+  assert.deepEqual({ own, active }, { own: [tracer.name], active: [] });
+});

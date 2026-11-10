@@ -900,7 +900,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     this.#disposed = true;
     this.#lights.clear();
     this.#occluders = [];
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = null;
     this.#release();
   }

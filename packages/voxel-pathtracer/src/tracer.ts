@@ -756,7 +756,7 @@ export class VoxelPathTracer implements EnginePlugin {
     } catch {
       // The graph is executing (dispose from inside a frame); the pass checks #disposed and does nothing.
     }
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#release();
     this.#engine = this.#graph = this.#removePass = undefined;
     if (this.#status === 'compiling') this.#settle?.[1](new MargoError('disposed', 'VoxelPathTracer is disposed'));

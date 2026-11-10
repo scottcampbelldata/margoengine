@@ -1256,7 +1256,7 @@ export class VFX implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.transparency.released?.();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;
   }

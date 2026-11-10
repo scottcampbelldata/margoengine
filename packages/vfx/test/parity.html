@@ -9,7 +9,7 @@ const camera=new Camera({position:[0,0,10],target:[0,0,0]});camera.update(1,true
 const still={capacity:32,rate:0,velocity:[0,0,0],position:[0,0,0],spread:0,turbulence:0,gravity:[0,0,0],ground:-100,lifetime:[10,10]};
 async function read(effect){const b=effect.gpuState.particles,copy=device.createBuffer({size:b.size,usage:9}),encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(b,0,copy,0,b.size);device.queue.submit([encoder.finish()]);await copy.mapAsync(1);const data=[...new Float32Array(copy.getMappedRange().slice(0))];copy.destroy();return data;}
 function step(effect,delta=0.1){const encoder=device.createCommandEncoder();effect.simulate({backend:'webgpu',device,delta,camera,width:64,height:64,encoder});device.queue.submit([encoder.finish()]);}
-async function ready(effect){effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});if(globalThis.__margoCompat){for(let i=0;i<1000&&!effect.route;i++){await new Promise(r=>setTimeout(r,10));}if(!effect.route)throw Error('compat route did not load');await device.queue.onSubmittedWorkDone();}effect.reset();}
+async function ready(effect){effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){},sceneOf(){return this}});if(globalThis.__margoCompat){for(let i=0;i<1000&&!effect.route;i++){await new Promise(r=>setTimeout(r,10));}if(!effect.route)throw Error('compat route did not load');await device.queue.onSubmittedWorkDone();}effect.reset();}
 window.checkSpace=async()=>{
  device.pushErrorScope('validation');const results={};
  for(const mode of ['local','world']){

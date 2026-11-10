@@ -20,7 +20,7 @@ window.unit=unit;
  */
 async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},read=[],lighting}){
  device.pushErrorScope('validation');
- effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){},lighting});
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){},sceneOf(){return this},lighting});
  setup();
  const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
  const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
@@ -547,7 +547,7 @@ window.checkShadowRelease=async()=>{
    const started=await run(effect,{frames:0,dt:0,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[1,2,3],life:4,size:2,color:[1,0,0]}],1))});
    error??=started.error;
    effect.simulate({backend:'webgpu',device,delta:0,camera,width:size,height:size,encoder:device.createCommandEncoder()});
-   if(mode==='restore')effect.onDeviceRestored({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+   if(mode==='restore')effect.onDeviceRestored({gpu:device,stats:{drawCalls:0},removePlugin(){},sceneOf(){return this}});
    else effect.dispose();
    await Promise.allSettled(mapped);
    // Rejection reporting runs at the microtask checkpoint. Yield one task after the maps settle so a broken

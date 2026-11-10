@@ -855,6 +855,7 @@ export interface CADControlsOptions {
  */
 export function cadControls(engine: EngineKernel, { profile, keys }: CADControlsOptions = {}): OrbitControls {
   // The stage facade's plugin that drives CADCameraControls (packages/stage/src/index.ts); a no-op without it.
+  // scene-owner: active scene on purpose, cadControls replaces the active scene's stage controls.
   engine.removePlugin('margoengine-controls');
   const orbit = OrbitControls.attach(engine);
   if (profile) orbit.setProfile(profile);

@@ -545,7 +545,7 @@ export class CookieLighting2D implements EnginePlugin {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = undefined;
     this.#release();
   }

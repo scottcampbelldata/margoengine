@@ -126,6 +126,8 @@ test('On the WebGL2 preview Picking needs webglPicking, then answers through eng
   const engine = {
     canvas: { width: 100, height: 50, clientWidth: 100, clientHeight: 50 },
     hasPlugin: (name) => plugins.has(name),
+    // One scene: the engine stands for it. Picking leaves through the scene it joined.
+    sceneOf: (plugin) => (plugins.has(plugin.name) ? engine : undefined),
     removePlugin: (name) => plugins.delete(name),
     async pick(x, y, view) {
       asked.push([x, y, view]);

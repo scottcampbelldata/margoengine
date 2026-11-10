@@ -60,7 +60,7 @@ try {
         resources.push(t);
         return t;
       };
-    const engine = { gpu: d, stats: { drawCalls: 0 }, removePlugin() {} },
+    const engine = { gpu: d, stats: { drawCalls: 0 }, removePlugin() {}, sceneOf() { return this; } },
       options = {
         capacity,
         initialCount: 0,

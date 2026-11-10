@@ -188,6 +188,8 @@ export function fakeEngine(device = fakeDevice()) {
         plugins.set(plugin.name, plugin);
         return engine;
       },
+      // One scene: the engine stands for it. A plugin leaves through the scene it joined.
+      sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
       removePlugin(name) {
         const plugin = plugins.get(name);
         if (!plugin) return;

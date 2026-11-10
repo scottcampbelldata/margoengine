@@ -1374,7 +1374,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.sources.length = 0;
     this.release();
     this.engine = this.device = undefined;

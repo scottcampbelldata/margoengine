@@ -208,6 +208,7 @@ export class EnvironmentLighting extends ShaderEffect {
       lighting.loadedInto = engine;
       return lighting;
     } catch (error) {
+      // scene-owner: active scene on purpose, the rollback runs in the same synchronous call as engine.use above.
       if (attached) engine.removePlugin(environment.name);
       else environment.dispose();
       throw error;
