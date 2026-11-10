@@ -166,6 +166,12 @@ test('MRC packed 4-bit, complex component choice, endian order and cancellation'
     bytes.set(source.subarray(0, 1024));
     const v = new DataView(bytes.buffer);
     v.setInt32(12, mode, true);
+    // This case covers even-width rows; odd-width padding is checked separately.
+    if (mode === 101) {
+      v.setInt32(0, 6, true);
+      v.setInt32(4, 5, true);
+      v.setInt32(8, 2, true);
+    }
     if (mode === 101) for (let i = 0; i < 30; i++) bytes[1024 + i] = (i % 16) | ((15 - (i % 16)) << 4);
     else
       for (let i = 0; i < count; i++) {
@@ -186,6 +192,26 @@ test('MRC packed 4-bit, complex component choice, endian order and cancellation'
   }
   assert.throws(() => parseMRC(source, { signal: AbortSignal.abort() }), { name: 'AbortError' });
   assert.throws(() => parseMRC(source.subarray(0, 1025)), /truncated/);
+});
+
+test('MRC mode 101 skips odd-width row padding and requires every padded byte', { timeout: 1000 }, () => {
+  for (const nx of [1, 3, 5]) {
+    const ny = 2, nz = 2, stride = Math.ceil(nx / 2),
+      bytes = new Uint8Array(1024 + stride * ny * nz);
+    bytes.set(read('owner-float32.mrc').subarray(0, 1024));
+    const header = new DataView(bytes.buffer);
+    for (const [offset, value] of [[0, nx], [4, ny], [8, nz], [12, 101]]) header.setInt32(offset, value, true);
+    bytes.fill(255, 1024);
+    const expected = [];
+    for (let row = 0; row < ny * nz; row++)
+      for (let x = 0; x < nx; x++) {
+        const value = (row * nx + x + 1) % 15, p = 1024 + row * stride + (x >> 1), shift = (x & 1) * 4;
+        expected.push(value);
+        bytes[p] = (bytes[p] & ~(15 << shift)) | (value << shift);
+      }
+    assert.deepEqual([...parseMRC(bytes).data], expected);
+    assert.throws(() => parseMRC(bytes.subarray(0, bytes.length - 1)), /truncated/);
+  }
 });
 test('OME BigTIFF and classic TIFF, tiles and strips, LZW and deflate retain uint16 Z/C/T stacks', {
   timeout: 10000,

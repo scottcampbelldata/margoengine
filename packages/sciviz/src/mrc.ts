@@ -67,18 +67,21 @@ export function parseMRC(bytes: Uint8Array, options: FileOptions = {}): MRCMap {
     bad('unit cell');
   const count = dims.reduce((a, b) => a * b, 1) * components,
     bpp = mode === 0 ? 1 : mode === 1 || mode === 3 || mode === 6 || mode === 12 ? 2 : mode === 101 ? 0.5 : 4,
-    start = 1024 + i(92);
+    start = 1024 + i(92),
+    rowBytes = Math.ceil(dims[0] / 2),
+    payloadBytes = mode === 101 ? rowBytes * dims[1] * dims[2] : count * bpp;
   if (
     start < 1024 ||
     !Number.isSafeInteger(count) ||
-    start + Math.ceil(count * bpp) > bytes.length ||
+    start + payloadBytes > bytes.length ||
     count * 4 > (options.maxBytes ?? 64 * 1024 * 1024)
   )
     bad('truncated or oversized data');
   const data = new Float32Array(count);
   for (let n = 0; n < count; n++) {
     if (!(n & 65535)) options.signal?.throwIfAborted();
-    const p = start + Math.floor(n * bpp);
+    const x = n % dims[0],
+      p = start + (mode === 101 ? Math.floor(n / dims[0]) * rowBytes + (x >> 1) : Math.floor(n * bpp));
     data[n] =
       mode === 0
         ? v.getInt8(p)
@@ -89,7 +92,7 @@ export function parseMRC(bytes: Uint8Array, options: FileOptions = {}): MRCMap {
             : mode === 12
               ? half(v.getUint16(p, little))
               : mode === 101
-                ? (bytes[p] >> ((n % 2) * 4)) & 15
+                ? (bytes[p] >> ((x & 1) * 4)) & 15
                 : v.getFloat32(p, little);
   }
   const rad = Math.PI / 180,
