@@ -1,5 +1,13 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 React: no props copy per mesh render, R3F harness (2026-11-10)
+
+`Mesh` copied its props into a handler record with object rest on every render: 20,000 props enumerations on a
+10,000-mesh StrictMode rerender, zero after, with identical transform bytes. The new black-box React Three Fiber
+adapter runs the same `react` scene; its smoke shows equal draw calls (1,000 and 10,000). Fix commit subject:
+`perf(react): avoid copying mesh props into pointer handlers`. Timing pending the quiet rerun.
+[Research, harness and reproduction](batch-170-react.md).
+
 ## Batch 170 audio: fixed pose-vector reads (2026-11-10)
 
 Fixed-vector destructuring in listener/panner writes started 154,500 iterators in the three-mode replay. Indexed

@@ -11,6 +11,9 @@ node scripts/gpu-lock.mjs run --owner=parity-preflight --max=30 --wait-max=20 --
 The external black-box adapters must already exist in the adjacent `engine-bench`
 checkout. Override that location with `--engine-bench=<path>`. `--cases=p-background,p-orbit-controls`
 selects exact case IDs; `--engines=margo` selects the local implementation alone.
+`--standard=<suite>` runs that suite's standard cases from `bench/scenes/catalog.js` instead of the parity cases,
+against Margo and any adapter named in `engine-bench/margo-bench/engines.json` (batch 170: `--standard=react
+--engines=margo,r3f`, [React Three Fiber adapter](batch-170-react.md)).
 The smoke runner executes one `task(0)` or one `render(0)` plus GPU idle. It never
 runs the throughput, timestamp, serial-frame or repeated-task phases. It does not
 enable `MARGO_SPEED_PHASE`, write a baseline, or enter `perf-vs-threejs.json`.

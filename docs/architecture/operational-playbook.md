@@ -7297,3 +7297,9 @@ first-operation native call counts, eight one-call CPU profiles and the previous
 empty slower-row diagnoses. Initialization counts are not steady-frame evidence.
 The inventory retains six real errors and four absent Margo adapters/APIs, so quiet
 refresh readiness remains open. [Sources, evidence and reproduction](../whitepaper/parity-diagnoses.md).
+
+### React rival preflight (batch 170, 2026-11-10)
+
+Section 5 evidence: the correctness preflight also runs a suite's standard cases (`--standard=react`) against
+black-box adapters in engine-bench. React Three Fiber 9.8.2 and Margo each drew `react-1000` and `react-10000`
+once with equal draw-call counts. Quiet timings remain open. [Adapter, scope and counts](../whitepaper/batch-170-react.md).

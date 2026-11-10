@@ -268,3 +268,13 @@ The historical volume-64 loss is retained. Its anisotropic normalized/world stri
 ## Batch 182 sciviz scenes
 
 Eight scenes against six rivals, same data, pixels, camera and colour ([sciviz-vs-rivals](sciviz-vs-rivals.md)). Smoke only: no timing row is published yet. Explicit work differences (Margo volume depth composition, Plotly PNG export on both sides, Cosmograph's own animation loop) are recorded per scene. Timing pending the quiet rerun.
+
+## Batch 170 React: work counts, 2026-11-10
+
+| Package | Work | Before | After | Black-box rival | Status |
+| --- | --- | --- | --- | --- | --- |
+| react | 10,000 meshes, one StrictMode rerender | 20,000 props enumerations | 0; 90,000 transform value bytes unchanged | React Three Fiber 9.8.2 (three r186): no counter for its props handling | `perf(react)`; timing pending the quiet rerun |
+| react | `react-1000` and `react-10000`, first frame after mount | 1,000 and 10,000 draw calls | same | R3F: 1,000 and 10,000 draw calls | equal draw work; timing pending the quiet rerun |
+
+The R3F adapter, its public-API scope and the smoke command are in [batch-170-react.md](batch-170-react.md).
+No rival timing was run and no speed ratio is claimed.

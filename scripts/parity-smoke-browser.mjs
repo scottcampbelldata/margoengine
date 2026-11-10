@@ -1,11 +1,13 @@
 // Correctness preflight for tonight's matrix. No timing samples or speed-phase override.
 // node scripts/gpu-lock.mjs run --owner=parity-smoke --max=30 -- node scripts/parity-smoke-browser.mjs --runs=1
+// --standard=<suite> runs that suite's standard cases (bench/scenes/catalog.js STANDARD) instead of the parity cases,
+// against Margo and any black-box adapter named in engine-bench/margo-bench/engines.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildPages, browserSession, externalEngines, serve } from '../bench/lib/browser.mjs';
 import { root } from '../bench/lib/env.mjs';
-import { SCENES, caseId, sceneParams } from '../bench/scenes/catalog.js';
+import { SCENES, STANDARD, caseId, sceneParams } from '../bench/scenes/catalog.js';
 import { parityCases } from '../bench/scenes/parity.js';
 import { smokeStatus } from '../bench/lib/smoke-result.mjs';
 import { browserLabel } from './lib/browser.mjs';
@@ -16,17 +18,22 @@ const { values: o } = parseArgs({
     engines: { type: 'string', default: 'margo,three-webgpu-parity,three-webgl-parity' },
     'engine-bench': { type: 'string', default: resolve(root, '../engine-bench') },
     cases: { type: 'string' },
+    standard: { type: 'string' },
     out: { type: 'string', default: 'test-results/bp-159-smoke.json' },
   },
 });
 if (o.runs !== '1') throw new RangeError('Correctness preflight requires --runs=1; use bench/cli.mjs for timing');
 if (!process.env.MARGO_GPU_LOCK_NESTED) throw new Error('Run through scripts/gpu-lock.mjs run');
 const engines = o.engines.split(',');
-if (engines.some((e) => !['margo', 'three-webgpu-parity', 'three-webgl-parity'].includes(e)))
-  throw new RangeError('Unknown parity engine');
+if (o.standard !== undefined && !Object.hasOwn(STANDARD, o.standard))
+  throw new RangeError(`Unknown standard suite ${o.standard}`);
 const external = externalEngines(resolve(o['engine-bench']));
+const known = o.standard === undefined ? ['margo', 'three-webgpu-parity', 'three-webgl-parity'] : ['margo', ...Object.keys(external)];
+if (engines.some((e) => !known.includes(e))) throw new RangeError('Unknown smoke engine');
 const filters = o.cases?.split(',');
-const cases = parityCases(SCENES).filter((c) => !filters || filters.includes(caseId(c.scene, c.params)));
+const cases = (o.standard === undefined ? parityCases(SCENES) : STANDARD[o.standard]).filter(
+  (c) => !filters || filters.includes(caseId(c.scene, c.params)),
+);
 if (!cases.length) throw new RangeError('No parity cases selected');
 const out = resolve(root, o.out);
 mkdirSync(resolve(out, '..'), { recursive: true });

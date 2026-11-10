@@ -463,6 +463,33 @@ const flush = () => act(async () => {});
 function tree(children, props = {}) {
   return React.createElement(StrictMode, null, React.createElement(MargoCanvas, props, children));
 }
+test('10000 meshes rerender without enumerating or copying their props into handler records', async () => {
+  let enumerations = 0;
+  const CountedMesh = React.forwardRef((props, ref) => Mesh.render(new Proxy(props, {
+    ownKeys(target) { enumerations++; return Reflect.ownKeys(target); },
+  }), ref));
+  const scene = (turn) => tree(Array.from({ length: 10000 }, (_, i) => React.createElement(CountedMesh, {
+    key: i, position: [i / 8, -i / 4, i % 7], rotation: [0, turn, -0], scale: [1, 2, 0.5],
+  })), { capacity: 10016 });
+  const view = render(scene(0));
+  await flush();
+  const engine = engines.at(-1);
+  assert.equal(engine.meshes.size, 10000);
+  const before = enumerations;
+  view.rerender(scene(0.25));
+  await flush();
+  const actual = new Float64Array(10000 * 9), expected = new Float64Array(actual.length);
+  let i = 0;
+  for (const node of engine.meshes.values()) {
+    actual.set([...node.position, ...node.rotation, ...node.scale], i * 9);
+    expected.set([i / 8, -i / 4, i % 7, 0, 0.25, -0, 1, 2, 0.5], i * 9);
+    i++;
+  }
+  assert.deepEqual(new Uint8Array(actual.buffer), new Uint8Array(expected.buffer));
+  assert.equal(enumerations - before, 0);
+  view.unmount();
+});
+
 afterEach(async () => {
   cleanup();
   deferModel = deferEnvironment = false;

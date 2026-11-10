@@ -583,8 +583,8 @@ export interface MeshProps extends PointerHandlers {
   children?: ReactNode;
 }
 /** The mesh component. */
-export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
-  {
+export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(props, ref) {
+  const {
     position = zero,
     rotation = zero,
     scale = one,
@@ -592,10 +592,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     receiveShadow = true,
     layers,
     children,
-    ...events
-  },
-  ref,
-) {
+  } = props;
   const parentScene = useScene(),
     { engine, registry: parent, pointerHandlers, world } = parentScene;
   const [node, setNode] = useState<EngineMesh | null>(null);
@@ -642,9 +639,9 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
   }, [engine, world, parent, registry]);
   // The record reads the current props, so a new handler function needs no re-registration; it is registered while the
   // mesh has any handler at all.
-  const latestEvents = useRef<PointerHandlers>(events);
-  latestEvents.current = events;
-  const listening = hasPointerHandlers(events);
+  const latestEvents = useRef<PointerHandlers>(props);
+  latestEvents.current = props;
+  const listening = hasPointerHandlers(props);
   useCommit(() => {
     const mesh = registry.current;
     if (!mesh || !listening) return;

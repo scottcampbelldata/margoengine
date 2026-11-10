@@ -607,7 +607,7 @@ export const STANDARD = {
     { scene: 'boxes', params: { n: 100_000, mode: 'instanced' } },
     { scene: 'helmet' },
   ],
-  react: [{ scene: 'react', params: { n: 1000 } }],
+  react: [1000, 10000].map((n) => ({ scene: 'react', params: { n } })),
   compute: [
     ...[1 << 16, 1 << 20, 1 << 22].map((n) => ({ scene: 'compute-sort', params: { n } })),
     ...[1 << 20, 1 << 24].flatMap((n) =>

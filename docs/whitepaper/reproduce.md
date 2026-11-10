@@ -1,5 +1,10 @@
 # Reproducing Margo's numbers
 
+- Batch 170 React: after building, `node --experimental-test-module-mocks --test --test-timeout=120000
+  --test-name-pattern=10000 packages/react/test/declarative.test.js` checks the props enumerations and transform
+  bytes. The R3F smoke is `node scripts/gpu-lock.mjs run --owner=react-smoke --max=20 -- node
+  scripts/parity-smoke-browser.mjs --runs=1 --standard=react --engines=margo,r3f`. [Setup](batch-170-react.md).
+
 - Batch 170 audio: after building, `node --test --test-timeout=120000 packages/audio/tests/workcount.test.js` checks
   iterator starts and exact parent automation/value bytes. [Research, fixture scope and quiet-rerun command](batch-170-audio.md).
 

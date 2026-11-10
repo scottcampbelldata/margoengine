@@ -57,6 +57,10 @@ without the optional peers; options typed by a peer you have not installed are `
 
 A box lit by the default sun, with a click handler:
 
+`Mesh` keeps the immutable React props for live pointer-handler lookup rather than copying a handler record on
+every render. Replacing a callback still takes effect without re-registering the mesh. All transform effects run
+as before. This removes prop-copy work; no measured speedup or comparison win is claimed.
+
 ```tsx
 import { createRoot } from 'react-dom/client';
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from 'margoengine/react';
@@ -65,7 +69,7 @@ export function App() {
   return (
     <Canvas style={{ height: 400 }}>
       <Stage camera={{ position: [0, 2, 5] }}>
-        <Mesh position={[0, 1, 0]} onClick={() => {}}>
+        <Mesh position={[0, 1, 0]} onClick={event => console.log('Selected mesh', event.object)}>
           <BoxGeometry args={[1, 1, 1]} />
           <PbrMaterial color="#84d6bd" />
         </Mesh>

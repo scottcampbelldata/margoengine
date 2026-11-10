@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 React: a 10,000-mesh StrictMode rerender enumerates 20,000 props objects on the parent and none after,
+  with all 90,000 transform value bytes unchanged. The R3F 9.8.2 smoke draws 1,000 and 10,000 boxes with the same
+  draw-call counts as Margo. Work evidence only, no speed claim. [Scope and reproduction](batch-170-react.md).
+
 - Batch 170 audio: stored pose-vector iterator starts fall from 154,500 to zero in the three-mode replay, preserving
   all 931,662 recorded automation events and raw values. This is semantic work evidence, not heap, PCM or timing
   evidence. [Scope and reproduction](batch-170-audio.md).

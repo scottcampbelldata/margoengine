@@ -1,5 +1,11 @@
 # Clean room
 
+### Batch 170 React work counts and R3F harness (2026-11-10)
+
+Compared the React team's *Components and Hooks must be pure* (living documentation) with TC39's *ECMAScript 2025*
+CopyDataProperties. React Three Fiber 9.8.2 runs only as a black box in engine-bench through its documented public
+API. [Titles, links, adapter and scope](whitepaper/batch-170-react.md). No external implementation was read.
+
 ### Batch 170 audio work counts (2026-11-10)
 
 Compared Adenot and Choi's W3C *Web Audio API 1.1* (2026 draft), TC39's *ECMAScript Language Specification*
