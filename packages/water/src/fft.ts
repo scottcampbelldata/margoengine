@@ -475,7 +475,7 @@ export class FFTOcean implements EnginePlugin {
     this.release();
     const engine = this.engine;
     this.engine = undefined;
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

@@ -346,7 +346,7 @@ fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleGrid.xy)/rippleGrid.z-0.5;let 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;
   }

@@ -2420,6 +2420,7 @@ The batch 168 timing drives `@mkkellogg/gaussian-splats-3d` 0.4.7 as a black box
 | W11 | integer hash for spray | water/src/spray.ts | xxHash32 avalanche (Collet, xxHash specification): public, but uncited (already listed in hashes.md) |
 | W12 | spray seeding and ballistics | water/src/spray.ts | Teschner et al. 2003 (spatial-hash primes), uncited |
 | W13 | fog tail on water (Neutral + fog mix + sRGB) | water/src/index.ts | Khronos PBR Neutral; IEC 61966-2-1 |
+| W14 | FFT ocean: Phillips spectrum with the exp(-k^2 l^2) small-wave cut (l = 0.1 m), JONSWAP S(omega) (omega_p = 22 (g^2 / (U F))^(1/3), alpha = 0.076 (U^2 / (F g))^0.22, sigma 0.07 / 0.09, gamma 3.3) times cos^2 / pi spreading, converted per d(kx) d(kz) by (d omega / dk) / k; h0 = (xi_r + i xi_i) sqrt(P / 2), h(k, t) = h0 e^(i omega t) + conj(h0(-k)) e^(-i omega t), choppy D = -i k / |k| h, folding foam from the displacement Jacobian | water/src/fft-shaders.ts, water/src/fft.ts | Tessendorf, Simulating Ocean Water, course notes 2004 (Clemson PDF), eq. 36-45, read in batch 132; JONSWAP after Hasselmann et al. 1973 (not read: the formula as commonly restated) |
 
 ## Extruded 3D text: `@margoengine/text/extrude`
 
