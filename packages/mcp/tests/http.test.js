@@ -328,8 +328,11 @@ test('sessions isolate identical request ids, reject duplicate ids and cancel on
     const a = await initialize(listener),
       b = await initialize(listener);
     const request = { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'wait' } };
-    const first = post(listener, request, a),
-      second = post(listener, request, b);
+    // One at a time, so started[0] is session a's tool and started[1] session b's. Posting both at once let them start
+    // in either order; under load b started first, started[1] then resolved a's settled call and b waited forever.
+    const first = post(listener, request, a);
+    while (started.length < 1) await new Promise((resolve) => setImmediate(resolve));
+    const second = post(listener, request, b);
     while (started.length < 2) await new Promise((resolve) => setImmediate(resolve));
     assert.equal((await post(listener, request, a)).status, 409);
     assert.equal(
