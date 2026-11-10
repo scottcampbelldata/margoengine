@@ -29,6 +29,17 @@ Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
 1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
 WebCodecs section 9.4 (2026); sources in clean-room.md.
 
+### Fixed: Water inside a TAA capture at 4x lost the whole frame
+
+C2 row c2-007 (taa, shadows, toon, water, points with a DepthTexture probe) read depth 0 at every probe on native
+WebGPU at 4x MSAA; 1x passed. Bisected to the pair TAA + Water. Cause: inside a 4x scene capture, Water copied the
+capture's depth into its own 4x surface depth with `SceneTarget.copyDepth(encoder, view, 4)` and no format, so the copy
+pipeline took the capture's format (TAA mirrors the canvas's depth32float-stencil8) while the surface depth uses the
+source depth's format (DepthTexture's depth32float). The device rejected the attachment state at `setPipeline` and
+dropped the frame's whole command buffer, so no pass of that frame ran. Water now passes its surface depth's format.
+Regression: `packages/water/test/water.test.js` "4x surface depth copies in its own format from a capture whose depth
+format differs" checks every pipeline's depth format and sample count against its pass's depth attachment.
+
 ### Fixed: umbrella indexes after the caustics rebase
 
 The merged workspace exports included optional entries absent from the

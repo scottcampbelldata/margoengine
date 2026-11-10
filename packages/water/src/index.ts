@@ -1107,7 +1107,9 @@ export class Water implements EnginePlugin {
       this.shadowEntries = shadowEntries;
     }
     const target = sceneTarget(c);
-    if (target && samples === 4) target.copyDepth(c.encoder, this.surfaceView!, 4);
+    // In the surface depth's own format: a capture's depth (e.g. TAA's, the canvas's depth32float-stencil8) can differ
+    // from the source depth this surface copies its format from, and a mismatched copy pipeline fails the whole frame.
+    if (target && samples === 4) target.copyDepth(c.encoder, this.surfaceView!, 4, this.surfaceDepth!.format);
     else {
       const copy = c.encoder.beginRenderPass(this.depthPresentation);
       copy.setPipeline(this.copyPipeline!);

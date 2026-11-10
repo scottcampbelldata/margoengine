@@ -426,6 +426,55 @@ test('4x refraction switches borrowed sources and survives restoration without d
     h.cleanup();
   }
 });
+// C2 row c2-007 (TAA + Water at 4x): TAA captures in the canvas's depth32float-stencil8 while the water's source depth
+// is depth32float. The surface copy from the capture used the capture's format, so its pipeline did not match the
+// surface depth attachment and the device rejected the frame's whole command buffer (every depth read back 0).
+test('4x surface depth copies in its own format from a capture whose depth format differs', () => {
+  const h = optionalGPU(),
+    c = h.context,
+    device = h.engine.gpu,
+    usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    make = (format) => device.createTexture({ size: [128, 96], format, usage: usage | GPUTextureUsage.COPY_SRC });
+  const color = make('rgba16float'),
+    captured = make('depth32float-stencil8'),
+    source = make('depth32float'),
+    target = new SceneTarget(device, color, captured, 4);
+  const water = new Water({ segments: 4, depth: () => source });
+  h.engine.use(water);
+  // WebGPU's attachment-state rule: a pipeline's depth format and sample count match the pass's depth attachment.
+  const mismatches = [],
+    begin = c.encoder.beginRenderPass;
+  c.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor),
+      depth = descriptor.depthStencilAttachment?.view?.texture;
+    pass.setPipeline = (pipeline) => {
+      if (!depth) return;
+      const format = pipeline.depthStencil?.format,
+        count = pipeline.multisample?.count ?? 1;
+      if (format !== depth.format || count !== depth.sampleCount)
+        mismatches.push(`${format} ${count}x pipeline in a ${depth.format} ${depth.sampleCount}x pass`);
+    };
+    return pass;
+  };
+  try {
+    c.color = h.originalColor;
+    c.depth = h.originalDepth;
+    c.format = 'rgba16float';
+    c.descriptor.depthStencil.format = 'depth32float-stencil8';
+    target.begin(c);
+    h.engine.frameGraph.execute(c);
+    target.resolve(c.encoder, true);
+    target.restore(c);
+    assert.equal(h.counts.indexed, 1);
+    assert.equal(water.surfaceDepth.format, 'depth32float');
+    assert.equal(water.surfaceDepth.sampleCount, 4);
+    assert.deepEqual(mismatches, []);
+  } finally {
+    water.dispose();
+    target.dispose();
+    h.cleanup();
+  }
+});
 test('mesh sampling fades short waves without changing their wavelength or height controls', () => {
   const h = optionalGPU(),
     edge = Math.hypot(2, 2),
