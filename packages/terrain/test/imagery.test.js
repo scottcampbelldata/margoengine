@@ -257,3 +257,26 @@ test('R5: a clipmap camera past the east edge loads the east edge tiles, not the
   assert.ok(!fine.includes(0), `level-5 columns ${fine} wrapped to the west edge`);
   f.imagery.dispose();
 });
+
+test('the small WebGL2 preview is refused during setup with a coded WebGPU error, before any lighting is added', () => {
+  const effects = new Set(),
+    terrain = {
+      options: { origin: [0, 0], size: [10, 20] },
+      addLighting(e) {
+        effects.add(e);
+        return () => effects.delete(e);
+      },
+    };
+  for (const engine of [
+    { backend: 'webgl2', gpu: null, sceneOf: () => undefined },
+    { backend: 'webgl2', gpu: {}, sceneOf: () => undefined },
+  ])
+    assert.throws(
+      () => new TerrainImagery(terrain, { automatic: false }).setup(engine),
+      (error) =>
+        error.code === 'unsupported' &&
+        error.message.startsWith('TerrainImagery needs WebGPU') &&
+        error.message.includes('https://margoengine.com/errors#webgpu'),
+    );
+  assert.equal(effects.size, 0);
+});

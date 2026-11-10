@@ -943,3 +943,5 @@ A hill can hide GPU-culled parts: `parts.addOccluder(terrain)` (`CulledParts` fr
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.
+
+`TerrainImagery` refuses the small preview through the shared `requireWebGPU` (`TerrainImagery needs WebGPU`, code `unsupported`, help link). Before 2026-11-10 it threw `unsupported` with `Imagery requires WebGPU or its compatibility device` and no help link, which the preview-contract gate counted as a silent skip, so `npm run verify` failed. It now also refuses an engine whose backend is `webgl2` even when a device object is present, as every shared refusal does. Regression: `test/imagery.test.js`.

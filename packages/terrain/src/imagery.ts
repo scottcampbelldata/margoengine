@@ -3,6 +3,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Terrain, TerrainLighting } from './index.js';
 import type { PlanetTerrain } from './planet.js';
 import type { TerrainVirtualTexture } from './rvt.js';
@@ -362,11 +363,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
 
   setup(engine: Engine): void {
     this.#live();
-    if (!engine.gpu)
-      throw new MargoError(
-        'unsupported',
-        'Imagery requires WebGPU or its compatibility device; attach to a GPU engine.',
-      );
+    requireWebGPU(engine, 'TerrainImagery');
     if ('owner' in this.terrain && this.terrain.owner && this.terrain.owner !== engine)
       throw new MargoError('attached', 'Imagery and terrain must belong to the same engine; attach them together.');
     this.owner = engine;
