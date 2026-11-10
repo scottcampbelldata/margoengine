@@ -12,6 +12,28 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const baselineShader = '20ea22e385536a54b32de541f69bfc9e75258364a0d1443de0975bacc6ca4297';
 
+test('clearcoat maps upload retained Node pixels and generate their sampler mip chain', async () => {
+  const image = { width: 2, height: 2, data: new Uint8Array(16).fill(127) };
+  const s = await scene({ clearcoatFactor: 1, clearcoatTexture: { index: 0 } }, [image], (doc) => {
+    doc.images = [{ uri: 'decoded.png' }];
+    doc.textures = [{ source: 0 }];
+  });
+  const writes = [];
+  const write = s.device.queue.writeTexture;
+  s.device.queue.writeTexture = (to, bytes, layout, size) => {
+    writes.push({ bytes, layout, size });
+    write(to, bytes, layout, size);
+  };
+  try {
+    install(s.model);
+    s.draw();
+    assert.equal(s.copies.length, 0, 'a byte source never uses the browser image upload');
+    assert.ok(writes.some((w) => w.bytes === image.data && w.layout.bytesPerRow === 8));
+  } finally {
+    s.engine.dispose();
+  }
+});
+
 async function scene(definition, images = [], configure = () => {}) {
   const harness = optionalGPU(),
     store = await TransformStore.create(16),

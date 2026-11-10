@@ -5,7 +5,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-async function fixture(definitions = [{ specVersion: '1.0' }], modes = definitions.map(() => 'OPAQUE')) {
+async function fixture(definitions = [{ specVersion: '1.0' }], modes = definitions.map(() => 'OPAQUE'), image) {
   const gpu = optionalGPU(),
     store = await TransformStore.create(32),
     engine = new Engine(
@@ -26,7 +26,11 @@ async function fixture(definitions = [{ specVersion: '1.0' }], modes = definitio
     extensions: { VRMC_materials_mtoon: extension },
   }));
   data.doc.meshes[0].primitives = definitions.map((_, material) => ({ ...primitive, material }));
-  const model = parseGLTF(engine, data.doc, data.buffers);
+  if (image) {
+    data.doc.images = [{}];
+    data.doc.textures = [{ source: 0 }];
+  }
+  const model = parseGLTF(engine, data.doc, data.buffers, image ? [image] : []);
   engine.camera.update(128 / 96, true);
   store.tick(false);
   const context = { ...gpu.context, camera: engine.camera };
@@ -39,6 +43,24 @@ async function fixture(definitions = [{ specVersion: '1.0' }], modes = definitio
     },
   };
 }
+test('MToon uploads retained Node texture pixels without a browser image source', async () => {
+  const image = { width: 2, height: 2, data: new Uint8Array(16).fill(127) };
+  const f = await fixture([{ specVersion: '1.0', shadeMultiplyTexture: { index: 0 } }], ['OPAQUE'], image);
+  const writes = [],
+    device = f.engine.gpu;
+  const write = device.queue.writeTexture;
+  device.queue.writeTexture = (to, bytes, layout, size) => {
+    writes.push({ bytes, layout, size });
+    write(to, bytes, layout, size);
+  };
+  try {
+    MToon.attach(f.model);
+    f.frame();
+    assert.ok(writes.some((w) => w.bytes === image.data && w.layout.bytesPerRow === 8));
+  } finally {
+    f.engine.dispose();
+  }
+});
 test('MToon belongs to the model scene and disposal restores author records without disposing the model', async () => {
   const f = await fixture(),
     original = f.model.primitives.map((p) => p.material),

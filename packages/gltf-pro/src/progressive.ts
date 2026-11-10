@@ -145,8 +145,8 @@ export function loadGLTFProgressive(
     settings = options.textures === true ? {} : options.textures,
     textures =
       settings && engine.gpu
-        ? import('./texture-stream.js').then(
-            ({ GLTFTextureStream }) => GLTFTextureStream.attach(instance, settings, controller.signal),
+        ? import('./texture-stream.js').then(({ GLTFTextureStream }) =>
+            GLTFTextureStream.attach(instance, settings, controller.signal),
           )
         : undefined;
   textures?.catch(() => {});
@@ -216,7 +216,10 @@ export function loadGLTFProgressive(
     pending.clear();
     if (model) model.dispose();
     else for (const image of images) (image as ImageBitmap | undefined)?.close?.();
-    void textures?.then((stream) => stream.dispose(), () => {});
+    void textures?.then(
+      (stream) => stream.dispose(),
+      () => {},
+    );
     rejectReady(error);
     rejectComplete(error);
   };
@@ -512,7 +515,7 @@ export function loadGLTFProgressive(
   };
   const message = (m: StreamMessage) => {
     if (finished) {
-      if (m.type === 'image') m.image?.close?.();
+      if (m.type === 'image' && m.image && 'close' in m.image) m.image.close();
       return;
     }
     try {

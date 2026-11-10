@@ -56,7 +56,9 @@ const config = (entry, outDir, fileName, name, plugins = [], write = true) => ({
   logLevel: 'warn',
   // Classic scripts have no module URL. Keep core's identity/version checks, naming the published worker instead.
   define: {
-    'import.meta.url': JSON.stringify(`@margoengine/${relative(packagesDir, resolve(outDir, fileName)).replaceAll('\\', '/')}`),
+    'import.meta.url': JSON.stringify(
+      `@margoengine/${relative(packagesDir, resolve(outDir, fileName)).replaceAll('\\', '/')}`,
+    ),
   },
   plugins,
   resolve: { alias: aliases },
@@ -235,14 +237,14 @@ function valueExports(file) {
   return names;
 }
 
-// Drop the package-build ignore comment and restore import.meta.url. tsc may copy the comment back into dist.
+// Restore worker URL annotations only. Runtime import() annotations must survive consumer bundling.
 export async function restoreWorkerUrls(dist) {
   if (!existsSync(dist)) return;
   for (const file of (await readdir(dist)).filter((file) => file.endsWith('.js'))) {
     const path = resolve(dist, file),
       code = await readFile(path, 'utf8'),
       fixed = code
-        .replace(/\/\*\s*@vite-ignore\s*\*\/\s*/g, '')
+        .replace(/(new URL\()\s*\/\*\s*@vite-ignore\s*\*\/\s*/g, '$1')
         .replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g, 'import.meta.url');
     if (fixed !== code) await writeFile(path, fixed);
   }

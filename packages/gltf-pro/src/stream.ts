@@ -29,8 +29,20 @@ export type StreamError = { name: string; message: string };
 export type StreamMessage =
   | { type: 'fallback' }
   | { type: 'doc'; doc: GLTFDocument }
-  | { type: 'geometry'; key: number; vertices?: Float32Array; indices?: Uint32Array; uvs?: Float32Array; error?: StreamError }
-  | { type: 'image'; index: number; image?: ImageBitmap; source?: GLTFStreamSource }
+  | {
+      type: 'geometry';
+      key: number;
+      vertices?: Float32Array;
+      indices?: Uint32Array;
+      uvs?: Float32Array;
+      error?: StreamError;
+    }
+  | {
+      type: 'image';
+      index: number;
+      image?: ImageBitmap | import('./asset.js').GLTFPixelImage;
+      source?: GLTFStreamSource;
+    }
   | { type: 'bytes'; loaded: number; total: number }
   | { type: 'done'; buffers: Uint8Array[]; accessors: [number, Float32Array][] }
   | { type: 'error'; error: StreamError };
@@ -506,7 +518,10 @@ export class GLTFStream {
     }
   }
   // Where KTX2 image `def` is. A view in a ranged file is left unfetched (counted as received) for the stream to read.
-  private async textureSource(doc: GLTFDocument, def: NonNullable<GLTFDocument['images']>[number]): Promise<GLTFStreamSource> {
+  private async textureSource(
+    doc: GLTFDocument,
+    def: NonNullable<GLTFDocument['images']>[number],
+  ): Promise<GLTFStreamSource> {
     if (def.bufferView === undefined) {
       if (typeof def.uri !== 'string')
         throw new TypeError(
@@ -612,16 +627,16 @@ export class GLTFStream {
         throw new TypeError(
           'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
         );
-      const image = await decodeImage(data, def.mimeType, index);
+      const image = await decodeImage(data, def.mimeType, index, this.signal);
       decoded += image.width * image.height * 4;
       if (image.width * image.height > 16_777_216) {
-        image.close?.();
+        if ('close' in image) image.close();
         throw new RangeError(
           'glTF images exceed decoded size limit; load a smaller model, or reduce its textures and meshes',
         );
       }
       if (decoded > this.limit * 4) {
-        image.close?.();
+        if ('close' in image) image.close();
         throw overBudget('glTF images exceed decoded size limit', this.limit * 4);
       }
       this.post({ type: 'image', index, image });

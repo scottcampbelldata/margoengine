@@ -1376,20 +1376,9 @@ cited in clean-room.md. No speculative shader or weaker edge bar was landed.
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
 
-### The README check counts a Node example that reaches its time limit as a pass
+### Fixed: unfinished Node examples cannot pass at their deadline
 
-- **What:** `runInNode` in `scripts/run-readme-examples.mjs` reports `pass` (note "ran to the 30 s limit") for an example
-  that is still running at 30 s. Under a whole run's load, examples that fail in a few seconds alone can reach the limit
-  and pass, so the same example passes in one run and fails in another, and a known entry can read "passes, still on the
-  known list" only because the machine was busy. Seen 2026-11-07 on the Beelink: four rigging entries
-  (`readme-corrective-shapes-...-ff3e5c`, `readme-face-tracking-...-8fff06`, `readme-ik-chains-...-138226`,
-  `readme-spring-bones-...-a41e82`) passed in a whole run and failed with their listed errors in a run of three packages.
-- **Repro:** on a loaded machine, `npm run check:readme-run`, then `npm run check:readme-run -- --packages=rigging`; compare
-  the rigging results in the two reports.
-- **Cause:** a time limit is taken as "a long-running example, such as a server", not as "unknown"; the result depends on the
-  machine's load.
-- **Needed to close:** tell a server or loop that is meant to keep running from a slow failure (for example by its
-  `listen` port, as `nodeTurns` already reads it), and give the others enough time, or report them as unknown rather than pass.
+Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinished page imports fail; the owned process tree or page closes. Lane C rechecked the three synthetic deadline regressions in tests/run-readme-examples.test.js on 2026-11-10: all pass. No README examples were run or edited.
 
 ## Checks
 
@@ -1403,6 +1392,7 @@ cited in clean-room.md. No speculative shader or weaker edge bar was landed.
   which holds about 0.004 m at 6 m and 0.125 m at 200 m. The limit of 16 was set before the display curve changed on 2026-10-17.
 - **Needed to close:** view depth in an `r32float` target of its own, which also serves scenes past 65,504 units; then the check
   joins `post` as `test:gpu:ssao` and leaves `LOOSE_CHECKS`. The limit stays.
+- **Lane C recheck (2026-11-10, two rounds):** current main reproduces 87 channel bytes over 2 and worst 17. A separate r32float view-depth target reduces that to 27, worst 17; all remaining differences are at x=399. The normal extractor chooses a clamped zero-length forward derivative at the screen edge. Selecting the available one-sided derivative plus full-precision depth makes the eye-movement comparison exact (0 bytes, worst 0). The check then reaches a separate IBL bar: perspective crease 4.0 and step 1.9 against strict >4 and >2. No assertion changed. The draft is parked in lane C's private handoff at the two-round cap, not shipped. Next: reproduce the IBL bar independently, then finish both changes with their regression tests before adding this check to post's plan.
 
 ## Boulder demo
 
@@ -1660,25 +1650,15 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 - **Cause** (measured on main at 82779ba8c, where seed 49 reached 7,772 m/s at step 1153 and 117 m open after step 1217; the contact changes of a6a767220 moved every web since): two rows depend on the others and are dropped (measured left: 1e-32 of their size). A third is 2.3e-3 rad from depending, a pivot of 5.4e-6 of its size at steps 1152 to 1216 against the stop of 14 u = 1.7e-6, so it is independent and the exact solve gives it the speed of one over that angle, as the kinematic ends ask more than the joints allow; at step 1216 it crosses the stop and is dropped. Checked in rationals: with the f32 epsilon stop the kernel's pivots matched an exact elimination to 1e-13 on every path of seed 49 at step 896 and seed 59 at step 1038 (pivots of 1.35e-7 and 1.76e-7 there, nonzero in rationals), so these are the scene's answers and not rounding.
 - **Needed to close:** a design for speeds near a toggle when the ends cannot both be met (damping per singular direction, as Buss and Kim 2005 do for a push, or a bound from what the kinematic bodies carry), then a gap bar in `a_web_of_joints_stays_in_the_numbers` for all 60 webs. `a_path_with_more_locks_than_freedoms_drops_the_row_that_depends` holds seeds 1 and 35 under 56.85 m to steps 400 and 600 now.
 
-### A Python script test can fail to spawn on Windows, about once in thousands of runs
+### Fixed: Python tests avoid the Windows app execution alias
 
-- **What:** `packages/exporters/tests/precision-native.test.js` failed in `verify` with `spawnSync python3 EINVAL`, on
-  the `python -c` call, just after `python3 --version` had worked in the same test (2026-11-06, during a run with other
-  lanes loading the machine; `pixel-art.test.js` makes the same call, and one earlier failure of this kind is in the
-  history of commit bdcb72659). The test passed in the verify 14 minutes before on the same code.
-- **Repro:** none on demand. 3,831 runs of `python3 -c` from 32 parallel spawns in 90 s all started, and the test alone
-  passes.
-- **Cause, not yet confirmed:** `python3` here is the Microsoft Store app execution alias, and `EINVAL` comes from
-  `CreateProcess`. Ruled out: the length of the script, the environment that `scripts/support/record-reads.mjs` passes
-  (the same on the call before), and spawn concurrency alone.
-- **Needed to close:** catch it again with the Windows error code, or run the tests with a Python that is not the alias
-  and see whether it stops.
+Fixed by 2dbaf192c. Exporter tests now use scripts/support/find-python.mjs, which selects an installed interpreter before trying command names. Lane C rechecked tests/find-python.test.js on 2026-11-10: all four pass, including a Windows alias that must never start and propagation of non-ENOENT spawn failures. This removes the suspected alias path; it does not claim a general Windows CreateProcess defect was proved.
 
-### A textured glTF does not load in Node
+### Fixed: textured glTF loads in Node (2026-11-10)
 
-- **What:** in Node on the `webgpu` binding, `loadGLTF` of `@margoengine/gltf-pro` rejects with `glTF image 0 could not be decoded (createImageBitmap is not defined)`, so a server thumbnail of a textured model cannot be made. Untextured scenes, sky and shadows draw.
-- **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
-- **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
+Without createImageBitmap, ordinary image bytes now use the existing lazy @margoengine/decoders/image reader. Retained RGBA8 pixels upload with writeTexture, with normal material mip generation and restoration. Material extension maps, MToon and React image copies accept the same pixel source. Browser bitmap decoding stays the default when available.
+
+Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cases failed on the original code and pass after the repair. The real Node binding renders textured primary colours exactly like uniform base colours. packages/gltf-pro/scripts/test-pixel-images.mjs compares PNG bitmap and pixel uploads, including restoration, pixel for pixel on both GPU backends. See gltf-node-images.md for limits and sources.
 
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
@@ -1716,6 +1696,8 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 - **Repro:** none yet. Other lanes were running their own checks on the machine at the time.
 - **Cause:** not found. The step now names a hang (see Fixed 2026-11-06), so the next one prints `HUNG TEST:` with its file and test.
 - **Needed to close:** a run that prints that line, and a fix of the test it names. Every verify run since is a run of this watch.
+
+- **Lane C sweep (2026-11-10):** no demand repro is available. Full verify is reserved for local CI; this entry remains its per-test hang watch, and no lane verify was run.
 
 ### Apple M6 sweep, 2026-11-05 (Chrome 157 and Playwright WebKit; Safari not run)
 
@@ -1802,9 +1784,13 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Cause:** the level has no `sample_index` in a fragment shader and no multisampled float format: neither r32float nor rgba16float, so the surfel sums have nothing to add into at 4x.
 - **Needed to close:** the routes `Shadows`, `SceneTarget` and eye-dome lighting took: a masked draw per sample (`packages/shared/msaa.js` `copyDepth`, `packages/points/src/plugin.ts` `edlPipelines`). Surfels need sums in a format the level multisamples, or a single-sample pass with its own copy of the scene depth. Then add the names to the list `adapter-browser.mjs` asserts.
 
+- **Lane C source audit (2026-11-10):** sky/fog.ts, environment/volumetric.ts and water/spray.ts retain their multisampled sample_index branches. points/surfels.ts still explicitly refuses 4x compatibility-level float accumulation. These repairs remain open; a per-sample masked draw fixes only the three depth consumers, not the surfel accumulation format. No new runtime pass or closure is claimed.
+
 ### External PBR display passes
 
 - K2 external-pass follow-up: PBRModel.draw with a caller-owned already-open external pass on a display-encoded target still uses native tint/add blending; reproduce with bright glass over a bright background via createRenderer. Cause: the caller owns the open pass and the package cannot end it to snapshot its background. Graph-managed Engine scenes are fixed; use a linear HDR external target pending a caller-supplied snapshot hook.
+
+- **Lane C source audit (2026-11-10):** PBRDeviceRenderer.draw still receives an already-open caller-owned pass and view; its prepare method handles deformation, not a colour snapshot. The caller snapshot API and its bright-background regression remain open. No renderer or assertion was changed for this entry.
 
 ### Findings of the outside audit (2026-10-28)
 
@@ -1832,18 +1818,9 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Needed to close:** the audit's F20 text (its input, or at least the target and the time). Then a regression test that
   fails without the fix.
 
-### text: the colour emoji check needs a colour emoji font on the machine
+### Fixed: the text colour emoji check supplies its own font
 
-- **Repro:** `npm run test:browser --workspace @margoengine/text` on a Linux machine with no colour emoji font
-  installed (the Ubuntu test server, 2026-10-28) fails "Emoji not drawn in color" (`colorGlyphs` 0) at
-  `packages/text/tests/text-browser.js`.
-- **Cause:** the check draws an emoji through the system's fonts, so its result depends on the machine. Windows has a
-  colour emoji font; a headless Linux server often has none. The engine draws what the system font gives it.
-- **Fix needed:** the test brings its own colour glyph source (a standard emoji font file recorded with its source and
-  licence in `THIRD-PARTY-NOTICES.md`, or a test font), or it detects that no colour font exists and says so with a
-  clear skip message; either with a test that the check fails when colour glyphs are not drawn although a colour
-  font is present.
-
+Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an original COLR/CPAL test font. The browser check always renders its two coloured glyphs; an optional system-font probe reports when that system font has no colour glyph. packages/text/tests/text.test.js checks the generated font and the diagnostic contract. Lane C source audit confirms both paths remain in the current check; no system font installation is required for the mandatory colour-rendering proof.
 
 ### biomes flythrough on laptops: the slow sends frame runs past 3.5 ms while the page thread is off the CPU
 

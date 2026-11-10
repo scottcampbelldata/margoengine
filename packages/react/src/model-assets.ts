@@ -35,7 +35,9 @@ async function copyImages(images: readonly GLTFImage[]): Promise<GLTFImage[]> {
           ? { ...image, close() {} }
           : 'mipmaps' in image
             ? { ...image }
-            : await createImageBitmap(image, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+            : 'data' in image
+              ? { ...image, data: image.data.slice() }
+              : await createImageBitmap(image, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
     }
     return copies;
   } catch (error) {

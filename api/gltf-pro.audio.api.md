@@ -553,7 +553,7 @@ interface GLTFExtensions {
   };
 }
 
-type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
+type GLTFImage = ImageBitmap | GLTFPixelImage | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
 
 interface GLTFImageBasedLight extends GLTFProperty {
   rotation?: number[];
@@ -650,6 +650,12 @@ interface GLTFNodeExtras {
     name: string;
     extras: Record<string, unknown>;
     matrix: Float32Array;
+}
+
+interface GLTFPixelImage {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array;
 }
 
 interface GLTFPrimitive extends GLTFProperty {

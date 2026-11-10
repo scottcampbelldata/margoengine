@@ -1399,3 +1399,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/exporters (batch 137): document the clean-room ETC1S/UASTC replacement, quality/effort/RDO, color/data/normal mips, lazy Wasm, AbortSignal and encoderPath compatibility; examples wait for the README phase.
 
 - @margoengine/decoders (AVIF review L2): document ignored OBU reserved bits, retained forbidden-bit validation, and the unified CPU/native test command after the build phase.
+- @margoengine/gltf-pro: Node PNG/JPEG image decoding, retained GLTFPixelImage ownership, byte uploads, mipmaps and restoration.
+- @margoengine/materials: Node pixel-backed extension maps.
+- @margoengine/rigging: MToon maps from retained Node pixels.
+- @margoengine/react: independent retained-pixel copies for cached model mounts.

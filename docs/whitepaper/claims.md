@@ -4546,3 +4546,7 @@ Proof: results/batch-137-quality-r10.json; reproduction: reproduce.md. Huffman
 literal coding changes no fitted byte; the data row now uses RDO 0.09375 instead
 of the failing 0.25. No metric, tolerance, source, mip or assertion was weakened.
 Throughput/load/memory comparisons remain scheduled for the quiet speed phase.
+### Node glTF ordinary image sources (2026-11-10)
+
+PNG and JPEG glTF images load without createImageBitmap using the existing optional image decoder. Evidence: node-images.test.js covers data URI, bufferView and fetched images, exact retained/uploaded bytes, colour-space selection, mip allocation, restoration, abort and invalid input. test-node-images.mjs uses the real Node binding and exact uniform-colour reference renders. test-pixel-images.mjs compares PNG bitmap/pixel uploads and restored models pixel for pixel on both backends. This claim covers these fixtures, not equality of all JPEG decoders or browser support for every optional image codec.
+Entry byte evidence: the quality bundle method measures gltf-pro/model at 60,402 bytes gzip on the parent sources and 60,566 on the repaired sources (+164). This is a byte count, not a timing or speed claim.

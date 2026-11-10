@@ -138,7 +138,7 @@ export interface GLTFExtendedMaterials {
     shader(plan: ExtendedPlan): string;
 }
 
-export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
+export type GLTFImage = ImageBitmap | GLTFPixelImage | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
 
 export interface GLTFLOD {
     node: Mesh;
@@ -171,6 +171,12 @@ export interface GLTFNodeExtras {
     name: string;
     extras: Record<string, unknown>;
     matrix: Float32Array;
+}
+
+export interface GLTFPixelImage {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array;
 }
 
 export interface GLTFSplatCloud {

@@ -6436,3 +6436,7 @@ another codec ABI and fetch. Existing optional size ceilings suffice. Core plus
 stage remains 24209 gzip B, below 25000 B.
 
 AVIF review L2 (2026-11-10): OBU reserved header/extension bits are ignored as required for decoders; forbidden-bit, strict config-size and truncated-payload checks remain enforced. The standard CPU tests now include the native/Wasm spec regressions; see docs/avif-review-fixes.md.
+### Node glTF image decoding (2026-11-10)
+
+Without createImageBitmap, gltf-pro lazily calls the existing decoders/image entry and retains RGBA8 rows with straight alpha. Browser bitmaps stay the default when available. PNG/JPEG data URIs, buffer views and fetched images use the same download and decoded-image limits as before; GPU dimensions still obey maxTextureDimension2D. The existing optional decoder owns its supported coding subsets and failures. Raw pixels stay in CPU memory for clone/device restoration, width * height * 4 bytes per image, plus independent React mount copies. Material uploads generate the same full mip chain as bitmaps; uploadImage itself returns a caller-owned single-level texture, as before. CPU decode time is not benchmarked in the build phase.
+The Node image repair changes the gltf-pro/model entry from 60,402 to 60,566 bytes gzip (+164), measured by the quality bundle method against the parent source. Its optional ceiling rises from 60,429 with the normal 3% margin. Splitting would require caller configuration and duplicate loading/upload/restoration paths for 164 bytes. Core and stage bytes are unchanged.

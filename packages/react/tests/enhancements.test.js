@@ -68,7 +68,8 @@ class Node {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement,
+    assertCore,
+    coreRequirement,
     Engine: {
       async create(canvas, options) {
         const engine = {
@@ -854,7 +855,8 @@ test('cached glTF bitmap, KTX2 and compressed sources retain independent image o
     format: 'rgba8unorm',
     mipmaps: [{ width: 2, height: 2, data: new Uint8Array(16) }],
   };
-  sourceImages = [bitmap, ktx2, undefined, compressed];
+  const pixels = { width: 1, height: 1, data: Uint8Array.of(9, 8, 7, 6) };
+  sourceImages = [bitmap, ktx2, undefined, compressed, pixels];
   try {
     const before = modelRequests.length,
       child = (show) => show && suspense(React.createElement(Model, { src: '/textured-model.glb' }));
@@ -864,6 +866,7 @@ test('cached glTF bitmap, KTX2 and compressed sources retain independent image o
     assert.equal(first.ownedImages[0], bitmap);
     assert.equal(first.ownedImages[1], ktx2);
     assert.equal(first.ownedImages[3], compressed);
+    assert.equal(first.ownedImages[4], pixels);
     assert.equal(copies.length, 1);
     assert.equal(copies[0].closes, 0);
     view.rerender(tree(child(false)));
@@ -882,6 +885,10 @@ test('cached glTF bitmap, KTX2 and compressed sources retain independent image o
     assert.notEqual(second.ownedImages[3], compressed);
     assert.equal(second.ownedImages[3].mipmaps, compressed.mipmaps);
     assert.equal(second.ownedImages[2], undefined);
+    assert.deepEqual(second.ownedImages[4], pixels);
+    assert.notEqual(second.ownedImages[4].data, pixels.data);
+    second.ownedImages[4].data[0] = 255;
+    assert.equal(pixels.data[0], 9, 'a mounted model owns an independent pixel buffer');
     assert.equal(modelRequests.length, before + 1);
     view.unmount();
     await flush();

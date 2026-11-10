@@ -547,7 +547,12 @@ export class MToon implements EnginePlugin {
               usage: 22,
             });
             try {
-              device.queue.copyExternalImageToTexture({ source: image }, { texture }, [image.width, image.height]);
+              if ('data' in image)
+                device.queue.writeTexture({ texture }, image.data, { bytesPerRow: image.width * 4 }, [
+                  image.width,
+                  image.height,
+                ]);
+              else device.queue.copyExternalImageToTexture({ source: image }, { texture }, [image.width, image.height]);
               generateMipmaps(device, texture, levels, this.mipPipelines);
             } catch (error) {
               texture.destroy();

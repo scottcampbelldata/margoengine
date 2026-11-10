@@ -67,6 +67,7 @@ import {
   downloadLimit,
   decodeKTX2Images,
   type GLTFImage,
+  type GLTFCompressedImage,
   type GLTFStreamedImage,
   type AssetOptions,
   type GLTFDecoderHooks,
@@ -142,7 +143,14 @@ import { occlusionShader } from './occlusion.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 export { GLTFAsset, closeImages } from './asset.js';
 export type { GLTFDocument } from './asset.js';
-export type { GLTFImage, GLTFStreamedImage, GLTFStreamSource, GLTFTextureOpener, KTX2Image } from './asset.js';
+export type {
+  GLTFImage,
+  GLTFPixelImage,
+  GLTFStreamedImage,
+  GLTFStreamSource,
+  GLTFTextureOpener,
+  KTX2Image,
+} from './asset.js';
 export { textureCoordinates } from './texture-coordinates.js';
 import type { TextureTransform } from './texture-coordinates.js';
 export type { TextureTransform } from './texture-coordinates.js';
@@ -1643,11 +1651,7 @@ export interface PBRMaterialShading extends LightingEffect {
    */
   readonly version?: number;
 }
-function uploadCompressedImage(
-  device: GPUDevice,
-  image: Exclude<GLTFImage, ImageBitmap | undefined | import('./asset.js').KTX2Image | GLTFStreamedImage>,
-  srgb: boolean,
-): GPUTexture {
+function uploadCompressedImage(device: GPUDevice, image: GLTFCompressedImage, srgb: boolean): GPUTexture {
   if (image.upload) return image.upload(device, srgb);
   const formats: Record<string, TranscodedKTX2Result['target']> = {
     'rgba8unorm': 'rgba8',
@@ -2067,6 +2071,21 @@ export class PBRModel implements EnginePlugin {
     private readonly images: readonly GLTFImage[] = [],
     prepared?: readonly (readonly PreparedGeometry[])[],
   ) {
+    for (const image of images)
+      if (
+        image &&
+        'data' in image &&
+        (!Number.isSafeInteger(image.width) ||
+          image.width < 1 ||
+          !Number.isSafeInteger(image.height) ||
+          image.height < 1 ||
+          !Number.isSafeInteger(image.width * image.height * 4) ||
+          !(image.data instanceof Uint8Array) ||
+          image.data.byteLength !== image.width * image.height * 4)
+      )
+        throw new RangeError(
+          'Invalid glTF pixel image; provide positive integer dimensions and exactly width * height * 4 RGBA8 bytes',
+        );
     this.engine = engineRuntime(instance);
     Object.defineProperty(this, shadowPrimitivesInto, { value: PBRModel.prototype.writeShadowPrimitives });
     const doc = asset.doc,
@@ -2901,7 +2920,9 @@ export class PBRModel implements EnginePlugin {
         });
         hold(texture);
         // Transcoded mips upload as-is: rgba8 rows, or 16-byte 4x4 blocks (BC7, ASTC 4x4, ETC2 RGBA8).
-        if (image) device.queue.copyExternalImageToTexture({ source: image as ImageBitmap }, { texture }, size);
+        if (image && 'data' in image)
+          device.queue.writeTexture({ texture }, image.data, { bytesPerRow: image.width * 4 }, size);
+        else if (image) device.queue.copyExternalImageToTexture({ source: image as ImageBitmap }, { texture }, size);
         else
           device.queue.writeTexture(
             { texture },
@@ -3130,7 +3151,8 @@ export class PBRModel implements EnginePlugin {
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       });
     try {
-      device.queue.copyExternalImageToTexture({ source: image }, { texture }, size);
+      if ('data' in image) device.queue.writeTexture({ texture }, image.data, { bytesPerRow: image.width * 4 }, size);
+      else device.queue.copyExternalImageToTexture({ source: image }, { texture }, size);
       return texture;
     } catch (error) {
       texture.destroy();

@@ -49,9 +49,15 @@ export interface GLTFStreamedImage {
   close(): void;
 }
 /**
- * A decoded glTF image: an ImageBitmap, a transcoded KTX2 image, a compressed GPU image, or undefined when absent.
+ * A decoded glTF image: a bitmap, retained RGBA8 pixels, a transcoded/compressed image or a streamed image.
  */
-export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
+export type GLTFImage = ImageBitmap | GLTFPixelImage | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
+/** Retained RGBA8 rows, top row first, with straight alpha and no embedded colour-space conversion. */
+export interface GLTFPixelImage {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array;
+}
 export interface GLTFImageOptions {
   signal?: AbortSignal;
   device?: GPUDevice;
@@ -1121,7 +1127,7 @@ export async function loadAsset(
           running.push([index, decoder.decode(data)]);
           await settle();
         } else {
-          const decoding = decodeImage(data, def.mimeType, index);
+          const decoding = decodeImage(data, def.mimeType, index, signal);
           // Its failure is reported when its turn comes in settle(); until then it is not an unhandled rejection.
           decoding.catch(() => {});
           running.push([index, decoding]);
@@ -1147,9 +1153,24 @@ export async function loadAsset(
 }
 /** Browser image decodes a load keeps running at once (createImageBitmap decodes off the main thread). */
 const IMAGE_DECODES = 8;
-/** Image bytes as an ImageBitmap; bytes the browser cannot decode throw TypeError('glTF image N could not be decoded (...)'). */
-export async function decodeImage(data: Uint8Array, type: string | undefined, index: number): Promise<ImageBitmap> {
+/** Image bytes as a bitmap, or retained pixels without browser decoding; invalid bytes name their image index. */
+export async function decodeImage(
+  data: Uint8Array,
+  type: string | undefined,
+  index: number,
+  signal?: AbortSignal,
+): Promise<ImageBitmap | GLTFPixelImage> {
+  signal?.throwIfAborted();
   try {
+    if (typeof createImageBitmap !== 'function') {
+      // Runtime resolution in Node: browser bundlers must not discover optional codec workers/Wasm while
+      // merely reading a model-free install kit's exports, before tree shaking removes this loader.
+      const decoderEntry = '@margoengine/decoders/image';
+      const { decodeImage: decodePixels } = (await import(
+        /* @vite-ignore */ /* webpackIgnore: true */ decoderEntry
+      )) as typeof import('@margoengine/decoders/image');
+      return await decodePixels(data, { signal });
+    }
     // The Blob copies the bytes; a copy before it is needed only for a SharedArrayBuffer, which a Blob refuses.
     const part = data.buffer instanceof ArrayBuffer ? (data as Uint8Array<ArrayBuffer>) : new Uint8Array(data);
     return await createImageBitmap(new Blob([part], { type }), {
@@ -1157,6 +1178,7 @@ export async function decodeImage(data: Uint8Array, type: string | undefined, in
       premultiplyAlpha: 'none',
     });
   } catch (error) {
+    signal?.throwIfAborted();
     // The browser rejects with a DOMException (InvalidStateError); report it as the loader's own error.
     throw new TypeError(
       `glTF image ${index} could not be decoded (${error instanceof Error ? error.message : error}); check the file`,
@@ -1175,6 +1197,6 @@ export function closeImages(images: readonly GLTFImage[]): void {
     if (!image) continue;
     const others = imageHolders.get(image);
     if (others) imageHolders.set(image, others - 1);
-    else if ('close' in image) image.close();
+    else if ('close' in image) image.close?.();
   }
 }

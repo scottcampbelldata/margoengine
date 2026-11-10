@@ -35,7 +35,8 @@
     "test:gpu:spec-gloss": "cd ../.. && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs --compat",
     "test:gpu:dds": "cd ../.. && node packages/gltf-pro/scripts/test-dds-browser.mjs && node packages/gltf-pro/scripts/test-dds-browser.mjs --compat",
     "test:gpu:base-textures": "cd ../.. && node packages/gltf-pro/scripts/test-base-textures-browser.mjs && node packages/gltf-pro/scripts/test-base-textures-browser.mjs --compat",
-    "test:browser:audio": "cd ../.. && node packages/gltf-pro/scripts/test-audio-browser.mjs"
+    "test:browser:audio": "cd ../.. && node packages/gltf-pro/scripts/test-audio-browser.mjs",
+    "test:gpu:pixel-images": "cd ../.. && node packages/gltf-pro/scripts/test-node-images.mjs && node packages/gltf-pro/scripts/test-pixel-images.mjs && node packages/gltf-pro/scripts/test-pixel-images.mjs --compat"
   },
   "sideEffects": false,
   "exports": {

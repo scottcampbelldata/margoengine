@@ -123,7 +123,9 @@ export class MaterialTextures {
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
           });
       this.owned.add(texture);
-      if (!('ktx2' in image) && !('mipmaps' in image))
+      if ('data' in image)
+        this.device.queue.writeTexture({ texture }, image.data, { bytesPerRow: image.width * 4 }, size);
+      else if (!('ktx2' in image) && !('mipmaps' in image))
         this.device.queue.copyExternalImageToTexture({ source: image }, { texture }, size);
       imageTexture = { texture, view: texture.createView(), levels, mipsReady: compressed || levels === 1, format };
       this.images.set(key, imageTexture);
