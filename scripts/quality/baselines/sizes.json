@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12490372,
+  "total": 12494116,
   "history": [
     {
       "date": "2026-10-24",
@@ -6061,6 +6061,12 @@
       "commit": "batch-237",
       "reason": "New optional wfc/overlapping3d 0 -> 3188 B min+gzip plus 256 B headroom; cubic extraction, slab adjacency and bounded graph search remain lazy to this entry.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "12701037e",
+      "reason": "Optional ui/forms 0 to 3492 B gzip, ceiling 3743 B; UI root 32080 to 32141 B. Native activation and deferred pointer focus prevent lost input; shared controls avoid duplicate renderers. Core+stage remains 23950 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7165,6 +7171,8 @@
     "@margoengine/wfc/tileset": 2142,
     "@margoengine/splines/query": 3870,
     "@margoengine/ecs/reactive": 1484,
-    "@margoengine/wfc/overlapping3d": 3444
+    "@margoengine/wfc/overlapping3d": 3444,
+    "@margoengine/ui/forms": 3743,
+    "leak @margoengine/ui/forms -> @margoengine/text": 1
   }
 }

@@ -14,6 +14,7 @@ import {
   UiRenderer,
   VirtualList,
   attachMirror,
+  attachInput,
   browserTextScale,
 } from '../dist/index.js';
 import { makeUi } from './helpers.js';
@@ -428,4 +429,71 @@ test('a virtual list mirrors as a listbox of its built rows, each with its place
   assert.equal(options[2].getAttribute('aria-selected'), 'true');
   options[0].dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
   assert.equal(list.selected, 0);
+});
+
+test('Enter and Space activate mirrored options while native buttons keep their activation', () => {
+  const { window, doc, canvas } = page(),
+    ui = makeUi(),
+    list = new List({ items: ['One', 'Two'] }),
+    button = new Button({ text: 'Native' });
+  ui.add(list, button);
+  const off = attachMirror(ui, canvas);
+  let selections = 0;
+  list.on('select', () => selections++);
+  try {
+    ui.focus(list.children[1], 'keyboard');
+    const option = doc.querySelectorAll('[role=option]')[1];
+    option.focus();
+    const enter = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    option.dispatchEvent(enter);
+    assert.equal(list.selected, 1);
+    assert.equal(selections, 1);
+    assert.equal(enter.defaultPrevented, true);
+    ui.focus(list.children[0], 'keyboard');
+    const space = new window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    doc.querySelectorAll('[role=option]')[0].dispatchEvent(space);
+    assert.equal(list.selected, 0);
+    assert.equal(selections, 2);
+    assert.equal(space.defaultPrevented, true);
+    ui.focus(button, 'keyboard');
+    const native = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    doc.querySelector('button').dispatchEvent(native);
+    assert.equal(native.defaultPrevented, false);
+  } finally {
+    off();
+    ui.dispose();
+    window.close();
+  }
+});
+
+test('pointer focus stays on the canvas until release, then reaches its accessible control', async () => {
+  const { window, doc, canvas } = page(),
+    ui = makeUi(),
+    button = new Button({ id: 'pointer-focus', text: 'Press' });
+  ui.add(button);
+  const offInput = attachInput(ui, canvas),
+    offMirror = attachMirror(ui, canvas);
+  let clicks = 0;
+  button.on('click', () => clicks++);
+  try {
+    canvas.focus();
+    ui.layout();
+    const r = button.rect,
+      x = r.x + r.width / 2,
+      y = r.y + r.height / 2;
+    ui.pointerDown(x, y, { id: 1, type: 'mouse' });
+    await tick();
+    assert.equal(doc.activeElement, canvas);
+    assert.equal(button.pressed, true);
+    assert.equal(ui.pointerUp(x, y, { id: 1, type: 'mouse' }), true);
+    await tick();
+    assert.equal(clicks, 1);
+    assert.equal(button.pressed, false);
+    assert.equal(doc.activeElement.id, 'margo-ui-pointer-focus');
+  } finally {
+    offMirror();
+    offInput();
+    ui.dispose();
+    window.close();
+  }
 });

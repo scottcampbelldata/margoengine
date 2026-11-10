@@ -3316,12 +3316,12 @@
     },
     "@margoengine/ui": {
       ".": {
-        "raw": 99812,
-        "gzip": 32080
+        "raw": 99979,
+        "gzip": 32141
       },
       "./react": {
-        "raw": 101733,
-        "gzip": 32253
+        "raw": 101901,
+        "gzip": 32306
       },
       "./world": {
         "raw": 26024,
@@ -3338,6 +3338,10 @@
       "./image": {
         "raw": 6224,
         "gzip": 2524
+      },
+      "./forms": {
+        "raw": 9498,
+        "gzip": 3492
       }
     },
     "@margoengine/usdz": {

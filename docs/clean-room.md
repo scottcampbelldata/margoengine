@@ -1,5 +1,13 @@
 # Clean room
 
+## Batch 258 job 3: accessible form controls
+
+Research compared W3C WAI-ARIA Authoring Practices Guide, Tabs, Radio Group and Keyboard Interface patterns (ARIA APG Task Force, accessed 2026): https://www.w3.org/WAI/ARIA/apg/patterns/tabs/ , https://www.w3.org/WAI/ARIA/apg/patterns/radio/ and https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/ . Roving tab stops, wrapping arrows, active panel relationships, named channels and native control behavior supply the interaction model. The native-control distinction also follows WHATWG, HTML Living Standard activation behavior (2026), https://html.spec.whatwg.org/multipage/interaction.html#activation-behavior . Div-based list options need UI Enter/Space handling; native buttons keep their own activation. The new CPU regression fails before that shared mirror repair and passes after it.
+
+Trevor D. Canham, I. Scott MacKenzie, Richard F. Murray and Michael S. Brown, The Effect of Perceptual Optimization on Color Space Navigability (GI 2023), https://www.yorku.ca/mack/gi2023.html , compares direct colour manipulation spaces. We combine a separate hue channel with saturation/value navigation and explicit RGB, alpha and hex controls. This adopts no timing result for Margo. The colour state is continuous; the displayed SV background uses a 64 by 64 grid. Native text editing follows the HTML input model already researched for job 1: a valid RGB prefix must not be replaced while the user completes alpha. A regression retains that editable prefix and exact final RGBA.
+
+The form mirror reconciles after the ordinary mirror's animation-frame callback, so new panels and modal options exist before roles or focus move. A controlled-frame CPU regression covers popup focus, restoration and new tab panels. Pointer focus remains on the canvas while pressed and moves to its accessible control after release, preventing canvas blur from resetting the pointer ID mid-press; the new mirror regression and actual checkbox click preserve that case. No competing engine implementation or companion code was read or copied. NASA planetary fact-sheet names in the browser fixture are public-domain data: https://nssdc.gsfc.nasa.gov/planetary/factsheet/ . Comparison inventories were documentation only; no rival-engine execution or speed claim is asserted.
+
 ## Batch 256 job 4: P2P host migration
 
 Research compared before implementation: Diego Ongaro and John Ousterhout,

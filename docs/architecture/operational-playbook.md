@@ -1,5 +1,9 @@
 # Engine architecture and quality reference
 
+## Batch 258 forms evidence (section 5 supplement)
+
+The forms entry composes existing UI widgets, native text input and the normal GPU draw list. It adds no core or stage code. CPU regressions cover disabled choices, one tab stop per choice strip, content ownership, exact colour values, native hex editing, modal reconciliation and native versus div key activation. The browser gate exercises pointer, keyboard, gamepad commands and actual accessibility-tree attributes on native WebGPU and complete compatibility. The shared mirror now defers native DOM focus until a canvas pointer press ends. Existing UI, input, image, world and dependent React GPU suites remain the compatibility gate; no benchmark is run.
+
 ## Batch 258 image evidence (section 5 supplement)
 
 Optional ui/image adds pixel textures, atlas cells, nine-slice borders and fit geometry. UI's shared batch maps image commands to existing colour quad instances, with premultiplied gutters and the original command order and clip stack. No core or stage change. Browser correctness checks read corner/cell/fit pixels, a real CC0 photographic texture, tint and exact zero uploads on an unchanged image-only second frame. They run under native WebGPU and complete compatibility, each also checking preview GL. CPU tests cover geometry, small targets, gutter bounds and immutable snapshots. Both GPU and preview caches record placeholder generations after binding, preventing an unnecessary image-only reupload. No wall-clock benchmark was run.

@@ -1,0 +1,17 @@
+﻿<!doctype html><html lang="en"><meta charset="utf-8"><title>Accessible form widget correctness</title><link rel="icon" href="data:,"><style>body{margin:0}#host{position:relative;width:600px;height:1100px}canvas{display:block;width:600px;height:1100px}</style><div id="host"><canvas width="600" height="1100"></canvas></div><button id="after">After UI</button><script type="module">
+import {Engine} from '@margoengine/core';
+import {Ui,UiRenderer,Panel,Label} from '@margoengine/ui';
+import {attachTextInputs} from '@margoengine/ui/input';
+import {Select,RadioGroup,Tabs,Checkbox,ColorPicker,attachFormsMirror} from '@margoengine/ui/forms';
+const canvas=document.querySelector('canvas'),engine=await Engine.create(canvas),ui=new Ui({safeArea:[0,0,0,0],reducedMotion:true});engine.scene.background='#101010';
+// Planet names are NASA public-domain facts: https://nssdc.gsfc.nasa.gov/planetary/factsheet/ .
+const options=[{label:'Mercury',value:'mercury'},{label:'Venus',value:'venus',disabled:true},{label:'Earth',value:'earth'}];
+const select=new Select({id:'select',label:'Planet',options,width:250,anchor:'top-left',margin:20});
+const radio=new RadioGroup({id:'radio',label:'Destination',options,width:450,orientation:'horizontal',anchor:'top-left',margin:[90,0,0,20]});
+const tabs=new Tabs({id:'tabs',label:'Information',options:[{label:'Overview',value:'overview',panel:new Label({text:'NASA planet overview'})},{label:'Details',value:'details',panel:new Label({text:'Public-domain planetary facts'})}],width:450,anchor:'top-left',margin:[160,0,0,20]});
+const checkbox=new Checkbox({id:'checkbox',text:'Remember destination',anchor:'top-left',margin:[290,0,0,20]});
+const color=new ColorPicker({id:'color',label:'Marker colour',width:300,anchor:'top-left',margin:[360,0,0,20]});ui.add(select,radio,tabs,checkbox,color);
+const errors=[];engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));const renderer=UiRenderer.attach(engine,ui),offForms=attachFormsMirror(ui,canvas),offText=attachTextInputs(ui,canvas);await ui.ready;engine.render(0);
+let active=true;function tick(){if(!active)return;engine.render(0);requestAnimationFrame(tick);}requestAnimationFrame(tick);
+window.formsTest={ui,engine,select,radio,tabs,checkbox,color,errors,renderer,rect:id=>({...ui.find(id).rect}),close(){active=false;offForms();offText();engine.dispose();ui.dispose();}};
+</script></html>

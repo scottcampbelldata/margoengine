@@ -305,6 +305,7 @@ export function attachMirror(ui: Ui, target: HTMLElement, options: MirrorOptions
     else content.removeAttribute('inert');
     if (hasModal) content.setAttribute('aria-hidden', 'true');
     else content.removeAttribute('aria-hidden');
+    focusCurrent();
   };
   const schedule = () => {
     if (scheduled) return;
@@ -340,19 +341,23 @@ export function attachMirror(ui: Ui, target: HTMLElement, options: MirrorOptions
     const w = widgetOf(e.target);
     if (w && ui.focused === w) ui.focus(null);
   });
+  function focusCurrent(): void {
+    const w = ui.focused,
+      el = w && entries.get(w)?.el,
+      active = doc.activeElement;
+    if (w && !w.pressed && el && (active === target || root.contains(active)) && active !== el) {
+      syncing = true;
+      try {
+        el.focus({ preventScroll: true });
+      } finally {
+        syncing = false;
+      }
+    }
+  }
   cleanups.push(
     ui.onFocus(() => {
-      const w = ui.focused,
-        el = w && entries.get(w)?.el,
-        active = doc.activeElement;
-      if (el && (active === target || inside(active)) && active !== el) {
-        syncing = true;
-        try {
-          el.focus({ preventScroll: true });
-        } finally {
-          syncing = false;
-        }
-      }
+      if (ui.inputMode === 'pointer' || ui.inputMode === 'touch') schedule();
+      else focusCurrent();
     }),
   );
 
@@ -369,8 +374,12 @@ export function attachMirror(ui: Ui, target: HTMLElement, options: MirrorOptions
     if (w instanceof Slider) w.setValue(Number((e.target as HTMLInputElement).value));
   });
   listen('keydown', (e) => {
-    // Enter and Space are native on buttons; arrows belong to a range input; Tab is native except inside a dialog.
-    const skip = new Set(['Enter', ' ']);
+    // Native form controls own their activation; div-based options use UI commands. Arrows belong to range inputs.
+    const skip = new Set<string>();
+    if ((e.target as Element | null)?.closest?.('button,input,textarea,select')) {
+      skip.add('Enter');
+      skip.add(' ');
+    }
     if (!ui.modalLayer.children.length) skip.add('Tab');
     if ((e.target as Element | null)?.getAttribute?.('type') === 'range')
       for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown']) skip.add(key);

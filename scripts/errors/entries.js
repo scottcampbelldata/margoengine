@@ -909,6 +909,12 @@ export const entries = [
     title: '@margoengine/ui: widgets, layout, themes and input',
     kind: 'family',
     messages: [
+      'Form options need labels and unique string values',
+      'Select value must name an option or be empty',
+      'RadioGroup value must name an option',
+      'Choice value must name an option',
+      'HSV channels must be in [0,1]',
+
       'ImageTexture needs positive integer dimensions and width * height * 4 RGBA bytes',
       'ImageTexture.from needs a decoded image or a video with a current frame',
       'Image needs an ImageTexture; load or create one first',

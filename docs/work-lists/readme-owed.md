@@ -256,3 +256,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/wfc: document /overlapping3d sample layout, N, input/output wrapping, rotations/reflections, pins, default budgets, stats, limits and synchronous cancellation (batch 237 job 3).
 - margoengine: document generated wfc/overlapping3d alias (batch 237 job 3).
 >>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
+
+
+| @margoengine/ui | forms entry: Select, RadioGroup, Tabs content ownership, Checkbox, ColorPicker, normalized channels, mirror/input attachment and disposal. | batch-258 job 3 |
+| margoengine | ui/forms alias and accessible form setup. | batch-258 job 3 |

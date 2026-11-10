@@ -3338,3 +3338,7 @@ Shipped Firefox159.0.1 on Windows executes all46 feature/compute cases against n
 ## Batch 237: cubic overlapping synthesis
 Every returned N-cube window is learned from the voxel sample, including all-axis periodic boundaries. Tests check N=2 and N=3 output-window membership, all 256 fully pinned binary cubes, pin preservation, copied samples, invalid inputs, contradictory odd periodic volumes, rotation/reflection cardinalities and deterministic seed replay. Native WebGPU and the WebGL2 compatibility browser routes solve the same pinned 4-cube checkerboard while rendering. No speed, global playability or unbiased distribution claim.
 >>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
+
+
+### UI form widgets (batch 258 job 3)
+The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPicker. Pointer, keyboard and gamepad commands share the same state changes, with mirrored roles, selection, popup and tab-panel relationships. forms.test.js and forms-browser.mjs support the row, including native hex/alpha edits. Existing complete checkbox behavior is reused. This is a functional parity claim for the requested row; it does not claim human AT certification or perceptually uniform colour coordinates.

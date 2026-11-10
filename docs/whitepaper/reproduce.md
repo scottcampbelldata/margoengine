@@ -2844,3 +2844,7 @@ After build:packages, supply the shipped Firefox executable through BROWSER_EXEC
 ## Batch 237 3D overlapping
 Build packages, then node --test --test-timeout=60000 packages/wfc/test/overlapping3d.test.js. Run the changed wfc package test:gpu through the shared GPU lock; assemble-browser.mjs checks all 64 pinned checkerboard values on native WebGPU and WebGL2 compatibility. Tests use authored numerical volumes and independent window extraction, not third-party implementations.
 >>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
+
+
+### Batch 258 forms correctness
+After build:packages, run node --test --test-timeout=120000 packages/ui/tests/forms.test.js packages/ui/tests/mirror.test.js. Under a shared GPU slot run node packages/ui/tests/forms-browser.mjs, then the same command with --compat. The driver uses actual canvas pointer and keyboard actions, shared gamepad commands, native hex input and exact ARIA state checks after mirror reconciliation. No timing assertion or benchmark is included.

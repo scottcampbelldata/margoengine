@@ -3438,6 +3438,10 @@
       "types": "./dist/ui/image.d.ts",
       "import": "./dist/ui/image.js"
     },
+    "./ui/forms": {
+      "types": "./dist/ui/forms.d.ts",
+      "import": "./dist/ui/forms.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

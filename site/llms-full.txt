@@ -6657,6 +6657,8 @@ ecs/objects entry: 1324 B min+gzip (new entry, previous 0 B); core + stage remai
 
 - xr/ar-extra: 0 to 3033 B gzip, ceiling 3289 B for the new optional DOM, image, mesh and persistent anchor entry. Core + stage remains 23950 B.
 
+
+
 Batch 249 relation-query: each result is a source plus one target per required relation term. Wildcards return every pair combination, so results may exceed world.capacity. Queries snapshot pairs and recheck live membership/rows before visits; new pairs wait until the next iteration. Optional source rows use -1. Target with terms are required and their rows flatten in term order. This is direct pair matching; traversal remains in Relation.
 ecs/relation-query: 1023 B min+gzip, new optional entry previously 0 B; ceiling 1279 B. Core plus stage unchanged at 23950 B.
 
@@ -6759,6 +6761,36 @@ Measured gzip after the upstream core-version guard: blend 8208 B (new ceiling 8
 
 Batch 245 skeleton JSON import is not shipped: full current Spine runtime parity includes physics constraints, while physics remains on hold. Scott must resolve the required import/runtime scope or resume that work; no partial importer is advertised.
 Batch 213 fresh-build integration with main core version guard: water root 20106 -> 20210 B gzip, ceiling 20185 -> 20289 B (exact growth, no extra headroom); caustics 8961 -> 9004 B under its existing 9230 B ceiling. Required package-registration validation stays with its owner, avoiding duplicated attachment contracts. Core plus stage is 24209 B; no core/stage source change in this job.
+
+SNORM compute storage uses the existing CPU route and native signed-byte textures for r8snorm, rg8snorm and rgba8snorm. Channel bytes remain 1, 2 and 4 per texel. Stores clamp to [-1, 1] and encode at scale 127; only written spans upload, with existing mip/layer synchronization. This does not add framebuffer renderability or change core/stage size. Exact signed-byte regression covers 9 format/dimension combinations. No speed claim.
+
+SNORM repair size receipt: lazy compatibility compute/readback 31547 -> 31756 B gzip (+209 B), ceiling 31741 -> 31756 B (+15 B). Shared optional base 74710 -> 74711 B; core/stage stay 24209 B. A separate chunk would add an asynchronous fetch at a synchronous publication boundary and expose internal view ownership. The supported native-byte representation and exact masked stores justify the optional bytes. Measured with the parent runtime substituted into the same current Vite build, then the unchanged bundleSplit/gzip method. Receipt: docs/whitepaper/results/snorm-storage-sizes.json.
+
+Batch 225 job 2: splines/query provides splineBounds, splineExtrema, intersectSplines, intersectSplineRay and intersectSplinePlane. Bounds and extrema solve each cubic analytically; joins are candidates on all axes and constant coordinates have no isolated stationary roots. Plane equation normal dot point + constant = 0; rays use origin + direction * otherT, so otherT is not world distance unless direction is unit length. Results separate isolated points and continuous overlaps. Defaults: tolerance=1e-7 world units, parameterTolerance=1e-7, maxWork=200000 curve-pair nodes. Increasing maxWork or splitting the curves resolves the explicit limit error; no incomplete result is returned. Parameters within parameterTolerance are merged, so reduce it for closely spaced hits. Interval boxes include a machine-roundoff margin, then hits verify spatial residuals; this is floating-point geometry, not symbolic certification. Closed t=0 and t=1 remain distinct parameter endpoints. No GPU state or GPU tests; core/stage unchanged.
+
+Batch 225 /query: new optional entry 0 -> 3614 B gzip (ceiling 0 -> 3870 B); geometry operations belong together to share polynomial calculations. Core + stage remains 24209 B gzip, below 25000 B; root sources untouched.
+
+Batch 225 gate correction: unchanged water root measures 20210 B gzip after main core-version guard, against prior ceiling 20185 B; optional ceiling becomes 20817 B using standard headroom. Version-skew prevention stays intact; no water/core/stage source changed.
+
+
+Batch 249 reactive: required/excluded shape changes update one entity per query. Cache order is packed. Optional rows resolve on visit. subscribe defaults to future transitions; initial:true immediately visits existing matches. flush delivers chronological queued transitions, including enter then exit in one window, at the caller chosen system boundary; listener mutations wait until next flush. Unsubscribed listeners receive nothing further. stop detaches and clears without exit callbacks. Field writes do not change membership.
+ecs/reactive: 1228 B min+gzip, new optional entry previously 0 B; ceiling 1484 B. Core plus stage unchanged at 23950 B. ComponentStore also permits mixed fields in typed query/tracker APIs.
+
+### Batch 273 Firefox matrix scope
+Firefox159.0.1 shipped browser on Windows: scoped correctness evidence covers46 numeric feature/compute cases,733 corpus renders,477 compute dispatches and1 required invalid-pipeline rejection. The browser's renderer string is privacy-masked and does not prove the actual adapter model. Default native WebGPU adapter acquisition is unavailable. Seven canonical native-baseline driver assumptions remain failures/refusals; their compatibility portions are not a full-package parity receipt. Physical Apple/mobile/AMD/lower-tier and headset evidence remains owed. Test-only changes add0 runtime bytes; combined core plus stage measures24209 B after the incoming core guard; this test change adds0 B. No size ceiling increases.
+## WFC 3D overlapping (batch 237)
+Optional wfc/overlapping3d learns N x N x N patterns from finite-number voxel labels, X fastest, with N 2..5 (default 2). Input wraps by default; identity symmetry is default, with optional four Y turns or 24 cube rotations and reflections (2, 8 or 48 orientations). Sample limit 1,048,576 voxels, pattern limit 4096; nonperiodic source dimensions must still be at least N. Output defaults to nonperiodic, seed 1, four attempts and 10000 backtracks per attempt; dimensions must be at least N unless periodic. Output limit 1,000,000 voxels and 16,777,216 lattice cell/pattern pairs. Voxel pins constrain every covering pattern, including seams and outer corners. Samples and rules are copied. Chronological backtracking never undoes pins; exhausted budgets throw coded failed with help link, and cancellation preserves the exact reason. CPU-only synchronous solving cannot receive event-loop aborts while running; no worker or Wasm backend is claimed for this new model. Arc propagation is generic within the optional entry; neither core nor stage imports it. Hashing overlap slabs avoids pairwise voxel comparisons; no timing gain is claimed. Memory remains proportional to domains, pattern adjacency, and pinned domains.
+Entry size: wfc/overlapping3d 3,188 B min+gzip, previously 0 B; ceiling 3,444 B. Core + stage root remains 23,950 B.
+>>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
+
+
+## Batch 258 forms scope
+
+Select defaults to the first enabled option and opens a modal listbox; disabled options are skipped. RadioGroup defaults to vertical and Tabs to horizontal. Their selected choice is the strip's single tab stop; arrow commands wrap enabled choices. Tabs owns and disposes the supplied content panels and displays one at a time. Programmatic value assignments do not emit change; user selection does. Checkbox reuses the existing complete checkbox toggle implementation.
+
+ColorPicker defaults to opaque white and exposes HSV, RGB and alpha channels normalized to [0,1], a pointer SV square and six/eight-digit hex editing. value is canonical #rrggbbaa; hue survives zero saturation. The SV display is 64 by 64 colour cells, while selected values remain continuous before 8-bit hex output. attachFormsMirror runs after UiRenderer's ordinary mirror; attachTextInputs supplies the hex editor's native editing. Both return disposable detachers and accept AbortSignal. Human assistive-technology certification and a continuous SV shader remain polish follow-ups, not claims of this change.
+
+Batch 258 job 3 sizes: forms 0 to 3492 B min+gzip, ceiling 3743 B; UI root 32080 to 32141 B. Sharing existing controls and renderer avoids duplicate pipelines. Core + stage remains 23950 B.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -11058,12 +11090,25 @@ GPU queue owner collision: start gpu-package-tests.mjs in two worktrees; both us
 
 Dependent audio GPU validation is incomplete for the version-guard landing: the shared GPU monitor reclaimed lane-T-version-guard at 2026-11-10T02:28:06.439Z after 211623 ms without GPU activity, while audio/scripts/test-browser.js awaited its browser evaluations before writing audio-browser.json. The suite produced no report and did not reach its own 10 min limit. Root cause of the uncompleted audio evaluation is unconfirmed; monitor evidence is in the local GPU idle record and test-results/version-guard-resume/gpu-lane-T.log. No timeout or idle threshold was raised.
 
-WebGL2 compatibility SNORM storage defect: MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs fails at line 74 for rgba8snorm, with incomplete framebuffer status 0x8cd6. Cause: WebGL2 compatibility compute writes use a framebuffer for the native RGBA8_SNORM texture even though device/formats.ts correctly marks that format non-renderable. The format/compute code is unchanged by the guard. Needs a supported storage-write representation and exact normalized conversion in webgl2-compat; no shader assertions, tolerances or ceilings were weakened. Native checks and core/stage compatibility checks pass. Reproduced once on clean origin/main 2cff40372 with rebuilt packages (test-results/version-guard-resume/clean-main-snorm-leaf.log); this unchanged dependent GPU defect is outside the version-guard push gate under lane rule 23.
-
 Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
 - Fixed while recording the VRM asset: appended WebXR generic-hand provenance is now part of the notices generator asset table, preserving the original licence and hashes. The existing supply-chain consistency test covers both records.
 
 - Existing VRM scene ownership: without an Animator, `addVRM` in packages/rigging/src/vrm.ts registers/removes its plugin through the engine active scene rather than the model scene; reproduce loading into an inactive secondary scene. Waits for the fix phase.
+
+### Batch 273 Firefox scope and concurrent landing blockers
+Shipped Firefox159.0.1 now launches through the package-owned BiDi transport and
+passes the scoped46 numeric cases,733 render pipelines and477 legal compute
+pipelines plus the required negative pipeline rejection. The old patched-browser
+side-by-side loader diagnosis above is historical, not a refusal by this shipped
+browser. Its default native WebGPU requestAdapter is null, so native-baseline
+canonical driver refusals remain visible in the receipt. Full-package and
+physical-device certification remains open; see work-lists/batch-273-browser-matrix.md.
+The latest main's committed merge markers in the umbrella manifest and size
+baseline blocked this job's package build. Both additions and history records
+are retained, budgets unchanged, and tests/integration-json.test.js parses all
+workspace manifests and quality baselines and checks their totals.
+
+Batch 258 forms fixed blockers: the generic mirror delegated Enter/Space on div options as though they were native buttons, and transferred focus during a canvas pointer press, losing its pointer ID. Exact activation and pointer-release regressions cover both repairs. Form annotations now run after mirror frame reconciliation; hex editing preserves a valid RGB prefix while alpha is entered. Remaining polish: continuous SV gradient and human AT certification are in private finish-later. No missing form widget remains in this job.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
