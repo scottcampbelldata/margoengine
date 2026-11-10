@@ -528,7 +528,7 @@ export class HTMLTexture {
     engine?.canvas.ownerDocument.removeEventListener('pointerdown', this.pointer, true);
     for (const surface of this.surfaces) surface.detach();
     this.surfaces.clear();
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.runtime = undefined;
   }
   declare [Symbol.dispose]: () => void;

@@ -553,7 +553,7 @@ export class HTML extends LabelRenderer {
   override dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.runtime?.removePlugin(this.name);
+    // super.dispose() removes it through engine.sceneOf(this); removePlugin(name) here hit the active scene.
     this.release();
     super.dispose();
     this.records.clear();
