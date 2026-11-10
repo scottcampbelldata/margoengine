@@ -1,0 +1,15 @@
+{
+  "before": {
+    "index": 63217,
+    "batched": 37459,
+    "transmission-layers": 4937
+  },
+  "after": {
+    "index": 63361,
+    "batched": 37641,
+    "transmission-layers": 4937
+  },
+  "coreStage": 24209,
+  "method": "build-optional equivalent, exact core requirement stamp, gzip bundle with bare imports external",
+  "reason": "Direct compressed colour-space uploads on compatibility devices"
+}

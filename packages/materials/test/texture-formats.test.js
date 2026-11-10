@@ -191,6 +191,58 @@ test('a transcoded KTX2 file uploads every mip at block size and decodes sRGB pe
   }
 });
 
+test('compat compressed KTX2 uploads each colour space directly and reuses both copies', () => {
+  for (const first of [true, false]) {
+    const gpu = device(['texture-compression-bc']);
+    gpu.device.adapterInfo = { vendor: 'margo-webgl2' };
+    const allocate = gpu.device.createTexture;
+    gpu.device.createTexture = (descriptor) => {
+      const result = allocate(descriptor),
+        view = result.createView;
+      result.createView = (options) => {
+        assert.equal(options.format, result.format, 'compressed views must match the uploaded internal format');
+        return view(options);
+      };
+      return result;
+    };
+    const source = {
+      width: 4,
+      height: 4,
+      format: 'bc7-rgba-unorm',
+      target: 'bc7',
+      srgb: false,
+      mipmaps: [{ width: 4, height: 4, data: new Uint8Array(16) }],
+    };
+    const texture = new Texture(source);
+    const log = gpu.record(() => {
+      texture.bind(gpu.device, first);
+      texture.bind(gpu.device, !first);
+      texture.bind(gpu.device, first);
+    });
+    assert.deepEqual(
+      textures(log).map((t) => t.format),
+      first ? ['bc7-rgba-unorm-srgb', 'bc7-rgba-unorm'] : ['bc7-rgba-unorm', 'bc7-rgba-unorm-srgb'],
+    );
+    assert.equal(calls(log, 'writeTexture').length, 2, 'one upload per colour space, not per draw');
+    assert.ok(Number.isFinite(texture.steady(gpu.device)));
+    texture.update();
+    const refreshed = gpu.record(() => {
+      texture.bind(gpu.device, false);
+      texture.bind(gpu.device, true);
+    });
+    assert.equal(textures(refreshed).length, 2, 'both copies refresh after update');
+    assert.equal(calls(refreshed, 'destroy').length, 2, 'both old copies are freed');
+    assert.equal(
+      calls(
+        gpu.record(() => texture.dispose()),
+        'destroy',
+      ).length,
+      2,
+      'dispose frees both copies',
+    );
+  }
+});
+
 test('Display P3 pixels stage as sRGB and convert to rgba16float linear sRGB with math P3_TO_SRGB', () => {
   const gpu = device(),
     texture = new Texture(

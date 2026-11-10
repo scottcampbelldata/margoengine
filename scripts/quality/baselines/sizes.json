@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13874345,
+  "total": 13880992,
   "history": [
     {
       "date": "2026-10-24",
@@ -7304,6 +7304,12 @@
       "commit": "batch-191-job-2",
       "reason": "New optional post/mask: 0 to 6006 B gzip. The wrapper preserves shared capture ownership, custom stage views and coverage compositing; splitting would duplicate lifecycle and colour boundary logic. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-184",
+      "reason": "New optional transmission background list, before 0 B; 4937 B gzip including the bounds cache. 5500 B ceiling retains capture, lifecycle and sorted/OIT integration in one entry. Materials batched measured 37459 to 37641 B for the direct compressed colour-space upload repair; ceiling 37624 to 38771 B. The 182 B preserves both cached interpretations without a package split or backend change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7818,7 +7824,7 @@
     "@margoengine/materials": 64979,
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 37624,
+    "@margoengine/materials/batched": 38771,
     "@margoengine/materials/eye": 3629,
     "@margoengine/materials/hair": 2011,
     "@margoengine/materials/layered": 3230,
@@ -8629,6 +8635,7 @@
     "@margoengine/decoders/lzfse": 2551,
     "@margoengine/voxel-edit/formats-extra": 5190,
     "@margoengine/shader/texture-array": 3442,
-    "@margoengine/post/mask": 6262
+    "@margoengine/post/mask": 6262,
+    "@margoengine/materials/transmission-layers": 5500
   }
 }

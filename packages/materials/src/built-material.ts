@@ -1,4 +1,5 @@
 import { requireWebGPU } from '../../shared/require-webgpu.js';
+import { compatTier } from '../../shared/compat.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine } from '@margoengine/core/extension';
@@ -154,6 +155,8 @@ export interface TextureRegion {
 }
 interface Slot {
   texture?: GPUTexture;
+  /** WebGL2 compressed textures cannot reinterpret sRGB: one upload per sampled colour space. */
+  transcoded?: Map<string, GPUTexture>;
   /** The mipmaps option the GPU copy was made with. */
   mips?: boolean;
   views: Map<string, GPUTextureView>;
@@ -631,7 +634,8 @@ export class Texture {
   dispose(): void {
     this.stamp = changeStamp();
     for (const slot of this.slots.values()) {
-      slot.texture?.destroy();
+      if (slot.transcoded) for (const texture of slot.transcoded.values()) texture.destroy();
+      else slot.texture?.destroy();
       slot.p3?.destroy();
     }
     this.slots.clear();
@@ -700,17 +704,28 @@ export class Texture {
         }
       };
     if (k.type === 'ktx2') {
+      const separate = !k.own && k.base !== 'rgba8unorm' && k.base !== 'rgba16float' && compatTier(device) === 'webgl2';
+      const format = (sRGB && !k.own && k.base !== 'rgba16float' ? k.base + '-srgb' : k.base) as GPUTextureFormat;
       if (!slot.texture || slot.version !== this.version) {
-        slot.texture?.destroy();
+        if (slot.transcoded) for (const texture of slot.transcoded.values()) texture.destroy();
+        else slot.texture?.destroy();
         const file = this.source as TranscodedTexture;
-        slot.texture = k.own ? file.upload!(device) : uploadTranscoded(device, file, k.base);
+        slot.texture = k.own ? file.upload!(device) : uploadTranscoded(device, file, k.base, separate && sRGB);
+        slot.transcoded = separate ? new Map([[format, slot.texture]]) : undefined;
         slot.mips = mips;
         slot.views.clear();
         slot.version = this.version;
         refit();
       }
-      const format = (sRGB && !k.own && k.base !== 'rgba16float' ? k.base + '-srgb' : k.base) as GPUTextureFormat;
-      return [this.viewOf(slot, slot.texture, format, k.dimension), slot.sampler];
+      let texture = slot.texture;
+      if (slot.transcoded) {
+        texture = slot.transcoded.get(format)!;
+        if (!texture) {
+          texture = uploadTranscoded(device, this.source as TranscodedTexture, k.base, sRGB);
+          slot.transcoded.set(format, texture);
+        }
+      }
+      return [this.viewOf(slot, texture, format, k.dimension), slot.sampler];
     }
     if (k.type === 'equirect') {
       const source = k.source.sampled(device, true, 'equirect source');

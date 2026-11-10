@@ -2086,6 +2086,10 @@
       "types": "./dist/materials/serialization.d.ts",
       "import": "./dist/materials/serialization.js"
     },
+    "./materials/transmission-layers": {
+      "types": "./dist/materials/transmission-layers.d.ts",
+      "import": "./dist/materials/transmission-layers.js"
+    },
     "./math": {
       "types": "./dist/math.d.ts",
       "import": "./dist/math.js"

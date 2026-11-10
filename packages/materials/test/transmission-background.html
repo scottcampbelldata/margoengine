@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Transmission background layers</title>
+<style>body{margin:0}canvas{display:block;width:192px;height:192px}</style><canvas width="192" height="192"></canvas>
+<script type="module">
+import {Engine} from '/packages/core/dist/extension.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {TransmissionLayers} from '/packages/materials/dist/transmission-layers.js';
+import {PostStack} from '/packages/post/dist/index.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {OIT} from '/packages/oit/dist/index.js';
+globalThis.margoLow=new URLSearchParams(location.search).has('single')?1:undefined;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,5],target:[0,0,0]}});
+engine.stop();engine.lighting.radiance[3]=0;
+const errors=[];
+engine.onError=e=>errors.push(String(e));
+const observe=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));observe();
+const stack=PostStack.attach(engine,[new Tonemap({curve:'neutral'})]);
+const quad=(z,x0=-3,x1=3)=>({positions:[x0,-3,z,x1,-3,z,x1,3,z,x0,3,z],normals:[0.6,0,0.8,0.6,0,0.8,0.6,0,0.8,0.6,0,0.8],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+const models=[],materials=[];let owner,foreground,weighted;
+const mesh=(g,o)=>{const m=new Material(o);materials.push(m);const model=createMesh(engine,g,m);models.push(model);return model;};
+const clear=()=>{owner?.dispose();foreground?.dispose();weighted?.dispose();for(const m of models)m.dispose();for(const m of materials)m.dispose();models.length=materials.length=0;};
+const frame=async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();};
+window.backgroundFixture={errors,
+async render({mode='sorted',glass=true,ior=1,reverse=false,front=false,occluder=false}={}){
+ clear();weighted=OIT.attach(engine,{order:2.95});owner=TransmissionLayers.attach(engine,{weighted});
+ mesh(quad(-2),{color:[0,0,1],shading:'basic'});
+ const layers=[mesh(quad(-1,-3,0.3),{color:[1,0,0],opacity:0.5,transparent:true,shading:'basic'}),mesh(quad(-0.8,-0.3,3),{color:[0,1,0],opacity:0.5,transparent:true,shading:'basic'})];
+ for(const m of reverse?layers.reverse():layers)owner.addLayer(m,{mode});
+ if(glass)owner.add(mesh(quad(0),{color:[1,1,1],transmission:1,ior,thickness:1,roughness:0}));
+ if(occluder)mesh(quad(0.2,-0.1,0.1),{color:[1,1,0],shading:'basic'});
+ if(front){foreground=OIT.attach(engine);foreground.add(mesh(quad(1,-0.1,0.1),{color:[1,0,1],opacity:0.5,transparent:true,shading:'basic'}));}
+ await frame();await frame();return true;
+},async restore(){const old=engine.gpu;await engine.rebootDevice();observe();await frame();return old!==engine.gpu;},
+async resize(){engine.canvas.width=160;engine.canvas.height=160;await frame();},
+dispose(){clear();stack.dispose();engine.dispose();}
+};
+</script></html>

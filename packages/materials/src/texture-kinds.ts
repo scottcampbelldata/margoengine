@@ -238,7 +238,7 @@ export function validateTranscoded(s: TranscodedTexture): string {
   return base;
 }
 /** A GPU texture of the transcoded `s` (all its mips), viewable with and without sRGB decoding. */
-export function uploadTranscoded(device: GPUDevice, s: TranscodedTexture, base: string): GPUTexture {
+export function uploadTranscoded(device: GPUDevice, s: TranscodedTexture, base: string, srgb = false): GPUTexture {
   const info = transcoded[base];
   if (info.feature && !device.features.has(info.feature))
     throw new MargoError(
@@ -249,8 +249,8 @@ export function uploadTranscoded(device: GPUDevice, s: TranscodedTexture, base: 
     throw new RangeError('Texture exceeds device limit; resize the image to the GPU maxTextureDimension2D or less.');
   const texture = device.createTexture({
     size: [s.width, s.height],
-    format: base as GPUTextureFormat,
-    viewFormats: base === 'rgba16float' ? [] : [(base + '-srgb') as GPUTextureFormat],
+    format: (srgb ? base + '-srgb' : base) as GPUTextureFormat,
+    viewFormats: base === 'rgba16float' ? [] : [(srgb ? base : base + '-srgb') as GPUTextureFormat],
     mipLevelCount: s.mipmaps.length,
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });

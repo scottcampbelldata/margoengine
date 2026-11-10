@@ -41,7 +41,8 @@
     "test:gpu:uv-groups": "cd ../.. && node scripts/materials-uv-groups-gpu-check.js",
     "test:gpu:normal-map": "cd ../.. && node scripts/normal-map-orientation-gpu-check.js",
     "test:gpu:physical-maps": "cd ../.. && node scripts/physical-material-maps-gpu-check.js",
-    "test:gpu:sheen-albedo": "cd ../.. && node scripts/sheen-albedo-gpu-check.js"
+    "test:gpu:sheen-albedo": "cd ../.. && node scripts/sheen-albedo-gpu-check.js",
+    "test:gpu:transmission-layers": "cd ../.. && node packages/materials/test/transmission-background-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -100,6 +101,10 @@
     "./serialization": {
       "types": "./dist/serialization.d.ts",
       "import": "./dist/serialization.js"
+    },
+    "./transmission-layers": {
+      "types": "./dist/transmission-layers.d.ts",
+      "import": "./dist/transmission-layers.js"
     }
   },
   "files": [
