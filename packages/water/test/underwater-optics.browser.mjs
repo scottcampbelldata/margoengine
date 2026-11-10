@@ -177,9 +177,93 @@ struct Sample {@location(0) color:vec4f,@builtin(frag_depth) z:f32}
       input.destroy();
       output.destroy();
     }
+    // Sun shaft focusing: the production sunDrift and sunFocus against rays traced in double precision. A crest
+    // (h = -A x^2) is a converging lens, so 1/|J| exceeds 1 under it; a trough spreads the light.
+    const focusModule = d.createShaderModule({
+      code:
+        declarations +
+        underwaterOptics +
+        `
+struct Case {a:vec4f,b:vec4f,c:vec4f,sun:vec4f,step:vec4f}
+@group(0) @binding(5) var<storage,read> cases:array<Case>;
+@group(0) @binding(6) var<storage,read_write> out:array<vec4f>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x<arrayLength(&cases)){let k=cases[id.x];
+ let s=sunDrift(k.a.xyz,k.sun.xyz,k.sun.w);out[id.x]=vec4f(s,sunFocus(s,sunDrift(k.b.xyz,k.sun.xyz,k.sun.w),sunDrift(k.c.xyz,k.sun.xyz,k.sun.w),k.step.x,k.step.y),0);}}
+`,
+    });
+    const focusPipeline = d.createComputePipeline({ layout: 'auto', compute: { module: focusModule, entryPoint: 'main' } });
+    const unit = (v) => v.map((x) => x / Math.hypot(...v));
+    const drift = (n, toSun, ior) => {
+      const i = toSun.map((x) => -x),
+        eta = 1 / ior,
+        c = -(n[0] * i[0] + n[1] * i[1] + n[2] * i[2]),
+        k = 1 - eta * eta * (1 - c * c);
+      const t = k < 0 ? [0, -1, 0] : unit(i.map((x, j) => eta * x + (eta * c - Math.sqrt(k)) * n[j]));
+      return [t[0] / Math.max(-t[1], 0.05), t[2] / Math.max(-t[1], 0.05)];
+    };
+    const cases = [],
+      truth = [];
+    for (const [A, toSun] of [
+      [0.2, [0, 1, 0]],
+      [-0.2, [0, 1, 0]],
+      [0.15, unit([0.3, 1, 0.2])],
+      [-0.1, unit([-0.4, 1, 0.1])],
+    ])
+      for (const x of [-0.5, 0, 0.75])
+        for (const z of [1, 2, 4]) {
+          // Surface h(x, w) = -A (x^2 + w^2 / 2); normal (-dh/dx, 1, -dh/dw).
+          const h = 0.25,
+            normal = (px, pw) => unit([2 * A * px, 1, A * pw]),
+            ior = 1.333;
+          const a = normal(x, 0.3),
+            b = normal(x + h, 0.3),
+            c = normal(x, 0.3 + h);
+          cases.push(...a, 0, ...b, 0, ...c, 0, ...toSun, ior, h, z, 0, 0);
+          // Traced: where each ray lands at depth z, and the area ratio of the landed cell.
+          const land = (n, px, pw) => {
+            const s = drift(n, toSun, ior);
+            return [px + z * s[0], pw + z * s[1]];
+          };
+          const p0 = land(a, x, 0.3),
+            px = land(b, x + h, 0.3),
+            pw = land(c, x, 0.3 + h);
+          const j = ((px[0] - p0[0]) * (pw[1] - p0[1]) - (px[1] - p0[1]) * (pw[0] - p0[0])) / (h * h);
+          truth.push({ A, x, z, focus: Math.min(1 / Math.max(Math.abs(j), 0.1), 10) });
+        }
+    const caseBuffer = d.createBuffer({ size: cases.length * 4, usage: 136 });
+    d.queue.writeBuffer(caseBuffer, 0, new Float32Array(cases));
+    const focusOut = d.createBuffer({ size: truth.length * 16, usage: 132 });
+    const focusEncoder = d.createCommandEncoder();
+    const focusPass = focusEncoder.beginComputePass();
+    focusPass.setPipeline(focusPipeline);
+    focusPass.setBindGroup(
+      0,
+      d.createBindGroup({
+        layout: focusPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 5, resource: { buffer: caseBuffer } },
+          { binding: 6, resource: { buffer: focusOut } },
+        ],
+      }),
+    );
+    focusPass.dispatchWorkgroups(Math.ceil(truth.length / 64));
+    focusPass.end();
+    const focusData = await read(focusOut, focusEncoder);
+    let focusError = 0,
+      crestUnderOne = 0,
+      troughOverOne = 0;
+    truth.forEach((t, i) => {
+      const f = focusData[i * 4 + 2];
+      focusError = Math.max(focusError, Math.abs(f - t.focus) / t.focus);
+      if (t.A > 0 && f <= 1) crestUnderOne++;
+      if (t.A < 0 && f >= 1) troughOverOne++;
+    });
+    caseBuffer.destroy();
+    focusOut.destroy();
+    const focus = { cases: truth.length, focusError, crestUnderOne, troughOverOne };
     const validation = await d.popErrorScope();
     engine.dispose();
-    return { reports, validation: validation?.message };
+    return { reports, focus, validation: validation?.message };
   });
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);
@@ -190,6 +274,9 @@ struct Sample {@location(0) color:vec4f,@builtin(frag_depth) z:f32}
     assert.ok(r.distanceError < 0.001, JSON.stringify(r));
     assert.ok(r.pixelError <= 1, JSON.stringify(r));
   }
+  assert.ok(result.focus.focusError < 1e-4, `sun focus matches traced rays: ${JSON.stringify(result.focus)}`);
+  assert.equal(result.focus.crestUnderOne, 0, 'a crest focuses sunlight (1/|J| > 1)');
+  assert.equal(result.focus.troughOverOne, 0, 'a trough spreads sunlight (1/|J| < 1)');
   await mkdir('test-results', { recursive: true });
   await writeFile(
     `test-results/water-underwater-optics-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,

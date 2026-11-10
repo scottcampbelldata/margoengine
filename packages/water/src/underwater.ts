@@ -80,17 +80,13 @@ ${underwaterOptics}
 fn cell(xz:vec2f)->vec2i {let r=u[18].x;return vec2i(floor(((xz-u[8].xz)/u[12].w*0.5+0.5)*r));}
 fn surfaceAt(p:vec2i)->vec4f {let r=i32(u[18].x);if(any(p<vec2i(0))||any(p>=vec2i(r))){return vec4f(0);}return textureLoad(field,p,0);}
 // Refracted propagation direction (pointing down) of sunlight through a surface with normal n.
-fn refracted(n:vec3f)->vec3f {
- let i=-u[12].xyz;let eta=1.0/u[19].w;let c=-dot(n,i);let k=1.0-eta*eta*(1.0-c*c);
- if(k<0.0){return vec3f(0,-1,0);}return normalize(eta*i+(eta*c-sqrt(k))*n);
-}
-fn slope(n:vec3f)->vec2f {let t=refracted(n);return t.xz/min(t.y,-0.05);}
+fn refracted(n:vec3f)->vec3f {return sunRefracted(n,u[12].xyz,u[19].w);}
+fn slope(n:vec3f)->vec2f {return sunDrift(n,u[12].xyz,u[19].w);}
 // 1/|J| of the map x -> x + z*slope(n(x)) over one field cell, clamped so a fold stays finite.
 fn focus(p:vec2i,z:f32)->f32 {
  let a=surfaceAt(p);let b=surfaceAt(p+vec2i(1,0));let c=surfaceAt(p+vec2i(0,1));
  if(dot(a.xyz,a.xyz)<0.5||dot(b.xyz,b.xyz)<0.5||dot(c.xyz,c.xyz)<0.5){return 1.0;}
- let h=2.0*u[12].w/u[18].x;let s=slope(a.xyz);let dx=(slope(b.xyz)-s)/h;let dz=(slope(c.xyz)-s)/h;
- let j=(1.0+z*dx.x)*(1.0+z*dz.y)-z*dx.y*z*dz.x;return min(1.0/max(abs(j),0.1),10.0);
+ return sunFocus(slope(a.xyz),slope(b.xyz),slope(c.xyz),2.0*u[12].w/u[18].x,z);
 }
 fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.566370614*d*sqrt(d));}
 @fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {

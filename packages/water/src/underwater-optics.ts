@@ -1,6 +1,18 @@
 // Clean-room dielectric boundary and projective pixel traversal. Research: docs/clean-room.md, batch 234 job 3.
 // Kept separate so the numerical GPU oracle executes the identical production functions.
 export const underwaterOptics = `
+// Propagation direction (pointing down) of sunlight (toward-sun unit vector) through a surface with normal n.
+fn sunRefracted(n:vec3f,toSun:vec3f,ior:f32)->vec3f {
+ let i=-toSun;let eta=1.0/ior;let c=-dot(n,i);let k=1.0-eta*eta*(1.0-c*c);
+ if(k<0.0){return vec3f(0,-1,0);}return normalize(eta*i+(eta*c-sqrt(k))*n);
+}
+// Horizontal travel per metre of depth: the refracted ray from surface point x reaches depth z at x+z*sunDrift(n).
+fn sunDrift(n:vec3f,toSun:vec3f,ior:f32)->vec2f {let t=sunRefracted(n,toSun,ior);return t.xz/max(-t.y,0.05);}
+// 1/|J| of x -> x+z*drift(x), from the drift at a cell (s) and at its +x (sx) and +z (sz) neighbours h apart;
+// clamped so a fold stays finite. Above 1 where the surface focuses the light (under a crest).
+fn sunFocus(s:vec2f,sx:vec2f,sz:vec2f,h:f32,z:f32)->f32 {
+ let dx=(sx-s)/h;let dz=(sz-s)/h;let j=(1.0+z*dx.x)*(1.0+z*dz.y)-z*dx.y*z*dz.x;return min(1.0/max(abs(j),0.1),10.0);
+}
 fn dielectric(c:f32,eta:f32)->f32 {
  if(eta==1.0){return 0.0;}
  let s=eta*eta*max(0.0,1.0-c*c);if(s>=1.0){return 1.0;}
