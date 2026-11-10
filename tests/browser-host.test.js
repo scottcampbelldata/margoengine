@@ -181,13 +181,16 @@ test('startHost: a browser the kernel never finishes with is logged as a survivo
 
 // The hang itself, end to end: a launched browser whose exit never arrives (the kernel still tearing it down after
 // TerminateProcess) is handed off at the grace, the close resolves, and the host alone records the survivor.
-test('launchBrowser: a browser the kernel never finishes with is handed off at the grace, logged by the host, and the suite moves on', { timeout: 30_000 }, async () => {
+test('launchBrowser: a browser the kernel never finishes with is handed off at the grace, logged by the host, and the suite moves on', { timeout: 30_000 }, async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'browser-host-'));
   try {
     const logFile = join(dir, 'survivors.log');
     let host;
     const hosting = async (settings) => (host = await startHost({ ...settings, stuck: true, reapMs: 2500, logFile }, { hostPath: fixture }));
     const reported = [];
+    // The bounded close reports to console.error, bound when the browser is launched: watch it from before the launch.
+    const graceLines = [];
+    t.mock.method(console, 'error', (line) => graceLines.push(String(line)));
     const browser = await launchBrowser({
       env: { MARGO_BROWSER: 'chromium' },
       platform: 'linux',
@@ -200,11 +203,16 @@ test('launchBrowser: a browser the kernel never finishes with is handed off at t
       exit: (code) => assert.fail(`launch failed ${code}`),
     });
     const exit = new Promise((resolve) => host.process.once('exit', resolve));
-    const begun = Date.now();
-    // Not through closeAll's 30 s budget: the close itself moves on at the 2,000 ms grace.
+    // Not through closeAll's 30 s budget: the close itself moves on at the 2,000 ms grace. Which wait ended it is read
+    // from the outcome, not a clock: the grace line (written to console.error by the bounded close) appears only when
+    // the grace timer wins the race, and a close that waited for the host instead would throw SHUTDOWN_TIMEOUT.
     await browser.close();
-    const took = Date.now() - begun;
-    assert.ok(took >= 1900 && took < 2500, `moved on at the grace, took ${took} ms`);
+    t.mock.restoreAll();
+    assert.equal(
+      graceLines.filter((line) => /was ended but the kernel had not finished tearing it down 2000 ms later/.test(line)).length,
+      1,
+      `the close moved on at the grace: ${graceLines.join(' | ')}`,
+    );
     assert.equal(await exit, 3, 'the host ended by itself with the survivor code');
     assert.match(await readFile(logFile, 'utf8'), /still present \d+ ms after they were ended: 4000000/);
   } finally {

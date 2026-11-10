@@ -208,9 +208,9 @@ test('a browser process the kernel has not finished tearing down cannot hold the
   const reported = [];
   const host = fakeHost({ finish: () => new Promise(() => {}) });
   const browser = withBoundedClose(listingBrowser([]), { host, graceMs: 100, report: (line) => reported.push(line) });
-  const begun = Date.now();
+  // Moving on at the grace, not the budget, is read from the outcome, not a clock: closeAll rejects with
+  // SHUTDOWN_TIMEOUT when its budget runs out, and the grace report below is written only when the grace timer won.
   await closeAll({ browser, budgetMs: 2000 });
-  assert.ok(Date.now() - begun < 1500, 'the close moved on at the grace, not at the budget');
   assert.deepEqual(host.calls.at(-1), ['release'], 'the host is released so the suite can end without it');
   assert.equal(reported.length, 1);
   assert.match(reported[0], /Chromium 10 was ended but the kernel had not finished tearing it down 100 ms later/);

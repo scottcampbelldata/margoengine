@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseSync } from 'rolldown/utils';
 
-test('all three Controls wrapper registrations retain the object used for scene cleanup', () => {
+test('every Controls wrapper registration retains the object used for scene cleanup', () => {
   let total = 0;
   for (const file of readdirSync('packages/controls/src').filter((name) => name.endsWith('.ts'))) {
     const source = readFileSync(`packages/controls/src/${file}`, 'utf8');
@@ -17,7 +17,11 @@ test('all three Controls wrapper registrations retain the object used for scene 
         const method = node.callee.property.name;
         if (method === 'use') {
           registrations++;
-          assert.equal(node.arguments[0].type, 'Identifier', `${file}: preserve registration identity`);
+          // The registered object itself is kept, in a local or a field of the wrapper (`this.overlayPlugin`), so
+          // dispose can find its owning scene with sceneOf; an inline object literal or a call result would be lost.
+          const [arg] = node.arguments;
+          const kept = arg.type === 'Identifier' || (arg.type === 'MemberExpression' && arg.object.type === 'ThisExpression' && !arg.computed);
+          assert.ok(kept, `${file}: preserve registration identity (got ${arg.type})`);
         }
         if (method === 'sceneOf') resolutions++;
         if (method === 'removePlugin' && !source.slice(node.start, node.end).includes('.sceneOf(')) nameOnly++;
@@ -34,5 +38,6 @@ test('all three Controls wrapper registrations retain the object used for scene 
       assert.equal(nameOnly, 0, file);
     }
   }
-  assert.equal(total, 3);
+  // Controls, TransformControls, ArcballGizmo and BoxGizmo: a wrapper added or removed updates this count on purpose.
+  assert.equal(total, 4);
 });
