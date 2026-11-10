@@ -96,10 +96,13 @@ export function resolveWang(
       const candidates = set.tiles.filter(
         (t) => (t.weight ?? 1) > 0 && t.colors.every((c, i) => target[i] < 0 || target[i] === c),
       );
-      let pick = hash(x, y, options.seed ?? 0) * candidates.reduce((n, t) => n + (t.weight ?? 1), 0);
-      for (const t of candidates) {
-        pick -= t.weight ?? 1;
-        if (pick < 0) {
+      // Common scaling preserves probabilities while keeping the sum and sampled intervals representable.
+      const maximum = candidates.reduce((n, t) => Math.max(n, t.weight ?? 1), 0);
+      let pick = hash(x, y, options.seed ?? 0) * candidates.reduce((n, t) => n + (t.weight ?? 1) / maximum, 0);
+      for (let i = 0; i < candidates.length; i++) {
+        const t = candidates[i];
+        pick -= (t.weight ?? 1) / maximum;
+        if (pick < 0 || i === candidates.length - 1) {
           result[y * width + x] = ((options.firstGid ?? 1) + t.tile) | (t.flags ?? 0);
           break;
         }

@@ -1093,3 +1093,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: pointcloud async factory/openPointCloud, source origins, global attribute maps, point/cache budgets, attribute hover, rectangle/lasso and open SelectionStore universes.
 - @margoengine/points: OctreeNodeData typed attributes/rowIds, MemoryOctree column preservation and COPC attributes.
 - margoengine: generated sciviz/pointcloud alias and synchronized environment/exr-codecs alias.
+- @margoengine/tilemap (review 4): describe Wang weights as finite nonnegative relative values, zero exclusions and deterministic normalized selection; README examples deferred.

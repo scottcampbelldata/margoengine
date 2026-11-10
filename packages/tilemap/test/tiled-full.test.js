@@ -5,6 +5,21 @@ import { resolveWang } from '../dist/autotile.js';
 import { FLIP_H, validateTileMap } from '../dist/index.js';
 import { buildMapQuads } from '../dist/objects.js';
 const base = (extra) => ({ width: 2, height: 1, tilewidth: 4, tileheight: 4, tilesets: [], layers: [], ...extra });
+
+test('Wang selection preserves relative weights without overflow or subnormal gaps', () => {
+  const rules = (weights) => ({
+    mode: 'wang', name: 'weighted', type: 'mixed', colors: [],
+    tiles: weights.map((weight, tile) => ({ tile, colors: Array(8).fill(0), weight })),
+  });
+  const choose = (weights) => resolveWang({}, 32, 16, rules(weights), { seed: 13, firstGid: 10 });
+  const equal = choose([1, 1, 0]);
+  assert.deepEqual(choose([1e308, 1e308, 0]), equal);
+  assert.deepEqual(choose([Number.MIN_VALUE, Number.MIN_VALUE, 0]), equal);
+  assert.ok(equal.includes(10) && equal.includes(11));
+  assert.ok(equal.every((gid) => gid === 10 || gid === 11));
+  assert.deepEqual(choose([1e308, 2.5e307, 0]), choose([4, 1, 0]));
+  assert.ok(choose([0, 0, 0]).every((gid) => gid === 0));
+});
 test('XML templates inherit shape/style/properties and local overrides including false and zero', async () => {
   const calls = [];
   const map = await parseTiled(
