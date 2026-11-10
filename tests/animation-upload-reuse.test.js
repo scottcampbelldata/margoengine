@@ -277,12 +277,12 @@ test('non-finite weights, singular meshes and Float32 palette overflow remain gu
   assert.equal(f.writes.length, 0);
   f.nodes[0].matrix.set(identity());
   f.nodes[1].matrix[0] = 3e38;
-  f.record.inverseBind[0][0] = 2;
+  f.record.inverseBind[0] = 2;
   assert.throws(() => f.frame(), /Skin matrix overflow/);
   assert.equal(f.counts.compute, before);
   assert.equal(f.writes.length, 0);
   f.nodes[1].matrix[0] = 1;
-  f.record.inverseBind[0][0] = 1;
+  f.record.inverseBind[0] = 1;
   f.frame();
   assert.equal(f.counts.compute, before + 1);
   assert.equal(f.writes.length, 2);

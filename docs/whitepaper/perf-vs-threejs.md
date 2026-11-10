@@ -477,3 +477,11 @@ uses one scratch array and groups primitives in one pass (0 filter passes), with
 sharing (`packages/animation/tests/clone-work.test.js`); perf-history "Batch 161 job 4". The GPU state each copy builds
 up front (uniform slot and bind groups) is an accepted difference: three builds it at the first render. Like-for-like
 row "clone + first draw": timing pending the quiet rerun (not yet built).
+
+## Animation.attach without per-channel searches (batch 161 job 5)
+
+Row 10.2 (`p-gltf-animated`) stays slower until the quiet rerun. Making an Animation of RobotExpressive searched the
+primitives once per channel (193) and set up 172 per-joint inverse-bind views; both are now 0, with the same clips and
+palette bytes (`packages/animation/tests/attach-work.test.js`); perf-history "Batch 161 job 5". The vertex packing,
+static bake and GPU uploads at load are an accepted difference: three does them at its first render. Like-for-like row
+"parse + first frame": timing pending the quiet rerun (not yet built).

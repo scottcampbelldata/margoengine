@@ -45,7 +45,7 @@ try {
         out = new Float32Array(r.joints.length * 16);
       invertMatrixStable(r.primitive.node.matrix, inverse, new Float64Array(52));
       for (let i = 0; i < r.joints.length; i++) {
-        multiplyMatrices(model.nodes[r.joints[i]].matrix, r.inverseBind[i], joint);
+        multiplyMatrices(model.nodes[r.joints[i]].matrix, r.inverseBind.subarray(i * 16, i * 16 + 16), joint);
         multiplyMatrices(inverse, joint, product);
         out.set(product, i * 16);
       }

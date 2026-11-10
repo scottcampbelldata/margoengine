@@ -3416,3 +3416,25 @@ The [volume comparison](../sciviz-rivals.md) adds --runs=1 without clocks, full 
   and `destroy` disposes them, because a copy is drawable at once; three's clone makes JavaScript objects only and builds
   GPU state at the first render (`docs/limits.md`). The like-for-like row "clone + first draw" is pending.
 - Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).
+
+### Batch 161 job 5: attach without per-channel searches or per-joint bind views (row 10.2)
+
+- Cause, counted on RobotExpressive (`p-gltf-animated`, `parseGLTFAsync` then `Animation.attach`): the Animation
+  constructor ran `model.primitives.find` once per channel for the target node's morph width (193 calls) and a
+  `times.some` closure per channel for key order; `setup` made one 16-float `subarray` view per joint of every skinned
+  primitive's inverse binds (43 a primitive, 172 in all), and for a skin with no inverse binds a `flatMap` and an array
+  per joint as well.
+- Fix: the width comes from the per-node primitive grouping job 1 built (the node's first primitive in model order, as
+  `find` returned); key order is a loop with the same comparisons (a NaN key still passes as before); each record keeps
+  its skin's inverse binds as one Float32Array and the palette product reads joint i at offset i * 16 with
+  `multiplyMatrices`' arithmetic in its order; a skin without inverse binds gets one identity-filled array. The influence
+  check was already one pass over the vertices and is unchanged.
+- Work counts, failing on the parent (`packages/animation/tests/attach-work.test.js`): primitive searches 0 (parent 193),
+  key-order closures 0 (parent one a channel), 16-float views 0 (parent 172), per-joint arrays and `flatMap` calls 0 for
+  a skin without binds (parent 172 and 4). Identical output: clip names, durations, targets, widths and key arrays as the
+  accessors give; inverse binds equal the accessor data or identities; uploaded palette bytes over three seeks equal the
+  parent's product (views of each joint's bind) byte for byte; the animation GPU suites pass unchanged.
+- Accepted difference in work: gltf-pro packs vertices, bakes static batches and uploads buffers at load, which three
+  defers to its first render (`docs/limits.md`); never moved or shrunk. The like-for-like row "parse + first frame" is
+  pending.
+- Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-gltf-animated --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).

@@ -116,7 +116,8 @@ interface Deformation {
   weightsQueue?: GPUQueue;
   uploadArgs: [GPUBuffer, number, Float32Array<ArrayBuffer>];
   joints: number[];
-  inverseBind: Float32Array[];
+  /** The skin's inverse bind matrices, 16 floats per joint in joint order (joint i's start at i * 16). */
+  inverseBind: Float32Array;
   /**
    * The record of an earlier primitive of the same skinned node whose bone range this one shares (batch.ts `add`): it
    * computes, checks and uploads the palette for both. Unset for the first primitive of a node, or one placed apart.
@@ -176,6 +177,21 @@ function skipPointers(model: PBRModel, def: ReturnType<typeof animationDefinitio
   return { ordinary, nodes: [], duration, warnings };
 }
 const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+/** `count` identity matrices, back to back: the inverse binds of a skin that gives none. */
+function identities(count: number): Float32Array {
+  const out = new Float32Array(count * 16);
+  for (let at = 0; at < out.length; at += 16) out[at] = out[at + 5] = out[at + 10] = out[at + 15] = 1;
+  return out;
+}
+/** The inverse binds of a primitive with no skin (shared: nothing reads or writes it). */
+const noBinds = new Float32Array(0);
+/** `a` times the 4x4 matrix at `b[at..at + 16]` into `out`: multiplyMatrices' arithmetic, in its order, with an offset. */
+function multiplyAt(a: ArrayLike<number>, b: Float32Array, at: number, out: Float32Array): void {
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++)
+      out[c * 4 + r] =
+        a[r] * b[at + c * 4] + a[4 + r] * b[at + c * 4 + 1] + a[8 + r] * b[at + c * 4 + 2] + a[12 + r] * b[at + c * 4 + 3];
+}
 // Only the ordinary same-realm native method has synchronous copy semantics
 // known here. Custom writers may change inputs during the copy and restore
 // them before returning, so comparing the input afterward cannot certify it.
@@ -281,7 +297,7 @@ function deformationRecord(p: PBRPrimitive): Deformation {
     weightsUploaded: false,
     uploadArgs: [undefined!, 0, undefined!],
     joints: [],
-    inverseBind: [],
+    inverseBind: noBinds,
   };
 }
 function record(
@@ -404,7 +420,9 @@ export class Animation implements EnginePlugin {
         const sampler = animationSampler(def.samplers[animationIndex(samplerId, def.samplers.length, 'sampler')]),
           times = model.asset.accessor(sampler.input, 'SCALAR'),
           interpolation = animationInterpolation(sampler.interpolation);
-        if (times.some((v, i) => v < 0 || (i > 0 && v <= times[i - 1])))
+        let ordered = true;
+        for (let i = 0; i < times.length && ordered; i++) ordered = !(times[i] < 0 || (i > 0 && times[i] <= times[i - 1]));
+        if (!ordered)
           throw new RangeError(
             'Invalid animation time/interpolation; keyframe times must be >= 0 and strictly increasing',
           );
@@ -415,7 +433,9 @@ export class Animation implements EnginePlugin {
           throw new TypeError(
             'Animation accessors must be Float32; re-export the glTF without quantised animation data',
           );
-        const weights = model.primitives.find((p) => p.nodeIndex === node)?.weights.length;
+        // The node's first primitive in model order, from the grouping validate() built: no search per channel.
+        const first = this.groupStart[node] < this.groupStart[node + 1] ? this.groupItems[this.groupStart[node]] : -1,
+          weights = first < 0 ? undefined : model.primitives[first].weights.length;
         const width = path === 'rotation' ? 4 : path === 'weights' ? (weights ?? 0) : 3;
         if (!width)
           throw new TypeError(
@@ -695,7 +715,7 @@ export class Animation implements EnginePlugin {
         for (const name of morphAttributes)
           if (target[name] !== undefined && asset.accessor(target[name], 'VEC3').length !== count * 3)
             throw new RangeError('Morph target count mismatch; every morph attribute needs one VEC3 per vertex');
-      let inverseBind: Float32Array = new Float32Array(identity),
+      let inverseBind: Float32Array = noBinds,
         joints: number[] = [];
       const attributes = definition.attributes,
         extra = skinId !== undefined && (attributes.JOINTS_1 !== undefined || attributes.WEIGHTS_1 !== undefined),
@@ -708,7 +728,7 @@ export class Animation implements EnginePlugin {
         joints = skin.joints;
         inverseBind =
           skin.inverseBindMatrices === undefined
-            ? Float32Array.from(joints.flatMap(() => Array.from(identity)))
+            ? identities(joints.length)
             : this.model.asset.accessor(skin.inverseBindMatrices, 'MAT4');
         if (
           skin.inverseBindMatrices !== undefined &&
@@ -776,7 +796,7 @@ export class Animation implements EnginePlugin {
         }
       }
       record.joints = joints;
-      record.inverseBind = joints.map((_, i) => inverseBind.subarray(i * 16, i * 16 + 16));
+      record.inverseBind = inverseBind;
       if (!joints.length) {
         record.palette = Float32Array.from(identity);
         record.paletteBits = new Uint32Array(record.palette.buffer);
@@ -927,7 +947,7 @@ export class Animation implements EnginePlugin {
         if (!invertMatrixStable(r.primitive.node.matrix, this.inverse, this.workspace))
           throw new RangeError('Singular skinned mesh transform; give the skinned node a non-zero scale');
         for (let i = 0; i < r.joints.length; i++) {
-          multiplyMatrices(this.joints.nodes[r.joints[i]].matrix, r.inverseBind[i], this.joint);
+          multiplyAt(this.joints.nodes[r.joints[i]].matrix, r.inverseBind, i * 16, this.joint);
           multiplyMatrices(this.inverse, this.joint, this.product);
           palette.set(this.product, i * 16);
         }
