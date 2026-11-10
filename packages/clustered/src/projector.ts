@@ -82,10 +82,11 @@ fn clusterProjector(index:u32,light:ClusterLight,position:vec3f)->vec3f {
 export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   readonly name = 'clustered:projector';
   /** @internal ClusteredLightTerm: the factor in the light loop. */
-  readonly term = 'clusterProjector(index,light,position)';
+  readonly term: string = 'clusterProjector(index,light,position)';
   readonly lights: Clustered;
   private engine?: Engine;
-  private device?: GPUDevice;
+  /** @internal Device used by optional projector extensions. */
+  protected device?: GPUDevice;
   private buffer?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
   private words = new Uint32Array(HEADER_WORDS);
@@ -211,8 +212,11 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   }
   // The buffer and the hook exist only while some light has an image, so an empty ProjectorLights changes no GPU call.
   // The buffer grows (to a power of two) when the images need more room, and is kept when they need less.
-  private sync(): void {
-    const active = !!this.device && !this.disposed && this.active;
+  /** @internal Whether this projector or an optional extension has images. */
+  protected get enabled(): boolean { return this.active; }
+  /** @internal Synchronize storage and the shared projector hook. */
+  protected sync(): void {
+    const active = !!this.device && !this.disposed && this.enabled;
     if (active && (!this.buffer || this.buffer.size < this.words.byteLength)) {
       this.buffer?.destroy();
       const size = Math.max(1024, 2 ** Math.ceil(Math.log2(this.words.byteLength))),

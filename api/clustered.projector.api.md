@@ -31,8 +31,9 @@ export interface ProjectorLightOptions {
 
 export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
     readonly name = "clustered:projector";
-    readonly term = "clusterProjector(index,light,position)";
+    readonly term: string;
     readonly lights: Clustered;
+    protected device?: GPUDevice;
     constructor(options: ProjectorLightOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: ProjectorLightOptions): ProjectorLights;
@@ -41,6 +42,8 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     setup(engine: Engine): void;
+    protected get enabled(): boolean;
+    protected sync(): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

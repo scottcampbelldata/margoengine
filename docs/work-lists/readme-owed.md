@@ -1033,3 +1033,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: document /curvilinear, structured and spherical node order/units/seams, shared source classifiers, physical referenceStep, index slices/outlines, masking, lifecycle, NOAA demo and accuracy limits.
 
 - margoengine: document generated /sciviz/curvilinear alias alongside the optional scientific volume entries.
+- @margoengine/clustered (batch 186 job 3): document CubeProjectorLights, six-face order/orientation, setCubes plus inherited spot setProjectors, quaternion rotation, sRGB/linear/alpha filtering, limits, restoration and copied pixels; examples deferred.
+- margoengine (batch 186 job 3): document clustered/cube-projector forwarding entry; examples deferred.

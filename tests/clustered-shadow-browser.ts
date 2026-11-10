@@ -9,6 +9,7 @@ import { DirectionalLights } from '../packages/clustered/dist/directional.js';
 import { AreaLights } from '../packages/clustered/dist/area.js';
 import { AreaShapes } from '../packages/clustered/dist/area-shapes.js';
 import { ShadowAtlas } from '../packages/clustered/dist/shadow-atlas.js';
+import { CubeProjectorLights } from '../packages/clustered/dist/cube-projector.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -28,6 +29,8 @@ type Config = {
   areas?: Light[];
   shapes?: Light[];
   atlas?: boolean;
+  cubes?: unknown[];
+  projectors?: unknown[];
   meshes: string[];
 };
 const canvas = document.querySelector('canvas')!,
@@ -60,6 +63,7 @@ let lights: Clustered | undefined, local: LocalShadows | undefined, suns: Direct
 let areas: AreaLights | undefined,
   shader = '';
 let shapes: AreaShapes | undefined;
+let cookies: CubeProjectorLights | undefined;
 engine.frameGraph.add({
   name: 'clustered-shadow:capture',
   order: -2.5,
@@ -68,7 +72,8 @@ engine.frameGraph.add({
   },
 });
 function scene(config: Config) {
-  for (const plugin of [shapes, areas, suns, local, lights]) plugin?.dispose();
+  for (const plugin of [cookies, shapes, areas, suns, local, lights]) plugin?.dispose();
+  cookies = undefined;
   shapes = undefined;
   areas = suns = local = undefined;
   for (const [name, m] of Object.entries(meshes)) m.visible = config.meshes.includes(name);
@@ -83,6 +88,11 @@ function scene(config: Config) {
   if (config.suns) (suns = DirectionalLights.attach(engine, { lights })).setLights(config.suns as never);
   if (config.areas) (areas = AreaLights.attach(engine, { lights })).setLights(config.areas as never);
   if (config.shapes) (shapes = AreaShapes.attach(engine, { lights })).setLights(config.shapes as never);
+  if (config.cubes || config.projectors) {
+    cookies = CubeProjectorLights.attach(engine, { lights });
+    if (config.cubes) cookies.setCubes(config.cubes as never);
+    if (config.projectors) cookies.setProjectors(config.projectors as never);
+  }
 }
 async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   device.pushErrorScope('validation');
@@ -99,7 +109,7 @@ async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
 }
 const kinds: Record<number, GPUBindGroupLayoutEntry> = {};
 for (const binding of [4, 14, 155]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
-for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150])
+for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150, 151])
   kinds[binding] = { binding, visibility: 0, buffer: { type: 'read-only-storage' } };
 for (const binding of [15, 29])
   kinds[binding] = { binding, visibility: 0, texture: { sampleType: 'depth', viewDimension: '2d-array' } };
@@ -208,8 +218,11 @@ async function messages(code: string): Promise<string[]> {
       }
     });
   },
+  cubes(entries: unknown[]) {
+    cookies!.setCubes(entries as never);
+  },
   dispose() {
-    for (const plugin of [shapes, areas, suns, local, lights]) plugin?.dispose();
+    for (const plugin of [cookies, shapes, areas, suns, local, lights]) plugin?.dispose();
     engine.dispose();
   },
 };

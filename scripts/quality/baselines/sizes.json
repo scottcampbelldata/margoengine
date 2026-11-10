@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14265795,
+  "total": 14270511,
   "history": [
     {
       "date": "2026-10-24",
@@ -7548,6 +7548,12 @@
       "date": "2026-11-10",
       "commit": "batch173-job5",
       "reason": "Batch 173 job 5: optional sciviz/curvilinear absent to 8220 B min+gzip, ceiling 8476 B. Direct trilinear inverse mapping with a spatial cell tree, exact nonuniform spherical inverse, shared scalar classification, masked support, curved coordinate slices and outline belong to one mapped-domain lifecycle. Splitting duplicates topology and GPU resource ownership. Core + stage remains 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-186-job3",
+      "reason": "New optional point cube cookies, 0 to 4493 B min+gzip. Shares existing spot projector upload/lifecycle, no duplicated light owner. Projector 2639 to 2720 B remains within its existing ceiling.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8915,6 +8921,7 @@
     "@margoengine/environment/exr-codecs": 1729,
     "@margoengine/environment dist/workers/exr-codecs.js": 1835,
     "@margoengine/gltf-pro/audio": 4973,
-    "@margoengine/sciviz/curvilinear": 8476
+    "@margoengine/sciviz/curvilinear": 8476,
+    "@margoengine/clustered/cube-projector": 4716
   }
 }
