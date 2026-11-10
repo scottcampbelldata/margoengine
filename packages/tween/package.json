@@ -61,6 +61,10 @@
     "./scroll-pin": {
       "types": "./dist/scroll-pin.d.ts",
       "import": "./dist/scroll-pin.js"
+    },
+    "./inertia": {
+      "types": "./dist/inertia.d.ts",
+      "import": "./dist/inertia.js"
     }
   },
   "files": [

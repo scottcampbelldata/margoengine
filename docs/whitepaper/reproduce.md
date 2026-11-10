@@ -2629,3 +2629,7 @@ Build packages, then node --test --test-timeout=120000 packages/tween/test/contr
 ### Pin and snap fixture (batch 215 job 5)
 
 Build packages; run node --test --test-timeout=120000 packages/tween/test/scroll-pin.test.js. Browser: node scripts/gpu-lock.mjs run --owner=codex-batch215 --max=4 --wait-max=60 -- node packages/tween/test/scroll-pin-browser.mjs, then add --compat for the second backend. The assertions check scroll/layout results, not a speed budget.
+
+### Inertia correctness samples (batch 215 job 6)
+
+Build packages; run node --test --test-timeout=120000 packages/tween/test/inertia.test.js. All time is explicitly supplied. Measure packages/tween/dist/inertia.js using bundleBytes and gzipSync, bare imports external. Tests include exact endpoint and two-sample velocity assertions plus analytic exponential samples.

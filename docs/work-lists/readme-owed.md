@@ -88,3 +88,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: tween/control alias (batch 215 job 4).
 - @margoengine/tween: pinTimeline, window/element sections, full/root label maps, snap modes, input cancellation, responsive refresh and disposal (batch 215 job 5).
 - margoengine: tween/scroll-pin alias (batch 215 job 5).
+- @margoengine/tween: VelocityTracker release timestamps, inertia friction, endpoint/list/function selection, hard vs bouncy ranges, rest thresholds, caller clock and cancellation (batch 215 job 6).
+- margoengine: tween/inertia alias (batch 215 job 6).

@@ -3773,7 +3773,7 @@ proven Wasm gain for the default-size contact checks. Core + stage remains
 23,950 B gzip, below the unchanged 25,000 B limit.
 ### Tween async entry (batch 215)
 
-Optional tween/async: 3431 B min+gzip (new entry, previously 0 B). Core and stage source unchanged. Tween root is 5513 B gzip after adding cancellation checks inside repeat/update callbacks. Each operation owns a driver and a promise allocated on creation. No automatic clock; cancelled values remain where last written. Group waits snapshot active work; retain a task to await its removed result. Timeline replay creates a new promise. Rejections must be observed by callers.
+Optional tween/async: 3431 B min+gzip (new entry, previously 0 B). Core and stage source unchanged. Tween root is 5529 B gzip after adding cancellation checks inside repeat/update callbacks. Each operation owns a driver and a promise allocated on creation. No automatic clock; cancelled values remain where last written. Group waits snapshot active work; retain a task to await its removed result. Timeline replay creates a new promise. Rejections must be observed by callers.
 
 ### Tween property entry (batch 215 job 2)
 
@@ -3790,3 +3790,7 @@ Optional tween/control: 3714 B gzip (previously 0 B). TweenControl is an explici
 ### Scroll pin entry (batch 215 job 5)
 
 New tween/scroll-pin: 2105 B gzip, previously 0 B. pinTimeline accepts a positive finite-duration seekable animation, root or optional timeline. Vertical window/element sources; one viewport distance by default, natural section start, pinSpacing true. Numeric start/distance may be refreshed by functions. Snap is disabled by default; labels (or directional labels), intervals, lists and custom functions select normalized progress. Idle delay 0.2 s, snap duration 0.25 s and scrub 0 s. Root timelines supply a labels map; the optional full timeline supplies labelTimes. Interval stops use constant storage regardless of interval size. No playback callbacks fire on scrubbing. Disposal restores DOM and styles.
+
+### Tween inertia (batch 215 job 6)
+
+New tween/inertia: 2778 B gzip from 0 B. Caller supplies release velocity or a VelocityTracker; sample/release times are seconds. The tracker defaults to a 0.1 s window and 32 samples, with configurable capacity 2..1024; stale release returns zero. Resistance defaults to 6 per second. Endpoints may be numeric, nearest lists or functions of the predicted end; optional min/max bound the selected endpoint. Hard ranges are default; bounce in [0,1) opts into spring overshoot. Rest thresholds are 0.01 units/s and 0.001 units; after maxDuration (default 10 simulated seconds) the exact end is written. Local speed 1 by default, with pause/play and AbortSignal. No wall clock or frame loop starts automatically. Observe cancellation promises. Core/stage unchanged.

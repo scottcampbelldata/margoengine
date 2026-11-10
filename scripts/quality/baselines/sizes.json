@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12219105,
+  "total": 12222139,
   "history": [
     {
       "date": "2026-10-24",
@@ -5510,6 +5510,12 @@
       "commit": "batch-215-scroll-pin",
       "reason": "New optional @margoengine/tween/scroll-pin: 0 to 2105 B gzip, with 256 B headroom; complete pin/snap behaviour and scroll-anchor-safe refresh, no core/stage change.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-215-inertia",
+      "reason": "New optional @margoengine/tween/inertia: 0 to 2778 B gzip, with standard headroom; complete opt-in behaviour, no core/stage change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6551,6 +6557,7 @@
     "@margoengine/tween/props": 3479,
     "@margoengine/tween/timeline": 3440,
     "@margoengine/tween/control": 3970,
-    "@margoengine/tween/scroll-pin": 2361
+    "@margoengine/tween/scroll-pin": 2361,
+    "@margoengine/tween/inertia": 3034
   }
 }

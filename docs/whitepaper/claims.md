@@ -3106,3 +3106,7 @@ Optional tween/control supplies target/key kills and overwrite, per-operation pa
 ### Scroll pin and idle snap (batch 215 job 5)
 
 Optional tween/scroll-pin pins a section during timeline scrubbing and snaps real scroll offsets to nearest/directional labels or other normalized stops after idle, matching the requested ScrollTrigger row. packages/tween/test/scroll-pin.test.js covers deterministic selection and lifecycle. scroll-pin-browser.mjs asserts real window and element geometry, refresh, label/interval destinations and restoration. Entry 2105 B gzip; no speed claim.
+
+### Release velocity and inertia (batch 215 job 6)
+
+Optional tween/inertia carries numeric properties using measured velocity and stops on an exact point/list/function endpoint or range, meeting the requested GSAP inertia row. packages/tween/test/inertia.test.js proves analytic free decay, identical physical samples under delta partitioning, velocity continuity, hard/bouncy bounds, exact completion, stale samples and lifecycle behaviour. Entry 2778 B gzip; no timing or speed claim.

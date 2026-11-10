@@ -3250,6 +3250,10 @@
       "types": "./dist/tween/scroll-pin.d.ts",
       "import": "./dist/tween/scroll-pin.js"
     },
+    "./tween/inertia": {
+      "types": "./dist/tween/inertia.d.ts",
+      "import": "./dist/tween/inertia.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"
