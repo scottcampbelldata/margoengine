@@ -27,7 +27,9 @@
     "test:gpu": "cd ../.. && node packages/splats/test/gpu/check.mjs",
     "test": "node --test test/*.test.js ../../tests/modern-temporal.test.js ../../tests/modern-data-subpaths.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu:formats": "cd ../.. && node packages/splats/test/gpu/formats-check.mjs && node packages/splats/test/gpu/formats-check.mjs --compat"
+    "test:gpu:formats": "cd ../.. && node packages/splats/test/gpu/formats-check.mjs && node packages/splats/test/gpu/formats-check.mjs --compat",
+    "test:gpu:lod-sog": "cd ../.. && node packages/splats/test/gpu/lod-sog-check.mjs",
+    "test:gpu:modify": "cd ../.. && node packages/splats/test/gpu/modify-check.mjs"
   },
   "sideEffects": false,
   "exports": {

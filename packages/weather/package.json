@@ -87,6 +87,7 @@
     "build": "node ../../scripts/build-optional.js weather",
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:parity": "cd ../.. && node packages/weather/tests/parity-browser.mjs gltf && node packages/weather/tests/parity-browser.mjs lens"
   }
 }

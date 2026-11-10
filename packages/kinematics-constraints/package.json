@@ -57,6 +57,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:gpu:multi-goal": "cd ../.. && node packages/kinematics-constraints/tests/multi-goal-browser.mjs",
     "build": "node ../../scripts/build-optional.js kinematics-constraints",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",

@@ -79,6 +79,10 @@
     "./shape": {
       "types": "./dist/shape.d.ts",
       "import": "./dist/shape.js"
+    },
+    "./decomp": {
+      "types": "./dist/decomp.d.ts",
+      "import": "./dist/decomp.js"
     }
   },
   "files": [
@@ -98,7 +102,7 @@
     }
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js compute",
+    "build": "node ../../scripts/build-optional.js compute && node scripts/copy-decomp.mjs",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/compute-browser.mjs",
     "test:browser:spec-math": "npm run build && node tests/compute-browser.mjs --spec-math-error=1",
@@ -106,6 +110,8 @@
     "test:browser:sweep": "npm run build && node tests/compute-precise-sweep.mjs",
     "test:gpu:owners": "cd ../.. && node packages/compute/tests/scene-owner-browser.mjs",
     "prepack": "npm run build",
-    "test:browser:shape": "node tests/shape-browser.mjs"
+    "test:browser:shape": "cd ../.. && node packages/compute/tests/shape-browser.mjs",
+    "test:browser:decomp": "cd ../.. && node packages/compute/tests/decomp-browser.mjs",
+    "build:decomp": "node scripts/build-decomp.mjs"
   }
 }

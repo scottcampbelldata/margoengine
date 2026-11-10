@@ -196,7 +196,9 @@ try {
     return info ? `${info.vendor} ${info.architecture} ${info.description}`.trim() : null;
   });
   await context.close();
+  const browserVersion = browser.version();
   await browser.close();
+  browser = undefined;
   releaseGpu(); // nothing below touches the GPU
 
   const path = (url) => {
@@ -237,7 +239,7 @@ try {
   const result = {
     commit: git('rev-parse', '--short', 'HEAD'),
     dirty: git('status', '--porcelain', '--', 'packages') !== '',
-    browser: `${browserLabel()} ${browser.version()} headless`,
+    browser: `${browserLabel()} ${browserVersion} headless`,
     adapter,
     method:
       'Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults',

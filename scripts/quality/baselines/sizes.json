@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13940643,
+  "total": 13944478,
   "history": [
     {
       "date": "2026-10-24",
@@ -7358,6 +7358,12 @@
       "commit": "batch-189",
       "reason": "New sky/compat-clouds aggregate: 0 to 15138 B gzip, ceiling 15593 B; shares the complete cloud, precipitation and weather-effects implementations with no renderer fork. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "fbffe7fd8",
+      "reason": "Batch 274 job 2: new optional decomp entry, 0 to 3617 B gzip, ceiling 3835 B; lazy SIMD kernel 25233 B gzip. One family shares loading and factor conventions; splitting duplicates validation and the ABI. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8693,6 +8699,7 @@
     "margoengine/web": 577,
     "@margoengine/post/pixelate": 9018,
     "@margoengine/vfx/json": 2860,
-    "@margoengine/staging/pathtrace-materials": 1816
+    "@margoengine/staging/pathtrace-materials": 1816,
+    "@margoengine/compute/decomp": 3835
   }
 }

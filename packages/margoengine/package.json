@@ -682,6 +682,10 @@
       "types": "./dist/compute/shape.d.ts",
       "import": "./dist/compute/shape.js"
     },
+    "./compute/decomp": {
+      "types": "./dist/compute/decomp.d.ts",
+      "import": "./dist/compute/decomp.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"

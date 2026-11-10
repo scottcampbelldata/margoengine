@@ -30,7 +30,9 @@
     "test:gpu:targets": "node scripts/test-targets.js",
     "test:gpu:paint": "node scripts/test-paint.js",
     "dev": "vite --config vite.config.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:grass-atmosphere": "cd ../.. && node packages/creative/scripts/test-grass-terrain.js && node packages/creative/scripts/test-orbit-atmosphere.js",
+    "test:gpu:paint-aniso": "cd ../.. && node packages/creative/scripts/test-paint-aniso.js"
   },
   "sideEffects": false,
   "exports": {

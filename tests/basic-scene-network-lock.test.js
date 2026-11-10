@@ -13,7 +13,8 @@ const root = resolve(import.meta.dirname, '..'),
  */
 function sources(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (/^(node_modules|dist|fixtures|\.git|\.claude|\.tmp|test-results|results|\.readme-check-.*)$/.test(entry.name)) continue;
+    if (/^(node_modules|dist|fixtures|\.git|\.claude|\.tmp|test-results|results|\.readme-check-.*)$/.test(entry.name))
+      continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) sources(path, out);
     else if (/\.(m|c)?js$|\.ts$/.test(entry.name)) out.push(path);
@@ -32,6 +33,25 @@ test('basic-scene-network takes the GPU lock before its server port', () => {
   const settings = script.slice(lock).match(/^acquire\(\{([^}]+)\}/)?.[1];
   assert.match(settings, /\bmax:\s*1\b/, 'the short browser capture has a one-minute GPU hold limit');
   assert.match(settings, /\bwaitMax:\s*60\b/, 'queueing does not use a GPU slot');
+});
+
+test('completed capture relinquishes its browser before the final cleanup', async () => {
+  const begin = script.indexOf('await context.close();');
+  const finish = script.indexOf('releaseGpu();', begin);
+  assert.ok(begin >= 0 && finish > begin);
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const release = new AsyncFunction('context', 'browser', script.slice(begin, finish) + '\nreturn browser;');
+  let closes = 0;
+  const browser = {
+    version: () => 'test-version',
+    close: async () => {
+      assert.equal(++closes, 1, 'an ended browser must never receive another close request');
+    },
+  };
+  const remaining = await release({ close: async () => {} }, browser);
+  // The real finally passes this remaining owner to closeAll, which closes it if present.
+  if (remaining) await remaining.close();
+  assert.equal(closes, 1);
 });
 
 test('the walk leaves out the scratch folder of a README check running beside it', (t) => {

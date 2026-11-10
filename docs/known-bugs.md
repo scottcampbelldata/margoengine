@@ -4809,3 +4809,18 @@ Batch 270 job 5: no new open defects identified in preset save/load; typed preci
 No new rendering defect found in the full compatibility route. Earlier unsupported wording described the small preview; the new optional entry and native/compatibility browser coverage make the full-layer contract explicit. Existing cloud/weather approximation limits remain in limits.md.
 
 Batch 189 landing repairs an incoming generated-export omission: post/pixelate existed in its owner package but margoengine lacked the facade and subpath export. Regenerated them with scripts/umbrella.mjs. The existing tests/umbrella.test.js fails on the missing alias before this correction.
+### Fixed: batch 274 package GPU-suite discovery and serving root
+
+The package GPU planner rejected the existing camera panorama and weather glTF suites because neither had a package test script. Register them in their owning manifests. Shape and decomposition suites also launched from the package directory while their URLs named repository-root pages, yielding HTTP 404; their scripts now enter the repository root, as the ComputeFrame suite already does. packages/compute/tests/gpu-registration.test.js checks discovery and command roots. No browser host or shutdown code changed.
+The same landing repair registers the new main camera stereo and voxel font-mask suites, plus the streamed-SOG diagnostic already imported by the broad splat suite. These are executable package commands; no assertions or discovery rules are removed.
+
+### Fixed: batch 274 basic-scene capture double close
+
+The network capture closed its browser before hashing and reporting, then passed the same released browser to closeAll in finally. The second end request reached a released host and returned a null acknowledgement. Cache the version and relinquish the browser owner after the successful early close; finally still owns failure cleanup and the preview server. tests/basic-scene-network-lock.test.js executes the actual early cleanup segment with a strict single-close browser, failing before this change. The real network capture now exits successfully. The three protected browser/shutdown files are unchanged.
+
+Batch 274 lazy-file inventory repair: the existing size-page regression found six built BVH/ECS/navmesh/scene-worker assets missing from LAZY_FILES. Register the existing load sites and measure the missing assets with the same raw/bundle, gzip and Brotli methods. No runtime package code changed for this inventory correction.
+The rebased water GPU script also placed its build after the first test, violating the existing planner contract; move that same build to the beginning without removing or changing any test command. The planner regression fails on the old ordering.
+
+Fixed in batch 274 decomp: zero-size factor stacks used to enter the matrix loop once per virtual matrix, allowing huge empty batches to stall. A zero-output work guard preserves empty factors with no kernel calls; packages/compute/tests/decomp.test.js checks the count (64 before, zero after) independently of time.
+
+Batch 274 fix-phase polish: removing/corrupting the served decomp-kernel.wasm asset, or denying its compilation by CSP, can expose native filesystem/CompileError failures rather than a help-linked MargoError. Cause: decomp.ts load() translates HTTP failures but does not wrap readFile/instantiate failures. Numerical decompositions and normal asset loading are complete; normalize these failure types in the fix phase (rule 22).

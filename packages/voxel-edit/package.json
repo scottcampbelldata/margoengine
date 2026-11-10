@@ -126,6 +126,7 @@
     "build": "node ../../scripts/build-optional.js voxel-edit",
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs && node packages/voxel-edit/tests/gpu-browser-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:generate": "cd ../.. && node packages/voxel-edit/tests/generate-browser-check.mjs"
   }
 }

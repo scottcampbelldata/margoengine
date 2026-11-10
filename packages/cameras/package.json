@@ -84,6 +84,8 @@
     "build": "node ../../scripts/build-optional.js cameras",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/cameras/test/browser-check.mjs"
+    "test:gpu": "cd ../.. && node packages/cameras/test/browser-check.mjs",
+    "test:browser:panorama": "cd ../.. && node packages/cameras/test/panorama-browser.mjs",
+    "test:browser:stereo": "cd ../.. && node packages/cameras/test/stereo-browser.mjs"
   }
 }

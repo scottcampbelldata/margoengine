@@ -921,3 +921,11 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sky (batch 189): document /compat-clouds shared plugin/type exports, explicit full-layer installation before Engine.create, native/compat behaviour, preview refusal, unchanged defaults and ownership; README examples deferred.
 - margoengine (batch 189): document generated sky/compat-clouds alias and the incoming post/pixelate alias; README examples deferred.
+- @margoengine/compute/decomp: document solve, inv, det, cholesky, reduced/full qr/svd, eigh/eigvalsh, batches/broadcast RHS, async signal, owned f32 factors, lazy SIMD Wasm limits and GPU readback route; add runnable examples after the build phase.
+- margoengine/compute/decomp: document the generated optional decomposition alias after the build phase.
+- @margoengine/cameras and @margoengine/weather: document the panorama/parity browser-suite commands after the build phase (batch 274 landing registration repair).
+- @margoengine/splats and @margoengine/voxel-edit: document lod-sog and font-mask browser suite commands after the build phase (batch 274 registration repair).
+- @margoengine/water: retain the GPU command with its build first when documenting test commands after the build phase.
+- @margoengine/vfx: document the existing parity GPU suite command after the build phase (batch 274 registration repair).
+- @margoengine/creative: document grass-terrain, orbit-atmosphere and paint-aniso GPU suite commands after the build phase (batch 274 registration repair).
+- @margoengine/kinematics-constraints: document the existing multi-goal GPU suite after the build phase (batch 274 registration repair).

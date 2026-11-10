@@ -1,6 +1,6 @@
 {
-  "commit": "4983505ec",
-  "dirty": false,
+  "commit": "d7ea2c5e1",
+  "dirty": true,
   "browser": "msedge 157.0.4341.42 headless",
   "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
@@ -9,37 +9,37 @@
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 808,
-      "raw": 558,
-      "gzip": 370,
-      "brotli": 231
+      "transferred": 807,
+      "raw": 557,
+      "gzip": 371,
+      "brotli": 222
     },
     {
-      "path": "assets/index-spRahO2U.js",
+      "path": "assets/index-DG_RKRCa.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 24365,
-      "raw": 58411,
-      "gzip": 23983,
-      "brotli": 21180
+      "transferred": 24400,
+      "raw": 58626,
+      "gzip": 24018,
+      "brotli": 21178
     },
     {
-      "path": "assets/geometry-DuxZuGD0.js",
+      "path": "assets/version-D1MoAe5f.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2631,
-      "raw": 4454,
-      "gzip": 2261,
-      "brotli": 2041
+      "transferred": 2796,
+      "raw": 4866,
+      "gzip": 2426,
+      "brotli": 2181
     },
     {
-      "path": "assets/dist-Cez3xx-L.js",
+      "path": "assets/dist-DkwhzuMS.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 7295,
-      "raw": 17999,
-      "gzip": 6923,
-      "brotli": 6213
+      "transferred": 7343,
+      "raw": 18127,
+      "gzip": 6971,
+      "brotli": 6269
     },
     {
       "path": "model.glb",
@@ -53,10 +53,10 @@
   ],
   "total": {
     "requests": 5,
-    "transferred": 36704,
-    "raw": 82754,
-    "gzip": 33991,
-    "brotli": 30024
+    "transferred": 36951,
+    "raw": 83508,
+    "gzip": 34240,
+    "brotli": 30209
   },
   "notFetched": []
 }
