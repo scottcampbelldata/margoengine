@@ -216,14 +216,25 @@ const lookupQueueGetter = Reflect.get(Object.prototype, '__lookupGetter__') as (
   this: object,
   property: string,
 ) => unknown;
+/**
+ * The mark a first-party queue sets on its own `writeBuffer` method to say that it copies its input before returning
+ * and never changes it: the WebGL2 compatibility layer's CompatQueue. Without it, every held palette and morph weight
+ * went up again each frame on that layer (known-bugs "Batch 132 audit: animation"). A host filter like the native one.
+ */
+const COPIES_INPUT = Symbol.for('margoengine.writeBuffer.copiesInput');
 function reusableWriter(queue: GPUQueue, writer: GPUQueue['writeBuffer']): boolean {
+  if (
+    Object.hasOwn(queue, 'writeBuffer') ||
+    typeof lookupQueueGetter !== 'function' ||
+    lookupQueueGetter.call(queue, 'writeBuffer') !== undefined
+  )
+    return false;
+  const prototype = Object.getPrototypeOf(queue);
+  if (nativeQueue && writer === nativeQueue.writer && prototype === nativeQueue.prototype) return true;
   return (
-    !!nativeQueue &&
-    writer === nativeQueue.writer &&
-    Object.getPrototypeOf(queue) === nativeQueue.prototype &&
-    !Object.hasOwn(queue, 'writeBuffer') &&
-    typeof lookupQueueGetter === 'function' &&
-    lookupQueueGetter.call(queue, 'writeBuffer') === undefined
+    !!prototype &&
+    Object.getOwnPropertyDescriptor(prototype, 'writeBuffer')?.value === writer &&
+    (writer as unknown as Record<symbol, unknown>)[COPIES_INPUT] === true
   );
 }
 function writeInput(

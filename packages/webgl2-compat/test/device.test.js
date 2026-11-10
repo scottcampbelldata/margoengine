@@ -5,7 +5,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMPAT_LIMITS, webgl2Capabilities } from '../dist/index.js';
-import { COMPAT_VENDOR, CompatCanvasContext, CompatDevice, createCompatGPU, isCompatDevice } from '../dist/device.js';
+import {
+  COMPAT_VENDOR,
+  CompatCanvasContext,
+  CompatDevice,
+  CompatQueue,
+  createCompatGPU,
+  isCompatDevice,
+} from '../dist/device.js';
 
 /** A stand-in context: just what webgl2Capabilities reads. */
 function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = {}) {
@@ -34,6 +41,12 @@ function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = 
     },
   };
 }
+
+test('writeBuffer carries the copies-input mark @margoengine/animation trusts (known-bugs Batch 132 audit: animation)', () => {
+  const mark = Symbol.for('margoengine.writeBuffer.copiesInput');
+  assert.equal(CompatQueue.prototype.writeBuffer[mark], true);
+  assert.equal(Object.getOwnPropertyDescriptor(CompatQueue.prototype.writeBuffer, mark).writable, false);
+});
 
 test('an adapter only on a full-tier context; below it, null and the context is released', async () => {
   let made;

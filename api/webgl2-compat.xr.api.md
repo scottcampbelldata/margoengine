@@ -274,6 +274,7 @@ class CompatDevice extends EventTarget {
     destroyed: boolean;
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
+    frame: number;
     readonly presents: Set<{
         present(): void;
     }>;

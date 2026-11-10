@@ -450,6 +450,16 @@ how many words or texels one invocation stores) and the reason it is not on a fa
 buffers by `"group:binding"` and changes them in place. Neither is needed to use compute through the device; both are
 there for tools and tests.
 
+Driver workaround (2026-11-10, lane I): Chrome on ANGLE's Metal back end drops the first draw through a framebuffer
+after the WebGL2 context's canvas was shown with `transferToImageBitmap` when that framebuffer's texture was uploaded to
+since its last draw, with no GL error. Scatter-tier dispatches refresh a buffer's word texture with such an upload, so
+on a Mac the second and later frames of a compute pass lost their stores. The device now attaches each cached
+framebuffer again on its first use after every shown frame (one re-attach and status check per framebuffer and frame,
+no new GL objects). Raw repro: `node test/metal-dropped-draw-repro.mjs`; regression: `scatterAfterWrite` in
+test/compute.html; details in docs/known-bugs.md "Batch 132 audit: animation". `CompatQueue.writeBuffer` also carries
+the mark `Symbol.for('margoengine.writeBuffer.copiesInput')`: it copies its input before it returns and never changes
+it, so @margoengine/animation keeps its upload caches on this queue.
+
 ### WGSL front end (`margoengine/webgl2-compat/wgsl`)
 
 The first part of the translator: a lexer, parser and type checker for WGSL, written from the W3C WGSL specification.

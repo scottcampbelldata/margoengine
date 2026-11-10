@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14731965,
+  "total": 14734271,
   "history": [
     {
       "date": "2026-10-24",
@@ -8213,6 +8213,12 @@
       "commit": "6532cd1c2",
       "reason": "points/las: LAS 1.5 headers, legacy-count rule and points by return in the writer (batch 132 audit fix)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "48a19ee1d",
+      "reason": "lane I: webgl2-compat re-attach + animation upload cache mark (batch 132 Mac compat fixes)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9105,7 +9111,7 @@
     "@margoengine/sciviz/formats": 20945,
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/geo-lod": 7509,
-    "@margoengine/sciviz/geo-time": 41056,
+    "@margoengine/sciviz/geo-time": 41047,
     "@margoengine/sciviz/geo-vector": 27652,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 25034,
@@ -9510,7 +9516,7 @@
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
     "@margoengine/webgl2-compat": 107944,
-    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 75875,
+    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 78190,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,

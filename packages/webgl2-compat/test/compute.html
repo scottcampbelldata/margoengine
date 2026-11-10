@@ -14,7 +14,7 @@
 // dispatch, and queue order around the first compute pipeline (whose runtime loads lazily). Each case takes a device
 // and returns { values, tier, tolerance }: plain numbers, the layer's tier (null on native) and the allowed float
 // difference.
-import { createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
+import { CompatCanvasContext, createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
 
 const U = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
 const B = { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 64, STORAGE: 128, INDIRECT: 256 };
@@ -403,6 +403,51 @@ const cases = {
     const out = buffer(device, new Float32Array(12).fill(-1));
     run(device, p, [group(device, p, [{ buffer: out }])], 2);
     return { values: f32(await readBuffer(device, out)), tier: tierOf(p) };
+  },
+  // A scatter dispatch, a frame shown on a canvas, CPU writes into the same buffer, then a second dispatch of the same
+  // bind group: its stores must land over the writes. Chrome on ANGLE Metal drops the second draw into the buffer's
+  // word texture unless the layer attaches the texture to its framebuffer again after the frame (known-bugs "Batch 132
+  // audit: animation": MorphWeightPlayer read every frame after the first as the CPU's zeros).
+  async scatterAfterWrite(device) {
+    const p = compute(device, `
+      @group(0) @binding(0) var<uniform> k: vec4f;
+      @group(0) @binding(1) var<storage, read> at: array<u32>;
+      @group(0) @binding(2) var<storage, read_write> out: array<f32>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+        if (id.x >= arrayLength(&at)) { return; }
+        out[at[id.x]] = f32(id.x + 1u) * k.x;
+      }`);
+    const at = buffer(device, Uint32Array.from({ length: 140 }, (_, i) => (i >> 1) * 4 + (i & 1)));
+    const out = buffer(device, new Float32Array(512)), k = buffer(device, Float32Array.of(1, 0, 0, 0), B.UNIFORM | B.COPY_DST);
+    const g = group(device, p, [{ buffer: k }, { buffer: at }, { buffer: out }]);
+    const read = async () => {
+      const all = [];
+      for (let i = 0; i < 70; i++) {
+        const r = device.createBuffer({ size: 8, usage: B.MAP_READ | B.COPY_DST }), e = device.createCommandEncoder();
+        e.copyBufferToBuffer(out, i * 16, r, 0, 8);
+        device.queue.submit([e.finish()]);
+        await r.mapAsync(1);
+        all.push(...new Float32Array(r.getMappedRange()));
+        r.unmap();
+        r.destroy();
+      }
+      return all;
+    };
+    run(device, p, [g], 3);
+    const first = await read();
+    // Show a frame: the layer's present ends with transferToImageBitmap on its OffscreenCanvas.
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 4;
+    const context = device.gl ? new CompatCanvasContext(canvas, HTMLCanvasElement.prototype.getContext) : canvas.getContext('webgpu');
+    context.configure({ device, format: 'rgba8unorm' });
+    const e = device.createCommandEncoder();
+    e.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: [1, 0, 0, 1] }] }).end();
+    device.queue.submit([e.finish()]);
+    await new Promise(requestAnimationFrame);
+    for (let i = 0; i < 70; i++) device.queue.writeBuffer(out, i * 16, new Float32Array(2));
+    device.queue.writeBuffer(k, 0, Float32Array.of(10, 0, 0, 0));
+    run(device, p, [g], 3);
+    return { values: { first, second: await read() }, tier: tierOf(p) };
   },
 };
 

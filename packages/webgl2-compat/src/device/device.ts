@@ -283,7 +283,16 @@ export class CompatDevice extends EventTarget {
   readonly loadSampler: WebGLSampler;
   private resolveLost!: (info: { reason: 'destroyed' | 'unknown'; message: string }) => void;
   private readonly scopes: { filter: ErrorFilter; error: CompatValidationError | CompatInternalError | null }[] = [];
-  private readonly framebuffers = new Map<string, WebGLFramebuffer>();
+  /** Cached framebuffers by attachment key, with how to attach them again and the frame they were last attached in. */
+  private readonly framebuffers = new Map<
+    string,
+    { fbo: WebGLFramebuffer; build: (fbo: WebGLFramebuffer) => void; frame: number }
+  >();
+  /**
+   * @internal Frames this device's canvases have shown (CompatCanvasContext.present). A cached framebuffer is attached
+   * again on its first use in each new frame: see {@link framebuffer}.
+   */
+  frame = 0;
   /** Canvas contexts with a frame waiting to be shown. */
   readonly presents = new Set<{ present(): void }>();
   /** Canvas contexts showing an image of this device's WebGL2 context. */
@@ -471,26 +480,38 @@ export class CompatDevice extends EventTarget {
 
   // ---------------------------------------------------------------- framebuffers
 
-  /** A framebuffer with these attachments, made once per attachment set. */
+  /**
+   * A framebuffer with these attachments, made once per attachment set and attached again on its first use after each
+   * frame the device's canvas showed. Chrome on ANGLE's Metal back end drops every draw through a framebuffer whose
+   * texture was uploaded to (texSubImage2D, from memory or a pixel unpack buffer) when the first draw through it comes
+   * after the context's OffscreenCanvas was shown with transferToImageBitmap: no GL error, a complete framebuffer, the
+   * texture keeps the uploaded data. Attaching the texture again before that draw makes it land (measured on an Apple
+   * M6, HeadlessChrome 156.0.8078.4, raw WebGL2 with no layer: docs/known-bugs.md "Batch 132 audit: animation").
+   */
   framebuffer(
     key: string,
     textures: readonly CompatTexture[],
     build: (fbo: WebGLFramebuffer) => void,
   ): WebGLFramebuffer {
-    let fbo = this.framebuffers.get(key);
-    if (!fbo) {
-      fbo = this.gl.createFramebuffer() as WebGLFramebuffer;
-      this.framebuffers.set(key, fbo);
-      for (const t of textures) t.framebuffers.add(key);
-      build(fbo);
+    const cached = this.framebuffers.get(key);
+    if (cached) {
+      if (cached.frame !== this.frame) {
+        cached.frame = this.frame;
+        cached.build(cached.fbo);
+      }
+      return cached.fbo;
     }
+    const fbo = this.gl.createFramebuffer() as WebGLFramebuffer;
+    this.framebuffers.set(key, { fbo, build, frame: this.frame });
+    for (const t of textures) t.framebuffers.add(key);
+    build(fbo);
     return fbo;
   }
 
   dropFramebuffers(texture: CompatTexture): void {
     for (const key of texture.framebuffers) {
-      const fbo = this.framebuffers.get(key);
-      if (fbo) this.gl.deleteFramebuffer(fbo);
+      const cached = this.framebuffers.get(key);
+      if (cached) this.gl.deleteFramebuffer(cached.fbo);
       this.framebuffers.delete(key);
     }
     texture.framebuffers.clear();
@@ -761,3 +782,10 @@ export class CompatQueue {
     return this.device.idle().then(() => undefined);
   }
 }
+
+// writeBuffer copies its input before it returns (at once, or into a copy that waits its turn) and never changes it:
+// the mark lets @margoengine/animation keep its uploaded-palette and morph weight caches on this queue as on the
+// browser's own (known-bugs "Batch 132 audit: animation").
+Object.defineProperty(CompatQueue.prototype.writeBuffer, Symbol.for('margoengine.writeBuffer.copiesInput'), {
+  value: true,
+});

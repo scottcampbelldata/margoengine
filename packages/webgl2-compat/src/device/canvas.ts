@@ -130,6 +130,8 @@ export class CompatCanvasContext {
       this.output.clearRect(0, 0, t.width, t.height);
       this.output.drawImage(source, 0, 0);
     }
+    // Cached framebuffers are attached again on their next use (CompatDevice.framebuffer: ANGLE Metal drops draws).
+    device.frame++;
   }
 
   /**
