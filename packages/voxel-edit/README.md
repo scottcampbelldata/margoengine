@@ -140,7 +140,7 @@ const text = writeQEF(models[0].grid, palette);
 | --- | --- | --- | --- |
 | Qubicle `.qb` | `parseQB` | `writeQB` | every matrix with its name and position; RGBA or BGRA, RLE or plain, left or right handed; alpha 0 is air; a visibility mask counts as opaque |
 | Qubicle `.qef` | `parseQEF` | `writeQEF` | one model; text; mask 0 is hidden; no alpha |
-| `binvox` | `parseBinvox` | | one model of index 1, plus the header's `translate` and `scale` |
+| `binvox` | `parseBinvox` | | one model of index 1 (version 2 files: the voxel values 1 to 255 as indices), plus the header's `translate` and `scale` |
 | KVX | `parseKVX` | | the first, largest mip; colour 255 is air; file colour k is index k + 1; `pivot` in cells |
 | VXL | `parseVXL` | | Voxlap maps, with a header or bare (`size`, default 512 x 512 x 64); solid cells without a colour take the last one above them |
 | Goxel `.gox` | `parseGOX` | `writeGOX` (async) | every layer with its name, `visible`, blend `mode` and `material`; clone and shape layers built; Z up in the file, so file (x, y, z) is cell (x, z, -y); any non-zero alpha is solid |

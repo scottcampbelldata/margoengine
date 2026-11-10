@@ -197,9 +197,17 @@ test('binvox limits', () => {
   assert.throws(() => parseBinvox(new TextEncoder().encode('#binvox 1\ndata\n')), /dim/);
   assert.throws(() => parseBinvox(join(head, Uint8Array.of(1, 4))), /ends early/);
   assert.throws(() => parseBinvox(join(head, Uint8Array.of(1, 9))), /run outside/);
-  assert.throws(() => parseBinvox(join(head, Uint8Array.of(2, 8))), /run outside/);
   assert.throws(() => parseBinvox(join(head, Uint8Array.of(1, 0))), /run outside/);
   assert.throws(() => parseBinvox(join(head, Uint8Array.of(1, 8)), { maxCells: 7 }), /maxCells/);
+});
+
+test('binvox version 2 (binvox_merge): voxel values 1 to 255 are kept as palette indices, not refused', () => {
+  // Batch 132 audit: the spec lets a version 2 file store any value above 0 up to 255; the reader threw on 2 and up.
+  const head = new TextEncoder().encode('#binvox 2\ndim 2 2 2\ndata\n');
+  const file = parseBinvox(join(head, Uint8Array.of(0, 2, 2, 3, 255, 2, 1, 1)));
+  assert.deepEqual([...file.models[0].grid.voxels].sort((a, b) => a - b), [0, 0, 1, 2, 2, 2, 255, 255]);
+  assert.deepEqual([...file.palette.subarray(255 * 4, 256 * 4)], [255, 255, 255, 255]);
+  assert.deepEqual([...file.palette.subarray(0, 4)], [0, 0, 0, 0], 'index 0 stays air');
 });
 
 /** A KVX with one slab per listed column: [x, y, top, colors]. */

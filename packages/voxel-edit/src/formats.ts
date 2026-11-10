@@ -300,8 +300,9 @@ export function writeQEF(grid: VoxelGrid, palette: Uint8Array): string {
 }
 
 /**
- * Reads a `binvox` file (Patrick Min's format): one model of palette index 1, white, with its header placement. The
- * file's y is vertical, as the grid's.
+ * Reads a `binvox` file (Patrick Min's format): one model with its header placement, each voxel's byte value as its
+ * palette index, white: 1 in a version 1 file, 1 to 255 in a version 2 file (binvox_merge). The file's y is vertical,
+ * as the grid's.
  *
  * @throws TypeError when it is not a binvox; RangeError on a damaged file or past `maxCells`.
  */
@@ -340,19 +341,20 @@ export function parseBinvox(bytes: Uint8Array | ArrayBuffer, limits: GridLimits 
     const value = data[at],
       run = data[at + 1];
     at += 2;
-    if (value > 1 || !run || done + run > cells)
+    if (!run || done + run > cells)
       throw new RangeError('binvox data has a run outside the model; the file is damaged, export it again');
     if (value)
       for (let i = done; i < done + run; i++) {
         const x = Math.floor(i / (sz * sy)),
           z = Math.floor(i / sy) % sz,
           y = i % sy;
-        voxels[cellIndex(size, x, y, z)] = 1;
+        voxels[cellIndex(size, x, y, z)] = value;
       }
     done += run;
   }
   const palette = new Uint8Array(1024);
-  palette.fill(255, 4, 8);
+  // Every index a file can use is white; a version 1 file uses index 1 only.
+  palette.fill(255, 4);
   return {
     models: [{ position: [0, 0, 0], grid: { size: [sx, sy, sz], voxels } }],
     palette,
