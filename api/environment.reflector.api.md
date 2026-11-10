@@ -34,6 +34,7 @@ export interface PlanarOptions {
     exclude?: Iterable<Mesh>;
     autoUpdate?: boolean;
     passes?: CapturePassFilter;
+    captureOnly?: boolean;
     order?: number;
     name?: string;
 }
@@ -43,6 +44,7 @@ export abstract class PlanarSurface {
     readonly order: number;
     readonly camera: Camera;
     autoUpdate: boolean;
+    captureOnly: boolean;
     passes: CapturePassFilter;
     exclude?: Iterable<Mesh>;
     normalRepeat: [number, number];
@@ -71,6 +73,7 @@ export abstract class PlanarSurface {
     get normalMap(): GPUTexture | NormalMapImage | undefined;
     set normalMap(value: GPUTexture | NormalMapImage | undefined);
     get texture(): GPUTexture | undefined;
+    get textureMatrix(): Float32Array | undefined;
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;

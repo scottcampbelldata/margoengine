@@ -73,6 +73,8 @@ export interface PlanarOptions {
   autoUpdate?: boolean;
   /** Frame-graph passes the capture runs. Default {@link scenePasses}. */
   passes?: CapturePassFilter;
+  /** Capture the scene without drawing the mirror/glass rectangle. Default false. Useful for water consumers. */
+  captureOnly?: boolean;
   /** Frame-graph order of the surface draw, after core's main pass. Default 1. */
   order?: number;
   /** Plugin and pass name. Default 'reflector-N' or 'refractor-N'. */
@@ -164,6 +166,8 @@ export abstract class PlanarSurface {
   readonly camera = new Camera();
   /** Capture before every engine frame. */
   autoUpdate: boolean;
+  /** True keeps scene capture active while omitting the surface rectangle. Default false. */
+  captureOnly: boolean;
   /** Frame-graph passes the capture runs. */
   passes: CapturePassFilter;
   /** Meshes left out of the capture. */
@@ -219,6 +223,9 @@ export abstract class PlanarSurface {
     this.layers = options.layers ?? 0xffffffff;
     this.exclude = options.exclude;
     this.autoUpdate = options.autoUpdate ?? true;
+    if (options.captureOnly !== undefined && typeof options.captureOnly !== 'boolean')
+      throw new TypeError('Invalid captureOnly; pass a boolean');
+    this.captureOnly = options.captureOnly ?? false;
     this.passes = options.passes ?? scenePasses;
     if (typeof this.passes !== 'function')
       throw new TypeError(`${kind} passes must be a function (pass) => boolean; pass scenePasses or omit it`);
@@ -303,6 +310,11 @@ export abstract class PlanarSurface {
   /** The latest captured image (linear `rgba16float`), or undefined before the first capture. */
   get texture(): GPUTexture | undefined {
     return this.captured ? this.target.color : undefined;
+  }
+
+  /** Borrowed world-to-clip matrix of texture, retained after a failed update; undefined before capture or after restore. */
+  get textureMatrix(): Float32Array | undefined {
+    return this.captured ? this.captureMatrix : undefined;
   }
 
   setup(engine: EngineKernel): void {
@@ -468,7 +480,7 @@ export abstract class PlanarSurface {
   private draw(c: PlanarContext): void {
     const node = this.nodeValue,
       engine = this.engine;
-    if (this.disposed || !node || !engine || activeCapture() === this) return;
+    if (this.disposed || this.captureOnly || !node || !engine || activeCapture() === this) return;
     if (activeCapture() === null) this.time += c.delta;
     const color = this.target.color;
     if (!this.captured || !color || this.target.device !== c.device) return;

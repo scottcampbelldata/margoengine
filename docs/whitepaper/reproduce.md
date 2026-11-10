@@ -3512,3 +3512,6 @@ Batch 271 job 3: build packages, run `node --test --test-timeout=30000 packages/
 
 ## Batch 198 job 3: compass/menu reproduction
 Build packages and run node --test packages/viewcube/test/*.test.js. The compass tests exercise actual delegated DOM input and lifecycle in JSDOM. Under the shared GPU lock, owner codex-batch198, --max=3 --wait-max=60, run packages/viewcube/test/browser-check.mjs then repeat with --compat. The new section clicks East/South, saves/returns Home through the context menu, toggles projection, clamps an edge menu and drags a cardinal with pointer capture. It writes one screenshot per backend for layout review. No new asset download or speed benchmark.
+### Batch 235 job 3: planar reflection input
+
+Build packages. CPU: node --test --test-timeout=120000 packages/water/test/reflector.test.js packages/environment/tests/mirror.test.js. GPU: node scripts/gpu-lock.mjs run --owner=water-reflector --wait-max=60 --max=4 -- node packages/water/test/reflector.browser.mjs, then repeat with --compat after the script path. The main-camera marker centre must be offscreen, its independently mirrored image gains red, unready capture pixels equal baseline and GPU validation stays clean. Reports/PNGs: test-results/water-reflector-webgpu and water-reflector-compat. The observational bearing is NOAA public-domain data attributed in water/test/data.

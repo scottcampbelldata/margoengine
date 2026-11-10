@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13852638,
+  "total": 13855298,
   "history": [
     {
       "date": "2026-10-24",
@@ -7274,6 +7274,12 @@
       "commit": "batch-198-job3",
       "reason": "New optional viewcube/compass: 0 to 7660 B gzip, ceiling 7916. DOM compass, turntable input and accessible menu share one lifecycle; splitting would complicate ownership. Root and core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-235-job-3",
+      "reason": "Optional planar water: absent to 2404 B gzip. Environment reflector 11209 to 11265 B, refractor 11166 to 11223 B. Capture-only and paired projection metadata belong to their owner; the water entry owns projective Fresnel/SSR sampling and lifecycle. A split would duplicate resource ownership. Core plus stage unchanged 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7464,6 +7470,7 @@
     "@margoengine/core/extension": 21951,
     "@margoengine/creative": 19368,
     "@margoengine/creative/grass": 6122,
+    "@margoengine/creative/grass-terrain": 1907,
     "@margoengine/creative/paint": 3329,
     "@margoengine/creative/particles": 759,
     "@margoengine/creative/planet": 7174,
@@ -8090,6 +8097,7 @@
     "@margoengine/sciviz/atmosphere": 33055,
     "@margoengine/sciviz/bricks": 27589,
     "@margoengine/sciviz/calc": 6978,
+    "@margoengine/sciviz/cinematic": 6262,
     "@margoengine/sciviz/clip": 5396,
     "@margoengine/sciviz/colormaps": 17381,
     "@margoengine/sciviz/contour": 3323,
@@ -8350,9 +8358,11 @@
     "@margoengine/video/demux": 6445,
     "@margoengine/video/dome": 2026,
     "@margoengine/video/material": 1407,
+    "@margoengine/video/playback": 1725,
     "@margoengine/video/record": 1396,
     "@margoengine/viewcube": 5321,
     "@margoengine/viewcube/axes": 6029,
+    "@margoengine/viewcube/compass": 7916,
     "@margoengine/viewcube/fit": 6898,
     "@margoengine/viewcube/up": 5897,
     "@margoengine/voxel": 6127,
@@ -8388,6 +8398,7 @@
     "@margoengine/voxel-net/rewind": 2409,
     "@margoengine/voxel-net/rooms": 19966,
     "@margoengine/voxel-net/server": 18515,
+    "@margoengine/voxel-net/server-runtimes": 20060,
     "@margoengine/voxel-net/shards": 9956,
     "@margoengine/voxel-net/sql-store": 1614,
     "@margoengine/voxel-net/webrtc": 7194,
@@ -8430,6 +8441,7 @@
     "@margoengine/water/fft": 7590,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/query": 4719,
+    "@margoengine/water/reflector": 2660,
     "@margoengine/water/ripples": 3940,
     "@margoengine/weather": 5230,
     "@margoengine/weather/audio": 1908,
@@ -8584,15 +8596,10 @@
     "leak @margoengine/usdz/compose -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
+    "margoengine/creative/grass-terrain": 325,
     "margoengine/creative/planet-atmosphere": 329,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sciviz/cinematic": 6262,
-    "@margoengine/voxel-net/server-runtimes": 20060,
-    "@margoengine/creative/grass-terrain": 1907,
-    "margoengine/creative/grass-terrain": 325,
-    "@margoengine/video/playback": 1725,
-    "@margoengine/viewcube/compass": 7916
+    "margoengine/web": 577
   }
 }

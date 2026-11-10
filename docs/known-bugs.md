@@ -4775,3 +4775,6 @@ Batch 194 job 3 reobserved the existing physical-composition compatibility limit
 
 
 - Batch 198 compass: attach CameraProjection and ViewCompass, request Top, then drag a cardinal. Continuous spin at that exact pole retains projection.up instead of turning the image because ViewCube.pole deliberately preserves a projection-owned valid screen up. Ordinary turntable drags, all cardinal clicks and menu actions work. Small rule-22 finish item: integrate arbitrary pole heading with projection-owned screen up without changing quarter-roll semantics or ownership.
+### Batch 235 job 3: captured-matrix and water feedback contract
+
+Environment now exposes the matrix of its last successful captured image rather than requiring consumers to read a mutable camera. captureOnly keeps capture active without drawing a second rectangle; water filters its draw from that capture to avoid self-feedback. Regression: environment/tests/mirror.test.js and water/test/reflector.browser.mjs prove snapshot identity, capture-only drawing, independent offscreen-object projection, exact unready fallback, SSR compilation and lifecycle.

@@ -4598,6 +4598,10 @@
       "types": "./dist/water/flow.d.ts",
       "import": "./dist/water/flow.js"
     },
+    "./water/reflector": {
+      "types": "./dist/water/reflector.d.ts",
+      "import": "./dist/water/reflector.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"
