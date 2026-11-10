@@ -38,6 +38,9 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     screenError: number;
     budget: number;
     readonly stats: PlanetStats;
+    get owner(): Engine | undefined;
+    get localCenter(): [number, number, number];
+    addLighting(effect: TerrainLighting): () => void;
     static attach(engine: EngineKernel, options?: PlanetTerrainOptions): PlanetTerrain;
     constructor(options?: PlanetTerrainOptions);
     get center(): [number, number, number];
@@ -75,4 +78,12 @@ export function planetNoise({ radius, relief, seed }?: {
     relief?: number;
     seed?: number;
 }): PlanetHeight;
+
+// Not exported from this entry, but used by the exports above:
+
+interface TerrainLighting {
+    readonly owner?: Engine;
+    shader(source: string, group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
 ```

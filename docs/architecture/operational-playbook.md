@@ -6148,3 +6148,7 @@ Section 5 evidence, batch 205 legacy FBX: the optional pre-index normalization h
 ### Lines optional stroke evidence (batch 227 job 1)
 Optional line entries supply shader transforms and owned bind-group resources to the lines renderer, with no imports from its root into those entries. Colour and picking use the same layout and transform, cache separately by feature, and rebuild resources after device restoration. Stroke retains independent width and world-distance data so dashes do not overwrite taper. GPU evidence includes 1x/4x taper/reveal, depth, picks and restoration on WebGPU and the compatibility layer; storage struct alignment has a CPU regression. Core/stage are unchanged.
 
+
+
+### 5. Batch 229 imagery surface evidence
+The new optional terrain/imagery collection patches the lit surface color after the clipmap or RVT color call and before lighting, or the equivalent planet base color. PlanetTerrain gains the existing TerrainLighting contract in its own optional entry; core and stage stay untouched. imagery.test.js covers source addressing, bounded parents, ownership, validation, stale requests and restore; imagery.browser.mjs covers actual slope/planet draping and exact source equivalence on native WebGPU and WebGL2 compatibility. The complete terrain GPU suite runs on both backends; CPU dependents include biomes and the umbrella facade tests. Multi-GPU hardware coverage and quiet timing are not claimed.

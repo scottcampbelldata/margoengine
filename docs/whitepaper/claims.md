@@ -3751,3 +3751,7 @@ The optional scatter/textured attachment uses the existing glTF PBR renderer for
 
 ### Lines width and reveal (batch 227 job 1)
 The optional stroke entry combines per-point width with normalized world-length visibility, including dashed and depth-writing strokes, with the same cutoff in picking. Evidence: packages/lines/tests/stroke.test.js and stroke in packages/lines/tests/features-browser.js. The browser suite runs at 1x/4x samples on WebGPU and the WebGL2 compatibility layer. This is a feature claim, not a speed claim; no broader GreasedLine material parity is asserted.
+
+
+### Batch 229 job 1: draped imagery layers
+terrain/imagery supplies the requested XYZ, WMTS and GPU imagery with ordered alpha, brightness and bounds on clipmap and planet surfaces. Evidence is packages/terrain/test/imagery.test.js plus imagery.browser.mjs, including RVT composition and native/compatibility runs. GPU, XYZ and WMTS versions of the CC0 photograph are exact pixel oracles; solid linear colors verify blend/order independently. This is a behavioral job-row claim, not a claim to implement every unrelated Cesium imagery option or a speed comparison.

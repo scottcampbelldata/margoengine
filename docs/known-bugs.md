@@ -4532,3 +4532,7 @@ Batch 266 fixed: PresentationControls tested only the root mesh, so local draggi
 Fixed during construction: general 4x4 conjugation can round an affine last-row 1 off unity for non-dyadic node scales. The attachment restores the mathematically exact affine last row before passing it to PBRInstances; textured.test.js retains a non-dyadic scaled-node regression. No open textured-scatter defect remains.
 
 Build-phase tooling gap: node scripts/gpu-package-tests.mjs --no-build --only=scatter --list refuses before selection because headless/tests/gif-gpu.mjs, headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs are not registered by that global plan. Cause: global discovery validates unrelated browser files before applying --only. Batch 231 runs every scatter browser script directly on both backends under the shared GPU lock; owning lanes can register the unrelated files.
+
+
+### Batch 229 job 1: imagery evidence
+No open defect identified in the job: native and compatibility clipmap, RVT and planet checks use exact XYZ/WMTS/GPU image equality, ordered composition, alpha, brightness and bounds. Operational and resource limits are in docs/terrain-imagery.md.

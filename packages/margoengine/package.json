@@ -1734,6 +1734,10 @@
       "types": "./dist/lines/hidden.d.ts",
       "import": "./dist/lines/hidden.js"
     },
+    "./lines/stroke": {
+      "types": "./dist/lines/stroke.d.ts",
+      "import": "./dist/lines/stroke.js"
+    },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
       "import": "./dist/loaders/ply.js"
@@ -3561,6 +3565,10 @@
     "./terrain/planet": {
       "types": "./dist/terrain/planet.d.ts",
       "import": "./dist/terrain/planet.js"
+    },
+    "./terrain/imagery": {
+      "types": "./dist/terrain/imagery.d.ts",
+      "import": "./dist/terrain/imagery.js"
     },
     "./text": {
       "types": "./dist/text.d.ts",

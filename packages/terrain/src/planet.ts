@@ -29,6 +29,8 @@ import { margoError } from '../../shared/errors.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
+import type { TerrainLighting } from './index.js';
+import { lightingLayout } from './lighting-layout.js';
 
 /**
  * Ground height in metres above `radius` at a unit direction from the planet's centre (float64). `detail` is the
@@ -302,6 +304,27 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
   readonly #pipelines = new Map<string, GPURenderPipeline>();
   #unfollow?: () => void;
   #disposed = false;
+  readonly #lighting = new Set<TerrainLighting>();
+
+  /** Engine owning this planet, while attached. */
+  get owner(): Engine | undefined {
+    return this.#engine;
+  }
+
+  /** Centre after the floating origin, in the engine's coordinates. */
+  get localCenter(): [number, number, number] {
+    return this.#local();
+  }
+
+  /** Adds a surface shader effect at group 1; the returned function removes it. */
+  addLighting(effect: TerrainLighting): () => void {
+    if (this.#disposed || !effect || typeof effect.shader !== 'function' || typeof effect.bindings !== 'function')
+      throw new TypeError('Invalid planet lighting; pass a live effect with shader() and bindings().');
+    if (effect.owner && this.#engine && effect.owner !== this.#engine)
+      throw margoError('attached', 'Planet lighting belongs to another engine; use the same engine.');
+    this.#lighting.add(effect);
+    return () => this.#lighting.delete(effect);
+  }
 
   /** Same as `engine.use(new PlanetTerrain(options))`; returns the planet. */
   static attach(engine: EngineKernel, options: PlanetTerrainOptions = {}): PlanetTerrain {
@@ -802,13 +825,21 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
 
   #draw(c: PassContext & { backend: 'webgpu' }): void {
     if (!this.#drawn.length) return;
+    let code = shader;
+    const entries: GPUBindGroupEntry[] = [];
+    for (const effect of this.#lighting) {
+      code = effect.shader(code, 1);
+      entries.push(...effect.bindings());
+    }
     const depth = c.descriptor.depthStencil!.format,
-      key = c.descriptor.multisample?.count + ':' + c.format + ':' + depth;
+      key = c.descriptor.multisample?.count + ':' + c.format + ':' + depth + code;
     let pipeline = this.#pipelines.get(key);
     if (!pipeline) {
-      const module = c.device.createShaderModule({ code: shader });
+      const module = c.device.createShaderModule({ code });
+      const layouts = [this.#layout!];
+      if (entries.length) layouts.push(c.device.createBindGroupLayout({ entries: lightingLayout(code, entries) }));
       pipeline = c.device.createRenderPipeline({
-        layout: c.device.createPipelineLayout({ bindGroupLayouts: [this.#layout!] }),
+        layout: c.device.createPipelineLayout({ bindGroupLayouts: layouts }),
         vertex: {
           module,
           entryPoint: 'vertex',
@@ -846,6 +877,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     applyView(pass, c);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.#group!);
+    if (entries.length)
+      pass.setBindGroup(1, c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries }));
     pass.setVertexBuffer(0, this.#vertexBuffer!);
     pass.setVertexBuffer(1, this.#instanceBuffer!);
     pass.setIndexBuffer(this.#indexBuffer!, 'uint16');
@@ -877,6 +910,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     this.#unfollow?.();
     this.#release();
     this.#pipelines.clear();
+    this.#lighting.clear();
     this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = this.#device = undefined;
   }

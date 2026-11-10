@@ -563,3 +563,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/scatter and margoengine: document /textured TexturedScatter whole-model placements, glTF normal/base MASK materials, shadows.add(scatter.model), embedded instances, node-pose capture, updates, limits and disposal.
 
 - @margoengine/lines (batch 227 job 1): document /stroke, width multipliers, progress in world arc length, defaults, point replacement, dashes/depth/fog/picking and disposal; README examples deferred.
+
+
+
+| @margoengine/terrain | imagery: XYZ/WMTS/GPU sources, ordered alpha/brightness/bounds, cancellation, residency, credits and planet surface hooks | batch-229 job 1 |
+| margoengine | Generated terrain/imagery facade and lazy optional entry usage | batch-229 job 1 |

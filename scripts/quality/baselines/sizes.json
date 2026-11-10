@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13208735,
+  "total": 13215890,
   "history": [
     {
       "date": "2026-10-24",
@@ -6654,6 +6654,12 @@
       "commit": "batch-227-job1",
       "reason": "Stroke entry 4407 B; root 19926 B with shared optional shader/resource ownership. Root prior ceiling 19862 B; new ceiling 20524 B. Splitting would duplicate rendering and restoration paths.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "81738add5",
+      "reason": "Batch 229 job 1: imagery new 5985 B gzip; planet 6429 to 7282 B for optional surface hooks. Keeping one renderer and lifecycle avoids a fork; no core/stage growth.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7543,7 +7549,7 @@
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/layers-pbr": 2819,
-    "@margoengine/terrain/planet": 6624,
+    "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/rvt": 5527,
     "@margoengine/terrain/sculpt": 4873,
@@ -7879,6 +7885,7 @@
     "@margoengine/fbx/legacy": 6650,
     "margoengine/fbx/legacy": 314,
     "@margoengine/scatter/textured": 1719,
-    "@margoengine/lines/stroke": 4663
+    "@margoengine/lines/stroke": 4663,
+    "@margoengine/terrain/imagery": 6241
   }
 }

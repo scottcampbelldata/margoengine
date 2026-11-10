@@ -3221,3 +3221,7 @@ Build packages, then run node --test --test-timeout=120000 packages/scatter/test
 
 ### Lines stroke correctness (batch 227 job 1)
 Build packages, then run node --test --test-timeout=120000 packages/lines/tests/stroke.test.js. Under the shared GPU lock run node packages/lines/scripts/test-browser.js, then the same command with --compat. The stroke check verifies taper pixels, a cutoff inside an unequal-length path, zero/full visibility, visible/hidden picks, dashes with depth writing and restoration. Existing package checks still run in full. No external asset is required for these synthetic correctness fixtures.
+
+
+### Batch 229 imagery
+Build with npm run build:packages. Run node --test --test-timeout=120000 packages/terrain/test/imagery.test.js. Render with node scripts/gpu-lock.mjs run --owner=imagery-repro --wait-max=60 --max=4 -- node packages/terrain/test/imagery.browser.mjs; repeat with --compat appended to the browser command. The existing terrain GPU script covers the whole changed package. Reports are written to test-results/terrain-imagery.json. No full verify or README checks are lane gates.
