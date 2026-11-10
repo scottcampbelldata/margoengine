@@ -470,7 +470,7 @@ function materialTarget(model: PBRModel, doc: Json, material: number, path: stri
   if (field === 'physical' || field === 'ext' || field === 'volume') {
     if (mats.some((m) => !m.physical))
       skip('targets a physical material factor gltf-pro did not load (pass decoders.materials)');
-    if ((field === 'volume' || offset === 3) && mats.some((m) => !m.tint))
+    if ((field === 'volume' || offset === 3) && mats.some((m) => !m.tint && !m.attenuation))
       skip('targets transmission or volume of a material loaded without transmission');
   }
   const size = sizes[accessor];
@@ -544,8 +544,11 @@ function materialState(def: Json, mats: PBRMaterial[]): MaterialState {
 function tint({ mats, atten, thickness, distance }: MaterialState): void {
   const depth = thickness / distance;
   for (const m of mats) {
-    if (!m.tint || !m.physical) continue;
-    for (let c = 0; c < 3; c++) m.tint[c] = m.base[c] * m.physical[3] * attenuationPower(atten[c], depth);
+    if ((!m.tint && !m.attenuation) || !m.physical) continue;
+    if (m.physical[3] > 0) {
+      const values = (m.tint ??= [0, 0, 0]);
+      for (let c = 0; c < 3; c++) values[c] = m.base[c] * m.physical[3] * attenuationPower(atten[c], depth);
+    } else m.tint = undefined;
     if (m.attenuation) {
       for (let c = 0; c < 3; c++) m.attenuation[c] = attenuationPower(atten[c], depth);
       // Read after transmittance edits so the owner's derived cache observes the new source before retaining precision.

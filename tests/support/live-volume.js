@@ -14,7 +14,7 @@ export async function liveVolume(t, volume = {}, channel) {
   const input = animatedTriangle();
   input.doc.materials[0].pbrMetallicRoughness.baseColorFactor = [1, 1, 1, 1];
   input.doc.materials[0].extensions = {
-    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_transmission: { transmissionFactor: channel?.initialTransmission ?? 1 },
     KHR_materials_volume: { thicknessFactor: 2, attenuationColor: [0.25, 0.5, 1], attenuationDistance: 2, ...volume },
   };
   if (channel) {
@@ -26,7 +26,7 @@ export async function liveVolume(t, volume = {}, channel) {
     input.doc.animations = [{
       samplers: [{ input: 5, output: index }],
       channels: [{ sampler: 0, target: { path: 'pointer', extensions: {
-        KHR_animation_pointer: { pointer: `/materials/0/extensions/KHR_materials_volume/${channel.property}` },
+        KHR_animation_pointer: { pointer: `/materials/0/extensions/${channel.extension ?? 'KHR_materials_volume'}/${channel.property}` },
       } } }],
     }];
   }

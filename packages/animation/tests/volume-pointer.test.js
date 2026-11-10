@@ -4,6 +4,32 @@ import { Animation } from '../dist/index.js';
 import { pointerChannels } from '../dist/pointer.js';
 import { liveVolume } from '../../../tests/support/live-volume.js';
 
+for (const thicknessFactor of [0, 2, 1200]) test(`zero transmission activates and returns to opaque at thickness ${thicknessFactor}`, async (t) => {
+  const { model, material, draw } = await liveVolume(t, { thicknessFactor }, {
+    initialTransmission: 0, extension: 'KHR_materials_transmission', property: 'transmissionFactor',
+    type: 'SCALAR', values: [0, 1],
+  });
+  const original = structuredClone(model.asset.doc);
+  assert.equal(material.tint, undefined);
+  draw(); // Populate the opaque draw memo before changing the material's structure.
+  const animation = new Animation(model, { pointers: pointerChannels, loop: false });
+  assert.deepEqual(animation.warnings, []);
+  for (const time of [0.5, 1, 0, 1]) {
+    animation.seek(time);
+    const depths = [Math.log(4) * thicknessFactor / 2, Math.log(2) * thicknessFactor / 2, 0];
+    if (time === 0) {
+      assert.equal(material.tint, undefined);
+      draw();
+    }
+    else {
+      assert.deepEqual(material.tint, [0.25, 0.5, 1].map((c) => time * c ** (thicknessFactor / 2)));
+      assert.deepEqual(material.opticalDepth, depths);
+      assert.deepEqual(draw(), depths.map(Math.fround));
+    }
+  }
+  assert.deepEqual(model.asset.doc, original);
+});
+
 const cases = [
   { property: 'attenuationColor', type: 'VEC3', values: [0.25, 0.5, 1, 1, 0, 0.25], color: [1, 0, 0.25], thickness: 2, distance: 2 },
   { property: 'thicknessFactor', type: 'SCALAR', values: [2, 4], color: [0.25, 0.5, 1], thickness: 4, distance: 2 },

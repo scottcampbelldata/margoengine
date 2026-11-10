@@ -36,7 +36,55 @@ approximation and display-space blend; the optional transmission installation su
 screen-space refraction and thickness textures. Default normal textures use exactly
 neutral half-float texels, including when a live shading hook retains fallback bindings.
 Run `npm run test:gpu:native-volume --workspace @margoengine/gltf-pro` after the package
-build for twenty analytic slab pixels on each backend.
+build for 56 analytic slab pixels on each backend, including transmission animated from zero.
+
+### Animate an opaque material into glass
+
+`KHR_materials_transmission` may start at its default factor of `0`. The physical
+parser retains the volume while zero stays on the opaque draw path. Pointer playback
+activates the tint and native background capture when the factor becomes positive;
+seeking back to zero restores the opaque path. This example builds its own triangle
+and animation, with no asset download:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parseGLTF, type GLTFDocument} from 'margoengine/gltf-pro';
+import {extendedMaterials} from 'margoengine/gltf-pro/extended';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 3], target: [0, 0, 0]},
+});
+const data = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0, 0, 1, 0, 1]);
+const doc: GLTFDocument = {
+  asset: {version: '2.0'},
+  extensionsUsed: ['KHR_materials_transmission', 'KHR_materials_volume', 'KHR_animation_pointer'],
+  buffers: [{byteLength: data.byteLength}],
+  bufferViews: [{buffer: 0, byteLength: 36}, {buffer: 0, byteOffset: 36, byteLength: 8},
+    {buffer: 0, byteOffset: 44, byteLength: 8}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3'},
+    {bufferView: 1, componentType: 5126, count: 2, type: 'SCALAR'},
+    {bufferView: 2, componentType: 5126, count: 2, type: 'SCALAR'}],
+  materials: [{pbrMetallicRoughness: {metallicFactor: 0}, extensions: {
+    KHR_materials_transmission: {transmissionFactor: 0},
+    KHR_materials_volume: {thicknessFactor: 1, attenuationColor: [0.25, 0.5, 1], attenuationDistance: 1},
+  }}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, material: 0}]}],
+  nodes: [{mesh: 0}], scenes: [{nodes: [0]}], scene: 0,
+  animations: [{samplers: [{input: 1, output: 2}], channels: [{sampler: 0, target: {
+    path: 'pointer', extensions: {KHR_animation_pointer: {
+      pointer: '/materials/0/extensions/KHR_materials_transmission/transmissionFactor',
+    }},
+  }}]}],
+};
+const model = parseGLTF(engine, doc, [data], [], {materials: extendedMaterials});
+const animation = Animation.attach(model, {pointers: pointerChannels, loop: false});
+animation.playing = false;
+animation.seek(1);
+console.log(model.primitives[0].material.tint); // [0.25, 0.5, 1]
+engine.start();
+```
 
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 

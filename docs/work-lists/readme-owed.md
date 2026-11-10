@@ -1,6 +1,6 @@
 # README work owed
 
-- @margoengine/animation: document coherent volume pointer attenuation and optical depth, including underflow and backward seeks (review5).
+- @margoengine/animation: DONE (lane Q fix phase): coherent volume pointer attenuation, optical depth, zero activation and backward seeks documented with the self-contained gltf-pro example; narrowed runtime gate runs both packages.
 - @margoengine/gltf-pro: document live attenuation edits, precise optical depth invalidation and progressive material preservation (review5).
 
 - @margoengine/sciviz: document raw notebook/share prepareBackend requirements and explicit WebGL2 errors; shipped Python/offline hosts provide automatic lazy fallback (review5).

@@ -1788,7 +1788,9 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
         ? Infinity
         : scalar(vo.attenuationDistance, Number.MIN_VALUE, Infinity, 'attenuation distance'),
     depth = thickness / distance;
-  const transmittance = transmission ? attenuation.map((c) => attenuationPower(c, depth)) : undefined;
+  // Extension presence reserves the medium, even when a pointer starts transmission at zero.
+  // tint stays absent at zero so this material keeps its ordinary opaque rendering path.
+  const transmittance = tr ? attenuation.map((c) => attenuationPower(c, depth)) : undefined;
   // Extended materials: thin film, anisotropy, diffuse transmission, bump or volume scatter in use; maps 13-20 and six more uniform rows.
   const x = extended?.parse(e),
     physical = !!(x || cc || tr || sh || sp || vo || e.KHR_materials_ior || e.KHR_materials_dispersion);
@@ -1864,9 +1866,9 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
       ? base.slice(0, 3).map((v, i) => v * transmission * attenuationPower(attenuation[i], depth))
       : undefined,
     attenuation: transmittance,
-    opticalDepth: transmission ? attenuation.map((c) => (c === 1 || depth === 0 ? 0 : -Math.log(c) * depth)) : undefined,
+    opticalDepth: tr ? attenuation.map((c) => (c === 1 || depth === 0 ? 0 : -Math.log(c) * depth)) : undefined,
     // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
-    volume: transmission ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
+    volume: tr ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
   });
 }
 /** Main-thread packings per asset and primitive definition, kept as long as the asset is. */
@@ -3043,7 +3045,7 @@ export class PBRModel implements EnginePlugin {
     models.segments.set(this, models.segment);
     // The capture's non-model passes run outside the model order. Register them after joining this model so merely
     // owning native glass does not split an existing HDR model run or introduce extra MSAA stores/loads.
-    if (!this.releaseNativeGlass && this.materials.some((m) => m.tint))
+    if (!this.releaseNativeGlass && this.materials.some((m) => m.tint || m.attenuation))
       this.releaseNativeGlass = acquireNativeGlass(
         this.engine,
         () =>

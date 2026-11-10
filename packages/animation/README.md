@@ -267,6 +267,17 @@ out (glTF nodes have no such paths); `AnimationGroup` and `retarget` ignore them
 
 ## KHR_animation_pointer playback
 
+Transmission can start at `0` (or its omitted default) and animate to a positive
+factor. Seeking back to `0` restores the opaque path. Volume attenuation and native
+capture follow the transition; the source document stays unchanged. The
+[self-contained triangle example](../gltf-pro/README.md#animate-an-opaque-material-into-glass)
+builds this channel without a downloaded model.
+
+Volume pointer writes update attenuation and optical depth together. Optical depth
+is retained before transmittance underflows, so a thick volume scaled down in the
+scene keeps its absorption. Backward seeks recompute those values from the source
+volume and the sampled keys.
+
 ```ts
 import {createStage} from 'margoengine';
 import {loadGLTF, viewGLTFCamera} from 'margoengine/gltf-pro';
@@ -434,10 +445,11 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {MorphWeightPlayer} from 'margoengine/animation/morph-gpu';
 import {cloneModel} from 'margoengine/animation/skeleton-utils';
-const stage = await createStage('#viewport', {backend: 'webgpu'});
-const source = await loadGLTF(stage.engine, '/face.glb');
+const stage = await createStage('#viewport', {backend: 'webgpu', capacity: 16384});
+// Copy this repository's CC0 RobotExpressive asset to the same public URL in your app.
+const source = await loadGLTF(stage.engine, '/examples/assets/robot-expressive.glb');
 const models = [source, ...(await Promise.all(Array.from({length: 99}, () => cloneModel(source))))];
-const talk = MorphWeightPlayer.attach(stage.engine, 'Talk'); // a clip name or index; {loop: false} holds the ends
+const talk = MorphWeightPlayer.attach(stage.engine, 'Dance'); // this asset's clip includes weight tracks
 for (const [i, model] of models.entries()) {
   const animation = Animation.attach(model);
   animation.playing = false; // or keep it playing a body clip: only weights are driven here
@@ -600,10 +612,13 @@ chunk carries its own triangles, so a fluid can change vertex count as it plays.
 
 ```ts
 import {createStage} from 'margoengine';
-import {GeometryCachePlayer} from 'margoengine/animation/geometry-cache';
+import {GeometryCachePlayer, encodeGeometryCache} from 'margoengine/animation/geometry-cache';
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
-const flag = await GeometryCachePlayer.attach(stage.engine, '/flag.mgc', {ahead: 3});
-flag.seek(2.5);
+// Two frames of one triangle, generated here so no external cache file is needed.
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1]);
+const bytes = encodeGeometryCache(30, [{frameCount: 2, positions, indices: new Uint32Array([0, 1, 2])}]);
+const flag = await GeometryCachePlayer.attach(stage.engine, bytes, {ahead: 3});
+flag.seek(1 / 60);
 flag.speed = 0.5;
 ```
 
@@ -669,27 +684,39 @@ before its payload is held.
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:
 
 ```ts
-import {Animation, AnimationGroup, applyKeyframeClip} from 'margoengine/animation';
+import {Animation, Skeleton, createKeyframeClip, applyKeyframeClip} from 'margoengine/animation';
 import {Retarget, cloneModel, retargetRig} from 'margoengine/animation/skeleton-utils';
 import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const [robot, mixamoModel, hero] = await Promise.all(
-  ['/RobotExpressive.glb', '/mixamo-walk.glb', '/hero.glb'].map((url) => loadGLTF(stage.engine, url)),
-);
-const mixamoAnimation = Animation.attach(mixamoModel), t = 0.5;
+// Copy this repository's CC0 RobotExpressive asset to the same public URL in your app.
+const robot = await loadGLTF(stage.engine, '/examples/assets/robot-expressive.glb');
 
 const second = await cloneModel(robot); // own nodes and skeleton; shares the parsed asset
 Animation.attach(second).play('Dance'); // animates apart from `robot`
 
-// Both characters stand in the same reference pose (T-pose, say) when their rigs are made.
-const retarget = new Retarget(retargetRig(mixamoModel), retargetRig(hero), {
-  names: {Hips: 'mixamorig:Hips', Spine: 'mixamorig:Spine', LeftArm: 'mixamorig:LeftArm'}, // others map by equal name
+// Explicit miniature rigs make the required names and reference poses reproducible.
+const source = new Skeleton([
+  {name: 'mixamorig:Hips', parent: -1, translation: [0, 1, 0]},
+  {name: 'mixamorig:Spine', parent: 0, translation: [0, 0.5, 0]},
+]);
+const hero = new Skeleton([
+  {name: 'Hips', parent: -1, translation: [0, 2, 0]},
+  {name: 'Spine', parent: 0, translation: [0, 1, 0]},
+]);
+const retarget = new Retarget(retargetRig(source), retargetRig(hero), {
+  names: {Hips: 'mixamorig:Hips', Spine: 'mixamorig:Spine'},
   hip: 'Hips', // follows the source hips' movement, scaled by the rest hip heights unless hipScale is given
 });
-retarget.apply(mixamoModel, hero); // live: pose hero as mixamoModel is posed now
-const walk = retarget.clip({animation: mixamoAnimation, clip: 'Walk'}, {fps: 30}); // or a source KeyframeClip
-applyKeyframeClip(walk, Animation.attach(hero), t); // or new AnimationGroup(walk) for many heroes
+source.setPose(0, {translation: [0.3, 1, 0]});
+retarget.apply(source, hero); // hero's hips now move 0.6 along x
+const sourceClip = createKeyframeClip({name: 'Walk', tracks: [{
+  target: 'mixamorig:Hips', path: 'translation', keys: [
+    {time: 0, value: [0, 1, 0]}, {time: 1, value: [1, 1, 0]},
+  ],
+}]});
+const walk = retarget.clip(sourceClip, {fps: 30});
+applyKeyframeClip(walk, hero, 0.5);
 ```
 
 `cloneModel(model)` resolves to a new `PBRModel` with its own root and nodes, starting in the source's current local

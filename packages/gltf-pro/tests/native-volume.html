@@ -15,6 +15,8 @@ window.volumeSlabs=async()=>{
   {scale:1,thickness:2,startThickness:1,pointer:'thicknessFactor'},
   {scale:1,thickness:1,distance:2,pointer:'attenuationDistance'},
   {scale:1/1200,thickness:1200,startThickness:1,pointer:'thicknessFactor'},
+  {scale:1,thickness:1,pointer:'transmissionFactor'},
+  {scale:1/1200,thickness:1200,pointer:'transmissionFactor'},
  ];
  for(const instanced of [false,true])for(const slab of slabs)for(const mirror of [1,-1]){
   const {scale,thickness,distance=1,color=[0.25,0.5,1]}=slab;
@@ -23,26 +25,36 @@ window.volumeSlabs=async()=>{
   try{
    engine.scene.background='#ffffff';engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([0,0,0,0]);
    const input=instancedGLTF([{s:[mirror,1,scale]}],{instanced,material:{extensions:{
-    KHR_materials_transmission:{transmissionFactor:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior:1},
+    KHR_materials_transmission:{transmissionFactor:slab.pointer==='transmissionFactor'?0:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior:1},
     KHR_materials_volume:{thicknessFactor:slab.startThickness??thickness,attenuationColor:[0.25,0.5,1],attenuationDistance:1},
    }}});
    if(slab.pointer){
-    const volume=input.doc.materials[0].extensions.KHR_materials_volume;
+    const extension=slab.pointer==='transmissionFactor'?'KHR_materials_transmission':'KHR_materials_volume';
+    const volume=input.doc.materials[0].extensions[extension];
     const add=(values,type,width)=>{
      const data=Float32Array.from(values),buffer=input.buffers.length,bufferView=input.doc.bufferViews.length,index=input.doc.accessors.length;
      input.buffers.push(data);input.doc.buffers.push({byteLength:data.byteLength});input.doc.bufferViews.push({buffer,byteLength:data.byteLength});
      input.doc.accessors.push({bufferView,componentType:5126,count:data.length/width,type});return index;
     };
-    const target=slab.pointer==='attenuationColor'?color:slab.pointer==='thicknessFactor'?thickness:distance;
+    const target=slab.pointer==='transmissionFactor'?1:slab.pointer==='attenuationColor'?color:slab.pointer==='thicknessFactor'?thickness:distance;
     const initial=volume[slab.pointer],vector=Array.isArray(initial);
     const times=add([0,1],'SCALAR',1),output=add(vector?[...initial,...target]:[initial,target],vector?'VEC3':'SCALAR',vector?3:1);
-    input.doc.animations=[{samplers:[{input:times,output}],channels:[{sampler:0,target:{path:'pointer',extensions:{KHR_animation_pointer:{pointer:'/materials/0/extensions/KHR_materials_volume/'+slab.pointer}}}}]}];
+    input.doc.animations=[{samplers:[{input:times,output}],channels:[{sampler:0,target:{path:'pointer',extensions:{KHR_animation_pointer:{pointer:'/materials/0/extensions/'+extension+'/'+slab.pointer}}}}]}];
    }
    const model=parseGLTF(engine,input.doc,input.buffers,[],{instancing,materials:extendedMaterials});
    await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+   const opaque=slab.pointer==='transmissionFactor'?canvas.toDataURL('image/png'):undefined;
    if(slab.edit)model.primitives[0].material.attenuation=color.slice();
-   if(slab.pointer)new Animation(model,{pointers:pointerChannels,loop:false}).seek(1);
+   const animation=slab.pointer?new Animation(model,{pointers:pointerChannels,loop:false}):undefined;
+   if(animation)animation.seek(1);
    if(slab.edit||slab.pointer)await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+   if(opaque){
+    animation.seek(0);
+    await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+    if(canvas.toDataURL('image/png')!==opaque)throw new Error('Zero transmission did not restore the original opaque frame');
+    animation.seek(1);
+    await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
+   }
    rows.push({instanced,scale,thickness,distance,color,edit:slab.edit,pointer:slab.pointer,mirror,material:model.primitives[0].material.tint,draws:engine.stats.drawCalls,width:canvas.width,height:canvas.height,png:canvas.toDataURL('image/png')});
   }finally{engine.dispose();canvas.remove();}
  }

@@ -6620,6 +6620,8 @@ The optional cache/eviction index coalesces removals in the same object-store tr
 
 Live volume materials (review5, 2026-11-10): attenuation edits invalidate parsed optical-depth caches per channel; replacing the array invalidates all channels. Equal numeric assignments are not observable, so replacing an underflowed zero with explicit opacity requires array replacement or explicit infinite optical depth. Pointer animation retains authored logarithmic precision. Exact slab evidence and the unchanged mesh-slab/range limitations are documented in live-volume-materials.md.
 
+Transmission activation from zero (2026-11-10): the physical parser retains medium state for an authored KHR_materials_transmission extension even when its factor is zero or omitted. Pointer playback activates tint for positive factors and restores the opaque path at zero. Native capture registration remains inactive until transmission is active. The existing scalar-thickness, screen capture and display-space blending limits still apply; this change adds no optical model.
+
 ### Range-cache response transit age (2026-11-10)
 
 RangeCache includes elapsed request time together with the Age header when calculating the freshness deadline after a miss or a 304 response. For max-age=10, Age=3 and a four-second request, three seconds of freshness remain when the response arrives; Age=8 with the same transit is already expired. The controlled-clock regression checks the next cache session revalidates in both cases. Existing once-per-instance checking and offline fallback policies are unchanged; this is clock correctness, not a speed result. No public API or schema change.
