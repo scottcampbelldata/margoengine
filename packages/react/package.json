@@ -33,7 +33,8 @@
     "test:browser:tags": "node scripts/test-tags-browser.js",
     "test:browser:bindings": "cd ../.. && node packages/react/scripts/test-bindings-browser.mjs",
     "test:browser:instances": "cd ../.. && node packages/react/scripts/test-instances-browser.mjs",
-    "test:browser:priority": "node scripts/test-priority-browser.mjs"
+    "test:browser:priority": "node scripts/test-priority-browser.mjs",
+    "test:browser:performance": "node scripts/test-performance-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -196,6 +197,11 @@
       "types": "./dist/xr-pointer.d.ts",
       "react-server": "./dist/rsc/xr-pointer.js",
       "import": "./dist/xr-pointer.js"
+    },
+    "./performance": {
+      "types": "./dist/performance.d.ts",
+      "react-server": "./dist/rsc/performance.js",
+      "import": "./dist/performance.js"
     },
     "./instances": {
       "types": "./dist/instances.d.ts",

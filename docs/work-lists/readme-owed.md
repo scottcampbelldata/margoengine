@@ -394,3 +394,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/react: browser binding and instance checks now launch from the repository root; README runtime work stays deferred.
 - @margoengine/sciviz: document /contour CPU/GPU multi-level isosurfaces and isolines, contourOperator, pulling cell assumptions, precision bound, cancellation and NASA demo.
 - margoengine: document generated sciviz/contour alias with the owning sciviz contour entry.
+
+
+| @margoengine/react | performance: PerformanceMonitor defaults, measured samples, callbacks/hook/controller, AdaptiveDpr decline/restoration, per-Canvas targets, picking, demand/XR and lifecycle limits | batch 265 job 5 |
+| margoengine | react/performance optional alias | batch 265 job 5 |

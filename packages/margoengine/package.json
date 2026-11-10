@@ -2650,6 +2650,10 @@
       "types": "./dist/react/xr-pointer.d.ts",
       "import": "./dist/react/xr-pointer.js"
     },
+    "./react/performance": {
+      "types": "./dist/react/performance.d.ts",
+      "import": "./dist/react/performance.js"
+    },
     "./react/instances": {
       "types": "./dist/react/instances.d.ts",
       "import": "./dist/react/instances.js"

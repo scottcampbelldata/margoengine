@@ -3029,3 +3029,8 @@ and composed compatibility GPU suites. Do not rerun the known native full-
 composition failure or full-package README deadline to green; lane-U owns both.
 No timing/benchmark command is needed for these correctness proofs.
 Batch 172 contours: build packages, run node --test packages/sciviz/tests/contour.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=6 --wait-max=60 -- node packages/sciviz/tests/contour-browser.mjs. Serve examples/sciviz-contour.html to switch CPU/GPU intersections and level multiplier on the original NASA quad slice. The browser report includes maximum coordinate difference, the computed bound, primitive counts and visible pixel counts for each backend. No timing benchmark is involved.
+
+
+### Batch 265 adaptive performance
+
+After build:packages, run node --test --test-timeout=120000 packages/react/tests/performance.test.js packages/react/tests/performance-react.test.js. Run node scripts/gpu-lock.mjs run --owner=react-performance --wait-max=60 --max=4 -- node packages/react/scripts/test-performance-browser.mjs, then the same command with --compat appended. The fixture injects fixed measured durations into the production controller to prove reduction and restoration independent of machine load. It does not benchmark elapsed execution. The default controller's monotonic clock and explicit sample input share the same arithmetic.

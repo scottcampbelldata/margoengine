@@ -1,6 +1,7 @@
 import type { Engine } from '@margoengine/core/extension';
 import type { FrameCallback } from '@margoengine/core';
 import type { Frames } from './internal.js';
+import { MargoError } from '@margoengine/math/errors';
 
 const priorities = new WeakMap<FrameCallback, number>();
 /** Cache the stable order until subscription membership changes; ordinary frames need no sorting or array copy. */
@@ -39,7 +40,9 @@ interface Bridge {
   stamp: number;
   xr?: () => void;
   drawingXR: boolean;
+  output?: FrameOutput;
 }
+export type FrameOutput = (options: Parameters<Engine['render']>[0], render: Engine['render']) => void;
 const bridges = new WeakMap<Frames, Bridge>();
 /** A positive live subscriber owns rendering; negative priorities only order callbacks. */
 export function frameTakeover(frames: Frames): boolean {
@@ -89,6 +92,7 @@ export function bridgeFrames(engine: Engine, frames: Frames): () => void {
       state.skip = false;
       if (frameTakeover(frames)) return;
     }
+    if (state.output) return state.output(options, (options) => render.call(this, options));
     return render.call(this, options);
   };
   const subscribe: Engine['onFrame'] = function (this: Engine, callback) {
@@ -112,6 +116,15 @@ export function bridgeFrames(engine: Engine, frames: Frames): () => void {
     if (bridges.get(frames) === state) bridges.delete(frames);
   };
 }
+/** Optional presentation work runs only when a frame actually draws, after takeover and XR routing. */
+export function frameOutput(frames: Frames, output: FrameOutput): () => void {
+  const state = bridges.get(frames);
+  if (!state) throw new MargoError('state', 'Canvas frame bridge is unavailable; mount AdaptiveDpr inside an active Canvas. See https://margoengine.com/errors#state');
+  if (state.output) throw new MargoError('attached', 'Canvas already has a presentation owner; release it before attaching another. See https://margoengine.com/errors#attached');
+  state.output = output;
+  return () => { if (state.output === output) state.output = undefined; };
+}
+export function inXRFrame(frames: Frames): boolean { return !!bridges.get(frames)?.xr; }
 /** Route a manual full-scene draw through the XR manager's current eyes, scoped to its frame callback. */
 export function xrFrameScope<T>(frames: Frames, draw: () => void, callback: () => T): T {
   const state = bridges.get(frames);

@@ -3539,3 +3539,8 @@ and equal-cost work, and root emitter-MIS suite coverage remain open. Full-packa
 README and native full-composition acceptance remain blocked in lane-U.
 ### Batch 172 grid contours
 The optional contour entry produces multiple unstructured-grid isosurfaces/isolines with consistent shared-face diagonals, gradient normals and source IDs. Proof: packages/sciviz/tests/contour.test.js checks all tetra sign cases and analytic mixed cell sections; contour-browser.mjs compares real GPU interpolation to CPU coordinates within the documented float envelope on both backends and renders the attributed NASA slice. GPU topology and gradient preparation currently run on the CPU. No speed or full volume CFD dataset claim.
+
+
+### Batch 265 measured adaptive performance
+
+PerformanceMonitor lowers and restores a bounded quality factor from measured frame-time windows. AdaptiveDpr applies it to per-Canvas scene resolution and restores the original rendering path. Proof contracts: packages/react/tests/performance.test.js and performance-react.test.js cover arithmetic, bidirectional decisions, fallback, commit behavior and lifetime. packages/react/scripts/test-performance-browser.mjs requires 256 -> 128 -> 256 raster dimensions with exact full-resolution restored pixels, retained CSS size, correct direct and pointer picking, and adapter disposal, across default/named Scenes, nearest filtering, manual takeover and demand mode. These dimensions are a deterministic work count; total frame cost includes an extra presentation pass and no speedup is claimed.

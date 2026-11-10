@@ -56,6 +56,7 @@ const expected = {
   './lines': ['Grid', 'Line'],
   './points': ['Points'],
   './instances': ['Instance', 'Instances'],
+  './performance': ['AdaptiveDpr', 'PerformanceController', 'PerformanceMonitor', 'usePerformanceMonitor'],
   './lod': ['Detailed'],
   './selection': ['Outline'],
   './splats': ['Splat'],

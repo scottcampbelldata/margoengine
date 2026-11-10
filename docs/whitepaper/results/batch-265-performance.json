@@ -1,0 +1,127 @@
+{
+  "webgpu": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "proof": [
+      {
+        "mode": "default",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "named",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "pixelated",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "manual",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "demand",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      }
+    ]
+  },
+  "compat": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "proof": [
+      {
+        "mode": "default",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "named",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "pixelated",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "manual",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      },
+      {
+        "mode": "demand",
+        "original": 256,
+        "reduced": 128,
+        "restored": 256,
+        "exact": true,
+        "picking": true
+      }
+    ]
+  }
+}
