@@ -6,10 +6,12 @@
 import { Inspector } from '../../inspector/dist/index.js';
 import { StateMachine } from '../dist/index.js';
 import { MachineView } from '../dist/inspect.js';
+import { importSCXML, exportSCXML } from '../dist/scxml.js';
 const inspector = new Inspector();
 const machine = new StateMachine({ play: { history: 'deep' }, explore: { parent: 'play' }, combat: { parent: 'play' }, pause: {} }, 'explore', {}, [
   { from: 'explore', to: 'combat', event: 'enemy' }, { from: 'play', to: 'pause', event: 'pause' },
 ]);
 const view = new MachineView(machine, { inspector });
-window.fsmCheck = { machine, view, inspector };
+const scxml = importSCXML(exportSCXML({ version: 1, initial: 'a', states: { a: {}, b: {} }, transitions: [{ from: 'a', to: 'b', after: 1 }] }));
+window.fsmCheck = { machine, view, inspector, scxml };
 </script></html>

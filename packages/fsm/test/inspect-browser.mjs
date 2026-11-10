@@ -7,6 +7,7 @@ const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 try {
   await page.waitForFunction(() => Boolean(window.fsmCheck), null, { timeout: 30000 });
+  assert.deepEqual(await page.evaluate(() => window.fsmCheck.scxml), { version: 1, initial: 'a', states: { a: {}, b: {} }, transitions: [{ from: 'a', to: 'b', after: 1 }] });
   const view = page.locator('[data-margo-machine-view]');
   await view.waitFor({ state: 'visible', timeout: 30000 });
   await page.evaluate(() => { window.fsmCheck.machine.send('enemy'); window.fsmCheck.machine.send('pause'); });

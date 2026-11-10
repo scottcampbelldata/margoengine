@@ -3040,3 +3040,5 @@ centroids, maxima plateaus, discrete outputs, rule aggregation and agent isolati
 are checked by packages/behavior/tests/fuzzy.test.js. This proves the fuzzy-set,
 rule and defuzzification row against published formulas and the documented web
 reference; it makes no full-library or real-game decision-quality claim.
+### SCXML configuration conversion (batch 250 job 5)
+The optional importer maps the supported W3C configuration subset to validated MachineDocument objects without executing content; the exporter preserves native field kinds through explicit namespace extensions and offers a plain common-subset mode. Proof: packages/fsm/test/scxml.test.js covers standard hierarchy/history/parallel documents, live behavior after loading, full native field round trips, stable transition order, hostile/unsupported inputs, prototype-like names and bounds. The browser check exercises default DOMParser. Accepted differences and excluded processor features are listed in docs/limits.md; no full SCXML interpreter claim.

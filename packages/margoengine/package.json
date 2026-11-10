@@ -1154,6 +1154,10 @@
       "types": "./dist/fsm/inspect.d.ts",
       "import": "./dist/fsm/inspect.js"
     },
+    "./fsm/scxml": {
+      "types": "./dist/fsm/scxml.d.ts",
+      "import": "./dist/fsm/scxml.js"
+    },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"

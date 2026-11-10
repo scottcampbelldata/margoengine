@@ -2583,3 +2583,4 @@ Batch 252 job 3: build, then `node --test --test-timeout=120000 packages/navmesh
 Batch 251 fuzzy decisions: build behavior, then run
 `node --test --test-timeout=120000 packages/behavior/tests/fuzzy.test.js`.
 Fixtures use analytical membership values and output moments, not timing budgets.
+SCXML proof: build packages, then node --test --test-timeout=120000 packages/fsm/test/scxml.test.js. packages/fsm/test/inspect-browser.mjs additionally round-trips a delayed machine with the browser native DOMParser, in normal and --compat runs under the shared GPU lock. No timed assertions or performance measurements.
