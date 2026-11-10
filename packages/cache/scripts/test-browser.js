@@ -53,7 +53,10 @@ const server = await createServer({
       name: 'cache-files',
       configureServer(vite) {
         vite.middlewares.use((request, response, next) => {
-          const path = new URL(request.url, 'http://127.0.0.1').pathname;
+          const path = new URL(request.url, 'http://127.0.0.1').pathname.replace(
+            '/packages/cache/test/sw-files/',
+            '/cache-files/',
+          );
           if (path === '/cache-files/stream-chair.glb') {
             response.setHeader('cache-control', 'max-age=3600');
             response.setHeader('content-length', glb.length);
@@ -217,6 +220,61 @@ try {
   assert.ok(plain.reads >= 30 * 2000, `default read ${plain.reads}`);
   assert.ok(indexed.reads <= 30 * 8, `index read ${indexed.reads}`);
   report.evictionReads = { plain, indexed };
+
+  const checkPrefetch = (result) => {
+    assert.equal(result.paused.started, 0);
+    assert.equal(result.paused.queued, 4);
+    assert.deepEqual(result.order, ['/cache-files/c', '/cache-files/b', '/cache-files/a', '/cache-files/chair.glb']);
+    assert.ok(result.outcomes.every((item) => item.status === 'done'));
+    assert.equal(result.stats.done, 4);
+    assert.equal(result.stats.cancelled, 1);
+    assert.equal(result.stats.bytes, glb.length + 300);
+    assert.equal(result.duplicate[0].status, 'done');
+    assert.equal(result.cancelled[0].status, 'cancelled');
+    assert.equal(result.sha, sha(glb));
+    assert.equal(result.usage.files, 4);
+    assert.equal(result.usage.bytes, glb.length + 300);
+  };
+  const checkThrottle = (result) => {
+    assert.ok(result.delays.length >= 2);
+    assert.deepEqual(result.delays, result.expected, 'shared byte debt sets the exact requested timer deadlines');
+    assert.deepEqual(result.values, [Array(100).fill(1), Array(100).fill(2)]);
+  };
+  report.prefetchWindow = await call('prefetchProof');
+  checkPrefetch(report.prefetchWindow);
+  report.throttleWindow = await call('throttleProof');
+  checkThrottle(report.throttleWindow);
+  assert.equal(await call('serviceWorkerReady'), true);
+  report.prefetchWorker = await call('workerProof', 'prefetch');
+  checkPrefetch(report.prefetchWorker);
+  report.throttleWorker = await call('workerProof', 'throttle');
+  checkThrottle(report.throttleWorker);
+  assert.equal(report.prefetchWindow.idleAPI, 'function');
+  assert.equal(report.prefetchWorker.idleAPI, 'undefined');
+  before = log.length;
+  const serviceCold = await call('serviceWorkerRange', 'bytes=1000-2999');
+  assert.equal(serviceCold.status, 206);
+  assert.equal(serviceCold.range, `bytes 1000-2999/${glb.length}`);
+  assert.equal(serviceCold.sha, sha(glb.subarray(1000, 3000)));
+  assert.ok(log.slice(before).some((item) => item.range === 'bytes=0-4095'));
+  const committed = await call('workerProof', 'flush');
+  assert.equal(committed.bytes, 4096);
+  const originalWorker = await call('workerProof', 'identity');
+  await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.getRegistration();
+    await registration.unregister();
+  });
+  await open();
+  assert.equal(await call('serviceWorkerReady', 2), true);
+  const replacementWorker = await call('workerProof', 'identity');
+  assert.notEqual(replacementWorker, originalWorker, 'a distinct worker instance reopens IndexedDB');
+  await context.setOffline(true);
+  before = log.length;
+  const serviceOffline = await call('serviceWorkerRange', 'bytes=1000-2999');
+  assert.deepEqual(serviceOffline, serviceCold, 'a restarted service worker reopens its persisted ranges offline');
+  assert.equal(log.length, before);
+  report.serviceWorker = { cold: serviceCold, offline: serviceOffline, restarted: true };
+  await context.setOffline(false);
 
   assert.deepEqual(errors, []);
   mkdirSync(results, { recursive: true });

@@ -348,6 +348,7 @@ export class AssetCache {
     response: Response,
     range: string | null,
     sent: number,
+    _background?: boolean,
   ): Promise<Response> {
     const control = response.headers.get('cache-control') ?? '',
       received = Date.now();
@@ -383,7 +384,7 @@ export class AssetCache {
       this.network(whole)
         .then((response) => {
           this.stats.misses++;
-          return this.keep(whole, key, response, null, sent);
+          return this.keep(whole, key, response, null, sent, true);
         })
         .catch(() => {
           this.checked.delete(key);

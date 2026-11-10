@@ -7,6 +7,7 @@ import { StreamingAssetCache } from '../dist/stream.js';
 import { DecodedAssetCache } from '../dist/decoded.js';
 import { hashBytes } from '../dist/hashed.js';
 import { DracoDecoder, KTX2Decoder } from '../../decoders/dist/index.js';
+import { prefetchProof, throttleProof } from './browser-prefetch.js';
 
 const query = new URLSearchParams(location.search);
 
@@ -71,6 +72,41 @@ async function stream(ranges, url) {
 }
 
 window.cacheChecks = {
+  prefetchProof: () => prefetchProof('window-prefetch'),
+  throttleProof,
+  async serviceWorkerReady(revision = 1) {
+    await navigator.serviceWorker.register(`./service-worker.js?revision=${revision}`, { type: 'module' });
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller)
+      await new Promise((resolve) =>
+        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }),
+      );
+    return !!navigator.serviceWorker.controller;
+  },
+  workerProof(operation) {
+    return new Promise((resolve, reject) => {
+      const channel = new MessageChannel();
+      const timeout = setTimeout(() => {
+        channel.port1.close();
+        reject(new Error('service worker proof exceeded 60 s'));
+      }, 60000);
+      channel.port1.onmessage = ({ data }) => {
+        clearTimeout(timeout);
+        channel.port1.close();
+        if (data.error) reject(new Error(data.error));
+        else resolve(data.result);
+      };
+      navigator.serviceWorker.controller.postMessage(operation, [channel.port2]);
+    });
+  },
+  async serviceWorkerRange(range) {
+    const response = await fetch('/packages/cache/test/sw-files/chair.glb', { headers: { range } });
+    return {
+      status: response.status,
+      range: response.headers.get('content-range'),
+      sha: await hex(await response.arrayBuffer()),
+    };
+  },
   async decodedCold() {
     const cache = new DecodedAssetCache({ name: 'decoded-browser' });
     const draco = new DracoDecoder({ workerLimit: 1 }),

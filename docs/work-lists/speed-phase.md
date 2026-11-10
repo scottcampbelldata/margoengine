@@ -387,3 +387,5 @@ Batch 171 atmosphere: NOAA globe with 2048 wind particles and 32 history samples
 
 Batch 221: quiet-machine single-worker versus multi-worker BVH construction (one-million-triangle mesh), worker startup/position sharing or cloning/transfer/packing costs, same packed buffers and queries. Compare worker counts under equal work; no speedup claim or timing budget during build phase.
 - Batch 249 ecs/parallel: quiet-phase throughput comparison of identical serial and shared-worker module systems with matching outputs; use the real worker fixtures and declared hazards. Atomic overlap is proven now; no wall-clock gain is claimed.
+
+Batch 208: quiet-machine real-network throttle throughput, burst behavior and prefetch impact on foreground downloads in window/service worker. Build-phase proof checks deterministic requested timer debt, exact bytes, idle scheduling and persistence, with no elapsed-time assertion or speed claim.

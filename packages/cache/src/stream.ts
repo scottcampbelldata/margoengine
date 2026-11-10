@@ -11,8 +11,10 @@ export class StreamingAssetCache extends AssetCache {
     response: Response,
     range: string | null,
     sent: number,
+    background = false,
   ): Promise<Response> {
     if (
+      background ||
       range ||
       response.status !== 200 ||
       !response.body ||

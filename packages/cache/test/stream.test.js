@@ -1,9 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StreamingAssetCache } from '../dist/stream.js';
-import { fakeIndexedDB } from './support.js';
+import { fakeIndexedDB, server } from './support.js';
 
 const url = 'https://assets.test/model.bin';
+
+test('a streaming cache range miss completes its background whole-file fill before flush', {
+  timeout: 5000,
+}, async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const body = new Uint8Array(100).map((_, i) => i),
+    network = server({ '/model.bin': { body, etag: '"range"' } });
+  const cache = new StreamingAssetCache({ fetch: network });
+  const partial = await cache.fetch(url, { headers: { Range: 'bytes=10-19' } });
+  assert.equal(partial.status, 206);
+  assert.deepEqual(new Uint8Array(await partial.arrayBuffer()), body.slice(10, 20));
+  await cache.flush();
+  network.offline = true;
+  assert.deepEqual(new Uint8Array(await (await cache.fetch(url)).arrayBuffer()), body);
+  assert.equal(cache.stats.stored, 1);
+  cache.dispose();
+});
 const setup = (options = {}) => {
   globalThis.indexedDB = fakeIndexedDB();
   let source,

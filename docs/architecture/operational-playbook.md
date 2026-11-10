@@ -2213,6 +2213,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 208 cache browser evidence now includes prefetch and throttle in native window/service worker realms and exact offline RangeCache bytes from a replacement worker instance. Tests scope registration changes to their origin and use respondWith/waitUntil for lifetime. The existing test:browser command owns this storage-only proof; no GPU slot or rendering backend check is needed. Real throughput remains in the deferred speed-phase list.
+
 Batch 208 cache/decoded adds a 4,540 B gzip ceiling (4,284 B measured, previously absent) for a coherent typed-result cache over the existing transactional storage. Browser proof uses real shipped Draco/KTX2 workers and the attributed Box/Rib_N assets, then verifies all array hashes and metadata across reload without a second decode. CPU tests cover key partitions, cancellation, storage failure and eviction; this path does not submit GPU work.
 
 Batch 208 cache/stream: the optional entry has a 3,654 B gzip ceiling for pull-driven network bodies and complete-body IndexedDB commits. Node tests exercise cancellation, abort, failed bodies and storage budgets; the cache browser check holds the attributed SheenChair response open until its prefix is received, then checks exact SHA-256 storage equality. This storage-only browser proof needs no GPU slot; no rendering backend behavior or timing claim changes.

@@ -353,3 +353,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/ecs (batch 249 job 5): SharedWorld/SharedComponent storage, sharedIndex, ParallelSchedule read/write declarations, module worker assets, dependencies, isolation, update/abort/deadline/disposal, endpoint adapters, partial-write and failed-host semantics.
 - margoengine (batch 249 job 5): generated ecs/parallel alias.
 - @margoengine/selection: document hit-details HitDetails replacement for Picking, fields/defaults, batch staging, core zero UV, overlay/proxy contracts, AbortSignal and disposal (batch 199 job 1).
+- @margoengine/cache: replace stale Node-only prefetch/throttle and RangeCache browser/service worker limitations with batch-208 browser evidence; document worker flush lifetime and offline range behavior.

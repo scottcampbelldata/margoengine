@@ -20,7 +20,7 @@ class AssetCache {
     constructor({ name, version, maxBytes, persist, timeout, fetch, keys, eviction, freshness }?: AssetCacheOptions);
     protected track<T>(work: Promise<T>): Promise<T>;
     readonly fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-    protected keep(request: Request, key: string, response: Response, range: string | null, sent: number): Promise<Response>;
+    protected keep(request: Request, key: string, response: Response, range: string | null, sent: number, _background?: boolean): Promise<Response>;
     flush(): Promise<void>;
     usage(): Promise<AssetCacheUsage>;
     delete(url: string | URL): Promise<void>;
