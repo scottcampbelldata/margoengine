@@ -70,7 +70,8 @@ export interface ArcballHandle {
 }
 /**
  * Free rotation of the camera around `camera.target` with Shoemake's arcball: the pointer's start and current points
- * are lifted onto a virtual ball (`arcballPoint`) and the view turns by the rotation between them, about any axis, so
+ * are lifted onto a virtual ball (`arcballPoint`) and the view turns by the angle between them (Bell's single angle;
+ * Shoemake's arcball doubles it, which `rotateSpeed = 2` gives), about any axis, so
  * the camera can roll and pass over the poles (it drives `camera.up`). Left drag rotates, right drag (or Shift, Ctrl or
  * Meta + left) pans with the grabbed point kept under the pointer, middle drag and the wheel zoom toward the cursor.
  * One finger rotates, two fingers pinch to zoom and move to pan. Perspective and orthographic cameras

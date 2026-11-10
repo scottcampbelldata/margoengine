@@ -225,7 +225,9 @@ loads bvh), `@margoengine/controls/third-person` (`ThirdPersonControls`; loads b
 `ArcballControls` turns the camera around `camera.target` with no fixed up axis. Each pointer move lifts the previous
 and current points onto a virtual ball (`arcballPoint(x, y)`: the unit sphere inside radius 1/sqrt(2) of the smaller
 half-size of the element, the hyperbolic sheet `z = 1 / (2r)` outside it, continuous where they meet) and turns the view
-by the rotation between them, so the camera rolls and passes over the poles; it writes `camera.up`. Pan moves the target
+by the angle between them about their cross product, so the camera rolls and passes over the poles; it writes
+`camera.up`. That is the single angle of Bell's trackball: Shoemake's original arcball turns by twice the angle, so a
+drag across the ball turns about half as far here (raise `rotateSpeed` to 2 for Shoemake's rate). Pan moves the target
 and camera together and keeps the grabbed point under the pointer; zoom scales the view about the point under the cursor
 on the plane through the target, within `minDistance` and `maxDistance`. Under a fixed-size orthographic
 `CameraProjection` the zoom changes `projection.zoom` instead (within `minZoom` and `maxZoom`), still about the cursor.
