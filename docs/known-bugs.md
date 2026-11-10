@@ -1,5 +1,7 @@
 # Known bugs and unverified features
 
+Lane A sweep, outside the compiler-delay repair: `node --test tests/check-fixed-waits.test.js` fails on `python/tests/sciviz-jupyter-browser.mjs` lines 31/68 from 5329898ca. Both sleeps poll readiness inside bounded `step` calls, but the scanner recognises only self-scheduled bounded polls, not these loop-based polls. Keep the detector and assertions unchanged; the Python producer or check owner must reconcile them in the fix phase. No compiler-delay source is named by the failure.
+
 Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
 
@@ -591,11 +593,14 @@ passes. The following additional failures remain with batch 273:
   unchanged assertions, including layers 256/2047 at 4x and 1x. The separate
   synthetic delay coverage gap below remains open. No texture work was reduced.
   Receipt: whitepaper/results/batch-273-array-layer-limits.json.
-- Forced-compatibility slow-compile coverage gap: `MARGO_COMPAT=1` with
-  `--pipeline-delay=500` patches the native GPUDevice prototype before
-  compatShim loads/replaces it, so the synthetic delay does not wrap the later
-  CompatDevice. Repro: voxel's slow-compile script with that environment;
-  apply/observe the delay on the actual device in a separate harness repair.
+- Fixed forced-compatibility slow-compile coverage gap (lane A, 2026-11-10):
+  the init script retains its prototype instrumenter and the lazy compatShim
+  applies it to CompatDevice before installing readiness counters. Render and
+  compute promises now include the requested delay in pending counts; shader
+  errors retain identity and release readiness. pipeline-delay.test.js loads
+  the real shim against a lazy device fixture and proves the old path schedules
+  zero timers instead of the required one. Native and compatibility voxel
+  slow-compile acceptance uses the unchanged 500 ms delay and both sample counts.
 - Fixed `root/modern:test:xr:browser`: simulated bindings identify the selected
   device and compatibility canvas presentation keeps its output context mode
   when reconfigured between page-backed XR and offscreen devices. Root native

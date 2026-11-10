@@ -132,26 +132,35 @@ function alive(pid) {
  * the suite's command line (the `test:gpu:slow-compile` scripts).
  */
 export function delayPipelines(ms) {
-  if (typeof GPUDevice === 'undefined') return;
-  for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
-    const original = GPUDevice.prototype[name];
-    GPUDevice.prototype[name] = function (...args) {
-      return original
-        .apply(this, args)
-        .then((pipeline) => new Promise((resolve) => setTimeout(() => resolve(pipeline), ms)));
-    };
-  }
-  for (const name of ['createRenderPipeline', 'createComputePipeline']) {
-    const original = GPUDevice.prototype[name];
-    GPUDevice.prototype[name] = function (...args) {
-      const pipeline = original.apply(this, args),
-        until = performance.now() + ms;
-      while (performance.now() < until) {
-        // Busy: a synchronous compile blocks the thread that asked for it.
-      }
-      return pipeline;
-    };
-  }
+  // Compatibility installs its device lazily, after this init script. Keep the
+  // same instrumenter available for that prototype instead of timing only the
+  // native GPUDevice that the page subsequently replaces.
+  const wrapped = new WeakSet();
+  const apply = (prototype) => {
+    if (wrapped.has(prototype)) return;
+    wrapped.add(prototype);
+    for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
+      const original = prototype[name];
+      prototype[name] = function (...args) {
+        return original
+          .apply(this, args)
+          .then((pipeline) => new Promise((resolve) => setTimeout(() => resolve(pipeline), ms)));
+      };
+    }
+    for (const name of ['createRenderPipeline', 'createComputePipeline']) {
+      const original = prototype[name];
+      prototype[name] = function (...args) {
+        const pipeline = original.apply(this, args),
+          until = performance.now() + ms;
+        while (performance.now() < until) {
+          // Busy: a synchronous compile blocks the thread that asked for it.
+        }
+        return pipeline;
+      };
+    }
+  };
+  globalThis.__margoDelayPipelines = apply;
+  if (typeof GPUDevice !== 'undefined') apply(GPUDevice.prototype);
 }
 
 /**

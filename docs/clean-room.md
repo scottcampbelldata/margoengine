@@ -8329,3 +8329,17 @@ No rival implementation source or companion code was read or copied.
 
 ## Behavior tree text options and shared-memory regression (2026-11-10)
 Research compared Michele Colledanchise and Petter Ogren, Behavior Trees in Robotics and AI: An Introduction (2018), https://arxiv.org/abs/1709.00084, on modular subtree composition, with the Microsoft TypeScript contributors, More on Functions and Type Compatibility (2026), https://www.typescriptlang.org/docs/handbook/2/functions.html and https://www.typescriptlang.org/docs/handbook/type-compatibility.html. Structural typing permits extra properties on a variable and overload order chooses the first compatible signature. Ordinary-tree inference must therefore exclude optional subtree registrations explicitly, with a broad subtree-document overload for general options. Compiler fixtures cover ordinary, registered and optional option variables plus unsafe consumer rejection; the runtime shared-state fixture uses independent typed keys. Runtime tree parsing and scheduling are unchanged. No external implementation source or files were read or copied.
+## Lane A late compiler instrumentation (2026-11-10)
+
+Compared Kai Ninomiya, Brandon Jones and Jim Blandy, WebGPU (2026), sections 3.2.2
+and 10, https://www.w3.org/TR/webgpu/, with WHATWG contributors, HTML Living
+Standard: Timers (2026), https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html,
+and TC39 contributors, ECMAScript Language Specification: Promise Objects (2026),
+https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-objects.
+Pipeline readiness belongs to the actual device and successful promise completion;
+init-script order cannot instrument a prototype that will be installed later.
+Retain the existing clean-room delay instrumenter, apply it at compatibility
+installation, then count the delayed render/compute promises. Timer callbacks are
+controlled in the regression, so it tests settlement and identity without a speed
+budget. Native compile errors remain unchanged; no retry or fallback hides them.
+No other engine or companion implementation source was read or copied.

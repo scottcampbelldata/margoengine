@@ -33,16 +33,20 @@ export function compatShim(url = '/packages/webgl2-compat/dist/device.js') {
       if (!result.installed) throw new Error(`the WebGL2 compatibility layer did not install: ${result.reason}`);
       // Asynchronous pipeline creations in flight, as scripts/support/gpu-ready.js counts them on WebGPU.
       const proto = m.CompatDevice.prototype;
-      const original = proto.createRenderPipelineAsync;
-      proto.createRenderPipelineAsync = function (...args) {
-        const state = (globalThis.__margoPipelines ??= { pending: 0, created: 0 });
-        const promise = original.apply(this, args);
-        state.pending++;
-        state.created++;
-        const settle = () => state.pending--;
-        promise.then(settle, settle);
-        return promise;
-      };
+      // Apply the init script's delay before counting, so readiness includes it.
+      globalThis.__margoDelayPipelines?.(proto);
+      for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
+        const original = proto[name];
+        proto[name] = function (...args) {
+          const state = (globalThis.__margoPipelines ??= { pending: 0, created: 0 });
+          const promise = original.apply(this, args);
+          state.pending++;
+          state.created++;
+          const settle = () => state.pending--;
+          promise.then(settle, settle);
+          return promise;
+        };
+      }
       return navigator.gpu;
     }));
   const stub = {

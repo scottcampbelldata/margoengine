@@ -6994,3 +6994,13 @@ clean-room.md, Lane A source inventory and bitmap investigation.
 
 C2 J2 second-set evidence (sections 4.1 and 5): 13 generated rows cover all 66 pairs among 12 members on native WebGPU and full WebGL2 at both MSAA levels. Real shadow, clustered, outline, line, point, text, label and wipe workloads join the first post scenes. Package-only changes automatically select the affected rows; scene code changes retain the suite whole. CPU selection regressions and an independent TypeScript scene check pass. Remaining C2 adapters are explicit in docs/integration-composition.md.
 
+### Section 5 evidence: slow compiler instrumentation on the selected device
+
+The delayed-pipeline init script now retains the same prototype instrumenter for
+compatShim's lazy CompatDevice. The shim installs that delay before readiness
+tracking, for render and compute alike. A fake-timer regression runs the actual
+lazy shim, sees no timer on the old build, and proves one 500 ms timer per pipeline,
+unchanged pipeline/error identity and readiness accounting on the repaired build.
+Native and compatibility voxel bevel checks retain their complete sample/layer,
+map, view, lightmap and restoration work. This is compiler-wait correctness,
+not a speed measurement. No browser shutdown owner, engine or package API changes.
