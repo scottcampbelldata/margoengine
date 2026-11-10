@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { clipGrid, thresholdGrid, isoVolume, imageGrid, extractSubset, clipOperator } from '../dist/clip.js';
+import { clipGrid, thresholdGrid, isoVolume, imageGrid, extractSubset, clipOperator, connectivityGrid } from '../dist/clip.js';
 import { FilterPipeline } from '../dist/pipeline.js';
 
 const cube={points:[0,0,0,1,0,0,1,1,0,0,1,0,0,0,1,1,0,1,1,1,1,0,1,1],connectivity:[0,1,2,3,4,5,6,7],offsets:[8],types:[12],pointData:[0,1,1,0,0,1,1,0],cellData:[7],
@@ -69,6 +69,35 @@ test('threshold selects multi-component tuples by component, magnitude, all or a
   assert.deepEqual(await points([0,4*Math.SQRT2+1e-9]),[0]);
   for(const component of [2,-1,0.5,'max'])await assert.rejects(ids([0,1],{component}),/component/);
   for(const range of [[NaN,1],[Infinity,Infinity],[-Infinity,-Infinity],[2,1]])await assert.rejects(ids(range),/ordered range/);
+});
+test('connectivity numbers point-sharing regions by size and extracts all, largest, listed, seeded and closest',async()=>{
+  // Ten points on x; lines 0-1, 1-2 (region of 2 cells), 3-4 (1 cell), 5-6, 6-7, 7-8 (3 cells); point 9 unused.
+  const g={points:Array.from({length:30},(_,i)=>i%3?0:i/3),connectivity:[0,1,1,2,3,4,5,6,6,7,7,8],offsets:[2,4,6,8,10,12],types:[3,3,3,3,3,3],cellData:[10,11,12,13,14,15]};
+  const all=await connectivityGrid(g);
+  assert.deepEqual([...all.regionCells],[3,2,1]);assert.deepEqual([...all.cellArrays.regionId],[1,1,2,0,0,0]);assert.deepEqual([...all.sourceCells],[0,1,2,3,4,5]);
+  assert.deepEqual([...all.pointArrays.regionId],[1,1,1,2,2,0,0,0,0]);assert.deepEqual([...all.cellData],[10,11,12,13,14,15]);
+  assert.deepEqual([...(await connectivityGrid(g,{order:'first'})).cellArrays.regionId],[0,0,1,2,2,2]);
+  assert.deepEqual([...(await connectivityGrid(g,{order:'ascending'})).cellArrays.regionId],[1,1,0,2,2,2]);
+  const cells=async(o)=>[...(await connectivityGrid(g,o)).sourceCells];
+  assert.deepEqual(await cells({extract:'largest'}),[3,4,5]);
+  assert.deepEqual(await cells({extract:'largest',order:'ascending'}),[3,4,5]);
+  assert.deepEqual(await cells({extract:'regions',regions:[1,2]}),[0,1,2]);
+  assert.deepEqual(await cells({extract:'cellSeeded',seeds:[2]}),[2]);
+  assert.deepEqual(await cells({extract:'pointSeeded',seeds:[1,8]}),[0,1,3,4,5]);
+  assert.deepEqual(await cells({extract:'pointSeeded',seeds:[9]}),[]);
+  assert.deepEqual(await cells({extract:'closest',point:[6.2,5,0]}),[3,4,5]);
+  assert.deepEqual(await cells({extract:'closest',point:[2.5,0,0]}),[0,1]);
+  // Scalar connectivity: points 1, 3 and 4 are out of [0, 1], so cells 0 and 1 separate and cell 2 joins nothing.
+  const s=await connectivityGrid({...g,pointData:[0,5,0,5,5,0,0,0,0,0]},{scalarRange:[0,1]});
+  assert.deepEqual([...s.regionCells],[3,1,1]);assert.deepEqual([...s.sourceCells],[0,1,3,4,5]);assert.deepEqual([...s.cellArrays.regionId],[1,2,0,0,0]);
+  // A structured image is one region; the pipeline operator runs the same filter.
+  const image={dims:[3,3,1],bounds:[0,2,0,2,0,0],pointData:Array(9).fill(1)};
+  assert.deepEqual([...(await connectivityGrid(image)).regionCells],[4]);
+  assert.deepEqual([...(await clipOperator().execute({inputs:[g],params:{operation:'connectivity',options:{extract:'largest'}},time:0,signal:new AbortController().signal})).sourceCells],[3,4,5]);
+  assert.deepEqual([...(await clipOperator().execute({inputs:[image],params:{operation:'threshold',range:[null,0.5]},time:0,signal:new AbortController().signal})).sourceCells],[]);
+  for(const o of [{extract:'regions',regions:[3]},{extract:'regions'},{extract:'cellSeeded',seeds:[6]},{extract:'pointSeeded',seeds:[-1]},{extract:'closest'},{extract:'closest',point:[NaN,0,0]},{extract:'nope'},{order:'size'},{scalarRange:[1,0]},{scalarRange:[0,1]}])
+    await assert.rejects(connectivityGrid(g,o),RangeError,JSON.stringify(o));
+  await assert.rejects(connectivityGrid(g,{signal:AbortSignal.abort('stop')}),e=>e==='stop');
 });
 test('structured subsets honor indices, strides, descending bounds and full tuple arrays',async()=>{
   const d=[5,4,3],image={dims:d,bounds:[4,0,0,6,-1,1],pointData:Array.from({length:60},(_,i)=>i),cellData:Array.from({length:24},(_,i)=>i),pointArrays:{vec:Array.from({length:180},(_,i)=>i)}};

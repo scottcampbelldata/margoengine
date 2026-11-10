@@ -42,6 +42,23 @@ export type ClipShape = {
     readonly array?: string;
 };
 
+export type ConnectivityExtract = 'all' | 'largest' | 'regions' | 'closest' | 'pointSeeded' | 'cellSeeded';
+
+export interface ConnectivityGrid extends AnalysisGrid {
+    readonly regionCells: Uint32Array;
+}
+
+export interface ConnectivityOptions {
+    readonly extract?: ConnectivityExtract;
+    readonly regions?: readonly number[];
+    readonly seeds?: readonly number[];
+    readonly point?: readonly [number, number, number];
+    readonly scalarRange?: readonly [number, number];
+    readonly array?: string;
+    readonly order?: 'descending' | 'ascending' | 'first';
+    readonly signal?: AbortSignal;
+}
+
 export interface SubsetOptions {
     readonly ranges?: readonly [readonly [number, number], readonly [number, number], readonly [number, number]];
     readonly strides?: readonly [number, number, number];
@@ -53,12 +70,15 @@ export interface ThresholdOptions {
     readonly array?: string;
     readonly mode?: 'all' | 'any';
     readonly invert?: boolean;
+    readonly component?: number | 'magnitude' | 'all' | 'any';
     readonly signal?: AbortSignal;
 }
 
 export function clipGrid(input: AnalysisGrid | AnalysisImage, shape: ClipShape, options?: ClipOptions): Promise<AnalysisGrid>;
 
 export function clipOperator(): PipelineOperator;
+
+export function connectivityGrid(input: AnalysisGrid | AnalysisImage, options?: ConnectivityOptions): Promise<ConnectivityGrid>;
 
 export function extractSubset(image: AnalysisImage, options?: SubsetOptions): Promise<AnalysisImage>;
 

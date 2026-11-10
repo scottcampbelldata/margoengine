@@ -111,6 +111,26 @@ inclusive logical ranges and positive strides, default full extent/unit strides;
 strided cell tuples come from the lower source cell, not an average. `imageGrid`
 materializes regular/curvilinear images with at least two active dimensions.
 
+`connectivityGrid` numbers the regions of cells that share a point (largest first by
+default; `order:'ascending'` or `'first'` by lowest cell ID; ties by lowest cell ID),
+adds `regionId` point and cell arrays and `regionCells` counts, and keeps `extract`:
+`'all'` (default), `'largest'`, listed `'regions'`, the regions of point or cell
+`seeds`, or the region `'closest'` to a point. `scalarRange` makes points outside the
+range join nothing; a cell with no point in range is dropped. The clip pipeline
+operator runs it as `{ operation: 'connectivity', options }`, and a `null` end of a
+threshold `range` is open there, since JSON has no Infinity.
+
+```ts
+import { connectivityGrid } from '@margoengine/sciviz/clip';
+
+// Three line pieces: cells 0-1 touch, cell 2 stands alone, cells 3-5 form the longest piece.
+const pieces = { points: [0,0,0, 1,0,0, 2,0,0, 3,0,0, 4,0,0, 5,0,0, 6,0,0, 7,0,0, 8,0,0],
+  connectivity: [0,1, 1,2, 3,4, 5,6, 6,7, 7,8], offsets: [2, 4, 6, 8, 10, 12], types: [3, 3, 3, 3, 3, 3] };
+const regions = await connectivityGrid(pieces);
+const largest = await connectivityGrid(pieces, { extract: 'largest' });
+console.log([...regions.regionCells], [...largest.sourceCells!]); // [3, 2, 1] [3, 4, 5]
+```
+
 `/probe` owns locator snapshots; rebuild after input edits. Barycentric simplex and
 pulling-linear mixed cells differ deliberately from true trilinear hex interpolation.
 Outside points return null, shared boundaries choose lowest current cell ID. Profiles

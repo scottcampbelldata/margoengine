@@ -355,14 +355,115 @@ export async function extractSubset(image: AnalysisImage, options: SubsetOptions
 }
 
 /** JSON pipeline adapter. Params: `{ operation: 'clip'|'threshold'|'isoVolume'|'subset', ... }`. */
+/** Which connected regions {@link connectivityGrid} keeps. Default `'all'`. */
+export type ConnectivityExtract = 'all' | 'largest' | 'regions' | 'closest' | 'pointSeeded' | 'cellSeeded';
+/** Options of {@link connectivityGrid}. */
+export interface ConnectivityOptions {
+  /** Default `'all'`. `'regions'` keeps the region IDs in `regions`; the seeded modes keep regions holding `seeds`. */
+  readonly extract?: ConnectivityExtract;
+  /** Region IDs for `'regions'`, after numbering. */
+  readonly regions?: readonly number[];
+  /** Point IDs for `'pointSeeded'`, cell IDs for `'cellSeeded'`. */
+  readonly seeds?: readonly number[];
+  /** Position for `'closest'`: the region of the used point nearest to it (ties: lowest point ID). */
+  readonly point?: readonly [number, number, number];
+  /** Scalar connectivity: only points whose scalar lies in this inclusive range join cells. Default off. */
+  readonly scalarRange?: readonly [number, number];
+  /** Point array for `scalarRange`. Default the unnamed `pointData`. */
+  readonly array?: string;
+  /** Region numbering: by cell count `'descending'` (default) or `'ascending'`, or by lowest cell ID `'first'`. */
+  readonly order?: 'descending' | 'ascending' | 'first';
+  readonly signal?: AbortSignal;
+}
+/** Kept cells with a `regionId` point and cell array; `regionCells[r]` counts the input cells of region r. */
+export interface ConnectivityGrid extends AnalysisGrid {
+  readonly regionCells: Uint32Array;
+}
+
+/**
+ * Connected regions of cells that share a point, as in the Connectivity filter described in the ParaView User's Guide
+ * (https://docs.paraview.org/en/latest/UsersGuide/filteringData.html, written from that description only): every
+ * region is numbered, `regionId` arrays are added and the chosen regions are kept with all tuples and `sourceCells`.
+ * Union-find with path halving (Tarjan and van Leeuwen, "Worst-case analysis of set union algorithms", JACM 1984)
+ * joins cells in near-linear time. With `scalarRange`, a point outside the range joins nothing and a cell with no
+ * point in range is in no region and never kept. Ties in region size are broken by the lowest cell ID.
+ */
+export async function connectivityGrid(input: AnalysisGrid | AnalysisImage, options: ConnectivityOptions = {}): Promise<ConnectivityGrid> {
+  options.signal?.throwIfAborted(); const grid = asGrid(input); validate(grid);
+  const extract = options.extract ?? 'all', order = options.order ?? 'descending', nc = grid.types.length, np = grid.points.length / 3;
+  if (!['all', 'largest', 'regions', 'closest', 'pointSeeded', 'cellSeeded'].includes(extract) || !['descending', 'ascending', 'first'].includes(order))
+    throw rangeError('Connectivity extract must be all, largest, regions, closest, pointSeeded or cellSeeded; order descending, ascending or first', 'sciviz');
+  const range = options.scalarRange;
+  if (range && (range.length !== 2 || range.some(Number.isNaN) || range[0] > range[1]))
+    throw rangeError('Connectivity scalarRange must be an ordered pair', 'sciviz');
+  const data = range ? scalar(grid, true, options.array) : undefined;
+  const usable = (id: number) => !data || (data[id] >= range![0] && data[id] <= range![1]);
+  const parent = new Int32Array(nc).map((_, i) => i), first = new Int32Array(np).fill(-1), active = new Uint8Array(nc);
+  const root = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let c = 0; c < nc; c++) {
+    if (c % 4096 === 0) { await pause(); options.signal?.throwIfAborted(); }
+    for (let k = c ? grid.offsets[c - 1] : 0; k < grid.offsets[c]; k++) {
+      const id = grid.connectivity[k];
+      if (!usable(id)) continue;
+      active[c] = 1;
+      if (first[id] < 0) { first[id] = c; continue; }
+      const a = root(c), b = root(first[id]);
+      if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+    }
+  }
+  // Each root is its region's lowest cell, so 'first' order is root order and size ties sort on it.
+  const size = new Map<number, number>();
+  for (let c = 0; c < nc; c++) if (active[c]) { const r = root(c); size.set(r, (size.get(r) ?? 0) + 1); }
+  const bySize = (a: number, b: number) => size.get(b)! - size.get(a)! || a - b;
+  const roots = [...size.keys()].sort((a, b) => order === 'first' ? a - b : order === 'descending' ? bySize(a, b) : size.get(a)! - size.get(b)! || a - b);
+  const label = new Map(roots.map((r, i) => [r, i])), cellRegion = new Int32Array(nc).fill(-1);
+  for (let c = 0; c < nc; c++) if (active[c]) cellRegion[c] = label.get(root(c))!;
+  const ids = (list: readonly number[] | undefined, limit: number, what: string) => {
+    if (!list?.length || list.some(v => !Number.isInteger(v) || v < 0 || v >= limit)) throw rangeError(`Connectivity ${extract} needs ${what} below ${limit}`, 'sciviz');
+    return list;
+  };
+  let keep: Set<number>;
+  if (extract === 'all') keep = new Set(label.values());
+  else if (extract === 'largest') keep = new Set(roots.length ? [label.get([...roots].sort(bySize)[0])!] : []);
+  else if (extract === 'regions') keep = new Set(ids(options.regions, roots.length, 'region IDs'));
+  else if (extract === 'cellSeeded') keep = new Set(ids(options.seeds, nc, 'cell IDs').map(c => cellRegion[c]).filter(r => r >= 0));
+  else {
+    const touching = new Int32Array(np).fill(-1);
+    for (let c = 0; c < nc; c++) for (let k = c ? grid.offsets[c - 1] : 0; k < grid.offsets[c]; k++) if (cellRegion[c] >= 0 && usable(grid.connectivity[k])) touching[grid.connectivity[k]] = cellRegion[c];
+    if (extract === 'pointSeeded') keep = new Set(ids(options.seeds, np, 'point IDs').map(p => touching[p]).filter(r => r >= 0));
+    else {
+      const q = options.point;
+      if (!q || q.length !== 3 || !q.every(Number.isFinite)) throw rangeError('Connectivity closest needs a finite xyz point', 'sciviz');
+      let best = -1, distance = Infinity;
+      for (let p = 0; p < np; p++) {
+        if (touching[p] < 0) continue;
+        const d = (grid.points[3 * p] - q[0]) ** 2 + (grid.points[3 * p + 1] - q[1]) ** 2 + (grid.points[3 * p + 2] - q[2]) ** 2;
+        if (d < distance) { distance = d; best = p; }
+      }
+      keep = new Set(best < 0 ? [] : [touching[best]]);
+    }
+  }
+  const selected: number[] = [];
+  for (let c = 0; c < nc; c++) if (cellRegion[c] >= 0 && keep.has(cellRegion[c])) selected.push(c);
+  options.signal?.throwIfAborted();
+  const out = select(grid, selected), cells = Float64Array.from(selected, c => cellRegion[c]);
+  const points = new Float64Array(out.points.length / 3);
+  for (let c = 0; c < selected.length; c++) for (let k = c ? out.offsets[c - 1] : 0; k < out.offsets[c]; k++) points[out.connectivity[k]] = cells[c];
+  return { ...out, pointArrays: { ...out.pointArrays, regionId: points }, cellArrays: { ...out.cellArrays, regionId: cells },
+    regionCells: Uint32Array.from(roots, r => size.get(r)!) };
+}
+
+/** Pipeline filter: `{ operation, shape, range, options }` runs clip, threshold (null ends open), connectivity, isoVolume or an image subset. */
 export function clipOperator(): PipelineOperator {
   return { kind: 'filter', execute: c => {
-    const p = c.params as unknown as { operation: string; shape: ClipShape; range: [number, number]; options?: ClipOptions & ThresholdOptions & SubsetOptions & { array?: string } };
+    const p = c.params as unknown as { operation: string; shape: ClipShape; range: [number | null, number | null]; options?: ClipOptions & ThresholdOptions & SubsetOptions & ConnectivityOptions & { array?: string } };
     const input = c.inputs[0] as AnalysisGrid | AnalysisImage, options = { ...p?.options, signal: c.signal };
     if (p?.operation === 'clip') return clipGrid(input, p.shape, options);
-    if (p?.operation === 'threshold') return thresholdGrid(input, p.range, options);
-    if (p?.operation === 'isoVolume') return isoVolume(input, p.range, options);
+    // JSON has no Infinity: a null end of a pipeline threshold range is open.
+    if (p?.operation === 'threshold') return thresholdGrid(input, [p.range?.[0] ?? -Infinity, p.range?.[1] ?? Infinity], options);
+    if (p?.operation === 'connectivity') return connectivityGrid(input, options);
+    if (p?.operation === 'isoVolume') return isoVolume(input, p.range as [number, number], options);
     if (p?.operation === 'subset' && 'dims' in input) return extractSubset(input, options);
-    throw rangeError('Clip pipeline params need clip, threshold, isoVolume or image subset operation', 'sciviz');
+    throw rangeError('Clip pipeline params need clip, threshold, connectivity, isoVolume or image subset operation', 'sciviz');
   } };
 }

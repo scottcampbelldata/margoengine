@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14678106,
+  "total": 14693003,
   "history": [
     {
       "date": "2026-10-24",
@@ -8129,6 +8129,12 @@
       "commit": "e8a17cea0",
       "reason": "stage fixes (shared lights, camera up, controls about camera.up) and core e8f3decf6's fixes (roll at pitch 90, aspect past 4096, fit past near); core cap 21813 B approved by Scott 2026-11-10",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "63ececab8",
+      "reason": "sciviz gaps 2026-11-10: formats reaches the lazy Blosc and Zstandard chunk for Zarr (loaded only by a blosc or zstd chunk), the readers worker bundles it, clip adds connectivity regions and threshold components; sciviz/bench was missing from the baseline since batch 182",
+      "grew": 4
     }
   ],
   "items": {
@@ -8988,7 +8994,7 @@
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 64619,
-    "@margoengine/sciviz dist/workers/readers.js": 42752,
+    "@margoengine/sciviz dist/workers/readers.js": 49534,
     "@margoengine/sciviz/a11y": 6480,
     "@margoengine/sciviz/aggregate": 29019,
     "@margoengine/sciviz/amr": 30374,
@@ -9002,7 +9008,7 @@
     "@margoengine/sciviz/cgns": 18856,
     "@margoengine/sciviz/charts-extra": 7548,
     "@margoengine/sciviz/cinematic": 6698,
-    "@margoengine/sciviz/clip": 5396,
+    "@margoengine/sciviz/clip": 6686,
     "@margoengine/sciviz/colormaps": 22732,
     "@margoengine/sciviz/contour": 3323,
     "@margoengine/sciviz/contour2d": 4058,
@@ -9018,7 +9024,7 @@
     "@margoengine/sciviz/fits": 5164,
     "@margoengine/sciviz/flow": 9392,
     "@margoengine/sciviz/format": 8085,
-    "@margoengine/sciviz/formats": 14262,
+    "@margoengine/sciviz/formats": 21089,
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/geo-lod": 7509,
     "@margoengine/sciviz/geo-time": 41056,
@@ -9068,7 +9074,7 @@
     "@margoengine/sciviz/volume-quality": 8765,
     "@margoengine/sciviz/vtk": 6744,
     "@margoengine/sciviz/webgl2": 4667,
-    "@margoengine/sciviz/workers": 1845,
+    "@margoengine/sciviz/workers": 1843,
     "@margoengine/sciviz/xdmf": 19832,
     "@margoengine/selection": 21948,
     "@margoengine/selection/area": 15746,
