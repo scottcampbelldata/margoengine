@@ -338,6 +338,40 @@ test('single-sided batches without mirrored parts draw back-culled without the d
   other.dispose();
 });
 
+// parts-check shadows frustum step 2 on the M6: 1 pixel (145 against 146) apart, because a shader patched by Shadows
+// made core draw with its plain pipeline (C false) while the parts drew with C=1, and Metal rounds the two apart.
+test('the back-culled variant sets C=1 only when core would draw the frame with its own C=1 pipeline', () => {
+  for (const [label, patch, own] of [
+    ['unpatched', () => {}, true],
+    [
+      'shader and bindings patched, as Shadows does',
+      (c) => {
+        c.shader = `${c.shader}\n// patched`;
+        c.bindings.push({ binding: 1, resource: { buffer: {} } });
+      },
+      false,
+    ],
+    ['shader patched alone', (c) => (c.shader = `${c.shader}\n// patched`), false],
+    ['a binding alone', (c) => c.bindings.push({ binding: 1, resource: { buffer: {} } }), false],
+  ]) {
+    const h = harness(),
+      parts = new CulledInstances(batches());
+    h.context.bindings = [];
+    h.engine.use(parts);
+    h.engine.frameGraph.add({ name: 'patch', order: -5, execute: patch });
+    // Core resets the shader and bindings at the start of every frame.
+    for (let i = 0; i < 2; i++) {
+      h.context.shader = wgsl;
+      h.context.bindings.length = 0;
+      h.engine.frameGraph.execute(h.context);
+    }
+    const culled = h.pipelines.filter((p) => p.primitive?.cullMode === 'back');
+    assert.equal(culled.length, 1, `${label}: one back-culled variant`);
+    assert.equal(culled[0].fragment.constants?.C, own ? 1 : undefined, `${label}: C follows core's choice`);
+    parts.dispose();
+  }
+});
+
 test('rejects malformed batches and transforms, and rolls back partial uploads', () => {
   for (const mutate of [
     (b) => (b[0].transforms = new Float32Array(17)),

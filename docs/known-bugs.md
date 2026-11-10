@@ -1744,7 +1744,7 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   the differing pixels instead of removing them. The night branch changes nothing. Chrome on the same M6 gives 0 with every one of these texts, so the values are right and only
   the rounding of one compile moves. Ruled out: a stale read, inputs, and an empty branch added to `sky/base` (folded away, same pixels). To close it, Sky would compile only the
   day model in use, and a model switch would recompile the sky, fog, reflection and lighting shaders with `reflectionTexture` kept: Scott's call. No tolerance was raised.
-- **`culling` `test:gpu`, Playwright WebKit and Chrome: parts and core meshes differ by 1 level with shadows on.** Chrome 156 on the same M6 shows it too (2026-11-07, `shadows frustum step 2`, 1 pixel). `parts-check.mjs`, `shadows frustum step 2`: 1 pixel reads 145 against 146;
+- **Fixed (2026-11-10, Mac lane H): `culling` `test:gpu`, Playwright WebKit and Chrome: parts and core meshes differ by 1 level with shadows on.** Chrome 156 on the same M6 shows it too (2026-11-07, `shadows frustum step 2`, 1 pixel). `parts-check.mjs`, `shadows frustum step 2`: 1 pixel reads 145 against 146;
   the close view has 2. Cause proved (2026-11-06): the two engines draw the same surface with two specializations of one shader. A shader patched by Shadows makes core draw single-sided
   meshes with its plain pipeline (`C` false, back faces discarded; the culled pipeline in `renderer.ts` serves only the unpatched shader), while CulledParts keeps its back-culled pipeline
   (`C` true) for them. Apple's compile under WebKit rounds the two differently. With `C` forced false on parts' pipeline every step gives 0; with `C` true and `cullMode` none it stays at
@@ -1752,6 +1752,15 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   (12,756 texels by 1 to 24 ulp in WebKit, 139,988 in Chrome), but with both casters rewritten until the maps were bit-identical the frames still differed by the same pixels. Also matrices
   and a shadow edge moving. To close it, either CulledParts follows core's choice, which puts back faces through the rasterizer under shadows, or core culls with patched shaders too, a core
   change: Scott's call. No tolerance was raised.
+  Fix (2026-11-10, in culling, the first option without its cost): `CulledInstances` (so `CulledParts` and `MeshletMesh`)
+  records core's unpatched shader, format and descriptor in a pass at the lowest order, and its back-culled variant sets
+  `C=1` only when the frame is still core's own with no extra bindings, which is exactly when core draws with its own
+  `C=1` pipeline. Otherwise the variant keeps `cullMode: 'back'` with core's `C` false: the same fragment code as core's
+  plain pipeline, whose discard removes the same back faces. Not the MSAA order effect: the comparison keeps MSAA and
+  0 pixels. parts-check now gives 0 on all 32 steps on the M6 (Chromium WebGPU on Metal). Regression: "the back-culled
+  variant sets C=1 only when core would draw the frame with its own C=1 pipeline" in packages/culling/test/culling.test.js
+  (fails on the old code). Not run here: Playwright WebKit. Open, same cause, outside culling: `packages/scatter/src/index.ts`
+  sets `C: 1` on its lit pipeline whenever the shader keeps the switch, patched or not.
 - **`visual:check` on the RTX A6000: 16 of 81 views fail against baselines last recorded on 2026-10-31.** `npm run visual:check -- --runs=1`, Edge 156.0.4314.58. All 16 pass at 47e4d7c9c on the
   same browser, so neither the browser nor the GPU moved them. A pass/fail search of the 317 code commits since names three, each a deliberate look change that recorded no baseline: cd345c483
   (shoreline foam cap: `night-citadel`, `gameplay-sandbox`), 6f0836ee3 (the tint draw reads the surface: `flight-helmet`, `FlightHelmet`, `ABeautifulGame`, `IridescenceLamp`, `LightsPunctualLamp`) and
@@ -5521,8 +5530,7 @@ requirement is unchanged. The frame-repeat check still runs under MSAA: a third 
 and each step redraws and compares both A and R to the byte. On `MARGO_COMPAT=1` the check failed at step 0 ("clusters
 drop triangles (0)"): the WebGL2 layer draws the whole mesh by design. It now has a compat branch: the frame must still
 match core and repeat, and "clusters drop triangles" is skipped with a printed note. Both runs pass on the M6. The `parts-check.mjs`
-shadows step 2 1-pixel failure is the open entry above (CulledParts back-culled pipeline under shadows, Scott's call); it
-stops `test:gpu` before the later scripts, which pass when run one by one.
+shadows step 2 1-pixel failure was the entry above (CulledParts back-culled pipeline under shadows), fixed 2026-11-10.
 
 Open (M6, found reading the code, not yet seen failing): `LodInstances` appends each kept instance to its level's list
 at an `atomicAdd` slot (lod.ts shader), so the order of a level's instances changes from frame to frame. Its doc said

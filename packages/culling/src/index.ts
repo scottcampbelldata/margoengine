@@ -115,10 +115,18 @@ export class CulledInstances implements EnginePlugin {
   protected hiz?: Pyramid;
   private samples = 0;
   private outside?: OccluderList;
-  // The main pass draws with core's pipeline state; single-sided batches without mirrored parts use its back-culled
-  // variant (cullMode back, override C=1 compiles out the back-face discard), as core does for its own batches.
+  // The main pass draws with core's pipeline state; single-sided batches without mirrored parts use a back-culled
+  // variant (cullMode back). It sets override C=1 (which compiles out the back-face discard) only when core would draw
+  // the frame with its own C=1 pipeline: core's shader, format and descriptor unpatched and no extra bindings. Otherwise
+  // core draws with C false, and so does the variant: the two specializations of one shader can round apart (the M6
+  // under Shadows: 1 pixel, 145 against 146, parts-check shadows frustum step 2; known-bugs.md).
   private pipeline?: GPURenderPipeline;
   private culledPipeline?: GPURenderPipeline;
+  // Core's frame state before any plugin patches it, read by a pass at the lowest order.
+  private readonly base: { shader: string; format: string; descriptor?: GPURenderPipelineDescriptor } = {
+    shader: '',
+    format: '',
+  };
   private pipelineKey = '';
   private group?: GPUBindGroup;
   private culledGroup?: GPUBindGroup;
@@ -331,6 +339,17 @@ export class CulledInstances implements EnginePlugin {
     });
   }
   registerPasses(graph: FrameGraph): void {
+    graph.add({
+      name: this.name + ':base',
+      order: -Number.MAX_VALUE,
+      execute: (c) => {
+        if (c.backend !== 'webgpu') return;
+        const base = this.base;
+        base.shader = c.shader;
+        base.format = c.format;
+        base.descriptor = c.descriptor;
+      },
+    });
     graph.add({
       name: this.name,
       order: 1,
@@ -577,7 +596,10 @@ export class CulledInstances implements EnginePlugin {
     }
     this.refine(c);
     // Main pass: core's own shader and pipeline state (sections, fog and other shader hooks apply), core's targets.
-    const key = c.shader + c.format + c.descriptor.multisample?.count + c.descriptor.depthStencil!.format;
+    const base = this.base,
+      own =
+        !c.bindings.length && c.shader === base.shader && c.format === base.format && c.descriptor === base.descriptor,
+      key = c.shader + c.format + c.descriptor.multisample?.count + c.descriptor.depthStencil!.format + own;
     if (key !== this.pipelineKey) {
       const module = d.createShaderModule({ code: c.shader }),
         fragment = { ...c.descriptor.fragment!, module, targets: [{ format: c.format }] },
@@ -588,7 +610,7 @@ export class CulledInstances implements EnginePlugin {
         ? d.createRenderPipeline({
             ...descriptor,
             primitive: { ...c.descriptor.primitive, cullMode: 'back' },
-            fragment: { ...fragment, constants: { ...fragment.constants, C: 1 } },
+            fragment: own ? { ...fragment, constants: { ...fragment.constants, C: 1 } } : fragment,
           })
         : undefined;
       this.pipelineKey = key;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14669318,
+  "total": 14669931,
   "history": [
     {
       "date": "2026-10-24",
@@ -8081,6 +8081,12 @@
       "commit": "77347d462",
       "reason": "Review5 live volume correctness: pointer 6988 to 7164 gzip bytes; usdz worker 135931 to 136160. Coherent animated/public attenuation and retained underflow precision are synchronous parse/draw state; splitting would add an async boundary or another public state API. No core/stage or eager optional dependency growth.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "88e07c98a",
+      "reason": "culling C=1 follows core's culled-pipeline rule",
+      "grew": 1
     }
   ],
   "items": {
@@ -8203,7 +8209,7 @@
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,
-    "@margoengine/cache/ranges": 4654,
+    "@margoengine/cache/ranges": 4640,
     "@margoengine/cache/stream": 4196,
     "@margoengine/cache/vary": 821,
     "@margoengine/cameras": 3008,
@@ -8298,7 +8304,7 @@
     "@margoengine/culling/depth": 6320,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/lod": 4010,
-    "@margoengine/culling/meshlets": 17631,
+    "@margoengine/culling/meshlets": 18258,
     "@margoengine/culling/models": 9657,
     "@margoengine/culling/parts": 14606,
     "@margoengine/culling/shadows": 20912,
