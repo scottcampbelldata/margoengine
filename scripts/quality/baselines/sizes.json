@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13758620,
+  "total": 13764673,
   "history": [
     {
       "date": "2026-10-24",
@@ -7215,6 +7215,12 @@
       "commit": "batch-198-job2",
       "reason": "New optional viewcube/fit: 0 to 6642 B gzip, ceiling 6898. Full transition framing including perspective and orthographic custom-up integration; root and core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "1b25bcdca",
+      "reason": "Batch 270 job 3: root 33476 to 34670 B, shapes 0 to 3592 B gzip. The emitter superset preserves existing APIs while adding uniform volume/area distributions. A separate facade would complicate setup and duplicate emitter ownership. Optional growth accepted by Scott; core plus stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8252,7 +8258,7 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 14210,
-    "@margoengine/vfx": 33506,
+    "@margoengine/vfx": 35711,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/depth-collide": 2262,
@@ -8521,6 +8527,7 @@
     "@margoengine/video/demux": 6445,
     "@margoengine/decoders/zstd": 5305,
     "@margoengine/decoders/lz4": 2417,
-    "@margoengine/viewcube/fit": 6898
+    "@margoengine/viewcube/fit": 6898,
+    "@margoengine/vfx/shapes": 3848
   }
 }

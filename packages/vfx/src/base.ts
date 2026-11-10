@@ -372,6 +372,7 @@ export interface VFXCurves {
  * and `spread`. Needs the `emitter` feature.
  */
 export type VFXEmitter =
+  | import('./shapes.js').VFXShape
   | {
       shape: 'sphere';
       /** Radius in world units, 0..1,000,000. Default 1. */

@@ -851,3 +851,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/viewcube (batch 198 job 2): document /fit FitViewCube, live world AABBs, padding/aspect defaults, transition envelopes, ortho zoom, Home and projection semantics, clipping and manual drag behavior.
 - margoengine (batch 198 job 2): document viewcube/fit forwarding.
+- @margoengine/vfx (batch 270 job 3): document /shapes as an emitter superset, all five shape defaults, shell/volume semantics, normals, grid replacement, torus restrictions and birth statistics; examples deferred.
+- margoengine (batch 270 job 3): document generated vfx/shapes alias; examples deferred.

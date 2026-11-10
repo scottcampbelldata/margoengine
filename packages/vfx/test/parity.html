@@ -30,5 +30,21 @@ window.checkOverLife=async()=>{
  const transform=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],rot=new VFX({...still,capacity:1,lifetime:[1,1],velocity:[2,0,0],space:{mode:'local',transform},overLife:{speed:[0,2]}});await ready(rot);rot.burst(1);step(rot);transform.splice(0,16,0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1);step(rot);const rotated=await read(rot);rot.dispose();
  return {states,first,replay,capped,rotated,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
 };
+window.checkShapes=async()=>{
+ device.pushErrorScope('validation');const results=[];
+ for(const emitter of [{shape:'hemisphere',radius:2},{shape:'hemisphere',radius:2,shell:true},{shape:'cylinder',radius:2,height:4},{shape:'cylinder',radius:2,height:4,shell:true},{shape:'torus',radius:2,tube:0.5},{shape:'torus',radius:2,tube:0.5,shell:true},{shape:'rectangle-edge',width:4,height:2},{shape:'grid',columns:4,rows:3,layers:2,spacing:[1,2,3]}]){
+ const e=new VFX({...still,capacity:4096,emitter:{...emitter,speed:2}});await ready(e);e.burst(4096);step(e,0);const p=await read(e);e.reset();e.burst(4096);step(e,0);const replay=await read(e);e.dispose();
+ let bad=0,radius=0,axial=0,cos=0,normalError=0;const cells={},sides=[0,0,0,0];
+ for(let i=0;i<4096;i++){const [x,y,z,life,vx,vy,vz]=p.slice(i*8,i*8+7);if(life!==10)bad++;normalError=Math.max(normalError,Math.abs(Math.hypot(vx,vy,vz)-2));
+ if(emitter.shape==='hemisphere'){const r=Math.hypot(x,y,z);if(y<0||r>2.00001)bad++;radius+=(r/2)**3;axial+=y/Math.max(r,1e-20);normalError=Math.max(normalError,Math.abs((x*vx+y*vy+z*vz)/Math.max(2*r,1e-20)-1));}
+ if(emitter.shape==='cylinder'){const r=Math.hypot(x,z);if(r>2.00001||Math.abs(y)>2.00001)bad++;radius+=r*r/4;axial+=y*y/16;normalError=Math.max(normalError,Math.abs(vy),Math.abs((x*vx+z*vz)/Math.max(2*r,1e-20)-1));}
+ if(emitter.shape==='torus'){const ring=Math.hypot(x,z),r=Math.hypot(ring-2,y);if(r>0.50001)bad++;radius+=r*r/0.25;cos+=(ring-2)/Math.max(r,1e-20);normalError=Math.max(normalError,Math.abs(((ring-2)*(x*vx+z*vz)/ring+y*vy)/Math.max(2*r,1e-20)-1));}
+ if(emitter.shape==='rectangle-edge'){if(Math.abs(y)>1e-5||Math.abs(x)>2.00001||Math.abs(z)>1.00001)bad++;const side=z===-1?0:x===2?1:z===1?2:x===-2?3:-1;if(side<0)bad++;else sides[side]++;}
+ if(emitter.shape==='grid'){const coords=[x+1.5,y/2+1,z/3+0.5];if(coords.some((v,j)=>Math.abs(v-Math.round(v))>1e-5||v<0||v>=[4,3,2][j]))bad++;const key=coords.map(Math.round).join(',');cells[key]=(cells[key]??0)+1;}
+ }
+ results.push({emitter,bad,radius:radius/4096,axial:axial/4096,cos:cos/4096,normalError,sides,cells,repeat:p.every((v,i)=>v===replay[i])});
+ }
+ return {results,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
+};
 window.ready=true;
 </script></body></html>

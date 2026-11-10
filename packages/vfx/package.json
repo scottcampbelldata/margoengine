@@ -121,6 +121,10 @@
     "./over-life": {
       "types": "./dist/over-life.d.ts",
       "import": "./dist/over-life.js"
+    },
+    "./shapes": {
+      "types": "./dist/shapes.d.ts",
+      "import": "./dist/shapes.js"
     }
   },
   "files": [

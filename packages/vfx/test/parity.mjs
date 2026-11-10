@@ -20,6 +20,30 @@ try {
   }
   near(r.results.rotated[0], 0);
   near(r.results.rotated[1], 1);
+  if (process.argv.includes('--shapes')) {
+    const r = await page.evaluate(() => window.checkShapes());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    for (const s of r.results) {
+      assert.equal(s.bad, 0, JSON.stringify(s));
+      assert.equal(s.repeat, true);
+      assert.ok(s.normalError < 2e-5, JSON.stringify(s));
+      if (['hemisphere', 'cylinder', 'torus'].includes(s.emitter.shape))
+        assert.ok(Math.abs(s.radius - (s.emitter.shell ? 1 : 0.5)) < 0.035, JSON.stringify(s));
+      if (s.emitter.shape === 'hemisphere') assert.ok(Math.abs(s.axial - 0.5) < 0.025);
+      if (s.emitter.shape === 'cylinder') assert.ok(Math.abs(s.axial - 1 / 12) < 0.01);
+      if (s.emitter.shape === 'torus' && s.emitter.shell) assert.ok(Math.abs(s.cos - 0.125) < 0.035, JSON.stringify(s));
+      if (s.emitter.shape === 'rectangle-edge')
+        for (let k = 0; k < 4; k++) assert.ok(Math.abs(s.sides[k] / 4096 - (k % 2 ? 1 / 6 : 1 / 3)) < 0.03);
+      if (s.emitter.shape === 'grid') {
+        assert.equal(Object.keys(s.cells).length, 24);
+        assert.ok(Object.values(s.cells).every((n) => Math.abs(n - 4096 / 24) < 60));
+      }
+    }
+    console.log(
+      'ok shapes: 4096 births each, volume/shell moments, torus area correction, perimeter shares, grid occupancy, normals and exact reset',
+    );
+  }
   assert.deepEqual(pageErrors, []);
   console.log('ok space: local/world, rigid rotation, velocity inheritance, eight spaced distance births');
   if (process.argv.includes('--over-life')) {

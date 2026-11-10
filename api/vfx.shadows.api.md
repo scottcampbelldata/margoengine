@@ -45,7 +45,7 @@ interface VFXDepthCollide {
     thickness?: number;
 }
 
-type VFXEmitter = {
+type VFXEmitter = import('./shapes.js').VFXShape | {
     shape: 'sphere';
     radius?: number;
     shell?: boolean;

@@ -101,7 +101,7 @@ function buildTriangles(e: Extract<VFXEmitter, { shape: 'mesh' }>): Float32Array
  */
 export const emitter: NonNullable<VFXFeatures['emitter']> = {
   validate(e: VFXEmitter, mesh = true): void {
-    if (!e || typeof e !== 'object' || !Object.hasOwn(shapes, e.shape))
+    if (!e || typeof e !== 'object' || (e.shape !== 'sphere' && e.shape !== 'cone' && e.shape !== 'mesh'))
       throw new TypeError(
         'VFX emitter needs a shape of "sphere", "cone" or "mesh"; pass e.g. {shape: "sphere", radius: 1}',
       );
@@ -142,6 +142,8 @@ export const emitter: NonNullable<VFXFeatures['emitter']> = {
     }
   },
   patch(simulation: string, e: VFXEmitter): string {
+    if (e.shape !== 'sphere' && e.shape !== 'cone' && e.shape !== 'mesh')
+      throw new TypeError('VFX emitter needs the shapes entry for this shape; pass {emitter: shapes}');
     let code = once(
       simulation,
       'fn hash(v:u32)',

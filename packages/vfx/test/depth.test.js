@@ -205,7 +205,8 @@ test('emitter feature: bad shapes throw errors that name the fix, and the shape 
       (error) => error instanceof kind && pattern.test(error.message),
       JSON.stringify(e),
     );
-  bad({ shape: 'torus' }, /"sphere", "cone" or "mesh"/, TypeError);
+  assert.doesNotThrow(() => new VFX({ emitter: { shape: 'torus' } }), 'the shapes superset supports torus');
+  bad({ shape: 'unknown-shape' }, /"sphere", "cone" or "mesh"/, TypeError);
   bad({}, /VFX emitter needs a shape/, TypeError);
   bad({ shape: 'sphere', radius: -1 }, /radius must be a number from 0/, RangeError);
   bad({ shape: 'sphere', shell: 1 }, /shell must be true or false/, TypeError);

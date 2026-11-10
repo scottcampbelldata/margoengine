@@ -4218,6 +4218,10 @@
       "types": "./dist/vfx/over-life.d.ts",
       "import": "./dist/vfx/over-life.js"
     },
+    "./vfx/shapes": {
+      "types": "./dist/vfx/shapes.d.ts",
+      "import": "./dist/vfx/shapes.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

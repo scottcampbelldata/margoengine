@@ -47,7 +47,7 @@ export interface VFXDepthCollide {
     thickness?: number;
 }
 
-export type VFXEmitter = {
+export type VFXEmitter = import('./shapes.js').VFXShape | {
     shape: 'sphere';
     radius?: number;
     shell?: boolean;
@@ -276,6 +276,37 @@ export interface VFXShadows {
     };
     buffer?: GPUBuffer;
 }
+
+export type VFXShape = {
+    shape: 'hemisphere';
+    radius?: number;
+    shell?: boolean;
+    speed?: number;
+} | {
+    shape: 'cylinder';
+    radius?: number;
+    height?: number;
+    shell?: boolean;
+    speed?: number;
+} | {
+    shape: 'torus';
+    radius?: number;
+    tube?: number;
+    shell?: boolean;
+    speed?: number;
+} | {
+    shape: 'rectangle-edge';
+    width?: number;
+    height?: number;
+    speed?: number;
+} | {
+    shape: 'grid';
+    columns?: number;
+    rows?: number;
+    layers?: number;
+    spacing?: readonly [number, number, number];
+    speed?: number;
+};
 
 export interface VFXSkinned {
     primitive: VFXSkinnedPrimitive;
