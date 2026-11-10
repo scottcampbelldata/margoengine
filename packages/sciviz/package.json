@@ -287,6 +287,10 @@
     "./aggregate": {
       "types": "./dist/aggregate.d.ts",
       "import": "./dist/aggregate.js"
+    },
+    "./views": {
+      "types": "./dist/views.d.ts",
+      "import": "./dist/views.js"
     }
   },
   "files": [
@@ -351,6 +355,7 @@
     "test:browser:annotate": "node scripts/browser-root.mjs tests/annotate-browser.mjs",
     "test:browser:provenance": "node scripts/browser-root.mjs tests/provenance-browser.mjs",
     "test:browser:amr": "node scripts/browser-root.mjs tests/amr-browser.mjs",
-    "test:browser:aggregate": "node scripts/browser-root.mjs tests/aggregate-browser.mjs"
+    "test:browser:aggregate": "node scripts/browser-root.mjs tests/aggregate-browser.mjs",
+    "test:browser:views": "node scripts/browser-root.mjs tests/views-browser.mjs"
   }
 }

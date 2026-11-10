@@ -1288,3 +1288,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine (batch 175 job 3): document the generated optional sciviz/aggregate alias in the README phase.
 - @margoengine/viz (batch 175 job 3): document the generated sciviz/aggregate optional alias after the build phase.
+- @margoengine/sciviz (batch 174 job 6): document LinkedCameras physical range/camera defaults and stopped-engine sync, FigureLayout ownership and factory, ComparativeGrid time/parameter graphs and registry/output disposal, VolumeQuad physical nearest-sample crosshair and isotropic resize, AbortSignal and disposal.
+- margoengine (batch 174 job 6): document generated sciviz/views optional alias.
+- @margoengine/viz (batch 174 job 6): document the generated sciviz/views domain-profile alias.
