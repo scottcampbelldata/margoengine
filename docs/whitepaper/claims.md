@@ -4130,3 +4130,7 @@ The optional DDS entry implements MSFT_texture_dds source substitution and prese
 
 ### Assigned batch-273 material sampler repair
 High-resource gltf-pro permutations preserve all existing material slots while using nine material texture declarations instead of thirteen. This leaves room for compatibility storage textures and depth sampling aliases. Proof: unchanged scripts/gltf-pro-materials-gpu-check.js assertions on both backends, the stricter binding regressions in materials-ext.test.js, and the 360-case test-base-textures-browser.mjs continuous-sampler oracle. RGBA32F packing preserves linear source texels, at an explicit memory/upload cost (limits.md). No speed claim or raised hardware limit.
+
+### Batch 203 job 3: HDR6 correctness
+
+The optional clean-room decoders/ktx2-hdr6 reads UASTC HDR 6x6i and native ASTC HDR 6x6 KTX2. The frozen independent fixture records prove byte-for-byte ASTC, half-float and RGB9E5 output for all 75 intermediate configurations in both stream versions, plus real HDR, noise, ramps and solids at every mip. Node worker tests cover concurrent jobs, transfer, cancellation and disposal. The browser GPU test uploads and reads back 393,216 half-float bytes per backend on WebGPU and WebGL2. Evidence: packages/decoders/tests/ktx2-hdr6.test.js, tests/hdr6-browser.mjs and native/hdr6/src/ise.rs. This is correctness evidence, not a throughput claim.

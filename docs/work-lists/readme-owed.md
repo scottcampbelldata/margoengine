@@ -967,3 +967,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/vfx (batch 201 landing blocker): manifest duplicate-script repair only; retained the complete existing GPU command, no README example change owed.
 
 - margoengine (batch 201): expose DDS/audio aliases in the eventual loader coverage; regenerated existing main prefiltered/halftone aliases, no README examples edited.
+
+- @margoengine/decoders: document /ktx2-hdr6, its clean-room assets, browser and Node workers, targets, limits, cancellation, transfer and GPU upload.
+
+
+- margoengine: document the generated decoders/ktx2-hdr6 alias and retain the environment/prefiltered alias emitted by the umbrella generator.

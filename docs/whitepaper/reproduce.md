@@ -3583,3 +3583,7 @@ After build:packages, run `node --test --test-timeout=120000 packages/gltf-pro/t
 
 ### Assigned batch-273 sampler overflow
 Build packages, then run gltf-pro CPU tests. Under the shared GPU lock run `node scripts/gltf-pro-materials-gpu-check.js` and again with `--compat`; all composed and transmissive permutations must still report null pipeline errors. Run `node packages/gltf-pro/scripts/test-base-textures-browser.mjs` and again with `--compat` for 360 continuous-filter reference cases per backend; test-results/batch201-base-textures[-compat].json records analytic and native filtering errors separately. No original pipeline assertion is relaxed.
+
+### Batch 203 HDR6
+
+Build packages, then run node --test packages/decoders/tests/ktx2-hdr6.test.js and cargo test --offline --locked --manifest-path packages/decoders/native/hdr6/Cargo.toml, with a hard process-tree timeout. Golden records and fixture attribution are in packages/decoders/tests/fixtures/ktx2-hdr6. The clean-room crate has no dependencies. Run node scripts/gpu-lock.mjs run --owner=hdr6-correctness --wait-max=60 --max=3 -- node packages/decoders/tests/hdr6-browser.mjs for both backends. Production asset emission is covered by packages/decoders/scripts/test-browser.js. No README run or full verify is a lane gate.

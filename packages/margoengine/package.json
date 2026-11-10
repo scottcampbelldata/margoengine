@@ -894,6 +894,10 @@
       "types": "./dist/cutscene/nested-editor.d.ts",
       "import": "./dist/cutscene/nested-editor.js"
     },
+    "./decoders/ktx2-hdr6": {
+      "types": "./dist/decoders/ktx2-hdr6.d.ts",
+      "import": "./dist/decoders/ktx2-hdr6.js"
+    },
     "./decoders/zstd": {
       "types": "./dist/decoders/zstd.d.ts",
       "import": "./dist/decoders/zstd.js"

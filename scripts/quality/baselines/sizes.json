@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14062689,
+  "total": 14107229,
   "history": [
     {
       "date": "2026-10-24",
@@ -7430,6 +7430,11 @@
       "commit": "0979b055c",
       "reason": "Assigned batch-273 gltf-pro sampler repair: full base-map mip copies and independent continuous sampling in float array layers preserve every existing material binding, leaving actual compatibility units for storage and shadows. Dependent blender pbr-ext inherits the shader. No split or feature omission for optional bytes. Core and stage unchanged. Before/after in docs/limits.md.",
       "grew": 5
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-203-job-3",
+      "reason": "New optional clean-room HDR6 entry: 0 to 43292 B gzip; ceiling 44540 B. Complete 75-mode codec and portable workers, with no vendor runtime. Core + stage stays 24209 B. Splitting the entry would add asset and API plumbing without reducing the required codec."
     }
   ],
   "items": {
@@ -8777,6 +8782,7 @@
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/post/stylize": 7202,
     "@margoengine/quality/events": 1223,
-    "@margoengine/gltf-pro/dds": 7076
+    "@margoengine/gltf-pro/dds": 7076,
+    "@margoengine/decoders/ktx2-hdr6": 44540
   }
 }

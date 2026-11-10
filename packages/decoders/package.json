@@ -36,6 +36,10 @@
   },
   "sideEffects": false,
   "exports": {
+    "./ktx2-hdr6": {
+      "types": "./dist/ktx2-hdr6.d.ts",
+      "import": "./dist/ktx2-hdr6.js"
+    },
     "./zstd": {
       "types": "./dist/zstd.d.ts",
       "import": "./dist/zstd.js"

@@ -24,58 +24,62 @@ execFileSync(
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
 // Build the optional clean-room asset from our crate, never from a registry codec.
-const native = spawn(
-  'cargo',
-  [
-    'build',
-    '--offline',
-    '--locked',
-    '--release',
-    '--target',
-    'wasm32-unknown-unknown',
-    '--manifest-path',
-    resolve(root, 'native/draco/Cargo.toml'),
-  ],
-  { windowsHide: true, stdio: 'inherit' },
-);
-let nativeTimeout = false,
-  nativeEnded = Promise.resolve([]);
-const nativeTimer = setTimeout(() => {
-  nativeTimeout = true;
-  if (native.pid) nativeEnded = endTree(native.pid);
-}, 120_000);
-try {
-  const code = await new Promise((done, reject) => {
-    native.once('error', reject);
-    native.once('close', done);
-  });
-  const survivors = await nativeEnded;
-  if (nativeTimeout || code !== 0 || survivors.length)
-    throw new Error('Clean-room Draco build failed or exceeded 120 s');
-} finally {
-  clearTimeout(nativeTimer);
+for (const feature of ['draco', 'hdr6']) {
+  const native = spawn(
+    'cargo',
+    [
+      'build',
+      '--offline',
+      '--locked',
+      '--release',
+      '--target',
+      'wasm32-unknown-unknown',
+      '--manifest-path',
+      resolve(root, `native/${feature}/Cargo.toml`),
+    ],
+    { windowsHide: true, stdio: 'inherit' },
+  );
+  let nativeTimeout = false,
+    nativeEnded = Promise.resolve([]);
+  const nativeTimer = setTimeout(() => {
+    nativeTimeout = true;
+    if (native.pid) nativeEnded = endTree(native.pid);
+  }, 120_000);
+  try {
+    const code = await new Promise((done, reject) => {
+      native.once('error', reject);
+      native.once('close', done);
+    });
+    const survivors = await nativeEnded;
+    if (nativeTimeout || code !== 0 || survivors.length)
+      throw new Error(`Clean-room ${feature} build failed or exceeded 120 s`);
+  } finally {
+    clearTimeout(nativeTimer);
+  }
+  await copyFile(
+    resolve(root, `native/${feature}/target/wasm32-unknown-unknown/release/margoengine_${feature}.wasm`),
+    resolve(dist, feature === 'draco' ? 'draco-native.wasm' : 'hdr6.wasm'),
+  );
 }
-await copyFile(
-  resolve(root, 'native/draco/target/wasm32-unknown-unknown/release/margoengine_draco.wasm'),
-  resolve(dist, 'draco-native.wasm'),
-);
-await build({
-  configFile: false,
-  publicDir: false,
-  logLevel: 'warn',
-  build: {
-    outDir: dist,
-    emptyOutDir: false,
-    minify: true,
-    target: 'es2022',
-    lib: {
-      entry: resolve(root, 'src/draco-native.worker.ts'),
-      name: 'MargoNativeDracoWorker',
-      formats: ['iife'],
-      fileName: () => 'draco-native.worker.js',
+for (const worker of ['draco-native', 'hdr6']) {
+  await build({
+    configFile: false,
+    publicDir: false,
+    logLevel: 'warn',
+    build: {
+      outDir: dist,
+      emptyOutDir: false,
+      minify: true,
+      target: 'es2022',
+      lib: {
+        entry: resolve(root, `src/${worker}.worker.ts`),
+        name: 'MargoNativeWorker',
+        formats: ['iife'],
+        fileName: () => `${worker}.worker.js`,
+      },
     },
-  },
-});
+  });
+}
 // The worker replaces tsc's module emit with one self-contained classic script, so it can importScripts the wrappers.
 await build({
   configFile: false,
