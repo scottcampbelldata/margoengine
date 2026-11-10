@@ -3451,3 +3451,6 @@ Optional cylinder/sphere panels render on WebGPU and WebGL2 with analytic ray-to
 
 ## Batch 210 job 1: action API
 animation/mixer provides cached clipAction, independent weights/timeScale, fadeIn/fadeOut, crossFadeTo/crossFadeFrom and warp/halt without an Animator graph. The CPU suite checks documented action transitions and independent analytical blending, including original-pose contribution and sparse channels. Native WebGPU and WebGL2 compatibility produce the same 510 checked strip coordinates within 1e-5 and deform the credited Fox rig during a warped crossfade. This is scoped action-API evidence, not a speed result, automatic retargeting claim or entire-runtime equivalence claim.
+
+### Batch 224 n-ary booleans
+The boolean-batch optional entry evaluates many solids in one exact coordinate space and materializes only the final boundary. Independent analytic tests cover 200 disconnected solids (200 volume units, one materialization, zero BSP builds), overlapping union/intersection/subtraction, repeated meshes, cavities and near-coincident faces. Binary exact outputs remain covered by the original regression suite. These deterministic counts establish work avoided, without a measured speed or universal robustness claim. Sources and numeric limits are recorded in docs/clean-room.md and docs/limits.md.

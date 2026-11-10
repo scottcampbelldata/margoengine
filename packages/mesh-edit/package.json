@@ -62,6 +62,10 @@
     "./section": {
       "types": "./dist/section.d.ts",
       "import": "./dist/section.js"
+    },
+    "./boolean-batch": {
+      "types": "./dist/boolean-batch.d.ts",
+      "import": "./dist/boolean-batch.js"
     }
   },
   "files": [

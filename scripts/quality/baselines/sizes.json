@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12700552,
+  "total": 12711327,
   "history": [
     {
       "date": "2026-10-24",
@@ -6292,6 +6292,12 @@
       "commit": "batch210-mixer",
       "reason": "New animation/mixer: 0 -> 4158 B min+gzip, ceiling 4414 B; generated umbrella alias shares it. Synchronous action clocks, envelopes and shared binding ownership form one cohesive optional API; splitting adds lifecycle coordination without quality gain. Core/stage unchanged. The synchronous PBRModel constructor and borrowed Animation/Skeleton identity reuse the existing animation root/model runtime; its transitive model dependency is intentional. Lazy loading would turn synchronous clipAction/model construction into an async API, or require a second copy of playback/deformation ownership.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-224-job2",
+      "reason": "New optional mesh-edit/boolean-batch: 0 to 10461 gzip bytes, 10775 B ceiling, one-space n-ary exact BSP evaluation and final assembly; binary exact shrinks from 10308 B measured before to 10308 B after, core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7438,6 +7444,7 @@
     "@margoengine/ui/curved": 1692,
     "leak @margoengine/ui/curved -> @margoengine/text": 1,
     "@margoengine/animation/mixer": 4414,
-    "leak @margoengine/animation/mixer -> @margoengine/gltf-pro/model": 1
+    "leak @margoengine/animation/mixer -> @margoengine/gltf-pro/model": 1,
+    "@margoengine/mesh-edit/boolean-batch": 10775
   }
 }

@@ -2034,6 +2034,10 @@
       "types": "./dist/mesh-edit/section.d.ts",
       "import": "./dist/mesh-edit/section.js"
     },
+    "./mesh-edit/boolean-batch": {
+      "types": "./dist/mesh-edit/boolean-batch.d.ts",
+      "import": "./dist/mesh-edit/boolean-batch.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"

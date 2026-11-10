@@ -2947,3 +2947,6 @@ After `npm run build:packages`, run `node --test --test-timeout=60000 packages/u
 
 ## Batch 210 job 1: action mixer
 Build packages; run node --test --test-timeout=30000 packages/animation/tests/mixer.test.js tests/animation-owner-contract.test.js. Under the shared GPU lock run node packages/animation/tests/mixer-browser.mjs, then the same command with --compat. The driver checks every strip vertex against independent trigonometry at five times, and two live Fox actions; Fox is the existing licensed Khronos asset. No benchmark, timing assertion or README execution is involved.
+
+### Batch 224 batch booleans
+After npm run build:packages, run node --test --test-timeout=120000 packages/mesh-edit/tests/boolean-batch.test.js packages/mesh-edit/tests/boolean-exact.test.js. The 200-solid fixture checks space/materialization/tree-build counts, closure, provenance and analytic volume; no benchmark or timing assertion runs. The existing mesh-edit browser command (and --compat variant) additionally draws the final batch output. No downloaded demo is introduced.

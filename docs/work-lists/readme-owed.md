@@ -359,3 +359,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/animation: document /mixer construction, clipAction weights/rates, fades, warped crossfade, loops, additive delta conventions, ownership and disposal (batch 210 job 1).
 - margoengine: document animation/mixer alias and regenerated exporters/splats alias (batch 210 job 1).
+
+- @margoengine/mesh-edit: cover boolean-batch n-ary union/intersection, first-minus-union, empties, duplicate IDs and per-input provenance, work counters, exact-space rounding, limits and cancellation (batch 224 job 2).
+- margoengine: document the generated mesh-edit/boolean-batch alias and upstream exporters/sparse alias in the README phase (batch 224 job 2).

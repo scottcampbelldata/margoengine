@@ -5,6 +5,7 @@ import { MeshSculptSession } from '@margoengine/mesh-edit/sculpt';
 import { SculptView } from '@margoengine/mesh-edit/sculpt-view';
 import { paintMeshWeights, VertexGroups } from '@margoengine/mesh-edit/weights';
 import { splitMeshByPlane } from '@margoengine/mesh-edit/section';
+import { batchBooleanMeshes } from '@margoengine/mesh-edit/boolean-batch';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -118,6 +119,13 @@ window.runSculptTests = async () => {
   assert(difference(empty, capped) > 1000, 'capped half-solid reaches the renderer');
   sectionView.dispose();
   checks.push('splitMeshByPlane capped output renders');
+  const batch = batchBooleanMeshes([createPrimitiveMesh('cube', 'a'), createPrimitiveMesh('cube', 'b')]),
+    batchSession = new MeshSculptSession(batch.mesh),
+    batchView = SculptView.attach(engine, batchSession);
+  assert(batch.work.materializations === 1, 'batch rounds once');
+  assert(difference(empty, snapshot(engine)) > 1000, 'batch union output reaches the renderer');
+  batchView.dispose();
+  checks.push('batchBooleanMeshes output renders');
   engine.dispose();
   return { checks };
 };
