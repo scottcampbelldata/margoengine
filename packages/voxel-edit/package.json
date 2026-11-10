@@ -94,6 +94,10 @@
     "./collab": {
       "types": "./dist/collab.d.ts",
       "import": "./dist/collab.js"
+    },
+    "./generate": {
+      "types": "./dist/generate.d.ts",
+      "import": "./dist/generate.js"
     }
   },
   "files": [

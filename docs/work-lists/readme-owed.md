@@ -746,3 +746,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mixer (batch 212 pitch): document createPitchShift/createBusPitchShift, semitones/audio-clock automation, window/delay/feedback/wet defaults, bounded wet delay/tail, unison identity and alias/formant limits.
 
 - margoengine (batch 212 pitch): document generated mixer/pitch alias.
+
+
+- @margoengine/voxel-edit (batch 241 job 1): document /generate image channels, rounding, palette reduction and image axes, and font loading, text extrusion, Canvas context ownership, budgets, abort and platform rasterization differences; README examples deferred.
+- margoengine (batch 241 job 1): document the generated voxel-edit/generate alias alongside the optional package entry; README examples deferred.

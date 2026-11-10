@@ -3380,3 +3380,7 @@ Batch 243 final regression: run cargo test --manifest-path packages/voxel-pathtr
 Build packages. CPU: node --test --test-timeout=60000 packages/weather/tests/lens.test.js. GPU: node scripts/gpu-lock.mjs run --owner=weather-lens-proof --wait-max=60 --max=2 -- node packages/weather/tests/parity-browser.mjs lens, then the same command with --compat. The original checkerboard scene is captured by PostStack; a probe reads the HDR result after LensDrops. Both the procedural field and image behavior are checked. No third-party fixture or benchmark is needed.
 ## Batch 212 job 5: time-domain pitch shift
 Build packages, run node --test --test-timeout=120000 packages/mixer/tests/pitch.test.js; changed-package/dependent CPU scope includes all mixer/audio tests and umbrella tests. Run the existing shared GPU-locked mixer/scripts/test-browser.js. Its final check measures pitch ratio and constant duration, exact unison samples, linked stereo and changes at audio time 0.5 s on both backends.
+
+
+### Voxel generation (batch 241 job 1)
+After building packages, run `node --test --test-timeout=120000 packages/voxel-edit/tests/generate.test.js`; native font proof: `node packages/voxel-edit/tests/generate-browser-check.mjs`. Package GPU correctness uses `node scripts/gpu-lock.mjs run --owner=codex-batch241 --wait-max=60 --max=5 -- npm run test:gpu --workspace=@margoengine/voxel-edit`, then the same command with MARGO_COMPAT=1. No benchmark is required. No external fixture download.

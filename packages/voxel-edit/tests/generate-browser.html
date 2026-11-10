@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Voxel text generation</title>
+<script type="module">
+import {textToVoxels} from '@margoengine/voxel-edit/generate';
+window.run=()=>{
+ const options={font:'italic 24px serif',depth:3}, out=textToVoxels('Mg\nO',options),g=out.grid;
+ const canvas=new OffscreenCanvas(g.size[0],g.size[1]),ctx=canvas.getContext('2d');
+ // Independently verify each extrusion plane and glyph holes against a native-font mask.
+ const single=textToVoxels('O',{font:'24px serif',depth:1});
+ const filled=single.grid.voxels.filter(Boolean).length;
+ let equal=true;for(let y=0;y<g.size[1];y++)for(let x=0;x<g.size[0];x++)
+ for(let z=1;z<3;z++)if(g.voxels[x+g.size[0]*(z+3*y)]!==g.voxels[x+g.size[0]*3*y])equal=false;
+ const withContext=textToVoxels('O',{font:'24px serif',context:ctx});
+ let budget=false,invalid=false;
+ try{textToVoxels('oversize',{font:'200px serif',maxCells:8});}catch(e){budget=e instanceof RangeError;}
+ try{textToVoxels('M',{font:'garbage'});}catch(e){invalid=e instanceof RangeError;}
+ return {equal,filled,total:single.grid.voxels.length,contextEqual:[...withContext.grid.voxels].join() === [...single.grid.voxels].join(),
+  blank:textToVoxels('',{font:'24px serif'}).grid.voxels.filter(Boolean).length,budget,invalid,
+  multiline:g.size[1]>single.grid.size[1], nonempty:g.voxels.some(Boolean)};
+};
+</script>

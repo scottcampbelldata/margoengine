@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13523869,
+  "total": 13526604,
   "history": [
     {
       "date": "2026-10-24",
@@ -7008,6 +7008,12 @@
       "commit": "batch212-pitch",
       "reason": "Optional pitch; @margoengine/mixer/pitch: ceiling 0 to 2622, measured 2366. Keep one shared routing lifetime and K-weighting design rather than duplicate state. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "192bff291",
+      "reason": "batch241-generation-new-optional-entry-before-0-after-2479B-font-and-image-coverage",
+      "grew": 1
     }
   ],
   "items": {
@@ -8278,6 +8284,7 @@
     "@margoengine/mixer/dynamics": 3112,
     "@margoengine/sciviz/transfer": 6252,
     "@margoengine/weather/lens": 3815,
-    "@margoengine/mixer/pitch": 2622
+    "@margoengine/mixer/pitch": 2622,
+    "@margoengine/voxel-edit/generate": 2735
   }
 }
