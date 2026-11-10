@@ -45,6 +45,10 @@
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"
+    },
+    "./assemble": {
+      "types": "./dist/assemble.d.ts",
+      "import": "./dist/assemble.js"
     }
   },
   "files": [
@@ -65,6 +69,6 @@
     "build": "node ../../scripts/build-optional.js wfc && node scripts/copy-wasm.mjs",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node test/browser-check.mjs"
+    "test:gpu": "node test/browser-check.mjs && node test/assemble-browser.mjs"
   }
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12432610,
+  "total": 12434331,
   "history": [
     {
       "date": "2026-10-24",
@@ -5734,6 +5734,12 @@
       "commit": "batch-260",
       "reason": "HTML resource inlining: CORS-aware images, CSS imports, used font faces, cancellation and surface preparation",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-237",
+      "reason": "New optional wfc/assemble: 1465 B measured plus 256 B headroom for static glTF grid instancing; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6826,6 +6832,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/xr/ar-extra": 3289,
-    "@margoengine/html/inline": 2744
+    "@margoengine/html/inline": 2744,
+    "@margoengine/wfc/assemble": 1721
   }
 }
