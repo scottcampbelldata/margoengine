@@ -57,14 +57,14 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
     return action && (() => {
       action();
       this.stabilize(data);
-      this.onStable();
+      this.onStable(data);
     });
   }
   /** Deliver an event, then reconsider eventless guards even when no event transition accepts it. */
   override send(event: string, data?: D): boolean {
     const action = this.plan(event, data);
     action?.();
-    if (!action && !this.done) { this.stabilize(data); this.onStable(); }
+    if (!action && !this.done) { this.stabilize(data); this.onStable(data); }
     return action !== null;
   }
   /** Directly enter a state and settle its eventless and completion transitions. */
@@ -92,6 +92,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
             if (++fired > 100000) throw new MargoError('state', 'Too many delayed transitions; use longer delays or a shorter delta');
             if (this.entered.has(name)) this.entered.set(name, this.clock);
             this.stabilize(undefined);
+            this.onStable();
             taken = true;
             break;
           }
@@ -115,7 +116,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
     this.onStable();
   }
   /** Extension point called once after a public operation reaches a stable configuration. */
-  protected onStable(): void {}
+  protected onStable(_data?: D): void {}
   private activePath(): string[] {
     const path: string[] = [];
     for (let name: string | undefined = this.state; name !== undefined; name = this.states[name].parent) path.unshift(name);

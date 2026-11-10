@@ -2911,3 +2911,6 @@ FinalMachine settles initial and event-triggered eventless chains, raises comple
 ### Batch 239 job 1: tile property styling
 
 The optional tiles/style entry evaluates color, show and pointSize from feature properties, including first-match conditions, nonrecursive defines, vectors and regular expressions. It binds to existing PBR model, instance and point rendering APIs; a renderer decorator follows streaming creation and disposal. Proof: packages/tiles/tests/style.test.js and the `style` case of packages/tiles/tests/tiles-browser.mjs, using the real CC0 FeatureIdAttributeAndPropertyTable sample. The claim covers the visual-property row, not vector label/billboard styling or the separate feature/property texture jobs. No performance result is claimed.
+
+### FSM invoked task lifetimes (batch 250 job 3)
+InvokeMachine starts promise services on stable entry, aborts on actual exit/disposal, and delivers done/error output without stale-generation events. Proof: packages/fsm/test/invoke.test.js covers resolve, reject, sync throw, payloads, re-entry, common ancestors, transient states, multiple tasks, external abort, preabort and handler rejection. Public reference: Stately promise actor lifetime and SCXML invoke cancellation; citations in docs/clean-room.md. This is promise-task parity for the batch row, not a full actor system claim.

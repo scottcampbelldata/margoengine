@@ -45,6 +45,10 @@
     "./final": {
       "types": "./dist/final.d.ts",
       "import": "./dist/final.js"
+    },
+    "./invoke": {
+      "types": "./dist/invoke.d.ts",
+      "import": "./dist/invoke.js"
     }
   },
   "files": [

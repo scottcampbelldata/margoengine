@@ -1126,6 +1126,10 @@
       "types": "./dist/fsm/final.d.ts",
       "import": "./dist/fsm/final.js"
     },
+    "./fsm/invoke": {
+      "types": "./dist/fsm/invoke.d.ts",
+      "import": "./dist/fsm/invoke.js"
+    },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"

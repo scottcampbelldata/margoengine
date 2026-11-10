@@ -10,7 +10,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
     send(event: string, data?: D): boolean;
     goto(next: string, duration?: number): void;
     update(delta: number): void;
-    protected onStable(): void;
+    protected onStable(_data?: D): void;
 }
 
 export interface FinalState<C, D = unknown> extends EventState<C, D> {
