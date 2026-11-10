@@ -49,6 +49,10 @@
     "./schedule": {
       "types": "./dist/schedule.d.ts",
       "import": "./dist/schedule.js"
+    },
+    "./objects": {
+      "types": "./dist/objects.d.ts",
+      "import": "./dist/objects.js"
     }
   },
   "files": [

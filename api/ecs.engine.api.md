@@ -51,6 +51,9 @@ class Component<S extends Schema = Schema> {
     index(entity: Entity): number;
     has(entity: Entity): boolean;
     add(entity: Entity, values?: Partial<Record<keyof S, number>>): number;
+    protected validateValues(values: Partial<Record<keyof S, number>>): void;
+    protected initializeRow(row: number): void;
+    protected moveRow(row: number, last: number): void;
     touch(entity: Entity): boolean;
     remove(entity: Entity): boolean;
 }

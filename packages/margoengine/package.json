@@ -162,6 +162,10 @@
       "types": "./dist/audio/binaural.d.ts",
       "import": "./dist/audio/binaural.js"
     },
+    "./audio/voices": {
+      "types": "./dist/audio/voices.d.ts",
+      "import": "./dist/audio/voices.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
@@ -897,6 +901,10 @@
     "./ecs/schedule": {
       "types": "./dist/ecs/schedule.d.ts",
       "import": "./dist/ecs/schedule.js"
+    },
+    "./ecs/objects": {
+      "types": "./dist/ecs/objects.d.ts",
+      "import": "./dist/ecs/objects.js"
     },
     "./environment": {
       "types": "./dist/environment.d.ts",

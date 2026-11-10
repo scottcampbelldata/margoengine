@@ -2706,6 +2706,7 @@ Batch 255 materials: after build:packages, run node --test packages/save/tests/m
 ### Batch 260 HTML preview texture
 Build packages, then run `node scripts/gpu-lock.mjs run --owner=html-check --max=5 --wait-max=60 -- node packages/html/scripts/test-browser.js`, followed by the same command with `--compat` after test-browser.js. Reports: packages/html/test-results/html-browser.json and html-browser-compat.json. CPU: `node --test --test-timeout=120000 packages/html/test/*.test.js`. No benchmark or timing-only assertion.
 
+<<<<<<< HEAD
 ### XR smooth movement and comfort
 
 Build packages, run `node --test packages/xr/tests/locomotion.test.js packages/xr/tests/xr.test.js`, then run `node scripts/gpu-lock.mjs run --owner=lane-P-xr --wait-max=60 --max=3 -- node packages/xr/tests/locomotion.browser.mjs`. The stereo check uses the existing licensed Khronos/Cesium Box fixture and writes test-results/xr-locomotion-browser.json. It covers native/compat, engine/separate routes and both eye textures. Quest/Android evidence is still required separately.
@@ -2749,9 +2750,15 @@ coverage. No timing assertions or benchmark measurements are involved.
 
 - Stats geometry: build packages, then `node --test packages/stats/test/geometry.test.js`. Hardware correctness on both backends: `node scripts/gpu-lock.mjs run --owner=stats-parity --wait-max=60 --max=3 --gpu=stats-native-render-counters -- node scripts/test-stats-parity.mjs`. The script renders two repository-owned boxes, checks submitted totals and frame reset, and releases the shared lock on exit. No timing benchmark.
 Batch 253 trigger rumble: build packages/input, then node --test --test-timeout=30000 packages/input/test/haptics.test.js. Injected actuator fixtures assert exact native effect type/parameters/results, capability absence and denial, preemption, parameter checks, bounded abort/timeout, zero-stop fallback, overlapping-call ownership and reset failure. On a physical supported controller, check supportsTriggerRumble(nativeGamepad), then verify independent trigger and handle channels; hardware acceptance remains owed. Run the input package GPU fixture on WebGPU and --compat as its renderer integration check; it does not claim tactile proof.
+<<<<<<< HEAD
 ### XR skinned hands
 
 After build:packages run `node --test packages/xr/tests/hands.test.js` and the registered xr test:gpu:hands leaf through the shared GPU lock. The standard left/right GLBs and licence are in packages/xr/tests/fixtures/hands. The browser records pose-driven skin-buffer changes and stereo pixel changes for both XR routes and backends. Real Quest/Android runs remain required separately.
 
 Batch 254 sprites: after build:packages run node --test --test-timeout=60000 packages/audio/tests/sprites.test.js. Shared-lock node packages/audio/scripts/test-browser.js runs sprites-browser.js, using native canPlayType and a controlled 503 response followed by tests/fixtures/rain-foa.wav (CC BY 4.0, existing NOTICE). The report records exact candidate order, PCM error and energy for one-shot and loop bounds.
 Batch 257 job 3: build packages, run node --test --test-timeout=10000 packages/worker/tests/pointer-lock.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-check.mjs. The GPU check must observe both native page lock and worker controls lock state, a changed camera target after mouse movement, and a worker-requested native unlock.
+=======
+=======
+Batch 249 job 1: build packages then node --test --test-timeout=120000 packages/ecs/test/objects.test.js. Synthetic identity/lifecycle fixtures, no asset downloads required.
+>>>>>>> d3eba2dfb (feat(ecs): add packed object and string component fields)
+>>>>>>> 7e7892c52 (feat(ecs): add packed object and string component fields)

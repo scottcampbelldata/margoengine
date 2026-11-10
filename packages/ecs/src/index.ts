@@ -70,8 +70,26 @@ export class Component<S extends Schema = Schema> {
    */
   add(entity: Entity, values: Partial<Record<keyof S, number>> = {}): number {
     this.world.check(entity);
-    const keys = Object.keys(values),
-      columns = this.columns;
+    this.validateValues(values);
+    const keys = Object.keys(values);
+    let row = this.index(entity);
+    const inserted = row < 0;
+    if (inserted) {
+      row = this.size;
+      this.initializeRow(row);
+      this.size++;
+      this.sparse[entity % this.world.stride] = row;
+      this.entities[row] = entity;
+    }
+    for (const key of keys) this.fields[key][row] = values[key as keyof S]!;
+    const observers = this.observers;
+    if (inserted) for (let i = 0; i < observers.length; i++) observers[i].onAdd(entity);
+    else if (keys.length) for (let i = 0; i < observers.length; i++) observers[i].onChange(entity);
+    return row;
+  }
+  /** Validate all values before changing a row; optional stores may extend field storage. */
+  protected validateValues(values: Partial<Record<keyof S, number>>): void {
+    const keys = Object.keys(values);
     for (const key of keys) {
       const value = values[key as keyof S];
       const field = this.fields[key];
@@ -86,19 +104,14 @@ export class Component<S extends Schema = Schema> {
       )
         throw new RangeError('Invalid component data; pass finite numbers that fit the field type');
     }
-    let row = this.index(entity);
-    const inserted = row < 0;
-    if (inserted) {
-      row = this.size++;
-      this.sparse[entity % this.world.stride] = row;
-      this.entities[row] = entity;
-      for (let i = 0; i < columns.length; i++) columns[i][row] = 0;
-    }
-    for (const key of keys) this.fields[key][row] = values[key as keyof S]!;
-    const observers = this.observers;
-    if (inserted) for (let i = 0; i < observers.length; i++) observers[i].onAdd(entity);
-    else if (keys.length) for (let i = 0; i < observers.length; i++) observers[i].onChange(entity);
-    return row;
+  }
+  /** Initialize storage before the add notification. */
+  protected initializeRow(row: number): void {
+    for (const column of this.columns) column[row] = 0;
+  }
+  /** Move storage before the remove notification. Optional stores also release reference fields here. */
+  protected moveRow(row: number, last: number): void {
+    if (row !== last) for (const column of this.columns) column[row] = column[last];
   }
   /** Report a write made straight into `fields`, which observers cannot see; false when `entity` has no row. */
   touch(entity: Entity): boolean {
@@ -117,9 +130,8 @@ export class Component<S extends Schema = Schema> {
       const moved = this.entities[last];
       this.entities[row] = moved;
       this.sparse[moved % this.world.stride] = row;
-      const columns = this.columns;
-      for (let i = 0; i < columns.length; i++) columns[i][row] = columns[i][last];
     }
+    this.moveRow(row, last);
     const observers = this.observers;
     for (let i = 0; i < observers.length; i++) observers[i].onRemove(entity);
     return true;
