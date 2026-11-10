@@ -77,6 +77,14 @@
     "./shaders": {
       "types": "./dist/shaders.d.ts",
       "import": "./dist/shaders.js"
+    },
+    "./remote": {
+      "types": "./dist/remote.d.ts",
+      "import": "./dist/remote.js"
+    },
+    "./remote-relay": {
+      "types": "./dist/remote-relay.d.ts",
+      "import": "./dist/remote-relay.js"
     }
   },
   "files": [
@@ -129,6 +137,7 @@
     "test:browser:gl:compat": "node test/gl-browser.mjs --compat",
     "test:browser:tools": "node test/tools-browser.mjs",
     "test:browser:tools:compat": "node test/tools-browser.mjs --compat",
-    "test:browser:shaders": "node test/shaders-browser.mjs"
+    "test:browser:shaders": "node test/shaders-browser.mjs",
+    "test:browser:remote": "node test/remote-browser.mjs"
   }
 }

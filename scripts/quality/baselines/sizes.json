@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14521711,
+  "total": 14531184,
   "history": [
     {
       "date": "2026-10-24",
@@ -7733,6 +7733,12 @@
       "commit": "e42caa7ce",
       "reason": "scatter/grass new optional entry (batch 64 job 6): GrassScatter builds blade clumps in the vertex stage from a (side, along, blade) ring mesh. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "aada605f2",
+      "reason": "batch 107 job 3: new entries @margoengine/inspector/remote and @margoengine/inspector/remote-relay",
+      "grew": 2
     }
   ],
   "items": {
@@ -8179,6 +8185,8 @@
     "@margoengine/inspector/gl": 4760,
     "@margoengine/inspector/history": 1101,
     "@margoengine/inspector/packages": 4990,
+    "@margoengine/inspector/remote": 7773,
+    "@margoengine/inspector/remote-relay": 1700,
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/shaders": 4712,
     "@margoengine/inspector/snapshot": 1320,

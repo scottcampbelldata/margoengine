@@ -11,6 +11,7 @@ import { BlockTypes, PackedChunk, VoxelWorld } from "@margoengine/voxel";
 import { NoiseTerrainOptions } from "@margoengine/voxel/generate";
 import { VoxelCharacter, VoxelCharacterOptions, VoxelHit } from "@margoengine/voxel/query";
 import { ChunkStore } from "@margoengine/voxel/stream";
+import { AddressInfo, IncomingMessage, SecureContextOptions } from "node";
 
 export const SHOT_PREFIX: Uint8Array;
 

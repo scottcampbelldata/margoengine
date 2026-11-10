@@ -1791,6 +1791,14 @@
       "types": "./dist/inspector/shaders.d.ts",
       "import": "./dist/inspector/shaders.js"
     },
+    "./inspector/remote": {
+      "types": "./dist/inspector/remote.d.ts",
+      "import": "./dist/inspector/remote.js"
+    },
+    "./inspector/remote-relay": {
+      "types": "./dist/inspector/remote-relay.d.ts",
+      "import": "./dist/inspector/remote-relay.js"
+    },
     "./kinematics-constraints": {
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"

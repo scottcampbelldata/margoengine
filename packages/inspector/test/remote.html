@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Remote inspection</title>
+<canvas width="320" height="240" style="width:320px;height:240px"></canvas><main></main>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {boxGeometry} from '@margoengine/geometry';
+import {PbrMaterial,createMesh} from '@margoengine/materials';
+import {RemoteInspector,RemoteTarget,relayTransport} from '@margoengine/inspector/remote';
+window.setup=async(url,token)=>{
+  const engine=window.engine=await Engine.create(document.querySelector('canvas'),{camera:{position:[2,2,3],target:[0,0,0]}});
+  const mesh=createMesh(engine,boxGeometry(1,1,1),new PbrMaterial({color:[0.9,0.3,0.1]}));mesh.name='Box';
+  window.target=RemoteTarget.attach(engine,{transport:relayTransport({url,token,role:'target'}),token:'device-secret',statsIntervalMs:200});
+  window.viewer=new RemoteInspector({transport:relayTransport({url,token,role:'viewer'}),token:'device-secret',parent:document.querySelector('main')});
+  engine.start();return engine.backend;
+};
+window.run=async()=>{
+  for(let i=0;i<50;i++){try{await window.viewer.request('stats');break;}catch{await new Promise(r=>setTimeout(r,100));}}
+  const hello=await window.viewer.connect();
+  const shot=await window.viewer.capture();
+  const image=await createImageBitmap(await (await fetch(`data:${shot.mimeType};base64,${shot.data}`)).blob());
+  const result={hello,objects:window.viewer.objects.map(o=>o.id),png:[image.width,image.height],fps:window.viewer.stats?.fps??0};
+  image.close();return result;
+};
+</script>

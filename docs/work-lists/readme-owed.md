@@ -1196,3 +1196,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/scatter (batch 64 job 6): document /grass GrassScatter, GrassShape defaults and ranges, ring segments, blade randomness, attach without meshes and limits; example deferred.
 - margoengine (batch 64 job 6): document the scatter/grass forwarding entry.
+
+| @margoengine/inspector | remote: createRemoteRelay with host 0.0.0.0, RemoteTarget.attach on the phone page, RemoteInspector.connect on the desktop page, set, undo, capture | batch-107 job 3 |

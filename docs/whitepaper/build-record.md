@@ -4755,3 +4755,16 @@ are unchanged.
 | 6. Procedural grass | DONE | this commit | scatter/grass; blade clumps built in the vertex stage, packages/scatter/test/grass.test.js and grass.browser.mjs |
 
 What each job left unfinished is in docs/work-lists/finish-later.md (rows 64.5 and 64.6).
+
+## Batch 107: inspector (2026-11-10)
+
+Four jobs in `@margoengine/inspector`, each adding to the inspector without changing core or stage. Jobs 1 and 2 add the entries `/packages` and `/shaders`, job 3 adds `/remote` and `/remote-relay`, job 4 extends `FrameReport` in `/frame`.
+
+| Job | Feature | Status | Commit | Result |
+| --- | --- | --- | --- | --- |
+| 1 | Edit every package's objects | DONE | 8508fc305 | New entry `@margoengine/inspector/packages`: lights, glTF materials, shadows, post effects and passed objects, each number within its documented range. |
+| 2 | Live shader editing | DONE | 75552ac99 | New entry `@margoengine/inspector/shaders`: `recompileShader` swaps a WgslMaterial mesh to the edited WGSL and reports compile errors by line (LIM-649). |
+| 3 | Remote inspection | DONE | this commit | New entries `@margoengine/inspector/remote` and `/remote-relay`: a desktop `RemoteInspector` reads and edits a `RemoteTarget` on a phone over a MessageChannel or a plain HTTP relay (LIM-651). |
+| 4 | Plugin and pass graph view | DONE | 5be47e01d | `FrameReport.plugins` lists every plugin in attach order with its passes and `onPreUpdate` time (LIM-570). |
+
+Left for later: job 3's run against a real phone or headset browser, relay stream reconnects and remote hierarchy editing (docs/work-lists/finish-later.md, 107.3). README examples are owed (docs/work-lists/readme-owed.md).

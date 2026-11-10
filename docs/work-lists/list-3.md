@@ -13,7 +13,7 @@ For the third account. Starts when Scott is home and opens it.
 | H | loading and interface | 104 | ui | 6 | done |
 | H | loading and interface | 105 | labels | 5 | done |
 | H | loading and interface | 106 | html | 4 | done |
-| H | loading and interface | 107 | inspector | 4 | list 2 (Mac, from Beelink) |
+| H | loading and interface | 107 | inspector | 4 | done |
 | H | loading and interface | 108 | selection | 3 | done |
 | H | loading and interface | 109 | viewcube | 5 | done |
 | I | sky and land | 57 | sky | 8 | done |

@@ -8,6 +8,7 @@ import { MutableVec3 } from "@margoengine/math";
 import { Snapshot, SnapshotBuffer } from "@margoengine/net";
 import { BlockTypes, VoxelWorld } from "@margoengine/voxel";
 import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query";
+import { Buffer, Duplex } from "node";
 
 export class VoxelBot {
     readonly client: VoxelNetClient;

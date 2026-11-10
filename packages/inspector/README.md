@@ -134,6 +134,17 @@ A good edit swaps in a new material with the same uniforms, textures and other v
 back. `recompileShader(mesh, wgsl, {device: engine.gpu})` does the same without a panel and returns the compiler's
 messages. Diagnostics need WebGPU; generated shaders of other materials stay read only in the Inspector.
 
+## Remote inspection
+
+`margoengine/inspector/remote` inspects a scene running on a phone or headset from a desktop browser. The page on the
+device attaches a `RemoteTarget`, the desktop page creates a `RemoteInspector`, and the two talk over any string
+channel: `channelTransport` wraps a MessagePort, BroadcastChannel or WebSocket the app already has, and
+`relayTransport` goes through the development relay that `margoengine/inspector/remote-relay` starts in Node
+(`createRemoteRelay({host: '0.0.0.0'})` prints a LAN url and a token). The desktop panel lists the device's lights,
+materials, shadows, post effects and meshes with their values, edits them (each edit is checked on the device, with
+undo), shows the frame rate and takes a screenshot of the device's canvas. The target runs only that fixed list of
+operations and, when given a token, refuses requests without it. Development builds only.
+
 ## Plugin and pass view
 
 `margoengine/inspector/frame` records one frame. Its report lists every attached plugin in attach order with the

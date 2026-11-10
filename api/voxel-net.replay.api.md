@@ -8,6 +8,7 @@ import { BlockTypes, PackedChunk, VoxelWorld } from "@margoengine/voxel";
 import { NoiseTerrainOptions } from "@margoengine/voxel/generate";
 import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query";
 import { ChunkStore } from "@margoengine/voxel/stream";
+import { AddressInfo, IncomingMessage, SecureContextOptions } from "node";
 
 export class VoxelRecorder implements AsyncDisposable {
     onError: (error: unknown) => void;

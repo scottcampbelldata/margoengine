@@ -8,6 +8,7 @@ import { BlockTypes, PackedChunk, VoxelWorld } from "@margoengine/voxel";
 import { NoiseTerrainOptions } from "@margoengine/voxel/generate";
 import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query";
 import { ChunkStore } from "@margoengine/voxel/stream";
+import { AddressInfo, Buffer, Duplex, IncomingMessage, SecureContextOptions } from "node";
 
 export interface AcceptWebSocketOptions extends WebSocketOptions {
     origins?: readonly string[] | '*';
