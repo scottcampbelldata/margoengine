@@ -190,3 +190,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 225 kinds): generated splines/kinds alias and refreshed existing audio/sprites, audio/voices and xr/hands aliases.
 
 | @margoengine/scatter | Native and full-compatibility shadow culling, actual command-count observation and parity limits. | Batch 273 group15 |
+| @margoengine/html | inlineResources/resourceInliner, texture prepare hook, same-origin/CORS images/fonts, imported sheets, cancellation, deadlines and explicit fontCSS for script-created faces. | Batch 260 job 3 |
+| margoengine | Generated html/inline alias and synchronised upstream audio/voices export. | Batch 260 job 3 |

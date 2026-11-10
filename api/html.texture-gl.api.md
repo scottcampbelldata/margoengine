@@ -18,6 +18,8 @@ export class HTMLTextureGL extends HTMLTexture {
 
 // Not exported from this entry, but used by the exports above:
 
+type HTMLResourceInliner = (element: HTMLElement, signal: AbortSignal) => Promise<Element>;
+
 class HTMLSurface {
     readonly element: HTMLElement;
     width: number;
@@ -35,6 +37,7 @@ class HTMLSurface {
     busy: boolean;
     readonly pixelRatio: number;
     readonly world: Float32Array<ArrayBuffer>;
+    get signal(): AbortSignal;
     painting?: () => void;
     constructor(owner: HTMLTexture, element: HTMLElement, options: HTMLSurfaceOptions);
     setMatrix(matrix: ArrayLike<number>): this;
@@ -61,14 +64,8 @@ class HTMLTexture {
     protected runtime?: Engine;
     protected readonly surfaces: Set<HTMLSurface>;
     protected readonly preview: boolean;
-    constructor(options?: {
-        name?: string;
-        rasterizer?: HTMLSurfaceRasterizer;
-    });
-    static attach(engine: EngineKernel, options?: {
-        name?: string;
-        rasterizer?: HTMLSurfaceRasterizer;
-    }): HTMLTexture;
+    constructor(options?: HTMLTextureOptions);
+    static attach(engine: EngineKernel, options?: HTMLTextureOptions): HTMLTexture;
     add(element: HTMLElement, options?: HTMLSurfaceOptions): HTMLSurface;
     remove(surface: HTMLSurface): void;
     get size(): number;
@@ -80,5 +77,11 @@ class HTMLTexture {
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface HTMLTextureOptions {
+    name?: string;
+    rasterizer?: HTMLSurfaceRasterizer;
+    prepare?: HTMLResourceInliner;
 }
 ```

@@ -1390,6 +1390,10 @@
       "types": "./dist/html/blend.d.ts",
       "import": "./dist/html/blend.js"
     },
+    "./html/inline": {
+      "types": "./dist/html/inline.d.ts",
+      "import": "./dist/html/inline.js"
+    },
     "./input": {
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"
@@ -3954,13 +3958,10 @@
       "types": "./dist/xr/hands.d.ts",
       "import": "./dist/xr/hands.js"
     },
-<<<<<<< HEAD
     "./xr/ar-extra": {
       "types": "./dist/xr/ar-extra.d.ts",
       "import": "./dist/xr/ar-extra.js"
     },
-=======
->>>>>>> 1a05a6bfe (feat(splines): add nonuniform cubic kinds and analytic geometry)
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"

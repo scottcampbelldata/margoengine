@@ -3279,3 +3279,5 @@ camera rings are [55,281,979] on both backends; the four shadow cascade rows
 are [39,8,0], [55,108,0], [55,274,91], [55,281,855]. The observation uses actual
 GPU-written command buffers. Regression: shadow-cull-fixture.test.js fails
 without the owning-route selection. No new speed or whole-package parity claim.
+### Self-contained foreignObject resources (batch 260 job 3)
+html/inline embeds same-origin/CORS images, computed CSS image URLs and matching document/adopted/imported font faces into data URLs before foreignObject drawing. packages/html/test/inline-browser.js validates 1,893 real image pixels and exact 92 px live/embedded font width, using a separate CORS server and existing licensed assets. packages/html/test/inline.test.js covers URL resolution, deduplication, form-state regression, import cycles, error rejection and abort/deadline semantics. Texture preparation is opt-in via resourceInliner(), with cancellation on surface removal. No claim is made to bypass CORS or discover binary sources of script-created FontFace objects.

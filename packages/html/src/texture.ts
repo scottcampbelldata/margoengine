@@ -10,6 +10,7 @@ import {
 import { margoError } from '../../shared/errors.js';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
+import { inlineCopy } from './dom.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 
@@ -30,6 +31,15 @@ export interface HTMLSurfaceOptions {
 }
 /** Which rasterizer draws the element: the browser's HTML-in-canvas `drawElementImage`, or an SVG `foreignObject`. */
 export type HTMLSurfaceRasterizer = 'element-image' | 'foreign-object';
+/** Prepares a self-contained element copy for foreignObject; receives the surface's removal signal. */
+export type HTMLResourceInliner = (element: HTMLElement, signal: AbortSignal) => Promise<Element>;
+/** Rasterizer, plugin name and optional external-resource preparation. */
+export interface HTMLTextureOptions {
+  name?: string;
+  rasterizer?: HTMLSurfaceRasterizer;
+  /** Optional foreignObject preparation, e.g. resourceInliner() from html/inline. Default computed-style copy only. */
+  prepare?: HTMLResourceInliner;
+}
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const shader = `
 struct Surface {camera:mat4x4f,model:mat4x4f,size:vec4f}
@@ -88,28 +98,6 @@ export function surfaceHit(
   if (!(u >= 0 && u <= 1 && v >= 0 && v <= 1) || !(w > 0)) return null;
   return { u, v, t: (a[2] * px + b[2] * py + o[2]) / w };
 }
-/** An inline copy of an element tree for an SVG image: every computed style written out, form state as attributes. */
-function inlineCopy(source: Element): Element {
-  const copy = source.cloneNode(false) as Element,
-    view = source.ownerDocument.defaultView!;
-  if (source instanceof view.HTMLElement || source instanceof view.SVGElement) {
-    const style = view.getComputedStyle(source);
-    let text = '';
-    for (let i = 0; i < style.length; i++) {
-      const name = style[i];
-      text += `${name}:${style.getPropertyValue(name)};`;
-    }
-    copy.setAttribute('style', text);
-  }
-  if (source instanceof view.HTMLInputElement) {
-    copy.setAttribute('value', source.value);
-    if (source.checked) copy.setAttribute('checked', '');
-    else copy.removeAttribute('checked');
-  } else if (source instanceof view.HTMLTextAreaElement) copy.textContent = source.value;
-  for (const child of source.childNodes)
-    copy.appendChild(child.nodeType === 1 ? inlineCopy(child as Element) : child.cloneNode(false));
-  return copy;
-}
 /** One element drawn on a quad in the scene. */
 export class HTMLSurface {
   readonly element: HTMLElement;
@@ -131,6 +119,9 @@ export class HTMLSurface {
   /** @internal */ readonly pixelRatio: number;
   /** @internal */ readonly world = new Float32Array(16);
   private readonly observer?: MutationObserver;
+  private readonly cancellation = new AbortController();
+  /** @internal Cancels resource preparation when this surface is removed. */
+  get signal(): AbortSignal { return this.cancellation.signal; }
   /** @internal A raster waiting for the holder canvas's next paint event (HTML-in-canvas draws only there). */
   painting?: () => void;
   private readonly mark = () => this.invalidate();
@@ -226,6 +217,7 @@ export class HTMLSurface {
     this.owner.remove(this);
   }
   /** @internal */ detach(): void {
+    this.cancellation.abort();
     this.observer?.disconnect();
     for (const type of [
       'input',
@@ -269,8 +261,10 @@ export class HTMLTexture {
   private readonly descriptor = overlayDepthPass();
   private readonly values = new Float32Array(36);
   private readonly pointer = (event: PointerEvent) => this.route(event);
-  constructor(options: { name?: string; rasterizer?: HTMLSurfaceRasterizer } = {}) {
+  private readonly prepare?: HTMLResourceInliner;
+  constructor(options: HTMLTextureOptions = {}) {
     this.name = options.name ?? 'html-texture';
+    this.prepare = options.prepare;
     const native =
       typeof CanvasRenderingContext2D !== 'undefined' && 'drawElementImage' in CanvasRenderingContext2D.prototype;
     this.rasterizer = options.rasterizer ?? (native ? 'element-image' : 'foreign-object');
@@ -282,7 +276,7 @@ export class HTMLTexture {
         "This browser has no HTML-in-canvas drawElementImage; use rasterizer: 'foreign-object'",
       );
   }
-  static attach(engine: EngineKernel, options?: { name?: string; rasterizer?: HTMLSurfaceRasterizer }): HTMLTexture {
+  static attach(engine: EngineKernel, options?: HTMLTextureOptions): HTMLTexture {
     const textures = new HTMLTexture(options);
     engineRuntime(engine).use(textures);
     return textures;
@@ -408,6 +402,7 @@ export class HTMLTexture {
         surface.draws++;
       })
       .catch((error: unknown) => {
+        if (surface.signal.aborted) return;
         // A failed raster is an error of the page (a tainting image, say): reported, never hidden.
         queueMicrotask(() => {
           throw error;
@@ -462,7 +457,9 @@ export class HTMLTexture {
       });
       return holder;
     }
-    const markup = new XMLSerializer().serializeToString(inlineCopy(surface.element));
+    const copy = this.prepare ? await this.prepare(surface.element, surface.signal) : inlineCopy(surface.element);
+    surface.signal.throwIfAborted();
+    const markup = new XMLSerializer().serializeToString(copy);
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${cssWidth} ${cssHeight}">` +
       `<foreignObject x="0" y="0" width="${cssWidth}" height="${cssHeight}">${markup}</foreignObject></svg>`;

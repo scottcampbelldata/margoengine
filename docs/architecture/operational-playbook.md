@@ -5629,3 +5629,5 @@ The unchanged three-scene native and compatibility checks pass exact shadow
 depth/frame comparisons and complete per-ring/per-cascade count checks, including
 the CPU plane classifier and distant-tree exclusion. The fixture regression
 executes the actual counts method and fails on the old native-only lookup.
+### Section 5 evidence: batch 260 self-contained DOM resources
+html/inline supplies inlineResources and resourceInliner; HTMLTexture's optional prepare hook runs before foreignObject serialization on both texture backends. The real browser fixture serves existing licensed image/font bytes from a separate CORS origin, including an imported font stylesheet. 1,893 selected image pixels match the direct image raster within one channel value; the embedded and live Source Sans glyph widths are exactly 92 px. Tests also cover same-origin URL resolution, fetch deduplication, CSS URL strings, SVG fragments, import cycles, errors, deadlines, cancellation and surface-removal cancellation. There is no new rendering backend or core/stage work. Performance is not claimed.

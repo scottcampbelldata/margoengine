@@ -2772,3 +2772,5 @@ After build:packages, run node --test packages/scatter/test/shadow-cull-fixture.
 Under a shared GPU lock run node packages/scatter/test/shadow-cull.browser.mjs,
 then the same driver with MARGO_COMPAT=1. Do not forward a Firefox executable
 override into these Chromium runs. All original assertions and scene work stay.
+### Batch 260 foreignObject resources
+The HTML browser commands above now also start a local CORS-only resource fixture server, serve the existing Noto Emoji donut and Source Sans 3 font with their recorded licences, and exercise an imported stylesheet. Inspect measurements.resources: matchedImagePixels = 1893, fontWidth = referenceWidth = 92. Both native and --compat invocations run it. CPU coverage is inline.test.js; the texture hook accepts prepare: resourceInliner() from @margoengine/html/inline. No README example or benchmark runs in this build-phase change.

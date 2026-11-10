@@ -4,6 +4,7 @@ import { HTMLTexture } from '@margoengine/html/texture';
 import { HTMLTextureGL } from '@margoengine/html/texture-gl';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { blendScenario } from './blend-browser.js';
+import { inlineScenario } from './inline-browser.js';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -252,16 +253,18 @@ window.runHTMLTests = async () => {
   for (const rasterizer of rasterizers) previewTextures.push(await textureScenario(rasterizer, 'webgl2', HTMLTextureGL));
   const portableTexture = await textureScenario('foreign-object', 'webgpu', HTMLTextureGL);
   const blendGPU=await blendScenario('webgpu'),blendGL=await blendScenario('webgl2');
+  const resources=await inlineScenario();
   return {
     checks: [...webgpu.checks, ...webgl2.checks, ...textures.flatMap((t) => t.checks),
       ...previewTextures.flatMap((t) => t.checks.map((c) => c.replace('webgpu:', 'preview:'))), ...portableTexture.checks,
-      ...blendGPU.checks,...blendGL.checks],
+      ...blendGPU.checks,...blendGL.checks,...resources.checks],
     measurements: {
       webgpu: webgpu.measurements,
       webgl2: webgl2.measurements,
       texture: Object.fromEntries(rasterizers.map((r, i) => [r, textures[i].measurements])),
       previewTexture: previewTextures.map((t) => t.measurements),
       blend:{webgpu:blendGPU.measurements,webgl2:blendGL.measurements},
+      resources:resources.measurements,
     },
   };
 };

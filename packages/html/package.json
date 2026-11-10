@@ -37,6 +37,10 @@
     "./blend": {
       "types": "./dist/blend.d.ts",
       "import": "./dist/blend.js"
+    },
+    "./inline": {
+      "types": "./dist/inline.d.ts",
+      "import": "./dist/inline.js"
     }
   },
   "files": [

@@ -16,6 +16,7 @@ export default defineConfig({
       { find: /^@margoengine\/html\/texture$/, replacement: resolve(root, 'dist/texture.js') },
       { find: /^@margoengine\/html\/texture-gl$/, replacement: resolve(root, 'dist/texture-gl.js') },
       { find: /^@margoengine\/html\/blend$/, replacement: resolve(root, 'dist/blend.js') },
+      { find: /^@margoengine\/html\/inline$/, replacement: resolve(root, 'dist/inline.js') },
       { find: /^@margoengine\/html$/, replacement: resolve(root, 'dist/index.js') },
     ],
   },
