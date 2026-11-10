@@ -3506,7 +3506,7 @@ The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPi
 - Batch 263 WebGL2 inspector: wireframe, normals, AABB and lights overlays, one-frame native draw/state/shader capture, per-view pass CPU costs and optional GPU intervals. Evidence: packages/inspector/test/gl.test.js and gl-browser.mjs, native and compatibility launch modes. Pixel changes/restoration and hidden-parent suppression are correctness assertions, with no speed claim.
 
 - Batch 220 job 1: math/compat supplies all 17 requested porting methods on seven familiar classes, with original per-type bundles unchanged. Proof: packages/math/test/methods.test.js and existing math.test.js small-import assertions. Six Euler orders, native/separate camera round trips on both depth conventions, ray/segment constraints, closed triangle/plane contacts, degenerate inputs and explicit color spaces are covered. This is mathematical correctness evidence, not a timing claim.
-# Batch 204 optional optimization
+## Batch 204 optional optimization
 
 Exporters `/sparse` writes sparse accessors and interleaved vertex streams while
 retaining every decoded value and accessor index/type/bound. The regression suite
@@ -4157,7 +4157,7 @@ Optional water/flow supports painted encoded RG and generated signed vector text
 ### Batch 194 job 2: pixel outline width
 Optional toon/screen-outline keeps core and model hull widths in drawing-buffer pixels using exact homogeneous projection derivatives and the active viewport. Proof: screen-outline.test.js per-view uniforms/ownership and screen-outline.browser.mjs on native WebGPU and full WebGL2 compatibility, core/material spheres at two distances with both projection types (5 px requested, 4..5 px rasterized) and animated CC0 Fox poses. This is the batch width behaviour documented by drei Outlines, retaining existing deformed/instanced model paths; no performance or image-dilation claim. See docs/toon-parity.md and docs/clean-room.md.
 
-# Batch 185 job 2: typed volume and layer writes
+## Batch 185 job 2: typed volume and layer writes
 
 Claim: shader/compute-volume writes and loads 3D voxels and array layers using all 16 storage formats, with optional ping-pong state, on native WebGPU and the full WebGL2 layer. Proof: compute-volume-check.mjs compares all 24 voxels in every format/dimension to independent CPU coordinates, checks three feedback steps and normalized 3D sampling. CPU lifecycle and validation proof: compute-volume.test.js. No performance or hardware-portability claim beyond the tested RTX A6000 backends. Exact constraints are in docs/limits.md.
 
@@ -4578,7 +4578,7 @@ Optional keyboard series/record focus, complete pageable tables, generated count
 
 ### Batch 178 job 6: scientific style tokens
 Optional named print/presentation styles, scoped CSS bindings and publisher final-column presets feed native chrome and publication paths, with explicit scientific encodings preserved. [Contract and primary sources](../sciviz-themes.md), [native/compatibility and physical-export ledger](results/batch178-themes.json). No universal printer/CMYK, font-substitution or publisher-compliance claim.
-# Batch 175 job 6: scientific reader workers
+## Batch 175 job 6: scientific reader workers
 
 The optional sciviz/workers entry executes NRRD, NIfTI, DICOM, Zarr, legacy VTK, NetCDF and VTK XML readers off the page through worker/rpc. Dedicated sessions preserve lazy methods, explicit inputs and output snapshots transfer buffers, progress is channel-isolated, and abort terminates synchronous work. CPU comparisons against the direct readers and the dual-backend real-data demo are the evidence; see docs/sciviz-workers.md and packages/sciviz/tests/workers{.test.js,-browser.mjs}. No speed, network throughput or zero-copy parsing claim is made. Reader feature/format limits remain the same.
 ### Batch 176 tensor fields
