@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "entry": "@margoengine/stage/scene",
+    "symbol": "LoadedScene.cameras",
+    "change": "signature",
+    "was": "08842356",
+    "reason": "Scene cameras carry up (c6dd876b1): a target straight below threw every frame and rolled cameras rendered unrolled. The field is added; existing readers keep working.",
+    "date": "2026-11-10",
+    "approved": "Scott 2026-11-10"
+  }
+]

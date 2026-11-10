@@ -22,7 +22,9 @@ export interface AddSceneOptions extends ValidateOptions {
 export interface LoadedScene {
     readonly meshes: ReadonlyMap<string, Mesh>;
     readonly models: ReadonlyMap<string, PBRModel>;
-    readonly cameras: ReadonlyMap<string, Required<CameraOptions>>;
+    readonly cameras: ReadonlyMap<string, Required<CameraOptions> & {
+        up: [number, number, number];
+    }>;
     readonly lights: Clustered | undefined;
     readonly meta: Readonly<Record<string, Json>>;
     dispose(): void;
