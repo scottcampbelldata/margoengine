@@ -7325,3 +7325,5 @@ Section 5 evidence: the correctness preflight also runs a suite's standard cases
 black-box adapters in engine-bench. React Three Fiber 9.8.2 and Margo each drew `react-1000` and `react-10000`
 once with equal draw-call counts. Quiet timings remain open. [Adapter, scope and counts](../whitepaper/batch-170-react.md).
 Section 5, batch 164 fog: four full command tapes match the parent byte for byte while numeric grid comparison removes per-frame serialization. The two dispatches, all shader text, uniform bytes and composite remain unchanged. [Sources, workload difference and reproduction](../whitepaper/batch-164-workcounts.md).
+
+Section 5, batch 164 screen effects: NodePass reuses one render pass descriptor per pass; full command tapes match the parent at 1x and 4x. The separate display-precision passes remain by design. [Evidence](../whitepaper/batch-164-workcounts.md#row-1319-screen-effect-passes).

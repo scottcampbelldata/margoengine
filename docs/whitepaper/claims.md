@@ -4812,3 +4812,5 @@ VolumeLayer.prepare reuses its existing 80-float uniform storage for inverse/nor
 
 Every batch 182 scene draws a non-empty image that repeats byte for byte on Margo and on its rival (smoke, `--runs=1`, [results/batch182-smoke.json](results/batch182-smoke.json)). Four closed-form references converge at second order (`packages/sciviz/tests/analytic-references.test.js`, `packages/sciviz/tests/transfer.test.js`). The feature rows cite a test or README section per Margo cell ([sciviz-vs-rivals](sciviz-vs-rivals.md)). No speed claim: timing pending the quiet rerun.
 Batch 164 froxel preparation removes grid serialization with four byte-identical full GPU-command tapes against the parent. This is an operation-count claim only. [Scope, workloads, sources and reproduction](batch-164-workcounts.md#row-95-froxel-preparation).
+
+Batch 164 screen effects: `NodePass` reuses one render pass descriptor per pass, 3 instead of 30 in a 10-frame three-effect story, with byte-identical full GPU-command tapes against the parent. Operation count only. [Scope and reproduction](batch-164-workcounts.md#row-1319-screen-effect-passes).

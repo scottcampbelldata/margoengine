@@ -73,7 +73,11 @@ export class NodePass implements EnginePlugin {
   private host?: StackHost;
   private engine?: Engine;
   private disposed = false;
-  private key = '';
+  private format?: GPUTextureFormat;
+  private samples?: number;
+  private encoded = false;
+  private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
+  private readonly descriptor: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   private pipeline?: GPURenderPipeline;
   private group?: GPUBindGroup;
   private last: GPUBindGroupEntry[] = [];
@@ -127,10 +131,11 @@ export class NodePass implements EnginePlugin {
   registerPasses(): void {}
   private render(c: Context, view: GPUTextureView, output: StageOutput): void {
     const device = c.device,
-      encode = this.kind === 'hdr' && !output.hdr,
-      key = output.format + output.multisample.count + encode;
-    if (this.key !== key) {
-      this.key = key;
+      encode = this.kind === 'hdr' && !output.hdr;
+    if (!this.pipeline || this.format !== output.format || this.samples !== output.multisample.count || this.encoded !== encode) {
+      this.format = output.format;
+      this.samples = output.multisample.count;
+      this.encoded = encode;
       this.pipeline = render(device, this.code(encode), output.format, { multisample: output.multisample });
       this.group = undefined;
     }
@@ -154,16 +159,17 @@ export class NodePass implements EnginePlugin {
         ? device.createBindGroup({ layout: this.pipeline!.getBindGroupLayout(0), entries })
         : undefined;
     }
-    const pass = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: output.view, loadOp: 'clear', storeOp: 'store' }],
-    });
+    this.attachment.view = output.view;
+    const pass = c.encoder.beginRenderPass(this.descriptor);
     pass.setPipeline(this.pipeline!);
     if (this.group) pass.setBindGroup(0, this.group);
     pass.draw(3);
     pass.end();
   }
   onDeviceRestored(): void {
-    this.key = '';
+    this.format = undefined;
+    this.samples = undefined;
+    this.encoded = false;
     this.sampler = this.group = this.pipeline = this.depthTexture = this.depthView = undefined;
   }
   dispose(): void {

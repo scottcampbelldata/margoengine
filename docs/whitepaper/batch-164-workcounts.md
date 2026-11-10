@@ -50,3 +50,30 @@ Clean-room research compared:
   producer/consumer ordering across workgroups.
 
 No companion code or rival source was read.
+
+## Row 13.19: screen effect passes
+
+Change: `perf(shader): reuse NodePass render pass descriptors`. Each `NodePass`
+render built a new render pass descriptor (object, attachment array and
+attachment) and a pipeline key string. It now keeps one descriptor per pass and
+compares output format, sample count and display encoding as values. In a
+10-frame story with `pixelate`, `rgbShift` and `vignette` (a uniform change, a
+resize, a format change, a sample-count change and a device restore), 30
+descriptors become 3 at 1x and at 4x. Both full GPU-command tapes match parent
+`960bb4f9b` exactly: WGSL, pipelines, bind groups, uniform bytes, passes, draws
+and intermediate formats.
+
+Reproduce after `npm run build:packages`:
+
+```sh
+node --test --test-timeout=120000 packages/shader/test/screen-effects-workcount.test.js
+npm run check:readme-run -- --packages=shader
+```
+
+This is CPU preparation work, not a GPU speed claim. The three passes stay. Each
+effect writes its result at the output's display precision and the next effect
+reads that stored image; a fused shader would skip those stores and change pixels,
+so the separate passes are an accepted workload difference. Jimenez (SIGGRAPH 2014,
+https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/)
+motivates fusion only where the intermediate values stay exact. No rival source
+was read.

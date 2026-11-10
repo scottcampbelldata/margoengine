@@ -3583,3 +3583,7 @@ rules (no `git stash` and no `npx` in any form). None changed the repository.
 ## Batch 164 fog preparation (2026-11-10)
 
 `perf(environment): compare froxel grid dimensions without serialization` removes 15 grid serializations in the 12-frame explicit-grid story, with exact GPU commands and uniform bytes in four variants. Row 9.5 retains the measured loss; shadowed temporal froxels versus a half-resolution raymarch remain different workloads. Timing pending the quiet rerun. [Reproduce](batch-164-workcounts.md).
+
+## Batch 164 screen effect descriptors (2026-11-10)
+
+`perf(shader): reuse NodePass render pass descriptors` makes 3 render pass descriptors instead of 30 in the 10-frame pixelate, rgbShift and vignette story at 1x and 4x, with identical GPU commands. The three effect passes remain (accepted difference: fusion would drop the stored display-precision intermediates). Timing pending the quiet rerun. [Reproduce](batch-164-workcounts.md#row-1319-screen-effect-passes).

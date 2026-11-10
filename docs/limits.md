@@ -6747,3 +6747,5 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | stats `GeometryStats`, `GLStats`, `StatsPanels` | Preview route | None: routes added (1, 2, 1 backend tests); new preview regression | `packages/stats/test/preview.test.js`, `packages/stats/test/gl.test.js` |
 
 Batch 164 row 9.5 retains shadowed temporal froxel injection, four-tap integration and per-sample compositing. The rival uses a half-resolution raymarch, so GPU workloads differ. Numeric grid comparison changes only CPU preparation; no speed gain or rival parity is claimed. [Evidence](whitepaper/batch-164-workcounts.md).
+
+Batch 164 row 13.19 keeps one render pass per `NodePass` screen effect. Each effect stores its image at the output's display precision before the next reads it; fusing pixelate, rgbShift and vignette into one shader would remove those stores and change pixels, so the extra passes are an accepted workload difference. [Evidence](whitepaper/batch-164-workcounts.md#row-1319-screen-effect-passes).
