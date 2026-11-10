@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, FrameGraph, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 
 /** The live map supplied by an unattached sky WeatherFX capture. */
 export interface PrecipitationMap {
@@ -54,6 +55,7 @@ export class PrecipitationCover implements EnginePlugin {
     if (this.disposed) throw new MargoError('disposed', 'PrecipitationCover is disposed; create a new cover');
     if (this.capture.options.weather.occlusion?.buffer)
       throw new MargoError('attached', 'Pass an unattached new WeatherFX to PrecipitationCover.attach');
+    requireWebGPU(engine, 'PrecipitationCover');
     this.capture.setup(engine);
     this.engine = engine;
   }

@@ -6729,4 +6729,5 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | materials `TransmissionLayers`, `NativeGlass` (internal) | WebGPU-only | `TransmissionLayers` refuses in its own setup (before, through `Transmission`); the native glass capture now refuses instead of registering two passes that skipped every frame | `packages/materials/tests/preview.test.js` |
 | selection `Highlight` | WebGPU-only | Refuses in its own setup; before, only through the inner `Selection` with that class's name | `packages/selection/test/highlight.test.js` |
 | terrain `TerrainImagery` | WebGPU-only | Refuses through `requireWebGPU` (help link added; a `webgl2` backend with a device object is now refused too) | `packages/terrain/test/imagery.test.js` |
+| weather `PrecipitationCover` | WebGPU-only | Refuses in its own setup before touching the capture; two unit fixtures gained `gpu: {}` (assertions unchanged) | `packages/weather/tests/cover.test.js` |
 

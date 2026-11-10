@@ -279,3 +279,5 @@ Build and unit tests: npm test --workspace @margoengine/weather
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+`PrecipitationCover` refuses the small preview in its own setup through the shared `requireWebGPU` (`PrecipitationCover needs WebGPU`, code `unsupported`, help link), after its `disposed` and `attached` checks and before it sets up the WeatherFX capture. Before 2026-11-10 it relied on the capture to refuse, which the preview-contract gate cannot see, so `npm run verify` failed. Two unit fixtures in `tests/cover.test.js` gained `gpu: {}` on their fake engine, because a cover now needs a GPU engine to attach; their assertions are unchanged. Regression: the new preview test in `tests/cover.test.js`.
