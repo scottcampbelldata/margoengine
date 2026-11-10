@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Stage } from '@margoengine/stage';
 import { addLights } from '@margoengine/stage/lights';
+import { addScene } from '@margoengine/stage/scene';
 import { Clustered } from '@margoengine/clustered';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
@@ -104,6 +105,43 @@ test('invalid later groups roll back earlier additions, and cancellation adds no
     stage.dispose();
     lights.dispose();
     assert.throws(() => lights.add(receiver()), /disposed/i);
+  } finally {
+    stage.dispose();
+  }
+});
+
+test('addScene and addLights share the clustered list in either order, and each dispose takes only its own', async () => {
+  // Before: addScene's light list replaced the whole list with its own lights, dropping addLights' (and back again).
+  const stage = await fixture(),
+    doc = {
+      format: 'margo-save',
+      version: 1,
+      entities: [
+        { id: 'lamp', transform: { position: [0, 2, 0] }, components: { light: { type: 'point', range: 5 } } },
+      ],
+    };
+  try {
+    const lights = await addLights(stage, [{ type: 'point', position: [0, 1, 0], range: 5 }]),
+      scene = await addScene(stage, doc, { fit: false });
+    assert.equal(lights.clustered.list.length, 2);
+    scene.dispose();
+    assert.deepEqual(
+      lights.clustered.list.map((light) => light.position),
+      [[0, 1, 0]],
+    );
+    const again = await addScene(stage, doc, { fit: false }),
+      more = await addLights(stage, [{ type: 'point', position: [0, 3, 0], range: 5 }]);
+    assert.equal(more.clustered.list.length, 3);
+    again.dispose();
+    assert.deepEqual(
+      more.clustered.list.map((light) => light.position),
+      [
+        [0, 1, 0],
+        [0, 3, 0],
+      ],
+    );
+    more.dispose();
+    lights.dispose();
   } finally {
     stage.dispose();
   }

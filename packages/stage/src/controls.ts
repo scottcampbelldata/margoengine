@@ -1,5 +1,22 @@
 import type { Camera, Vec3 } from '@margoengine/core';
 import { rangeError } from '../../shared/errors.js';
+const dot = (p: readonly number[], q: readonly number[]) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+/**
+ * An orthonormal frame [a, u, b] with u = normalized `up` and a = u x b, so +Y up gives the X, Y, Z axes: b is world +Z
+ * with its part along u removed (world +Y when up is along Z).
+ */
+function frame(up: readonly number[]): [number[], number[], number[]] {
+  const length = Math.hypot(up[0], up[1], up[2]);
+  if (!length || !Number.isFinite(length)) throw rangeError('Invalid camera up: pass a nonzero [x, y, z]', 'camera');
+  const u = [up[0] / length, up[1] / length, up[2] / length],
+    seed = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [0, 1, 0],
+    along = dot(seed, u),
+    raw = seed.map((v, i) => v - along * u[i]),
+    size = Math.hypot(raw[0], raw[1], raw[2]),
+    b = raw.map((v) => v / size);
+  return [[u[1] * b[2] - u[2] * b[1], u[2] * b[0] - u[0] * b[2], u[0] * b[1] - u[1] * b[0]], u, b];
+}
+
 /**
  * Pointer orbit/pan/zoom for a {@link Camera} on a canvas: left drag orbits, middle/right or Shift+left drag pans, the
  * wheel zooms between 2x `near` and 0.8x `far`. Call `update(delta)` each frame (seconds) to apply wheel zoom, and
@@ -76,6 +93,10 @@ export class CADCameraControls {
     this.camera.target = [...point];
     this.camera.cancelFit();
   }
+  /**
+   * Turntable orbit about `camera.up` (any direction, not only +Y): `azimuth` turns about it, `elevation` tilts toward
+   * it, stopping 0.001 rad short of either pole.
+   */
   orbit(azimuth: number, elevation: number): void {
     if (![azimuth, elevation].every(Number.isFinite)) throw rangeError('Invalid orbit', 'camera');
     this.camera.cancelFit();
@@ -83,15 +104,17 @@ export class CADCameraControls {
       p = c.position.map((v, i) => v - c.target[i]),
       r = Math.hypot(...p);
     if (!r || !Number.isFinite(r)) throw rangeError('Invalid orbit', 'camera');
-    const u = p[0] || p[2] ? p : c.up.map((v) => -v * p[1]),
-      theta = Math.atan2(u[0], u[2]) + azimuth,
-      phi = Math.max(0.001, Math.min(Math.PI - 0.001, Math.acos(Math.max(-1, Math.min(1, p[1] / r))) + elevation));
-    c.position = [
-      c.target[0] + r * Math.sin(phi) * Math.sin(theta),
-      c.target[1] + r * Math.cos(phi),
-      c.target[2] + r * Math.sin(phi) * Math.cos(theta),
-    ];
+    const [a, u, b] = frame(c.up),
+      x = dot(p, a),
+      z = dot(p, b),
+      theta = (x || z ? Math.atan2(x, z) : 0) + azimuth,
+      phi = Math.max(0.001, Math.min(Math.PI - 0.001, Math.acos(Math.max(-1, Math.min(1, dot(p, u) / r))) + elevation)),
+      s = r * Math.sin(phi);
+    c.position = c.target.map(
+      (v, i) => v + s * Math.sin(theta) * a[i] + r * Math.cos(phi) * u[i] + s * Math.cos(theta) * b[i],
+    ) as unknown as Vec3;
   }
+  /** Moves position and target together in the screen plane, whose up follows `camera.up`. */
   pan(x: number, y: number): void {
     if (![x, y].every(Number.isFinite)) throw rangeError('Invalid pan', 'camera');
     this.camera.cancelFit();
@@ -99,14 +122,15 @@ export class CADCameraControls {
       d = c.position.map((v, i) => v - c.target[i]),
       r = Math.hypot(...d);
     if (!r || !Number.isFinite(r)) throw rangeError('Invalid pan', 'camera');
-    const h = Math.hypot(d[0], d[2]),
-      pole = Math.hypot(c.up[0], c.up[2]),
-      right = h
-        ? [d[2] / h, 0, -d[0] / h]
-        : pole
-          ? [(-c.up[2] * Math.sign(d[1])) / pole, 0, (c.up[0] * Math.sign(d[1])) / pole]
-          : [1, 0, 0],
-      up = [(d[1] * right[2]) / r, h / r, (-d[1] * right[0]) / r],
+    const [a, u] = frame(c.up),
+      cross = [u[1] * d[2] - u[2] * d[1], u[2] * d[0] - u[0] * d[2], u[0] * d[1] - u[1] * d[0]],
+      h = Math.hypot(...cross),
+      right = h ? cross.map((v) => v / h) : a,
+      up = [
+        (d[1] * right[2] - d[2] * right[1]) / r,
+        (d[2] * right[0] - d[0] * right[2]) / r,
+        (d[0] * right[1] - d[1] * right[0]) / r,
+      ],
       scale = 2 * r * Math.tan((c.fov * Math.PI) / 360),
       offset = right.map((v, i) => (-x * v + y * up[i]) * scale);
     c.position = c.position.map((v, i) => v + offset[i]) as unknown as Vec3;

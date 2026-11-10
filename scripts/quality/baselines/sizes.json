@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14675990,
+  "total": 14678106,
   "history": [
     {
       "date": "2026-10-24",
@@ -8123,6 +8123,12 @@
       "commit": "5e16f1bf4",
       "reason": "batch 161 jobs 2 and 3: shared bone ranges, palette arrays swapped instead of copied and one coalesced bone write",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e8a17cea0",
+      "reason": "stage fixes (shared lights, camera up, controls about camera.up) and core e8f3decf6's fixes (roll at pitch 90, aspect past 4096, fit past near); core cap 21813 B approved by Scott 2026-11-10",
+      "grew": 2
     }
   ],
   "items": {
@@ -8320,7 +8326,7 @@
     "@margoengine/controls/transform": 12121,
     "@margoengine/controls/transitions": 14087,
     "@margoengine/controls/walk": 14348,
-    "@margoengine/core": 21775,
+    "@margoengine/core": 22467,
     "@margoengine/core/extension": 21951,
     "@margoengine/creative": 19368,
     "@margoengine/creative/grass": 6122,
@@ -8988,6 +8994,7 @@
     "@margoengine/sciviz/amr": 30374,
     "@margoengine/sciviz/annotate": 7680,
     "@margoengine/sciviz/atmosphere": 35321,
+    "@margoengine/sciviz/bench": 1425,
     "@margoengine/sciviz/bricks": 29625,
     "@margoengine/sciviz/calc": 7263,
     "@margoengine/sciviz/categorical": 23404,
@@ -9330,7 +9337,7 @@
     "@margoengine/voxel-edit/collab": 2676,
     "@margoengine/voxel-edit/edit": 10734,
     "@margoengine/voxel-edit/export": 9297,
-    "@margoengine/voxel-edit/formats": 9294,
+    "@margoengine/voxel-edit/formats": 9293,
     "@margoengine/voxel-edit/formats-extra": 5190,
     "@margoengine/voxel-edit/generate": 2735,
     "@margoengine/voxel-edit/gpu": 6177,

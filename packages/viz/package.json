@@ -1463,6 +1463,10 @@
       "types": "./dist/scene/tags.d.ts",
       "import": "./dist/scene/tags.js"
     },
+    "./sciviz/bench": {
+      "types": "./dist/sciviz/bench.d.ts",
+      "import": "./dist/sciviz/bench.js"
+    },
     "./sciviz": {
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"

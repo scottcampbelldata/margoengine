@@ -37,8 +37,8 @@ export interface LoadedScene {
   readonly meshes: ReadonlyMap<string, Mesh>;
   /** The glTF models, by the id of the entity that holds each. */
   readonly models: ReadonlyMap<string, PBRModel>;
-  /** Each `camera` component in world space, by entity id: `Object.assign(stage.engine.camera, cameras.get(id))` switches. */
-  readonly cameras: ReadonlyMap<string, Required<CameraOptions>>;
+  /** Each `camera` component in world space (up is the entity's +Y), by entity id: `Object.assign(stage.engine.camera, cameras.get(id))` switches. */
+  readonly cameras: ReadonlyMap<string, Required<CameraOptions> & { up: [number, number, number] }>;
   /** The `Clustered` holding the scene's point and spot lights, for `add`ing more receivers. Undefined when it has none. */
   readonly lights: Clustered | undefined;
   /** The document's `meta`. */
@@ -110,24 +110,26 @@ function checkCamera(entity: ResolvedEntity): void {
   if (active !== undefined && typeof active !== 'boolean') throw wrong('active: boolean');
 }
 
+type Point = [number, number, number];
 /** Where an entity's mesh is and which way it faces in the world: glTF's rule, a light or camera looks down its -Z. */
-function pose(mesh: Mesh): { position: [number, number, number]; forward: [number, number, number] } {
+function pose(mesh: Mesh): { position: Point; forward: Point; up: Point } {
   const m = (mesh as unknown as RuntimeMesh).matrix,
-    length = Math.hypot(m[8], m[9], m[10]) || 1;
-  return { position: [m[12], m[13], m[14]], forward: [-m[8] / length, -m[9] / length, -m[10] / length] };
+    length = Math.hypot(m[8], m[9], m[10]) || 1,
+    tall = Math.hypot(m[4], m[5], m[6]) || 1;
+  return {
+    position: [m[12], m[13], m[14]],
+    forward: [-m[8] / length, -m[9] / length, -m[10] / length],
+    up: [m[4] / tall, m[5] / tall, m[6] / tall],
+  };
 }
 
-/** What each scene put on a shared light list, so that two scenes add up and one leaves without taking the other's. */
-const held = new WeakMap<object, Set<unknown[]>>();
-function hold<T>(list: { setLights(lights: T[]): unknown }, own: T[]): () => void {
-  const all = (held.get(list) ?? new Set()) as Set<T[]>;
-  held.set(list, all as Set<unknown[]>);
-  all.add(own);
-  list.setLights([...all].flat());
-  return () => {
-    all.delete(own);
-    list.setLights([...all].flat());
-  };
+/**
+ * Adds a scene's own lights to a shared light list and returns the undo that removes only those, by object: the rule
+ * addLights' `contribute` follows, so scenes and addLights calls add up and each leaves without taking another's.
+ */
+function hold<T>(list: { readonly list: readonly T[]; setLights(lights: T[]): unknown }, own: T[]): () => void {
+  list.setLights([...list.list, ...own]);
+  return () => list.setLights(list.list.filter((light) => !own.includes(light)));
 }
 
 /** Builds an entity's mesh from its `mesh` and `material` components. */
@@ -283,7 +285,7 @@ export async function addScene(
       for (const mesh of built.splice(0)) mesh.dispose();
     };
   const shown = [...meshes.values(), ...[...models.values()].flatMap((model) => model.nodes)],
-    cameras = new Map<string, Required<CameraOptions>>(),
+    cameras = new Map<string, Required<CameraOptions> & { up: Point }>(),
     runtime = stage.engine as unknown as RuntimeEngine;
   let lights: Clustered | undefined;
   try {
@@ -291,13 +293,23 @@ export async function addScene(
     const camera = stage.engine.camera;
     for (const entity of viewed) {
       const { fov = camera.fov, near = camera.near, far = camera.far, target } = entity.components.camera as CameraOptions,
-        { position, forward } = pose(meshes.get(entity.id)!);
+        { position, forward, up } = pose(meshes.get(entity.id)!),
+        look = target ?? (position.map((v, i) => v + forward[i] * 10) as Point),
+        view = look.map((v, i) => v - position[i]),
+        // The entity's +Y is the screen up, so a rolled camera renders rolled. A target straight along that +Y (a
+        // top-down view from an unrotated entity) would make the look-at degenerate, so then the entity's -Z is up.
+        side = Math.hypot(
+          up[1] * view[2] - up[2] * view[1],
+          up[2] * view[0] - up[0] * view[2],
+          up[0] * view[1] - up[1] * view[0],
+        );
       cameras.set(entity.id, {
         fov,
         near,
         far,
         position,
-        target: target ?? (position.map((v, i) => v + forward[i] * 10) as [number, number, number]),
+        target: look,
+        up: side > 1e-6 * Math.hypot(...view) ? up : forward,
       });
     }
     const active = (wanted: boolean | undefined) =>

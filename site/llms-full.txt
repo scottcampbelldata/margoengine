@@ -2854,10 +2854,28 @@ features add no core or stage functionality.
 
 # Design envelope
 
+- Batch 164 SSAO/GTAO: 4x removes one early colour resolve; 1x is unchanged.
+  The 40 B/pixel reduction counts logical rgba16float resolve source reads and
+  destination writes, not physical bandwidth. No shader, quality, target-size,
+  rival-speed or sampling reduction is claimed. Timing pending the quiet rerun.
+  Native and ANGLE Vulkan pass exact pixels. Default ANGLE D3D11 varies in
+  unchanged control frames too (59 channels, at most two display levels after
+  resize); this fixture is not certified byte-stable there.
+
+- Batch 165 job 1: optional tonemap root gzip 12,490 to 12,598 B (+108 B), ceiling 12,561 to 12,976 B. Cube parsing retains one row token array, removes the complete line/comment arrays and the redundant RGBA validation pass, with byte-identical samples. Its synchronous root API is preserved; a split would retain that implementation or change the API. Input caps and GPU grading are unchanged. [Work counts and reproduction](whitepaper/batch-165-workcounts.md); timing pending the quiet rerun.
+
 - Batch 179 job 4 size: sciviz/provenance 0 to 24,854 B gzip, ceiling 25,600 B. The entry includes exact portable numeric/GPU argument decoding and its shared colour data, bounded runnable history, compressed PNG/SVG records and build versions. Splitting would duplicate lifecycle handling or require applications to assemble the export/trace feature. Core + stage stays 24,209 B; no speed claim.
 
 - Batch 179 provenance: opt-in /provenance factories or withProvenance() add PNG/SVG records and trace() to an instance. Version 1 records contain the full portable spec, typed-array/source and numeric-JSON hashes, timestamp, exact build-resolved Margo runtime dependency versions, adapter information and browser identity. Browser privacy can leave adapter fields empty; no driver identity is guessed. Compressed PNG iTXt parsing checks every CRC and bounds the input and inflated text to 256 MiB by default. The record SHA-256 detects content changes and is not an authorship signature. Trace defaults to 10000 retained successful calls and a conservative 256 MiB argument budget; exceeding a bound releases history and makes trace() reject, without interrupting figure rendering. Final portable state preserves camera/time, pipeline, selection, callbacks represented as frames and external data writes; application codecs/operator registries remain explicit replay inputs. Returned ESM needs the normal package resolver, bundler or import map. There is no global prototype patch and no core/stage change.
 
+
+
+- Batch 163 points frame reuse retains a 144-byte snapshot per PointsPlugin plus a typed view and flag. It removes unchanged camera uploads only; point culling, sorting, quads and draw counts remain as before. Timing pending the quiet rerun; historical slower rows are not reclassified. See [work-count proof](whitepaper/bp-163-workcounts.md).
+
+
+### Batch 163 light-helper circle retention
+
+A light helper retains 528 bytes of Float64 circle samples and two three-number coordinate arrays only after it draws a circle. This removes repeated geometry preparation work; it changes no precision, edge count or raster work. Timing pending the quiet rerun. [Proof](whitepaper/bp-163-workcounts.md#job-2-live-light-helper-circles).
 
 ## K2 rendering and test limits
 
@@ -3641,6 +3659,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Spatial weather regions (`@margoengine/weather/regions`, 2026-11-07) | Enforced: front speed 0 to 200 m/s and width 1 to 100,000 m; cell radius 1 to 1,000,000 m. | Authoring shapes, not a forecast model (LIM-388). | By method: fronts are straight lines at a constant speed and cells are circles at a constant velocity, blended in a fixed order (base, fronts, cells), so there is no front that bends, stalls or occludes and no cell that grows from the air; a place's ground wetness and snow come from the machine it feeds, not from the map's history there. | Stack several `fronts` and `cells` (`addFront`, `addCell`; they apply in order over the base), and give a cell `life: [from, to]` to grow it in and fade it out. |
 | Hail lighting and splashes (`lit` and `splashes` on `@margoengine/weather/hail`, 2026-11-07) | Enforced: `splashes` 0 to 8 chips a stone. | By method: a stone is shaded as a ball from its place across its streak by the engine's one sun and ambient light, Lambert diffuse and a Blinn-Phong glint: it casts no shadow and the scene's shadows do not reach it, so a stone under a roof is lit as in the open; chips burst from the ground height `groundY`, not from the surface the stone meets, and fly on closed-form paths without colliding. Proved on one GPU, a Radeon 680M (LIM-390). | A stone casts no shadow and takes none from the scene, and chips burst from `groundY` rather than from the surface the stone meets. | Set `groundY` to the height where stones should land, and `lit: false` for the flat `color` if the sun shading looks wrong under cover; `splashes` is 0 to 8. |
 | Weather drive (`@margoengine/weather/drive`, 2026-11-07) | By method: it writes numbers into targets each frame before they draw; it sets a sky's cloud sheet and fog only when the sky has them, and cloud cover is the state's `cloud` for every layer (no cloud types or heights from the weather); the layer's density (0.02 to 0.08 per metre) and its wind aloft (three times the ground wind) are design choices, not measured profiles. Proved on one GPU, a Radeon 680M (LIM-391). | It writes numbers into targets each frame before they draw, and the layer's density and wind aloft are design choices. | A target attached before the drive lags a frame, and cloud cover is the state's `cloud` for every layer. | Attach it before the targets for no frame of lag. |
+| DynamicInstances record size (`@margoengine/culling/dynamic`, accepted structural difference, 2026-11-10) | Counted (batch 166, `packages/culling/test/dynamic.test.js`): each kept instance is a 96-byte core instance record (matrix 64, colour 16, material factors 16) read through six vertex attributes, against 64 bytes in three's `InstancedMesh`; the vertex stage fetches 32 bytes more a box vertex (24 vertex invocations a box). The rows themselves upload 48 bytes each, 16 fewer than three. | Core draws the instances (`Batch.redirect`) with its own shader and every patch (shadow receiving, sections, fog), which read the record's colour and factors; core is frozen, and a package-owned draw pipeline would lose those patches, so the picture would not be identical. | 32 bytes a kept instance of GPU memory and vertex fetch; the colour and factors per instance are what let tints and core's patches work. Timing pending the quiet rerun. | Nothing to do; for static instances use `CulledInstances`, which shares the record. |
 | Weather audio cues (`@margoengine/weather/audio`, 2026-11-07) | By method: the rain and wind are one looping noise each (2 s, filtered: a low-pass for rain, a band-pass for wind), not recordings, and play everywhere at once (no rain on a roof louder than in a field, no direction for the wind); thunder is one generated rumble per strike from the strike's loudness and length, not a recorded clap. | The mix curves are design choices, set at each update, smoothed by `@margoengine/audio` (LIM-394). | Rain and wind sound the same everywhere in the scene, and thunder is a generated rumble, not a recorded clap. | Pass your own `buffers` for recorded sound. |
 | Real weather from METAR reports (`@margoengine/weather/data`, 2026-11-07) | By method: one report at a time, the observation only: the trend (NOSIG, BECMG, TEMPO) and remarks are kept as text, not decoded, and TAF forecasts are not read; runway visual range, runway state, wind shear and sea groups are skipped; cloud becomes the greatest layer's cover (no layer heights or types in the state), precipitation one of three intensities, and the state's fog comes from the prevailing visibility, so mist and haze read as fog by their visibility alone. Proved on 798 real reports of 50 aerodromes (LIM-397). | One METAR report is read at a time, and only the observation in it. | Mist and haze read as fog by their visibility alone. | `metarState` returns a plain `WeatherState`: set `fog` or any other field on it before `transitionTo`, for example to clear fog on a mist report. |
 | Astronomical sky (`@margoengine/sky/astro`, 2026-11-07) | No counted threshold; the planet elements are valid 1800 to 2050. | Each part uses a published method with a stated accuracy. | By method: the sun by Meeus' low-accuracy method (about 0.01 degree), the moon by his chapter 47 series (about 10 arcseconds) with its parallax, the planets by Standish's Keplerian elements (valid 1800 to 2050; tens of arcseconds, several arcminutes for Saturn), nutation by the short series (0.5 arcsecond); aberration (up to 20.5 arcseconds) is not applied, Saturn's magnitude leaves out its rings, and the planets are points, not discs. Delta T is Espenak and Meeus' polynomials (to their fits, 0.6 s apart where they meet). Stars are points of a 1 px Gaussian with no twinkle; on a float target the sky behind a star is dimmed by 1/64 of the star's alpha (an 8-bit target replaces it by the alpha), and stars are drawn over the moon's disc. The catalogue is the user's to serve (`fetchBrightStarCatalog`; the test copy is not shipped). Proved on one GPU, a Radeon 680M. | Set `planets: false` for dates outside 1800 to 2050, and give your own `deltaT` (seconds) where the polynomial fit is poor. |
@@ -3992,6 +4011,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Animation LOD (`@margoengine/animation/lod`, 2026-11-06) | CPU only, and not measured for speed yet: how many copies update is counted, the frame time is not. Every copy still goes through the GPU deform dispatch each frame, and each still draws. Visibility is a sphere at the model root against the view, with no occlusion. `depth` counts node levels from the scene roots, so its meaning depends on the rig. A tier with a depth does not play `KHR_animation_pointer` channels. Deeper bones hold, so a far character can show a slightly wrong pose until it comes closer. Why: A skipped pose must still draw, and the deformed output is what draws. What you see: A crowd limited by the GPU gains little. A copy far larger than its `radius` can stop updating while part of it shows. Escape hatch: Set `radius` to cover the character. Use `VATCrowd` when the GPU is the limit. |
 | Clip editing (`@margoengine/animation/clip-utils`, 2026-11-06) | By method: an eased or cubic segment that a cut passes through becomes straight keys at `fps` (default 60), so it follows the curve only to that step; segments kept whole stay exact. Works on `KeyframeClip`s, not glTF clips. `makeAdditive` leaves property tracks out, and `applyAdditiveClip` poses a `Skeleton` only, without morph weights. Why: An eased curve is defined over its whole segment, so one key cannot carry part of it. What you see: Very fine motion inside a cut curve can flatten between samples. Escape hatch: Pass a higher `fps`. For a glTF clip use an `@margoengine/animator` additive layer. |
 | Engine ticks per `cloneModel` copy (2026-11-06) | None when the copy can take its source's static batches, skinned models included, so a crowd no longer costs a tick of every mesh per copy. One when the source moved since baking, has a parent, or had its geometry rewritten: the copy bakes for itself. A copy's world matrices publish with the next tick; a direct `node.matrix` read before it sees the old value. The time saved is not measured yet. |
+| Work per `cloneModel` copy (2026-11-10, accepted difference) | A copy builds what it needs to draw at once: a core node per glTF node plus its root (75 for RobotExpressive), a uniform slot and bind groups per primitive; `destroy` disposes them. three's `SkeletonUtils.clone` makes JavaScript objects only and builds GPU state at its first render, so `p-skeleton-clone` times less work on three's side. The node copy itself makes one array a copy and the constructor groups primitives in one pass. The like-for-like row "clone + first draw" is pending the quiet rerun. |
 | Dual quaternion skinning (`@margoengine/animation/dqs`, 2026-11-06) | Per `Animation`, fixed when it is created. `Skin` on raw data, `bakeVAT` and bone-texture crowds stay linear. Stretch blends linearly about the mesh origin, so between bones of different scale the result differs from a linear blend. Each bone costs a polar decomposition on the CPU every frame. Frame time is not measured yet. |
 | Bone-texture crowds (`@margoengine/animation/instanced-skin`, 2026-11-06) | One material, opaque, no CPU culling, like `VATCrowd`. Morph targets are frozen at bake time, and bones blend linearly. Two clips a member: more needs another bake. Texture rows cap at 8,192 of 2,048 texels, about 5.5 million bone frames. Each vertex reads up to 96 texels when two clips blend across eight influences (24 for one clip and four). Frame time against `VATCrowd` and `Animation` is not measured yet. |
 | Geometry caches (`@margoengine/animation/geometry-cache`, `/point-cache`, 2026-11-06) | PC2 and MDD are read, proved on files Blender's published add-ons wrote; the triangles come from the caller, as neither format holds them. Alembic is not read: the format has no published specification, and Margo is built from specs and papers. 3 to 1,000,000 vertices a chunk, one mesh, one material. The CPU interpolates and writes the whole mesh to the GPU every changed frame, so upload bandwidth is the ceiling: 80 bytes a vertex. Vertices are uncompressed. A seek back on a URL rereads from the start of the file, and a loop rereads it every lap unless it is one chunk: no range requests and no index of chunks. A stream source keeps every chunk it read. No mix across a change of mesh: the last frame holds. Motion vectors, frame time and upload cost are not measured yet. |
@@ -9458,6 +9478,8 @@ The optional cache/eviction index coalesces removals in the same object-store tr
 
 Live volume materials (review5, 2026-11-10): attenuation edits invalidate parsed optical-depth caches per channel; replacing the array invalidates all channels. Equal numeric assignments are not observable, so replacing an underflowed zero with explicit opacity requires array replacement or explicit infinite optical depth. Pointer animation retains authored logarithmic precision. Exact slab evidence and the unchanged mesh-slab/range limitations are documented in live-volume-materials.md.
 
+Transmission activation from zero (2026-11-10): the physical parser retains medium state for an authored KHR_materials_transmission extension even when its factor is zero or omitted. Pointer playback activates tint for positive factors and restores the opaque path at zero. Native capture registration remains inactive until transmission is active. The existing scalar-thickness, screen capture and display-space blending limits still apply; this change adds no optical model.
+
 ### Range-cache response transit age (2026-11-10)
 
 RangeCache includes elapsed request time together with the Age header when calculating the freshness deadline after a miss or a 304 response. For max-age=10, Age=3 and a four-second request, three seconds of freshness remain when the response arrives; Age=8 with the same transit is already expired. The controlled-clock regression checks the next cache session revalidates in both cases. Existing once-per-instance checking and offline fallback policies are unchanged; this is clock correctness, not a speed result. No public API or schema change.
@@ -9470,6 +9492,58 @@ Locked-toolchain root entry measurements for this repair: DOF 9529 to 9538 gzip 
 
 SSGI exact one-bounce round trips on RTX A6000 / ANGLE D3D11 can differ by one display level despite identical GL commands. The first differing target is the ray trace; native WebGPU and ANGLE Vulkan pass this fixture. This separately recorded driver case leaves the exact assertion unchanged. See [raw values and reproduction](review5-ssgi-angle.md).
 
+### Ambiguous flat pen tilt (2026-11-10)
+
+When a pen event lacks spherical angles, a tilt pair with both components nonzero and either at +/-90 degrees maps to altitude zero and azimuth zero, following the informative Pointer Events Level 3/4 fallback convention. This cannot recover the pen's physical direction from ambiguous readings. The four flat axis directions and explicitly supplied altitude/azimuth retain their values; raw tilt samples remain unchanged. Evidence uses synthetic legacy events on the CPU and in the native/compatibility input browser gate, not a physical stylus. No public API change.
+
+### Validated cache policy retention (2026-11-10)
+
+AssetCache and RangeCache persist Cache-Control and Expires with their metadata. A 304 retains either omitted field, replaces any provided value and calculates freshness using the current response's Date/Age and request transit. An explicit no-cache therefore remains effective on later 304 responses that omit lifetime fields. Freshness updates require matching stored validators. Older records without saved policy remain conservatively revalidated until a response supplies it; their offline bytes remain usable. Public API and schema version are unchanged. Root and ranges entry sizes remain within their existing ceilings.
+
+### Asset-cache delayed hit bookkeeping (2026-11-10)
+
+An already-read response may still finish after its stored copy is evicted or replaced. Its background last-use update cannot recreate missing metadata, overwrite a newer file's size, type or validators, or move last use backwards. A 304 freshness update requires matching stored validators. The same four delayed-response cases run with plain and indexed eviction on the CPU stand-in and real IndexedDB; after a 150-byte-budget eviction only one 100-byte file remains, and replacing that file with an 80-byte response retains the new response's headers. Public API and schema are unchanged. This does not add global request coalescing or change the documented offline fallback.
+
+Batch 162 lathe/tube angular reuse: per-call Float64 tables add 16 bytes per angular column (2,064 bytes for the p-extrude lathe, 272 bytes for its tube). Frames, curve samples, normalization, closed seams, extrusion and output stream bytes stay unchanged; no cache survives a call. The claim covers angular operation counts only, with timing pending the quiet rerun. [Evidence](whitepaper/batch-162-workcounts.md#row-42-lathe-and-tube-angular-reuse).
+
+Batch 162 primitive angular reuse: sphere/cylinder/capsule/torus allocate a temporary Float64 sin/cos table of 16 bytes per angular column including the seam (at most 1,040 bytes per affected p-primitives builder). No cache survives a call. Geometry buffers and groups match the parent byte for byte on the same JavaScript runtime; cross-runtime transcendental bit identity is not promised. Operation counts are not a runtime or competitive speed claim. [Evidence](whitepaper/batch-162-workcounts.md).
+
+### Subdivision face counts against Blender (batch 169, 2026-11-10)
+
+`subdivideMesh` keeps every face planar, so each curved quad of the result is stored as
+two triangles; Blender's Subdivision Surface modifier keeps curved quads. Vertex positions
+match Blender 5.3 within its Float32 storage (largest 1.52e-7 on the tested cube, cylinder,
+wedge and open grid), but curved results hold twice Blender's faces (cube level 1: 48
+against 24). Flat results are equal. Accepted work difference: planar faces are a
+mesh-edit invariant. [Values](whitepaper/batch-169.md#job-3-mesh-edit-subdivision-edges).
+
+### Text measurement reuse and oracle scope (batch 169, 2026-11-10)
+
+`layoutText` reuses logical kerning only when visual neighbors retain their original
+source adjacency; shaped prefix advances remain raw until the same scaling and
+spacing operations run. A deterministic measurer is required within a call.
+Four Source Sans 3 advance widths equal Canvas, while external Troika 0.52.4
+selection widths differ by up to 8.900960288826809e-6 em. Numeric differences are
+retained; glyph pixels and full Unicode equivalence were not measured. This is not
+a runtime speed claim. [All values and commands](whitepaper/batch-169.md).
+
+### UI layout measurement contract (batch 169, 2026-11-10)
+
+`arrange` retains content sizes by node and available inner width only during one
+call. Custom measurers return stable values for a width during that call. Direct
+edits between calls require no dirty flags. On the nested-row oracle, two different
+width constraints require two callbacks, versus Yoga 3.2.1's one; fully explicit
+grow/shrink fixtures require zero callbacks on either side and yield equal
+rectangles. [Evidence and reproducible scope](whitepaper/batch-169.md). No cross-call
+cache, competitive timing result or full CSS/Yoga conformance is claimed.
+
+## Batch 182 volume comparison limits
+
+The [volume controls](sciviz-rivals.md) record full 64/128 cubes at 256 x 256. The historical shaded anisotropic row differs in step and lighting. Isotropic controls share inputs and nominal integration distance but retain half-float/float storage, jitter, interpolation and output differences. Margo retains opaque-depth capture/composition work. Exact repeated frames are required independently; cross-engine image differences are reported, not asserted equivalent. Timing pending the quiet rerun.
+
+
+The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)) draws every scene at 256 x 256. Rows past a source table repeat its rows and are labelled replicated; the volume scenes share one nearest-neighbour resample of the MRI head. Image differences are observations, never pass marks. Cosmograph keeps its own animation loop, which also runs during Margo's samples. The analytic references converge at second order (sphere area error 0.062 %, volume 0.12 %, ABC streamline 0.0013, isoline 0.00024 at 65 samples per axis). Timing pending the quiet rerun.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -9478,7 +9552,7 @@ Lane B controls README (2026-11-10): strict TypeScript rejects a Spline passed d
 
 Lane B README runtime gate (2026-11-10): concurrent check:readme-run commands in distinct worktrees serialize as one lane because scripts/run-readme-examples.mjs passes the constant owner check-readme-run and scripts/support/gpu-admission.mjs sameLane compares owner-derived lane names across worktrees. Repro: start the full local CI README runner, then a narrowed runner elsewhere while another GPU slot is free. Run a narrowed command under scripts/gpu-lock.mjs run --owner=lane-B-readme so nested locking retains a real lane identity; fix the runner owner at its owning lane in the fix phase.
 
-Review 5 outside-scope finding (2026-11-10): start a glTF material at KHR_materials_transmission.transmissionFactor 0 and animate that factor to 1 with KHR_animation_pointer. Parsing reserves tint/attenuation only for an initially positive factor, and pointer tint() skips a material without tint, so the zero-to-transmitting transition has no native transmission tint. Cause: load-time transmission resource/derived-state reservation. Build-phase rules defer this separate transition gap to the fix phase.
+Fixed in lane Q fix phase (2026-11-10): KHR_animation_pointer transmissionFactor can start at zero, become positive, then return to the opaque path. The physical parser reserves medium state from extension presence and native capture admission observes that capability; the pointer writer activates tint only for a positive factor. Regression: packages/animation/tests/volume-pointer.test.js, packages/gltf-pro/tests/beer-distance.test.js and packages/gltf-pro/tests/native-volume.html. Source documents remain unchanged.
 
 Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/check-example-types.test.js` fails its cameras-scoped expectation because cameras now reaches 14 packages, above the unchanged 12-package full-run threshold; the planner correctly selects all projects but the fixture expects a named subset. Outside the API-record classification job; reconcile the fixture in the fix phase without weakening closure coverage.
 
@@ -11626,6 +11700,22 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   symptom.
 
 
+## Sciviz comparison gaps
+
+Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)). Each is a missing
+feature that a web rival or desktop tool documents, with no export, README section or test in `@margoengine/sciviz`.
+Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
+
+- **No MinIP volume mode.** VTK.js documents minimum intensity projection; sciviz volumes offer composite and MIP.
+- **No multi-component or general multi-volume compositing.** Label maps fuse over one scalar volume only.
+- **Missing grid filters:** threshold, plot over line, integrate, resample, warp and connectivity are not in the
+  batch 172 pipeline.
+- **Zarr Blosc and Zstandard codecs are refused** (README "Medical and array formats").
+- **SPLOM has no test.** `scatterMatrix` in `src/parcoords.ts` is exported without a test of its own.
+- **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
+- **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
+  for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.
+
 ## Performance losses still open
 
 Measured but not fixed. Their history, sources and rerun commands are in
@@ -11644,8 +11734,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   1.300 ms, one 256 x 256 frame plus the pixel read, paired turns, per-round minimum, busy machine, diagnostic. The
   rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). Mean absolute channel difference of the last pair is 1.801.
   Repro: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`
-  after the sciviz build. The rival is installed outside the repository. Cause not yet found. Publishing the number
-  does not close it.
+  after the sciviz build and only in the active quiet speed phase. The rival stays outside the repository.
+  Batch 182 diagnoses unequal anisotropic stepping/lighting and extra Margo depth/capture work; its separate
+  isotropic controls record full workloads. Two per-frame matrix allocations are removed with exact uniform-byte
+  regression coverage. The elapsed-time loss remains open; [controls and reproduction](sciviz-rivals.md).
 - **A degree-3 cloud of 1,692,538 splats does not attach** (`@margoengine/splats`, perf history entry 103): the
   published truck at iteration 7,000. SH is 16 coefficients per channel as float32 (192 bytes a splat, about 310 MiB).
   `Splats.attach` refuses that buffer because the device's `maxStorageBufferBindingSize` stays at the WebGPU minimum
@@ -11778,6 +11870,10 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   6.67 against 6.11 ms at 100,000 and 16.2 against 15.7 ms at 250,000 (three.js WebGPU; numbers in
   [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md), "Moving instances on the GPU"). The checked
   `setMatrixAt` stays about 15% over three at 100,000, the validation cost.
+- **Counted (batch 166, 2026-11-10), per frame at 250,000 moving boxes:** n calls of `setMatrixAt` (16 finite tests, the
+  affine test, a determinant, 12 copies) or n row copies and one `update()`; 0 allocations; one `writeBuffer` run of
+  12,000,000 bytes (48 a row, where three uploads 64); a 176-byte frame and a 64-byte part uniform; the attribute rows
+  untouched. Timing pending the quiet rerun.
 
 ### DynamicInstances: about 15-35% more GPU time than InstancedMesh at 100,000 and 250,000 moving boxes
 
@@ -11787,10 +11883,16 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
 - **Ruled out, by measurement at 250,000:** the compute passes cost little (skipping their dispatches: still 2.51 ms
   moving, 1.38 ms static, against 2.73 and 1.50 with them), so the cull is not the gap. Moving the upload's barrier ahead of the
   timed passes changed nothing (2.70 ms).
-- **Cause of the rest: not found.** Moving costs about 1.1 ms more in the timed passes than a still frame, even when the
-  moved rows reach no draw (compute skipped, so `drawn` is stale). The 12 MB upload runs then, and the CPU takes 15 ms a
-  frame, so the GPU idles between frames: either could slow the passes. **Next to test:** a moving frame with the upload
-  held and the CPU work kept, then the reverse. three's still frame at 250,000 was not measured in the same run.
+- **Counted (batch 166, 2026-11-10):** a moving frame with the compute skipped submits the same passes, bytes and
+  draws as a still frame plus one 12,000,000-byte staging copy outside the timed passes, so the 1.1 ms seen inside the
+  passes is not work: the frame is CPU bound (about 15 ms CPU, 2.7 ms GPU), the GPU idles about 80% and its clocks
+  drop, and the copy can overlap the passes. three at 250,000 is CPU bound too (15.7 ms). Inside the design the kernels
+  read each row twice with 36 scalar loads and round-tripped 4 bytes a row through a scan: fixed by `perf(culling)` one-dispatch dynamic cull (batch 166 job 1)
+  (one dispatch, three vec4 loads a row; 232 to 160 bytes of GPU memory traffic a kept row; perf-history entry 113).
+- **Left:** the 96-byte record with six attributes is core's frozen instance layout, an accepted structural difference
+  (`docs/limits.md`, "DynamicInstances record size"). **Next:** the quiet rerun reads the `dynamic-upload` (GPU bound,
+  no CPU maths) and `dynamic-cpu` (CPU maths, no upload) bench modes beside the moving and still cases, which separates
+  clocks from the copy; this entry is rewritten from that run.
 
 The two entries below come from the three.js speed matrix ([whitepaper/perf-vs-threejs.md](whitepaper/perf-vs-threejs.md),
 rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their first causes are fixed (perf-history entry
@@ -11829,6 +11931,12 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 - **Cause of what is left:** the 200 draws' rows, uniform writes and bindings, and the 100 Animations' own work
   (`setMorph`, validation, weight writes, `upload`, `deformAll`). A multi-primitive model joining a run would not help this
   scene: deformed primitives cannot join an instanced batch (`batchable`).
+- **Batch 161 job 1:** the per-frame validation pass (a `Map` and a primitives loop per Animation per frame) is gone:
+  primitives are grouped by node once and re-checked without allocating (`packages/animation/tests/frame-path.test.js`).
+  Timing pending the quiet rerun.
+- **Batch 161 jobs 2 and 3:** bone palettes are made once per skinned node, kept in one array per Animation, swapped
+  with their uploaded copy instead of copied, and written in one call when contiguous. Morph weights still go up per
+  primitive (2 writes per MorphStressTest copy a frame).
 - **Plan:** write the weights of every Animation of a device in one upload (`packages/animation/src/index.ts`, `upload`),
   then profile again. No core change. For copies playing one clip, `MorphWeightPlayer`
   (`@margoengine/animation/morph-gpu`, 2026-11-06) samples and writes the weights on the GPU; its effect on `p-morph`
@@ -11845,6 +11953,9 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   creates objects only.
 - **Plan:** rerun the row in the quiet pass. Whatever is left is `destroy`, `setup` and node creation: make those
   cheaper, or publish the rest as an accepted difference if it is work three does not do.
+- **Batch 161 job 4:** a copy no longer passes 225 arrays to the node setters and the constructor no longer filters
+  the primitives per node (`packages/animation/tests/clone-work.test.js`). The GPU state a copy builds up front is
+  published as an accepted difference (`docs/limits.md`, "Work per `cloneModel` copy"). Timing pending the quiet rerun.
 
 ### GPU picking waits for one readback per pick
 
@@ -14781,6 +14892,8 @@ Platform defect below the compatibility layer, proven at the WebGL call level (b
 - Atmosphere (`SPEC_DEMOS=atmosphere SPEC_BACKENDS=webgl2 node packages/sciviz/tests/spec-demos-browser.mjs`, and the zero-cloud hash in `atmosphere-browser.mjs`): this did not reproduce here. One full spec-demo run, 8 repeats, 6 page loads of 4 repeats and 2 parallel probes of 5 loads of 3 repeats all gave byte-identical captures. The earlier failures signed the same way (one-step differences on unchanged source, under the shared GPU queue), but the cause there is not proven. Treat it as the same open item until a failing run is captured with the recorder.
 - Sciviz geo-lod (`packages/sciviz/tests/geo-lod-browser.mjs` line 85, `retained data restores identical pixels`, max difference 1): same defect, on an 8-bit 4x resolve. On plain main 5329898ca it failed 1 of 4 test runs. A probe that captures the refined globe four times with no restore, then restores the layer six times with two captures each, showed one-level flips in 4 of 6 page loads under D3D11. They show up just as often between two unchanged captures with no restore as after a restore, so `layer.restore()` is not the cause. Each frame clears, issues 16 tile draws, resolves the 4x target with blitFramebuffer, flips it with a second blit and reads it back. The recorder (per-capture object ids renamed in creation order, sync polling dropped) shows two consecutive unchanged captures with byte-identical streams up to and including the readback. Only the bytes read back differ, in 46 channels by one level. Under ANGLE Vulkan on the same RTX A6000, 6 page loads gave 90 captures and every one was exact. Native WebGPU (D3D12) also flipped one green channel at pixel (313, 57) by one level in 3 of 3 loads. The test compares only the red channel, so native passes. This suggests the NVIDIA D3D resolve path rather than ANGLE alone, but it is not proven. Probes: `geo-lod-probe-browser.mjs` (run from a worktree's `.lane/` through `scripts/gpu-lock.mjs run`; `PROBE_BACKENDS`, `PROBE_LOADS`, `PROBE_ROUNDS`, `PROBE_REC=1` for the recorder), `geo-lod-norm.cjs` and `geo-lod-ndiff.cjs` (stream grouping and diff), `geo-lod-streams-d3d11.json` (failing load; compare after2 with after3), and the D3D11 and Vulkan logs. The exact assertion stays unchanged; the job that hits it changed no geo-lod or compat source.
 - Probes (git-excluded, in the main checkout): `private/handoffs/compat-determinism-probes/` holds `disp-probe.js` (the grid with recorder, extra frames, direct reads, attachment map and `PROBE_NOINVALIDATE`), `gl-recorder.js`, `diffstreams.cjs`, the raw pages and one failing stream capture.
+- Batch 164 SSAO resolve control (2026-11-10): `node packages/post/test/ssao-resolve-browser.mjs` with `MARGO_COMPAT=1` fails default ANGLE D3D11 exact pixels after odd-size 4x resize (59 channels, max two display levels). Its three unchanged historical-control frames also vary by the same 59 channels and two levels; native and ANGLE Vulkan (`BROWSER_ARGS=["--use-angle=vulkan"]`) pass all 12 pairs. This is consistent with the recorded D3D resolve defect above, but this fixture still needs a raw GL command replay to isolate the cause. Control evidence: `test-results/bp164-compat-diagnostic.log`; native `bp164-ssao-pixels.log` and actual Vulkan `bp164-compat-vulkan-real.log` (the earlier `bp164-compat-vulkan.log` did not forward the backend argument and is not Vulkan evidence). Under Scott's 2026-11-10 control-variance ruling, D3D11 cannot prove or disprove this change's identical output; the exact native and Vulkan checks supply that proof. The original exact test and assertion remain unchanged. This is a landing exception, not a repaired driver claim.
+
 - Next step: report to ANGLE/NVIDIA with a self-contained replay of the recorded session (full payloads, not hashes). Until then this stays a release blocker for exact compat captures on Windows D3D11. Never raise the bound for it.
 
 
@@ -14911,11 +15024,9 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 ### Open: cache findings not fixed in the audit
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
-- `serve()` puts the entry back blind: a hit looked up before a queued write evicts it brings back a record without
-  bytes (maxBytes 150, two 100-byte files: usage 200 bytes, 2 files). Fix: get then put in one transaction, only if the
-  record exists, as RangeCache `touch` does.
-- A 304 without `Cache-Control` or `Expires` drops the stored lifetime instead of keeping it (RFC 9111 4.3.4; only
-  non-conforming servers, as RFC 9110 15.4.5 makes servers send them).
+- Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
+- Fixed, lane S (2026-11-10): AssetCache and RangeCache retain stored Cache-Control/Expires fields when omitted by a 304; provided fields replace them, and Date/Age are taken from the validating response. The common policy helper persists only the two lifetime fields, with matching-validator updates. Parent-failing regressions in packages/cache/test/freshness.test.js cover both caches; additional cases cover retained Expires, current Age and no-cache replacement/retention. Legacy metadata without saved policy remains conservatively revalidated until a response supplies that policy; offline bytes remain usable.
+- RangeCache response snapshot race (lane S, 2026-11-10, found during 304 policy retention): warm URL a with 100 bytes, ETag "a" and model/gltf-binary; hold a reader's conditional 304, then replace a from a second cache with 80 different bytes, ETag "new" and application/new before releasing the 304. The held response contains the new 80 bytes with the old ETag/type. Cause: answer holds old metadata across revalidation, but assemble reads blocks later by reused URL/block keys in another transaction. Metadata and the requested stored Blob handles need one consistent snapshot; validator-guarded freshness updates alone do not fix the response. The standalone delayed-response probe reproduces with fakeIndexedDB; no runtime change in the policy-retention job under lane rule 21.
 - RangeCache combines blocks under a weak ETag or no validator at all; RFC 9111 3.4 allows it only under one strong
   validator. Same size, new bytes, same weak tag: one answer mixes two versions. Fix: combine only under a strong
   validator and send `If-Range` with it on block requests.
@@ -14925,8 +15036,9 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
   (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play, but not in limits.md.
 - Fixed, lane S (2026-11-10): RangeCache captures request start time for a miss and a 304 revalidation and passes it to the existing RFC 9111 freshness calculation. Age plus transit now consumes the correct lifetime. Two controlled-clock regressions in packages/cache/test/freshness.test.js fail on the parent and cover both partly consumed and entirely expired responses without real waits or speed assertions.
 - Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
-  duplicated; decoded.ts uses `max-age=3153600000`, past the 2^31 cap of RFC 9111 1.2.2; Vary name records are never
+  duplicated; Vary name records are never
   evicted; 27 throws carry no help link.
+- Verified, lane S (2026-11-10): decoded.ts's max-age=3153600000 is not a 2^31-cap defect. RFC 9111 section 1.2.2 defines an overflow fallback rather than an absolute cap; this value and its millisecond deadline are exact safe JavaScript integers. The literal introduced in 4f7774957 is unchanged. The current freshUntil calculation returns an exact 3153600000000-ms lifetime with no wrap. Source: https://www.rfc-editor.org/rfc/rfc9111.html#section-1.2.2. This review does not certify arbitrarily large delta-seconds values.
 
 ### Fixed: J6 product implicit-sampler footprint
 The red 121 versus 120 product probe came from webgl2-compat replacing implicit textureSample footprint selection with a Euclidean derivative LOD estimate. The first resolved scene HDR red was binary16 0x3329 on native and 0x3321 on both ANGLE backends. Keeping hardware implicit sampling repairs the owning emitter; explicit mip interpolation stays unchanged. The glsl.test.js regression fails before repair; the oblique implicitFootprint GPU case changes from native 0x3e99f89a versus old compatibility 0x3ed98258 to 0x3e99f89a on all three paths. Product's existing exact cross-backend and restoration probes now pass, with zero tracked allocations after disposal. Intermediate HDR bit equality is not claimed. Reproduction and raw centre copies: docs/integration-product.md.
@@ -15050,9 +15162,7 @@ Open (not fixed in the audit):
   focused, visible and top level got the same). Native pointer lock is unverified on this Mac.
 - `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
   so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
-- `Pen` tilt to angles at |tilt| = 90 with the other tilt nonzero returns the azimuth of the leaning side (tiltX -90,
-  tiltY 30 gives pi), where the specification's informative `tilt2spherical` returns 0 ("not enough information"); the
-  code inverts `spherical2tilt` instead, a deliberate difference.
+- Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.
 
 ## Batch 132 audit: net (fixed and open)
 
@@ -15129,6 +15239,19 @@ Two unchanged one-bounce frames have identical 435-call GL streams, normalized t
 Across D3D11 and Vulkan, the first captured target difference is also the trace output: at (122,150), green is 0.447509765625 versus 0.447265625 and blue is 0.448486328125 versus 0.4482421875. Diagnostic f32 shader outputs at affected texel (300,76) first separate at ray normalization: the identical finite nonzero vector (-0.9959985613822937,-0.001060005626641214,-0.08936194330453873) stays unchanged on D3D11 but normalizes to (-0.9959986805915833,-0.0010600057430565357,-0.08936195075511932) on Vulkan. This ordinary cross-backend precision difference is not proof that normalization causes the repeat-render discrepancy. No Margo undefined-input dependence was found in the bounded investigation; the exact driver/compiler cause remains unresolved. All dumped float targets are finite and the final probe has zero GL errors.
 
 Scott's coordinator ruling (2026-11-10) accepts the identical-stream and backend evidence as below-Margo proof: this one compat-D3D11 SSGI case is recorded and does not block the restore repair. The original test and exact assertion stay unchanged; every other failure still stops. [Reproduction, raw dumps, scope and standards](review5-ssgi-angle.md). No blanket SSGI or backend exemption is added to the test runner.
+
+### Batch 159 matrix preflight gaps (2026-11-10)
+
+Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md. MeshoptCubeTest fails because gltf-pro recognizes KHR meshopt views but only EXT fallback-buffer markers; the packer omits that KHR fallback payload. The compute and grading adapters reject APIs now available in shader; coefficient-supplied SH and point-position/configurable-element lens-flare inputs still need owning-package work. Black-box reference depth-material WebGPU, USDZ (both) and FourCC-zero DDS (both) fail their current adapter/fixture contracts. Exact errors and outputs: docs/whitepaper/results/bp-159-preflight.json. These remain open; no test assertion or workload was removed.
+
+### hygiene gate 6: TypeScript async API threw "getNodeId requires a RemoteNode" once (2026-11-10)
+
+`npm run hygiene` in the lane-P worktree (bp-161, branch from 5ecb5ab1a, packages freshly built) failed once at
+`scripts/hygiene.js` gate 6 (`checker.getSymbolAtLocation(await program.getSourceFile(dts))`) with
+`Error: getNodeId requires a RemoteNode` while 14 packages' CPU tests ran beside it; the rerun on the same files passed,
+and a standalone pass over all 1,312 entry `.d.ts` files found every source file. Cause not found yet: a
+`getSourceFile` that resolves to a non-remote node under load in `typescript/unstable/async`. Repro attempt: run
+`npm run hygiene` while `npm test` runs in several packages.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -15479,13 +15602,15 @@ A namespace import tree-shakes like named imports in every modern bundler: only 
 
 ## Third-party libraries
 
-Two packages use a library you install yourself, only when you use that package. Everything else is in the one
+Four entries use a library you install yourself, only when you use that entry. Everything else is in the one
 install.
 
 | Package | Install | Why |
 | --- | --- | --- |
 | `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | The solver; `await Physics.load()` readies it once per app |
+| `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | The 2D solver; `await Physics2D.load()` readies it once per app |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
+| `margoengine/ui/react` | `npm i react` | React bindings for the UI package |
 
 `margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf-pro`
 (`Model`, `Gltf`), `/fbx`, `/animation`, `/materials` and `/physics`. The first four reach the Draco and Basis decoders,
@@ -15602,6 +15727,17 @@ console.log(resolution.scale);
 
 # @margoengine/webgl2-compat
 
+The WGSL front end resolves adjacent minus signs in expression context, while keeping statement decrements:
+
+```ts
+import {checkWGSL} from '@margoengine/webgl2-compat/wgsl';
+const module = checkWGSL('const value = 1--2; fn f(){var i=2; i--;}');
+const value = module.globals.find(item => item.name === 'value');
+console.log(value?.kind === 'const' ? value.value : undefined); // 3
+```
+
+This also accepts subtraction of negative constants in generated shaders, including Tonemap's custom curves.
+
 Live `/restore` rebuilds and renderer disposal release the renderer's current shader program before
 deleting it. Other plugins can save and restore GL state during reconstruction without retaining a
 deleted program; a current program owned by another plugin is preserved. The existing restore example
@@ -15642,22 +15778,6 @@ if (!webgpu) await (await import('margoengine/webgl2-compat')).install();
 const engine = await Engine.create(canvas);
 engine.render();
 ```
-
-`install()` makes `navigator.gpu` a WebGPU-shaped GPU on WebGL2, makes `canvas.getContext('webgpu')` return its canvas
-context, defines `GPUBufferUsage` and the other flag objects where the browser lacks them, and names its classes as
-the WebGPU interfaces (`GPUBuffer`, `GPUDevice` and the rest) while installed, so `instanceof GPUBuffer` holds for its
-objects, also in a browser that defines those interfaces without an adapter. Where the browser's own
-WebGPU has an adapter it retains native WebGPU (it resolves `{ installed: false, reason: 'webgpu' }` and warns with
-a linked `MargoError` code `state`, explaining the choice) unless you pass
-`{ force: true }`, which the layer's tests use to compare both paths on one machine. It rejects with MargoError code
-`unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything
-back. The root entry holds only the probe below and `install()`: the device, the GLSL back end and the WGSL front end
-load inside `install()`.
-
-Installer diagnostics keep the error code, help link and every missing capability
-name concise enough to fit the existing entry size ceilings. A full-tier probe
-checks capabilities; package parity failures remain tracked in
-[known bugs](../../docs/known-bugs.md#open-full-layer-validation-transferred-to-parity-batch-273).
 
 [README continues: https://margoengine.com/llms/packages/webgl2-compat.md]
 
@@ -16066,25 +16186,23 @@ approximation and display-space blend; the optional transmission installation su
 screen-space refraction and thickness textures. Default normal textures use exactly
 neutral half-float texels, including when a live shading hook retains fallback bindings.
 Run `npm run test:gpu:native-volume --workspace @margoengine/gltf-pro` after the package
-build for twenty analytic slab pixels on each backend.
+build for 56 analytic slab pixels on each backend, including transmission animated from zero.
 
-Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
+### Animate an opaque material into glass
 
-Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
+`KHR_materials_transmission` may start at its default factor of `0`. The physical
+parser retains the volume while zero stays on the opaque draw path. Pointer playback
+activates the tint and native background capture when the factor becomes positive;
+seeking back to zero restores the opaque path. This example builds its own triangle
+and animation, with no asset download:
 
 ```ts
-import {createStage} from 'margoengine';
-import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
-const stage = await createStage('#viewport', {backend:'webgpu'});
-const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
-const b = model.bounds;
-stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
-// Call model.destroy() when unloading the model, or stage.dispose() on unmount.
+import {Engine} from 'margoengine/core';
+import {parseGLTF, type GLTFDocument} from 'margoengine/gltf-pro';
+import {extendedMaterials} from 'margoengine/gltf-pro/extended';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
 ```
-
-`KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
-
-Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
 
 [README continues: https://margoengine.com/llms/packages/gltf-pro.md]
 
@@ -17463,9 +17581,13 @@ const newXyz = new Float32Array(300).map(() => Math.random() * 10);
 cloud.updatePositions(5000, newXyz);
 
 // Thousands of camera-facing sprites in one draw call.
-const atlasImage = await (await fetch('/labels.png')).blob();
-const labels = points.add(new SpriteBatch({material: {map: await createImageBitmap(atlasImage)}}));
+const atlas = new OffscreenCanvas(64, 64);
+const ctx = atlas.getContext('2d')!;
+ctx.fillStyle = 'white';
+ctx.fillRect(0, 0, 64, 64);
+const labels = points.add(new SpriteBatch({material: {map: atlas}}));
 labels.add({position: [0, 2, 0], size: 0.5, uv: atlasRect(3, 4, 4)});
+engine.render();
 
 // CPU picking of the nearest drawn point.
 canvas.addEventListener('click', event => {
@@ -17479,10 +17601,10 @@ canvas.addEventListener('click', event => {
 - **Blocks.** `new PointCloud()` splits the points into spatially compact blocks of at most `blockSize` points (median splits along the longest axis, like a kd-tree) and records each block's bounds. Each frame the plugin transforms every block's bounds by the model matrix and frustum-culls it on the CPU against `camera.planes`.
 - **Point budget and level of detail.** The points inside each block are shuffled once with a seeded PRNG, so the first `k` slots of a block are an even random sample of it. Visible blocks share `pointBudget` in proportion to their projected screen area, and blocks that need less than their share give the rest to the others. Each block then draws a prefix of its slots: one `draw(4, k, 0, firstSlot)` call per visible block. This is the progressive subsampling Potree uses, without its octree files.
 - **GPU data.** Positions (f32 xyz), packed RGBA8 colors, optional f32 sizes and the shuffled slot order live in storage buffers; the vertex shader expands each point into a quad (a 4-vertex triangle strip per instance). The arrays stay in your order, so `updatePositions`, `updateColors` and `updateSizes` call `writeBuffer` on exactly the changed byte range. Position updates also grow the affected blocks' bounds.
+- **Frame uploads.** Points and sprites share a 144-byte camera uniform. Consecutive views with identical uniform bytes reuse the last upload; camera, viewport, format or projection changes upload again. Device restoration always uploads to the new buffer. This removes one queue write per unchanged view; timing is pending the quiet rerun.
 - **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-32 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors `edlRadius` pixels away (Boucheny's eye-dome lighting; background neighbors count as 0).
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
-- **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that view's camera; `pick(x, y, {view: id})` through a named one (`RenderView.id`). A view not drawn for a frame is forgotten.
-- **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same
+- **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
@@ -17616,17 +17738,30 @@ dashed.dashOffset += 0.01;
 // On teardown: engine.removePlugin('lines') or engine.dispose().
 ```
 
-## How it works
 
-- **Instanced screen-space quads.** Each segment is one instance of 78 vertices drawn from a storage buffer of points; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.
-- **Widths.** Pixel widths are CSS pixels, scaled by the ratio of the render target to the canvas client size. World-unit widths are converted per endpoint from the camera's focal length and the clip w, so thick lines taper with perspective. Lines thinner than one pixel are drawn one pixel wide with proportionally lower alpha.
-- **Antialiasing.** Geometry grows by one pixel and the fragment shader ramps coverage over the last pixel of every edge, butt or square cap end and dash end (dash ends use `fwidth` of the distance). This coverage ramp works alongside 4× MSAA on the WebGPU canvas path.
-- **Dashes.** Distances accumulate along the line in world space (after the model or mesh matrix) on the CPU, are recomputed only when the points or the matrix change, and are interpolated perspective-correctly. Segment lists accumulate across segments.
-- **Depth.** Lines test against the scene depth with reversed-Z `greater-equal` and do not write depth unless `depthWrite` is set (see [Depth writing](#depth-writing)). `onTop` lines use `always` and draw after the depth-tested ones. Endpoints behind the near plane are clipped in clip space, so a line passing beside the camera is cut, not mirrored.
-- **Color.** Colors are linear RGB (`'#rrggbb'` and `0xrrggbb` are sRGB and converted, like `PbrMaterial`). Output is sRGB-encoded for unorm canvas formats and left linear for `-srgb` and float targets such as the `rgba16float` target of the post-processing packages. Blending is straight alpha (`src-alpha, one-minus-src-alpha`).
-- **Plugin lifecycle.** The pass is `lines:draw` at frame-graph order 20, after the scene, sky and particles and before post-processing resolves at 30. GPU buffers are created lazily per line and rebuilt from the CPU copies in `onDeviceRestored`. `dispose()` (and `engine.removePlugin`) destroys every buffer and the pass; the lines stay registered with the plugin object, so it can be attached again.
-- **Mesh attachment.** `mesh` or `line.attach(mesh)` reads the mesh's world matrix from `engineRuntime(engine).store.matrices` each frame. A hidden or disposed mesh hides its lines. Unattached lines use `line.matrix` (identity by default).
-- **SSR safety.** Nothing touches `window`, `navigator` or GPU globals
+## Live light helpers
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Lines, PointLightHelper} from '@margoengine/lines';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+const light = {position: [0, 1, 0] as [number, number, number], color: [1, 0.5, 0] as [number, number, number]};
+const helper = lines.add(new PointLightHelper(light, {size: 0.25}));
+engine.render();
+light.position[0] = 2; // The helper follows live positions on the next render.
+engine.render();
+helper.dispose();
+engine.dispose();
+```
+
+Point, spot and hemisphere helpers retain the original 33 circle samples on
+first use, including the closing endpoint, and reuse two coordinate arrays.
+Moving a point-light helper then needs zero circle sine/cosine calls instead
+of 1,152, with identical geometry bytes. Helpers without circles allocate no
+circle table. This is a work-count result; timing pending the quiet rerun.
+
+## How it works
 
 [README continues: https://margoengine.com/llms/packages/lines.md]
 
@@ -20411,24 +20546,25 @@ ui.add(settings);
 
 Sizes are UI units. By default one unit is one CSS pixel; see Scaling.
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `direction` | `'column'` | `'row'`, `'column'`, `'stack'` (children anchored over each other) or `'grid'` |
-| `gap` | `0` | space between children; a number or `[column gap, row gap]` |
-| `align` | stretch (column), center (row) | cross-axis placement: `'start'`, `'center'`, `'end'`, `'stretch'` |
-| `justify` | `'start'` | main-axis placement: `'start'`, `'center'`, `'end'`, `'space-between'`, `'space-around'`, `'space-evenly'` |
-| `padding`, `margin` | `0` | a number, `[vertical, horizontal]` or `[top, right, bottom, left]` |
-| `width`, `height` | `'auto'` | a number, `'auto'` (fit content), `'fill'` or a percentage such as `'50%'` |
-| `minWidth`, `maxWidth`, `minHeight`, `maxHeight` | none | bounds in UI units |
-| `grow`, `shrink` | `0`, `1` | shares of the free or missing main-axis space |
-| `alignSelf` | the parent's `align` | cross-axis placement of this child |
-| `anchor` | `'stretch'` in a stack | `'top-left'`, `'top'`, `'top-right'`, `'left'`, `'center'`, `'right'`, `'bottom-left'`, `'bottom'`, `'bottom-right'` or `'stretch'`; `margin` is the distance from the edges |
-| `position` | `'flow'` | `'absolute'` takes the child out of a row or column and anchors it |
-| `offset` | `[0, 0]` | shift after layout, for animation |
-| `bleed` | `false` | in a stack, ignore the parent's padding and the safe area |
-| `columns`, `cellWidth`, `cellHeight` | `1`, widest, tallest | for `direction: 'grid'` |
-| `overflow` | `'visible'` | `'hidden'` clips; `'scroll'` clips and scrolls on the main axis (a wrapping row scrolls its lines vertically) |
-| `wrap` | `false` | in a `'row'`, children that do not fit move onto new lines below |
+`arrange` shares measurements of the same node and available width within one call. A custom
+`LayoutNode.measure` returns a stable content size for that width during the call. The next call
+measures again, so direct edits to styles, children or content take effect without an invalidation API.
+The cache belongs to that call, including when a measurer starts a separate layout.
+
+```ts
+import { arrange, type LayoutNode } from '@margoengine/ui';
+
+const label: LayoutNode = {
+  style: {}, children: [], rect: { x: 0, y: 0, width: 0, height: 0 },
+  measure: (width) => ({ width: Math.min(80, width), height: 20 }),
+};
+const row: LayoutNode = {
+  style: { direction: 'row', align: 'center' }, children: [label],
+  rect: { x: 0, y: 0, width: 0, height: 0 },
+};
+arrange(row, { x: 0, y: 0, width: 200, height: 100 });
+console.log(label.rect); // { x: 0, y: 40, width: 80, height: 20 }
+```
 
 [README continues: https://margoengine.com/llms/packages/ui.md]
 
@@ -20507,12 +20643,13 @@ Visible core and PBR selection outlines using Jump Flood Algorithm distance fiel
 ```ts
 import {Selection} from 'margoengine/selection';
 import {Engine} from 'margoengine/core';
-import {createMesh} from 'margoengine/materials';
 import {box} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const mesh = engine.createMesh().setGeometry(box());
 const selection = Selection.attach(engine, {algorithm: 'jfa', width: 3, color: [1,0.5,0]});
 selection.set([mesh]);
+engine.start();
+// On teardown: selection.dispose(); engine.dispose();
 ```
 
 `Picking.attach(engine)` enables faster `engine.pick(x, y)` in canvas CSS pixels:
@@ -20563,6 +20700,25 @@ const meshes = hits.map((hit) => hit?.mesh ?? null);
 === @margoengine/audio (packages/audio/README.md) ===
 
 # @margoengine/audio
+
+Pose writes read the three stored vector components directly. They preserve the existing parameter scheduling,
+smoothing and clock-read order. This removes vector-iterator work; it does not establish a measured speedup.
+For a self-contained offline example with no audio device or user gesture:
+
+```ts
+import {AudioListener, PositionalAudio} from '@margoengine/audio';
+
+const context = new OfflineAudioContext(2, 4800, 48000);
+const listener = new AudioListener({context, autoResume: false, smoothing: 0});
+const sound = new PositionalAudio(listener);
+const oscillator = context.createOscillator();
+sound.setNodeSource(oscillator);
+sound.setPosition(1, 0, -2).setDirection([0, 0, 1]);
+oscillator.start();
+const rendered = await context.startRendering();
+console.assert(rendered.length === 4800 && rendered.numberOfChannels === 2);
+listener.dispose();
+```
 
 Import `margoengine/audio` from the `margoengine` package, or `@margoengine/audio` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
@@ -21627,6 +21783,25 @@ opacity. Tangents must be present; occlusion callbacks must return finite 0..1.
 Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities.
 Box-only consumers drop the internal lattice helper used by the other grid primitives; their vertices, indices, UVs and groups remain unchanged.
 
+Sphere, cylinder, capsule, torus, lathe and tube builders reuse angular columns within each call. They retain no cache between calls.
+For CPU-only generation, import the primitives entry; no renderer is required:
+
+```ts
+import {sphereGeometry, cylinderGeometry, capsuleGeometry, torusGeometry} from '@margoengine/geometry/primitives';
+const shapes = [sphereGeometry(1, 64, 32), cylinderGeometry(1, 1, 1, 64, 8),
+  capsuleGeometry(0.5, 1, 16, 32), torusGeometry(1, 0.4, 32, 64)];
+console.log(shapes.map(shape => shape.indices.length / 3));
+```
+
+Lathe profiles use `[radius, height]`; tube paths supply their own frames and arc-length sampling:
+
+```ts
+import {latheGeometry, tubeGeometry, LineCurve3} from '@margoengine/geometry';
+const vase = latheGeometry([[0, 0], [0.5, 0.2], [0.3, 1], [0.4, 1.2]], 128);
+const pipe = tubeGeometry(new LineCurve3([0, 0, 0], [0, 2, 0]), 512, 0.1, 16);
+console.log(vase.indices.length / 3, pipe.indices.length / 3);
+```
+
 Build from source with `npm run build` in `packages/geometry`.
 
 ```ts
@@ -21652,32 +21827,6 @@ const tube = tubeGeometry(path, 128, 0.1, 12);
 Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `indices`, optional `tangents` and `groups`) made of typed arrays. `toGeometry(data)` hands positions, normals and indices to core's `Geometry`; core has no UV or tangent slots, so those stay on `GeometryData` for packages that use them.
 
 ## What it includes
-
-| Functions |
-| --- |
-| `boxGeometry`, `planeGeometry`, `circleGeometry`, `ringGeometry` |
-| `cylinderGeometry`, `coneGeometry`, `sphereGeometry`, `capsuleGeometry` |
-| `torusGeometry`, `torusKnotGeometry`, `latheGeometry`, `tubeGeometry` |
-| `polyhedronGeometry`, `tetrahedronGeometry`, `octahedronGeometry`, `icosahedronGeometry`, `dodecahedronGeometry` |
-| `shapeGeometry`, `extrudeGeometry` |
-| `LineCurve`, `LineCurve3`, `QuadraticBezierCurve`, `QuadraticBezierCurve3`, `CubicBezierCurve`, `CubicBezierCurve3`, `EllipseCurve`, `ArcCurve`, `SplineCurve`, `CatmullRomCurve3`, `CurvePath`, `Path`, `Shape`; points are `[x, y]` or `[x, y, z]` arrays |
-| `shapeArea`, `isClockWise`, `triangulateShape`, `triangulate` |
-| `mergeGeometries`, `mergeVertices`, `computeTangents`, `creasedNormals` (plus smoothing groups) |
-| `computeVertexNormals`, `toNonIndexed`, `applyMatrix4`, `center`, `computeBoundingBox`, `computeBoundingSphere`: pure functions returning new data |
-| `edgesGeometry`, `wireframe` (line index pairs) |
-| `loopSubdivide` |
-| `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
-| `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
-| `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
-| `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
-| `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
-| `sweepGeometry`, `loftGeometry` from `@margoengine/geometry/sweep` |
-| `tessellateGeometry`, `tessellateWithParents` from `@margoengine/geometry/tessellate` |
-| `GeometryGenerator`, `GpuGeometry`, `GpuPath`, `gridIndices` from `@margoengine/geometry/gpu` |
-| `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
-| `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
-
-## Smaller entries
 
 [README continues: https://margoengine.com/llms/packages/geometry.md]
 
@@ -22142,13 +22291,9 @@ This first scene needs no model or texture files. For a reader moving from anoth
 
 `Stage` configures the existing canvas stage and renders its children once that stage is available. Its `camera` prop updates the active camera; `shadows` uses the canvas's existing optional `@margoengine/shadows` lifecycle. Install that peer when enabling shadows. Canvas still creates and disposes the single engine and stage.
 
-`Mesh` and `Model` accept `onClick`, `onPointerOver`, and `onPointerOut`. The canvas dispatches hits from its existing `engine.pick`; a click requires no more than three CSS pixels of total pointer movement, so OrbitControls drags do not click. Handlers receive `nativeEvent`, the hit mesh as `object`, `mesh`, and `target`, canvas-local `x`/`y`, and `clientX`/`clientY`.
+`Mesh` and `Model` accept `onClick`, `onPointerOver`, and `onPointerOut`. The canvas dispatches hits from its existing `engine.pick`; a click requires no more than three CSS pixels of total pointer movement, so OrbitControls drags do not click. Handlers receive `nativeEvent`, the hit mesh as `object`, `mesh`, and `target`, canvas-local `x`/`y` (CSS pixels from the canvas padding edge, inside any border, the same as `engine.pick` takes), and `clientX`/`clientY`.
 
 `Group` is a geometry-free `Mesh` for parent transforms. Lowercase exports are aliases of the same hook-based components: `mesh === Mesh`, `group === Group`, `boxGeometry === BoxGeometry`, and `meshStandardMaterial === PbrMaterial`. Use a namespace in JSX:
-
-```tsx
-import * as Margo from 'margoengine/react';
-```
 
 [README continues: https://margoengine.com/llms/packages/react.md]
 

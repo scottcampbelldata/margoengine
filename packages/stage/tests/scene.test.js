@@ -57,7 +57,12 @@ mock.module('@margoengine/clustered', {
           name: 'clustered',
           setup() {},
           dispose() {},
+          current: [],
+          get list() {
+            return this.current;
+          },
           setLights(lights) {
+            this.current = lights;
             world.lists.push(lights);
           },
           add(model) {
@@ -75,7 +80,17 @@ mock.module('@margoengine/clustered/directional', {
   namedExports: {
     DirectionalLights: {
       attach(engine, { lights }) {
-        const plugin = { name: 'clustered:directional', lights, setup() {}, dispose() {}, setLights: (list) => world.suns.push(list) };
+        const plugin = {
+          name: 'clustered:directional',
+          lights,
+          list: [],
+          setup() {},
+          dispose() {},
+          setLights(list) {
+            this.list = list;
+            world.suns.push(list);
+          },
+        };
         engine.use(plugin);
         return plugin;
       },
@@ -375,6 +390,29 @@ test('a camera takes the world pose, sets the view instead of fit, and every cam
   Object.assign(camera, free);
   near(camera.position, [3, 2, 3]);
   assert.equal(camera.fov, 40);
+});
+
+test('a scene camera takes its up from the entity: straight down renders, and a rolled camera stays rolled', async () => {
+  // Before: up was never set, so a target straight below threw 'Vertical camera' every frame and a roll was lost.
+  const stage = await fixture(),
+    roll = [0, 0, Math.sin(0.3), Math.cos(0.3)],
+    scene = await addScene(
+      stage,
+      saved([
+        { id: 'floor', components: { mesh: { shape: 'box', size: [10, 1, 10] } } },
+        { id: 'top', transform: { position: [0, 10, 0] }, components: { camera: { target: [0, 0, 0] } } },
+        { id: 'rolled', transform: { position: [0, 1, 5], rotation: roll }, components: { camera: { active: false } } },
+      ]),
+    ),
+    camera = stage.engine.camera;
+  near(camera.up, [0, 0, -1]);
+  camera.update(1, true);
+  stage.engine.render();
+  Object.assign(camera, scene.cameras.get('rolled'));
+  near(camera.up, [-Math.sin(0.6), Math.cos(0.6), 0]);
+  camera.update(1, true);
+  // Screen up (row 1 of the view-projection) leans the way the entity rolled.
+  assert.ok(camera.matrix[0 * 4 + 1] < -0.1, `roll lost: ${camera.matrix[1]}`);
 });
 
 test('a camera with active false waits, and fit still frames the scene', async () => {

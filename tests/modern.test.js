@@ -794,6 +794,48 @@ test('CAD controls orbit an arbitrary pivot, pan, smooth zoom, fit portrait boun
   assert.equal(listeners.size, 0);
   assert.equal(element.style.touchAction, 'auto');
 });
+test('CAD controls orbit and pan about camera.up, so a Z-up camera keeps its height and pans along the screen', () => {
+  // Before: orbit and pan used Y-up spherical coordinates, so with up [0, 0, 1] orbit(0.3, 0) moved the height from
+  // 2 to 1.911 and pan(-0.1, 0) moved at cos 0.476 to the screen's right.
+  const element = {
+      clientHeight: 400,
+      style: { touchAction: 'auto' },
+      addEventListener() {},
+      removeEventListener() {},
+      hasPointerCapture: () => false,
+    },
+    zUp = new Camera({ position: [0, -5, 2], target: [0, 0, 0] });
+  zUp.up = [0, 0, 1];
+  const controls = new CADCameraControls(zUp, element);
+  controls.orbit(0.3, 0);
+  assert.ok(Math.abs(zUp.position[2] - 2) < 1e-12, `height ${zUp.position[2]}`);
+  assert.ok(Math.abs(Math.hypot(zUp.position[0], zUp.position[1]) - 5) < 1e-12);
+  controls.orbit(0, 0.2);
+  assert.ok(zUp.position[2] < 2, 'elevation tilts away from up, as with Y up');
+  zUp.position = [3, -5, 2];
+  zUp.target = [0, 0, 0];
+  zUp.update(1, true);
+  const before = [...zUp.position],
+    // Screen right in world space: row 0 of the view-projection's 3x3 (column-major), normalized.
+    m = zUp.matrix,
+    right = [m[0], m[4], m[8]].map((v, i, all) => v / Math.hypot(...all));
+  controls.pan(-0.1, 0);
+  const moved = zUp.position.map((v, i) => v - before[i]),
+    along = moved.reduce((sum, v, i) => sum + v * right[i], 0) / Math.hypot(...moved);
+  assert.ok(along > 1 - 1e-9, `pan along screen right: cos ${along}`);
+  // Y up is unchanged: the same numbers as the Y-up spherical form.
+  const yUp = new Camera({ position: [1, 2, 3], target: [0, 0, 0] }),
+    r = Math.hypot(1, 2, 3),
+    theta = Math.atan2(1, 3) + 0.4,
+    phi = Math.acos(2 / r) + 0.2;
+  new CADCameraControls(yUp, element).orbit(0.4, 0.2);
+  const expected = [r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.cos(theta)];
+  assert.ok(
+    yUp.position.every((v, i) => Math.abs(v - expected[i]) < 1e-12),
+    `${yUp.position}`,
+  );
+});
+
 test('fitToBoundingBox frames by the true bounding sphere and keeps the whole box past near', () => {
   // Before: the radius was raised to 2 near (a 2 cm part sat 0.44 away, 11x its sphere fit) and nothing kept the box
   // past near, so at fov 120 the nearest corner of a 0.35 box was 0.082 from the eye, inside near 0.1.

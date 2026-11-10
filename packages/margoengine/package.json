@@ -3391,6 +3391,10 @@
       "types": "./dist/scenery/moon.d.ts",
       "import": "./dist/scenery/moon.js"
     },
+    "./sciviz/bench": {
+      "types": "./dist/sciviz/bench.d.ts",
+      "import": "./dist/sciviz/bench.js"
+    },
     "./sciviz": {
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"
