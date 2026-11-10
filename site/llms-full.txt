@@ -9612,6 +9612,8 @@ Batch 164 row 13.19 keeps one render pass per `NodePass` screen effect. Each eff
 
 Batch 164 rows 9.7 and 13.15: with a 4x scene capture, Tonemap resolves colour in a pass of its own, after core's scene pass, because core's scene pass (frozen for v1.0.0) ends without a resolve target; the `acescg` curve is the fitted AP1 RRT/ODT, not ACESFilmic, so the images differ. Row 13.17: `TAA({velocityOnly: true})` draws velocity in its own geometry pass, because core's scene pass writes no velocity attachment. Accepted differences, timing pending the quiet rerun. [Evidence](whitepaper/batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
 
+Batch 132 text bidi fix (lane I, 2026-11-10, 71beba857): the UAX #9 weak-type pass (number, separator and terminator code point lists, rules W2 to W7, number levels) grew `@margoengine/text` from 17109 to 17967 B gzip and each entry that bundles the layout (animate, curve, fit, rich) by about 640 B, recorded in scripts/quality/baselines/sizes.json with that reason under the push-anyway rule (gates skipped by the fast landing Scott ordered on 2026-11-10). No speed claim; layout time not re-measured.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
