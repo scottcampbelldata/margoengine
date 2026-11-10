@@ -14,6 +14,7 @@ import {
 } from './geometry.js';
 import { clipPlanes, copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
 import { attachableMesh } from '../../shared/pass.js';
+import type { LineExtension } from './extension.js';
 
 /**
  * Style options for `LineMaterial` (and `Line`). Validated on set and every frame: out-of-range numbers throw
@@ -198,6 +199,8 @@ interface LineOwner {
  * A fat line: segments or a polyline drawn as screen-space quads with joins, caps, dashes and antialiasing.
  */
 export class Line {
+  /** Optional entry's shader and resources, consumed by Lines and LinePicking. */
+  protected extension?: LineExtension;
   readonly material: LineMaterial;
   mode: LineMode;
   visible: boolean;

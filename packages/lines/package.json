@@ -54,6 +54,10 @@
     "./hidden": {
       "types": "./dist/hidden.d.ts",
       "import": "./dist/hidden.js"
+    },
+    "./stroke": {
+      "types": "./dist/stroke.d.ts",
+      "import": "./dist/stroke.js"
     }
   },
   "files": [

@@ -53,6 +53,7 @@ interface Gpu {
   /** Pipelines by compare, then whether the line has a width per point. */
   pipelines: Record<'depth' | 'top', [GPURenderPipeline, GPURenderPipeline]>;
   /** The pipeline of a flat ribbon, made when the first one is picked. */
+  extended(line: Line, depthCompare: GPUCompareFunction): GPURenderPipeline;
   ribbon(depthCompare: GPUCompareFunction): GPURenderPipeline;
 }
 
@@ -76,7 +77,10 @@ export function linePickShader(): string {
     fields = '@location(3) world:vec3f,\n',
     world = '  o.world=mix(';
   if (end < 0 || !lineShader.includes(fields) || !lineShader.includes(world))
-    throw new MargoError('unsupported', 'Line picking needs the line shader it was written for; update its edits with it');
+    throw new MargoError(
+      'unsupported',
+      'Line picking needs the line shader it was written for; update its edits with it',
+    );
   return (
     lineShader
       .slice(0, end)
@@ -135,6 +139,7 @@ export class LinePicking {
       plain = device.createShaderModule({ code: biasedShader(linePickShader()) }),
       widths = device.createShaderModule({ code: biasedShader(pointWidthShader(linePickShader())) }),
       ribbons = new Map<GPUCompareFunction, GPURenderPipeline>(),
+      extended = new Map<string, GPURenderPipeline>(),
       pipeline = (depthCompare: GPUCompareFunction, module: GPUShaderModule, entryPoint = 'vertex') =>
         device.createRenderPipeline({
           layout,
@@ -154,6 +159,25 @@ export class LinePicking {
       pipelines: {
         depth: [pipeline('greater-equal', plain), pipeline('greater-equal', widths)],
         top: [pipeline('always', plain), pipeline('always', widths)],
+      },
+      extended: (line, depthCompare) => {
+        const extension = line['extension']!;
+        const key = extension.key + depthCompare;
+        let made = extended.get(key);
+        if (!made) {
+          const module = device.createShaderModule({ code: extension.shader(biasedShader(linePickShader()), true) });
+          made = device.createRenderPipeline({
+            layout: device.createPipelineLayout({
+              bindGroupLayouts: [layouts.frame, this.lines['styleLayout'](extension), baseLayout],
+            }),
+            vertex: { module, entryPoint: 'vertex' },
+            fragment: { module, entryPoint: 'fragment', targets: [{ format: 'r32uint' }] },
+            primitive: { topology: 'triangle-list', cullMode: 'none' },
+            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare },
+          });
+          extended.set(key, made);
+        }
+        return made;
       },
       ribbon: (depthCompare) => {
         let made = ribbons.get(depthCompare);
@@ -221,9 +245,11 @@ export class LinePicking {
           const segments = line.segmentCount;
           if (next + segments > MAX_IDS) break;
           pass.setPipeline(
-            line['flatNormal']
-              ? gpu.ribbon(compare)
-              : pipelines[line['pointWidths'] && !line.material.dashed ? 1 : 0],
+            line['extension']
+              ? gpu.extended(line, compare)
+              : line['flatNormal']
+                ? gpu.ribbon(compare)
+                : pipelines[line['pointWidths'] && !line.material.dashed ? 1 : 0],
           );
           bases[(slot * BASE_STRIDE) / 4] = c.firstId + next;
           this.entries.push({ line, first: next });

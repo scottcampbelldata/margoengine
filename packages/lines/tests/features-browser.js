@@ -2,6 +2,7 @@
 import { Engine, box } from '@margoengine/core';
 import { Lines, Line, ArrowHelper, PlaneHelper } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
+import { Stroke } from '@margoengine/lines/stroke';
 import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
 import { LineBatch, LineBatches } from '@margoengine/lines/batch';
@@ -167,7 +168,15 @@ async function trail() {
   const { engine, lines, frame, done } = await rig();
   const mesh = engine.createMesh().setGeometry(box(0.01, 0.01, 0.01));
   const trailLine = lines.add(
-    new Trail({ target: mesh, lifetime: Infinity, maxLength: 6.5, width: 10, color: RED, tailWidth: 0.2, minDistance: 0 }),
+    new Trail({
+      target: mesh,
+      lifetime: Infinity,
+      maxLength: 6.5,
+      width: 10,
+      color: RED,
+      tailWidth: 0.2,
+      minDistance: 0,
+    }),
   );
   // Walking the mesh along x leaves a line behind it, wide at the head and thin at the far end, faint at the far end.
   for (let x = -3; x <= 3; x += 0.5) {
@@ -218,7 +227,10 @@ async function ribbon() {
     const head = rows(image, 205),
       tail = rows(image, 51),
       expected = (2 / (2 * 10 * Math.tan(Math.PI / 6))) * 256;
-    assert(Math.abs(Math.max(head, tail) - expected) < 3, `A flat trail is 2 world units wide: ${head}, ${tail} of ${expected}`);
+    assert(
+      Math.abs(Math.max(head, tail) - expected) < 3,
+      `A flat trail is 2 world units wide: ${head}, ${tail} of ${expected}`,
+    );
     assert(Math.min(head, tail) < 0.75 * Math.max(head, tail), `A flat trail tapers: ${head}, ${tail}`);
     engine.camera.position = [0, 0.01, 10];
     image = await frame();
@@ -373,11 +385,25 @@ async function filled() {
   const { lines, frame, done } = await rig();
   const at = (image, x, y, z = 0) => image.at(Math.round(pixel(x, y, z)[0]), Math.round(pixel(x, y, z)[1]));
   const arrow = lines.add(
-    new ArrowHelper({ direction: [1, 0, 0], origin: [-3, 0, 0], length: 6, headLength: 3, headWidth: 3, color: RED, width: 2, solidHead: true }),
+    new ArrowHelper({
+      direction: [1, 0, 0],
+      origin: [-3, 0, 0],
+      length: 6,
+      headLength: 3,
+      headWidth: 3,
+      color: RED,
+      width: 2,
+      solidHead: true,
+    }),
   );
   // Between the wire spokes of the head, only a fill can be red.
   let image = await frame();
-  for (const [x, y] of [[1, 0.25], [0.5, -0.3], [1.5, 0.18]]) assert(isRed(at(image, x, y)), `The head is solid at ${x},${y}`);
+  for (const [x, y] of [
+    [1, 0.25],
+    [0.5, -0.3],
+    [1.5, 0.18],
+  ])
+    assert(isRed(at(image, x, y)), `The head is solid at ${x},${y}`);
   // It writes depth: a line behind it, drawn later, stays hidden.
   const beside = [1, -3, -1, 1, 3, -1];
   const behind = lines.add(vertical(-1, { color: GREEN, positions: beside, width: 4 }));
@@ -431,7 +457,10 @@ async function dashCaps() {
     square = await read('square'),
     round = await read('round');
   assert(butt.inside && !butt.past, `A butt end stops at the dash: ${JSON.stringify(butt)}`);
-  assert(square.past && square.corner && !square.beyond, `A square end reaches half the width: ${JSON.stringify(square)}`);
+  assert(
+    square.past && square.corner && !square.beyond,
+    `A square end reaches half the width: ${JSON.stringify(square)}`,
+  );
   assert(round.past && !round.corner && !round.beyond, `A round end is round: ${JSON.stringify(round)}`);
   // A dot: a dash near zero with round ends is a disc as wide as the line.
   line.material.set({ dashSize: 0.001, gapSize: 3, dashOffset: 1.5, dashCap: 'round' });
@@ -442,8 +471,58 @@ async function dashCaps() {
   return 'dashCap draws round and square ends on every dash, and dots';
 }
 
+async function stroke() {
+  const { lines, engine, frame, done } = await rig();
+  try {
+    const line = lines.add(
+      new Stroke({ positions: [-3, 0, 0, 0, 0, 0, 3, 0, 0], widths: [0.25, 1, 2], width: 16, color: RED, cap: 'butt' }),
+    );
+    let image = await frame();
+    const rows = (x) => {
+      let n = 0;
+      for (let y = 80; y < 176; y++) if (isRed(image.at(x, y))) n++;
+      return n;
+    };
+    assert(
+      rows(80) < rows(175),
+      `Per-point widths taper the stroke: ${rows(80)},${rows(175)}, pixels ${image.at(80, 128)},${image.at(175, 128)}`,
+    );
+    line.progress = 0.25;
+    image = await frame();
+    assert(isRed(image.at(70, 128)) && !isRed(image.at(110, 128)), 'Reveal follows length and cuts inside a segment');
+    const picker = Picking.attach(engine, { capture: false });
+    const picking = LinePicking.attach(picker, lines);
+    assert((await picker.pick(70, 128))?.line === line, 'Visible stroke picks');
+    assert((await picker.pick(110, 128))?.line !== line, 'Unrevealed stroke does not pick');
+    line.progress = 0;
+    image = await frame();
+    assert(!isRed(image.at(70, 128)), 'Zero progress draws nothing');
+    line.progress = 1;
+    line.material.set({ dashed: true, dashSize: 0.5, gapSize: 0.5, depthWrite: true });
+    image = await frame();
+    let runs = 0,
+      previous = false;
+    for (let x = 64; x < 192; x++) {
+      const on = isRed(image.at(x, 128));
+      if (on && !previous) runs++;
+      previous = on;
+    }
+    assert(runs >= 5, 'Dashes and variable widths compose');
+    line.material.dashed = false;
+    line.setWidths([1, 1, 1]);
+    await engine.rebootDevice?.();
+    image = await frame();
+    assert(isRed(image.at(128, 128)), 'Stroke resources restore after device reboot');
+    picking.dispose();
+  } finally {
+    done();
+  }
+  return 'Stroke per-point widths, arc-length reveal, dashes, depth, picking and device restore';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, ribbon, batch, hidden, coverage, filled, dashCaps]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, ribbon, batch, hidden, coverage, filled, dashCaps, stroke])
+    checks.push(await check());
   return checks;
 };

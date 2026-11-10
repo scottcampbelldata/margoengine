@@ -3218,3 +3218,6 @@ Batch 205 job 3: build packages, then run `node --test --test-timeout=120000 pac
 ### Batch 231 textured scatter
 
 Build packages, then run node --test --test-timeout=120000 packages/scatter/test/textured.test.js. In a shared GPU slot run node packages/scatter/test/textured.browser.mjs, then the same command with --compat. The fixture uses the checked-in licensed Khronos DiffuseTransmissionPlant and compares the whole scene against separately loaded plant copies at 1x and 4x MSAA, plus normal, mask, shadow and reboot controls. GPU lock owner codex-batch231, no exclusive hold. No benchmark or timing assertion.
+
+### Lines stroke correctness (batch 227 job 1)
+Build packages, then run node --test --test-timeout=120000 packages/lines/tests/stroke.test.js. Under the shared GPU lock run node packages/lines/scripts/test-browser.js, then the same command with --compat. The stroke check verifies taper pixels, a cutoff inside an unequal-length path, zero/full visibility, visible/hidden picks, dashes with depth writing and restoration. Existing package checks still run in full. No external asset is required for these synthetic correctness fixtures.

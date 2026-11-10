@@ -5,6 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
+import type { LineExtension } from './extension.js';
 import { fillFrame } from './math.js';
 import {
   biasedShader,
@@ -24,6 +25,7 @@ declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: numb
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 interface Resources {
+  extra?: ReturnType<LineExtension['create']>;
   uniform: GPUBuffer;
   points: GPUBuffer;
   colors: GPUBuffer;
@@ -90,7 +92,8 @@ export class Lines implements EnginePlugin {
   /** Told when a line joins or leaves (LinePicking's stand-in meshes). */
   private readonly watchers = new Set<{ added(line: Line): void; removed(line: Line): void }>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
-  private readonly modules = new Map<number, GPUShaderModule>();
+  private readonly modules = new Map<string, GPUShaderModule>();
+  private readonly extendedLayouts = new Map<string, GPUBindGroupLayout>();
   private engine?: Engine;
   private device?: GPUDevice;
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
@@ -199,8 +202,8 @@ export class Lines implements EnginePlugin {
   }
 
   /** The shader module of a variant, made when first used. */
-  private module(variant: number): GPUShaderModule {
-    const key = variant & ~(ON_TOP | WRITE | BEHIND | COVER);
+  private module(variant: number, extension?: LineExtension): GPUShaderModule {
+    const key = `${variant & ~(ON_TOP | WRITE | BEHIND | COVER)}|${extension?.key ?? ''}`;
     let module = this.modules.get(key);
     if (!module) {
       let code = variant & FOGGED ? foggedLineShader() : lineShader;
@@ -211,6 +214,7 @@ export class Lines implements EnginePlugin {
       if (variant & SQUARE_DASH) code = dashCapShader(code, 'square');
       if (variant & FILL) code = filledShader(code);
       code = phasedShader(code, Math.floor(variant / STEP));
+      if (extension) code = extension.shader(code);
       module = this.device!.createShaderModule({ code });
       this.modules.set(key, module);
     }
@@ -222,16 +226,21 @@ export class Lines implements EnginePlugin {
     depthFormat: GPUTextureFormat,
     count: number,
     variant: number,
+    extension?: LineExtension,
   ): GPURenderPipeline {
-    const key = `${format}|${depthFormat}|${count}|${variant}`;
+    const key = `${format}|${depthFormat}|${count}|${variant}|${extension?.key ?? ''}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const fogged = (variant & FOGGED) !== 0,
         covered = (variant & COVER) !== 0,
         fog = fogged ? this.fogResources() : undefined,
-        module = this.module(variant);
+        module = this.module(variant, extension);
       pipeline = this.device!.createRenderPipeline({
-        layout: fog?.pipeline ?? this.layouts!.pipeline,
+        layout: extension
+          ? this.device!.createPipelineLayout({
+              bindGroupLayouts: [this.layouts!.frame, this.styleLayout(extension), ...(fog ? [fog.layout] : [])],
+            })
+          : (fog?.pipeline ?? this.layouts!.pipeline),
         vertex: { module, entryPoint: variant & FILL ? 'fillVertex' : variant & RIBBON ? 'ribbonVertex' : 'vertex' },
         fragment: {
           module,
@@ -278,6 +287,7 @@ export class Lines implements EnginePlugin {
     if (r && r.capacity === line.capacityVersion) return r;
     if (r) this.release(line);
     const created: GPUBuffer[] = [];
+    let extra: Resources['extra'];
     try {
       const make = (size: number, usage: number) => {
         const buffer = device.createBuffer({ size, usage });
@@ -290,16 +300,19 @@ export class Lines implements EnginePlugin {
         Math.max(16, colors?.byteLength ?? 16),
         GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       );
+      extra = line['extension']?.create(device);
       const group = device.createBindGroup({
-        layout: this.layouts!.style,
+        layout: this.styleLayout(line['extension']),
         entries: [
           { binding: 0, resource: { buffer: uniform } },
           { binding: 1, resource: { buffer: points } },
           { binding: 2, resource: { buffer: colorBuffer } },
+          ...(extra?.entries ?? []),
         ],
       });
       const style = new ArrayBuffer(STYLE_BYTES);
       r = {
+        extra,
         uniform,
         points,
         colors: colorBuffer,
@@ -312,6 +325,7 @@ export class Lines implements EnginePlugin {
         written: new Float32Array(STYLE_BYTES / 4).fill(NaN),
       };
     } catch (error) {
+      extra?.dispose();
       for (const buffer of created) buffer.destroy();
       throw error;
     }
@@ -319,9 +333,28 @@ export class Lines implements EnginePlugin {
     return r;
   }
 
+  /** Layout shared by colour and picking for an optional entry. */
+  private styleLayout(extension?: LineExtension): GPUBindGroupLayout {
+    if (!extension) return this.layouts!.style;
+    let layout = this.extendedLayouts.get(extension.key);
+    if (!layout) {
+      layout = this.device!.createBindGroupLayout({
+        entries: [
+          { binding: 0, visibility: 3, buffer: { type: 'uniform', minBindingSize: STYLE_BYTES } },
+          { binding: 1, visibility: 1, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
+          { binding: 2, visibility: 1, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
+          ...extension.entries,
+        ],
+      });
+      this.extendedLayouts.set(extension.key, layout);
+    }
+    return layout;
+  }
+
   private release(line: Line): void {
     const r = this.resources.get(line);
     if (!r) return;
+    r.extra?.dispose();
     r.uniform.destroy();
     r.points.destroy();
     r.colors.destroy();
@@ -373,8 +406,9 @@ export class Lines implements EnginePlugin {
         material = line.material;
       if (!segments) continue;
       material.validate();
-      if (material.dashed) line.updateDistances(model);
+      if (material.dashed || line['extension']) line.updateDistances(model);
       const r = this.ensure(line);
+      r.extra?.update();
       if (r.version !== line.version) {
         device.queue.writeBuffer(r.points, 0, line.points as Float32Array<ArrayBuffer>, 0, line.count * 4);
         if (line.colors)
@@ -535,7 +569,13 @@ export class Lines implements EnginePlugin {
           (dashed && dashCap === 'round' ? ROUND_DASH : 0) |
           (dashed && dashCap === 'square' ? SQUARE_DASH : 0) |
           (fogged && fog ? FOGGED : 0),
-        next = this.pipeline(context.format, depthFormat, count, (covered ? variant % STEP : variant) | bits);
+        next = this.pipeline(
+          context.format,
+          depthFormat,
+          count,
+          (covered ? variant % STEP : variant) | bits,
+          line['extension'],
+        );
       if (next !== current) pass.setPipeline((current = next));
       pass.setBindGroup(1, r.group);
       pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);
@@ -550,6 +590,7 @@ export class Lines implements EnginePlugin {
 
   private releaseGpu(): void {
     for (const line of [...this.resources.keys()]) this.release(line);
+    this.extendedLayouts.clear();
     this.frameBuffer?.destroy();
     this.fogGpu?.buffer.destroy();
     this.frameBuffer = this.frameGroup = this.layouts = this.device = this.fogGpu = undefined;

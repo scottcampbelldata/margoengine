@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13203410,
+  "total": 13208735,
   "history": [
     {
       "date": "2026-10-24",
@@ -6648,6 +6648,12 @@
       "commit": "batch-231",
       "reason": "scatter/textured new optional whole-model plant instancing entry: 0 to 1463 B gzip, ceiling 1719 B. Conjugated placements preserve node and embedded instance transforms while reusing gltf-pro textures, normals and MASK colour/shadow passes. Splitting this small attachment would add wiring without saving its consumers bytes; core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-227-job1",
+      "reason": "Stroke entry 4407 B; root 19926 B with shared optional shader/resource ownership. Root prior ceiling 19862 B; new ceiling 20524 B. Splitting would duplicate rendering and restoration paths.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7077,7 +7083,7 @@
     "@margoengine/lightmap/imported": 1535,
     "@margoengine/lightmap/mesh": 3272,
     "@margoengine/lightmap/refracted": 7846,
-    "@margoengine/lines": 19862,
+    "@margoengine/lines": 20524,
     "@margoengine/lines/batch": 6519,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
@@ -7872,6 +7878,7 @@
     "@margoengine/react/controls-extra": 4412,
     "@margoengine/fbx/legacy": 6650,
     "margoengine/fbx/legacy": 314,
-    "@margoengine/scatter/textured": 1719
+    "@margoengine/scatter/textured": 1719,
+    "@margoengine/lines/stroke": 4663
   }
 }

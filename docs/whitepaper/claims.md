@@ -3748,3 +3748,6 @@ Batch 205 FBX legacy: opt-in 6.x binary/ASCII normalization retains geometry, na
 ### Batch 231 job 1: textured plant instances
 
 The optional scatter/textured attachment uses the existing glTF PBR renderer for textured, normal-mapped, MASK whole-plant instances including colour and shadow passes. CPU evidence: packages/scatter/test/textured.test.js. Real-data GPU evidence: packages/scatter/test/textured.browser.mjs, native and --compat, 1x and 4x MSAA. Two instanced plants match two separately placed models with zero differing pixels on the development RTX A6000; normal, mask and shadow toggles affect over 100 pixels each, and device reboot preserves the image. This is a correctness comparison, not a speed claim. Research and licensed data attribution are in docs/clean-room.md.
+
+### Lines width and reveal (batch 227 job 1)
+The optional stroke entry combines per-point width with normalized world-length visibility, including dashed and depth-writing strokes, with the same cutoff in picking. Evidence: packages/lines/tests/stroke.test.js and stroke in packages/lines/tests/features-browser.js. The browser suite runs at 1x/4x samples on WebGPU and the WebGL2 compatibility layer. This is a feature claim, not a speed claim; no broader GreasedLine material parity is asserted.

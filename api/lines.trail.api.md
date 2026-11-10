@@ -38,6 +38,7 @@ export interface TrailOptions extends Omit<LineOptions, 'positions' | 'colors' |
 // Not exported from this entry, but used by the exports above:
 
 class Line {
+    protected extension?: LineExtension;
     readonly material: LineMaterial;
     mode: LineMode;
     visible: boolean;
@@ -68,6 +69,17 @@ class Line {
 }
 
 type LineCap = 'butt' | 'round' | 'square';
+
+interface LineExtension {
+    readonly key: string;
+    readonly entries: GPUBindGroupLayoutEntry[];
+    shader(code: string, picking?: boolean): string;
+    create(device: GPUDevice): {
+        entries: GPUBindGroupEntry[];
+        update(): void;
+        dispose(): void;
+    };
+}
 
 type LineJoin = 'miter' | 'round' | 'bevel';
 

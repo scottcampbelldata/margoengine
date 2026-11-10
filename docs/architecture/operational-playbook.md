@@ -6144,3 +6144,7 @@ Batch 266 section 5 evidence: React controls-extra adds no rendering math. Its s
 
 Batch 266 additional correctness: scroll mesh extent reads an installed camera projection for orthographic cameras, with a deterministic 4-world-unit fixture. Product-local pointer presses include live descendants in the existing controls BVH pick, with a detached-mesh regression. No rendering backend or core math changed.
 Section 5 evidence, batch 205 legacy FBX: the optional pre-index normalization hook shares the existing bounded parser and scene pipeline, then the same PBR geometry, skins, morphs and animation. Real ASCII/binary paired accessors and validator are CPU evidence; legacy-browser renders actual binary 6.1 cube pixels in page/worker modes on native WebGPU and WebGL2 compatibility. Core and stage source remain untouched; base gzip is 24,209 B after the full package build.
+
+### Lines optional stroke evidence (batch 227 job 1)
+Optional line entries supply shader transforms and owned bind-group resources to the lines renderer, with no imports from its root into those entries. Colour and picking use the same layout and transform, cache separately by feature, and rebuild resources after device restoration. Stroke retains independent width and world-distance data so dashes do not overwrite taper. GPU evidence includes 1x/4x taper/reveal, depth, picks and restoration on WebGPU and the compatibility layer; storage struct alignment has a CPU regression. Core/stage are unchanged.
+
