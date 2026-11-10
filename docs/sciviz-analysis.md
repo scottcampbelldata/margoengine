@@ -127,3 +127,82 @@ field gradients, shared face intersections, equalities, pipeline integration,
 validation and abort reasons. Browser tests dispatch on WebGPU and WebGL2, compare
 all output coordinates and topology, and check visible NASA output.
 The NASA Tecplot slice contains collapsed quads representing triangular boundary elements. The demo parser retains one original cell ID for each element while converting those rows to VTK triangle cells; the original data is never modified. The provenance test covers this format conversion. Both GPU backends produced 2352 segments and maximum position delta 5.960464477539063e-8; the documented envelope was 0.0037318677496081375. The render check counted 7407 visible pixels on each backend.
+
+## Clip, threshold and structured subsets (batch 172 job 3)
+
+The optional sciviz/clip entry exports clipGrid, thresholdGrid, isoVolume, imageGrid,
+extractSubset and clipOperator. Inputs are AnalysisGrid (the existing unstructured
+layout plus named arrays) or AnalysisImage (dims and sample bounds, optionally
+explicit curvilinear xyz). The original volume cell types, triangles and quads
+are supported. Images have two or three active axes and at most 1000000 samples.
+Named arrays contain flat interleaved tuples; width is inferred from the associated
+point or cell count. pointData/cellData are the default scalar arrays. All arrays
+and original cell IDs survive filtering. Output arrays are owned Float64Array,
+Uint32Array and Uint8Array values; callers must leave borrowed inputs unchanged
+until the promise settles. sourceCells composes original cell IDs across filters.
+Do not use an empty string as a named-array key; that key is reserved internally
+for the default scalar association.
+
+clipGrid retains the positive side of a plane dot(normal,p)+offset, the interior
+of a box or sphere, or scalar values at least the selected value. invert defaults
+to false. Plane normals need not be unit length. Box bounds are finite and ordered;
+sphere radius must be positive. Scalar clips require a finite scalar point array.
+A sphere evaluates radius squared minus distance squared at sample vertices and
+clips the piecewise-linear interpolant on each tetrahedron; a sphere entirely
+inside one coarse cell can be missed when all its vertices evaluate outside.
+This is the sampled-implicit convention used by marching-cell scientific filters,
+not an analytic curved boundary reconstruction. Refine the input grid for curved
+boundaries. Boxes instead apply six halfspaces sequentially, so an interior box
+is retained even when none of the original cell vertices lies in it. Inverted
+boxes generate disjoint complement pieces, not overlapping independent clips.
+
+Volume cells use job 2's globally ordered pulling simplices. Each retained convex
+simplex polytope clips its faces and adds a cap, then uses a global-ID pulling fan
+without adding interior points. Canonical shared-edge intersections merge by source
+point IDs; exact level vertices reuse their original identities. Zero-volume cut
+pieces are omitted. Every new point interpolates all point tuple components with
+the same parameter, and every new cell retains all source cell tuples. Float64
+arithmetic is used throughout. Surface cells similarly produce exact clipped
+triangles. Equalities are included in both closed halfspaces; shared zero-measure
+boundaries do not duplicate positive volume. isoVolume applies two scalar clips,
+retaining the inclusive interval of the piecewise-linear field, rather than
+retaining complete cells whose scalar samples merely fall within the interval.
+
+crinkle defaults to false. When true, clipGrid retains entire original cells
+intersecting the retained region rather than introducing cut points. Plane and
+sampled-sphere crinkle use the node sign convention. Box crinkle obtains original
+cell IDs from the exact six-halfspace cut, including boxes inside a cell.
+thresholdGrid retains complete original cells in a finite inclusive scalar range.
+association defaults to point; point mode defaults to all vertices in range, with
+any available explicitly. Cell mode uses one selected scalar per cell. invert
+negates the complete selection. Nonfinite threshold samples fail the range test;
+nonfinite scalar clip values reject rather than generate undefined intersections.
+
+extractSubset uses inclusive index ranges and positive integer strides. Defaults
+are the full extent and unit strides. The last output sample is the final stride
+position within the range, not necessarily the supplied upper index. Cartesian
+bounds retain signed physical spacing; explicit curvilinear coordinates are copied
+exactly and their physical bounds recomputed. Point tuples follow sampled indices.
+Each output cell tuple comes from the source cell at that output cell's lower
+logical sample, clamped at a singleton boundary; it is not an average across a
+stride-sized region. A planar subset remains drawable as quads via imageGrid.
+Single-axis subsets may be returned as data, but imageGrid requires two active
+axes for surface/volume cell materialization.
+
+All async operations accept AbortSignal; bounded loops yield and preserve the exact
+abort reason. Validation, image materialization and final compaction are synchronous.
+There is no hidden device, GPU compute path or persistent resource to dispose.
+clipOperator registers clip, threshold, isoVolume or subset as a pipeline filter;
+params contain operation and shape/range/options as finite JSON. Inputs remain
+borrowed and output arrays can be retained until normal graph invalidation.
+
+The demo renders real NASA cut triangles and a calibrated CT-ORG scalar threshold
+on both WebGPU and WebGL2. The CT-ORG case 0 mirror is pinned by revision and SHA256;
+the committed 64x64x19 int16 sample array takes every eighth x/y and fourth z sample
+from the downloaded 512x512x75 NIfTI. Its original slope/intercept map to HU. No
+averaging or invented samples are added. This sampling can omit thin structures;
+the threshold is not an anatomical segmentation. The mirror's int16 encoding is
+not claimed bit-identical to the publisher's float32 encoding. CC BY 3.0 citation,
+transformation, orientation, physical bounds and hashes are in source.json.
+
+Job 3 rendered evidence: both backends retain 3349 CT cells at 300 HU and 106 at 1000 HU; the before/after renders contain 35385 and 3833 non-background pixels. The lower NASA slice cut contains 27594 triangles and 51982 non-background pixels. CT display colour is the maximum vertex HU in each selected cell; this is derived display data and leaves the retained point arrays unchanged. The NASA data plane is viewed along scene +y because figure data x/y maps to scene x/-z.

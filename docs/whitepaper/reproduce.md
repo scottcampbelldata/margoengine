@@ -3088,3 +3088,4 @@ Under a named shared GPU lease, run node packages/voxel-pathtracer/tests/denoise
 
 ### Batch 209 null stage correctness
 After build:packages run node --test --test-timeout=120000 packages/headless/tests/null.test.js. No GPU slot is needed: the proof forbids GPU access and uses the real CPU transform kernel and animation samplers.
+Batch 172 clipping: after build:packages, run node --test packages/sciviz/tests/clip.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=4 --wait-max=60 -- node packages/sciviz/tests/clip-browser.mjs. Serve examples/sciviz-clip.html and change the calibrated CT lower threshold. Asset source.json pins the CT-ORG mirror revision, original downloaded gzip hash, NIfTI calibration, stride sampling, dimensions and derived sample hash. The NASA slice is shared with the contour demo. Deterministic tetra volume fractions and complementary cuts are CPU correctness checks; no timing is asserted.

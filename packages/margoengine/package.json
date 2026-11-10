@@ -2974,6 +2974,10 @@
       "types": "./dist/sciviz/contour.d.ts",
       "import": "./dist/sciviz/contour.js"
     },
+    "./sciviz/clip": {
+      "types": "./dist/sciviz/clip.d.ts",
+      "import": "./dist/sciviz/clip.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -1,0 +1,42 @@
+{
+  "collection": "CT-ORG",
+  "case": "volume-0",
+  "publisher": "The Cancer Imaging Archive",
+  "citation": "Rister, B., Yi, D., Shivakumar, K., Nobashi, T., and Rubin, D. (2019). CT-ORG: A Dataset of CT Volumes With Multiple Organ Segmentations (Version 1).",
+  "doi": "https://doi.org/10.7937/tcia.2019.tt7f4v7o",
+  "reference": "https://www.cancerimagingarchive.net/collection/ct-org/",
+  "license": "CC BY 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+  "download": "https://huggingface.co/datasets/MedOtter/ct-org/resolve/968fed156ec1a10e204792d8b0f7d25f011bd855/volumes/volume-0.nii.gz",
+  "originalSHA256": "7cd876e2f6d050dcf6ae6b2fb9f4b3053a7aeeb145374db7db3755c3532e9522",
+  "originalBytes": 18655710,
+  "originalDims": [
+    512,
+    512,
+    75
+  ],
+  "dims": [
+    64,
+    64,
+    19
+  ],
+  "strides": [
+    8,
+    8,
+    4
+  ],
+  "transform": "Original stored int16 samples at x,y stride 8, z stride 4. No averaging or invented samples; NIfTI slope/intercept convert to Hounsfield units.",
+  "slope": 0.06765850633382797,
+  "intercept": -806.9661865234375,
+  "bounds": [
+    172.89999389648438,
+    -181.47500610351562,
+    -179.296875,
+    175.078125,
+    -368,
+    -8
+  ],
+  "sha256": "9f762e5ad50543ac8b6ef84ee81400cfc20d09e141cc034665bd5bed99f27058",
+  "mirrorRevision": "968fed156ec1a10e204792d8b0f7d25f011bd855",
+  "originalSHA256Meaning": "Hash of the downloaded mirrored NIfTI gzip, not an independently obtained publisher file. Stored int16 samples and header calibration are retained. No exact equivalence to the publisher float32 encoding is claimed."
+}

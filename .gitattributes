@@ -70,3 +70,4 @@ packages/procedural/test/fixtures/caves/ne_110m_land.geojson -text
 # Original NASA data bytes are hash-pinned for the scientific pipeline demo.
 examples/assets/sciviz/pipeline/cf-plate.dat -text
 examples/assets/sciviz/contour/bump.dat -text
+examples/assets/sciviz/clip/ct-org-0-samples.bin -text

@@ -444,3 +444,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/headless and margoengine: document /null createNullStage, scene/plugin and animation ticks, fixed delta/time, disposal, cancellation, and GPU-only operation refusals.
+- @margoengine/sciviz: document /clip, named tuple arrays, sourceCells, all cut shapes and inversions, crinkle, threshold modes, image/curvilinear subsets, cancellation, sampled implicit limits and TCIA/NASA demos.
+- margoengine: document the generated sciviz/clip alias with its owning optional entry.
