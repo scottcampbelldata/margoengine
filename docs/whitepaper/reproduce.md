@@ -3400,3 +3400,6 @@ Build packages, then node --test --test-timeout=120000 packages/splats/test/modi
 ### Batch 217 job 4: nested authoring
 
 After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/nested-editor.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-nested --wait-max=60 --max=2 -- node packages/cutscene/tests/nested-browser.mjs, and repeat with MARGO_COMPAT=1 for compatibility browser behavior. The package test:gpu includes this proof and existing render/editor suites. No benchmark, timing assertion, README check or example execution is required during build phase.
+
+### Screen-space voxel selections (batch 241 job 2)
+Build packages, then `node --test --test-timeout=120000 packages/voxel-edit/tests/select.test.js`. These independent grid/camera oracles are deterministic and need no external assets or GPU. Changed-package GPU suites run under the shared lock with MARGO_COMPAT=0 and 1; no dependent GPU suite or timing benchmark is part of this job.

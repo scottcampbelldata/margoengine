@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13574905,
+  "total": 13583404,
   "history": [
     {
       "date": "2026-10-24",
@@ -7044,6 +7044,12 @@
       "commit": "batch-217",
       "reason": "Optional cutscene authoring entry with lazy gizmo attachment and cancellation, no feature split or quality loss.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "87e4a7ec4",
+      "reason": "batch241-selection-new-optional-entry-projection-shapes-visibility-and-colour",
+      "grew": 1
     }
   ],
   "items": {
@@ -8321,6 +8327,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/voxel-edit/select": 8499
   }
 }

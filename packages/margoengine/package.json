@@ -4346,6 +4346,10 @@
       "types": "./dist/voxel-edit/generate.d.ts",
       "import": "./dist/voxel-edit/generate.js"
     },
+    "./voxel-edit/select": {
+      "types": "./dist/voxel-edit/select.d.ts",
+      "import": "./dist/voxel-edit/select.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"

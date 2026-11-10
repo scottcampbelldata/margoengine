@@ -3949,3 +3949,6 @@ The optional modify entry performs procedural per-splat position, opacity and ev
 ### Batch 217 job 4: nested authoring and discrete keys
 
 The optional nested editor opens nested timeline clips inline, keys boolean/string properties with step sampling, shares root undo/redo and maps playheads through speed/offset. Evidence: nested-editor.test.js checks exact nested boundaries, seek order, duplicate times, validation refusal, shared history and literal names; nested-browser.mjs opens two levels with actual double-clicks, edits with keyboard, authors both primitive types, checks local/global playheads and reopens saved edits. This is the requested feature-row coverage, with no whole-editor or speed superiority claim.
+
+### Screen-space voxel selections (batch 241 job 2)
+Optional `/select` provides rectangle, even-odd lasso and RGBA-similarity selection with model/camera projection, clip rejection, optional first-hit visibility, and dense/sparse edit indexes. Proof: packages/voxel-edit/tests/select.test.js independently enumerates exact expected cells for projection, near clipping, drag direction, concavity, boundaries, occlusion, palette duplicates, tolerance and indexes beyond 2^32. No whole-voxel silhouette-overlap or perceptual-colour claim.

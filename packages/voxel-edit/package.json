@@ -98,6 +98,10 @@
     "./generate": {
       "types": "./dist/generate.d.ts",
       "import": "./dist/generate.js"
+    },
+    "./select": {
+      "types": "./dist/select.d.ts",
+      "import": "./dist/select.js"
     }
   },
   "files": [

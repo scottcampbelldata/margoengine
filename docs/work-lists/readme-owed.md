@@ -768,3 +768,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/cutscene (batch 217 job 4): document nested-editor registration, discrete step state/extras, inline local/global playheads, shared definitions/history, TimelineModel.nested/setTimeline, passing a model to TimelineEditor, key forms and cleanup; examples deferred.
 - margoengine (batch 217 job 4): document generated cutscene/nested-editor alias.
+
+- @margoengine/voxel-edit and margoengine (batch 241 job 2): document /select NDC conversion, cell-centre boundary rules, lasso parity, select-through/visibleOnly, model placement, normalized RGBA similarity, sparse indexes and budgets; README examples deferred.

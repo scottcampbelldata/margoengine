@@ -6329,3 +6329,6 @@ CPU cases cover N-link CCD/FABRIK, capsule/hull/SDF obstacles, fixed lengths/end
 ### Section 5 evidence: batch 217 nested editor
 
 Nested/discrete authoring adds no renderer or GPU arithmetic. It extends CPU timeline validation and undo sharing; root snapshots validate every changed nested definition and all existing placements. Browser proofs exercise two nested levels, input isolation with the curve editor present, exact primitive keys and cleanup on both backend configurations. The reserved native-process shutdown failure from the separate scroll gate is documented in known-bugs; no timeout, assertion or browser lifecycle code was changed.
+
+### Section 5 evidence: batch 241 screen-space voxel selection
+Voxel-edit `/select` uses the renderer's zero-to-one homogeneous clip convention on both backends, including camera/model composition and W rejection before divide. CPU evidence in select.test.js enumerates an orthographic frustum, a perspective eye plane and near-plane clipping, transformed models, lasso boundaries and visible-centre first-hit rays. Both existing changed-package GPU suites remain the backend correctness gate. No core, stage, GPU shader or renderer code changes, and no speed claim.
