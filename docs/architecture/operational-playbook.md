@@ -7022,3 +7022,6 @@ unchanged pipeline/error identity and readiness accounting on the repaired build
 Native and compatibility voxel bevel checks retain their complete sample/layer,
 map, view, lightmap and restoration work. This is compiler-wait correctness,
 not a speed measurement. No browser shutdown owner, engine or package API changes.
+
+### Section 5 evidence: batch 176 molecule impostors
+The optional sciviz/molecule entry owns the sphere/capped-cylinder pipelines, conservative projected-box quads, perspective/orthographic data-space ray reconstruction, inverse-transpose normals and reversed-Z fragment depth. Core and stage are unchanged. A molecule is one six-vertex instanced draw; CPU residue picking intersects the same analytic surfaces. Resource-failure unit tests cover every earlier allocation, disposal and snapshot ownership; device restore renders identical pixels. molecule-browser.mjs covers real CC0 1CRN modes, analytic roots (tangency, inside, caps, axial rays and misses), screen picking, same PDB/mmCIF pixels, and depth-order invariance on native WebGPU and compatibility WebGL2. GPU evidence concerns correctness, not a speed benchmark. Native WebGL2, crystal assembly expansion and optional ribbons remain outside this entry's supported contract.

@@ -5,6 +5,10 @@
 ```ts
 export interface PDBAtom {
     serial: number;
+    id?: string;
+    residueId?: string;
+    insertionCode?: string;
+    alternateLocation?: string;
     name: string;
     element: string;
     residue: string;

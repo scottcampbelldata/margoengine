@@ -104,3 +104,6 @@ packages/sciviz/tests/fixtures/graph-gpu/*.json text eol=lf
 packages/sciviz/tests/fixtures/series/** -text
 # Native DWI crop and independent numeric reference hashes retain exact bytes.
 packages/sciviz/tests/fixtures/tensor/** -text
+
+# Preserve downloaded standard molecule coordinate bytes and recorded hashes.
+packages/sciviz/tests/fixtures/molecule/** -text

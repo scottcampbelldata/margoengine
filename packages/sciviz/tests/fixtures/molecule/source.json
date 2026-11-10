@@ -1,0 +1,19 @@
+{
+  "entry": "1CRN",
+  "authors": "W. A. Hendrickson and M. M. Teeter",
+  "title": "Structure of the hydrophobic protein crambin determined directly from the anomalous scattering of sulphur",
+  "doi": "10.1038/290107a0",
+  "entryDOI": "10.2210/pdb1CRN/pdb",
+  "license": "CC0 1.0",
+  "licenseURL": "https://www.rcsb.org/pages/policies",
+  "files": {
+    "1crn.cif": {
+      "url": "https://files.rcsb.org/download/1CRN.cif",
+      "sha256": "23787562c427d7c1abe5420e86d5f1d0a6c7007dec1e8ce85645a6d69c32e8ba"
+    },
+    "1crn.pdb": {
+      "url": "https://files.rcsb.org/download/1CRN.pdb",
+      "sha256": "42199a30a0701864a2a5cc76cd7f35cc544cd0e65fbcf63e03c166543249b811"
+    }
+  }
+}

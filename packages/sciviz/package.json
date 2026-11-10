@@ -343,6 +343,10 @@
     "./tensor": {
       "types": "./dist/tensor.d.ts",
       "import": "./dist/tensor.js"
+    },
+    "./molecule": {
+      "types": "./dist/molecule.d.ts",
+      "import": "./dist/molecule.js"
     }
   },
   "files": [
@@ -424,6 +428,7 @@
     "test:browser:series": "node scripts/browser-root.mjs tests/series-browser.mjs",
     "test:browser:themes": "node scripts/browser-root.mjs tests/themes-browser.mjs",
     "test:browser:workers": "node scripts/browser-root.mjs tests/workers-browser.mjs",
-    "test:browser:tensor": "node scripts/browser-root.mjs tests/tensor-browser.mjs"
+    "test:browser:tensor": "node scripts/browser-root.mjs tests/tensor-browser.mjs",
+    "test:browser:molecule": "node scripts/browser-root.mjs tests/molecule-browser.mjs"
   }
 }

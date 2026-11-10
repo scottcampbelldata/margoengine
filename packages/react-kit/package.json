@@ -1139,6 +1139,10 @@
       "types": "./dist/loaders/threemf-lattice.d.ts",
       "import": "./dist/loaders/threemf-lattice.js"
     },
+    "./loaders/mmcif": {
+      "types": "./dist/loaders/mmcif.d.ts",
+      "import": "./dist/loaders/mmcif.js"
+    },
     "./lod/msft": {
       "types": "./dist/lod/msft.d.ts",
       "import": "./dist/lod/msft.js"

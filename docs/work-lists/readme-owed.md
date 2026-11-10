@@ -1372,3 +1372,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine and @margoengine/viz, batch 176 job 5: document generated /sciviz/tensor aliases.
 
 - @margoengine/behavior: cover parseTreeText inference for ordinary options, explicit registrations and TreeTextOptions variables; use BlackboardKey objects for shared subtree state.
+- @margoengine/loaders (batch 176 job 6): document loaders/mmcif and PDB residue insertion/alternate metadata, first-model/conformer policy and struct_conn limits.
+- @margoengine/sciviz (batch 176 job 6): document molecule representations/defaults, element-radius fallbacks, residue picking and resource lifetime with a runnable example in the README phase.
+- margoengine (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
+- @margoengine/game (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
+- @margoengine/web (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
+- @margoengine/viz (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
+- @margoengine/react-kit (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.

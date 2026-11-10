@@ -2119,6 +2119,10 @@
       "types": "./dist/loaders/threemf-lattice.d.ts",
       "import": "./dist/loaders/threemf-lattice.js"
     },
+    "./loaders/mmcif": {
+      "types": "./dist/loaders/mmcif.d.ts",
+      "import": "./dist/loaders/mmcif.js"
+    },
     "./lod/msft": {
       "types": "./dist/lod/msft.d.ts",
       "import": "./dist/lod/msft.js"
@@ -3706,6 +3710,10 @@
     "./sciviz/tensor": {
       "types": "./dist/sciviz/tensor.d.ts",
       "import": "./dist/sciviz/tensor.js"
+    },
+    "./sciviz/molecule": {
+      "types": "./dist/sciviz/molecule.d.ts",
+      "import": "./dist/sciviz/molecule.js"
     },
     "./selection": {
       "types": "./dist/selection.d.ts",

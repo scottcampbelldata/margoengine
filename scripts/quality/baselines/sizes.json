@@ -1,6 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
+  "total": 15512162,
   "history": [
     {
       "date": "2026-10-24",
@@ -7984,6 +7985,12 @@
       "commit": "1e0de4257",
       "reason": "Tensor optional entry: new 0 to 27622 B gzip, ceiling 28451 B. GPU eigensystems, glyph rendering, ordinary least-squares fitting and deterministic tracking share one coherent tensor API; mandatory splits would complicate coordinate and lifetime wiring. Core plus stage unchanged at 24209 B. Preserve every upstream ceiling.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "701ac14ea",
+      "reason": "Molecule optional entries: loaders/mmcif new 0 to 3186 B gzip (ceiling 3442 B), sciviz/molecule new 0 to 5163 B (ceiling 5419 B). Complete CIF structures and coherent sphere/cylinder representation/picking belong in their owning optional entries; splitting would duplicate grammar and primitive lifetime wiring. Existing loaders/pdb 2208 to 2269 B remains under its ceiling. Core plus stage stays 24209 B. Preserve every upstream ceiling.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8500,6 +8507,7 @@
     "@margoengine/loaders/lwo": 4394,
     "@margoengine/loaders/materialx": 5082,
     "@margoengine/loaders/md2": 2265,
+    "@margoengine/loaders/mmcif": 3430,
     "@margoengine/loaders/mocap": 2146,
     "@margoengine/loaders/mtl": 8186,
     "@margoengine/loaders/nrrd": 7006,
@@ -8886,6 +8894,7 @@
     "@margoengine/sciviz/link": 5335,
     "@margoengine/sciviz/math": 5002,
     "@margoengine/sciviz/maths": 9120,
+    "@margoengine/sciviz/molecule": 5419,
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/mrc": 3427,
     "@margoengine/sciviz/netcdf": 3674,
@@ -9423,6 +9432,5 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577
-  },
-  "total": 15503313
+  }
 }
