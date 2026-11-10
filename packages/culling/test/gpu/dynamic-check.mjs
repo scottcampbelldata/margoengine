@@ -1,7 +1,8 @@
 // Real-GPU check for @margoengine/culling's DynamicInstances: engine A draws boxes through it, engine B draws the same
 // boxes as plain core meshes (each instance's matrix is read from B's mesh, so both draw the same floats). Every step's
 // frames must be identical (moves, hides, deletes, adds, camera moves; then all again with shadows cast and received),
-// the GPU must drop boxes in a partial view, and the instance pick must name the box engine.pick names.
+// the GPU must drop boxes in a partial view, and the instance pick must name the box engine.pick names. A bulk list of
+// 200,000 rows must compact the same rows in order with the look-back scan and with its fallback alone.
 // Run from the repository root after building packages, holding a GPU slot:
 //   node packages/culling/test/gpu/dynamic-check.mjs
 import assert from 'node:assert/strict';
@@ -54,6 +55,13 @@ for (const shadows of [false, true]) {
     }
     assert.ok(partial > 0, 'the GPU dropped boxes in a partial view');
     if (!shadows) {
+      const bulk = await page.evaluate(() => window.check.bulk());
+      console.log('bulk compaction', JSON.stringify(bulk));
+      assert.ok(bulk.counts[0] > 1000 && bulk.counts[0] < bulk.alive * 0.9, 'a partial view of the 200,000 rows');
+      assert.equal(bulk.counts[1], bulk.counts[0], 'the look-back fallback keeps as many rows as the look-back');
+      assert.ok(bulk.same, 'and the same records, byte for byte');
+      assert.ok(bulk.ordered, 'kept rows in row order');
+      assert.ok(bulk.shown, 'no hidden, deleted or non-finite row kept');
       const picks = await page.evaluate(() => window.check.picks()),
         hits = picks.filter(([p]) => p !== null).length;
       assert.deepEqual(

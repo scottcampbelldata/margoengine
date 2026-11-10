@@ -50,25 +50,37 @@ const BLOCK = 256;
 /** `factors.w` of every record: past core's 2^23 entity ids, so a record never names a core mesh. */
 const NO_MESH = 16777216;
 
-// The cull kernel tests each live row like CulledMeshes; then the CulledMeshes scan and an order-keeping scatter build the
-// kept rows' 96-byte core instance records and the indirect arguments. `fill` builds `world`, every row's record in row
-// order (free, hidden and non-finite rows zero, which draws nothing), only for what reads it: shadows and picking. Written
-// every frame it was 192 bytes of GPU memory traffic per instance that drawing never used.
+// One kernel culls, scans and compacts: each workgroup tests its block of 256 rows (each row read once, as three vec4
+// loads), scans the kept flags in workgroup memory, publishes the block's count, and finds the count of kept rows
+// before it by decoupled look-back (Merrill and Garland 2016, "Single-pass Parallel Prefix Scan with Decoupled
+// Look-back"): earlier blocks' published counts are summed until one carries its inclusive prefix. WebGPU does not
+// promise that an earlier workgroup runs while a later one waits, so after `wait` looks at a block that has not
+// published, the waiting workgroup counts that block itself (the decoupled fallback of Smith, Levien and Owens 2025,
+// "Decoupled Fallback: A Portable Single-Pass GPU Scan") with the same code that counts its own block, so both counts
+// agree bit for bit. Kept rows are written in row order (stream compaction as Haar and Aaltonen 2015), and the last
+// block writes the indirect arguments. Each published word is epoch (7 bits), status (2: 1 count, 2 prefix) and value
+// (23 bits), in args after the five indirect words, so no buffer is cleared between frames.
+// `keep` tests the world sphere as core's kernel computes it (radius scaled by sqrt(norm1*normInf) of the 3x3), padded
+// for float32. `load` reads a row's 12 floats as three vec4 (columns 0 to 2 without w, then the translation), its tint
+// and state. The outer loop of `cull` counts its own block first, then any earlier block that has not published in time. `fill` builds `world`,
+// every row's record in row order (free, hidden and non-finite rows zero, which draws nothing), only for what reads it:
+// shadows and picking. Written every frame it was 192 bytes of GPU memory traffic per instance that drawing never used.
 const shader = `
 struct Frame {camera:mat4x4f,planes:array<vec4f,6>,size:vec4f}
-struct Part {count:u32,indices:u32,pad:vec2u,sphere:vec4f,factors:vec4f,base:vec4f}
+struct Part {count:u32,indices:u32,epoch:u32,pad:u32,sphere:vec4f,factors:vec4f,base:vec4f}
 struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
+struct Row {m:mat4x4f,tint:vec4u,ok:bool}
 @group(0) @binding(0) var<uniform> f:Frame;
 @group(0) @binding(1) var<uniform> b:Part;
-@group(0) @binding(2) var<storage,read> matrices:array<f32>;
+@group(0) @binding(2) var<storage,read> matrices:array<vec4f>;
 @group(0) @binding(3) var<storage,read> rows:array<vec4u>;
 @group(0) @binding(4) var<storage,read_write> world:array<Record>;
-@group(0) @binding(5) var<storage,read_write> local:array<u32>;
-@group(0) @binding(6) var<storage,read_write> groups:array<u32>;
-@group(0) @binding(7) var<storage,read_write> drawn:array<Record>;
-@group(0) @binding(8) var<storage,read_write> args:array<u32>;
+@group(0) @binding(5) var<storage,read_write> drawn:array<Record>;
+@group(0) @binding(6) var<storage,read_write> args:array<atomic<u32>>;
+override wait:u32=64u;
 var<workgroup> scratch:array<u32,256>;
-// World sphere as core's kernel computes it (radius scaled by sqrt(norm1*normInf) of the 3x3), padded for float32.
+var<workgroup> total:u32;
+var<workgroup> look:u32;
 fn keep(m:mat4x4f)->bool {
   let c=(m*vec4f(b.sphere.xyz,1.0)).xyz;let a=mat3x3f(abs(m[0].xyz),abs(m[1].xyz),abs(m[2].xyz));
   let one=vec3f(1.0);let cols=max(max(dot(a[0],one),dot(a[1],one)),dot(a[2],one));let rows=a[0]+a[1]+a[2];
@@ -77,43 +89,53 @@ fn keep(m:mat4x4f)->bool {
   let w=dot(vec4f(f.camera[0].w,f.camera[1].w,f.camera[2].w,f.camera[3].w),vec4f(c,1.0));
   return f.size.z<=0.0||w<=r||r*f.size.y/w>=f.size.z;
 }
-fn finite(x:f32)->bool {return (bitcast<u32>(x)&0x7f800000u)!=0x7f800000u;}
-fn shown(i:u32)->bool {
-  let k=i*12u;var ok=rows[i].w==1u;for(var j=0u;j<12u;j++){ok=ok&&finite(matrices[k+j]);}
-  return ok;
+fn finite(x:vec4f)->bool {return all((bitcast<vec4u>(x)&vec4u(0x7f800000u))!=vec4u(0x7f800000u));}
+fn load(i:u32)->Row {
+  let k=i*3u;let x=matrices[k];let y=matrices[k+1u];let z=matrices[k+2u];let t=rows[i];
+  let m=mat4x4f(vec4f(x.xyz,0.0),vec4f(x.w,y.xy,0.0),vec4f(y.zw,z.x,0.0),vec4f(z.yzw,1.0));
+  return Row(m,t,t.w==1u&&finite(x)&&finite(y)&&finite(z));
 }
-fn matrix(i:u32)->mat4x4f {
-  let k=i*12u;return mat4x4f(vec4f(matrices[k],matrices[k+1u],matrices[k+2u],0.0),vec4f(matrices[k+3u],matrices[k+4u],matrices[k+5u],0.0),vec4f(matrices[k+6u],matrices[k+7u],matrices[k+8u],0.0),vec4f(matrices[k+9u],matrices[k+10u],matrices[k+11u],1.0));
-}
-fn record(i:u32)->Record {return Record(matrix(i),vec4f(b.base.rgb*bitcast<vec3f>(rows[i].xyz),1.0),b.factors);}
-@compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
-  let i=g.x;var v=0u;
-  if(i<b.count){
-    if(shown(i)&&keep(matrix(i))){v=1u;}
+fn record(r:Row)->Record {return Record(r.m,vec4f(b.base.rgb*bitcast<vec3f>(r.tint.xyz),1.0),b.factors);}
+@compute @workgroup_size(256) fn cull(@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
+  let id=w.x;let e=b.epoch<<25u;
+  var blk=id;var prefix=0u;var own=0u;var at=0u;var v=0u;var mine:Row;
+  loop {
+    let i=blk*256u+l;var k=0u;
+    if(i<b.count){let r=load(i);if(r.ok&&keep(r.m)){k=1u;}if(blk==id){mine=r;}}
+    scratch[l]=k;workgroupBarrier();
+    for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
+    if(l==255u){total=scratch[255];}
+    let c=workgroupUniformLoad(&total);
+    if(blk==id){v=k;at=scratch[l]-k;own=c;if(l==0u){atomicStore(&args[8u+id],e|(select(1u,2u,id==0u)<<23u)|c);}}
+    else{prefix+=c;}
+    if(blk==0u){break;}
+    var j=blk-1u;var n=0u;var found=false;
+    loop {
+      workgroupBarrier();
+      if(l==0u){look=atomicLoad(&args[8u+j]);}
+      let s=workgroupUniformLoad(&look);
+      if(wait>0u&&(s&0xfe000000u)==e){
+        prefix+=s&0x7fffffu;
+        if(((s>>23u)&3u)==2u||j==0u){found=true;break;}
+        j--;n=0u;continue;
+      }
+      n++;if(n>=wait){break;}
+    }
+    if(found){break;}
+    blk=j;
   }
-  scratch[l]=v;workgroupBarrier();
-  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
-  if(i<b.count){local[i]=(scratch[l]-v)|(v<<31u);}
-  if(l==255u){groups[w.x]=scratch[255];}
-}
-@compute @workgroup_size(256) fn scan(@builtin(local_invocation_index) l:u32) {
-  let n=(b.count+255u)/256u;let per=(n+255u)/256u;let lo=min(l*per,n);let hi=min(lo+per,n);
-  var sum=0u;for(var k=lo;k<hi;k++){sum+=groups[k];}
-  scratch[l]=sum;workgroupBarrier();
-  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
-  var run=scratch[l]-sum;for(var k=lo;k<hi;k++){let t=groups[k];groups[k]=run;run+=t;}
-}
-@compute @workgroup_size(256) fn scatter(@builtin(global_invocation_id) g:vec3u) {
-  let i=g.x;
-  if(i==0u&&b.count==0u){args[0]=b.indices;args[1]=0u;args[2]=0u;args[3]=0u;args[4]=0u;}
-  if(i>=b.count){return;}
-  let e=local[i];let v=e>>31u;let p=groups[i>>8u]+(e&0x7fffffffu);
-  if(v==1u){drawn[p]=record(i);}
-  if(i==b.count-1u){args[0]=b.indices;args[1]=p+v;args[2]=0u;args[3]=0u;args[4]=0u;}
+  if(l==0u){
+    if(id>0u){atomicStore(&args[8u+id],e|(2u<<23u)|(prefix+own));}
+    if(id==max((b.count+255u)/256u,1u)-1u){
+      atomicStore(&args[0],b.indices);atomicStore(&args[1],prefix+own);
+      atomicStore(&args[2],0u);atomicStore(&args[3],0u);atomicStore(&args[4],0u);
+    }
+  }
+  if(v==1u){drawn[prefix+at]=record(mine);}
 }
 @compute @workgroup_size(256) fn fill(@builtin(global_invocation_id) g:vec3u) {
   let i=g.x;
-  if(i<b.count){var r:Record;if(shown(i)){r=record(i);}world[i]=r;}
+  if(i<b.count){var o:Record;let r=load(i);if(r.ok){o=record(r);}world[i]=o;}
 }
 `;
 // Depth-only caster drawing for @margoengine/shadows (its cascade passes: depth32float, less-equal, no face culling).
@@ -150,8 +172,6 @@ interface Buffers {
   matrices: GPUBuffer;
   rows: GPUBuffer;
   world: GPUBuffer;
-  local: GPUBuffer;
-  groups: GPUBuffer;
   drawn: GPUBuffer;
   args: GPUBuffer;
 }
@@ -206,8 +226,6 @@ export class DynamicInstances implements EnginePlugin {
   protected buffers?: Buffers;
   private pipelines?: {
     cull: GPUComputePipeline;
-    scan: GPUComputePipeline;
-    scatter: GPUComputePipeline;
     fill: GPUComputePipeline;
     group: GPUBindGroup;
   };
@@ -227,6 +245,10 @@ export class DynamicInstances implements EnginePlugin {
   private partWords = new Uint32Array(this.part);
   private partFloats = new Float32Array(this.part);
   private sphere = new Float32Array(this.part, 16, 4);
+  /** Look-back epoch, 1 to 127: block counts published by an earlier dispatch never match. */
+  private epoch = 0;
+  /** Looks at an unpublished earlier block before counting it itself; 0 counts every earlier block (tests). */
+  protected wait?: number;
   private batch?: Batch;
   private readonly redirect: { instances: GPUBuffer; args: GPUBuffer } = {} as never;
   private route?: ReturnType<typeof import('./compat.js').dynamicRoute>;
@@ -466,6 +488,7 @@ export class DynamicInstances implements EnginePlugin {
       bounds = this.geometry.bounds;
     words[0] = this.high;
     words[1] = this.geometry.indices.length;
+    words[2] = this.epoch = (this.epoch % 127) + 1;
     for (let i = 0; i < 4; i++) floats[4 + i] = bounds[i];
     floats[8] = data[4];
     floats[9] = data[5];
@@ -507,10 +530,6 @@ export class DynamicInstances implements EnginePlugin {
         groups = Math.max(1, Math.ceil(this.high / BLOCK));
       pass.setBindGroup(0, p.group);
       pass.setPipeline(p.cull);
-      pass.dispatchWorkgroups(groups);
-      pass.setPipeline(p.scan);
-      pass.dispatchWorkgroups(1);
-      pass.setPipeline(p.scatter);
       pass.dispatchWorkgroups(groups);
       pass.end();
       this.filled = false;
@@ -572,10 +591,9 @@ export class DynamicInstances implements EnginePlugin {
         matrices: make(n * ROW * 4, S),
         rows: make(n * 16, S),
         world: make(n * 96, S | GPUBufferUsage.VERTEX),
-        local: make(n * 4, S),
-        groups: make(Math.ceil(n / BLOCK) * 4, S),
         drawn: make(n * 96, S | GPUBufferUsage.VERTEX),
-        args: make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC),
+        // Five indirect words, padding to 32 bytes, then one look-back word per block of 256 rows.
+        args: make(32 + Math.ceil(n / BLOCK) * 4, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC),
       };
       // A new device holds nothing yet: every row up to the high row is uploaded on the first frame.
       this.dirtyMatrices.fill(1);
@@ -599,24 +617,20 @@ export class DynamicInstances implements EnginePlugin {
         entry('storage'),
         entry('storage'),
         entry('storage'),
-        entry('storage'),
-        entry('storage'),
       ].map((e, binding) => ({ binding, ...e })),
     });
-    const module = d.createShaderModule({ code: this.shape?.shader(shader, 'matrix(i)') ?? shader }),
+    const module = d.createShaderModule({ code: this.shape?.shader(shader, 'r.m') ?? shader }),
       pipelineLayout = d.createPipelineLayout({ bindGroupLayouts: [layout] }),
-      pipeline = (entryPoint: string) =>
-        d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
+      pipeline = (entryPoint: string, constants?: Record<string, number>) =>
+        d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint, constants } });
     const group = d.createBindGroup({
       layout,
-      entries: [b.frame, b.part, b.matrices, b.rows, b.world, b.local, b.groups, b.drawn, b.args].map(
+      entries: [b.frame, b.part, b.matrices, b.rows, b.world, b.drawn, b.args].map(
         (buffer, binding) => ({ binding, resource: { buffer } }),
       ),
     });
     return {
-      cull: pipeline('cull'),
-      scan: pipeline('scan'),
-      scatter: pipeline('scatter'),
+      cull: pipeline('cull', this.wait === undefined ? undefined : { wait: this.wait }),
       fill: pipeline('fill'),
       group,
     };

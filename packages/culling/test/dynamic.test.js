@@ -65,13 +65,14 @@ test('draws its instances through core: own batch redirected to GPU-compacted re
   assert.equal(b.drawn.size, 1000 * 96);
   assert.deepEqual(
     h.pipelines.filter((p) => p.compute).map((p) => p.compute.entryPoint),
-    ['cull', 'scan', 'scatter', 'fill'],
+    ['cull', 'fill'],
   );
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
-  assert.match(code, /drawn\[p\]=record\(i\)/, 'order-keeping compaction, kept rows only');
-  assert.match(code, /rows\[i\]\.w==1u/, 'only shown rows');
+  assert.match(code, /drawn\[prefix\+at\]=record\(mine\)/, 'order-keeping compaction, kept rows only');
+  assert.match(code, /t\.w==1u/, 'only shown rows');
   assert.equal(code.match(/world\[i\]=/g).length, 1, 'only `fill` writes every row');
-  assert.match(code, /finite\(matrices\[k\+j\]\)/, 'non-finite rows draw nothing');
+  assert.match(code, /finite\(x\)&&finite\(y\)&&finite\(z\)/, 'non-finite rows draw nothing');
+  assert.equal(b.args.size, 32 + 4 * 4, 'indirect words, then one look-back word per block of 256 rows');
   // Rows: 12 floats of affine columns, attributes rgb tint + state word.
   assert.deepEqual(Array.from(new Float32Array(b.matrices.data, 48, 12)), [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0]);
   assert.deepEqual(Array.from(new Float32Array(b.rows.data, 16, 3)), [0.5, 1, 0]);
@@ -335,4 +336,32 @@ test('a failed retain in setup releases nothing, and the error reaches the calle
   };
   assert.throws(() => h.engine.use(new DynamicInstances({ geometry: box(), material: new PbrMaterial(), capacity: 8 })), /GPU buffer limit/);
   assert.deepEqual(h.released, []);
+});
+
+test('a frame culls and compacts in one dispatch, reading each row once (batch 166 work count)', () => {
+  const h = harness(),
+    crowd = make({ capacity: 100_000 });
+  h.engine.use(crowd);
+  for (let i = 0; i < 100_000; i++) crowd.addInstance();
+  const encoder = h.context.encoder,
+    begin = encoder.beginComputePass,
+    dispatched = [];
+  let passes = 0;
+  encoder.beginComputePass = function (...args) {
+    passes++;
+    const pass = begin.apply(this, args);
+    pass.dispatchWorkgroups = (x) => dispatched.push(x);
+    return pass;
+  };
+  h.run();
+  assert.equal(passes, 1, 'one compute pass a frame');
+  assert.deepEqual(dispatched, [Math.ceil(100_000 / 256)], 'one dispatch: cull, scan and compaction fused');
+  const cull = h.pipelines.find((p) => p.compute?.entryPoint === 'cull'),
+    code = cull.compute.module.code;
+  assert.equal(cull.layout.bindGroupLayouts[0].entries.length, 7, 'frame, part, matrices, rows, world, drawn, args');
+  assert.equal(code.match(/matrices\[/g).length, 3, 'three vec4 loads carry a row');
+  assert.match(code, /var<storage,read> matrices:array<vec4f>/);
+  assert.doesNotMatch(code, /\blocal\b|\bgroups\b/, 'no per-row round trip through memory');
+  assert.equal(h.pipelines.filter((p) => p.compute).length, 2, 'cull and fill pipelines only');
+  crowd.dispose();
 });

@@ -21,6 +21,7 @@ export class DynamicInstances implements EnginePlugin {
     protected engine?: Engine;
     protected device?: GPUDevice;
     protected buffers?: Buffers;
+    protected wait?: number;
     static attach(engine: EngineKernel, options: DynamicInstancesOptions): DynamicInstances;
     constructor({ geometry, material, capacity, minRadius, mirrored }: DynamicInstancesOptions);
     get count(): number;
@@ -72,8 +73,6 @@ interface Buffers {
     matrices: GPUBuffer;
     rows: GPUBuffer;
     world: GPUBuffer;
-    local: GPUBuffer;
-    groups: GPUBuffer;
     drawn: GPUBuffer;
     args: GPUBuffer;
 }

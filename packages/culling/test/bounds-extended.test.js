@@ -64,7 +64,7 @@ test('dynamic box culling retains the world list and uses a distinct padded shap
   });
   p.addInstance(I);
   h.engine.frameGraph.execute(h.context);
-  assert.ok(h.pipelines.some((p) => p.compute?.module.code.includes('shown(i)&&keep(matrix(i))&&boxKeep(matrix(i))')));
+  assert.ok(h.pipelines.some((p) => p.compute?.module.code.includes('r.ok&&keep(r.m)&&boxKeep(r.m)')));
   assert.ok(batches[0].redirect);
   p.dispose();
 });

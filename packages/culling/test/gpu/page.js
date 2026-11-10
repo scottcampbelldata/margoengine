@@ -145,5 +145,80 @@ async function picks() {
     }
   return out;
 }
-window.check = { setup, step, steps: steps.length, picks, errors };
+// Bulk compaction on a third engine: 200,000 rows (782 blocks of 256) in a partial view, with hidden, deleted and
+// non-finite rows. One list publishes block counts as usual; the other (wait 0) never reads them and counts every
+// earlier block itself, the look-back fallback. Both must keep the same rows in row order, byte for byte.
+// `drawn` has no COPY_SRC usage: a small compute pass copies its first `size` bytes into a buffer that can be mapped.
+async function readBack(device, buffer, size) {
+  if (!size) return new Uint8Array(0);
+  const words = size / 4,
+    out = device.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+    read = device.createBuffer({ size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+    module = device.createShaderModule({
+      code: '@group(0) @binding(0) var<storage,read> a:array<u32>;@group(0) @binding(1) var<storage,read_write> o:array<u32>;@compute @workgroup_size(256) fn main(@builtin(global_invocation_id) g:vec3u){if(g.x<arrayLength(&o)){o[g.x]=a[g.x];}}',
+    }),
+    pipeline = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } }),
+    group = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer } },
+        { binding: 1, resource: { buffer: out } },
+      ],
+    }),
+    encoder = device.createCommandEncoder(),
+    pass = encoder.beginComputePass();
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, group);
+  pass.dispatchWorkgroups(Math.ceil(words / 256));
+  pass.end();
+  encoder.copyBufferToBuffer(out, 0, read, 0, size);
+  device.queue.submit([encoder.finish()]);
+  await read.mapAsync(GPUMapMode.READ);
+  const bytes = new Uint8Array(read.getMappedRange().slice(0));
+  read.unmap();
+  read.destroy();
+  out.destroy();
+  return bytes;
+}
+async function bulk() {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'width:256px;height:256px';
+  document.body.append(canvas);
+  const c = await Engine.create(canvas, { camera: { fov: 50, near: 0.1, far: 400, position: [0, 30, 60], target: [0, 0, 0] } });
+  c.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
+  const n = 200_000,
+    lists = [0, 1].map(() => DynamicInstances.attach(c, { geometry, material: white, capacity: n }));
+  lists[1].wait = 0;
+  for (const list of lists) {
+    for (let r = 0; r < n; r++) list.addInstance([0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0.2, 0, (r % 500) * 0.5 - 125, 0, Math.floor(r / 500) * 0.5 - 100, 1]);
+    for (let r = 0; r < n; r += 7) list.setVisibleAt(r, false);
+    for (let r = 3; r < n; r += 17) list.deleteInstance(r);
+    for (let r = 5; r < n; r += 13) list.matrices[r * 12 + 9] = Number.NaN;
+    list.update();
+  }
+  c.render();
+  await c.gpu.queue.onSubmittedWorkDone();
+  const out = [];
+  for (const list of lists) {
+    const count = await list.readCount();
+    out.push({ count, records: Array.from(await readBack(c.gpu, list.buffers.drawn, count * 96)) });
+  }
+  // Rows kept in increasing row order, each shown, alive and finite.
+  const f = new Float32Array(new Uint8Array(out[0].records).buffer),
+    kept = [];
+  for (let k = 0; k < out[0].count; k++) kept.push(Math.round((f[k * 24 + 14] + 100) / 0.5) * 500 + Math.round((f[k * 24 + 12] + 125) / 0.5));
+  const ordered = kept.every((r, k) => k === 0 || r > kept[k - 1]),
+    shown = kept.every((r) => r % 7 !== 0 && (r - 3) % 17 !== 0 && (r - 5) % 13 !== 0);
+  for (const list of lists) list.dispose();
+  c.dispose();
+  canvas.remove();
+  return {
+    alive: n - Math.ceil((n - 3) / 17),
+    counts: out.map((o) => o.count),
+    same: out[0].records.length === out[1].records.length && out[0].records.every((v, k) => v === out[1].records[k]),
+    ordered,
+    shown,
+  };
+}
+window.check = { setup, step, steps: steps.length, picks, bulk, errors };
 window.ready = true;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14672224,
+  "total": 14673533,
   "history": [
     {
       "date": "2026-10-24",
@@ -8099,6 +8099,12 @@
       "commit": "5ecb5ab1a",
       "reason": "batch 161 job 1: per-track key cursor and the per-node primitive group table replace per-frame validation and binary search (+167 B animation root, +29 B interactivity)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "13be2be67",
+      "reason": "batch 166 job 1: DynamicInstances culls, scans and compacts in one dispatch (decoupled look-back with its portable fallback) instead of three kernels",
+      "grew": 2
     }
   ],
   "items": {
@@ -8312,9 +8318,9 @@
     "@margoengine/creative/targets-depth": 3654,
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 14096,
-    "@margoengine/culling/bounds": 19473,
+    "@margoengine/culling/bounds": 20401,
     "@margoengine/culling/depth": 6320,
-    "@margoengine/culling/dynamic": 7461,
+    "@margoengine/culling/dynamic": 7842,
     "@margoengine/culling/lod": 4625,
     "@margoengine/culling/meshlets": 18258,
     "@margoengine/culling/models": 9657,

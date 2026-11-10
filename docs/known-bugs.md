@@ -2304,6 +2304,10 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   6.67 against 6.11 ms at 100,000 and 16.2 against 15.7 ms at 250,000 (three.js WebGPU; numbers in
   [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md), "Moving instances on the GPU"). The checked
   `setMatrixAt` stays about 15% over three at 100,000, the validation cost.
+- **Counted (batch 166, 2026-11-10), per frame at 250,000 moving boxes:** n calls of `setMatrixAt` (16 finite tests, the
+  affine test, a determinant, 12 copies) or n row copies and one `update()`; 0 allocations; one `writeBuffer` run of
+  12,000,000 bytes (48 a row, where three uploads 64); a 176-byte frame and a 64-byte part uniform; the attribute rows
+  untouched. Timing pending the quiet rerun.
 
 ### DynamicInstances: about 15-35% more GPU time than InstancedMesh at 100,000 and 250,000 moving boxes
 
@@ -2313,10 +2317,16 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
 - **Ruled out, by measurement at 250,000:** the compute passes cost little (skipping their dispatches: still 2.51 ms
   moving, 1.38 ms static, against 2.73 and 1.50 with them), so the cull is not the gap. Moving the upload's barrier ahead of the
   timed passes changed nothing (2.70 ms).
-- **Cause of the rest: not found.** Moving costs about 1.1 ms more in the timed passes than a still frame, even when the
-  moved rows reach no draw (compute skipped, so `drawn` is stale). The 12 MB upload runs then, and the CPU takes 15 ms a
-  frame, so the GPU idles between frames: either could slow the passes. **Next to test:** a moving frame with the upload
-  held and the CPU work kept, then the reverse. three's still frame at 250,000 was not measured in the same run.
+- **Counted (batch 166, 2026-11-10):** a moving frame with the compute skipped submits the same passes, bytes and
+  draws as a still frame plus one 12,000,000-byte staging copy outside the timed passes, so the 1.1 ms seen inside the
+  passes is not work: the frame is CPU bound (about 15 ms CPU, 2.7 ms GPU), the GPU idles about 80% and its clocks
+  drop, and the copy can overlap the passes. three at 250,000 is CPU bound too (15.7 ms). Inside the design the kernels
+  read each row twice with 36 scalar loads and round-tripped 4 bytes a row through a scan: fixed by `perf(culling)` one-dispatch dynamic cull (batch 166 job 1)
+  (one dispatch, three vec4 loads a row; 232 to 160 bytes of GPU memory traffic a kept row; perf-history entry 113).
+- **Left:** the 96-byte record with six attributes is core's frozen instance layout, an accepted structural difference
+  (`docs/limits.md`, "DynamicInstances record size"). **Next:** the quiet rerun reads the `dynamic-upload` (GPU bound,
+  no CPU maths) and `dynamic-cpu` (CPU maths, no upload) bench modes beside the moving and still cases, which separates
+  clocks from the copy; this entry is rewritten from that run.
 
 The two entries below come from the three.js speed matrix ([whitepaper/perf-vs-threejs.md](whitepaper/perf-vs-threejs.md),
 rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their first causes are fixed (perf-history entry

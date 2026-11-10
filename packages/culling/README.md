@@ -336,7 +336,11 @@ console.log(await crowd.pick(200, 150)); // the instance index under a CSS pixel
 Each frame, before any core draw, the plugin uploads the blocks of 256 rows that were written (one `writeBuffer` per run
 of them) and runs one compute pass: each live row's bounding sphere (the kernel's bound, padded for float32) is tested
 against the frustum and, with `minRadius`, its size on screen, and the kept rows' 96-byte core instance records are
-built on the GPU, compacted in index order, with indirect draw arguments. Core then draws them as one batch
+built on the GPU, compacted in index order, with indirect draw arguments. That pass is one dispatch: each workgroup
+tests its 256 rows (each row read once, as three 16-byte loads), scans them in workgroup memory and finds how many rows
+before it were kept by decoupled look-back (Merrill and Garland 2016), counting an earlier block itself when that block
+has not published in time (the decoupled fallback of Smith, Levien and Owens 2025), since WebGPU does not promise
+that an earlier workgroup runs while a later one waits. Core then draws them as one batch
 through `Batch.redirect`, core's GPU-culling hook: a batch with a redirect is drawn even when core collected no
 instances for it, which is the one line of core this class needs. So the instances draw in core's main pass and every
 replay of it (SSAO, outline, post) with core's own shader and every shader patch, shadow receiving included.
@@ -357,7 +361,8 @@ with core meshes through hides, hierarchy moves, removes, adds and shadows, and 
 `packages/culling/test/gpu/dynamic-check.mjs`: 576
 boxes drawn as DynamicInstances and as core meshes, through moves, hides, deletes, adds into freed and new rows and
 camera moves, with and without shadows: 0 differing pixels in every frame, and `crowd.pick` names the box `engine.pick`
-names. RTX A6000, Edge 156.
+names. A bulk list of 200,000 rows in a partial view keeps the same records, byte for byte and in row order, with the
+look-back and with the fallback alone. RTX A6000, Edge 156.
 
 Measured (diagnostic, busy machine; RTX A6000, Edge 156, 1280 x 720; `npm run bench -- dynamic`): with nothing moving the plugin's CPU work is 0.05 ms per frame at 10,000 and at
 250,000 instances. With every box moving and its matrix set each frame, 7.7 ms CPU and 1.5 ms GPU at 100,000 boxes

@@ -183,6 +183,12 @@ this is diagnostic. CPU ms / GPU ms per frame:
   [known-bugs.md](../known-bugs.md), "DynamicInstances: about 15-35% more GPU time".
 - three.js core meshes (`Mesh` per box) at 100,000 moving: 546 ms CPU per frame on WebGPU; the 250,000 case was not
   run (about 1.4 s a frame).
+- Counted, batch 166 (2026-11-10): the GPU column above is confounded by clocks. At 250,000 the frame is CPU bound
+  (about 15 ms CPU, 2.7 ms GPU), so the GPU idles and clocks down, and a moving frame differs from a still one only by
+  a 12,000,000-byte staging copy. Inside the kernels each row was read twice (36 scalar loads) with a scan round trip;
+  `perf(culling)` one-dispatch dynamic cull (batch 166 job 1) makes it one dispatch with three vec4 loads a row, identical records (perf-history entry 113). The
+  96-byte record is core's (accepted, `docs/limits.md`). Timing pending the quiet rerun, which adds GPU-bound
+  `dynamic-upload` and no-upload `dynamic-cpu` cases.
 
 ## Update 2026-10-26: 10,000 separate materials meshes (diagnostic, busy machine)
 

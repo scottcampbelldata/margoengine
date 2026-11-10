@@ -2830,6 +2830,35 @@ The Box2D browser goal remains unmet. Quiet release reruns remain required; no a
   replacement remains rejected for drift, collapse and seam failures. Profile setup/gather/materialization
   before another formulation change; no forecast substitutes for the full accuracy and work contract.
 
+### 113. DynamicInstances: one dispatch a frame, each row read once (batch 166 job 1, 2026-11-10)
+
+- **Counted before** (250,000 moving boxes, all in view, no shadows; `packages/culling/test/dynamic.test.js`, fake
+  device): one compute pass of three dispatches (cull 977 workgroups, scan 1, scatter 977) on a bind group of 9
+  bindings. `matrices` was bound as `array<f32>`: 36 scalar loads a row (12 in the finite test, 12 to build the matrix
+  in cull, 12 again in scatter), so each row's 48 bytes were read twice, and a 4-byte `local` word per row was written by
+  cull and read back by scatter. GPU memory traffic a kept row: 132 bytes read and 100 written (232); a culled row 72.
+- **Why two timing hunts failed:** a moving frame with the compute skipped submits the same passes, bytes and draws as
+  a still frame plus one 12,000,000-byte staging copy outside the timed passes. The frame is CPU bound (about 15 ms CPU,
+  2.7 ms GPU), so the GPU idles about 80% of the time and its clocks drop; three at 250,000 is CPU bound too (15.7 ms).
+  No timing is read again until the bench runs a GPU-bound case (batch 166 job 3).
+- **Change** (`perf(culling)` one-dispatch dynamic cull (batch 166 job 1)): `matrices` is bound as `array<vec4f>` (three 16-byte loads a row; stride, layout and
+  API unchanged), and cull, scan and compaction are one kernel: each workgroup counts its 256 rows, scans them in
+  workgroup memory and sums the counts published by earlier blocks (decoupled look-back, Merrill and Garland 2016),
+  counting an earlier block itself when it has not published in time (decoupled fallback, Smith, Levien and Owens 2025),
+  since WebGPU does not promise forward progress between workgroups. The last block writes the indirect arguments.
+- **Counted after:** one dispatch (977 workgroups), 7 bindings, 2 pipelines (cull, and `fill` for shadows and picking),
+  3 `matrices[` loads in the shader text, no per-row scratch buffer. A kept row reads 64 bytes and writes 96 (160); a
+  culled row reads 64. One 4-byte look-back word per 256 rows, kept with the indirect arguments (32 + 4 x blocks bytes),
+  stamped with a 7-bit epoch so nothing is cleared between frames.
+- **Same output:** a one-off A/B page ran origin/main's three-kernel class and the new one side by side on the same
+  250,000 rows (hidden, deleted and tinted rows mixed in) from five camera positions: the drawn records are identical
+  byte for byte and the drawn counts equal (52,799; 36,668; 96,297; 150,356; 33,768). `dynamic-check.mjs`: 0 differing
+  pixels against core meshes in all 8 steps with and without shadows, picks equal, and a 200,000-row list keeps the same
+  records in row order with the look-back and with the fallback alone (36,451 rows both ways).
+- **Left, accepted:** the 96-byte record with six attributes is core's frozen instance layout (`docs/limits.md`,
+  "DynamicInstances record size"). Frustum culling is Margo's extra work, kept.
+- **Timing:** pending the quiet rerun (`npm run bench -- dynamic --engines=margo,three-webgpu`).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

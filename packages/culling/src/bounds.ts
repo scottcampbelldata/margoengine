@@ -75,7 +75,7 @@ function shape(): CullShape {
           'keep(s)&&(u.mode.x!=2u||unoccluded(s))',
           `keep(s)&&boxKeep(${matrix})&&(u.mode.x!=2u||boxDepth(${matrix}))`,
         )
-        .replace('shown(i)&&keep(matrix(i))', 'shown(i)&&keep(matrix(i))&&boxKeep(matrix(i))');
+        .replace(`r.ok&&keep(${matrix})`, `r.ok&&keep(${matrix})&&boxKeep(${matrix})`);
       return code + planeCode + (code.includes('fn reaches(') ? depthCode : '');
     },
     write(target, offset, vertices, stride, padding = 0) {
