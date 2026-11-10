@@ -107,6 +107,11 @@ interface Deformation {
   uploadArgs: [GPUBuffer, number, Float32Array<ArrayBuffer>];
   joints: number[];
   inverseBind: Float32Array[];
+  /**
+   * The record of an earlier primitive of the same skinned node whose bone range this one shares (batch.ts `add`): it
+   * computes, checks and uploads the palette for both. Unset for the first primitive of a node, or one placed apart.
+   */
+  leader?: Deformation;
 }
 /** Portable clip playback; clip index disambiguates repeated names. */
 export interface AnimationState {
@@ -300,6 +305,8 @@ export class Animation implements EnginePlugin {
   private device?: GPUDevice;
   private arena?: DeformArena;
   private resources: Deformation[] = [];
+  /** The distinct nodes of `resources`, so the hidden check walks each node's ancestry once. */
+  private deformedNodes: PBRPrimitive['node'][] = [];
   /** The resources' slots, in order (the arena's view of this Animation). */
   private slots: Slot[] = [];
   /** This Animation's own dispatches, for deformation outside a shared frame-graph pass. */
@@ -776,11 +783,21 @@ export class Animation implements EnginePlugin {
     for (const slot of slots) arena.pipeline(slot.extra, slot.mode);
     records.forEach((record, i) => {
       record.slot = slots[i];
+      // A primitive sharing an earlier one's bone range shares its palette: same node, so same joints and binds.
+      const leader = records.slice(0, i).find((r) => r.slot.bones === slots[i].bones && !r.leader);
+      if (leader) {
+        record.leader = leader;
+        record.palette = leader.palette;
+        record.paletteBits = leader.paletteBits;
+        record.uploadedPalette = leader.uploadedPalette;
+      }
       const weights = record.primitive.weights;
       if (weights.length && weights.byteLength <= weightRegion(slots[i].targets) * 4)
         device.queue.writeBuffer(record.weights, slots[i].weights.offset * 4, weights as Float32Array<ArrayBuffer>);
     });
     this.resources.push(...records);
+    for (const record of records)
+      if (!this.deformedNodes.includes(record.primitive.node)) this.deformedNodes.push(record.primitive.node);
     this.model.prepareDeformation = this.prepareDeformation;
     this.model.createDeformationRenderer = this.createDeformationRenderer;
   }
@@ -853,13 +870,16 @@ export class Animation implements EnginePlugin {
     if (context.backend !== 'webgpu' || this.model.disposed) return false;
     // A level of detail not on show, or another hidden model: no draw reads its vertices, so they wait until it shows.
     const { store } = this.model.root.engine;
-    if (this.resources.every((r) => hiddenInTree(store, r.primitive.node.id))) return false;
+    let shown = false;
+    for (let i = 0; !shown && i < this.deformedNodes.length; i++)
+      if (!hiddenInTree(store, this.deformedNodes[i].id)) shown = true;
+    if (!shown) return false;
     for (const r of this.resources) {
       const weights = r.primitive.weights;
       for (let i = 0; i < weights.length; i++)
         if (!Number.isFinite(weights[i]))
           throw new RangeError('Invalid morph weights; set finite weights on the primitive');
-      if (r.joints.length) {
+      if (r.joints.length && !r.leader) {
         if (!invertMatrixStable(r.primitive.node.matrix, this.inverse, this.workspace))
           throw new RangeError('Singular skinned mesh transform; give the skinned node a non-zero scale');
         for (let i = 0; i < r.joints.length; i++) {
@@ -950,6 +970,7 @@ export class Animation implements EnginePlugin {
       for (const slot of this.slots) this.arena.remove(slot);
     }
     this.resources = [];
+    this.deformedNodes = [];
     this.slots = [];
     this.arena = undefined;
   }

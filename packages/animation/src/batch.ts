@@ -20,6 +20,8 @@ const VERTEX = 80,
 interface Range {
   offset: number;
   size: number;
+  /** Slots naming this range: a bone palette is shared by the primitives of one skinned node (see `add`). */
+  refs?: number;
 }
 /** Immutable data every copy of a primitive reads (bind-pose vertices, morph deltas, skin influences), held once. */
 interface Block {
@@ -172,20 +174,44 @@ export class DeformArena {
       },
     }));
   }
-  /** Places the primitives of one owner, growing a page at most once; returns their slots in order. */
+  /**
+   * Places the primitives of one owner, growing a page at most once; returns their slots in order. Skinned primitives
+   * of one node and skin (glTF gives every primitive of a skinned mesh node the same joints and inverse binds, so the
+   * same palette) share one bone range when they land on one page: the owner computes and uploads it once.
+   */
   add(specs: readonly SlotSpec[]): Slot[] {
     if (!specs.length) return [];
     const plans = new Map<Page, SlotSpec[]>(),
       fresh: Page[] = [],
-      pending = new Map<Page, number[]>();
+      pending = new Map<Page, number[]>(),
+      /** The first spec of each skinned node and skin, and the page it went to. */
+      palettes = new Map<object, Map<number | undefined, { spec: SlotSpec; page: Page }>>(),
+      /** Specs that take an earlier spec's bone range. */
+      sharing = new Map<SlotSpec, SlotSpec>();
     for (const spec of specs) {
       const need = this.needs(spec);
       if (need.some((n, i) => n * [VERTEX, VERTEX, MORPH, WORD, WEIGHT, MATRIX][i] > this.limit))
         throw new RangeError(
           'Animation buffer exceeds device limit; split the mesh or reduce vertices, joints and morph targets',
         );
-      let page = [...this.pages, ...fresh].find((p) => this.fits(p, pending.get(p), need));
+      const node = spec.joints ? spec.primitive.node : undefined,
+        first = node && palettes.get(node)?.get(spec.skin);
+      let page: Page | undefined;
+      if (first && first.spec.joints === spec.joints && first.spec.mode === spec.mode) {
+        const bones = need[5];
+        need[5] = 0;
+        if (this.fits(first.page, pending.get(first.page), need)) {
+          page = first.page;
+          sharing.set(spec, first.spec);
+        } else need[5] = bones;
+      }
+      page ??= [...this.pages, ...fresh].find((p) => this.fits(p, pending.get(p), need));
       if (!page) fresh.push((page = new Page(this.alignment)));
+      if (node && !first) {
+        let bySkin = palettes.get(node);
+        if (!bySkin) palettes.set(node, (bySkin = new Map()));
+        bySkin.set(spec.skin, { spec, page });
+      }
       // Vertices, deltas and influences another copy already placed (or one placed earlier in this call) are shared.
       const queued = plans.get(page) ?? [];
       if (this.block(page, spec, 's') || queued.some((q) => same(q, spec, 's'))) need[0] = 0;
@@ -200,10 +226,13 @@ export class DeformArena {
     }
     this.pages.push(...fresh);
     for (const [page, list] of plans) this.reserve(page, pending.get(page)!, list);
-    const slots = specs.map((spec) => {
-      const page = [...plans].find(([, list]) => list.includes(spec))![0];
-      return this.place(page, spec);
-    });
+    const placed = new Map<SlotSpec, Slot>(),
+      slots = specs.map((spec) => {
+        const page = [...plans].find(([, list]) => list.includes(spec))![0],
+          slot = this.place(page, spec, placed.get(sharing.get(spec)!)?.bones);
+        placed.set(spec, slot);
+        return slot;
+      });
     // Outputs start as the bind pose, copied on the GPU: a copy of a placed primitive uploads no vertices.
     const encoder = this.device.createCommandEncoder();
     for (const slot of slots)
@@ -226,7 +255,7 @@ export class DeformArena {
     if (this.published(slot)) p.deformed = p.deformedOffset = undefined;
     page.output.ranges.delete(slot.output);
     page.weights.ranges.delete(slot.weights);
-    page.bones.ranges.delete(slot.bones);
+    if ((slot.bones.refs = (slot.bones.refs ?? 1) - 1) <= 0) page.bones.ranges.delete(slot.bones);
     for (const [block, pool] of [
       [slot.source, page.source],
       [slot.morphs, page.morphs],
@@ -382,7 +411,7 @@ export class DeformArena {
     page.version++;
     this.version++;
   }
-  private place(page: Page, spec: SlotSpec): Slot {
+  private place(page: Page, spec: SlotSpec, bones?: Range): Slot {
     const allocate = (pool: Pool, size: number): Range => {
       const offset = roundUp(pool.top, pool.align),
         range = { offset, size };
@@ -418,7 +447,7 @@ export class DeformArena {
       source: shared(page.source, 's', spec.count, () => spec.primitive.vertices)!,
       output: allocate(page.output, spec.count),
       weights: allocate(page.weights, weightRegion(spec.targets)),
-      bones: allocate(page.bones, spec.joints),
+      bones: bones ? (bones.refs!++, bones) : Object.assign(allocate(page.bones, spec.joints), { refs: 1 }),
       morphs: shared(page.morphs, 'm', spec.count * spec.targets, spec.deltas),
       influences: shared(page.influences, 'i', spec.joints ? spec.count * (spec.extra ? 4 : 2) : 0, spec.influences),
       index: -1,

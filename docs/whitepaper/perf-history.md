@@ -3318,3 +3318,18 @@ and do not replace steady-state timing attribution. No speed verdict changed; ba
   the same transform and rotation lanes, bit for bit, as `sampleTrackInto` plus the setters driven by hand.
 - No timing was taken: timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-mixer,p-morph
   --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).
+
+### Batch 161 job 2: one bone palette per skinned node (rows 12.1, 12.3)
+
+- Cause, read from the code: `Animation.upload` built a bone palette per deform record. RobotExpressive's two skinned
+  nodes have two primitives each, and glTF gives every primitive of a skinned node the same joints and inverse binds, so
+  each model computed 4 palettes where 2 differ: 344 mat4 products, 4 finite scans, 4 encodes, 4 comparisons and 4
+  bone `writeBuffer` calls a model a frame. `hiddenInTree` was also walked per record, not per node.
+- Fix: `DeformArena.add` gives the slots of one call with the same node and skin one bone range (refcounted, freed with
+  its last slot); the Animation keeps the palette on the first record and the others point at it, so it is made and
+  written once. The hidden check walks each deformed node once.
+- Work counts (`packages/animation/tests/palette-share.test.js`, fail on the parent): bone writes per frame 2 (parent 4),
+  bone bytes per frame 5,504 (one 43-joint palette per node; parent 11,008), both primitives of a node name one bone
+  offset. Identical output: every primitive's uploaded palette bytes equal the parent's product for it (inverse node,
+  joint, inverse bind, then the encoding), linear and dual quaternion; the real-GPU skin and DQS checks pass unchanged.
+- Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-mixer --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).

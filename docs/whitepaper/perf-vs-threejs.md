@@ -441,3 +441,10 @@ re-checked without allocating, each track continues from last frame's key (at mo
 playback, 7 before) and nodes are written through the transform refs. Parent-failing work counts and a bit-for-bit
 transform store comparison are in `packages/animation/tests/frame-path.test.js`; perf-history "Batch 161 job 1".
 Timing pending the quiet rerun.
+
+## One bone palette per skinned node (batch 161 job 2)
+
+Rows 12.1 and 12.3 (`p-mixer`) stay slower until the quiet rerun. Each RobotExpressive copy built and uploaded four bone
+palettes a frame where two differ (two primitives per skinned node). The primitives of one node and skin now share one
+bone range, so a copy writes 2 palettes a frame instead of 4 with the same bytes per primitive
+(`packages/animation/tests/palette-share.test.js`); perf-history "Batch 161 job 2". Timing pending the quiet rerun.
