@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14116638,
+  "total": 14122341,
   "history": [
     {
       "date": "2026-10-24",
@@ -7453,6 +7453,12 @@
       "commit": "76db3f779",
       "reason": "batch236: optional weather/cover top-down shelter map for core and gltf-pro surfaces; no root changes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "3c91db384",
+      "reason": "Batch272-caustics-new5447B-ceiling5703B-public-GPU-BVH-and-integer-photon-ledger",
+      "grew": 1
     }
   ],
   "items": {
@@ -8804,6 +8810,7 @@
     "@margoengine/gltf-pro/dds": 7076,
     "@margoengine/decoders/ktx2-hdr6": 44540,
     "@margoengine/sciviz/contour2d": 4058,
-    "@margoengine/environment/reflector-pbr": 3556
+    "@margoengine/environment/reflector-pbr": 3556,
+    "@margoengine/staging/caustics": 5703
   }
 }

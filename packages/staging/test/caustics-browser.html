@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Product caustics</title><canvas width="64" height="64" style="width:64px;height:64px"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {sphereGeometry,boxGeometry} from '/packages/geometry/dist/primitives.js';
+import {ProductCaustics} from '/packages/staging/dist/caustics.js';
+window.run=async compat=>{
+ if(compat)await(await import('/packages/webgl2-compat/dist/index.js')).install({force:true});
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,5,3],target:[0,0,0]},clearColor:'#000000'});
+ const errors=[],watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));watch();
+ const plane={positions:new Float32Array([-2,1,-2,2,1,-2,-2,1,2,2,1,2]),indices:new Uint32Array([0,2,1,1,2,3])};
+ let c=await ProductCaustics.attach(engine,{geometry:plane,backside:false,ior:1.333,resolution:64,photonSide:64,worldRadius:0});
+ const frame=async()=>{engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();};
+ const map=async()=>{await frame();return(await c.readMap({signal:AbortSignal.timeout(30000)})).irradiance;};
+ const maxDiff=(a,b)=>a.reduce((m,v,i)=>Math.max(m,Math.abs(v-b[i])),0);
+ try{
+  const water=await map(),waterF=((1.333-1)/(1.333+1))**2,waterError=Math.max(...water.map(v=>Math.abs(v-(1-waterF))));
+  await frame();const held=c.stats.updates===1;
+  const slab=boxGeometry(4,1,4);for(let i=1;i<slab.positions.length;i+=3)slab.positions[i]+=1.5;
+  c.options.ior=1.5;c.options.backside=true;await c.setGeometry(slab);const glass=await map();
+  const glassError=Math.max(...glass.map(v=>Math.abs(v-(1-.04)**2)));
+  c.options.height=1;let liveHeightRejected=false;try{await frame();}catch(e){liveHeightRejected=e instanceof RangeError;}c.options.height=3;
+  const lens=sphereGeometry(.6,48,24);for(let i=1;i<lens.positions.length;i+=3)lens.positions[i]+=1.2;
+  await c.setGeometry(lens);const focused=await map();
+  const lensPeak=Math.max(...focused),flux=focused.reduce((s,v)=>s+v,0)/focused.length;
+  let cancelled=false;try{await c.setGeometry(plane,{signal:AbortSignal.abort()});}catch(e){cancelled=e.name==='AbortError';}
+  const afterAbort=await map();
+  const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();await c.ready;
+  const restored=await map();
+  c.options.lightPosition=[0,8,0];c.invalidate();const point=await map();const pointPower=point.reduce((s,v)=>s+v,0);
+  let rejected=false;const tooHigh={...plane,positions:Float32Array.from(plane.positions,(v,i)=>i%3===1?5:v)};
+  try{await c.setGeometry(tooHigh);}catch(e){rejected=e instanceof RangeError;}
+  await c.setGeometry(plane);c.options.lightPosition=undefined;c.options.backside=false;
+  const recovered=await map();
+  return {waterError,glassError,liveHeightRejected,held,lensPeak,flux,cancelled,abortError:maxDiff(focused,afterAbort),restoreError:maxDiff(focused,restored),pointPower,rejected,recovery:recovered.some(v=>v>0),errors};
+ }finally{window.cleanup=()=>{c.dispose();c.dispose();engine.dispose();};}
+};window.ready=true;
+</script>

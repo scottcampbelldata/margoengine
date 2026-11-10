@@ -45,6 +45,10 @@
     "./accumulate-ambient": {
       "types": "./dist/accumulate-ambient.d.ts",
       "import": "./dist/accumulate-ambient.js"
+    },
+    "./caustics": {
+      "types": "./dist/caustics.d.ts",
+      "import": "./dist/caustics.js"
     }
   },
   "files": [
@@ -57,7 +61,8 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/voxel-pathtracer": "^1.0.0"
+    "@margoengine/voxel-pathtracer": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0"
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
@@ -68,10 +73,14 @@
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/staging/test/browser-check.mjs --no-record && node packages/staging/test/ground-browser.mjs && node packages/staging/test/ground-browser.mjs --studio && node packages/staging/test/ground-browser.mjs --studio --compat && node packages/staging/test/accumulate-browser.mjs && node packages/staging/test/accumulate-browser.mjs --compat && node packages/staging/test/pathtrace-browser.mjs && node packages/staging/test/orientation-browser.mjs && node packages/staging/test/orientation-browser.mjs --compat && node packages/staging/test/floor-browser.mjs && node packages/staging/test/floor-browser.mjs --compat && node packages/staging/test/hdr-shadow-browser.mjs && node packages/staging/test/hdr-shadow-browser.mjs --compat",
     "test:gpu:materials": "cd ../.. && node packages/staging/test/pathtrace-materials-browser.mjs",
-    "test:gpu:ambient": "cd ../.. && node packages/staging/test/accumulate-ambient-browser.mjs"
+    "test:gpu:ambient": "cd ../.. && node packages/staging/test/accumulate-ambient-browser.mjs",
+    "test:gpu:caustics": "cd ../.. && node packages/staging/test/caustics-browser.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/voxel-pathtracer": {
+      "optional": true
+    },
+    "@margoengine/bvh": {
       "optional": true
     }
   }

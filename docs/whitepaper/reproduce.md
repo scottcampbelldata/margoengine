@@ -3597,3 +3597,6 @@ Batch 188 Fresnel floor: build packages, node --test --test-timeout=120000 packa
 
 ## Precipitation cover (batch 236 job 2)
 Build packages. CPU: node --test --test-timeout=60000 packages/weather/tests/cover.test.js. GPU: node scripts/gpu-lock.mjs run --owner=weather-cover-proof --wait-max=60 --max=8 -- node packages/weather/tests/parity-browser.mjs cover, then the same command with --compat (or npm run test:browser:parity --workspace=@margoengine/weather for gltf, cover and lens on both backends). Original procedural fixture: imported floor and wall, core strip, capture-only roof with 0.5 m eaves and a small canopy probe. No third-party fixture or benchmark.
+
+## Batch 272 job 3: product caustics
+After build:packages run node --test --test-timeout=120000 packages/staging/test/*.test.js and node scripts/gpu-lock.mjs run --owner=staging-caustics --max=4 --wait-max=60 -- node packages/staging/test/caustics-browser.mjs. Both backends use original plane, slab and sphere oracles; report: test-results/staging-caustics.json. Compare water against 1-((ior-1)/(ior+1)) squared and the slab against two such Fresnel transmission factors. Require focused irradiance above one, integrated flux below one, nonblack floor pixels, exact retained/restored maps and rejection followed by successful replacement. No network assets or timing assertions.

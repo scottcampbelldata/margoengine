@@ -3814,6 +3814,10 @@
       "types": "./dist/staging/accumulate-ambient.d.ts",
       "import": "./dist/staging/accumulate-ambient.js"
     },
+    "./staging/caustics": {
+      "types": "./dist/staging/caustics.d.ts",
+      "import": "./dist/staging/caustics.js"
+    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"

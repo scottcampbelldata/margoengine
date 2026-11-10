@@ -4144,3 +4144,6 @@ Batch 188 job 3: optional environment/reflector-pbr adds angle-dependent Fresnel
 
 ## Precipitation cover (batch 236 job 2)
 weather/cover stops rain, wetness, puddles, rings, snow cover and snow depth under roofs and trees from one top-down depth map, on core meshes and imported gltf-pro models, on WebGPU and WebGL2 compatibility. Proof: packages/weather/tests/cover.test.js and cover-check.html through parity-browser.mjs cover. 0 of 11,564 sheltered pixels change under full wetness and snow while 11,443 exposed pixels change; an out-of-view canopy probe proves the four-texel edge lookup. Shelter is limited to the camera-centred map (docs/limits.md). No speed claim.
+
+## Batch 272 job 3: product floor caustics
+staging/caustics traces arbitrary indexed glass/water surfaces with the existing public GPU BVH traversal, exact Snell/Fresnel transmission and integer photon deposits. It presents an additive floor independent of camera visibility. Proof: caustics.test.js and caustics-browser.mjs, analytic water/slab Fresnel, focusing, catcher pixels, cancellation, atomic replacement/recovery and actual device restore on both backends. Scope/exclusions: docs/staging-parity.md. No full-transport or speed claim.

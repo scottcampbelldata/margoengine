@@ -979,3 +979,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/environment (batch 188 job 3): document /reflector-pbr, Fresnel/IOR/metalness/baseColor, roughness and world blurDistance, geometric-normal and constant-base limits, capture lifecycle and supported backends.
 - @margoengine/vfx (batch 188 manifest repair): describe the complete recurring parity GPU gate and its native/full-compatibility cases; no API changed.
 - @margoengine/weather and margoengine forwarding (batch 236 job 2): document /cover PrecipitationCover.attach with an unattached WeatherFX, GLTFWeather cover option, bias, map area and edge limits; examples deferred.
+
+- @margoengine/staging (batch 272 job 3): cover ProductCaustics source snapshots, glass/water IOR, point/directional lights, floor/frame/photon controls, update/readMap/restore and transport limitations; examples deferred.
+- margoengine (batch 272 job 3): document staging/caustics forwarding; examples deferred.
