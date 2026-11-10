@@ -102,3 +102,5 @@ packages/sciviz/tests/fixtures/graph-gpu/*.json text eol=lf
 
 # Hash-pinned GWOSC strain and reference-writer files retain exact bytes.
 packages/sciviz/tests/fixtures/series/** -text
+# Native DWI crop and independent numeric reference hashes retain exact bytes.
+packages/sciviz/tests/fixtures/tensor/** -text

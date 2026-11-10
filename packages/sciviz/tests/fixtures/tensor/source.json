@@ -1,0 +1,99 @@
+{
+  "title": "UCLA Consortium for Neuropsychiatric Phenomics LA5c Study, subject 10159 DWI",
+  "doi": "10.18112/openneuro.ds000030.v1.0.0",
+  "source": "https://s3.amazonaws.com/openneuro.org/ds000030/sub-10159/dwi/",
+  "license": "CC0",
+  "licenseURL": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "datasetDescription": "https://s3.amazonaws.com/openneuro.org/ds000030/dataset_description.json",
+  "dimensions": [
+    32,
+    32,
+    8,
+    65
+  ],
+  "cropStart": [
+    32,
+    32,
+    24
+  ],
+  "cropEndExclusive": [
+    64,
+    64,
+    32
+  ],
+  "sourceAffine": [
+    [
+      -1.9791666269302368,
+      0.0,
+      -0.0,
+      89.13703918457031
+    ],
+    [
+      -0.0,
+      1.9791666269302368,
+      -0.0,
+      -84.4979248046875
+    ],
+    [
+      0.0,
+      0.0,
+      2.0,
+      -22.383333206176758
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "cropAffine": [
+    [
+      -1.9791666269302368,
+      0.0,
+      -0.0,
+      25.803707122802734
+    ],
+    [
+      -0.0,
+      1.9791666269302368,
+      -0.0,
+      -21.164592742919922
+    ],
+    [
+      0.0,
+      0.0,
+      2.0,
+      25.616666793823242
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "method": "Ordinary linear least squares of log S = log S0 - b g^T D g, unconstrained, minSignal=1. No eddy-current or motion correction. Gradient basis is the supplied FSL voxel basis. Negative eigenvalues retained in the reference.",
+  "oracle": {
+    "numpy": "2.5.4",
+    "nibabel": "5.5.0",
+    "leastSquares": "numpy.linalg.lstsq, rcond=None",
+    "eigen": "numpy.linalg.eigh"
+  },
+  "sourceHashes": {
+    "sub-10159_dwi.bval": "e6a05f095504b544801b65b7ad778ebb04479c6924918199420e04e05b3e5576",
+    "sub-10159_dwi.bvec": "138b045375ebb3ba7cdef77374e89491e845de06069a2f9068e6a9d3fa58bb86",
+    "sub-10159_dwi.json": "bc8af4e8a9c07d1d513fbbbf7184f936035b443e7d4faca8113ab20a7547f3f8",
+    "sub-10159_dwi.nii.gz": "01a5a7494f0915d9084154aab4522cefcbc169858ab67ec8c97a29d7e7f8edd9"
+  },
+  "files": {
+    "baseline.f64.gz": "3efce24ea8ea1399ddbed542462e8ff7e425fecb92130d1b884268404a05004e",
+    "dwi-crop.nii.gz": "b25819fc504430b804fcaf9734a8ef18d13041c99f287e9a11af925e81c1ee51",
+    "dwi.bval": "e6a05f095504b544801b65b7ad778ebb04479c6924918199420e04e05b3e5576",
+    "dwi.bvec": "138b045375ebb3ba7cdef77374e89491e845de06069a2f9068e6a9d3fa58bb86",
+    "eigenvalues.f64.gz": "6bec11b60cb49669fc61f4d84a7a0c8fd02e28e79ea791a6133b7b0173e3d1fa",
+    "fa.f64.gz": "945c9c216f49f825b83cb2d00ad75212232ebb77994258291cf61cda9069492e",
+    "residual.f64.gz": "551acfecc9ba36908d5c4c6f4378d3e5d0767f3bbb5c3614d4d64343640b0fbb",
+    "tensors.f64.gz": "d3af509a838ad45e203e8d6c6075546dff4afd1d4f52a737466e9a7d74f36293"
+  }
+}

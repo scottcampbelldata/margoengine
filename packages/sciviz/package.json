@@ -339,6 +339,10 @@
     "./workers": {
       "types": "./dist/workers.d.ts",
       "import": "./dist/workers.js"
+    },
+    "./tensor": {
+      "types": "./dist/tensor.d.ts",
+      "import": "./dist/tensor.js"
     }
   },
   "files": [
@@ -419,6 +423,7 @@
     "test:browser:cf": "node scripts/browser-root.mjs tests/cf-browser.mjs",
     "test:browser:series": "node scripts/browser-root.mjs tests/series-browser.mjs",
     "test:browser:themes": "node scripts/browser-root.mjs tests/themes-browser.mjs",
-    "test:browser:workers": "node scripts/browser-root.mjs tests/workers-browser.mjs"
+    "test:browser:workers": "node scripts/browser-root.mjs tests/workers-browser.mjs",
+    "test:browser:tensor": "node scripts/browser-root.mjs tests/tensor-browser.mjs"
   }
 }

@@ -3699,6 +3699,14 @@
       "types": "./dist/sciviz/themes.d.ts",
       "import": "./dist/sciviz/themes.js"
     },
+    "./sciviz/workers": {
+      "types": "./dist/sciviz/workers.d.ts",
+      "import": "./dist/sciviz/workers.js"
+    },
+    "./sciviz/tensor": {
+      "types": "./dist/sciviz/tensor.d.ts",
+      "import": "./dist/sciviz/tensor.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -5246,10 +5254,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./sciviz/workers": {
-      "types": "./dist/sciviz/workers.d.ts",
-      "import": "./dist/sciviz/workers.js"
     }
   },
   "dependencies": {

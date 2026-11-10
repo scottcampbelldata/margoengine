@@ -5045,3 +5045,5 @@ Batch 180 job 4 GPU observation (2026-11-10): the existing atmosphere spec demo 
 ## Batch 175 job 6: known driver exception
 
 The sciviz GPU gate encountered the known ANGLE D3D11 MSAA resolve defect documented above: geo-lod-browser.mjs:85 reported max red-channel difference 1; diagnostic evidence found 47 one-level channel differences, no GPU errors, and exact native WebGPU pixels. Scott authorized continuing the gate on 2026-11-10. No geo-lod or compatibility source or assertion changed. Evidence: lane U test-results/job6-gpu.log, job6-geodebug2.log and job6-geodebug3.log.
+
+Batch 176 job 5: no open defect found in the declared tensor/OLS/Cartesian tracking contract. Device precision, degenerate-axis ambiguity, raw indefinite fits and analysis/preprocessing limits are recorded in limits.md.
