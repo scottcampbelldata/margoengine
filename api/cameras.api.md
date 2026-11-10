@@ -29,6 +29,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
             width: number;
             height: number;
         };
+        sceneOf?: EngineKernel['sceneOf'];
     }): void;
     fit(bounds: ArrayLike<number>, { aspect, duration, padding }?: FitOptions): void;
     onPreUpdate(delta: number): void;
