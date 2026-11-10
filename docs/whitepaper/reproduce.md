@@ -2843,7 +2843,6 @@ Batch 249 job 3: build then node --test --test-timeout=120000 packages/ecs/test/
 After build:packages, supply the shipped Firefox executable through BROWSER_EXECUTABLE in the process environment; never commit the value. Run node packages/webgl2-compat/test/firefox-matrix.mjs for the eleven-driver sweep, which preserves failures and returns nonzero if any remain. Under a shared correctness GPU lock run node packages/webgl2-compat/test/firefox-compat-cases.mjs for the46 cross-browser cases. To isolate a changed cell, use --fixtures=compute.html?strict and retain the selected receipt alongside the original. Run firefox-matrix.mjs --leaf=corpus-draw-browser.mjs under a shared lock for all recorded corpus work. The corpus separately checks the intended over-limit negative pipeline; all legal pipelines must dispatch. Run node --test packages/webgl2-compat/test/firefox-bidi.test.js packages/webgl2-compat/test/corpus-validation.test.js tests/integration-json.test.js. Forced tiers never replace physical lower-tier evidence.
 ## Batch 237 3D overlapping
 Build packages, then node --test --test-timeout=60000 packages/wfc/test/overlapping3d.test.js. Run the changed wfc package test:gpu through the shared GPU lock; assemble-browser.mjs checks all 64 pinned checkerboard values on native WebGPU and WebGL2 compatibility. Tests use authored numerical volumes and independent window extraction, not third-party implementations.
->>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
 
 
 ### Batch 258 forms correctness
@@ -2851,3 +2850,6 @@ After build:packages, run node --test --test-timeout=120000 packages/ui/tests/fo
 - Batch 263 WebGL2 inspector: build packages, run `node --test --test-timeout=30000 packages/inspector/test/gl.test.js`; under the shared GPU lock run `node packages/inspector/test/gl-browser.mjs` and the same command with `--compat`. The fixture uses CC0 BoxVertexColors geometry and checks all overlays, returned draw/shader state, pass costs and pixel restoration.
 
 Batch 220 job 1: build packages, then node --test --test-timeout=120000 packages/math/test/*.test.js. methods.test.js imports math/compat and checks analytic independent results; math.test.js retains unchanged small-import assertions. CPU-only mathematics; this package defines no GPU test. Sources and API contract comparison are in docs/clean-room.md.
+# Batch 204 exporter optimization
+
+After building packages, run `node --test --test-timeout=90000 packages/exporters/tests/optimize-extra.test.js` for deterministic key, resource and instance counts, geometry from the existing Khronos Box fixture, and Khronos validator checks. The exporters browser suite runs through the shared GPU lock; `MARGO_COMPAT=1` selects its WebGL2 compatibility path. `packages/exporters/tests/capture-browser.mjs` accepts the same compatibility flag. No wall-clock benchmark is part of this evidence.

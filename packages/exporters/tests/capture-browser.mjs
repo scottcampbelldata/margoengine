@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { launchBrowser, resolveBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({
@@ -20,6 +21,7 @@ let browser;
 try {
   browser = await launchBrowser({ headless: true });
   const page = await browser.newPage({ viewport: { width: 320, height: 240 }, deviceScaleFactor: 2 });
+  if (compatRun()) await page.addInitScript(compatShim, compatUrl());
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
@@ -135,12 +137,8 @@ try {
       art: {
         repetitionCount: art.repetitionCount,
         durations: art.frames.map((f) => f.duration),
-        colours: art.frames.every((f, k) =>
-          f.data.every((v, i) => i % 4 === 3 || v === expected(pixelArt[k].data, i)),
-        ),
-        alpha: art.frames.every((f, k) =>
-          f.data.every((v, i) => i % 4 !== 3 || v === expected(pixelArt[k].data, i)),
-        ),
+        colours: art.frames.every((f, k) => f.data.every((v, i) => i % 4 === 3 || v === expected(pixelArt[k].data, i))),
+        alpha: art.frames.every((f, k) => f.data.every((v, i) => i % 4 !== 3 || v === expected(pixelArt[k].data, i))),
         still: Array.from(stillContext.getImageData(0, 0, still.width, still.height).data).every(
           (v, i) => v === expected(pixelArt[0].data, i),
         ),
@@ -239,7 +237,11 @@ try {
   assert.equal(report.transparent.green[1][3], 255);
   // GIF through the browser's decoder.
   // WebKit's ImageDecoder gives its own -1 for "forever" where the WebCodecs spec says Infinity.
-  assert.equal(report.gif.art.repetitionCount, resolveBrowser().engine === 'webkit' ? '-1' : 'Infinity', 'loops forever');
+  assert.equal(
+    report.gif.art.repetitionCount,
+    resolveBrowser().engine === 'webkit' ? '-1' : 'Infinity',
+    'loops forever',
+  );
   // A GIF delay is a whole number of 1/100 s, so that is the unit to compare in: WebKit reports 4/100 s as 39,999 us.
   const hundredths = (durations) => durations.map((us) => Math.round(us / 10000));
   assert.deepEqual(hundredths(report.gif.art.durations), [4, 4, 4], '25 fps: 4/100 s');

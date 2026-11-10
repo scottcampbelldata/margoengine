@@ -255,7 +255,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Retained XR AR extras alias after concurrent manifest integration. | Batch273 landing blocker |
 - @margoengine/wfc: document /overlapping3d sample layout, N, input/output wrapping, rotations/reflections, pins, default budgets, stats, limits and synchronous cancellation (batch 237 job 3).
 - margoengine: document generated wfc/overlapping3d alias (batch 237 job 3).
->>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
 
 
 | @margoengine/ui | forms entry: Select, RadioGroup, Tabs content ownership, Checkbox, ColorPicker, normalized channels, mirror/input attachment and disposal. | batch-258 job 3 |
@@ -265,3 +264,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/math (batch 220 job 1): document math/compat import migration, 17 methods, radians/shear layout, native and separate cameras, axis-angle output, degenerate/closed geometry, color spaces, cloning and original-entry size preservation.
 - margoengine (batch 220 job 1): document generated math/compat alias.
+# Batch 204 exporters
+
+- `@margoengine/exporters/optimize-extra`: document independent resample, prune and static sibling instancing passes, defaults, conservative extension retention and abort handling.

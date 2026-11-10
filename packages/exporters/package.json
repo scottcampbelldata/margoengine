@@ -200,6 +200,10 @@
     "./optimize": {
       "types": "./dist/optimize.d.ts",
       "import": "./dist/optimize.js"
+    },
+    "./optimize-extra": {
+      "types": "./dist/optimize-extra.d.ts",
+      "import": "./dist/optimize-extra.js"
     }
   },
   "files": [
