@@ -763,6 +763,19 @@ only suggest shrinking. `--summary` prints the biggest offenders; `--details` wr
 
 ## API lock
 
+`api/lock.json` and `api/breaks.json` are explicitly inert file-class records for GPU
+selection, alongside API snapshots. Their contents still pass mandatory `api:check`.
+Unknown API JSON paths remain unclassified and fail `tests/file-classes.test.js`;
+that test also checks every tracked path and both named records. Reproduce with
+`node --test --test-timeout=120000 tests/file-classes.test.js tests/check-merge-affected.test.js`.
+Clean-room basis: D. Richard Kuhn, Raghu N. Kacker and Yu Lei, *Practical
+Combinatorial Testing*, NIST SP 800-142 (2010),
+https://csrc.nist.gov/pubs/sp/800/142/final, for independent input-space coverage;
+and the Git project, *git-ls-files* (2026), https://git-scm.com/docs/git-ls-files,
+for the authoritative tracked inventory. Compared a broad API-directory exception
+with named records; named records preserve rejection of unknown inputs.
+
+
 Run `npm run api:check` after the final rebase. New or extended APIs need `npm run api:update` output in
 the same commit. Never edit `api/*.api.md` or `api/lock.json` by hand. Exports maps define coverage: every
 non-alias entry needs a TypeScript report with no unresolved exports. Missing manifests/exports require an
@@ -1279,7 +1292,7 @@ They describe browser bundles, separately from npm install bytes. Lazy parts and
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
 | `margoengine/game` | Games | 365,936 B |
-| `margoengine/viz` | Visualization | 256,216 B |
+| `margoengine/viz` | Visualization | 264,713 B |
 | `margoengine/web` | Web scenes | 95,846 B |
 
 `node scripts/kit-install-check.mjs` packs the checkout, serves a read-only local registry, installs in new folders
@@ -1309,8 +1322,8 @@ package is added only after recording the base install. No symlink to workspace 
 
 Reproduce: build packages; run `node scripts/kit-install-check.mjs`; then run
 `node scripts/gpu-lock.mjs run --owner=kit-check --wait-max=60 --max=4 --gpu=packed-kit-first-frames -- node scripts/kit-browser-check.mjs`.
-The packed-install CPU check is part of local CI's verify. Lanes run the fast gate only. README examples are owed
-in [readme-owed.md](../work-lists/readme-owed.md) during the build phase.
+The packed-install CPU check is part of local CI's verify. Each kit README holds one example that
+`npm run check:readme-run -- --packages=game,web,viz,react-kit` runs as written.
 
 ## Contents
 
@@ -6309,7 +6322,7 @@ warm losses recorded; default replacement still requires speed parity.
 Coordinator note 2 limits this landing to the decoder. The optional
 `@margoengine/decoders/draco-native` entry exposes mesh and point decoder classes;
 default entries and automatic loaders retain both prebuilts. It uses one lazy
-122,685-byte Wasm (47,360 bytes gzip, Node level 9). Input and internal workspace
+122,842-byte Wasm (47,392 bytes gzip, Node level 9). Input and internal workspace
 are each bounded at 256 MiB; requested output uses the existing decoder limits.
 Native corpus peak linear memory is 18,874,368 bytes versus the prebuilt's
 20,185,088. JS result copies and process RSS are separate from linear memory.
@@ -6323,6 +6336,16 @@ metadata equivalence are incomplete. The optional landing does not close these
 replacement gates or remove either prebuilt. No new speed work is included.
 See [retained speed evidence](whitepaper/results/batch-133-paired-checkpoint.json)
 and [current native evidence](whitepaper/results/batch-133-resume8.json).
+
+Lane G wide-component repair: the optional native reader accepts nonzero UI8
+component counts (1 through 255). Component-sized quantization/KD minima and
+reusable prediction buffers are charged to the existing internal workspace
+budget. Native tests cover sequential raw/integer/quantized data, signed and
+quantized KD data, and parallelogram/multi/constrained prediction at widths
+1, 16, 17, 31, 64, 127 and 255. Shipped Wasm tests preserve typed arrays and point
+indices across the same width boundaries. Zero counts, truncated input and
+requested-output limits still reject. The historical public binding's negative
+count at 255 and the existing predictor/metadata/RSS/speed gaps are not closed.
 
 Batch 133 metadata continuation: the optional bridge now preserves observed
 short-string conversion and exact raw name lookup. All 1,445 bounded crafted
@@ -6761,7 +6784,29 @@ Input/output limit: 1 MiB UTF-8; 10,000 XML elements; 128 XML nesting levels; ex
 
 Batch 250 job 5: fsm/scxml 0 to 4970 B min+gzip, ceiling 5226 B. Optional runtime is not loaded by the FSM root or core/stage.
 
+## Audio voice registration failure (2026-11-10)
+The optional voices manager evaluates caller gain estimates before changing a
+new registration's physical source. Failed estimation releases ownership and
+preserves the original playing source and phase. Gain callbacks must not mutate
+the audio graph. Disposing an old handle again leaves a replacement registration
+owned. Regression: packages/audio/tests/voice-manager.test.js. Public signatures,
+voice budgets, ranking and valid-input waveform references are unchanged.
+
+## Direct MCP active request IDs (2026-11-10)
+The direct server, including stdio, rejects a duplicate active tools/call ID with
+JSON-RPC invalid request (-32600) before another tool invocation. The first
+request retains its cancellation signal until completion; numeric and string IDs
+remain distinct. Completed-ID handling and transport-level session policies are
+unchanged. Regression: packages/mcp/tests/server.test.js.
+
 ## Behavior tree text (batch 251)
+
+`parseTreeText` infers `TreeDocument` only when its options exclude subtree
+registrations. A variable typed `TreeTextOptions` (including an optional variable)
+returns `SubtreeDocument`; consumers must use the subtree-aware API or resolve
+references before ordinary-tree execution. Explicitly absent registrations retain
+ordinary-tree inference. Parsing syntax, runtime validation and text budgets are
+unchanged. Regression: `packages/behavior/tests/text-types.test.js`.
 
 New behavior/text: 3,751 B min+gzip, previously absent; umbrella alias 60 B external.
 No existing ceiling raised. Syntax is type(key=JSON,...) with optional brace-delimited
@@ -6920,6 +6965,12 @@ Batch 252 job 6 byte deltas: build 12,491 -> 12,519 B gzip; tiles 14,911 -> 14,9
 
 Batch 253 pointer lock: optional input/lock exports PointerLock. request defaults to unadjustedMovement true and falls back once to adjusted movement only on native NotSupportedError; fallback false rejects instead. Permission and activation failures propagate. Requests must originate in a user gesture; the complete request has a 5000 ms timeout (configurable) and AbortSignal. A legacy void API settles from pointerlockchange/error and raw is null because ignored options cannot be detected. Modern raw is true on confirmed raw acquisition and false on adjusted movement or release. update consumes relative counts, exposes x/y without clamping, and publishes control id lock (configurable on attach), axes x/y. Scale actions to avoid their standard scalar clamp. release cancels pending work, exits only the owned lock and clears counts. Late modern acquisitions after cancellation/disposal are released. Legacy browser requests cannot be canceled by the platform; a late legacy acquisition is released while the publisher is alive. Physical raw-count fidelity is a hardware follow-up.
 Batch 255 job 2: save/scene-state captures bound point, spot, directional and area light lists including all shadow options; mutable directional Shadows.options can be bound separately. Animation/Animator snapshots include pause, rate, loop, state time, triggers, parameters, current/rest/fade pose and independently timed layers. Restore onto the same model topology and installed state definitions, clocks and procedural solvers. Stateful custom clocks supply captureState/restoreState; callbacks and GPU handles remain app-owned. Snapshots use finite JSON; they do not serialize asset data or procedural functions. Failed binding restoration rolls back changed bindings and reports rollback failures. No core or stage changes.
+
+Shadow-setting keys, including `__proto__`, `constructor` and `toString`, restore
+as own enumerable writable configurable data properties. Restoration and rollback
+preserve the target's original ordinary or null prototype. The snapshot remains
+finite JSON and bound settings must be mutable. Regression:
+`packages/save/tests/scene-state.test.js`.
 
 Batch 255 job 2: @margoengine/animation/interactivity 21540 to 24983 B, ceiling 24902 to 25733; @margoengine/animator 19150 to 20041 B, ceiling 19297 to 20643; @margoengine/animator/graph 8527 to 9416 B, ceiling 8542 to 9699; @margoengine/save/scene-state None to 1011 B, ceiling None to 1267. Exact fade poses, layer and sync clocks and transactional save state justify optional bytes. Keeping owner methods avoids a private-field shim or duplicated animator implementation. Core plus stage unchanged at 23950 B.
 
@@ -9030,7 +9081,7 @@ water/rain WaterRain draws rain rings on one Water: rain 0 to 1 (or a weather's,
 - WCS retains primary or A..Z axes, units, CRPIX/CRVAL, CD or PC/CDELT and legacy CROTA, with zero-based pixel input. Linear axes, SIP forward polynomials and TAN/SIN/ARC/STG/ZEA sky projections have independent WCSLIB tests. Other projection/rotation/spectral algorithms are outside this entry's current world() projection support; original cards and linear metadata remain available. No all-projections claim.
 - sciviz/mrc reads MRC/CCP4 little/big endian modes 0/1/2/3/4/6/12/101, complex selection, labels and opaque extended headers, MAPC/MAPR/MAPS, starts, origin and triclinic unit-cell geometry. Storage order is never silently flipped; file handedness cannot be inferred from this standard. Vendor extended headers and crystallographic symmetry operators are retained as bytes rather than interpreted. ORIGIN is applied as the translation plus the indexed starts; Fourier phase origins remain metadata, not an inverse FFT.
 - sciviz/ometiff reads classic/BigTIFF Z/C/T stacks through decoders/tiff. Quantitative uint8/int8/uint16/int16/uint32/int32/float32/float64 samples remain unscaled. LZW, deflate, PackBits and uncompressed tiles/strips, chunky/planar samples and integer/floating predictors are supported. Explicit TiffData, series selection and multi-file FileName/UUID resolution are supported; unspecified planes reject on access. Metadata and individual planes are lazy after bounded full-file acquisition. SubIFD pyramids, BinaryOnly companion XML, JPEG/JPEG2000 microscopy payloads and vendor annotations are outside the requested lossless stack projection. The real IDR fixture is an explicitly identified, native-pixel, lossless crop of the original JPEG2000 image, not a claim that the runtime decodes JPEG2000 TIFF.
-- Default per-file/per-read maxBytes is 64 MiB; TIFF default maxPixels is 2^26 and safe integer 64-bit offsets are required. The OME loader bounds each volume by maxBytes and planes conservatively by maxBytes/8 pixels. FITS and MRC accept gzip; FITS also bzip2. Non-axis-aligned/celestial world() coordinates are preserved exactly within supported transforms; generic grid/volume helpers display an axis-aligned envelope of the storage grid, without physical resampling. Readers retain full precision independently of Float32 renderer grids. Scientific volume helpers do not imply celestial reprojection or an affine/sheared volume renderer.
+- Default per-file/per-read maxBytes is 64 MiB; TIFF default maxPixels is 2^26 and safe integer 64-bit offsets are required. The OME loader bounds each volume by maxBytes and planes conservatively by maxBytes/8 pixels. FITS and MRC accept gzip; FITS also bzip2. Non-axis-aligned/celestial world() coordinates are preserved exactly within supported transforms; generic grid/volume helpers preserve directed physical axes and reject rotation, shear, permutation or nonuniform sample spacing with code unsupported, without physical resampling. Readers retain full precision independently of Float32 renderer grids. Scientific volume helpers do not imply celestial reprojection or an affine/sheared volume renderer.
 
 Scientific entry gzip (bare package imports external): TIFF 4401 -> 6064 B; new sciviz/fits 4908 B, /mrc 2906 B, /ometiff 3207 B. Their optional budgets are raised in the same change. Quantitative BigTIFF addressing, lazy pages, signed/floating samples and full plane mappings justify these bytes; splitting TIFF would duplicate directory or codec infrastructure. Core + stage root remains 24209 B.
 
@@ -9073,7 +9124,7 @@ Basic-scene size evidence follows main's full PBR Stage/gltf path (3d7dd74c9). T
 
 ### Batch 181 job 3: GPU ID picking
 
-Optional /pick-gpu is 5953 B min+gzip from 0 B, with a new 6209 B ceiling; existing root/grids ceilings are unchanged. Core plus stage remains 24209 B. One rgba32uint ID texel, one depth32float texel and a 256-byte aligned readback cost 276 descriptor bytes per picker; supported layers add 320-byte uniforms. CPU point/cell uploads use 12/16 bytes per item and must fit maxBufferSize. Each volume's voxel index is u32 (at most 2^32 voxels), x-fastest. The ray traverses the complete clipped box in at most 2048 midpoint samples, using current quality/classification/density and default step-opacity threshold 0.002. Query timeout defaults to 30000 ms, including queue wait. Native WebGPU and full WebGL2 compatibility are covered; native WebGL2 without compatibility rejects before allocation. Custom unsupported layer kinds are excluded. CPU-backed arrays require invalidate after in-place edits. No CPU item projections occur per query; GPU work remains proportional to input geometry. Strict nearest-centre ranking differs from the existing CPU half-pixel tie rule; original triangle cell IDs differ from the CPU height-field nearest-sample ID. First hit is not MIP-peak or perceptual structure picking. Normalized binary16 input precision and f32 voxel-boundary ambiguity remain. See sciviz-pick-gpu.md for complete semantics and independent reference proof. No speed result is claimed.
+Optional /pick-gpu is 5953 B min+gzip from 0 B, with a new 6209 B ceiling; existing root/grids ceilings are unchanged. Core plus stage remains 24209 B. One rgba32uint ID texel, one depth32float texel and a 256-byte aligned readback cost 276 descriptor bytes per picker; supported layers add 320-byte uniforms. CPU point/cell uploads use 12/16 bytes per item and must fit maxBufferSize. Each volume's voxel index is u32 (at most 2^32 voxels), x-fastest. The ray traverses the complete clipped box in at most 2048 midpoint samples, using current quality/classification/density and default step-opacity threshold 0.002. Query timeout defaults to 30000 ms, including queue wait. Native WebGPU and full WebGL2 compatibility are covered; native WebGL2 without compatibility rejects before allocation. Custom unsupported layer kinds are excluded. CPU-backed arrays synchronize in-place edits by comparing a retained snapshot (12/16 additional CPU bytes per point/cell); each query compares contents linearly and uploads only the changed span. No CPU item projections occur per query; GPU work remains proportional to input geometry. Strict nearest-centre ranking differs from the existing CPU half-pixel tie rule; original triangle cell IDs differ from the CPU height-field nearest-sample ID. First hit is not MIP-peak or perceptual structure picking. Normalized binary16 input precision and f32 voxel-boundary ambiguity remain. See sciviz-pick-gpu.md for complete semantics and independent reference proof. No speed result is claimed.
 
 - Review 3 SV3: VolumeLayer.getClassification returns an owned CPU snapshot of a custom classifier, or undefined for the original colormap/opacity. bindTransfer restores that prior snapshot on disposal or abort while the layer is valid; it does not recreate a disposed volume. Snapshot storage is four bytes per classifier texel plus metadata. No core/stage or shader change.
 Batch 180 job 3, optional sciviz/geo-time: full WGS72 SGP4, 518 published state vectors across 29 element sets at <0.1 m position and <0.1 mm/s velocity norm error. These are implementation-agreement bars, not real-world forecast accuracy; element sets age and contain model/observation uncertainty. TEME of date, Unix UTC milliseconds, optional DUT1 for GMST; no polar motion or representable leap-second instant. Propagation offsets are bounded to ten years for loop/resource safety, not an accuracy guarantee. TLE checksum and catalog matching are on by default. OMM defaults omitted CelesTrak metadata to Earth/TEME/UTC/SGP4 and preserves larger IDs.
@@ -9101,7 +9152,7 @@ AMR scalar transfer lookup also accepts the shared log/symmetric-log, binned and
 
 
 ### Batch 175 job 3: exact aggregation
-Optional sciviz/aggregate defaults to 256x256 bins, edges 1..4096, at most 1048576 bins and 16777216 bin/category cells. Partial GPU storage is bins*(280+categories)*4 B and must fit maxStorageBufferBindingSize. Chunk rows default to 32768, maximum 65536, with at most 8388608 row/bin tests per dispatch. Finite binary64 values retain all bits; sums and means round once, ties to even. Geometry uses projected f32 coordinates; point bin ownership is corrected at f32 boundaries. Mesh values are cell values, polygons use even/odd pixel-centre coverage and segments use pixel-box intersection. Fractional antialiasing and vertex interpolation are outside this contract. Exhaustive work is O(rows*bins); no throughput claim. The 100M physical-row WebGPU check repeats 4096 original TLC observations, uses 2400000000 B input arrays, 8442384 B peak staging, 17920 B partial output, 1526 dispatches and 1600000000 row/bin tests. All 100M rows contribute. Details and evidence: docs/sciviz-aggregate.md.
+Optional sciviz/aggregate defaults to 256x256 bins, edges 1..4096, at most 1048576 bins and 16777216 bin/category cells. Partial GPU storage is bins*(280+categories)*4 B and must fit maxStorageBufferBindingSize. Chunk rows default to 32768, maximum 65536, with at most 8388608 row/bin tests per dispatch. Finite binary64 values retain all bits; sums and means round once, ties to even. Geometry uses projected f32 coordinates; point bin ownership is corrected at f32 boundaries. Mesh values are cell values, polygons use even/odd pixel-centre coverage and segments use pixel-box intersection. Fractional antialiasing and vertex interpolation are outside this contract. Exhaustive work is O(rows*bins); no throughput claim. The 100M physical-row WebGPU check repeats 4096 original TLC observations, uses 2400000000 B input arrays, 8442384 B peak staging, 17920 B partial output, 1526 dispatches and 1600000000 row/bin tests. All 100M rows contribute. Display spreading uses circular radii 0..32; density, when supplied, is in (0,1] and measures occupied pixels having an occupied eight-neighbour. Growth stops at the first qualifying radius or the cap, without changing original statistics. Details and evidence: docs/sciviz-aggregate.md.
 
 Batch 175 job 3 measured optional entry: sciviz/aggregate 0 -> 28201 B gzip, ceiling 29019 B. Exact full-range binary64 accumulators, five glyphs, all reductions and one coherent figure/shading lifecycle justify the bytes. Splitting would fragment table/trace ownership. Core + stage remains 24209 B.
 - Batch 174 job 6: optional sciviz/views absent to 4786 B min+gzip, ceiling 5042 B. Current sciviz root 60851 B; this job changes no root source. Core + stage remains 24209 B. Each FigureLayout cell owns one engine and canvas; there is no shared GPU-resource or single-canvas claim. Defaults: ceil(sqrt(count)) columns, 320px cell height, 12px gap; labels default View N. Links default to 3D cameras or 2D x/y physical ranges, with first-figure initial state; selected axes, programmatic sync and AbortSignal are supported. Polling follows changes on the next active engine frame; call sync for stopped engines. All linked figures must have the same dimensionality. Camera projection overrides are borrowed functions. ComparativeGrid uses independent FilterPipeline caches with a shared registry; complete node params replace per-cell params, time defaults to zero, and all outputs are released by the owning pipeline's operator contracts. VolumeQuad owns three orthographic nearest-sample heatmaps and a 3D volume plus three slice planes. It clamps and snaps the crosshair to exact sample centres, retains voxel IDs/orientation, and keeps physical screen scale isotropic across resize. Source CPU samples are borrowed, dimensions must each be >=2, and total voxel count must fit uint32 provenance IDs. Default colormap gray; one shared colour range comes from the 3D volume. Box extent/spacing is axis aligned; no oblique reslicing or patient-space registration is added. Layouts/controllers are disposable; individual setCrosshair signals cancel unpublished work and ready accepts an abortable wait. No timing or clinical claim.
@@ -9110,10 +9161,194 @@ Batch 175 job 3 measured optional entry: sciviz/aggregate 0 -> 28201 B gzip, cei
 ## Batch 120 scaffold profile routing
 
 The five create-margo starters install one engine profile each: web 40 engine packages, game 70, viz 42, React and Next 42 in the packed rehearsal. React, React DOM, Next, Rapier and development tools remain explicit app dependencies as appropriate. All five production builds draw a first frame; Next runs its own production server. Profile entry sizes and core + stage remain unchanged. scripts/template-install-check.mjs and template-browser-check.mjs reproduce this route from packed engine and CLI tarballs with no workspace engine symlink. The starting-path review is docs/guides/kit-migration.md. Timing is deferred to the speed phase; template README examples remain owed.
+- Batch 179 share: optional `/share` uses a version-1 DEFLATE/base64url fragment and repeated-array dictionary. Default payload/allocation bound 256 MiB and URL bound 32 MiB; browsers, address bars and messaging products can impose smaller limits. Use hash-pinned external raw arrays for short links, or offline HTML for large data. Standalone runtime is explicitly bundled by `packages/sciviz/scripts/bundle-share.mjs`; no remote runtime is downloaded. Native codecs and their assets are bundled, while application recipes/operator registries need an application runtime. Embed requires a known HTTP(S) origin and peer window, supports 32 queued requests, and times out client requests after 10 seconds. Opaque-origin iframe messaging is intentionally unavailable; offline file viewing remains supported. Camera and time index are validated before application. No speed claim.
+
+- Batch 179 job 2 entry size: sciviz/share 0 to 5,033 B gzip, ceiling 5,289 B. The bytes provide compressed/dictionary links, hash-checked inline HTML and bounded iframe control with one ownership boundary. Splitting would make applications assemble the same feature and duplicate lifecycle handling. Core + stage remains 24,209 B; no rendering mathematics changed. The offline bundler is shipped under scripts/bundle-share.mjs and uses Vite as a development build tool.
+Batch 178 accessibility: optional a11y provides complete pageable native point/line/bin/surface/volume rows; custom layer kinds need AccessibleSeries adapters. DOM page size defaults to 50 (1..1000), and sonification defaults to 100000 records, rejecting larger inputs without truncation. Lighthouse results concern loaded-page automated checks, not manual WCAG certification. See [contract and evidence](sciviz-a11y.md).
+
+Measured job 5 gzip: a11y 0 -> 6233 B, sciviz root 60026 -> 61010 B, format 7306 -> 7598 B and spec 27106 -> 27127 B. Format ceiling rises 7562 -> 7826 B; a11y receives 6480 B. The bytes preserve complete data/keyboard/audio/lifetime contracts without application registration glue. Core + stage stays 24209 B.
+
+Final integration: all 50 current scientific demo pages score 100. Rebased root 61327 B, a11y 6233 B, format 7598 B, spec 27443 B; core + stage 24209 B.
+
+The share viewer audit uses a complete LIGO share URL as its input; no missing-link error screen is substituted for a restored scientific figure.
+
+
+
+## Batch 181 job 5: progressive rendering
+
+Optional sciviz/progressive reduces moving dimensions (default 0.5) and ray/lighting integration (default 0.25); after 2 settling and 8 refinement frames it returns exactly to the original rendering path. Soft submitted-frame latency budget defaults to 16.7 ms and is not a deadline or throughput claim. Temporary nearest-reconstructed single-sample images have no scalar/image error guarantee. One controller per engine, one reduced colour/depth target per retained view, normal device texture limits. Native WebGPU and full WebGL2 compatibility are covered; native preview rejects before attachment. CPU-backed layers restore through their owners; external GPU-only sources retain the documented application recreation contract. Full policy and options: docs/sciviz-progressive.md. Core/stage source unchanged.
+
+New progressive entry: absent (0 B) to 4746 B min+gzip, ceiling 5002 B. The optional controller retains one target/depth/lifecycle owner and deterministic policy; splitting those parts would add orchestration without reducing the complete feature. Existing entry ceilings are retained. Core plus stage remains 24209 B.
+
+
+## Batch 180 job 5: temporal analysis
+
+The optional @margoengine/sciviz/temporal entry measures 3,901 B min+gzip (previously 0 B), ceiling 4,157 B; core + stage remains 24,209 B. It reads one field per step and retains O(field length) arrays. Statistics use equal step weights with population or sample deviation, not duration weighting. NaN handling is explicit; infinity, overflow, changed field length, duplicate/decreasing times and invalid series reject. Flat field correspondence belongs to the caller; fixed physical probes support moving meshes. Linear interpolation preserves missing endpoints and never extrapolates unless boundary clamping is requested. Charts use relative time origins, split missing runs, and use native lines/scatter; there is no hidden payload cache. Numeric source steps support model times; string time origins are proleptic Gregorian, millisecond precision, year 0000-9999, without leap seconds or calendar month/year units. Other calendar decoding belongs to /cf. The ERA5 demo contains eight six-hour samples (64x32), while NOAA contains eight daily 5x5 fields; interpolated instants are labelled. See docs/sciviz-temporal.md and its CPU/GPU tests. No speed claim.
+
+Batch 181 job 4 density limits: optional sciviz/density uses borrowed interleaved float32 xyz, exact u32 count bins (at most 4,294,967,295 input points), 12 raster bytes per drawing-buffer pixel, 8192 per axis and 16,777,216 total pixels, further constrained by device storage and allocation limits. Source chunks have at most 1,048,576 points/12,582,912 bytes and shrink for binding/dispatch limits. 20M points: 240,000,000 source GPU bytes/20 chunks; 10M: 120,000,000/10, with every repeated real-data vote retained on both backends. Kernel bandwidth default 4, (0,32], finite normalized Gaussian truncated at ceil(4*sigma), zero outside plot scissor. Opacity default 0.08, colour #56b4e9; opacity summary is floating point, analytical counts remain integer. Overlay ignores depth occlusion, clips offscreen halo, and quantizes positions to nearest screen bins. Compatibility atomic count currently runs on its CPU compute tier; no frame-time, memory ceiling or rival speed parity is claimed. Full contracts: docs/sciviz-density.md; timing comparison is deferred in speed-phase.md.
+Entry size: sciviz/density was absent (0 B), now 4,815 B min+gzip with a 5,071 B ceiling. Core + stage remains 24,209 B. These optional bytes provide exact all-point accumulation, Gaussian mode, readback and scatter ownership; splitting those cooperating raster passes would add plumbing without improving quality.
+
+Density rival pixel non-parity at 256 x 256 is retained, not hidden: mean red-byte difference 0.1480712891/max 246 against regl-scatterplot 1.16.0 at 20M, and 0.0787353516/max 255 against deck.gl 9.4.1 at 10M. Pixels above two bytes: 0.2227783203% and 0.1724243164%. Raster edge/circle coverage, projection rounding and u8 alpha policies differ; isolated cause attribution is still owed, and no speed or byte-parity claim exists. Frozen full report: docs/whitepaper/results/batch181-density.json.
+
+Batch 274 job 5 ONNX supported profile: the optional loader currently executes isolated CPU SIMD Wasm inference. Tensor dimensions are integers in 0..2147483647 and total scalar elements at most 16777216; packet/model bytes at most 512 MiB; persistent tensor storage defaults to 256 MiB and accepts 64 KiB..1 GiB. Loop/Scan/SequenceMap default maxIterations=10000, expanded maxNodes=1000000 and graph/container nesting=64. Random state persists per expanded lexical call site across runs, with at most one million sites per model. Seeded sequences are reproducible within Margo, not promised bit-identical across runtimes. FFT complex work vectors have at most 16777216 scalar components, including Bluestein scratch (2*nextPowerOfTwo(2*n-1)); inverse DFT normalization is 1/n. Cancellation yields between graph nodes, not within a synchronous kernel. Host bool snapshots are logical 0/1 values; a BitCast back inside the graph retains original byte patterns. Empty scanned outputs currently need static element shape information; string crop extrapolation remains restricted. The deferred operator/type/opset groups are listed below. The pinned 96-case external comparison and analytic tests establish only their named cases. PROBIT uses a more accurate tail inversion than the tested external provider; single-target regression honors post_transform. These accepted numerical/semantic differences are described with values in docs/clean-room.md and remain subject to the final catalogue review.
+
+
+Batch 274 job 5 deferred ONNX groups (coordinator-authorized supported-profile landing): quantized operators (lane T owns /quant); RegexFullMatch; TfIdfVectorizer; image decode; DeformConv; attention/rotary/newer operators; float8/float4/int2/complex review; old-opset conformance review. Unbuilt operators reject during load with code unsupported, domain/operator name, imported opset and help URL; onnx.test.js covers every named unbuilt operator group. The dtype and historical schema reviews remain conformance work, not a full-parity claim. ONNX inference uses CPU SIMD Wasm, including on pages with WebGPU or compatibility, with no GPU inference claim.
+
+Batch 274 job 5 measured ONNX entry: 0 to 10139 B min+gzip, new ceiling 10444 B; separate lazy onnx-kernel.wasm 684541 B raw / 244935 B gzip. The entry keeps validation, lexical graph execution and lifetime ownership together; splitting would duplicate its Wasm bridge and resource accounting. Core plus stage remains 24209 B under the unchanged 25000 B limit.
+- Batch 179 notebook: optional /notebook AFM plus a thin local Python anywidget wrapper. Defaults: 480 CSS pixels (100..4000), auto backend, 256 MiB aggregate decode budget, empty 3D spec and plot limits [0,1,0,1,0,1]. SHA-256 binary attachments borrow aligned little-endian numeric views; dtype/offset conversions, comm framing, recorder snapshots and GPU uploads can copy. Null/multi-chunk Arrow converts explicitly; int64 outside +/-2^53 rejects. Borrowed mutations need refresh(). No Python renderer or runtime CDN. Static HTML retains interaction but no live Python callbacks. Actual GPU evidence covers both backends and offline files; actual kernel evidence covers JupyterLab. Other AFM hosts use the same standard contract; interactive VS Code/Colab/marimo acceptance remains separately owed. No speed claim.
+
+- Batch 179 notebook sizes: new /notebook 0 to 1831 B min+gzip, ceiling 2095 B. The view lifecycle stays together; splitting duplicates cancellation/model ownership. /spec with binary attachment support is 27550 B (existing ceiling 27920 B). Core + stage stays 24209 B. The local Python wheel includes a bundled AFM and codecs; its built file size is recorded in local build output, not part of the tiny optional entry measurement.
+
+## Compute quantized inference (batch 274 job 6)
+
+`@margoengine/compute/quant` uses signed int8 packed four per word. Matmul supports
+vector promotion and broadcast batches, per-row activation and per-column weight
+parameters shared across batches. Conv2d uses NCHW/OIHW, per-tensor activations,
+per-output-channel weights, groups/depthwise, stride, dilation and explicit or same
+padding. Output parameters are per tensor. Int32 accumulator overflow is rejected
+conservatively, including bias. Dimensions and index products must fit signed
+32-bit indexing and device storage/dispatch limits. Nearest-even f32 requantization
+is lossy and saturates. Float-reference error bounds, scale representability and
+finite-output assumptions are in docs/compute-quant.md. No latency or model-wide
+accuracy claim; uint8, training and integer-only requantization are outside this
+signed-int8 entry. Core and stage receive no changes.
+
+The new optional /quant entry measures 3,927 B minified gzip (previously absent,
+0 B), with a 4,183 B quality ceiling. The bytes provide both backends, packed
+storage and validation in one optional module; splitting would add loading and
+API complexity without reducing core/stage. The core + stage root remains
+24,209 B gzip in this build, below its unchanged 25,000 B ceiling.
+
+
+## GPU graph layout (batch 175 job 5)
+
+Optional @margoengine/sciviz/graph-gpu has device-resident 2D/3D FR and ForceAtlas2, a sorted Morton grid tree, styled screen-space edges/arrows, GPU FDEB and collision-avoiding labels. CPU all-pairs references remain available. There is no root/core/stage import.
+
+Graph counts are 1..16,777,216 nodes, subject to per-device buffer/binding limits; indices are exact u32. Grid side is a power of two, 2..512 in 2D or 2..64 in 3D. Defaults are 128 and 16. theta defaults to 0.7; 0 gives all pairs. Tree bounds use actual points even outside the Morton partition box. Sorting takes log2(padded N)*(log2(padded N)+1)/2 device passes; every node is represented, with no sampling. Concentrated/coincident leaves can require quadratic pair work. Force storage and accumulation are float32, not bit-identical to binary64 CPU results. Zero-length pairs receive a seeded index direction.
+
+FDEB defaults to six cycles, 50 initial iterations, 0.1 step/stiffness and 0.6 compatibility; 1..9 cycles, at most 10,000 initial iterations. It is deliberately opt-in: compatible pairs are evaluated without truncation, O(E squared * subdivision points * iterations), and buffers must fit device limits. Rebundle after moving nodes; bundled endpoints are a snapshot. Arrows follow each edge's own direction. Self loops do not pull on their node; degenerate projected edge segments are not drawn.
+
+Label candidates are explicit node/text records, default maximum 200 visible. Only candidate positions are gathered/read back by refreshLabels(); frame hooks reproject that snapshot for camera changes. Call refreshLabels after layout changes. Labels avoid each other and viewport boundaries; obscured labels can be suppressed. Device loss hides a GPU-owned layer; recreate layout/bundles/layer on the replacement device, as with other caller-owned GPU arrays. Dispose drawing layers before their caller-owned layout and bundles.
+
+The million-node proof records all output positions, moved-node count, capped movement, persistent buffer bytes, dispatches, compare-exchanges and many-body interaction count. These are logical allocations/work, not physical VRAM, heap totals, FPS or wall-clock measurements. Million-node topology repeats the original OpenAlex citation subgraph; it does not claim a million unique works. Runtime speed comparisons await the speed phase.
+
+The new graph-gpu entry measures 13717 B gzip (before 0 B), ceiling 14129 B. Core + stage remains 24,209 B. Full layout, bundling and drawing share one optional lifecycle; a split would add resource coordination solely to save optional bytes.
+Batch 180 job 4 CF and projections: /cf reads existing CDF-1/2 NetCDF lazily, not HDF5/NetCDF-4. Independent dimension coordinates, scalar numeric and character labels, matching two-dimensional geographic auxiliaries and selected time-dependent auxiliaries are recognised. Every non-horizontal dimension longer than one requires an explicit zero-based index; no implicit first member/time/level. Projected x/y mappings supported: CF Lambert conformal conic, Albers, polar stereographic, Mercator and latitude/longitude; other CRS names require geographic auxiliary coordinates. The coordinate metadata is retained, not a complete CF validation or general UDUNITS implementation. Unit conversion covers documented climate SI vocabulary, compound integer exponents, pressure, degrees/radians and affine Celsius/Fahrenheit/Kelvin; unknown or incompatible conversions reject. Units metadata temperature differences suppress affine offsets.
+CF reference-time conversion supports standard/gregorian with the 1582 gap, proleptic Gregorian, Julian, noleap/365_day, all_leap/366_day and 360_day. Uses fixed SI durations, numeric timezone offsets, fractional/negative offsets, no Date conversion of model dates. Years bounded +/-1000000; standard/Julian require positive years. Leap-second instants, calendar=none and custom calendars require caller conversion, not silent Gregorian fallback. Appendix D vertical formulas broadcast by dimension names into Pa/down or m/up; dimensional positive metadata is preserved. Maximum broadcast 16777216 elements, caller configurable.
+Source sampler cap 16777216 nodes, target default cap 4194304 cells. Rectilinear axes must be monotonic after longitude unwrap; full cycles inferred, regional seams explicit, duplicate seam values must agree. Bilinear default or nearest, strict missing corners by default or explicit renormalization. Curvilinear uses a 5 degree cell index and bounded inverse bilinear solves; folded/degenerate cells and missing geographic positions are holes. Curvilinear periodicity requires explicit periodic=true. No extrapolation beyond source nodal coverage. Land masks are independent fraction/percent grids sampled categorically; default threshold 0.5. Map-cell centre sampling is for display and is not conservative. conservativeCF separately preserves rectilinear cell-average area integrals using CF bounds or midpoint-derived edges; returns valid-area coverage, and rejects overlapping source cells. It does not invent arbitrary curvilinear conservative cell corners.
+Projection angular inputs are degrees, outputs use radius units (default metres with radius6378137). Default WGS84 flattening for conics/polar/Mercator, zero for plate/Robinson/Mollweide. Conic defaults parallels30/60; origin0 except polar90; central meridian0, false origin0, scale1. Opposite standard parallels reject as a degenerate cone; singular poles return undefined, out-of-domain inverses return undefined. Robinson uses the published 5-degree table and a local monotone Hermite interpolant, so between-knot pixels can differ from other interpolants. Mollweide is spherical. Neither conformality nor equal-area properties are claimed for Robinson. Rendering uses retained finite-cell meshes, existing colour maps and both backends, with device restore.
+
+Batch 180 job 4 entry sizes: cf 0 -> 14438 B gzip, ceiling 14872 B; projections 0 -> 2328 B, ceiling 2584 B. Optional CF semantics and independent Snyder transforms are retained together to avoid duplicated dimension/lifetime coordination; the existing mesh owner stays lazy. Core + stage source unchanged.
+
+
+
+Batch 274 ONNX tree/SVM follow-up: TreeEnsembleRegressor and TreeEnsembleClassifier execute legacy ML1..4 encodings, plus a compatibility extension retaining their semantics under deprecated ML5 imports. TreeEnsemble uses ML5 with float16/float32/float64 typed splits/weights and membership sets. Legacy trees accept float32/float64/int32/int64 inputs and produce float32 scores, preserving exact int64 labels. Graph tuples, references, targets, flag vectors and all cycles validate before traversal. Combined modern nodes/leaves and legacy node counts cap at 16777216; output tensors share the existing element/storage caps. SVMClassifier/Regressor implement all four kernels, regression/one-class output, linear and support-vector classification, raw pairwise multiclass scores, labels, calibration and post-transforms. Uncalibrated support-vector output has K*(K-1)/2 scores (two for binary), calibrated output K. Calibration uses at most 16777216 workspace scalars, at most 4096 classes, residual <0.005/K and at most max(100,K) sweeps; exhaustion rejects. Model parameters must be finite. All inference remains synchronous CPU SIMD Wasm inside each graph node. Compatibility does not mean GPU inference. No throughput claim.
+Accepted provider differences and exact evidence are in clean-room.md: top-class labels follow raw class scores, regression honors post_transform, and PROBIT retains the existing mathematical inverse-normal behavior. The external provider refuses deprecated ML5 legacy trees; analytic tests cover that compatibility extension. Wider single-score binary metadata and extreme calibration coverage remain review work. Remaining unbuilt groups listed above are unchanged.
+
+Follow-up measured size: ONNX entry 10139 -> 10139 B min+gzip (existing 10444 B ceiling retained); separate onnx-kernel.wasm 684541 -> 753589 B raw and 244935 -> 270831 B gzip. The additional 25896 B gzip retains complete tree/SVM inference, topology validation and calibrated probabilities in the same optional per-model Wasm owner; splitting would add another ABI and attribute/resource lifetime bridge. Core plus stage remains 24209 B.
+
+## Batch 175 job 4: series
+Optional /series uses 1 MiB network chunks, 512 MiB per encoded/decoded block, 100M rows by default (override reader limits), and at most uint32 original row IDs. Exact selection retains loaded binary64 blocks; it is not constant-total-memory storage. Flat scalar Arrow/Parquet limits and codecs match /table. M4 is exact for the aliased pixel-column line model, not arbitrary antialiasing/thick-line blending. Min-max/LTTB are alternatives; LTTB defaults to retaining pixel extrema too. NaN gaps split lines and can exceed the usual four-vertices-per-column output. Spectra require finite uniform samples, explicit sample rate and 2..16777216 values. STFT defaults to 256-sample periodic Hann, half-window hop, mean removal, complete windows, 256 MiB output bound and one-window GPU staging. HTTP sources need valid 206 byte ranges and immutable versions; Range/CORS headers must be exposed. Details, defaults and physical PSD normalization: docs/sciviz-series.md. No speed claim.
+
+Batch 175 job 4 measured sizes: /series absent (0 B) to 13801 B min+gzip, ceiling 14169 B; /table 12655 B after sharing progressive decoders. The bytes preserve one coherent reader/data/selection/spectral lifecycle instead of a split requiring applications to duplicate state. Core plus stage remains 24209 B before and after.
+Batch 178 themes: optional named tokens, per-figure CSS bindings and journal final-column presets are documented in [sciviz-themes.md](sciviz-themes.md). Width/font tokens are (0,256] CSS px, inward ticks [0,64], counts 2..100. Palettes/scalar maps default newly created marks; explicit author encodings and widths remain. Print safety requires device/profile proofing; PDF outline fonts are caller-supplied and Nature editable-text compliance is not claimed.
+
+Measured job 6 gzip before/after: sciviz root 61327 -> 62735 B; themes 0 -> 19428 B; format 7598 -> 7838 B; a11y 6233 -> 6260 B; spec 27443 -> 27463 B. Raised optional ceilings and ownership rationale are in the size baseline history. Core + stage stays 24209 B. The full viz kit is 264653 B; its previous recorded 256216 B is refreshed rather than weakening the equality check.
+# Batch 175 job 6: worker reader limits
+
+The optional sciviz/workers entry supports the seven named reader families through dedicated, disposable worker sessions. Existing per-format validation and codec limits remain authoritative. Input buffers clone unless explicitly listed for transfer; output buffers are snapshotted once inside the worker before transfer so lazy caches remain usable. Custom source callbacks remain on their owner thread. Progress reports start/complete operation milestones and unique backing-buffer bytes, not network totals or parsing percentages. Cancellation of any call terminates that session. Response deadline defaults to 30000 ms per operation. No worker pool, automatic retry, shared-memory input or page parsing fallback is introduced. See docs/sciviz-workers.md for the full lifetime and method-proxy contract.
+
+Measured gzip: sciviz/workers 0 to 1589 B, ceiling 1845 B; its bundled reader worker 0 to 41506 B by the package-entry measurement, ceiling 42752 B, or 41409 B when served verbatim (116841 B raw). The worker includes all seven reader families and compression handling; splitting would duplicate RPC and complicate lazy session ownership. worker/rpc adds progress within its existing 2408 B ceiling, measured 2253 B after the change. Core plus stage stays 24209 B. No load-time or inflater speed result is claimed during the deferred speed phase.
+
+## Integration
+
+C2 composition J2 initially proves six of 276 target pass pairs (post/FXAA, TAA, DOF, Tonemap) on native WebGPU and full WebGL2 compatibility, at 1x and 4x MSAA. The generator independently covers all four binary states over the 24-member target; this CPU coverage is distinct from executed GPU coverage. Sciviz is excluded. C1 and C3-C10 are not proven by this suite. See docs/integration-composition.md for scenes, assertions and remaining scope.
+
+### Batch 176: tensor fields
+sciviz/tensor uses symmetric coefficients xx,yy,zz,xy,xz,yz. CPU eigensystems use float64; GPU systems use scaled float32 Jacobi, at most 48 rotations, and an absolute residual bound of 64 * 2^-23 * the maximum absolute coefficient. Nonzero GPU input magnitude must be between 2^-96 and 2^120; rescale tensor units outside that accuracy range. Zero and repeated spectra are supported, with canonical signs and a right-handed basis; individual eigenvectors in a degenerate eigenspace are not unique. Output eigenvalues are algebraically descending. FA uses its published formula, is zero for a zero tensor and can exceed one for indefinite tensors. Float64 spectral overflow is rejected. Device buffer limits are checked before copying a GPU field.
+Glyphs are ellipsoids or Kindlmann superquadrics in one instanced draw, with GPU eigensystems remaining in storage buffers. Default superquadric gamma 3, resolution 16 polar by 32 azimuthal, per-tensor maximum-radius normalization, size .4 voxel spacing (.4 data units for scattered points), stride 1, direction-FA RGB and opacity 1. FA colour uses the selected map (default viridis). Signed glyph geometry uses absolute eigenvalues ordered by magnitude; signed values remain available for interpretation. Positions and glyph bounds must fit float32. Exact quarter-turn parameters preserve poles and symmetry; normals use centred parametric differences and scalar-free normalization, including large physical unit scales. Empty selections draw nothing; disposal and device resource reconstruction are supported.
+TensorField bounds are outer voxel faces of an axis-aligned, cell-centred, x-fastest Cartesian grid. Samples interpolate six coefficients before decomposing. Fibres default to bidirectional FACT, FA >= .15, maximum turn 45 degrees, maximum length 1000 per direction, 4096 steps per direction and 1000000 returned points. Euler defaults to one quarter of minimum voxel spacing. Tracking stops at masks, missing samples, negative eigenvalues, zero/degenerate principal directions, domain edges and the requested limits. Hyperstreamlines default to 12 sides, radius .5 voxel spacing times lambda2/lambda1 and lambda3/lambda1, with 1000000 triangles maximum. Explicit options raise output budgets.
+Diffusion fitting is ordinary, unconstrained log-linear least squares, never a weighted, constrained or nonlinear estimator. Signals are volume-major, b-values s/mm^2, and output tensors mm^2/s. Gradients must be within 1e-4 of unit length and are normalized once; b=0 directions are ignored. Default signal floor is 1. A rank-deficient design rejects using the documented 1e-10 relative QR column threshold. Excluded voxels retain NaN coefficients; estimated non-positive spectra are flagged, not projected away. The demonstration says this method explicitly, preserves all 65 volumes in a 32x32x8 native crop, displays two-voxel glyph spacing in each axis and uses millimetres along the supplied FSL voxel-axis basis with equal physical plot lengths. No scanner-affine conversion, eddy-current/motion correction or anatomical validation is claimed. No speed number is published during the build phase.
+
+Tensor optional entry: new 0 to 27,622 B gzip, ceiling 28,451 B. The bytes keep fitting, eigensystems, glyphs and tracking in one coherent coordinate/lifetime contract; mandatory companion entry splits would add wiring without improving results. Core plus stage remains 24,209 B.
+
+Integration J2 second set historically covered 12 C2 members in 13 rows and 66/276 positive pairs. The full set below supersedes that intermediate coverage.
+
+### Batch 176: molecules
+sciviz/molecule consumes structures returned by loaders/pdb and loaders/mmcif and supplies an opaque, 3D linear-axis MoleculeLayer. Coordinates and radii are angstroms. Default ball-and-stick uses 0.3 times each van der Waals atom radius, bondRadius 0.2 angstrom; space-filling uses full van der Waals radii and no bonds; licorice uses bondRadius for both atom spheres and bonds. atomScale applies to ball-and-stick only. atomIndices defaults to all atoms and displays a bond only when both ends are selected. Empty selections allocate/draw nothing. The layer owns its snapshot, restores GPU resources and supports Symbol.dispose. GPU buffer size/binding limits are enforced; rendering uses float32 precision, so coordinates should stay near the molecular origin. Native WebGPU and compatibility WebGL2 are supported; native WebGL2 requires a separate backend implementation and is rejected before allocation.
+One six-vertex instanced draw covers both analytic spheres and closed cylinders. Fragment depth comes from the ray hit, with endpoint element colours split at each bond's midpoint. Conservative projected boxes fall back to full-screen coverage across the near plane. Picking uses these same displayed surfaces: pick(x,y) uses canvas-relative CSS pixels; pickRay uses angstrom-space rays. The nearest atom or nearer bond endpoint returns a complete author residue identity (chain, author id, insertion code, name, all source atom indices). Other scene layers are not included in a molecule layer's pick query. It does not install a global Figure hover picker.
+The loaders select the first coordinate model and first location of each alternate atom. mmCIF supports CIF 1.1 quoted values, semicolon fields, comments, loops/single values, first or explicitly named data block, author identifiers with label fallbacks, and identity-symmetry covalent/disulfide struct_conn bonds. Parse limits are the shared loaders maxVertices (default 8,000,000 atoms). Non-identity crystal connections warn and require crystal expansion; no biological assembly generation, BinaryCIF, CIF 2.0, bond order/valence inference or crystallographic symmetry expansion is claimed. GuessBonds defaults true and shares the PDB spatial grid: 0.4 < distance <= covalent radius sum + 0.45 angstrom. Existing common-element covalent radii/colours are shared by both readers; unlisted elements use pink and 1.5 angstrom covalent radius. Space filling has Bondi common-element radii (Ca from Mantina 2009), with 2 angstrom for unlisted elements. Deuterium/tritium and unsupported element labels use those explicit fallbacks. The default heuristics can connect nearby non-covalent contacts; disable guessBonds to retain deposited bonds only. Secondary-structure ribbons are the optional stretch goal, not part of the implemented sphere/stick row. No speed claim is published.
+
+Molecule optional entry sizes: loaders/mmcif new 0 to 3,186 B gzip, ceiling 3,442 B; sciviz/molecule new 0 to 5,163 B, ceiling 5,419 B. Existing loaders/pdb changes from 2,208 to 2,269 B, within its existing ceiling. These entries keep complete coordinate parsing in loaders and rendering/picking lifetime in sciviz; forced splits would duplicate grammar or primitive ownership. Core plus stage remains 24,209 B.
+
+
+AVIF review M1 (2026-11-10): the final OBU of an image item may omit its size and consumes the remaining item bytes; av1C configuration OBUs still require sizes. Exact white-sample RGBA and strict configuration regressions: docs/avif-review-fixes.md.
+
+
+Stage glTF review M3: addGLTF uses the basic loader for plain opaque constant-colour triangles; advanced features select gltf-pro, with animation required for skins/morphs/clips. Root download budget remains 64 MiB. Only selected packages load, with a feature-specific coded refusal when missing. Basic results omit pbr. Core plus stage stays 24,209 B gzip. See [stage-gltf-routing.md](stage-gltf-routing.md).
+
+Draco encoder review L1: quantized float attributes require a finite float32 range, finite inverse and inverse-times-range, and a nonzero reconstruction step. Unrepresentable transforms reject with code unsupported before returning a stream; use bits 0 or rescale. Both extreme-range regressions and raw-float round trips run in draco-native.test.js. See [draco-float-ranges.md](draco-float-ranges.md).
+
+AVIF review M2 (2026-11-10): chroma position 1 uses horizontal co-siting and vertical centering; positions 0 and 2 keep their existing centered/co-sited behavior. All 16 pixels of an authored 10-bit 4:2:0 ramp are checked exactly at each position in the native regression; see docs/avif-review-fixes.md.
+
+## Batch 137 encoder limits
+
+The clean-room ETC1S/UASTC encoder replaces the bundled prebuilt encoder, with the
+same public settings and a single lazy SIMD Wasm module. ETC1S uses shared endpoint
+and selector codebooks; all nineteen UASTC modes participate at level 2 and above.
+RDO reuses valid previous blocks over a bounded 256-block dictionary; lambda zero
+preserves the unconditioned stream. Zstandard literals use at most eleven-bit
+canonical Huffman codes, four streams for large literal sections and at most
+128 KiB per frame block. Source pixels and fitted blocks are unchanged by entropy
+coding. No throughput or peak-memory parity is claimed during the deferred phase.
+
+On the unchanged full three-role CC0 corpus, all 66 PSNR and 42 valid 11x11 Gaussian
+SSIM mip comparisons pass at or below the old complete-file byte budgets. Exact
+settings, source and artifact hashes: whitepaper/results/batch-137-quality-r10.json.
+The comparison tunes rate by ETC1S quality or UASTC RDO; it does not establish a
+universal quality guarantee on other textures. Measured optional ktx2 bundle: 422537 raw / 147879 gzip B, from round 9's
+395263 / 138922 B. The distinct lazy Wasm asset is 291861 raw / 91747 gzip B,
+from 271457 / 84726 B. Bundle and file figures are not additive. These added
+bytes buy lossless literal coding and quality parity; splitting would require
+another codec ABI and fetch. Existing optional size ceilings suffice. Core plus
+stage remains 24209 gzip B, below 25000 B.
+
+AVIF review L2 (2026-11-10): OBU reserved header/extension bits are ignored as required for decoders; forbidden-bit, strict config-size and truncated-payload checks remain enforced. The standard CPU tests now include the native/Wasm spec regressions; see docs/avif-review-fixes.md.
+### Node glTF image decoding (2026-11-10)
+
+Without createImageBitmap, gltf-pro lazily calls the existing decoders/image entry and retains RGBA8 rows with straight alpha. Browser bitmaps stay the default when available. PNG/JPEG data URIs, buffer views and fetched images use the same download and decoded-image limits as before; GPU dimensions still obey maxTextureDimension2D. The existing optional decoder owns its supported coding subsets and failures. Raw pixels stay in CPU memory for clone/device restoration, width * height * 4 bytes per image, plus independent React mount copies. Material uploads generate the same full mip chain as bitmaps; uploadImage itself returns a caller-owned single-level texture, as before. CPU decode time is not benchmarked in the build phase.
+The Node image repair changes the gltf-pro/model entry from 60,402 to 60,566 bytes gzip (+164), measured by the quality bundle method against the parent source. Its optional ceiling rises from 60,429 with the normal 3% margin. Splitting would require caller configuration and duplicate loading/upload/restoration paths for 164 bytes. Core and stage bytes are unchanged.
+
+
+### Integration J2 full C2 coverage
+
+All 24 adapter members execute in 34 sparse rows: 136/136 cases on native WebGPU
+and full WebGL2 compatibility at 1x/4x MSAA, covering 276/276 positive pairs and
+all four binary adapter states. Common core/post depth/stack/backend plumbing is
+present even when a corresponding adapter state is absent. Assertions cover six
+RGBA probes, six reversed-depth values (1e-6), exact scene draw counts, render
+target/MSAA/viewport/scissor restoration, empty validation/error collectors and
+simulated XR delivery into real 96x96 eye texture layers. Physical headset
+certification, untested options, every pixel and higher-order interactions are
+outside this result. Windows compatibility tracer rows use ANGLE Vulkan; the
+parked ANGLE D3D11 tracer shader-link defect remains. The per-scene limit is 150 s
+and the full GPU hold is 10 minutes. No timing assertion, speed claim, package API
+or package source/size change. Evidence and reproduction:
+[integration composition](integration-composition.md) and
+[raw results](whitepaper/results/integration-j2-composition.json).
+
+## J6 game integration
+
+The game test page composes 13 optional packages on native WebGPU and full WebGL2. Four RGBA probes and five scene draws survive an actual device destruction/replacement unchanged. Teardown leaves zero tracked live device allocations, meshes, plugins, physics bodies and crowd agents. The silent audio source is exercised without an acoustic-quality claim. This is one deterministic scene, not every option or every package pair. Reproduction and instrumentation limits: [everything scenes](integration-everything.md).
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/check-example-types.test.js` fails its cameras-scoped expectation because cameras now reaches 14 packages, above the unchanged 12-package full-run threshold; the planner correctly selects all projects but the fixture expects a named subset. Outside the API-record classification job; reconcile the fixture in the fix phase without weakening closure coverage.
+
+Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/no-private-paths.test.js` finds 12 tracked files with references to excluded local paths (clean-room, known-bugs, limits, sciviz-a11y, whitepaper claims/reproduce/atmosphere result, netcode lobby test, accessibility audit, two sciviz preparation scripts and llms-full). Cause: producers committed machine-local evidence pointers unavailable in a clone; replace at the owning producers in the fix phase. No classification or assertion change.
 
 Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
@@ -9130,6 +9365,29 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 Whole untransformed straight-alpha bitmap uploads now preserve every channel. A cropped, flipped or explicitly premultiplied ImageBitmap still passes through Canvas2D in webgl2-compat/device/render.ts and can quantize low-alpha RGB. Repro: crop the 61x23 diagnostic WebP from splats/test/gpu/check.mjs before copying it and compare straight RGB at alpha 0 or 1. Cause: Canvas2D stores premultiplied colour; a GPU transform path is needed to retain straight RGB through these operations. This existing transformed-copy gap is outside the progressive-loading job; unchanged-bitmap regression and existing transform semantics both pass.
 
+Lane A sweep, 2026-11-10: reproduced on f4f7f43ad with a 7x5 ImageData bitmap,
+alpha 0/1/128/255, whole/cropped, flipped/unflipped and straight/premultiplied
+copies into 1/2/6-layer textures. Native and compatibility differ in 13 of 48
+cases. Two bounded investigation rounds rejected a VideoFrame substitution:
+whole straight uploads preserve RGB, but visibleRect cropping loses low-alpha
+RGB and alpha conversions differ by one byte in some channels (36/48 cases).
+No draft or weaker assertion shipped. Next: direct bitmap upload plus a GPU
+crop/flip path, with explicit handling of the source's alpha representation.
+Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
+1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
+WebCodecs section 9.4 (2026); sources in clean-room.md.
+
+### Fixed: Water inside a TAA capture at 4x lost the whole frame
+
+C2 row c2-007 (taa, shadows, toon, water, points with a DepthTexture probe) read depth 0 at every probe on native
+WebGPU at 4x MSAA; 1x passed. Bisected to the pair TAA + Water. Cause: inside a 4x scene capture, Water copied the
+capture's depth into its own 4x surface depth with `SceneTarget.copyDepth(encoder, view, 4)` and no format, so the copy
+pipeline took the capture's format (TAA mirrors the canvas's depth32float-stencil8) while the surface depth uses the
+source depth's format (DepthTexture's depth32float). The device rejected the attachment state at `setPipeline` and
+dropped the frame's whole command buffer, so no pass of that frame ran. Water now passes its surface depth's format.
+Regression: `packages/water/test/water.test.js` "4x surface depth copies in its own format from a capture whose depth
+format differs" checks every pipeline's depth format and sample count against its pass's depth attachment.
+
 ### Fixed: umbrella indexes after the caustics rebase
 
 The merged workspace exports included optional entries absent from the
@@ -9145,16 +9403,21 @@ Initialize the timer before notifying peers and stop recovery work once authorit
 is ready. The synchronous-transport case in packages/netcode/tests/migrate.test.js
 fails before the change and stays ready past the deadline afterward.
 
-### Batch 258 image checks
+### Fixed: Batch 258 image checks
 
 Fixed within the image job: four-value slice arrays previously remained aliased after validation; defensive copies now cover construction, assignment and reads. Lazy creation of an unused SDF atlas placeholder changed generation after the upload key was captured, causing one redundant image-only second-frame upload. Both WebGPU and GL now retain the post-binding generation. image.test.js and image-browser.mjs preserve the regressions. No other UI defect is being repaired in this build job.
 
+Lane A sweep: the fixes are already on main in 12701037e. The unchanged image
+and text-input CPU regressions pass on current main; no README example was run.
+
 ### Batch 258 text fields
 
-Tooling follow-up: running quality concurrently with React subpath CPU tests
-can fail reading a deleted tests/.subpaths-*/hooks.mjs after its file snapshot;
-repro: start both commands together. Run quality after those tests until the
-fix phase adds a stable inventory of source files. No product source changed.
+Fixed by the lane A sweep, 2026-11-10: the disposable Vite consumers under
+React tests/.subpaths-*/ were unignored, so quality's Git inventory included
+them and failed with ENOENT when the test removed them. The producer's temporary
+directory is now ignored. tests/quality-inventory.test.js deterministically
+removes the generated hooks.mjs between inventory and detector reads and
+retains real untracked source coverage; it fails with ENOENT before the fix.
 
 The former shared Chromium shutdown failure is fixed upstream at 919fdc09e.
 This branch is rebased onto that fix; both native and compatibility input
@@ -9306,6 +9569,12 @@ receipts remain available. Final missing-target/public-API memory acceptance
 remains open and the prebuilt decoder remains retained.
 
 ### Open: batch 134 BC1/BC3 source quality and remaining targets
+
+Lane A current-main audit, 2026-11-10: the default decoder and native Draco
+regressions pass 28 tests. Production still retains the prebuilt decoders;
+the replacement quality/target gaps below remain build work and are not a
+reproduced failure of that default API. ETC2/EAC hardware proof is excluded
+from this NVIDIA sweep. No private replacement draft was landed.
 
 The private discrete cluster-fit draft passes71 native tests before owned-range
 addition (72 afterward), and87/98 original-source BC1/BC3 pairs (1296 images,
@@ -9516,7 +9785,13 @@ gate retaining its existing five known failures and no new failure.
 - Fixed root glass: the interior inverse Snell candidates could offer the same unchanged direction through several face normals, adding their full light estimates while the path used one MIS share. A canonical box-exit face now offers that direction once, with the existing direction-equality predicate. The root glassfurnace GPU case rejects the old 1.03826 result and covers IOR 1, 1.000001, 1.0001 and 1.5 against analytic equilibrium.
 - Fixed spectral: wavelength-independent contributions now stay RGB on one path. Importance-sample a hero only at the first dispersive glass interface or active chromatic lens. The spectral GPU suite rejects the old 1.578737 channel spread and requires exactly zero spread and exact root equality at 1 and 64 spp; analytic radiance, lens and restoration bounds are unchanged.
 - Fixed composition transport: /compose selects all 32 subsets of five shared transforms with media conversion and atomic mesh storage. CPU, retained native transport/AOV proofs and the failed-only WebGL2/Vulkan continuation pass. Compatibility finishes within the unchanged 12-minute lease; the old uninstrumented timeout has no attributable phase. Triangle emitters and mesh deflectors remain part of full-scene work. Evidence: whitepaper/results/review-99-compose-20261109.json.
-- Full-scene meshes: missing UV textures, smooth normals, shared geometry instance transforms and emissive-triangle light sampling; zero-area triangles reject an entire scene and the BVH uses spatial medians. Real scene import needs each of these addressed, including SAH construction.
+- Resolved full-scene mesh source gaps: 5225908a6 supplies retained normal/UV
+  attributes, shared affine BLAS instances and degenerate-triangle accounting;
+  6e8863845 supplies PBR channels and glTF snapshots; b163daf9e supplies mesh
+  emitter sampling and the newer mesh builder. The lane A sweep passes all 26
+  unchanged attribute/build/instance/PBR/light CPU regressions. These replace
+  the old missing-API allegation; independent full-scene transport, guiding and
+  many-light GPU evidence below remain separate requirements. No speed claim.
 - Guiding evidence: guiding.html renders its convergence reference with the guided estimator itself and uses absolute bounds for dim scenes. Use an independent root/analytic reference and justified relative bounds.
 - Many-light evidence: restir.html covers diffuse receivers and absorption only. Rough metal, coat and scattering-media vertices need root-reference comparisons with relative bounds.
 - Reuse naming: /restir implements per-pixel RIS without spatial or temporal reuse. Implement reuse or rename the entry and documentation; retain the equal-cost work-count question without timing runs during the build phase.
@@ -9640,10 +9915,18 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   at 4x and 1x. No assertion or tolerance changed. Durable receipt:
   whitepaper/results/batch-273-stencil-checkpoint.json. Remaining batch failures
   are still open; this does not establish whole-package parity.
-- `materials/test:gpu:wireframe` reports
-  mirrored/reference pixel hashes and duplicate-edge alpha differences, and
-  `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
-  rasterization/orientation divergences still need numeric root-cause proof.
+- `materials/test:gpu:wireframe`: the current-main compatibility sweep passes
+  all 249 checks and 60 captures. A second control using the bitmap upload from
+  before c06603fef also passes, excluding that repair as its explanation.
+  The earlier mirrored/reference and duplicate-edge failure is not reproduced;
+  its precise fixing change remains unidentified, so it is not claimed closed.
+- Resolved `materials/test:gpu:normal-map` by c06603fef (bitmap orientation).
+  The unchanged complete compatibility suite passes, including derived,
+  authored/mirrored frames, lobes and export round trips. Replacing only the
+  bitmap upload with its pre-fix implementation reproduces the original dent:
+  mesh dome top/bottom 96/222, versus corrected 222/99. Constant tilt remains
+  221/75 in both controls. Current source and build were restored afterward;
+  no normal-map shader, image, threshold or assertion was changed.
 
 - Fixed `react/test:browser` XR preparation: the supported compatibility XR
   route is installed by the fixture; its complete canonical compatibility suite
@@ -9665,6 +9948,12 @@ passes. The following additional failures remain with batch 273:
 - `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
   prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
   The awaited operation after that marker remains unisolated.
+  Current-main sweep: the unchanged models command now finishes inside the
+  original 60 s body lease, including both 600-pixel perspective/orthographic
+  grids (600/600 agreement), silhouettes, outlines and occlusion. The loop
+  immediately after the old marker is the perspective pick/Raycaster grid.
+  Main's 48ac02963 readback/task-polling repair covers mapping progress; the
+  old hang is no longer reproduced. This does not waive a future timeout.
 - Resolved failure 18, shader readback: compatibility compute pipelines did not
   enforce advertised binding limits. Resource counts now reject overflow before
   either compute route runs; asynchronous pipeline errors also avoid assigning
@@ -9673,9 +9962,21 @@ passes. The following additional failures remain with batch 273:
 - `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
   4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
   those timing values are not accepted evidence during the build phase.
+  Current sweep: weather, volumetric, cloud-shadows, aerial and shafts now pass
+  at both sample counts before the unchanged 98 s investigation lease ends.
+  A second disjoint run passes the unfinished weather-fx, sleet, astro,
+  hillaire, albedo and presets at both sample counts, with teardown. All 22
+  feature groups have unchanged passing value assertions; no permanently
+  stalled await was found. The monolithic command's 98 s investigation limit
+  still expires and is not raised or claimed passed. Frame timings remain
+  diagnostics, not speed acceptance.
 - `splats/test:gpu`: all GPU checks print success, then the command does not exit
   before its 62 s body bound. This is not a passing suite. Cleanup remains with
   the dedicated teardown owner; no teardown repair is attempted in this lane.
+  Current-main sweep: the unchanged complete compatibility command passes and
+  exits with the 919fdc09e host teardown mechanism already on main. The recorded
+  command duration includes GPU queue contention; it is not a body-time speed
+  claim. No browser/shutdown code or teardown bound changed in this sweep.
 - Resolved reference selection for failures 21 and 25: the outer forced shim
   replaced the native baseline in seven comparison drivers. Each now opts out
   of that shim and retains its own backend selection. All seven setup
@@ -9692,11 +9993,14 @@ passes. The following additional failures remain with batch 273:
   unchanged assertions, including layers 256/2047 at 4x and 1x. The separate
   synthetic delay coverage gap below remains open. No texture work was reduced.
   Receipt: whitepaper/results/batch-273-array-layer-limits.json.
-- Forced-compatibility slow-compile coverage gap: `MARGO_COMPAT=1` with
-  `--pipeline-delay=500` patches the native GPUDevice prototype before
-  compatShim loads/replaces it, so the synthetic delay does not wrap the later
-  CompatDevice. Repro: voxel's slow-compile script with that environment;
-  apply/observe the delay on the actual device in a separate harness repair.
+- Fixed forced-compatibility slow-compile coverage gap (lane A, 2026-11-10):
+  the init script retains its prototype instrumenter and the lazy compatShim
+  applies it to CompatDevice before installing readiness counters. Render and
+  compute promises now include the requested delay in pending counts; shader
+  errors retain identity and release readiness. pipeline-delay.test.js loads
+  the real shim against a lazy device fixture and proves the old path schedules
+  zero timers instead of the required one. Native and compatibility voxel
+  slow-compile acceptance uses the unchanged 500 ms delay and both sample counts.
 - Fixed `root/modern:test:xr:browser`: simulated bindings identify the selected
   device and compatibility canvas presentation keeps its output context mode
   when reconfigured between page-backed XR and offscreen devices. Root native
@@ -9764,6 +10068,13 @@ WideAngle and WideAngleCube, and missing detachment in NodePass (dispose dropped
 its engine reference but left registration). Their owning-package repairs have
 per-class inert-GPU regressions and a cross-package joinStack source guard.
 Physical GPU/README gates and the wider non-PostStack lifecycle audit remain open.
+
+Lane A sweep: all 95 existing scene-owner regressions pass across post, DOF,
+tonemap, creative, cinematic, shader and terrain. The concrete disposal causes
+above are already repaired in 257c0aaf6, 542bca326, daa740e55, 05f35486c,
+02fd42e4c, 6eb490883 and 7239d8752. The broader candidate inventory remains
+unclassified; no full-package GPU or manual lifecycle certification is inferred
+from these CPU results. README work stays deferred.
 
 ### Batch 56 review repair audit
 
@@ -10043,6 +10354,12 @@ whitepaper/results/readme-node-basis-20261109.json.
 
 ### Open: batch 133 default replacement remains incomplete
 
+Lane A current-main audit: the default and native regression command passes
+28 tests; draco.ts still selects the prebuilt wrapper/Wasm. The missing
+specification-derived rules below remain an open replacement build, with the
+existing crafted-input black-box authorization. A passing default decoder
+does not complete or waive any replacement rule, corpus or quality bar.
+
 This is a replacement prerequisite, not a newly observed failure of the shipped decoder.
 Reproduce the source gap by following the published specification's connectivity
 dispatch for header encoder type 0, or its attribute decoder for generic,
@@ -10079,6 +10396,11 @@ prediction, KD and memory regressions through `verify` and `check:merge`, with
 hard process-tree limits and no skip when Cargo is unavailable.
 
 ### Open: batch 134 Basis replacement remains unverified
+
+Lane A current-main audit: the retained default codec route passes its CPU
+regressions as part of the 28-test decoder/native run. This establishes no
+replacement identity, quality equivalence, fuzz, memory or GPU acceptance;
+those build prerequisites below remain open. No timing was measured or reused.
 
 Scott's ruling dated 2026-11-10 resolves the earlier byte-choice prerequisite:
 require identical output where specified and per-file quality no worse than the
@@ -10344,6 +10666,15 @@ The byte ceilings above are approved; all normal checks are required before push
 - **Needed to close:** save both pictures, find the pixels and which pass writes them, and fix it in the package that
   owns that pass.
 
+Lane A bounded sweep: the unchanged real-file command reproduces a maximum
+four-level repeat difference. A second focused capture saves every sorted
+pair at eight angles: 4x differs at 180 degrees (5 pixels, maximum 1) and 270
+degrees (31 pixels, maximum 4); every 1x pair is exact. One changed pixel is
+(185,250), RGB [42,42,23] versus [44,43,27]. The two affected regions are now
+localized, but the writing pass and deeper cause remain unisolated. No driver
+waiver or numerical tolerance applies. Private lane evidence: oit-focused
+PNGs/log; native WebGPU, RTX A6000, Edge 157.0.4341.42.
+
 ### A blurred edge of DOF spreads to one side only
 
 - **What:** a card out of focus in `@margoengine/dof` should spread across its outline, half inside and half outside. A far card
@@ -10354,6 +10685,17 @@ The byte ceilings above are approved; all normal checks are required before push
   behind a far card takes nothing from the card. The near gather always counts the foreground centre, at full weight.
 - **Needed to close:** decide from the published work on gather depth of field how a pixel behind a blurred edge takes its share
   without a sharp subject leaking onto its background, build it in `@margoengine/dof` and test the edge profile on the GPU.
+
+Lane A sweep reproduces the original card profiles on current main, with no
+GPU errors. At far-card x=464 with near focus, the green row jumps directly
+20 -> 154 -> 164 -> 173: background pixels receive no far-card contribution.
+With far focus, the near-card x=244 reaches 147 immediately before 208 and
+stays full-strength inside. Source audit confirms the far depth predicate and
+forced full near coverage still own these two asymmetries. A correction needs
+source-footprint coverage and a distinct background estimate at silhouettes;
+simply removing the depth predicate would not establish sharp-foreground
+occlusion. Compared Demers (2004), Hammon (2007) and Potmesil/Chakravarty (1981),
+cited in clean-room.md. No speculative shader or weaker edge bar was landed.
 
 ## README examples
 
@@ -10382,20 +10724,9 @@ The byte ceilings above are approved; all normal checks are required before push
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
 
-### The README check counts a Node example that reaches its time limit as a pass
+### Fixed: unfinished Node examples cannot pass at their deadline
 
-- **What:** `runInNode` in `scripts/run-readme-examples.mjs` reports `pass` (note "ran to the 30 s limit") for an example
-  that is still running at 30 s. Under a whole run's load, examples that fail in a few seconds alone can reach the limit
-  and pass, so the same example passes in one run and fails in another, and a known entry can read "passes, still on the
-  known list" only because the machine was busy. Seen 2026-11-07 on the Beelink: four rigging entries
-  (`readme-corrective-shapes-...-ff3e5c`, `readme-face-tracking-...-8fff06`, `readme-ik-chains-...-138226`,
-  `readme-spring-bones-...-a41e82`) passed in a whole run and failed with their listed errors in a run of three packages.
-- **Repro:** on a loaded machine, `npm run check:readme-run`, then `npm run check:readme-run -- --packages=rigging`; compare
-  the rigging results in the two reports.
-- **Cause:** a time limit is taken as "a long-running example, such as a server", not as "unknown"; the result depends on the
-  machine's load.
-- **Needed to close:** tell a server or loop that is meant to keep running from a slow failure (for example by its
-  `listen` port, as `nodeTurns` already reads it), and give the others enough time, or report them as unknown rather than pass.
+Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinished page imports fail; the owned process tree or page closes. Lane C rechecked the three synthetic deadline regressions in tests/run-readme-examples.test.js on 2026-11-10: all pass. No README examples were run or edited.
 
 ## Checks
 
@@ -10409,6 +10740,7 @@ The byte ceilings above are approved; all normal checks are required before push
   which holds about 0.004 m at 6 m and 0.125 m at 200 m. The limit of 16 was set before the display curve changed on 2026-10-17.
 - **Needed to close:** view depth in an `r32float` target of its own, which also serves scenes past 65,504 units; then the check
   joins `post` as `test:gpu:ssao` and leaves `LOOSE_CHECKS`. The limit stays.
+- **Lane C recheck (2026-11-10, two rounds):** current main reproduces 87 channel bytes over 2 and worst 17. A separate r32float view-depth target reduces that to 27, worst 17; all remaining differences are at x=399. The normal extractor chooses a clamped zero-length forward derivative at the screen edge. Selecting the available one-sided derivative plus full-precision depth makes the eye-movement comparison exact (0 bytes, worst 0). The check then reaches a separate IBL bar: perspective crease 4.0 and step 1.9 against strict >4 and >2. No assertion changed. The draft is parked in lane C's private handoff at the two-round cap, not shipped. Next: reproduce the IBL bar independently, then finish both changes with their regression tests before adding this check to post's plan.
 
 ## Boulder demo
 
@@ -10666,25 +10998,15 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 - **Cause** (measured on main at 82779ba8c, where seed 49 reached 7,772 m/s at step 1153 and 117 m open after step 1217; the contact changes of a6a767220 moved every web since): two rows depend on the others and are dropped (measured left: 1e-32 of their size). A third is 2.3e-3 rad from depending, a pivot of 5.4e-6 of its size at steps 1152 to 1216 against the stop of 14 u = 1.7e-6, so it is independent and the exact solve gives it the speed of one over that angle, as the kinematic ends ask more than the joints allow; at step 1216 it crosses the stop and is dropped. Checked in rationals: with the f32 epsilon stop the kernel's pivots matched an exact elimination to 1e-13 on every path of seed 49 at step 896 and seed 59 at step 1038 (pivots of 1.35e-7 and 1.76e-7 there, nonzero in rationals), so these are the scene's answers and not rounding.
 - **Needed to close:** a design for speeds near a toggle when the ends cannot both be met (damping per singular direction, as Buss and Kim 2005 do for a push, or a bound from what the kinematic bodies carry), then a gap bar in `a_web_of_joints_stays_in_the_numbers` for all 60 webs. `a_path_with_more_locks_than_freedoms_drops_the_row_that_depends` holds seeds 1 and 35 under 56.85 m to steps 400 and 600 now.
 
-### A Python script test can fail to spawn on Windows, about once in thousands of runs
+### Fixed: Python tests avoid the Windows app execution alias
 
-- **What:** `packages/exporters/tests/precision-native.test.js` failed in `verify` with `spawnSync python3 EINVAL`, on
-  the `python -c` call, just after `python3 --version` had worked in the same test (2026-11-06, during a run with other
-  lanes loading the machine; `pixel-art.test.js` makes the same call, and one earlier failure of this kind is in the
-  history of commit bdcb72659). The test passed in the verify 14 minutes before on the same code.
-- **Repro:** none on demand. 3,831 runs of `python3 -c` from 32 parallel spawns in 90 s all started, and the test alone
-  passes.
-- **Cause, not yet confirmed:** `python3` here is the Microsoft Store app execution alias, and `EINVAL` comes from
-  `CreateProcess`. Ruled out: the length of the script, the environment that `scripts/support/record-reads.mjs` passes
-  (the same on the call before), and spawn concurrency alone.
-- **Needed to close:** catch it again with the Windows error code, or run the tests with a Python that is not the alias
-  and see whether it stops.
+Fixed by 2dbaf192c. Exporter tests now use scripts/support/find-python.mjs, which selects an installed interpreter before trying command names. Lane C rechecked tests/find-python.test.js on 2026-11-10: all four pass, including a Windows alias that must never start and propagation of non-ENOENT spawn failures. This removes the suspected alias path; it does not claim a general Windows CreateProcess defect was proved.
 
-### A textured glTF does not load in Node
+### Fixed: textured glTF loads in Node (2026-11-10)
 
-- **What:** in Node on the `webgpu` binding, `loadGLTF` of `@margoengine/gltf-pro` rejects with `glTF image 0 could not be decoded (createImageBitmap is not defined)`, so a server thumbnail of a textured model cannot be made. Untextured scenes, sky and shadows draw.
-- **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
-- **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
+Without createImageBitmap, ordinary image bytes now use the existing lazy @margoengine/decoders/image reader. Retained RGBA8 pixels upload with writeTexture, with normal material mip generation and restoration. Material extension maps, MToon and React image copies accept the same pixel source. Browser bitmap decoding stays the default when available.
+
+Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cases failed on the original code and pass after the repair. The real Node binding renders textured primary colours exactly like uniform base colours. packages/gltf-pro/scripts/test-pixel-images.mjs compares PNG bitmap and pixel uploads, including restoration, pixel for pixel on both GPU backends. See gltf-node-images.md for limits and sources.
 
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
@@ -10722,6 +11044,8 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 - **Repro:** none yet. Other lanes were running their own checks on the machine at the time.
 - **Cause:** not found. The step now names a hang (see Fixed 2026-11-06), so the next one prints `HUNG TEST:` with its file and test.
 - **Needed to close:** a run that prints that line, and a fix of the test it names. Every verify run since is a run of this watch.
+
+- **Lane C sweep (2026-11-10):** no demand repro is available. Full verify is reserved for local CI; this entry remains its per-test hang watch, and no lane verify was run.
 
 ### Apple M6 sweep, 2026-11-05 (Chrome 157 and Playwright WebKit; Safari not run)
 
@@ -10800,6 +11124,17 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   staged path loop. Actual GPU output parity and disposal-during-compilation regressions remain required.
 - **Meanwhile:** a page on this route gets the raster view. WebGPU is the route on such a machine where the browser has
   it, and ANGLE Vulkan works.
+- **C2 composition (2026-11-10):** integration row c2-003 (post/FXAA, toon, transitions, scenery/Moon and
+  voxel-pathtracer) never returned on the WebGL2 layer at 1x, and the GPU lease reclaimed the run after 195.7 s idle.
+  Bisected on an RTX A6000 under ANGLE Direct3D 11: voxel-pathtracer alone stalls at `await tracer.ready`, while the
+  other four together pass. Two programs never report `COMPLETION_STATUS_KHR` (45 s, context not lost): the `trace`
+  render pipeline (GLSL vertex 366 and fragment 134,717 bytes; ANGLE HLSL fragment 220,071 bytes, SHA-256 prefix
+  cc09ce32cd70a8b8) and the compute `preview` stand-in (GLSL vertex 70,244 bytes; HLSL 117,960 bytes, 7ca27c68a5387fb6),
+  read back with `WEBGL_debug_shaders`. The same page under `--use-angle=vulkan` on the same GPU passes with the
+  expected probes, so the cause is the native compile above, not an interaction between members. The C2 runner now runs
+  rows with this member on ANGLE Vulkan on Windows, as the tracer's own compatibility checks do, and bounds each scene
+  with `ERR_COMPOSITION_STALL` (docs/integration-composition.md). C2 coverage of the tracer on ANGLE Direct3D 11 stays
+  open with this entry.
 
 ### Three routes still break WebGPU compatibility-level rules
 
@@ -10808,9 +11143,13 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Cause:** the level has no `sample_index` in a fragment shader and no multisampled float format: neither r32float nor rgba16float, so the surfel sums have nothing to add into at 4x.
 - **Needed to close:** the routes `Shadows`, `SceneTarget` and eye-dome lighting took: a masked draw per sample (`packages/shared/msaa.js` `copyDepth`, `packages/points/src/plugin.ts` `edlPipelines`). Surfels need sums in a format the level multisamples, or a single-sample pass with its own copy of the scene depth. Then add the names to the list `adapter-browser.mjs` asserts.
 
+- **Lane C source audit (2026-11-10):** sky/fog.ts, environment/volumetric.ts and water/spray.ts retain their multisampled sample_index branches. points/surfels.ts still explicitly refuses 4x compatibility-level float accumulation. These repairs remain open; a per-sample masked draw fixes only the three depth consumers, not the surfel accumulation format. No new runtime pass or closure is claimed.
+
 ### External PBR display passes
 
 - K2 external-pass follow-up: PBRModel.draw with a caller-owned already-open external pass on a display-encoded target still uses native tint/add blending; reproduce with bright glass over a bright background via createRenderer. Cause: the caller owns the open pass and the package cannot end it to snapshot its background. Graph-managed Engine scenes are fixed; use a linear HDR external target pending a caller-supplied snapshot hook.
+
+- **Lane C source audit (2026-11-10):** PBRDeviceRenderer.draw still receives an already-open caller-owned pass and view; its prepare method handles deformation, not a colour snapshot. The caller snapshot API and its bright-background regression remain open. No renderer or assertion was changed for this entry.
 
 ### Findings of the outside audit (2026-10-28)
 
@@ -10838,18 +11177,9 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Needed to close:** the audit's F20 text (its input, or at least the target and the time). Then a regression test that
   fails without the fix.
 
-### text: the colour emoji check needs a colour emoji font on the machine
+### Fixed: the text colour emoji check supplies its own font
 
-- **Repro:** `npm run test:browser --workspace @margoengine/text` on a Linux machine with no colour emoji font
-  installed (the Ubuntu test server, 2026-10-28) fails "Emoji not drawn in color" (`colorGlyphs` 0) at
-  `packages/text/tests/text-browser.js`.
-- **Cause:** the check draws an emoji through the system's fonts, so its result depends on the machine. Windows has a
-  colour emoji font; a headless Linux server often has none. The engine draws what the system font gives it.
-- **Fix needed:** the test brings its own colour glyph source (a standard emoji font file recorded with its source and
-  licence in `THIRD-PARTY-NOTICES.md`, or a test font), or it detects that no colour font exists and says so with a
-  clear skip message; either with a test that the check fails when colour glyphs are not drawn although a colour
-  font is present.
-
+Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an original COLR/CPAL test font. The browser check always renders its two coloured glyphs; an optional system-font probe reports when that system font has no colour glyph. packages/text/tests/text.test.js checks the generated font and the diagnostic contract. Lane C source audit confirms both paths remain in the current check; no system font installation is required for the mandatory colour-rendering proof.
 
 ### biomes flythrough on laptops: the slow sends frame runs past 3.5 ms while the page thread is off the CPU
 
@@ -12968,9 +13298,9 @@ wait, retry, weakened assertion or runtime engine change is involved.
 
 Stats closing acceptance: the collected verify on the current-main stats rebase completes with 13,864 of 13,881 repository tests passing, 17 failures and zero skips. Missing ComputeFrame GPU-script wiring, a fixed-frame workload classification and a pre-initialization planner test reference cause those failures. The repairs pass all 244 checks in the complete failed test files plus compute units and the new gate regression. The complete compute GPU suite, strengthened owner proof on both backends and all 21 compute README examples also pass. Every other verify step passed; no second full verify or fresh all-green full-run claim is made. The original process disappeared without a result, so its incomplete log is retained without a pass claim. The single replacement finished within its 40-minute bound. The real-GPU stats script passes, including eight owner cases, two shader modules and zero compilation errors; all eight runtime README examples pass. Stats source is unchanged by the exporter/documentation-only rebase. Lint and hygiene pass with 120 existing lint warnings; entry ceilings are unchanged. [Durable receipt](whitepaper/results/batch-56-stats-owner-20261109.json). The wider owner audit remains open.
 
-### Open: Save factory ignores secondary restore target
+### Fixed in b4bb08a45: Save factory secondary restore target
 
-Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}}) when the type's synchronous attach calls engine.use(plugin). applyPlugins calls attach outside target scene setup, so the factory registers in default; rollback removes by name from secondary instead. A same-name default plugin makes the restore reject before state loads. Nine real-engine cases retain three passing default controls and six secondary failures, covering success, immediate load failure and a later binding failure. The lane retains save-owner-regression-red.log and the regression draft; a package repair is next.
+Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}}) when the type's synchronous attach calls engine.use(plugin). The factory previously ran outside target setup and rollback removed by name from the wrong scene. Commit b4bb08a45 invokes factories in target setup and rolls back by identity. Lane G reran packages/save/tests/scene-owner.test.js on current main: all 16 cases pass, including secondary/default-name isolation and attach/load/later-failure rollback. See the full fixed note below.
 
 Capture root-cause update from the coordinator: the red capture regression is owned by core lighting's uniform-only light-direction normalization under GPU load. The core repair waits for Scott's approval. The red regression and its package wiring stay off main; the exact-zero assertions remain unchanged.
 
@@ -13067,18 +13397,14 @@ changes 4608 out-of-scissor components; the repaired four owner cases change
 zero and each draws exactly 512 red pixels. The caller's frame stays alive.
 [Video receipt](whitepaper/results/batch-56-video-owner-20261109.json).
 
-### Open: Animation registration cleanup still uses the active scene
+### Fixed in 8e91c547e: Animation registration cleanup
 
-The next package owner audit is Animation. Source inspection confirms that
-Animation.dispose (packages/animation/src/index.ts) calls model.root.engine.removePlugin
-without sceneOf(this). With a live model, register a new Animation on a secondary
-scene, then call animation.dispose outside dispatch: the active default registry
-is queried and the secondary registration remains. The model disposal callback
-reaches that same cleanup. The package's other class, factory and inheritance
-candidates still need their own runtime proofs; VATCrowd.dispose contains no
-detachment at all. The package is explicitly pending in the finite ledger.
-No Animation source was edited in this continuation; reproduce and fix its own
-registration/factory paths with regression and complete package gates next.
+Animation.dispose previously removed by name from the active default scene,
+leaving its secondary registration behind. Commit 8e91c547e repairs Animation,
+its model-disposal callback and the other package owners, including VATCrowd.
+Lane G reran packages/animation/tests/scene-owner.test.js on current main:
+all 19 cases pass, covering 16 constructor/factory owners, same-name default
+isolation, asynchronous cache cancellation and disposal during initial loading.
 
 ### Browser shutdown recurrence: reproduced PID-wait defect repaired (2026-11-09)
 
@@ -13220,18 +13546,23 @@ Linear-memory peaks pass; physical-page, JIT and live-allocation contributions
 to the RSS excess are not yet isolated. This remains an unaccepted target
 requiring a root allocation diagnosis, not a busy-machine timing waiver.
 
-Native descriptor components are capped at16 despite accepted generic widths
-17/31/64/127 (440 usable crafted cases); descriptor/transform/predictor scratch
-arrays assume16. Expand the owning decoder consistently, with regressions
-for every affected path; removing only the descriptor check would permit
-array slicing traps. The record contains a full width17 i8 repro and frozen
-old output. Another110 width255 streams decode in the old full build but its
-public binding exposes count-1; these are recorded separately.
+Fixed in the lane G sweep: the native descriptor rejected widths above 16,
+and quantization, KD minima and prediction scratch also assumed 16 components.
+The descriptor now accepts nonzero UI8 counts; budgeted component-sized vectors
+cover every affected transform and reuse prediction scratch across rows/faces.
+wide.rs retains the historical width17 i8 repro and frozen public oracle, adds
+raw/integer/quantized and signed/quantized KD cases through 255 components,
+and preserves zero/truncation/output-budget rejection. The native quad checks
+all three parallelogram predictors beyond 16; draco-wide.test.js verifies the
+shipped Wasm and typed output. The old public binding's negative width255 count
+is still a separate parity difference, not reproduced by the owned UI8 API.
 
 Historical predictor3 is absent from integer.rs's supported-method set. The
 record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
 UV bytes and intact canaries; native returns code5. The old-format reconstruction
 rule remains to be established by further crafted public-API observations.
+
+Outside this decoder repair: packageInputs in scripts/package-stamps.mjs omits native Rust folders (PACKAGE_INPUTS lists package.json, tsconfig.json, src and scripts), so a native-only edit can leave API freshness stamps unchanged. Repro: inspect packageInputs(root, 'decoders', manifest), then change native/draco/src/integer.rs; no listed input changes. Full builds still compile the crate. Tooling ownership; deferred under rule 6.
 
 ### Batch 265 native React binding scope
 
@@ -13241,14 +13572,20 @@ restoring its property descriptors and prior owner on cleanup. Regression: packa
 checks same-frame dolly, vertical views, fixedOrthographic, nested defaults and option/default changes.
 Instances, texture hooks, frame priorities and adaptive performance remain separate batch jobs.
 
-Open outside job 1: render Grid inside Scene name="hud" and draw only that scene with RenderView; the grid is missing there because packages/react/src/lines.tsx Grid attaches with engine.use instead of the enclosing world.use. Recorded under lane-efficiency rule 6; the new Line binding uses its owning Scene.
+Fixed in the lane G sweep: Grid inside Scene name="hud" was missing from a RenderView drawing only hud because it attached with engine.use. Grid now shares Line's attachBinding/detachBinding helpers, using the enclosing world for attachment and cleanup. kit-helpers.test.js fails on the parent and covers StrictMode, prop replacement, same-name default isolation and unmount. The extras browser proof renders a green grid while drawing only its secondary scene. All 278 changed-package/dependent CPU cases and all 13 package GPU scripts on both native and compatibility backends pass, without driver resets.
 
-### XR manager secondary-scene disposal
+### Fixed 2026-11-10: XR manager secondary-scene disposal
 
 Register XR on a secondary scene, then dispose outside dispatch: XR.dispose
-checks/removes the active scene by name (packages/xr/src/index.ts), leaving its
-secondary registration behind or removing a same-name default plugin. This
-pre-existing owner repair is outside batch 268 pointer scope and remains open.
+checked the active default registry by name, removed a same-name default plugin
+and left its own registration behind. Resolve the manager's actual scene with
+sceneOf(this) before removal. Four real-engine tests in xr.test.js cover direct
+disposal and owner removal in default/secondary scenes, an active inline session,
+one-time device/session cleanup and safe replacement. The secondary direct case
+fails on the parent. scene-owner-source.test.js guards this class of detachment.
+All 134 XR CPU cases, six selected XR GPU suites and the fresh 1,470-case
+changed-package/dependent CPU run pass with no skips. No headset acceptance
+claim is added.
 
 ### README browser shutdown observation
 
@@ -13287,10 +13624,17 @@ cycles and bounded expansion reject during construction (subtrees.test.js).
 
 Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
 
-## tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
+Lane G current-main repro update (2026-11-10): the unchanged RiggedFigure portion,
+isolated from the demo and other cases, now returns moved true, repeats true and
+zero GPU errors on compatibility. It uses the same archive, camera and seek times
+0/0.7/0. No repair commit or cause of the historical failure is established by
+this passing control, so no animation or capture code was changed and closure
+is not claimed. Local receipt: test-results/kb-g/gate-81788-0.log.
+
+## Fixed: tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
 
 - **Repro:** `node --test --test-reporter=tap tests/gpu-lock.test.js` on origin/main 896ebf844 while other lanes hold the shared GPU lock: five tests pass, then the file exits 1 with no failing subtest named (about 78 s). Selected tests (`--test-name-pattern`) pass.
-- **Cause:** not yet found; the file-level exit happens before the sixth test reports. Owner: scripts/gpu-lock.mjs and its tests. Waits for the fix phase (Scott 2026-11-09, build first).
+- **Cause and repair (2026-11-10):** the sixth fixture filled three holders after b7d02c892 raised the default capacity to five, then waited forever for a request that had already acquired a free slot to appear in the queue. Current-main reproduction reaches the test's 20-second diagnostic bound; the process tree was terminated at the 35-second hard limit. The FIFO regression now fills the configured capacity and checks identical tied-timestamp, reverse-name admission ordering at one, three and five slots, under its existing 30-second bound. Scheduler policy, deadlines and assertions are unchanged.
 Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
 text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 
@@ -13310,7 +13654,7 @@ The numerical/consumer limits are in limits.md and the sciviz README; no algorit
 Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.
 
 Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.
-`scripts/gpu-package-tests.mjs --serial` labels shared leases `check:gpu-packages`, so sameLane serializes unrelated worktrees with that owner; repro: queue serial suites in two lanes. Workaround for this lane: wrap the real GPU suite with gpu-lock run --owner=codex-batch197; leave shared scheduler repair for the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 197). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
 Fixed with animation landing: React bindings/instances browser scripts now select repository-root cwd. The package-cwd CPU regression covers every React browser leaf; native/compat GPU checks retain their assertions.
 Batch 251 job 3: the exact plateau-mean fixture exposed naive-sum rounding.
@@ -13324,19 +13668,21 @@ Batch 251 job 5: memory namespace/id concatenation could collide, for example
 namespace foo with id string:a versus namespace foo:string with id a. Tuple
 encoding fixes the cause; triggers.test.js retains the failing-before regression.
 
-Batch 251 finish-phase test quality: subtrees.test.js uses string keys in its
-shared-memory fixture instead of BlackboardKey objects. The count assertions
-still exercise a shared board, but use a typed key in the fix phase.
-Batch 251 finish-phase typing: a variable typed TreeTextOptions with optional
-subtrees can match parseTreeText's ordinary-tree overload. Add a broad overload
-returning SubtreeDocument so that variable cannot advertise unresolved references
-as an ordinary TreeDocument. Explicit registry literals already use the correct
-overload; runtime parsing and reference validation are unaffected.
+Fixed 2026-11-10: batch 251 subtree shared-memory fixture. The fixture uses
+BlackboardKey objects, compares the inline and referenced counters, checks an
+independent fallback and verifies that serialization names the counter correctly.
+Regression: packages/behavior/tests/subtrees.test.js.
+Fixed 2026-11-10: batch 251 tree-text options typing. Ordinary-tree options now
+exclude possible registrations; a broad overload returns SubtreeDocument when
+TreeTextOptions may carry references, including optional options variables.
+The compiler regression in packages/behavior/tests/text-types.test.js rejects
+passing that result as TreeDocument and retains ordinary-tree inference when
+registrations are absent. Runtime parsing and validation are unchanged.
 ### Batch 215 async lifecycle coverage
 
 No open defect identified in the new completion/AbortSignal entry. Deterministic lifecycle coverage is in packages/tween/test/async.test.js; existing root APIs remain available.
 
-Batch 215 outside scope: node packages/cutscene/tests/vfx-browser.mjs --compat fails frame 40 replay equality on clean origin/main 01faf2a63 with the same hashes as the tween branch (played particles 3932506386, sought 397093820; both picture 396217175 and live 110). Reproduced once after a clean-main build; log .review/b215-main-cutscene-compat.log. This predates the six tween jobs and belongs to compatibility VFX replay/readback state; exact differing particle words and root cause remain for the owning lane. Dependent GPU coverage runs in local CI under rule 23.
+Fixed 2026-11-10: Batch 215 outside scope. cutscene VFX replay waits for the actual compatibility route before recording (326c67544). Unchanged vfx-browser.mjs --compat passes all seven replay frames including frame 40 particle hash 397093820.
 
 ## Batch 262 tweak panel
 
@@ -13348,9 +13694,9 @@ text, retained vector/colour references, shared folders and abort cleanup.
 
 Resolved on main by 2c1b94730: the GPU queue now observes owner exit before replaying completion evidence.
 
-Outside batch 262: run scripts/gpu-package-tests.mjs in two different worktrees; both request owner check:gpu-packages, and ownerLane maps both to check, so sameLane serializes unrelated lanes. Use a distinct lane owner when running these tests directly; the runner owner needs a tooling fix.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 262). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
-Outside batch 262: node packages/cutscene/tests/vfx-browser.mjs --compat reproduces on clean origin/main 5d6e5facd without any inspector changes: frame 40 sought particle hash 397093820 vs played 3932506386, live 110 and picture 396217175 match. The compatibility VFX reset/replay or readback cause remains unproven. Log: test-results/batch262-resume-baseline-gate-0.log. Dependent GPU coverage belongs to scheduled CI and does not gate inspector landing.
+Fixed 2026-11-10: Outside batch 262. cutscene VFX replay waits for the actual compatibility route before recording (326c67544). Unchanged vfx-browser.mjs --compat passes all seven replay frames including frame 40 particle hash 397093820.
 
 
 ### Fixed in batch 262: inspector disposal in another scene
@@ -13376,7 +13722,9 @@ the optional finalizer before mutation. Regression: the invalid history finalize
 case in packages/inspector/test/edit.test.js fails without the validation.
 
 Fixed in batch 262: the React after-scene readiness fixture counted historical plugin instances whenever their name was currently attached. Reused materials:opaque-color names could count twice with no material installation, publish ready too soon, then report 0 instead of 1. It now reads the current engine.plugins identities. Regression: packages/react/tests/plugin-state.test.js and the unchanged installation assertion in packages/react/scripts/test-after-scene-browser.js. The latter passed once on clean main 5d6e5facd, failed with the rebased fixture, and passes after the observation fix; no assertion or timeout was loosened.
-- Batch 255 follow-up (rule 21): save/scene-state shadow restoration uses Object.assign on bound settings. Repro: an unsigned snapshot with an own __proto__ key changes the settings prototype; cause is the assignment setter. Use own data-property definitions in the fix phase, with a regression test. Playback and light lists are unaffected.
+Fixed 2026-11-10: save/scene-state shadow restoration invoked the inherited __proto__ setter through Object.assign. Restoration now defines the sanitized snapshot's own data properties, preserving bound prototypes and the same behavior during rollback. Regression: packages/save/tests/scene-state.test.js covers ordinary and null prototypes, special property names, detached recapture and failure of a later shadow binding. Both new regressions fail on the parent; playback and light-list restoration remain unchanged.
+
+Fixed during the same save gate: engine-check.mjs captured its animation frame before lazy compatibility submissions had completed, failing the exact layered-fade pixel comparison. The capture helper now awaits the existing GPU queue fence after its batch-building first frame, before drawing and capturing its final frame in the same task. No render, sample, assertion or pixel bound was removed. Regression: packages/save/tests/capture-readiness.test.js executes the real helper with a deferred queue; it returns the stale version before the repair. The unchanged engine GPU fixture passes native and compatibility after repair.
 
 Batch 267 job 1: no open live-bridge defect found in CPU or both-backend browser correctness checks; origin-clean capture and dev-only deployment limits are documented in docs/limits.md.
 
@@ -13396,10 +13744,18 @@ without the shared exclusion and passes with no notifications.
 
 Outside the batch 262 single-aspect viewer: simultaneous depth and stencil bindings of one resolved MSAA source still share the backend resolved texture object. applyBindings changes that object mode per binding, so the last aspect wins; ordinary non-MSAA views already get separate aliases. Repro for the fix phase: one fragment shader textureLoads both aspects of a 4-sample depth24plus-stencil8 texture in the same draw; allocate synchronized resolved aliases per aspect.
 
-Outside batch 262: scoped API surface merging accepts conflict markers and duplicate package rows from its input (observed on main 8b5e85718, including the 9ed943656 marker). scripts/api-report-scope.mjs validates the first summary/header but never rejects conflict text or duplicate rows, so a scoped merge preserves them. Full api:update regenerates a clean report; fix phase should add strict input validation with a regression.
+Fixed 2026-11-10: Outside batch 262. scoped API merging rejects marked or duplicated input (6cf48539f). tests/api-report-scope.test.js passes all five checks.
 
-### Batch 254 voice registration callback rollback (fix phase)
-Repro: start a decoded Audio, then manager.add(sound,{gain:()=>NaN}) throws for invalid gain; a second manager.add(sound) raises attached and the original sound remains paused. Cause: registration pauses the sound and inserts ownership before update evaluates the user gain callback, with no rollback on that error. Valid-input voice budgeting/phase tests pass. Per build-phase rules 21/22 this invalid-callback edge waits for the fix phase; restore the prior playback/ownership on failed registration with a regression test.
+### Fixed: batch 254 voice registration callback rollback
+Registration now defers its first source change until all gain estimates have
+validated; failed estimation releases its own registry/owner entries and
+propagates the original error. The caller's playing source, exact phase and other
+allocated voices survive NaN, negative, infinite and throwing gain callbacks.
+Removal also checks registration identity, so disposing a stale handle twice
+cannot release a replacement handle. Regression:
+packages/audio/tests/voice-manager.test.js; all three new lifecycle regressions
+fail without their corresponding repairs. Valid transport, ranking and waveform
+checks retain their existing assertions.
 - Batch 260 HTMLBlend inherited custom view: with `HTMLBlend.attach(engine, {view: {viewport: [0.5, 0, 0.5, 1]}})`, the DOM projects into that rectangle while the aperture uses the active render context's camera/viewport. Cause: mask draw consumes PassContext rather than LabelRenderer.view. Ordinary full-canvas blending passes on all three backends; synchronize explicit view/scissor/camera in the fix phase.
 
 
@@ -13411,7 +13767,7 @@ a second install or a stale build to mutate core's ownership registries silently
 two-install and stale-build regressions now reject before plugin work; same-path matching imports
 pass. [Design, regression and size evidence](core-version-guard.md).
 
-GPU queue owner collision: start gpu-package-tests.mjs in two worktrees; both use owner check:gpu-packages, so gpu-admission.mjs sameLane treats them as one lane and the second can wait for the first entire suite chain despite free slots. Repro: parallel runner in lane-T queued from 02:01:58 UTC behind lane-P; no tests ran. Cause: the generic owner is used as a lane identity in addition to the distinct worktree identity. This guard landing uses the supported gpu-lock run CLI with explicit owner lane-T-version-guard and serial nested suites; repair default runner owners in the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (version guard). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
 Dependent audio GPU validation is incomplete for the version-guard landing: the shared GPU monitor reclaimed lane-T-version-guard at 2026-11-10T02:28:06.439Z after 211623 ms without GPU activity, while audio/scripts/test-browser.js awaited its browser evaluations before writing audio-browser.json. The suite produced no report and did not reach its own 10 min limit. Root cause of the uncompleted audio evaluation is unconfirmed; monitor evidence is in the local GPU idle record and test-results/version-guard-resume/gpu-lane-T.log. No timeout or idle threshold was raised.
 
@@ -13455,10 +13811,10 @@ The same incoming metadata merge reset28 approved size ceilings while leaving th
 
 Batch 267 job 3: no open HTTP transport defect found in the real-network correctness suite; supported revisions, JSON reply mode and deployment ownership are stated in docs/limits.md.
 
-Build-phase follow-up outside batch 267 HTTP: direct stdio/createMcpServer calls with concurrent tools/call messages reusing one id overwrite the running cancellation map, and the first finalizer can delete the second entry. Repro: send two pending calls with id 7, then notifications/cancelled for id 7. Cause: server.ts running.set/delete has no duplicate ownership check. HTTP legacy now rejects duplicate active ids before dispatch; direct/stdin ownership repair is deferred under lane rule 21.
+Fixed 2026-11-10: direct MCP duplicate active tool IDs. createMcpServer now rejects a duplicate active tools/call ID with the standard invalid-request protocol error before invoking the tool or replacing the original cancellation controller. Completion removes only its own controller. Direct and batch regressions in packages/mcp/tests/server.test.js fail on the parent, preserve numeric/string ID distinction and prove cancellation still reaches the original request. Stdio uses that same server handler; completed-ID behavior and HTTP transport are unchanged.
 
-Outside batch 267: node scripts/gpu-package-tests.mjs --no-build planning rejects packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs as browser-driving files absent from registered scripts. Cause: the browser-file registry has no matching commands/helper classification for those two files. MCP leaves are registered; this pre-existing registry issue is deferred to its owners under lane rule 21.
-- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+Fixed 2026-11-10: Outside batch 267. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
+Fixed 2026-11-10: Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8. notice regeneration preserves appended asset credits (a9aecea66). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
 ### Batch 172 pipeline regression coverage
 
@@ -13491,9 +13847,9 @@ error before any assertion ran. It now selects the repository root like the
 adjacent React browser suites. `packages/react/tests/browser-working-directory.test.js`
 reproduces the package invocation with a mocked browser entry and no GPU.
 
-Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-browser.mjs --compat fails frame40 particle bytes (397093820 vs 3932506386), with identical 110 live particles and picture 396217175; lane R batch 215 reproduced it on clean main. The dependent LOD imposter hang is resolved by batch 222: buffer mapping now waits its own nonforcing readback readiness after queued submits, retaining a device fence only for an invalid GPU-only shadow. Delayed scheduler tasks (fresh-timer message fallback) leave the event loop idle for WebGL sync state. The unchanged 16384-pick grid passes with 16362 agreements, every 262 imposter pixel and 1128 full-detail pixel picking correctly, and all original atlas sweep assertions pass (test-results/batch222-imposter-local.log). Cutscene remains with its owning package for the fix phase.
+Fixed 2026-11-10: animation dependent cutscene replay (326c67544). The unchanged compatibility VFX suite passes all seven frames including exact frame 40 particle bytes (397093820). The dependent LOD imposter hang is resolved by batch 222: buffer mapping now waits its own nonforcing readback readiness after queued submits, retaining a device fence only for an invalid GPU-only shadow. Delayed scheduler tasks (fresh-timer message fallback) leave the event loop idle for WebGL sync state. The unchanged 16384-pick grid passes with 16362 agreements, every 262 imposter pixel and 1128 full-detail pixel picking correctly, and all original atlas sweep assertions pass (test-results/batch222-imposter-local.log).
 
-GPU runner registration on clean origin/main b47fdef13: `node scripts/gpu-package-tests.mjs --plan --select=animation/test:gpu` rejects MCP assets-browser/live-browser, WebGL2 Firefox support and worker browser-matrix leaves as unregistered. This animation job changes none of their registrations; owning packages must register or classify those leaves in the fix phase.
+Fixed 2026-11-10: GPU runner registration on clean origin/main b47fdef13. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.
 
@@ -13516,14 +13872,14 @@ No open defect found in the requested row. Unrepresentable local shear is an exp
 ### Batch 226 clone
 No open defect found in the requested shared-geometry/material subtree-copy row. Plugin, animation and constraints remain owned by their packages and are outside mesh cloning.
 
-Outside batch 239: an extra forced-compat run of scripts/gltf-pro-materials-gpu-check.js exceeds the WebGL2 fragment texture-unit limit in the extended material plus all lighting composition. Native official material checks pass; the changed feature shader passes both backends. Cause: this worst-case combined resource plan needs more fragment textures than the compatibility adapter exposes. Track a capability-aware resource plan in the owning rendering packages during the fix phase.
+Fixed 2026-11-10: Outside batch 239 physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 ### Batch273 normal-map upload and blocking isolation: resolved
 ImageBitmap uploads ignored requested unpack flip/alpha settings at the WebGL boundary, making flipped mesh normal domes appear dented while unflipped glTF remained raised. Cropped drawable-source normalization fixes the owning upload path. The complete canonical native/compatibility normal-map matrix and round-trip exact images pass unchanged; external-image.test.js fails the parent.
 Incoming main61b17b70d independently repairs the inspector isolation blocker with its native-context observation, local compiler and regressions. Main also supplies the missing exporters/materials alias. Preserve those owner fixes and the existing isolation/import-equivalence tests; no duplicate implementation lands with this group.
 The final dependent check exposed the incoming exporters/sparse umbrella alias missing as well; regenerate it with the owning script and retain the original full import-equivalence regression. Quality was initially run beside React's source-fixture tests, so its file snapshot caught a temporary consumer.tsx that the test then removed. Run that gate after fixture-producing CPU tests finish; no engine failure, ignored file or tolerance change is claimed.
 Fixed in batch 208: StreamingAssetCache range misses left the background full-file body unread after its new response hook returned, so flush never finished and an offline full-file visit missed. Background fills now explicitly request complete buffered consumption. Regression: packages/cache/test/stream.test.js, background whole-file fill (5 s timeout before repair, exact 100-byte offline response afterward). Caller-facing streaming stays pull-driven.
-- Batch 259 tooling follow-up: `node scripts/gpu-package-tests.mjs --no-build --only=ui/` fails before selection because browser discovery classifies `packages/webgl2-compat/test/support/firefox-bidi.mjs` and `packages/worker/tests/browser-matrix.mjs` as unregistered suites. Cause: global discovery precedes scoped selection. UI GPU suites run directly under the shared GPU lock instead; tooling repair waits for its owner.
+Fixed 2026-11-10: Batch 259 tooling follow-up. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 210 job 1: requested action operations pass mixer.test.js and analytical/real-rig GPU checks. Cache lookup follow-up for the fix phase (under the 5% rule): existingAction on an unknown clip throws instead of returning null, and a fresh optional root can create an unnecessary player because the lookup calls resolve/player; repro new AnimationMixer(skeleton).existingAction("missing"), or existingAction(clip, anotherModel). The umbrella generator also restores the already-exported but missing exporters/splats alias; the existing umbrella consistency test covers that generated-file gap. Optional-root pointer rebinding and reverse-time scheduled starts receive broader fix-phase coverage in private/handoffs/finish-later.md; all requested mixer operations are built.
 
@@ -13531,7 +13887,7 @@ Batch 210 job 1: requested action operations pass mixer.test.js and analytical/r
 Origin/main 43e08376d added exporters/sparse without its umbrella facade. The ordinary umbrella generator needed for mesh-edit/boolean-batch also restores that upstream alias. Regression: tests/umbrella.test.js (manifest, identity and import-map checks). No exporter implementation changes.
 ### Batch 226 tags and lifecycle
 Fixed during integration: synchronous parent/creation notifications could expose attach transforms or clone metadata before initialization. Optional graph/clone now batch notifications until commit; the tags.test.js attach/clone listener and failed-allocation regression fails without that boundary. Failed observer installation restores any already-installed wrappers. No open defect found in the requested row; pre-saved method references and private-store mutation are documented observation limits.
-`check:gpu-packages --no-build --only=sprites --serial` cannot plan on main 59061a16b: packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs drive browsers but have no matching registered package script. The planner checks unrelated unregistered leaves before filtering. Batch 245 runs every sprites GPU leaf directly under the shared GPU lock, both backends; no assertions or scripts are weakened. Planner registration repair waits for its owning lanes.
+Fixed 2026-11-10: Batch 245 GPU planner registrations. GPU planner registrations and command ordering are repaired on main (af4b357e1, d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 - XR AR-extras GPU fixture: node packages/xr/tests/ar-extra.browser.mjs fails on clean origin/main 6ab64e777 as well as batch 265 with missing AR observations. The fixture counts session frames started before its async observation helpers attach; under shared load it reads before those helpers receive a frame. Receipt: test-results/batch265-resume-cleanmain-xr-ar.log. Owning fixture fix waits for the fix phase (rule 21).
 
@@ -13569,13 +13925,13 @@ WebGL2 timeout did not recur on either checkpoint or attribute inputs. Native
 composition was not retried; its readiness failure remains open.
 - Bug 45 PARKED (rule 21): native path-tracing compiler pressure and CPU/GPU camera rounding remain unresolved; native split work retained on bug45-native-split at 333a02a44 for the fix phase.
 - BLAS landing dependent-gate repair: controls/globe had a manually ordered umbrella export and lacked its generator banner; node scripts/umbrella.mjs restores canonical output, covered by tests/umbrella.test.js.
-- Outside batch 243: direct serial scripts/gpu-package-tests.mjs requests use owner check:gpu-packages for every worktree; ownerLane collapses them to check, so unrelated runners block admission. Repro: two direct serial runners on different worktrees. Use the brief-required outer named shared lock for this lane; tooling repair waits for the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 243). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 - BLAS dependent-gate repair: React bindings/instances commands served rooted fixture URLs from the package directory and returned navigation errors. Commands now select the repository root; packages/react/tests/browser-scripts.test.js fails before repair and checks the browser fixture class.
 
-Batch 243 outside scope: the package GPU planner rejects webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs as unregistered browser leaves on main. Cause: planning scans support runners without matching their registered parent script. Changed mesh/React GPU fixtures run directly under this lane's named shared lock; planner repair waits for the fix phase.
+Fixed 2026-11-10: Batch 243 outside scope. Current complete GPU plan passes browser registration and chain validation; original repairs: d7be06653. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 - Batch 172 clean-main atmosphere check (948fc52e5): native passes; WebGL2 fails zero-cloud transparency before reaching restoration (expected hash 1630307923, actual -1597066215), with no page errors. Repro: node packages/sciviz/tests/atmosphere-browser.mjs. Existing retained atmosphere/GPU-flow render state failure is baseline, not calculator-induced; exact root cause remains in the atmosphere/compatibility owner. Preserve all assertions; rules 21/22 defer it.
 
-Batch 265 integration observation: on main baseline 298227511, scripts/gpu-package-tests.mjs rejects its complete plan before selecting React because packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs have no registered starter recognized by that planner. Cause: global browser reachability validation runs before --select filtering. React browser leaves are run directly under the same shared GPU lock; planner registration repair belongs to the owning tooling lane.
+Fixed 2026-11-10: Batch 265 integration observation. GPU planner registrations and command ordering are repaired on main (af4b357e1, d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 ### Mesh repair validation boundary (batch 224)
 The repair entry sanitizes invalid soup positions/faces and compacts discarded vertices before calling the strict hole-fill API. The nonfinite-position fixture in packages/mesh-edit/tests/repair.test.js retains the regression; validation is not weakened. Remaining open borders, zero volume and geometric reconstruction limits are explicitly reported and documented in docs/limits.md.
@@ -13584,7 +13940,7 @@ Batch 210 job 2: no open playback defect found by the loop, endpoint, event, pro
 
 
 Batch 207 object actions: generated dependency-graph instances still use export-frame world placement (objects.py keeps these as roots); animating the generating collection/pivot does not yet resample instance transforms. Repro: animate a collection-instancing empty and export with object_animation=True; ordinary mesh/empty object actions and hierarchy are covered.
-Batch 205 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=decoders` fails during plan construction because packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs are not registered in the runner; direct changed-package commands cover this job. Owning runner registration waits for its lane/fix phase.
+Fixed 2026-11-10: Batch 205 gate observation. Current complete GPU plan passes browser registration and chain validation; original repairs: d7be06653. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 Fixed within batch 205: FBX previously selected only the first image hook, so an image converter later in extensions was unreachable. The reader now tries registered converters in order; packages/fbx/test/textures.test.js covers PBR plus textures in either order.
 
@@ -13604,7 +13960,7 @@ Batch 243 job 2 historical compatibility timeout: the earlier renderImage call r
 
 Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked: export real mesh objects for spatially distinct irradiance (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects).
 
-- Batch 246 gate inventory finding: `node scripts/gpu-package-tests.mjs --no-build --only=tilemap` rejects existing unregistered browser drivers headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs before selecting tilemap. Cause: global driver inventory runs before selection; tilemap uses its registered leaf commands directly. Deferred to the owning lanes.
+Fixed 2026-11-10: Batch 246 gate inventory finding. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 ### Fixed: repair alias during batch 224 rebase
 The job 3 shared-manifest conflict resolution took the upstream umbrella manifest, leaving the new repair source facade without its export mapping. Regenerate the umbrella from all package exports after resolving the manifest, before the rebase commit, rather than accepting one side's generated JSON. Job 4 restores the mapping together with the new hull entries. Regression: tests/umbrella.test.js validates manifests, binding identities and import maps; the lane's local merge helper now regenerates before continuing a rebase.
@@ -13632,7 +13988,7 @@ depth masking. The visual approximations are listed in docs/limits.md.
 - Batch 213 MToon integration: an alpha-cutout shadow caster with a spatially varying UV animation mask uses the static alpha UV while beauty moves; optional shadow sampling does not receive the material's mask/time bindings. Beauty, normals, emission and hull animation are built; shadow integration is a fix-phase follow-up.
 
 - Existing gltf-pro GPU driver: test-extensions-browser.js reads argv[2] as a name filter, so --compat selects zero checks. Use MARGO_COMPAT=1 with no filter for the full compatibility run; driver repair waits for the fix phase.
-- Existing physical-material compatibility limit: scripts/gltf-pro-materials-gpu-check.js rejects the two 16-texture worst-case composed pipelines on RTX A6000 with MAX_TEXTURE_IMAGE_UNITS(16); all 160 BRDF numeric cases match and native pipelines pass. The direct shader fixture never attaches MToon; its shader/composition inputs are identical to parent 0d80e463b (hash proof in whitepaper/results/batch213-physical-compat-existing-failure.json). WebGL2 sampler-layout integration waits for the fix phase; no assertion or tolerance changed.
+Fixed 2026-11-10: Existing physical-material compatibility limit physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 Batch 246 job 3: no open plane-rendering defect found by the matrix, depth and real-GPU ray-plane checks. Existing cross-lane browser-inventory findings remain listed above.
 
@@ -13642,14 +13998,14 @@ No open correctness defect identified. Regression covers layout scale reaching D
 
 Batch 266 input helpers: alias-release and modifier-change regressions are covered in controls-extra.test.js; no additional known defect found in this job.
 
-Batch 266 gate finding: gpu-package-tests plan rejects unregistered browser support files in headless, webgl2-compat and worker before React selection. Cause: global loose-browser discovery precedes --only filtering. React registered scripts run directly under shared locks for this job; owning lanes retain planner registration work.
+Fixed 2026-11-10: Batch 266 gate finding. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 266 fixed: PresentationControls tested only the root mesh, so local dragging a React group never started. The owning controls entry now tests live descendants, excluding detached or unrelated meshes; controls/tests/presentation.test.js and the local-drag browser fixture cover the cause.
 ### Batch 231 textured scatter
 
 Fixed during construction: general 4x4 conjugation can round an affine last-row 1 off unity for non-dyadic node scales. The attachment restores the mathematically exact affine last row before passing it to PBRInstances; textured.test.js retains a non-dyadic scaled-node regression. No open textured-scatter defect remains.
 
-Build-phase tooling gap: node scripts/gpu-package-tests.mjs --no-build --only=scatter --list refuses before selection because headless/tests/gif-gpu.mjs, headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs are not registered by that global plan. Cause: global discovery validates unrelated browser files before applying --only. Batch 231 runs every scatter browser script directly on both backends under the shared GPU lock; owning lanes can register the unrelated files.
+Fixed 2026-11-10: Build-phase tooling gap. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 
 ### Batch 229 job 1: imagery evidence
@@ -13728,7 +14084,7 @@ Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage;
 ### Batch 244 job 1
 The camera rig is built with direct CPU trace and GPU overlay regressions. No open defect identified in this job's scope; other known defects remain in their existing entries.
 
-Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing unregistered headless/rigging/splats/worker browser files before selecting pixel. Repro: node scripts/gpu-package-tests.mjs --no-build --only=pixel. Cause: global registration audit precedes selection. Pixel package GPU scripts run directly on both backends for this batch.
+Fixed 2026-11-10: Outside batch 244. Current complete GPU plan passes browser registration and chain validation; original repairs: 326c67544, d7be06653, f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 - Batch 236: origin/main 42c1cbdac already contains conflict markers in known-bugs.md and whitepaper/reproduce.md; reproduce with rg for conflict markers. Cause: committed shared-doc merge text. Outside weather scope, deferred under rule 21.
 Batch 212 analyser: repaired bus insertion deleting internal output taps and shared-document merge markers, both covered by regression tests. No open tested defect.
@@ -13758,7 +14114,7 @@ Batch 244 landing repair: the existing umbrella generated-file regression expose
 ### Batch 196 panorama
 
 No known open defect in the completed panorama entry; cancellation observes the pending map rejection before unmapping, covered by panorama-browser.mjs.
-GPU plan registration: tests/gpu-browser-registration.test.js fails because packages/cameras/test/panorama-browser.mjs, packages/cameras/test/stereo-browser.mjs and packages/splats/test/gpu/lod-sog-check.mjs drive a browser but no package script starts them. Repro: node --test tests/gpu-browser-registration.test.js. Cause: drivers added without a test:gpu or test:browser script; owners cameras and splats, deferred under rule 21. The weather driver is registered as weather test:browser:parity (batch 236 job 2).
+Fixed 2026-11-10: GPU plan registration. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 Batch 248 job 3: prebuilt RGB field reduction was the cause of rounded MSDF corners; fixed by sampling RGB before median, covered by interpolation and GPU regression tests.
 Batch 212 fx: full-wet mixing now preserves processed signed zero, covered by the quantisation regression; no open defect found in tested equations or rendered chains.
 
@@ -13805,7 +14161,7 @@ Build-phase follow-up (batch 212 analyser): queue a meter report, call reset(), 
 ### Batch 214 scope
 Chain avoidance has no known defect from its correctness cases; bounded search and static-only limitations are documented in limits.md.
 
-Batch 214 unrelated GPU planner repro: node scripts/gpu-package-tests.mjs --no-build --select=animator/test:gpu rejects cameras/test/panorama-browser.mjs and weather/tests/parity-browser.mjs because neither has a registered package test script. Changed-package GPU leaves run directly under the lock instead; owners must register these scripts.
+Fixed 2026-11-10: Batch 214 unrelated GPU planner repro. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 238 job 4: no open modifier defect found by independent SH/position/opacity probes, repeated seek, lifecycle and real-image restoration checks. Source centre/opacity changes require explicit setRest, as documented; RGB, SH and covariance remain live inputs.
 
@@ -13836,7 +14192,7 @@ Batch 222 job 3 fixed atlas sequence aliasing: registering a static imposter and
 Batch 222 job 3 gate repair: the inherited API summary omitted pixel/follow and retained an older package/export count. Full api:update regenerated the summary from current declarations; api:check now passes. No unrelated implementation changed, and the existing generated-report check catches recurrence.
 Batch 222 job 3 outline fixture repair: a cold compatibility compute import can hold submitted selection work while a synchronous capture sees a blank canvas (including the unchanged mesh outline). CompatQueue.hold/drain correctly orders that work. The fixture now awaits queue.onSubmittedWorkDone for each state, then renders/captures in one task; all original outline pixel assertions remain. This fixes test synchronization, without changing rendering or shutdown support.
 
-Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The extra physical-composition compatibility run reproduces the already recorded 16 texture units limit when all material maps, shadows, clustered storage and IBL are composed. The new spec/gloss fixture uses neither this worst-case composition nor additional sampler bindings; the existing source fixture is unchanged and its owning compatibility follow-up remains under rule 21.
+Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. Fixed 2026-11-10: the inherited full physical-composition compatibility sampler limit was repaired by aa3e347da; its unchanged 160-case BRDF and complete-lighting pipeline check now passes with no GPU/page errors. The spec/gloss implementation and its assertions are unchanged.
 
 
 
@@ -13845,7 +14201,7 @@ Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The
 Batch 214 job 2: no new defect found in legal-pose rejection; static-only scope and undefined twist at antipodal swing are documented in limits.md.
 
 
-Batch 203 gate discovery: node scripts/gpu-package-tests.mjs --no-build --only=decoders --list fails before selection because cameras panorama/stereo, splats lod-sog-check and weather parity browser scripts lack registrations. Cause: global plan validation runs before package filtering. Changed-package suites were invoked directly under the shared GPU lock; registration repair belongs to the owning build jobs.
+Fixed 2026-11-10: Batch 203 gate discovery. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 240 job 2: object-block tests cover source-disposal independence, invalid graph rejection before defining an id, per-instance culling and streamed removal. No open defect accepted for this job.
 
@@ -13868,7 +14224,7 @@ Batch 270 job 2: no new open defects identified in lifetime dynamics; exact rese
 
 - Batch 193 job 1: no open defect found in HueGrade; its display-linear domain, 64-point cap and HSV luminance difference are documented limits.
 
-- Batch 193 gate finding: the GPU package runner cannot select tonemap because packages/water/package.json has an npm build in the middle of test:gpu. Repro: node scripts/gpu-package-tests.mjs --no-build --only=tonemap. Tonemap scripts run directly under the shared lock; water script correction belongs to its lane.
+Fixed 2026-11-10: Batch 193 gate finding. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 ### Closed: draws into a 3D slice beside a depth attachment (batch 271 job 1)
 On the WebGL2 layer, a render pass whose colour attachment is a slice of a 3D texture and which also attaches depth or stencil kept its clear colour: every draw was dropped. Cause, measured in raw WebGL2 on ANGLE Direct3D 11 (NVIDIA RTX A6000, Chrome): with a DEPTH_COMPONENT32F texture or renderbuffer beside `framebufferTextureLayer` of an RGBA8 3D texture, the framebuffer is complete, `clearBufferfv` lands and `drawArrays` writes nothing, with no GL error; the same draw into a 2D texture, an array layer, or the 3D slice with no depth attachment lands (30 probe rows, 8 failing, all 3D with depth). Fix in `@margoengine/webgl2-compat` (`Replayer.standIn`, `CompatTexture.sliceStandIn`): such a slice is drawn in a 2D stand-in of the same format and level size, loaded from the slice on `loadOp: 'load'` and blitted back on `storeOp: 'store'`. Regression: `volumeSliceDepth` in `packages/webgl2-compat/test/features.html` (native and layer must match, plus exact expected bytes); it failed before the fix (slice 0 red on the layer, green natively) and passes after. `node packages/creative/scripts/test-targets-depth.js --compat` now passes 164 surfaces.
@@ -13880,7 +14236,7 @@ The post/compute graph editor gap is built in shader/editor-pass. No open defect
 
 - Batch 193 job 2: no open defect found in Grade/HueGrade cube export. Finite-grid interpolation and display-linear domain are documented limits; spatial and other Tonemap effects are outside the exported Grade.
 
-Batch 194 job 3 reobserved the existing physical-composition compatibility limit above: the extra MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js run fails the extended/transmissive plus all-lighting pipelines at MAX_TEXTURE_IMAGE_UNITS(16). The direct shader fixture, gltf-pro/src/shader.ts, shared/pbr-hooks.js and compatibility GLSL emitter are text-identical after line-ending normalization to this job's parent; it never calls PBRModel.draw or installs a material adapter. Primary cause and fix-phase owner remain the already recorded sampler-layout/resource plan; new model hatching and the material-layer draw regression pass both backends. No test or limit changed.
+Fixed 2026-11-10: Batch 194 job 3 reobserved physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 
 
@@ -13896,7 +14252,7 @@ Batch 270 job 4: no new open defects identified in scheduling; the prewarm compa
 ## Batch 185 job 4
 The missing texture-array node is built in shader/texture-array, including restoration through the existing material codec. No open defect was found in layer selection, binding sharing, fallback, colour-space sampling or lifecycle. Limits and backend evidence are recorded in limits.md.
 Batch 184 transmission background list: no open defect in eight native/compat, sorted/weighted, 1x/4x grids including foreground, opaque occlusion and device restore. Existing materials dispersion live-reset compatibility defect is outside the unchanged transmission sampling/uniform paths and remains tracked above.
-Batch 184 gate discovery: gpu-package-tests plan() rejects the existing packages/water test:gpu script because npm run build appears inside its command chain; use the materials manifest directly for this lane. Water command ordering owns the cause and is outside this materials job.
+Fixed 2026-11-10: Batch 184 gate discovery. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Fixed during batch 184 landing: materials KTX2 BC7/ETC/ASTC copies always uploaded a linear internal format, then requested an sRGB reinterpretation that WebGL2 cannot perform for nonrenderable compressed textures. The materials upload now caches a direct compressed upload per requested colour space on compatibility devices. Regression: materials/test/texture-formats.test.js checks both first-use orders, per-format views, reuse, update and disposal; the original GPU repro is mat-more-gpu-check.js with MARGO_COMPAT=1.
 
@@ -13915,7 +14271,7 @@ Repro: install compatShim in packages/taa/test/upscale-browser.mjs and run the u
 
 Batch 270 job 5: no new open defects identified in preset save/load; typed precision, signed zero, missing resources, pollution keys, exact simulation replay and pixel equality have regression coverage.
 
-- Batch 272 unrelated gate finding: gpu-package-tests plan fails before staging selection when packages/water/package.json test:gpu places npm run build after initial GPU steps; move that build to the script start in the owning lane. Repro: node scripts/gpu-package-tests.mjs --no-build --select=staging/test:gpu. Staging gates are run directly instead.
+Fixed 2026-11-10: Batch 272 unrelated gate finding. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 
 ### Batch 189: cloud/weather fallback support
@@ -13951,7 +14307,7 @@ Fur follow-up integration, outside the completed shell-controls row: combining a
 Fixed while landing batch 195 job 1: main 72642362b retained an old VFX test:gpu line beside its fuller replacement with no separator, so every manifest consumer rejected JSON. Remove the stale duplicate and retain all parity cases. Regression: tests/integration-json.test.js.
 
 Fixed batch 270 registration manifest merge: a text-only conflict resolver concatenated two package JSON property lines without a comma during the rebase onto an upstream dedicated parity script. The package manifest is now reconstructed as valid JSON, retaining the upstream script and placing both --all backend runs there. Existing test:gpu stays the original render suite, so CI does not duplicate parity runs. gpu-registration.test.js now checks all automatically discovered GPU scripts together with the same two-backend assertions. The lane resolver rejects other JSON conflicts for structural resolution, and landing validates changed JSON before a push.
-Batch 186 gate finding: gpu-package-tests.mjs --select=clustered/test:gpu fails during its global plan because packages/water/package.json places npm run build midway through test:gpu. Run the selected clustered scripts directly; water ownership must move that build to the start in the fix phase.
+Fixed 2026-11-10: Batch 186 gate finding. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 quality/events (batch 195 job 3): no open defect found in motion policy, queued-input coalescing, asynchronous pick serialization, rejection or cancellation tests. Explicit notification of programmatic movement and no stationary-pointer polling are documented contracts in limits.md.
 
@@ -13959,7 +14315,7 @@ Batch 201 job 2: DDS source loading, retained mip uploads and signed/HDR fallbac
 
 Batch 177 job 1: the finite-supertriangle design was replaced before landing by convex hull initialization plus Delaunay legalization. Thin-domain coverage and empty-circumcircle tests retain the regression; no open contour2d correctness defect is known. Inline label collision avoidance is a future layout quality improvement documented in limits.md.
 
-Batch 177 out-of-scope gate finding: `node scripts/gpu-package-tests.mjs --list --only=sciviz --no-build` rejects `packages/water/package.json` because `test:gpu` contains `npm run build` after browser commands. Cause: planner validates every package before applying selection. Sciviz's own GPU commands run directly through the shared lock for this job; water script ordering belongs to its owner during the build phase.
+Fixed 2026-11-10: Batch 177 out-of-scope gate finding. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 Batch 184 packaging follow-up: the fur conflict resolution locale-sorted the generated umbrella export keys, violating its canonical package-group and owning-entry order. Upstream regeneration has restored the canonical map; this follow-up adds packages/margoengine/tests/export-order.test.js to catch that conflict-resolution class independently. No export key, target or condition changed. Incoming main f9ff16e06 independently contains invalid packages/vfx/package.json JSON: a missing comma between two test:gpu properties (lines 34-35). That pre-existing parse error blocks the full umbrella generator/build/API/quality recheck; VFX owns the cause and stays outside this materials lane under rules 21/22.
 
 The VFX JSON parse blocker above is resolved upstream by f359f4473; the batch 184 packaging continuation rebases onto that valid manifest before its final checks.
@@ -13979,7 +14335,7 @@ No new open correctness defect in the implemented encoder is known from its curr
 
 ## Batch 178 vector publication
 No known depth-order, clipping, committed-readback or cancellation defect remains in the tested contract. Appearance refinements (lighting, procedural contour/grid ink and non-pixel series styles) are explicit accepted limits in docs/sciviz-vector-export.md and are tracked in the private finish-phase handoff.
-Batch 178 gate discovery finding: node scripts/gpu-package-tests.mjs --no-build --only=sciviz --list fails before filtering because packages/water/package.json test:gpu contains an interior npm run build after three GPU leaves. Cause: global plan validation rejects builds after a GPU step. The lane executes the sciviz GPU leaves directly under shared locks; the water manifest repair belongs to its owner/fix phase.
+Fixed 2026-11-10: Batch 178 gate discovery finding. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 ## Batch 176 job 1
 No unresolved defect found in the implemented dataset contract. Exact curved-cell filtering and adaptive error-controlled tessellation are not claimed; the input is explicitly normalized at a caller-controlled refinement level. Invalid or over-budget topology rejects rather than silently losing cells. The remaining batch format, AMR, tensor and molecule jobs are separate unbuilt jobs, not known bugs in this entry.
 
@@ -13991,7 +14347,7 @@ Build-phase follow-up outside batch 176 job 1: legacy parseVTKXML mislabels mixe
 The lane rebase helper counted only @margoengine rows when rebuilding the shared API summary, omitting margoengine kits from its header. The next full api:update regenerates the header and table from emitted declarations, and api:check requires exact agreement. No public implementation changed; future shared-doc merges include the umbrella row before the normal generated check.
 
 Batch 177 job 2: no open correctness defect after statistical formula, missing-step, constant-axis, input-code and hash regressions. LOESS confidence coverage is an explicitly approximate conditional model, documented in limits.md; simultaneous/prediction intervals are outside this job's mean-band claim. NASA live TAP returned HTTP 503 on both official hosts; the demo's pinned public table snapshot avoids a runtime network dependency and records its date and source.
-- Outside batch 175: gpu-package-tests.mjs --only=sciviz --no-build --list stops in plan() because packages/water test:gpu contains an interior npm run build. Cause: the global plan validates every workspace before filtering. Batch 175 runs the unchanged sciviz GPU leaves directly under the shared lock; water manifest repair belongs to its lane.
+Fixed 2026-11-10: Outside batch 175. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 ### Batch 195 job 2 discovery: legacy feature-scaler compatibility suite deadline
 
@@ -14005,7 +14361,7 @@ Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject corr
 
 
 Batch 136 replacement proof: the geometric-normal unsigned-residue scoring defect is fixed with circular-distance and complete-payload selection; the sparse high-precision RAW cutoff is expanded within a fixed memory bound. Rust regressions and the 76-row two-decoder corpus pass with no open defect found in this scope.
-- Build-phase follow-up: node scripts/supply-chain.mjs regenerates the table but drops manually appended notices after the generated footer (HEAD had 73 such lines); the renderer has no preserved-tail mechanism. Job 173.5 retains all existing notices; fix generator ownership in the fix phase.
+Fixed 2026-11-10: Build-phase follow-up. notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
 - Fix-phase investigation, existing sciviz glyph capture: glyph-browser.mjs produced too few compatibility pixels once for custom and once for line shapes in the batch 173 gate. Instrumented failures retain image/canvas/stats now; isolated and full diagnostic runs then matched native output exactly (line 151 pixels, custom 3158), and the original assertions with failure diagnostics pass both backends. Root cause remains unisolated, so this is not claimed as a fix or a timing-only miss. Logs stay in lane-X private/batch173/job5/{gpu-glyph-browser.mjs,final-gpu-glyph,glyph-failure-data,glyph-diagnostic}.log. Investigate cold command replay/capture state without retries or lowered pixel bars.
 Batch 186 job 3: no open correctness defect found in cube projection or mixed spot/cube ownership. Filtering is the supplied-image bilinear contract; mipmapped minification and HDR inputs remain documented later quality extensions, not asserted here.
@@ -14019,10 +14375,10 @@ Batch 186 composition follow-up: all three clustered list buffers plus rectangle
 
 Batch 180 job 1: no open defect found in the view/cache/height contract. XYZ source polar coverage, conservative visibility and native-preview refusal are recorded limits; geo-lod.test.js and geo-lod-browser.mjs cover this entry.
 
-GPU runner lane identity (observed during batch 180): simultaneous serial scripts/gpu-package-tests.mjs --no-build --only=<package> from separate worktrees both request owner check:gpu-packages. gpu-lock status showed lane check queued behind another worktree while 2 of 5 slots were free. Cause: the generic owner collapses independent lanes in admission. Use lane-specific outer gpu-lock run --owner=<lane> for direct runs; repair the runner identity in its owning tooling lane during the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 180). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
 Batch 136 removal landing blocker fixed: supply-chain regeneration previously replaced the whole notices file and discarded appended asset credits. Explicit retained addenda, legacy-boundary migration, unknown-boundary rejection and an idempotence/stale-generated-content regression preserve them. No remaining blocker in this scope.
-- Build-phase follow-up (batch 177 job 3): `node scripts/supply-chain.mjs` drops the manually appended notices after the generated document body; cause: render() emits only its ASSETS records. Repro: generate and diff THIRD-PARTY-NOTICES.md on main. Existing trailing credits preserved in this change; generator repair belongs to the fix phase.
+Fixed 2026-11-10: Build-phase follow-up (batch 177 job 3). notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
 Batch 274 fix-phase API polish: Module.stateDict() and Tensor.read() in compute/nn expose no AbortSignal, so an in-flight large state readback cannot be cancelled by their callers. Repro: start model.stateDict() for a large model; there is no signal option to pass. Cause: the existing wrappers call GpuArray.read() without forwarding ReadOptions; BatchNorm follows that existing signature. Add optional wait/read options through nested modules in the fix phase. NN-extra numerical execution, gradients and saved state are complete.
 ### Fixed: batch 1 umbrella package test discovery
@@ -14074,7 +14430,7 @@ Water's built-in surface-driven pipe drives each pipe with the full surface diff
 
 A Rivers source with radius 0 (the default) or below half a cell, off a cell centre, had an empty footprint, so it added no water. The footprint now always includes the cell under the position (a position off the map still feeds nothing), in the shader and the float64 model. Regression: packages/water/test/rivers.test.js "a source narrower than a cell feeds the one cell under it", and a radius-0 source in rivers.browser.mjs.
 
-Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative delta, but with lerp=0 and delta=Number.MAX_VALUE, delta*60 overflows and 1**Infinity is NaN, publishing [NaN,NaN] instead of keeping the camera fixed. Repro: PixelCamera({width:16,height:16}), PixelFollow({camera,target:{x:30,y:40},lerp:0}), update(Number.MAX_VALUE). Cause: overflow in the smoothing exponent. Private failing regression: lane Q private/review-3-pixel-follow.test.js. Fix the smoothing calculation without narrowing accepted deltas; cover zero/unit lerp and extreme finite inputs. Awaiting the next review context.
+Fixed 2026-11-10: review 3 P1 PixelFollow extreme finite deltas (cde120852). Smoothing preserves stationary zero-lerp axes without evaluating 1**Infinity and retains tiny positive factors through log1p/expm1. Current-main reproduction: all eight packages/pixel/tests/follow.test.js cases pass, including zero/unit/tiny lerps, Number.MIN_VALUE, Number.MAX_VALUE/60 and Number.MAX_VALUE. Accepted input ranges and integer camera positions are unchanged.
 
 - ChartPolish visibility on selection-bound marks: bind a scatter/line layer, attach polishFigure, then setVisible(layer, false); the binding still draws. Cause: format.ts mutates the hidden source visible flag rather than SelectionBinding.visible. Ordinary Figure picking/brushing already follows the linked-draw identity on main. Outside batch 174 query scope; fix phase.
 
@@ -14115,13 +14471,64 @@ Review 3 SV4 (61928c3a0): bindTransfer checks signal before its initial apply(),
 - Batch 120 incidental gate finding, base 2ed6fd460: node --test tests/check-fixed-waits.test.js flags packages/biomes/tests/water-check.html line 101, a fixed 90-frame loop absent from the baseline. Cause: the biomes test waits for frame count instead of GPU readiness; unrelated to profile installation, deferred to its owning lane under efficiency rule 21.
 Batch 176 job 4: no open defect found in the supported Cartesian cell-centred AMR contract. Format extensions, block-edge reconstruction and explicit sample/index budgets are documented in limits.md; refinements remain on the private finish-later list.
 
-Batch 176 inspection: node scripts/gpu-package-tests.mjs --only=sciviz --no-build --list fails before selection because packages/stage/test/gpu/viewer-extras-check.mjs has no registered browser script. Cause: global discovery validates an unregistered upstream stage test before applying --only. Outside this job; the AMR suite runs directly with the shared GPU lock on both backends.
+Fixed 2026-11-10: Batch 176 inspection. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 - Batch 174 annotation keyboard focus: on a running figure, focus an editable SVG handle and let the next engine frame run; focus returns to the document because Annotations.render replaces every SVG child with innerHTML on each frame. Pointer dragging still uses capture on the stable SVG root. Preserve/reconcile the focused handle across frame paints in the fix phase; current keyboard regression covers stopped figures.
 
 
 - Batch 120 path audit: public npm create margo@latest still reaches the prerelease placeholder until Scott authorizes publication; cause is intentionally pending registry release. The actual create/install/build/frame path is proven against the private packed registry.
 - Batch 120 path audit: a browser without WebGPU needs an explicit @margoengine/webgl2-compat install, one extra step compared with a bundled WebGL renderer. Cause is the deliberate optional backend boundary; documentation and both kit-backend checks cover it, while reducing the extra setup remains a release UX decision.
 - Batch 120 incidental documentation gate, base b4404cddb: node --test tests/from-threejs-snippets.test.js flags docs/guides/react-test-offscreen.md because it has no ts fence recognized by the snippet harness. All changed kit/import/migration guide snippets pass; the unrelated React guide/harness mismatch is deferred to its owner under rule 21.
+
+### Open: ANGLE D3D11 returns two versions of the same MSAA-resolved HDR texture (compat dispersion live reset; sciviz geo-lod restore; likely the atmosphere same-source byte)
+
+Platform defect below the compatibility layer, proven at the WebGL call level (bug hunt, 2026-11-10). No exact workaround exists inside `@margoengine/webgl2-compat`, so the exact assertions stay unchanged and open.
+
+- Repro: `node scripts/material-dispersion-gpu-check.js --backend=compat` on the RTX A6000 under Chrome's default ANGLE D3D11 backend. Failure 9 (4x live positive-to-zero reset, 10 HDR channels, max 0.000244140625) reproduced on the first run. With six unchanged `live(0)` frames added after the reset, 9 of 9 full-grid runs reached the same second image ("alt"). Every time it differed from the constructor-zero image ("base") in the same 10 channels, each by one float16 step. Most of those pixels lie outside the transmissive quad, where only the opaque background and the final 4x resolve touch them. 1x stays exact.
+- Proof that the layer issues identical work: a WebGL2 call recorder (each call's name, object identity and payload FNV hash) shows that consecutive unchanged frames issue byte-identical WebGL2 command streams, yet one frame returns base and the next returns alt. Each frame clears or fully overwrites every attachment it reads, and the opaque-only resolve and its level-0 copy hash identically in every frame. A direct `readPixels` of the resolve target's framebuffer, issued with no WebGL call between it and the layer's own fenced pixel-buffer readback, returned the other version (base, then alt, and in another run alt, then base). Once settled, 30 rereads 20 ms apart agree. So one texture yields two contents with no command in between, which breaks the repeatability rule of the OpenGL ES 3.0 specification, Appendix A.1.
+- Ruled out: uniform staleness (the only stream difference between the reset frame and the next is the 4-byte dispersion write; the other frames are identical); invalidateFramebuffer (patching it to a no-op still gives alt in 2 of 2 runs); readback row layout (both reads are tightly packed RGBA float); shader compile variants inside the layer (programs are identical objects across the compared frames); engine timing state (the stream diff is empty). Raw WebGL2 pages without engine code (a UBO-driven refract shader; a 4x RGBA16F renderbuffer resolve with 3,000 edge triangles, with and without invalidate; 300 frames each) did not reproduce it, so the trigger also needs the full grid's earlier resource churn.
+- Backend check: the same probe on ANGLE Vulkan with the same NVIDIA GPU (`BROWSER_ARGS='["--use-angle=vulkan"]'`) was exact in 2 of 2 runs (reset and six extras). ANGLE OpenGL fell back to SwiftShader and was refused. This puts the defect in ANGLE's D3D11 backend or the NVIDIA D3D11 driver. Native WebGPU (D3D12) passes all 278 checks.
+- Atmosphere (`SPEC_DEMOS=atmosphere SPEC_BACKENDS=webgl2 node packages/sciviz/tests/spec-demos-browser.mjs`, and the zero-cloud hash in `atmosphere-browser.mjs`): this did not reproduce here. One full spec-demo run, 8 repeats, 6 page loads of 4 repeats and 2 parallel probes of 5 loads of 3 repeats all gave byte-identical captures. The earlier failures signed the same way (one-step differences on unchanged source, under the shared GPU queue), but the cause there is not proven. Treat it as the same open item until a failing run is captured with the recorder.
+- Sciviz geo-lod (`packages/sciviz/tests/geo-lod-browser.mjs` line 85, `retained data restores identical pixels`, max difference 1): same defect, on an 8-bit 4x resolve. On plain main 5329898ca it failed 1 of 4 test runs. A probe that captures the refined globe four times with no restore, then restores the layer six times with two captures each, showed one-level flips in 4 of 6 page loads under D3D11. They show up just as often between two unchanged captures with no restore as after a restore, so `layer.restore()` is not the cause. Each frame clears, issues 16 tile draws, resolves the 4x target with blitFramebuffer, flips it with a second blit and reads it back. The recorder (per-capture object ids renamed in creation order, sync polling dropped) shows two consecutive unchanged captures with byte-identical streams up to and including the readback. Only the bytes read back differ, in 46 channels by one level. Under ANGLE Vulkan on the same RTX A6000, 6 page loads gave 90 captures and every one was exact. Native WebGPU (D3D12) also flipped one green channel at pixel (313, 57) by one level in 3 of 3 loads. The test compares only the red channel, so native passes. This suggests the NVIDIA D3D resolve path rather than ANGLE alone, but it is not proven. Probes: `geo-lod-probe-browser.mjs` (run from a worktree's `.lane/` through `scripts/gpu-lock.mjs run`; `PROBE_BACKENDS`, `PROBE_LOADS`, `PROBE_ROUNDS`, `PROBE_REC=1` for the recorder), `geo-lod-norm.cjs` and `geo-lod-ndiff.cjs` (stream grouping and diff), `geo-lod-streams-d3d11.json` (failing load; compare after2 with after3), and the D3D11 and Vulkan logs. The exact assertion stays unchanged; the job that hits it changed no geo-lod or compat source.
+- Probes (git-excluded, in the main checkout): `private/handoffs/compat-determinism-probes/` holds `disp-probe.js` (the grid with recorder, extra frames, direct reads, attachment map and `PROBE_NOINVALIDATE`), `gl-recorder.js`, `diffstreams.cjs`, the raw pages and one failing stream capture.
+- Next step: report to ANGLE/NVIDIA with a self-contained replay of the recorded session (full payloads, not hashes). Until then this stays a release blocker for exact compat captures on Windows D3D11. Never raise the bound for it.
+
+
+Fixed 2026-11-10: Batch 181 gate observation. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
+
+
+Fixed 2026-11-10: Batch 180 job 5 incidental gate finding (base b4404cddb). GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
+
+- Batch 180 job 5 visual review: add two named heatmaps to a default Figure, then remove the first. Figure.#updateLegend sets element.hidden=true when only one remains, but Legend's inline display:grid overrides the browser's hidden rule, leaving both old legend rows visible. Repro: select several field reductions in examples/sciviz-temporal.html; evidence test-results/sciviz-temporal-webgpu.png. Numerical fields and exported pixels without overlays are correct. Small existing legend presentation gap deferred under rules 21/22; fix the owning legend visibility and add its DOM/browser regression in the fix phase.
+
+Batch 181 job 4 fixed before landing: density scatter replacement must retain the source's original visibility across native updateData cloud replacement, including when the replacement is hidden and disposed before its next frame. Cause: capturing the new cloud's logical replacement visibility overwrote the original source visibility, and disposal could still address the old cloud. Regression: packages/sciviz/tests/density.test.js, hidden replacement before/after preparation. All source votes and analytical counts are unaffected.
+
+Batch 274 job 6: no open correctness defect found in signed int8 matmul/Conv2d.
+Conservative accumulator limits and f32 rescale error bounds are documented in
+docs/compute-quant.md; independent float-reference cases cover CPU and both GPU backends.
+
+Batch 175 job 5: no open defect found in the built graph-gpu paths. The straight-edge zero-subdivision u32 underflow is fixed in the owning optional shader and covered by the invisible-first-edge GPU regression; figure dimensionality, both force references, bundling boundaries, labels and device routes are checked. Float32 precision, concentrated-leaf costs, FDEB quadratic pair work and explicit label snapshot refresh remain documented limits.
+Batch 180 job 4: no open correctness defect found in the implemented climate/projection paths. CF coverage and interpolation domains are explicit in docs/limits.md. Outside this job: openCloudZarr rejects valid rank-zero scalar arrays (shape/chunks []); repro public IPSL tas height/.zarray at the climate source URL, cause dimension-count validation requires nonempty shape. The offline data curation reads those uncompressed scalar coordinate bytes directly; CF reads the resulting NetCDF scalar without this restriction. Rule 21 leaves broader Cloud Zarr scalar support to its owner.
+Batch 180 job 4 GPU observation (2026-11-10): the existing atmosphere spec demo reproduced the recorded ANGLE D3D11 nondeterminism under the shared queue: 50 bytes differed, including 50 between two unchanged source captures (test-results/batch180-job4-gpu-all.log). No CF/projection scene failed. The unchanged atmosphere/surface/volume/points spec assertions are exact on the documented ANGLE Vulkan backend (test-results/batch180-job4-gpu-remaining.log). D3D11 remains the existing release blocker above; this is not a repaired driver claim or a widened pixel bound.
+
+- Batch 175 job 4 landing gate: the unchanged geo-lod exact restoration assertion observed one-level differences, 1 native channel and 46 WebGL2 channels. This matches the documented ANGLE D3D11/NVIDIA resolve defect above and Scott's 2026-11-10 landing exception. The test and assertion remain unchanged. Evidence: test-results/b175-j4-package-gpu.log and b175-j4-geo-probe-direct.log; /series passes both backends.
+
+
+## Batch 175 job 6: known driver exception
+
+The sciviz GPU gate encountered the known ANGLE D3D11 MSAA resolve defect documented above: geo-lod-browser.mjs:85 reported max red-channel difference 1; diagnostic evidence found 47 one-level channel differences, no GPU errors, and exact native WebGPU pixels. Scott authorized continuing the gate on 2026-11-10. No geo-lod or compatibility source or assertion changed. Evidence: lane U test-results/job6-gpu.log, job6-geodebug2.log and job6-geodebug3.log.
+
+Batch 176 job 5: no open defect found in the declared tensor/OLS/Cartesian tracking contract. Device precision, degenerate-axis ambiguity, raw indefinite fits and analysis/preprocessing limits are recorded in limits.md.
+
+Batch 176 job 6: no open defect found in the declared first-model molecular sphere/stick contract. Unknown-element fallbacks, geometric bond inference and unsupported assembly/ribbon formats are explicit in limits.md.
+
+### Batch 137 quality gap closed
+
+The former 1024 UASTC data loss was caused by forcing a stronger lossy RDO setting
+to compensate for raw Zstandard literals. Finer RDO alone still lost quality.
+RFC 8878 Huffman literals preserve the fitted bytes while reducing the required
+rate conditioning. At RDO 0.09375: 1,305,680 / 1,306,710 B, PSNR 44.380795263 /
+44.027242948 dB and SSIM 0.981507121 / 0.980103599. Every mip row passes.
+See whitepaper/results/batch-137-quality-r10.json and basis-zstd.test.js.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -14258,7 +14665,10 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
 
-## CAD camera controls
+### Options and defaults
+
+`createStage(target, options)` takes every [core engine option](../core/README.md) (`backend`, `camera`, `capacity`,
+`fallback`, `features`, `exactSize`, `signal`, `startupWarning`, `startupTimeout`, `powerPreference`) and four of its own:
 
 [README continues: https://margoengine.com/llms/packages/stage.md]
 
@@ -14289,7 +14699,33 @@ The root contains common exports; member subpaths expose the complete installed 
 All packages release together at one version. Optional third-party peers remain app choices.
 
 See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
-model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, Shadows, OrbitControls, Input, Tween} from '@margoengine/game';
+
+const stage = await createStage('#viewport', {controls: false});
+const shadows = Shadows.attach(stage.engine, {resolution: 2048});
+const ground = stage.box({size: [10, 0.2, 10], color: '#c8c8c8'});
+const player = stage.box({position: [0, 1, 0], color: '#84d6bd'});
+shadows.add(ground);
+shadows.add(player);
+const controls = new OrbitControls(stage.engine.camera, stage.engine.canvas as HTMLCanvasElement);
+const input = new Input({jump: [{type: 'key', code: 'Space'}]});
+const tween = new Tween();
+const height = {y: 1};
+stage.onTick((delta) => {
+  input.update();
+  if (input.state('jump').pressed) tween.to(height, 'y', 3, {duration: 0.4});
+  tween.update(delta);
+  player.position.y = height.y;
+  controls.update(delta);
+});
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/game/gltf-pro'`.
 
 === @margoengine/web (packages/web/README.md) ===
 
@@ -14302,7 +14738,26 @@ The root contains common exports; member subpaths expose the complete installed 
 All packages release together at one version. Optional third-party peers remain app choices.
 
 See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
-model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, Environment, OrbitControls, Shadows, Tonemap} from '@margoengine/web';
+
+const stage = await createStage('#viewport', {controls: false});
+const shadows = Shadows.attach(stage.engine, {resolution: 2048});
+const tonemap = Tonemap.attach(stage.engine, {curve: 'neutral', exposure: 0});
+const floor = stage.box({size: [6, 0.1, 6], color: '#d8d8d8'});
+const product = stage.sphere({radius: 0.8, position: [0, 0.9, 0], color: '#c0792b', roughness: 0.3});
+shadows.add(floor);
+shadows.add(product);
+const controls = new OrbitControls(stage.engine.camera, stage.engine.canvas as HTMLCanvasElement);
+stage.onTick((delta) => controls.update(delta));
+console.log(typeof Environment, tonemap.options.curve);
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/web/gltf-pro'`.
 
 === @margoengine/viz (packages/viz/README.md) ===
 
@@ -14315,7 +14770,24 @@ The root contains common exports; member subpaths expose the complete installed 
 All packages release together at one version. Optional third-party peers remain app choices.
 
 See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
-model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, PointsPlugin, PointCloud, OrbitControls, colormap} from '@margoengine/viz';
+
+const stage = await createStage('#viewport', {controls: false});
+const points = PointsPlugin.attach(stage.engine);
+const positions = new Float32Array(30_000).map(() => Math.random() * 10);
+const colors = new Float32Array(30_000).fill(1);
+points.add(new PointCloud({positions, colors, material: {size: 2, shape: 'round'}}));
+const controls = new OrbitControls(stage.engine.camera, stage.engine.canvas as HTMLCanvasElement);
+stage.onTick((delta) => controls.update(delta));
+console.log(typeof colormap);
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/viz/gltf-pro'`.
 
 === @margoengine/react-kit (packages/react-kit/README.md) ===
 
@@ -14328,7 +14800,29 @@ The root contains common exports; member subpaths expose the complete installed 
 All packages release together at one version. Optional third-party peers remain app choices.
 
 See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
-model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page and a `<div id="root"></div>` for React:
+
+```tsx
+import {createRoot} from 'react-dom/client';
+import {Canvas, Mesh, BoxGeometry, PbrMaterial} from '@margoengine/react-kit';
+
+function App() {
+  return (
+    <Canvas style={{height: 400}}>
+      <Mesh position={[0, 1, 0]}>
+        <BoxGeometry args={[1, 1, 1]} />
+        <PbrMaterial color="#84d6bd" />
+      </Mesh>
+    </Canvas>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<App />);
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/react-kit/gltf-pro'`.
 
 === margoengine (packages/margoengine/README.md) ===
 

@@ -260,7 +260,7 @@ export async function* readSplatsProgressive(
     signal?.throwIfAborted();
     bytes.append(chunk);
     if (format === 'ply' && !header) {
-      const text = new TextDecoder().decode(bytes.view.subarray(0, 65536));
+      const text = new TextDecoder('latin1').decode(bytes.view.subarray(0, 65536));
       const end =
         text.indexOf('end_header\n') >= 0
           ? text.indexOf('end_header\n') + 11

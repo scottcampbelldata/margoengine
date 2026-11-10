@@ -36,8 +36,11 @@ for (const [format, name, parse] of [
       total = expected.positions.length / 3;
     let consumed = 0;
     const output = [];
+    // Packets arrive one network turn apart. An instant source lets a runtime's DecompressionStream drain the
+    // whole input before it emits (Node 26 accepts about 139 KB of gzip ahead), which says nothing about arrival.
     async function* stream() {
       for await (const chunk of packets(bytes, 4093)) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
         consumed += chunk.length;
         yield chunk;
       }
@@ -227,4 +230,17 @@ test('abort between batches stops records already buffered from the same chunk',
   assert.equal((await iterator.next()).value.first, 0);
   controller.abort(reason);
   await assert.rejects(iterator.next(), (error) => error === reason);
+});
+test('a UTF-8 comment in a binary PLY header leaves the streamed body at its byte offset (review 5)', async () => {
+  // Byte offsets come from the header bytes; a UTF-8 decode makes "café" one character shorter than its bytes.
+  const plain = fixture('raccoon-v2.ply'),
+    comment = new TextEncoder().encode('ply\ncomment exported by café\n'),
+    file = new Uint8Array(comment.length + plain.length - 4);
+  file.set(comment);
+  file.set(plain.subarray(4), comment.length);
+  const expected = parsePly(file),
+    output = [];
+  for await (const batch of readSplatsProgressive(packets(file, 4093), { format: 'ply', batchSize: 257 }))
+    output.push(...sorted(batch.data));
+  assert.deepEqual(output.sort(compare), sorted(expected));
 });
