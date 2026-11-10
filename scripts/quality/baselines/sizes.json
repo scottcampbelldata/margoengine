@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13191619,
+  "total": 13201691,
   "history": [
     {
       "date": "2026-10-24",
@@ -6636,6 +6636,12 @@
       "commit": "1282cd0e8",
       "reason": "Batch 266 new optional React input entry: 0 to 4156 B gzip; listeners and native scroll/presentation ownership require no core/stage additions",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-205-job3",
+      "reason": "Optional legacy entry absent to 6394 B gzip (6650 ceiling); FBX classic worker 98163 to 100787 B (100703 to 103811 ceiling) for name-based 6.x objects, geometry, skins, morphs and mixed scalar Takes keys. Reusing the existing layers evaluator and parser avoids a second importer and worker protocol. Core plus stage 24209 B unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -6944,7 +6950,7 @@
     "@margoengine/exporters/usdz-anim": 20969,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 22144,
-    "@margoengine/fbx dist/workers/fbx.js": 100703,
+    "@margoengine/fbx dist/workers/fbx.js": 103811,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
     "@margoengine/fbx/export": 8525,
@@ -7857,6 +7863,8 @@
     "margoengine/web": 577,
     "@margoengine/sciviz/calc": 6978,
     "@margoengine/culling/sort": 14464,
-    "@margoengine/react/controls-extra": 4412
+    "@margoengine/react/controls-extra": 4412,
+    "@margoengine/fbx/legacy": 6650,
+    "margoengine/fbx/legacy": 314
   }
 }

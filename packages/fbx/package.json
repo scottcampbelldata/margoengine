@@ -61,6 +61,10 @@
     "./large": {
       "types": "./dist/large.d.ts",
       "import": "./dist/large.js"
+    },
+    "./legacy": {
+      "types": "./dist/legacy.d.ts",
+      "import": "./dist/legacy.js"
     }
   },
   "files": [
@@ -88,6 +92,7 @@
     "build": "node ../../scripts/build-optional.js fbx",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node test/textures-browser.mjs"
+    "test:gpu": "node test/textures-browser.mjs",
+    "test:gpu:legacy": "node test/legacy-browser.mjs"
   }
 }

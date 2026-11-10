@@ -4636,7 +4636,7 @@ are opaque. JPEG/PNG-in-BMP, OS/2 v2 compression and embedded colour-profile tra
 
 The texture-rgba decoder entry shares the existing textureFileToRGBA implementation with decoders/image, without container/transcoder imports. BMP and texture bridge defaults do not add a core/stage feature.
 
-Batch 205 min+gzip entry sizes: fbx/textures 586 B (new, ceiling 751 B), decoders/bmp 1,518 B (new, ceiling 1,774 B), decoders/texture-rgba 4,446 B (new, ceiling 4,702 B). The FBX worker grows from 83,143 B (ceiling 85,638 B) to 97,769 B (ceiling 100,703 B), buying all four image decoders in the classic worker. Splitting classic-worker codec delivery would add a second asset loader/protocol for this small optional feature. Core plus stage remains 16,769 B.
+Batch 205 min+gzip entry sizes: fbx/textures 586 B (new, ceiling 751 B), decoders/bmp 1,518 B (new, ceiling 1,774 B), decoders/texture-rgba 4,446 B (new, ceiling 4,702 B). The FBX worker grows from 83,143 B (ceiling 85,638 B) to 97,769 B (ceiling 100,703 B), buying all four image decoders in the classic worker. Splitting classic-worker codec delivery would add a second asset loader/protocol for this small optional feature. Core plus stage is 24,209 B; the original 16,769 B was the build summary particlesOnly figure.
 
 
 
@@ -4921,3 +4921,7 @@ The optional react/controls-extra entry owns keyboard listeners, a native HTML s
 Input helper entry measured at 4,310 B gzip (4,156 B before sticky HTML and projection-aware mesh scrolling); its recorded optional ceiling is 4,412 B. Core plus stage remains 24,209 B gzip, below 25,000 B.
 
 Batch 266 product picking: controls/presentation 6,772 -> 6,857 B gzip, within its 7,028 B ceiling. The hierarchy scan runs only at pointer press, reuses the existing BVH picker and supports geometry-free presentation roots.
+Batch 205 job 3: `@margoengine/fbx/legacy` exports `legacyFBX`, passed in extensions on page or worker imports. It enables 6000 through 6999; the root without this entry still refuses pre-7100. Name-keyed objects/connections, inline mesh/control-point layers, Properties60, nested GlobalSettings, pose references, skin links, inline shape channels and Takes TRS/morph curves normalize before ordinary scene validation. Constant/next, linear, user/broken/weighted cubic, auto and TCB curves use the optional layers evaluator. All ordinary or configured per-import budgets and AbortSignal checks remain active. Unknown curve tokens and malformed streams reject instead of dropping animation. Existing glTF representability and node/skin/morph limits still apply. No 3.x/4.x/5.x claim.
+Core plus stage is 24,209 B from `npm run measure:size` after `npm run build:packages`. The earlier 16,769 B report selected build output's `particlesOnly` field, not `base`; both figures appear in the same build output. Job 2's final worker measurement was 98,163 B, not the preliminary 98,112 B.
+
+Job 3 min+gzip: new legacy entry 6,394 B, ceiling 6,650 B. Classic FBX worker grows from 98,163 B to 100,787 B; ceiling 100,703 B to 103,811 B. It shares the ordinary parser/layers evaluator, retaining one worker protocol instead of a second generation-specific importer. Core plus stage stays 24,209 B.

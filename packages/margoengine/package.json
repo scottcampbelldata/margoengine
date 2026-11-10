@@ -1270,6 +1270,10 @@
       "types": "./dist/fbx/large.d.ts",
       "import": "./dist/fbx/large.js"
     },
+    "./fbx/legacy": {
+      "types": "./dist/fbx/legacy.d.ts",
+      "import": "./dist/fbx/legacy.js"
+    },
     "./fsm": {
       "types": "./dist/fsm.d.ts",
       "import": "./dist/fsm.js"

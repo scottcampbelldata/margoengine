@@ -171,7 +171,13 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
         lines();
         // A comma continues a property list, and an opening brace can be on
         // the following line. Other newlines terminate this node's values.
-        if ((properties.length && !comma) || peek().value === '{') continue;
+        if (
+          (properties.length && !comma) ||
+          peek().value === '{' ||
+          peek().value === ',' ||
+          (!properties.length && (peek().kind === 'string' || numeric.test(peek().value)))
+        )
+          continue;
         break;
       }
       if (token.kind === 'end' || token.value === '}') break;

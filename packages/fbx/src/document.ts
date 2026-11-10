@@ -1,3 +1,4 @@
+import type { ExtensionHooks } from './extension.js';
 import { defaultLimits, type FBXImportLimits } from './limits.js';
 import { margoError } from '../../shared/errors.js';
 import { parseBinary, binaryMagic } from './binary.js';
@@ -88,6 +89,7 @@ export async function parseDocument(
   input: ArrayBuffer | ArrayBufferView,
   signal?: AbortSignal,
   limits: Readonly<FBXImportLimits> = defaultLimits,
+  extensions: readonly ExtensionHooks[] = [],
 ): Promise<FBXDocument> {
   const budget = new ParseBudget(signal, limits);
   const bytes =
@@ -101,9 +103,12 @@ export async function parseDocument(
       'FBX input budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );
   const binary = binaryMagic.every((value, index) => bytes[index] === value);
-  const parsed = binary ? await parseBinary(bytes, budget) : parseASCII(bytes, budget);
+  const minimumVersion = Math.min(7100, ...extensions.map((e) => e.minimumVersion ?? 7100));
+  const parsed = binary ? await parseBinary(bytes, budget, minimumVersion) : parseASCII(bytes, budget);
   const { roots, version } = parsed;
-  if (!Number.isInteger(version) || version < 7100 || version > 7700) invalid(`unsupported version ${version}`);
+  if (!Number.isInteger(version) || version < minimumVersion || version > 7700)
+    invalid(`unsupported version ${version}`);
+  for (const extension of extensions) extension.document?.(roots, version, budget);
   const objects = new Map<bigint, FBXNode>(),
     connections: FBXConnection[] = [];
   for (const root of roots) {

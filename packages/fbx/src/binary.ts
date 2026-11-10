@@ -11,6 +11,7 @@ const widths: Record<string, number> = { Y: 2, C: 1, I: 4, F: 4, D: 8, L: 8 };
 export async function parseBinary(
   bytes: Uint8Array,
   budget: ParseBudget,
+  minimumVersion = 7100,
 ): Promise<{ roots: FBXNode[]; version: number }> {
   const data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let cursor = 23;
@@ -24,7 +25,7 @@ export async function parseBinary(
     return value;
   }
   const version = u32();
-  if (version < 7100 || version > 7700) invalid(`unsupported version ${version}`);
+  if (version < minimumVersion || version > 7700) invalid(`unsupported version ${version}`);
   const wide = version >= 7500,
     headerBytes = wide ? 25 : 13;
   function field(limit: number): number {
@@ -95,7 +96,7 @@ export async function parseBinary(
         case 'Y':
           return data.getInt16(offset, true);
         case 'C':
-          return data.getUint8(offset) ? 1 : 0;
+          return version < 7000 ? data.getUint8(offset) : data.getUint8(offset) ? 1 : 0;
         case 'I':
           return data.getInt32(offset, true);
         case 'F':

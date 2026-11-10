@@ -19,7 +19,12 @@ export async function convert(
     layers?: boolean;
   } = {},
 ): Promise<ArrayBuffer> {
-  const document = await parseDocument(input, signal, importLimits(options.extensions)),
+  const document = await parseDocument(
+      input,
+      signal,
+      importLimits(options.extensions),
+      options.extensions as readonly ExtensionHooks[] | undefined,
+    ),
     ctx = context(document, signal, options.extensions as readonly ExtensionHooks[] | undefined, options.layers);
   buildScene(ctx);
   const morphs: MorphBinding[] = [];

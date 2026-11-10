@@ -147,9 +147,18 @@ function evaluator(times: number[], values: ArrayLike<number>, keys: Key[]): (ti
     const span = times[lo + 1] - times[lo],
       alpha = (time - times[lo]) / span;
     if (mode !== CUBIC) return a + (b - a) * alpha;
+    if (alpha === 0) return a;
     const x1 = key.rightWeight,
       x2 = 1 - key.nextLeftWeight;
-    return bezier(alpha, a, b, a + key.right * key.rightWeight * span, b - key.nextLeft * key.nextLeftWeight * span, x1, x2);
+    return bezier(
+      alpha,
+      a,
+      b,
+      a + key.right * key.rightWeight * span,
+      b - key.nextLeft * key.nextLeftWeight * span,
+      x1,
+      x2,
+    );
   };
 }
 
@@ -259,13 +268,7 @@ function blendedCurve(times: Set<number>, jumpsAt: Set<number>, at: (time: numbe
 }
 
 /** The layers' curves on a path of a model as one curve per axis. */
-function blendPath(
-  layers: Layer[],
-  key: bigint,
-  path: string,
-  rest: readonly number[],
-  read: LayerRead,
-): Axes {
+function blendPath(layers: Layer[], key: bigint, path: string, rest: readonly number[], read: LayerRead): Axes {
   const on = layers
     .map((layer) => ({ layer, axes: layer.tracks.models.get(key)?.get(path) }))
     .filter((entry) => entry.axes);

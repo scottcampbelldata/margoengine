@@ -559,3 +559,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/react: controls-extra KeyboardControls/useKeyboardControls, ScrollControls/useScroll/Scroll (mesh and HTML), PresentationControls, optional controls peer and cleanup.
 - margoengine: react/controls-extra umbrella alias and native SpringOptions naming.
 - @margoengine/controls: PresentationControls accepts geometry-free product roots and picks their live nested descendants.
+- @margoengine/fbx (batch 205 job 3): document legacyFBX opt-in 6.x ASCII/binary, legacy Takes/skin/morph/material semantics, worker composition and supported interpolation/budgets.

@@ -324,3 +324,4 @@ Record: https://svs.gsfc.nasa.gov/4720/
 Public-use NASA imagery under https://www.nasa.gov/nasa-brand-center/images-and-media/;
 credit NASA's Scientific Visualization Studio. This standard data asset is the
 AGENTS.md sample-data exception; it is not code from another repository.
+Batch 205 FBX 6.1 standard sample assets: Samuli Raivio, ufbx data collection, MIT or Unlicense. Source, per-file Git blobs and SHA-256 hashes: `packages/fbx/test/fixtures/real/NOTICE.md`. Model data only; no importer source.

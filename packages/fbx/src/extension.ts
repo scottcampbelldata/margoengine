@@ -2,7 +2,7 @@ import type { FBXImportLimits } from './limits.js';
 import type { MaterialData, TextureData } from '@margoengine/exporters';
 import type { Curve, LayerRead, StackTracks } from './animation.js';
 import type { MeshBinding } from './scene.js';
-import type { FBXNode } from './document.js';
+import type { ParseBudget, FBXNode } from './document.js';
 import type { SceneContext } from './scene.js';
 
 /**
@@ -39,6 +39,10 @@ export interface SkinRead {
 
 /** What an extension does: each hook runs at its step of the conversion. */
 export interface ExtensionHooks extends FBXExtension {
+  /** Normalize an older document before object indexing. */
+  document?(roots: FBXNode[], version: number, budget: ParseBudget): void;
+  /** Lowest binary version this entry can normalize. Default 7100. */
+  minimumVersion?: number;
   /** After the node tree is built. True when it added something worth a file with no mesh. */
   scene?(ctx: SceneContext): boolean | void;
   /** Takes the skins and clusters the base reader refuses, and records what glTF has no place for. */

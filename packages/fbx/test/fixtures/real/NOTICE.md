@@ -42,3 +42,17 @@ b3e774ac46d3a8b8a268f696d9012ba71d6e5cd6daecd92ad8aa58320e30ec9c  maya_dq_weight
 78ad2c3511678301d8f9143cc239ebed7caa46e34fc847f3a21c2f697b6d2807  maya_rotation_order_7500_binary.fbx
 d47fd240ee698fa1c3c58e441f9cfd4390a5092308ef9dc686ef3ed130d813af  maya_rotation_order.obj
 ```
+
+## Batch 205 legacy FBX data
+
+Standard FBX sample assets from Samuli Raivio, ufbx test-data collection, MIT or Unlicense (same licence choice as above); no implementation source read. Data: https://github.com/ufbx/ufbx/tree/main/data . Pinned content:
+
+- `max2009_cube_anim_6100_ascii.fbx`: Git blob `84c19daf23b7a1cd1d03baa121afcce06db76c95`, SHA-256 `fb5f2cd52386a6a62b8ec15bc4ad87dc054d3b1381eb44ccd569cae251489d4d`.
+- `max2009_cube_anim_6100_binary.fbx`: Git blob `f122be53136fbdcbe031e4aa7295afab9621b0b9`, SHA-256 `3520d35ab684d5c85c98a03c4b1acf3186b9d55d6b7de98d64c9666e9471cf7b`.
+- `blender_279_default_6100_ascii.fbx`: Git blob `5fcb5574adbcb54ef62063fb7edffc2e69531b61`, SHA-256 `662affba7f4937036de8fd4697450a4efa839617a6431e3313113ac30afee99a`.
+- `maya_transformed_skin_6100_ascii.fbx`: Git blob `aee78cd5789483d7546f1bcfa6565543b8927047`, SHA-256 `ba4e8fb185a27495cb02cec730bc713ad649fdb7cc75ad45da789d90135421ee`.
+- `maya_transformed_skin_6100_binary.fbx`: Git blob `bf7391318db6a293818ce12ff06bd4f6edfb92ee`, SHA-256 `a997f614cc4ff7e0cd1e114b08cc0efd1447d2ada926410ce844bfa16fce2cc8`.
+- `maya_blend_shape_cube_6100_ascii.fbx`: Git blob `df242d23d51c51d5ec5ef1d5b31b82b69cd75212`, SHA-256 `f6e3a80827d0fca2da0c5114b70a1b9bad63e9fdceb06a7a2aaf85db3ca256fb`.
+- `maya_blend_shape_cube_6100_binary.fbx`: Git blob `26d6fa865ea4113dc1ae2b29d3c3bb8eda740c03`, SHA-256 `2ab5c26eabbc804294a003555af4723ef9815c21100ffca2ad9ac04924943f86`.
+- `maya_interpolation_modes_6100_ascii.fbx`: Git blob `b0143e0c8e6cdd2a1bf81ab62a1b4aa16f3e431a`, SHA-256 `d75f612e4d893a6ef658478cfeb316c50de5265dd963044aa43d07a3400d2ef8`.
+- `maya_interpolation_modes_6100_binary.fbx`: Git blob `1e2e76836065cf6afa011fbf92ad9278dcf19443`, SHA-256 `474d94c864a64310d0dc0b1a7b33d1a99e0c1805e2a20eb2e88a5a7b708120e5`.
