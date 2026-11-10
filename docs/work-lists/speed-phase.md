@@ -386,3 +386,4 @@ Batch 171 atmosphere: NOAA globe with 2048 wind particles and 32 history samples
 | Worker page/worker independence budgets, at least 10 page ticks and 5 worker frames during 400 ms opposing-thread blocks | packages/worker/tests/browser-check.mjs | Existing assertions retained behind speedEnabled(); run in the quiet speed phase. RPC and rendered-pixel correctness run now. |
 
 Batch 221: quiet-machine single-worker versus multi-worker BVH construction (one-million-triangle mesh), worker startup/position sharing or cloning/transfer/packing costs, same packed buffers and queries. Compare worker counts under equal work; no speedup claim or timing budget during build phase.
+- Batch 249 ecs/parallel: quiet-phase throughput comparison of identical serial and shared-worker module systems with matching outputs; use the real worker fixtures and declared hazards. Atomic overlap is proven now; no wall-clock gain is claimed.

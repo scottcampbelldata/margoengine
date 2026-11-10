@@ -2936,3 +2936,6 @@ Batch 230 PBR: after build, `node --test packages/procedural/test/textures-pbr.t
 
 ### Batch273 bitmap orientation
 After build:packages, run node --test packages/webgl2-compat/test/external-image.test.js packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js. Under a shared GPU lock run node scripts/normal-map-orientation-gpu-check.js, then repeat with MARGO_COMPAT=1, retaining the complete canonical case list. Counterfactual swaps only the owning upload source to the parent, builds them, runs the regressions, and restores/builds the repair in finally. It changes no baseline, numeric assertion or runtime setting. Existing tests/umbrella.test.js checks the regenerated alias.
+
+Batch 249 job 5: build packages, then node --test --test-timeout=150000 packages/ecs/test/parallel.test.js packages/ecs/test/parallel-browser.test.js. Fixtures use original numeric worlds, no external assets. Node verifies real worker overlap without a timing assertion; the isolated browser runs the shipped worker with GPU disabled. No GPU lock is acquired for CPU work.
+Final batch 249 size check: npm run measure:size reports current rebased main core plus stage at 24209 B; source in those packages is unchanged by this batch.

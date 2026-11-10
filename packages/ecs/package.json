@@ -65,6 +65,10 @@
     "./serialize": {
       "types": "./dist/serialize.d.ts",
       "import": "./dist/serialize.js"
+    },
+    "./parallel": {
+      "types": "./dist/parallel.d.ts",
+      "import": "./dist/parallel.js"
     }
   },
   "files": [

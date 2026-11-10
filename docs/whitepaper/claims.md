@@ -3439,3 +3439,5 @@ Claim: one optional GPU baker produces four coherent PBR maps for 11 motifs and 
 
 ### Batch273 external bitmap copies
 WebGL2 compatibility honors ImageBitmap copy orientation and alpha flags after crop normalization. All original normal-map cases and exported/re-imported images pass on both backends, including every extension lobe and tangent convention. The actual-copy unit regression fails the parent; positive package/dependent and GPU checks accompany the change. Full numeric data, scope and before/after entry sizes: results/batch-273-bitmap-orientation.json. No tolerance, work grid, sample count or native rendering code changes.
+
+Batch 249 job 5: ecs/parallel runs independent module systems concurrently on shared numeric storage and orders declared hazards, including aliased buffers. Proof: packages/ecs/test/parallel.test.js atomic rendezvous and output tests, plus real browser asset/isolation evidence in parallel-browser.test.js. No wall-clock speed claim or undeclared-access sandbox claim.

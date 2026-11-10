@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12671422,
+  "total": 12677366,
   "history": [
     {
       "date": "2026-10-24",
@@ -6268,6 +6268,12 @@
       "commit": "batch-230",
       "reason": "New optional procedural/textures-pbr entry: 0 to 4946 B gzip for four GPU maps, 11 motifs and complete filtered mipmaps; a split would duplicate GPU lifecycle and settings; no core or stage change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7623f09ce",
+      "reason": "Batch 249 parallel: new optional shared-world worker scheduler 0 -> 4938 B gzip, separate worker 0 -> 494 B. Buffer hazards, guarded lifetime and reentrant disposal stay together; worker remains an on-demand asset. Core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7407,6 +7413,8 @@
     "margoengine/react/instances": 318,
     "margoengine/bvh/parallel": 11405,
     "@margoengine/tiles/features": 9837,
-    "@margoengine/procedural/textures-pbr": 5202
+    "@margoengine/procedural/textures-pbr": 5202,
+    "@margoengine/ecs dist/workers/parallel.js": 750,
+    "@margoengine/ecs/parallel": 5194
   }
 }

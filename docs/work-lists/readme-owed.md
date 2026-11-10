@@ -349,3 +349,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/webgl2-compat | Bitmap source crop/orientation/alpha semantics, temporary canvas cost, destination types and normal-map proof. | Batch273 group12 |
 | margoengine | Generated exporters/sparse alias and its import-equivalence proof. | Batch273 group12 landing blocker |
+
+- @margoengine/ecs (batch 249 job 5): SharedWorld/SharedComponent storage, sharedIndex, ParallelSchedule read/write declarations, module worker assets, dependencies, isolation, update/abort/deadline/disposal, endpoint adapters, partial-write and failed-host semantics.
+- margoengine (batch 249 job 5): generated ecs/parallel alias.

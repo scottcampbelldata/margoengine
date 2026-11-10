@@ -934,6 +934,10 @@
       "types": "./dist/ecs/serialize.d.ts",
       "import": "./dist/ecs/serialize.js"
     },
+    "./ecs/parallel": {
+      "types": "./dist/ecs/parallel.d.ts",
+      "import": "./dist/ecs/parallel.js"
+    },
     "./environment": {
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"
