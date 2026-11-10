@@ -354,6 +354,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/exporters',
+    file: 'packages/exporters/dist/draco-native-encoder.wasm',
+    label: 'draco-native-encoder.wasm',
+    kind: 'Clean-room Draco encoder Wasm',
+    measure: 'file',
+    when: 'First compressDraco call; one lazy SIMD module in its browser worker or the Node process',
+  },
+  {
+    package: '@margoengine/exporters',
     file: 'packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js',
     label: 'draco-encoder/draco_encoder_wrapper.js',
     kind: 'Draco encoder glue',

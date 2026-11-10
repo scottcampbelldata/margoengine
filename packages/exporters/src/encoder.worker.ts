@@ -4,6 +4,7 @@
 import { margoError } from '../../shared/errors.js';
 import { encodeDracoMesh, type DracoEncoderModule, type DracoJob } from './draco-encode.js';
 import { boxed, type EncoderRequest, type Factory, type ModuleBox } from './encoder-host.js';
+import { encodeNativeMesh, loadNativeEncoder, type NativeDracoEncoder } from './draco-native-encode.js';
 import { encodeBasis, type BasisEncoderModule, type BasisJob } from './ktx2-encode.js';
 
 declare const self: {
@@ -21,6 +22,7 @@ async function bytes(url: string): Promise<ArrayBuffer> {
 }
 
 let draco: Promise<ModuleBox<DracoEncoderModule>> | undefined;
+let native: Promise<NativeDracoEncoder> | undefined;
 const startDraco = async ({ wrapperURL, wasmURL }: EncoderRequest): Promise<ModuleBox<DracoEncoderModule>> => {
   self.importScripts(wrapperURL);
   if (!self.DracoEncoderModule)
@@ -44,7 +46,11 @@ self.onmessage = async ({ data }) => {
   if (!data || typeof data !== 'object') return;
   const { id } = data;
   try {
-    if (data.kind === 'draco') {
+    if (data.kind === 'draco-native') {
+      native ??= loadNativeEncoder(data.wasmURL);
+      const result = encodeNativeMesh(await native, data.job as DracoJob);
+      self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
+    } else if (data.kind === 'draco') {
       draco ??= startDraco(data);
       const { module } = await draco,
         result = encodeDracoMesh(module, data.job as DracoJob);

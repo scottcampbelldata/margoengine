@@ -64,6 +64,7 @@ const basis = resolve(root, 'dist/basis-encoder/basis_encoder.js');
 await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_encoder.js'));
 await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(root, 'dist/THIRD-PARTY-NOTICE.md'));
 await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(root, 'dist/LICENSE-Apache-2.0.txt'));
+await copyFile(resolve(root, 'src/draco-native-encoder.wasm'), resolve(root, 'dist/draco-native-encoder.wasm'));
 await packageDeclarations(root);
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);

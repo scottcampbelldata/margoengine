@@ -4152,3 +4152,9 @@ The optional sciviz/link store resolves global, union and intersect view brushes
 
 ### Batch 186 job 2: one image, per-light screen demand
 ShadowAtlas packs every logical shadow face into one depth image, selects point/spot resolution by viewport coverage and preserves directional/area shadow composition. CPU tests prove packing, memory/work counts and live camera-driven viewports; scripts/clustered-shadow-atlas-gpu.mjs checks blocked/clear production-shader probes for point/spot lights and combined rectangle/sphere shadows on both backends. The documented PlayCanvas shadow-atlas row is implemented. No speed, exact projected-sphere bound or incremental-update claim. Limits and accepted redraw trade-offs are in limits.md.
+
+
+
+## Batch 136: optional clean-room Draco encoding
+
+Claim: compressDraco uses the original optional Rust/Wasm SIMD encoder without a core/stage dependency change. Sequential, standard/valence EdgeBreaker, position welding, independent corner-attribute seams and five prediction methods retain all oriented triangles and exact nonquantized attributes. Proof: exporters/draco-kernel unit tests and exporters/tests/draco-native.test.js compare the existing native decoder and opaque prebuilt decoder, including UINT32 boundaries, degenerate/nonmanifold inputs, shared seams, 3,000 deterministic normal directions and encode/free reuse. Existing draco.test.js protects GLB skins/weights/animations/images/bounds and the public entry contract. Browser exporter tests protect worker loading, cancellation and round-trip rendering on both backends. Entry gzip 181,081 -> 89,161 B; core plus stage remains 24,209 B. Eight output-bridge boundary calls are a deterministic bridge-work reduction, not a CPU speed claim. Sources and read scope: clean-room.md. Timing remains owed in the deferred speed phase.

@@ -1,5 +1,5 @@
-// compressDraco: a GLB in, the same GLB with KHR_draco_mesh_compression geometry out. The encoder is Google's own Draco
-// Wasm, loaded on the first call, so an app that never compresses never fetches it.
+// compressDraco: a GLB in, the same GLB with KHR_draco_mesh_compression geometry out.
+// The optional Rust/Wasm encoder loads on the first compression call.
 import {
   encodeDracoMesh,
   type DracoEncoded,
@@ -9,7 +9,7 @@ import {
   type DracoKind,
 } from './draco-encode.js';
 import { encoderFile, inProcess, inWorker, loadInNode, type EncoderRequest, type ModuleBox } from './encoder-host.js';
-import { joinGLB, readAccessor, splitGLB, type AccessorValues, type GLBParts } from './glb.js';
+import { joinGLB, readAccessor, splitGLB, type AccessorValues } from './glb.js';
 import { addView, packGLB, useExtension, type JSONObject, type NewViews } from './glb-pack.js';
 
 const EXTENSION = 'KHR_draco_mesh_compression';
@@ -32,7 +32,7 @@ export interface CompressDracoOptions {
   encodeSpeed?: number;
   /** From 0, the smallest file, to 10, the fastest decode. Default 5. */
   decodeSpeed?: number;
-  /** Folder holding draco_encoder_wrapper.js and draco_encoder.wasm. Defaults to the copy bundled with this package. */
+  /** Override with a folder holding a compatible draco_encoder_wrapper.js and draco_encoder.wasm. Default: bundled clean-room Wasm. */
   encoderPath?: string;
   /** Stops the encode. A browser ends the worker at once; Node stops between meshes. */
   signal?: AbortSignal;
@@ -230,7 +230,7 @@ interface Planned {
   bits: number;
 }
 
-let local: Promise<ModuleBox<DracoEncoderModule>> | undefined;
+let native: Promise<import('./draco-native-encode.js').NativeDracoEncoder> | undefined;
 
 /**
  * Compresses the triangle geometry of a GLB with Draco, as KHR_draco_mesh_compression. Attributes are quantized as
@@ -408,20 +408,29 @@ export async function compressDraco(glb: Uint8Array, options: CompressDracoOptio
 }
 
 async function encode(jobs: DracoJob[], options: CompressDracoOptions): Promise<DracoEncoded[]> {
+  if (options.encoderPath === undefined) {
+    const wasmURL = new URL('./draco-native-encoder.wasm', import.meta.url).href;
+    if (typeof Worker === 'undefined') {
+      const { loadNativeEncoder, encodeNativeMesh } = await import('./draco-native-encode.js');
+      native ??= loadNativeEncoder(wasmURL);
+      const module = await native;
+      return inProcess(jobs, (job) => encodeNativeMesh(module, job), options.signal);
+    }
+    return inWorker<DracoEncoded>(
+      jobs.map((job) => ({ kind: 'draco-native', wrapperURL: '', wasmURL, job })),
+      (request: EncoderRequest) => {
+        const { indices, attributes } = request.job as DracoJob;
+        return [indices.buffer as ArrayBuffer, ...attributes.map(({ values }) => values.buffer as ArrayBuffer)];
+      },
+      options.signal,
+    );
+  }
   const { encoderPath, signal } = options,
-    // Whole file names, so a bundler can see and copy each one.
-    wrapper =
-      encoderPath === undefined
-        ? new URL('./draco-encoder/draco_encoder_wrapper.js', import.meta.url)
-        : encoderFile(encoderPath, 'draco_encoder_wrapper.js'),
-    wasm =
-      encoderPath === undefined
-        ? new URL('./draco-encoder/draco_encoder.wasm', import.meta.url)
-        : encoderFile(encoderPath, 'draco_encoder.wasm');
+    wrapper = encoderFile(encoderPath, 'draco_encoder_wrapper.js'),
+    wasm = encoderFile(encoderPath, 'draco_encoder.wasm');
   if (typeof Worker === 'undefined') {
     const start = (): Promise<ModuleBox<DracoEncoderModule>> => loadInNode<DracoEncoderModule>(wrapper, wasm);
-    if (encoderPath === undefined) local ??= start();
-    const { module } = await (encoderPath === undefined ? local! : start());
+    const { module } = await start();
     return inProcess(jobs, (job) => encodeDracoMesh(module, job), signal);
   }
   return inWorker<DracoEncoded>(

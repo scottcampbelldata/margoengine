@@ -42,3 +42,5 @@ teardown pass in test-results/56fix/resume-gpu-teardown-ground-studio-compat.log
 with the unchanged 30,000 ms close budget. This was a teardown defect, not a
 busy-time exception. The separate compatibility capture value failure remains
 an open correctness gate in known-bugs.md.
+
+| Batch 136 clean-room Draco encoder cold/warm Node/browser timing | batch-136 replacement commit | Windows dev PC, RTX A6000 | Not run: Scott's deferred speed phase; no time number or budget change | Not sampled because no timing run occurred | 2026-11-10 | Owed on a quiet machine before release; scenes/settings retained in speed-phase.md |

@@ -3605,3 +3605,11 @@ Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/link
 
 ### Batch 186 job 2: shared shadow atlas
 After build:packages, run clustered CPU tests. Run node scripts/gpu-lock.mjs run --owner=codex-batch186 --max=4 --wait-max=60 -- node scripts/clustered-shadow-atlas-gpu.mjs, and append --compat for the full WebGL2 check. Point/spot blocked visibility must be below 0.05; clear visibility must stay within 0.02 of 1; combined rectangle/sphere probes must remain blocked below 0.05 of clear. No shader warnings or errors. CPU shadow-atlas.test.js independently pins face count, disjoint tiles, allocation and rasterized-texel counts. Benchmarks remain deferred.
+
+
+
+## Batch 136: clean-room Draco encoder
+
+Rebuild the single optional SIMD artifact with node packages/exporters/scripts/build-draco.mjs, then npm run build:packages. CPU correctness: cargo test --locked --manifest-path packages/exporters/draco-kernel/Cargo.toml and node --test --test-timeout=120000 packages/exporters/tests/draco.test.js packages/exporters/tests/draco-native.test.js. The normal test records opaque Draco 1.5.7 maximum errors for an original xorshift-seeded 3,000-direction input and compares six bit depths; no encoder oracle dependency ships in that test. The boundary-call test counts actual exported Wasm calls through a forwarding object at two output sizes. The output is decoded independently, so reducing the count cannot omit geometry.
+
+Own-package browser correctness: node packages/exporters/scripts/test-browser.js, tests/png-browser.mjs and tests/capture-browser.mjs, with and without --compat, each under node scripts/gpu-lock.mjs run --owner=codex-batch136 --max=1 --wait-max=60 -- . Use the complete repository-relative paths for the two tests. These are shared correctness slots. Never run a timing benchmark during the deferred build phase. Entry bytes use scripts/measure-size.js bundleBytes followed by gzipSync; raw/gzip Wasm bytes use the committed artifact. The pre-change entry was measured from origin-main source against the same supporting modules before implementation changes. The complete external-corpus ratio/settings harness is the following proof job; no universal ratio or speed guarantee is asserted here.

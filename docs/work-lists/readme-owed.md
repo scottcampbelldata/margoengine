@@ -990,3 +990,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/clustered (batch 186 job 2): document ShadowAtlas, camera-driven point/spot resolution, shared directional/area maps, square guarded tiles, budgets, defaults and full-atlas redraw policy; examples deferred.
 - margoengine (batch 186 job 2): document clustered/shadow-atlas forwarding entry; examples deferred.
+
+
+- @margoengine/exporters (batch 136): document the clean-room lazy Draco SIMD encoder, sequential and EdgeBreaker modes, speed budgets, quantization and prediction, preserved custom encoderPath compatibility, and input limits during the README phase.

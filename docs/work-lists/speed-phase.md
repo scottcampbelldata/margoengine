@@ -404,3 +404,7 @@ Batch 208: quiet-machine real-network throttle throughput, burst behavior and pr
 Batch 174 job 1: shared selection mask uploads have deterministic one-write evidence at two million plotted marks; quiet-machine throughput and latency measurements remain owed before release. Run link-browser.mjs with the same pinned 2MASS observations and membership readback; no timing assertions run in the build phase.
 
 - Batch 186 job 2: quiet-machine shadow-atlas timing remains owed after the build phase. Correctness gates use only deterministic allocated/rasterized texel counts; preserve light/caster work and the whole-atlas dirty policy when comparing.
+
+
+
+- Batch 136 Draco encoder: quiet cold/warm Node and browser encoding versus the opaque 1.5.7 encoder on the same Box, Fox, MetalRoughSpheres, CommercialRefrigerator, Lantern and RiggedFigure streams at identical bit/speed settings. Keep every triangle, attribute and error check. Record encode/decode time, memory and output bytes; include bounded seed-search cost. Build-phase evidence is gzip bytes and fixed eight output-bridge calls only; no end-to-end timing claim.

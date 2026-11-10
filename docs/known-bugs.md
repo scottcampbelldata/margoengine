@@ -4857,3 +4857,9 @@ Batch 174 presentation follow-up: binding a styled scatter or line currently use
 Batch 174 landing repair, closed: main 72642362b duplicated the VFX test:gpu property without a separating comma, blocking all workspace parsing. Removed the obsolete member, retaining both parity backends. Regression: tests/package-exports.test.js.
 Batch 174 follow-up: a lazily materialized rowIds property on the most recent change event can become empty after SelectionStore.dispose(), because disposal clears the same Set captured by that event. Repro: retain the change detail, dispose the store, then read detail.rowIds. Cause and fix-phase item recorded in private/handoffs/finish-later.md; live linked-view selection is unaffected.
 Batch 186 job 2: no open correctness defect found in shared atlas packing/filtering. Whole-atlas redraw on any dirty face and discrete resolution changes without hysteresis are documented trade-offs in limits.md; incremental dirty-tile updates remain later quality work.
+
+
+
+## Batch 136 encoder boundary
+
+No new open correctness defect in the implemented encoder is known from its current fixtures. Normal quantization at one bit is not a representable octahedral format and returns RangeError; the new encoder's 30-bit path is covered without invoking the upstream build that aborts on that option. Universal compression dominance and end-to-end timing are not established by finite corpus tests; the remaining proof and deferred speed rows are recorded in limits.md and the work lists.
