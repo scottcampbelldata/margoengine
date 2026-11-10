@@ -8,7 +8,7 @@ export interface SCXMLExportOptions {
 }
 
 export interface SCXMLImportOptions {
-    parser?: Pick<DOMParser, 'parseFromString'>;
+    parser?: unknown;
 }
 
 export function exportSCXML(document: MachineDocument, options?: SCXMLExportOptions): string;

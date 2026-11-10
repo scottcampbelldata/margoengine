@@ -172,6 +172,28 @@ const again = loadMachine(JSON.parse(text), guard, bindings);
 
 Guards in `StateMachine` get the context too: `guard: (context) => context.awake`.
 
+## SCXML (`margoengine/fsm/scxml`)
+
+Read and write the W3C SCXML subset that maps onto machine documents: `state`, `parallel`, `initial`, `history`, `transition` with `event`/`cond`/`target`, and `onentry`/`onexit` hooks written as a name call such as `leave()`. Hooks and guards stay names, as in a document; nothing in the file runs. Margo reads the XML itself, the same way in browsers, workers and Node, so no DOM parser is needed and file text is never parsed as HTML.
+
+```ts
+import {loadMachine} from 'margoengine/fsm/document';
+import {exportSCXML, importSCXML} from 'margoengine/fsm/scxml';
+
+const document = importSCXML(`<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="idle">
+  <state id="idle"><transition event="go" target="run" cond="ready()"/></state>
+  <state id="run"><onentry><script>shout()</script></onentry></state>
+</scxml>`);
+const machine = loadMachine(document, {}, {hooks: {shout: () => console.log('off we go')}, guards: {ready: () => true}});
+machine.send('go');
+console.log(machine.state); // 'run'
+console.log(exportSCXML(document, {extensions: false}).startsWith('<?xml')); // true
+```
+
+- `importSCXML(text)` throws a `TypeError` naming the problem for malformed XML, a DTD or entity declaration, processing instructions, script code that is not a single name call, unknown elements or attributes, or input over 1 MiB, 10,000 elements or 128 levels deep.
+- `exportSCXML(document, {extensions})` writes the document back. With the default `extensions: true`, fields SCXML cannot hold (`after`, `duration`, `update`, region history, names that are not XML ids) keep their values in the `urn:margoengine:fsm:1` namespace; with `extensions: false` such a document is refused instead of losing them.
+- The old `parser` option is ignored and deprecated.
+
 ## Snapshots and trace (`margoengine/fsm/trace`)
 
 `snapshotMachine` gives where a machine is now as plain data: the state, cross-fade, every delay's progress, what states remember and all parallel regions. Put it in a save file or send it over the network, and `restoreMachine` puts a machine with the same definition back there. The machine then goes on exactly as the first would have, so rollback netcode can go back and replay.

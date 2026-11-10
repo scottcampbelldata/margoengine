@@ -1,12 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { JSDOM } from 'jsdom';
 import { importSCXML, exportSCXML } from '../dist/scxml.js';
 import { loadMachine, validateMachine } from '../dist/document.js';
 
-const dom = new JSDOM();
-const options = { parser: new dom.window.DOMParser() };
-const parse = text => importSCXML(text, options);
+const parse = text => importSCXML(text);
 const xml = content => `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0">${content}</scxml>`;
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -74,13 +71,24 @@ test('unsupported content, entity declarations, invalid XML and cross-region ref
   ]) assert.throws(() => parse(xml(content)), TypeError, content);
   assert.throws(() => parse('<!DOCTYPE scxml [<!ENTITY ext SYSTEM "file:///secret">]>' + xml('<state id="a"/>')), /DTD/);
   assert.throws(() => parse(xml('<state id="a">')), /malformed/);
+  // Security: markup-shaped file text stays data. HTML-only syntax is malformed XML, and escaped markup in a hook body
+  // is not a binding name, so neither reaches a document or a script.
+  for (const hostile of [
+    '<state id="a"><onentry><script><img src=x onerror="globalThis.touched=1"></script></onentry></state>',
+    '<state id="a"><onentry><script>&lt;img src=x onerror=globalThis.touched=1&gt;</script></onentry></state>',
+    '<state id="a"><onentry><script><![CDATA[</script><script>globalThis.touched=1</script>]]></script></onentry></state>',
+    '<state id="a" onclick="globalThis.touched=1"/>',
+    '<state id="&quot;&gt;&lt;script&gt;"/>',
+  ]) assert.throws(() => parse(xml(hostile)), TypeError, hostile);
   assert.equal(globalThis.touched, undefined);
 });
 
-test('prototype-like ids, control-character rejection, input budgets and explicit Node parser', () => {
+test('prototype-like ids, control-character rejection, input budgets and the built-in XML reader', () => {
   const document = parse(xml('<state id="__proto__"><transition event="go" target="constructor"/></state><state id="constructor"/>'));
   assert.equal(loadMachine(document, {}).send('go'), true);
-  assert.throws(() => importSCXML(xml('<state id="a"/>')), /parser/);
+  // Node has no DOMParser global: the strict built-in reader needs none, and the deprecated parser option is ignored.
+  assert.equal(globalThis.DOMParser, undefined);
+  assert.deepEqual(plain(importSCXML(xml('<state id="a"/>'), { parser: { parseFromString: () => { throw new Error('used'); } } })), { version: 1, initial: 'a', states: { a: {} } });
   assert.throws(() => parse(' '.repeat(1048577)), /1 MiB/);
   assert.throws(() => exportSCXML({ version: 1, initial: 'bad\0', states: { 'bad\0': {} } }), /XML 1.0/);
   const deep = Array.from({ length: 130 }, (_v, i) => `<state id="a${i}">`).join('') + '</state>'.repeat(130);

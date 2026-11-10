@@ -1,4 +1,5 @@
 import { validateMachine, type MachineDocument, type RegionDocument, type StateDocument, type TransitionDocument } from './document.js';
+import { parseXMLDocument, type XMLElement } from '../../shared/xml-document.js';
 
 const NS = 'http://www.w3.org/2005/07/scxml';
 const EXT = 'urn:margoengine:fsm:1';
@@ -7,16 +8,19 @@ const SYMBOL = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
 const ID = /^[A-Za-z_][\w.-]*$/;
 const MAX = 1048576;
 function fail(message: string): never { throw new TypeError(`Unsupported SCXML: ${message}; use the documented document subset or native machine JSON`); }
-const extension = (element: Element, name: string) => element.getAttributeNS(EXT, name);
-const nameOf = (element: Element) => (extension(element, 'name') ?? element.getAttribute('id')) || fail('state has no id/name');
-const children = (element: Element): Element[] => Array.from(element.children);
-const standard = (element: Element, name: string) => element.namespaceURI === NS && element.localName === name;
-const stateElement = (element: Element) => standard(element, 'state') || standard(element, 'parallel');
+const extension = (element: XMLElement, name: string) => element.getAttributeNS(EXT, name);
+const nameOf = (element: XMLElement) => (extension(element, 'name') ?? element.getAttribute('id')) || fail('state has no id/name');
+const children = (element: XMLElement): XMLElement[] => Array.from(element.children);
+const standard = (element: XMLElement, name: string) => element.namespaceURI === NS && element.localName === name;
+const stateElement = (element: XMLElement) => standard(element, 'state') || standard(element, 'parallel');
 
-/** XML parsing options, with no runtime dependency on a DOM implementation in Node. */
+/** SCXML import options. */
 export interface SCXMLImportOptions {
-  /** XML DOM parser. Default the browser's DOMParser; Node callers must supply one. */
-  parser?: Pick<DOMParser, 'parseFromString'>;
+  /**
+   * @deprecated Ignored. SCXML is read by Margo's own strict XML reader in browsers, workers and Node alike, so no DOM
+   * parser is needed and file text is never parsed as HTML.
+   */
+  parser?: unknown;
 }
 
 /** SCXML output options. */
@@ -25,7 +29,7 @@ export interface SCXMLExportOptions {
   extensions?: boolean;
 }
 
-function attributes(element: Element, allowed: string[], extra: string[] = []): void {
+function attributes(element: XMLElement, allowed: string[], extra: string[] = []): void {
   for (const attr of Array.from(element.attributes)) {
     if (attr.namespaceURI === XMLNS) continue;
     if (attr.namespaceURI === EXT && extra.includes(attr.localName)) {
@@ -50,15 +54,13 @@ function binding(text: string): string {
  * Native extensions round-trip fields that SCXML cannot express directly. Rejects DTDs and unsupported content.
  */
 export function importSCXML(text: string, options: SCXMLImportOptions = {}): MachineDocument {
+  void options;
   if (typeof text !== 'string' || text.length > MAX || new TextEncoder().encode(text).byteLength > MAX || /<!\s*(?:DOCTYPE|ENTITY)\b/i.test(text))
     fail('input is over 1 MiB or contains a DTD/entity declaration');
-  const parser = options.parser ?? (typeof DOMParser === 'undefined' ? undefined : new DOMParser());
-  if (!parser) fail('no XML parser; pass options.parser in Node');
-  const xml = parser.parseFromString(text, 'application/xml');
-  const root = xml.documentElement;
-  if (!root || !standard(root, 'scxml') || xml.getElementsByTagName('parsererror').length) fail('malformed XML or wrong root namespace');
+  const root = parseXMLDocument(text, { fail: reason => fail(`malformed XML, ${reason}`) }).documentElement;
+  if (!standard(root, 'scxml')) fail('wrong root element or namespace');
   const ids = new Set<string>();
-  const stack: [Element, number][] = [[root, 0]];
+  const stack: [XMLElement, number][] = [[root, 0]];
   let count = 0;
   while (stack.length) {
     const [element, depth] = stack.pop()!;
@@ -76,15 +78,15 @@ export function importSCXML(text: string, options: SCXMLImportOptions = {}): Mac
   if (root.getAttribute('version') !== '1.0') fail('version must be 1.0');
   if (root.hasAttribute('datamodel') && !['null', 'ecmascript'].includes(root.getAttribute('datamodel')!)) fail('unknown datamodel');
 
-  function readRegion(container: Element, includeContainer = false): RegionDocument {
+  function readRegion(container: XMLElement, includeContainer = false): RegionDocument {
     if (!includeContainer && standard(container, 'state'))
       attributes(container, ['id', 'initial'], ['name', 'wrapper', 'transitions']);
     const states: Record<string, StateDocument> = Object.create(null);
     const local = new Map<string, string>();
     const aliases = new Map<string, string>();
-    const elements: [Element, string, StateDocument][] = [];
+    const elements: [XMLElement, string, StateDocument][] = [];
     const pending: { transition: TransitionDocument; order: number }[] = [];
-    const register = (element: Element, parent?: string) => {
+    const register = (element: XMLElement, parent?: string) => {
       const name = nameOf(element), id = element.getAttribute('id') ?? fail('state id is required');
       if (Object.hasOwn(states, name)) fail(`duplicate state name ${name}`);
       attributes(element, ['id', ...(standard(element, 'state') ? ['initial'] : [])], ['name', 'initial', 'history', 'update', 'transitions',
@@ -108,7 +110,7 @@ export function importSCXML(text: string, options: SCXMLImportOptions = {}): Mac
     if (includeContainer) register(container);
     else for (const element of children(container).filter(stateElement)) register(element);
     const target = (id: string) => local.get(id) ?? aliases.get(id) ?? fail(`target ${id} crosses a region or is unknown`);
-    const initial = (element: Element, infer: boolean): string | undefined => {
+    const initial = (element: XMLElement, infer: boolean): string | undefined => {
       const nodes = children(element).filter(e => standard(e, 'initial'));
       if (nodes.length > 1 || (nodes.length && element.hasAttribute('initial'))) fail('initial attribute and element conflict');
       const native = extension(element, 'initial');

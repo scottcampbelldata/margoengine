@@ -125,7 +125,6 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 | @margoengine/navmesh | queries seeded randomPoint, strict randomPointAroundCircle, rejection bound, distanceToWall and partial seam intervals | batch-252 job 3 |
 | @margoengine/behavior | fuzzy: JSON shapes/rules, finite domains, hedges, weighted consequences, pure FuzzySystem evaluation, centroid/mean-of-max/max-average sampling and fallback | batch-251 job 3 |
 | margoengine | Generated behavior/fuzzy alias | batch-251 job 3 |
-| @margoengine/fsm | scxml: importSCXML/exportSCXML, browser DOMParser and explicit Node parser, supported subset, named bindings, namespace extensions, limits and extensions:false rejection | batch-250 job 5 |
 | margoengine | Generated fsm/scxml alias | batch-250 job 5 |
 | @margoengine/netcode | generate-rust: schema.json input, Msg types and f_ fields, enum indices, boxed optionals, full/delta methods, errors, native Rust toolchain and nesting limit | batch-256 job 3 |
 | margoengine | Generated netcode/generate-rust alias | batch-256 job 3 |
