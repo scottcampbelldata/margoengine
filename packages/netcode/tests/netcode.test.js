@@ -277,3 +277,14 @@ test('client: a join survives a lost first ping', async () => {
   assert.equal(dropped > 0, true);
   assert.ok(client, 'the client joined within 2 s of game time');
 });
+
+test('a player who joins and leaves within one tick leaves no ghost in the state', () => {
+  const server = new GameServer(game, { now: () => 0 });
+  const connection = { send() {}, close() {}, onmessage: null, onclose: null };
+  server.accept(connection);
+  connection.onmessage(encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: game.schema.hash }), 'reliable');
+  connection.onclose(1000, 'gone');
+  server.step();
+  assert.deepEqual(server.players, []);
+  assert.ok(!server.state.boxes.has(1), 'the joined-then-left player is not in the state');
+});

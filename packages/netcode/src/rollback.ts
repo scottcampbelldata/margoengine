@@ -218,6 +218,10 @@ export class RollbackSession<State, Input> {
         const frame = r.varint(),
           hash = r.u32();
         r.end();
+        // Only frames this peer can still compare are kept: a peer cannot confirm a frame past the inputs this one
+        // sent, and older ones were pruned here already, so anything else would only grow the map.
+        if (!this.every || frame % this.every || frame < this.confirmedFrame - 32 * this.every) return;
+        if (frame > this.frameNumber + this.depth + this.delay + MAX_INPUTS) return;
         remote.checksums.set(frame, hash);
         this.compare(player, remote, frame);
       } else throw r.fail(`has unknown kind ${kind}`);
@@ -347,6 +351,8 @@ export class RollbackSession<State, Input> {
           this.compare(player, remote, f);
         }
         for (const key of this.checksums.keys()) if (key < f - 32 * this.every) this.checksums.delete(key);
+        for (const remote of this.remotes.values())
+          for (const key of remote.checksums.keys()) if (key < f - 32 * this.every) remote.checksums.delete(key);
       }
     }
     this.confirmedFrame = Math.max(this.confirmedFrame, final);

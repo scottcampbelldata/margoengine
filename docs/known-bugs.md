@@ -5849,3 +5849,8 @@ stops at `implicitFootprint: compat differs from native`: all eight `.linear/obl
 came in with 42d6e24ae and was edited by 43b65e70e (both another machine's sampler-footprint work), and it fails the
 same way before and after 60552800e, so the Mac's per-frame framebuffer re-attach is not the cause. The test is not
 changed. Repro: `MARGO_GPU_SLOTS=2 node packages/webgl2-compat/test/features-browser.mjs` on the M6.
+
+## Batch 132 audit: netcode (fixed)
+
+- Fixed: `GameServer` (packages/netcode/src/server.ts) queued a join on hello and a leave on close, and `step()` runs leaves before joins. A client that said hello and closed before the next tick got `game.leave` first (a no-op) and then `game.join`, so its player stayed in the authoritative state for good, and every client saw it; a hostile client could repeat hello and close to fill the state. A leave now cancels a join that has not run. Regression: "a player who joins and leaves within one tick leaves no ghost in the state" in packages/netcode/tests/netcode.test.js.
+- Fixed: `RollbackSession` (packages/netcode/src/rollback.ts) stored every checksum a peer sent, whatever its frame, and only deleted one when it compared it. A broken or hostile peer sending checksums for frames off the exchange interval or far past anything it could have confirmed grew the map without bound (10,000 entries from 10,000 messages in the test). Such checksums are now refused and stale ones pruned with this peer's own. Regression: "checksums a peer sends for frames that can never be compared are not kept" in packages/netcode/tests/rollback.test.js.

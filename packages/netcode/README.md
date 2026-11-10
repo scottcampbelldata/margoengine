@@ -68,7 +68,8 @@ frame; the loop above drives both by hand so the example runs anywhere, at once,
   both ends hold. `schema.json` is the normalized definition a generator in another language reads (see "Wire format").
 - **Authoritative server** (`GameServer`): fixed-timestep ticks (`run` in real time, scheduled from a fixed start so
   timer error does not drift the rate; `step` for one tick), per-player input buffers keyed by tick, the player's last
-  input when this tick's has not arrived, joins and leaves at the start of a tick, snapshots against the newest
+  input when this tick's has not arrived, joins and leaves at the start of a tick (a player who leaves before that
+  tick never reaches the game), snapshots against the newest
   snapshot each client confirmed (or in full), per-player views (`view`) for interest management or hidden
   information, reliable game messages (`send`, `onmessage`), `kick`, `close` and `using`.
 - **Client** (`GameClient.join` resolves once welcomed, clock-synced and holding a snapshot): runs ahead of the server by

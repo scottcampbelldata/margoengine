@@ -216,3 +216,30 @@ test('rollback: peers come back from an outage longer than the redundancy', () =
   const after = Math.min(...sessions.map((s) => s.confirmed));
   assert.ok(after > during + 60, `confirmed ${during} during the outage and ${after} after it`);
 });
+
+test('checksums a peer sends for frames that can never be compared are not kept', () => {
+  const connection = { send() {}, close() {}, onmessage: null, onclose: null };
+  const session = new RollbackSession(game, {
+    players: [1, 2],
+    local: 1,
+    peers: new Map([[2, connection]]),
+    input: () => ({ x: 0, y: 0, boost: false }),
+  });
+  const message = (frame) => {
+    const bytes = [33];
+    for (let v = frame; ; v = Math.floor(v / 128)) {
+      if (v < 128) {
+        bytes.push(v);
+        break;
+      }
+      bytes.push((v % 128) | 128);
+    }
+    return new Uint8Array([...bytes, 1, 2, 3, 4]);
+  };
+  // A hostile or broken peer: checksums far ahead of any frame it could have confirmed, and off the exchange interval.
+  for (let k = 1; k <= 5000; k++) connection.onmessage(message(30 * (k + 1000)), 'reliable');
+  for (let k = 1; k <= 5000; k++) connection.onmessage(message(30 * k + 7), 'reliable');
+  for (let i = 0; i < 10; i++) session.advance();
+  assert.equal(session.remotes.get(2).checksums.size, 0);
+  assert.equal(session.stats.checked, 0);
+});

@@ -54,7 +54,10 @@ export interface GameServerStats {
   inputs: number;
   /** Inputs that arrived after their tick ran. */
   lateInputs: number;
-  /** Inputs dropped by `validateInput`, as duplicates, or as too far ahead. */
+  /**
+   * Inputs dropped by `validateInput` or as too far ahead. The repeated copies of an input that later input messages
+   * carry are not counted.
+   */
   rejectedInputs: number;
   /** Ticks a playing client had no input for (its last input was used). */
   missedInputs: number;
@@ -204,8 +207,12 @@ export class GameServer<State, Input> {
   }
 
   private remove(peer: Peer<State, Input>): void {
-    if (!this.peers.delete(peer)) return;
-    if (peer.playing) this.leaves.push(peer.player);
+    if (!this.peers.delete(peer) || !peer.playing) return;
+    // A player who leaves before the tick that would add it never reaches the game: step() runs leaves before joins,
+    // so queueing both would leave it in the state for good.
+    const pending = this.joins.indexOf(peer.player);
+    if (pending >= 0) this.joins.splice(pending, 1);
+    else this.leaves.push(peer.player);
   }
 
   private receive(peer: Peer<State, Input>, data: Uint8Array, _channel: Delivery): void {
