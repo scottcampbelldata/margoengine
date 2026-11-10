@@ -4457,3 +4457,5 @@ Batch 265 integration observation: on main baseline 298227511, scripts/gpu-packa
 
 ### Mesh repair validation boundary (batch 224)
 The repair entry sanitizes invalid soup positions/faces and compacts discarded vertices before calling the strict hole-fill API. The nonfinite-position fixture in packages/mesh-edit/tests/repair.test.js retains the regression; validation is not weakened. Remaining open borders, zero volume and geometric reconstruction limits are explicitly reported and documented in docs/limits.md.
+
+Batch 210 job 2: no open playback defect found by the loop, endpoint, event, promise, subscriber/owner cancellation and failed-attachment regressions. The umbrella generator restores the pre-existing missing selection/hit-details alias; the existing umbrella test guards generated consistency.

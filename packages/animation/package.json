@@ -31,7 +31,8 @@
     "test:gpu:instanced-skin": "cd ../.. && node scripts/animation-instanced-skin-tests.js",
     "test:gpu:geometry-cache": "cd ../.. && node scripts/animation-geometry-cache-tests.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu:mixer": "cd ../.. && node packages/animation/tests/mixer-browser.mjs"
+    "test:gpu:mixer": "cd ../.. && node packages/animation/tests/mixer-browser.mjs",
+    "test:gpu:playback": "cd ../.. && node packages/animation/tests/playback-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -90,6 +91,10 @@
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
+    },
+    "./playback": {
+      "types": "./dist/playback.d.ts",
+      "import": "./dist/playback.js"
     }
   },
   "files": [

@@ -94,6 +94,10 @@
       "types": "./dist/animation/mixer.d.ts",
       "import": "./dist/animation/mixer.js"
     },
+    "./animation/playback": {
+      "types": "./dist/animation/playback.d.ts",
+      "import": "./dist/animation/playback.js"
+    },
     "./animator": {
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
@@ -1762,6 +1766,10 @@
       "types": "./dist/loaders/xml.d.ts",
       "import": "./dist/loaders/xml.js"
     },
+    "./loaders/vtk-legacy": {
+      "types": "./dist/loaders/vtk-legacy.d.ts",
+      "import": "./dist/loaders/vtk-legacy.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
@@ -2053,6 +2061,10 @@
     "./mesh-edit/boolean-batch": {
       "types": "./dist/mesh-edit/boolean-batch.d.ts",
       "import": "./dist/mesh-edit/boolean-batch.js"
+    },
+    "./mesh-edit/repair": {
+      "types": "./dist/mesh-edit/repair.d.ts",
+      "import": "./dist/mesh-edit/repair.js"
     },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
@@ -2945,6 +2957,10 @@
     "./selection/xray": {
       "types": "./dist/selection/xray.d.ts",
       "import": "./dist/selection/xray.js"
+    },
+    "./selection/area": {
+      "types": "./dist/selection/area.d.ts",
+      "import": "./dist/selection/area.js"
     },
     "./shader": {
       "types": "./dist/shader.d.ts",
@@ -4189,10 +4205,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./loaders/vtk-legacy": {
-      "types": "./dist/loaders/vtk-legacy.d.ts",
-      "import": "./dist/loaders/vtk-legacy.js"
     }
   },
   "dependencies": {
