@@ -121,6 +121,32 @@ const cases = {
     run(device, p, [group(device, p, [src, samp, dst, { buffer: k }])], 2, 2);
     return { values: f16(await readTexture(device, dst, { bytes: 8 })), tier: tierOf(p), tolerance: 2e-3 };
   },
+  // An rgba8unorm store of values just past a half step, (k + 0.52) / 255 and the like: WebGPU rounds each to k + 1.
+  // The layer draws into a colour attachment, whose export the Radeon 680M's D3D11 driver narrows to binary16 by
+  // truncation first (k + 0.52 became k + 0.477, so k), unless the layer rounds to the 255 steps in the shader.
+  async fragmentUnormRound(device) {
+    const p = compute(device, `
+      @group(0) @binding(0) var dst: texture_storage_2d<rgba8unorm, write>;
+      @compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) id: vec3u) {
+        let k = f32(id.x + id.y * 16u);
+        textureStore(dst, id.xy, vec4f(k + 0.52, k + 0.48, k + 0.505, k + 0.5625) / 255.0);
+      }`);
+    const dst = texture(device, { size: [16, 16], usage: U.STORAGE_BINDING | U.COPY_SRC });
+    run(device, p, [group(device, p, [dst])], 2, 2);
+    return { values: [...(await readTexture(device, dst, { bytes: 4 }))], tier: tierOf(p) };
+  },
+  // The same values on the scatter tier: each invocation stores the texel mirrored from its own.
+  async scatterUnormRound(device) {
+    const p = compute(device, `
+      @group(0) @binding(0) var dst: texture_storage_2d<rgba8unorm, write>;
+      @compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) id: vec3u) {
+        let k = f32(id.x + id.y * 16u);
+        textureStore(dst, vec2u(15u - id.x, id.y), vec4f(k + 0.52, k + 0.48, k + 0.505, k + 0.5625) / 255.0);
+      }`);
+    const dst = texture(device, { size: [16, 16], usage: U.STORAGE_BINDING | U.COPY_SRC });
+    run(device, p, [group(device, p, [dst])], 2, 2);
+    return { values: [...(await readTexture(device, dst, { bytes: 4 }))], tier: tierOf(p) };
+  },
   async fragmentLayers(device) {
     const p = compute(device, `
       @group(0) @binding(0) var layers: texture_storage_2d_array<rgba8unorm, write>;

@@ -11,6 +11,8 @@ import { openBrowser } from '../../../scripts/browser.js';
 const TIERS = {
   firstPipeline: 'scatter',
   fragmentStore: 'fragment',
+  fragmentUnormRound: 'fragment',
+  scatterUnormRound: 'scatter',
   fragmentLayers: 'fragment',
   fragmentReadWrite: 'fragment',
   fragmentMipViews: 'fragment',

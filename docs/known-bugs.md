@@ -71,6 +71,27 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   decision 2026-11-09), with a control that drops one box from the culled engine alone and must show. `meshlets-check`
   compares A and B without MSAA instead. On the WebGL2 layer the resolved frames are compared as before.
 
+### Radeon 680M: a colour attachment's export narrows the shader output to binary16 by truncation (list 5 R6 row 25, 2026-11-10, worked around in webgl2-compat)
+
+- **What:** `packages/webgl2-compat` `test:gpu:preview-contract` (`test/package-tiers-browser.mjs`) on the Beelink
+  (Radeon 680M, driver 32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): the procedural texture baker (bricks,
+  16 x 16) stored red 133 at texel (3, 0) on the WebGL2 layer where native WebGPU stores 134; the other 15 texels of
+  the row matched.
+- **Repro:** a CPU model of the bake in f32 (the bricks shader, op by op): texel 3 is 133.5204 / 255. Rounded straight
+  from f32, as a WebGPU storage texture store does, that is 134, and the model gives native's whole row. Truncated to
+  binary16 first (11 significant bits: 0.523609 becomes 0.5234375, 133.477 / 255) and then rounded, it is 133, and
+  that model gives the layer's whole row. `compute-browser.mjs` case `fragmentUnormRound` stores (k + 0.52) / 255 and
+  three other near-half values into an rgba8unorm storage texture: before the fix the layer stored k on many texels
+  (the first at texel 8, blue 8.505 / 255) where native WebGPU stores k + 1.
+- **Cause:** below Margo. The layer runs a compute store into rgba8unorm as a draw into a colour attachment, and the
+  680M's driver exports the fragment output to an 8-bit target as binary16, truncating, before the UNORM conversion
+  (the same truncation as R6 row 7's half targets). The conversion rounding of a colour write is implementation
+  chosen, so this is allowed; NVIDIA exports f32 and matches.
+- **Workaround (`packages/webgl2-compat/src/compute/glsl.ts`):** the fragment and scatter tiers round a float texel to
+  the 255 steps in the shader before an 8-bit UNORM target stores it, as the CPU tier's quantize already did. A value
+  on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores k.
+  `fragmentUnormRound` and `scatterUnormRound` pass, and so does the baker comparison.
+
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 
 - **What:** on the WebGL2 layer, which runs no level or cluster kernel and culls no loaded model, `MeshletMesh`

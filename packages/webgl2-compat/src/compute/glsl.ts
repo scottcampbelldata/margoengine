@@ -54,6 +54,16 @@ const SWIZZLE = 'xyzw';
 const texelType = (format: string): string =>
   ({ f32: 'vec4', i32: 'ivec4', u32: 'uvec4' })[STORAGE_FORMATS[format] ?? 'f32'] as string;
 
+/**
+ * A float texel as an 8-bit UNORM storage texture keeps it, rounded in the shader. WebGPU stores a texel straight from
+ * f32, rounded to the nearest of the 255 steps (the CPU tier's quantize does the same). A draw into a colour attachment
+ * may narrow the shader's output first: the Radeon 680M's D3D11 driver exports it as binary16, truncated to 11
+ * significant bits, so 133.52 / 255 stored 133 there, not 134 (docs/known-bugs.md). A value already on the k / 255
+ * grid survives any narrowing to 11 or more bits (the error stays under 0.13 of a step), so every GPU stores k.
+ */
+const storedTexel = (format: string | undefined, value: string): string =>
+  /^(r|rg|rgba|bgra)8unorm$/.test(format ?? '') ? `(floor(clamp(${value}, 0.0, 1.0) * 255.0 + 0.5) / 255.0)` : value;
+
 /** Translates a compute entry point for one target in the fragment or scatter tier. */
 export function emitCompute(
   module: IRModule,
@@ -92,7 +102,8 @@ function fullTriangle(): ComputeStage {
 /** The fragment stage of the scatter tier: the point's value, as the target stores it. */
 function pointFragment(target: ComputeTarget): ComputeStage {
   const t = target.kind === 'buffer' ? 'uvec4' : texelType(target.format as string);
-  const value = t === 'uvec4' ? '_sv' : t === 'ivec4' ? 'ivec4(_sv)' : 'uintBitsToFloat(_sv)';
+  const value =
+    t === 'uvec4' ? '_sv' : t === 'ivec4' ? 'ivec4(_sv)' : storedTexel(target.format, 'uintBitsToFloat(_sv)');
   return {
     ...empty,
     stage: 'fragment',
@@ -206,7 +217,7 @@ class ComputeEmitter extends StageEmitter {
       return '';
     }
     if (this.tier === 'fragment') {
-      this.line(`_o0 = ${value}; _w = true;`);
+      this.line(`_o0 = ${vt === 'vec4' ? storedTexel(tt.format as string, value) : value}; _w = true;`);
       return '';
     }
     const p =
