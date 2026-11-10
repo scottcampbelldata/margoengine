@@ -29,7 +29,7 @@ fn margoBaseLevel(slot:i32,uv:vec2f,level:i32,linear:bool)->vec4f {
 fn margoBaseSample(slot:i32,at:vec2f)->vec4f {
   let a=margoBaseInfo.rows[slot*2];let b=margoBaseInfo.rows[slot*2+1];
   let dx=dpdx(at)*a.xy;let dy=dpdy(at)*a.xy;let lod=log2(max(max(length(dx),length(dy)),0.000001));
-  let linear=select(b.x>0.5,a.w>0.5,lod<=0.0||b.y>1.5);
+  let linear=select(b.x>0.5,a.w>0.5,lod<=0.0);
   let l=select(clamp(lod,0.0,a.z-1.0),0.0,b.y>1.5);
   if(b.y<0.5){return margoBaseLevel(slot,at,i32(floor(l+0.5)),linear);}
   let lo=i32(floor(l));let hi=min(lo+1,i32(a.z)-1);

@@ -1140,3 +1140,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/stage (batch 183 job 2): cover stage/lights definitions, defaults/units, shared ownership, automatic and manual receivers, cancellation, disposal and the native/compatibility device requirement.
 - @margoengine/clustered (batch 183 job 2): document hasReceiver and its false-after-removal/disposal contract.
 - margoengine (batch 183 job 2): document the generated stage/lights alias during the README phase.
+
+- @margoengine/gltf-pro (review 4): cover independent non-mip min/mag filtering on ordinary and packed physical textures and unchanged native interpolation differences; examples deferred.

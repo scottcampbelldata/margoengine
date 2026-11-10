@@ -118,6 +118,7 @@ async function scene(materials, extra = {}) {
     null,
   );
   engine.camera.update(4 / 3, true);
+  extra.configureGPU?.(gpu);
   const fixture = animatedTriangle(),
     primitive = fixture.doc.meshes[0].primitives[0],
     uv = new Float32Array([0, 0, 1, 0, 0.5, 1]);
@@ -151,6 +152,34 @@ async function scene(materials, extra = {}) {
   store.tick(false);
   return { gpu, engine, model, view: context(gpu, { samples: 4, format: 'rgba16float', depthFormat: 'depth32float' }) };
 }
+
+test('non-mip glTF samplers preserve minification independently from magnification', async () => {
+  for (const minFilter of [9728, 9729]) {
+    const descriptors = [],
+      magFilter = minFilter === 9728 ? 9729 : 9728,
+      { engine, model } = await scene([{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }], {
+        doc: { textures: [{ source: 0, sampler: 0 }], images: [{}], samplers: [{ minFilter, magFilter }] },
+        images: [{ width: 4, height: 4, close() {} }],
+        configureGPU(gpu) {
+          const create = gpu.device.createSampler;
+          gpu.device.createSampler = (descriptor) => {
+            descriptors.push({ ...descriptor });
+            return create(descriptor);
+          };
+        },
+      });
+    try {
+      const sampler = descriptors.find((s) => s.lodMaxClamp !== undefined);
+      assert.equal(sampler.minFilter, minFilter === 9728 ? 'nearest' : 'linear');
+      assert.equal(sampler.magFilter, magFilter === 9728 ? 'nearest' : 'linear');
+      assert.equal(sampler.mipmapFilter, 'nearest', 'sample only level zero without forcing magnification');
+      assert.equal(sampler.lodMaxClamp, 0.25, 'a positive LOD keeps minification active, nearest mip stays zero');
+    } finally {
+      model.dispose();
+      engine.dispose();
+    }
+  }
+});
 
 for (const variant of ['physical', 'extended', 'factors']) {
   test(`${variant} clearcoat without a normal map retains the geometric normal`, async () => {

@@ -77,7 +77,7 @@ await runSuite(
           sam = input.sampler;
         const lod = Math.log2((Math.max(input.width, input.height) * scale) / 32);
         const linear =
-          (lod <= 0 || [9728, 9729].includes(sam.minFilter)
+          (lod <= 0
             ? sam.magFilter
             : [9728, 9984, 9986].includes(sam.minFilter)
               ? 9728
@@ -140,8 +140,8 @@ await runSuite(
                         s.wrapT === 33071 ? 'clamp-to-edge' : s.wrapT === 33648 ? 'mirror-repeat' : 'repeat',
                       magFilter: magFilter === 9728 ? 'nearest' : 'linear',
                       minFilter: [9728, 9984, 9986].includes(minFilter) ? 'nearest' : 'linear',
-                      mipmapFilter: [9984, 9985].includes(minFilter) ? 'nearest' : 'linear',
-                      lodMaxClamp: [9728, 9729].includes(minFilter) ? 0 : 32,
+                      mipmapFilter: [9728, 9729, 9984, 9985].includes(minFilter) ? 'nearest' : 'linear',
+                      lodMaxClamp: [9728, 9729].includes(minFilter) ? 0.25 : 32,
                     });
                     const pair = [];
                     for (const manual of [false, true]) {
@@ -186,15 +186,22 @@ await runSuite(
                       texture.destroy();
                     }
                     let error = 0,
-                      nativeError = 0;
+                      nativeError = 0,
+                      nativeTruthError = 0;
                     for (let i = 0; i < pair[0].length; i++) {
                       const pixel = Math.floor(i / 4),
                         truth = expected(input, slot, scale, pixel % 32, Math.floor(pixel / 32), i % 4);
                       error = Math.max(error, Math.abs(truth - pair[1][i]));
+                      nativeTruthError = Math.max(nativeTruthError, Math.abs(truth - pair[0][i]));
                       nativeError = Math.max(nativeError, Math.abs(pair[0][i] - pair[1][i]));
                     }
                     if (!Number.isFinite(error) || error > 0.005)
                       throw new Error(JSON.stringify({ minFilter, magFilter, wrapS, slot, scale, error, nativeError }));
+                    // Nearest mode has no implementation-defined interpolation weights; this also checks the
+                    // native sampler selects minFilter at positive footprint LOD when mip selection is disabled.
+                    const nearest = Math.max(input.width, input.height) * scale <= 32 ? magFilter === 9728 : minFilter === 9728;
+                    if ([9728, 9729].includes(minFilter) && nearest && (!Number.isFinite(nativeTruthError) || nativeTruthError > 0.005))
+                      throw new Error(JSON.stringify({ minFilter, magFilter, wrapS, slot, scale, nativeTruthError }));
                     maxError = Math.max(maxError, error);
                     if (nativeError > maxNativeError) {
                       maxNativeError = nativeError;

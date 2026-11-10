@@ -2944,8 +2944,8 @@ export class PBRModel implements EnginePlugin {
           addressModeV: wrap(s.wrapT),
           magFilter: s.magFilter === 9728 ? 'nearest' : 'linear',
           minFilter: [9728, 9984, 9986].includes(s.minFilter!) ? 'nearest' : 'linear',
-          mipmapFilter: [9984, 9985].includes(s.minFilter!) ? 'nearest' : 'linear',
-          lodMaxClamp: [9728, 9729].includes(s.minFilter!) ? 0 : 32,
+          mipmapFilter: [9728, 9729, 9984, 9985].includes(s.minFilter!) ? 'nearest' : 'linear',
+          lodMaxClamp: [9728, 9729].includes(s.minFilter!) ? 0.25 : 32,
         },
         samplerKey = Object.values(state).join();
       let samplers = deviceSamplers.get(device);
