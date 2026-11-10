@@ -982,3 +982,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/staging (batch 272 job 3): cover ProductCaustics source snapshots, glass/water IOR, point/directional lights, floor/frame/photon controls, update/readMap/restore and transport limitations; examples deferred.
 - margoengine (batch 272 job 3): document staging/caustics forwarding; examples deferred.
+
+- margoengine: retain canonical package-group and entry order when maintaining generated aliases; this repair adds no API.
