@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12124065,
+  "total": 12130907,
   "history": [
     {
       "date": "2026-10-24",
@@ -5420,6 +5420,12 @@
       "commit": "2f9dec9e1",
       "reason": "Batch 255 job 4: new optional signed safe storage entry, 0 to 2581 B gzip; complete safe frame and key authentication with two-copy recovery in one entry. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-197",
+      "reason": "New optional controls/box-gizmo: 0 to 6586 B min+gzip, ceiling 6842 B. Includes wireframe, 20 handles, parent-aware transforms and both backends through the existing overlay; core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6443,6 +6449,7 @@
     "margoengine/game": 996,
     "margoengine/react/instances": 318,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/controls/box-gizmo": 6842
   }
 }

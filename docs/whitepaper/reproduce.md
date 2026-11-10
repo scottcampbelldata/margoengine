@@ -2575,3 +2575,6 @@ source-cell indices for fixed corners, repeat edges, flips and scrolled fills.
 ### Authenticated saves (batch 255 job 4)
 
 Build packages, then run node --test --test-timeout=120000 packages/save/tests/signed.test.js. The save package test:gpu command also exercises signedStorage with native WebCrypto and IndexedDB across page reload in safe-check.mjs. Run that changed-package suite normally and with MARGO_COMPAT=1, each through the shared GPU lock. Its generated binary fixtures and deterministic test keys are tests, not production secrets or a public asset demo. No speed or timing-only assertion is used.
+### Batch 197 BoxGizmo
+
+After build:packages, run node --test --test-timeout=30000 packages/controls/tests/box-gizmo.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js box-gizmo. Read packages/controls/test-results/box-gizmo-browser.json for both backend pixel and transform checks.

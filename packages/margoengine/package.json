@@ -626,6 +626,10 @@
       "types": "./dist/controls/collide.d.ts",
       "import": "./dist/controls/collide.js"
     },
+    "./controls/box-gizmo": {
+      "types": "./dist/controls/box-gizmo.d.ts",
+      "import": "./dist/controls/box-gizmo.js"
+    },
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"

@@ -3023,3 +3023,6 @@ work-count claim, not a measured speed claim. Core/stage are unchanged.
 ### Authenticated safe saves (batch 255 job 4)
 
 save/signed binds format, physical key and complete generation/payload frame with WebCrypto HMAC-SHA-256, then delegates redundant-copy recovery to safeStorage. Tests in packages/save/tests/signed.test.js independently recompute stored tags with node:crypto, flip every stored byte, swap roles/keys, reject wrong keys and CRC-valid unsigned edits, and observe cancellation during crypto. The real browser safe-check.mjs checks IndexedDB persistence across reload and recovers the trusted older copy after tampering. This is integrity with an application-managed shared secret, not encryption or rollback protection.
+### Batch 197 bounding-box editing
+
+The optional BoxGizmo provides eight corner scale and twelve edge rotation handles on both rendering backends. CPU evidence in packages/controls/tests/box-gizmo.test.js covers exact transformed bounds, snapping, opposite-corner/centre pivots, nonuniform parents, all three local rotation axes, pointer capture, cancellation and cleanup. The matching browser fixture checks cyan/yellow handle pixels, overlay triangles, scale and edge rotation on WebGPU/WebGL2. This is a mesh-bounds editor, with no hierarchy or deformed-mesh bounds claim.

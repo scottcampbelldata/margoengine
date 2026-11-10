@@ -4103,3 +4103,6 @@ The numerical/consumer limits are in limits.md and the sciviz README; no algorit
 Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.
 
 Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.
+`scripts/gpu-package-tests.mjs --serial` labels shared leases `check:gpu-packages`, so sameLane serializes unrelated worktrees with that owner; repro: queue serial suites in two lanes. Workaround for this lane: wrap the real GPU suite with gpu-lock run --owner=codex-batch197; leave shared scheduler repair for the fix phase.
+
+React test:browser:bindings and test:browser:instances scripts assume repository-root cwd in scripts/browser.js startDevServer, but their package commands run in packages/react and request /packages/react/tests/*.html, producing HTTP 404. Repro: run the package scripts; both scripts pass from the repository root on WebGPU and --compat. Fix phase: correct owning package commands and add a cwd regression.

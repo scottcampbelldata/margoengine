@@ -5481,3 +5481,6 @@ pivot and sort keys. Repeat counts and phase map UVs within each source cell,
 using integer loads or explicit-gradient linear sampling. Core and stage have
 no changes. CPU layout and real pixel readback fixtures are in sprites/tests/
 slice.test.js and slice-check.mjs; both GPU backends are required before landing.
+### Section 5 evidence: batch 197 BoxGizmo
+
+The optional controls/box-gizmo reuses controls' OverlayRenderer and tessellate paths for WebGPU and WebGL2. Exact local mesh bounds feed transformed wireframe edges and fixed CSS-size handle triangles; no core or stage change. Its optional-browser fixture checks both backend colors, triangle counts and edited transforms. Original-pose CPU tests cover parent-frame pivot preservation, three rotation axes, snapping and cancellation. Device restoration releases overlay GPU resources through the package plugin. Bounds do not include child meshes, skinning or morph deformation.

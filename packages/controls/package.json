@@ -31,7 +31,8 @@
     "prepack": "npm run build",
     "test:browser:walk": "npm run build && node scripts/test-walk-browser.js",
     "test:browser:globe": "npm run build && node scripts/test-optional-browser.js globe",
-    "test:browser:collide": "npm run build && node scripts/test-optional-browser.js collide"
+    "test:browser:collide": "npm run build && node scripts/test-optional-browser.js collide",
+    "test:browser:box-gizmo": "npm run build && node scripts/test-optional-browser.js box-gizmo"
   },
   "sideEffects": false,
   "exports": {
@@ -86,6 +87,10 @@
     "./collide": {
       "types": "./dist/collide.d.ts",
       "import": "./dist/collide.js"
+    },
+    "./box-gizmo": {
+      "types": "./dist/box-gizmo.d.ts",
+      "import": "./dist/box-gizmo.js"
     }
   },
   "files": [
