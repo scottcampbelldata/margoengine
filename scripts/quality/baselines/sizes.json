@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15171454,
+  "total": 15171885,
   "history": [
     {
       "date": "2026-10-24",
@@ -7846,6 +7846,12 @@
       "commit": "ab91b0dda",
       "reason": "splines/closest exact closest-point search (quintic root isolation per piece), 983 to 1478 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "88665f01b",
+      "reason": "R5 tiles review fixes: shared data URI decoder and FLOAT feature IDs in the features entry (9837 to 9968 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8913,7 +8919,7 @@
     "@margoengine/tilemap/tiled": 7483,
     "@margoengine/tiles": 16288,
     "@margoengine/tiles/fade": 2015,
-    "@margoengine/tiles/features": 9837,
+    "@margoengine/tiles/features": 10268,
     "@margoengine/tiles/i3dm": 1629,
     "@margoengine/tiles/imagery": 7451,
     "@margoengine/tiles/ion": 3001,

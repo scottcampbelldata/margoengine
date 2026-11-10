@@ -67,25 +67,40 @@ for (const kind of ['model', 'points']) {
     const f = fixture();
     let finish;
     let released = 0;
-    const pending = new Promise((resolve) => { finish = resolve; });
+    const pending = new Promise((resolve) => {
+      finish = resolve;
+    });
     const features = new TileFeatures(f.engine, { decorate: () => pending });
     const work = features.decorate({ ...f.context, kind });
     features.dispose();
-    finish({ bytes: 1, dispose() { released++; } });
+    finish({
+      bytes: 1,
+      dispose() {
+        released++;
+      },
+    });
     await assert.rejects(work, { code: 'disposed' });
     assert.equal(released, 1);
   });
 }
 
 test('aborting a pending preceding decorator releases it and preserves a falsy reason', async () => {
-  const f = fixture(), controller = new AbortController();
+  const f = fixture(),
+    controller = new AbortController();
   let finish;
   let released = 0;
-  const pending = new Promise((resolve) => { finish = resolve; });
+  const pending = new Promise((resolve) => {
+    finish = resolve;
+  });
   const features = new TileFeatures(f.engine, { decorate: () => pending });
   const work = features.decorate({ ...f.context, signal: controller.signal });
   controller.abort(false);
-  finish({ bytes: 1, dispose() { released++; } });
+  finish({
+    bytes: 1,
+    dispose() {
+      released++;
+    },
+  });
   try {
     await assert.rejects(work, (error) => error === false);
     assert.equal(released, 1);
@@ -104,11 +119,23 @@ test('controller disposal during feature image decoding rejects the decoration a
   });
   let finish, started;
   let released = 0;
-  const pending = new Promise((resolve) => { finish = resolve; });
-  const decoding = new Promise((resolve) => { started = resolve; });
+  const pending = new Promise((resolve) => {
+    finish = resolve;
+  });
+  const decoding = new Promise((resolve) => {
+    started = resolve;
+  });
   const features = new TileFeatures(f.engine, {
-    decorate: () => ({ bytes: 1, dispose() { released++; } }),
-    image: () => { started(); return pending; },
+    decorate: () => ({
+      bytes: 1,
+      dispose() {
+        released++;
+      },
+    }),
+    image: () => {
+      started();
+      return pending;
+    },
   });
   const work = features.decorate(f.context);
   await decoding;
@@ -351,4 +378,98 @@ test('feature texture transforms and UINT32 shader factors remain exact and budg
   assert.equal(decoration.bytes, 0);
   assert.equal(destroyed, 1);
   features.dispose();
+});
+test('feature ID texture transforms pick and highlight the texel gltf-pro draws (review 5)', async () => {
+  const { textureCoordinates } = await import('../../gltf-pro/dist/index.js');
+  const transform = { offset: [0.25, 0.5], rotation: Math.PI / 2, scale: [2, 1] };
+  const f = fixture((doc) => {
+    const p = doc.meshes[0].primitives[0];
+    p.attributes.TEXCOORD_0 = p.attributes.POSITION;
+    const set = p.extensions.EXT_mesh_features.featureIds[0];
+    delete set.attribute;
+    delete set.propertyTable;
+    set.texture = { index: 0, channels: [0], extensions: { KHR_texture_transform: transform } };
+    doc.textures = [{ source: 0 }];
+  });
+  const m = textureCoordinates({ extensions: { KHR_texture_transform: transform } }).transform;
+  const drawn = (uv) => [m[0] * uv[0] + m[1] * uv[1] + m[2], m[4] * uv[0] + m[5] * uv[1] + m[6]];
+  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, COPY_DST: 2 };
+  f.engine.gpu = {
+    createTexture: () => ({ createView: () => ({}), destroy() {} }),
+    queue: { writeTexture() {} },
+    createSampler: () => ({}),
+  };
+  f.model.asset.accessor = () => new Float32Array(8);
+  const features = new TileFeatures(f.engine, { image: () => ({ width: 1, height: 1, data: new Uint8Array(4) }) });
+  await features.decorate(f.context);
+  const set = { texture: f.doc.meshes[0].primitives[0].extensions.EXT_mesh_features.featureIds[0].texture };
+  features.highlight(features.resolve(pick(f)));
+  const code = f.primitive.extension.wgsl;
+  const rows = [...code.matchAll(/dot\(vec2f\(([^,()]+),([^,()]+)\),uv\(i,0\.0\)\)\+([^,()]+)/g)].map((r) =>
+    r.slice(1, 4).map(Number),
+  );
+  assert.equal(rows.length, 2, 'the highlight shader applies the transform as one affine map');
+  for (const uv of [
+    [0.1, 0.3],
+    [0.7, 0.2],
+    [0.5, 0.95],
+  ]) {
+    const cpu = features.transformed(set, uv),
+      gpu = rows.map(([a, b, c]) => a * uv[0] + b * uv[1] + c);
+    drawn(uv).forEach((v, k) => {
+      assert.ok(Math.abs(cpu[k] - v) < 1e-6, `CPU pick ${cpu} vs drawn ${drawn(uv)}`);
+      assert.ok(Math.abs(gpu[k] - v) < 1e-6, `GPU highlight ${gpu} vs drawn ${drawn(uv)}`);
+    });
+  }
+  features.dispose();
+});
+test('FLOAT feature ID attributes (EXT_mesh_features, legacy b3dm _BATCHID) decode as IDs, not raw bits (review 5)', () => {
+  const features = new TileFeatures({ use() {}, removePlugin() {} });
+  const ids = new Float32Array([0, 1, 2, 3]);
+  const asset = {
+    maxBytes: 1 << 20,
+    doc: {
+      accessors: [{ componentType: 5126, type: 'SCALAR', count: 4, bufferView: 0 }],
+      bufferViews: [{ byteLength: 16 }],
+    },
+    view: () => new Uint8Array(ids.buffer),
+  };
+  assert.deepEqual([...features.rawIds({ asset }, 0)], [0, 1, 2, 3]);
+  ids[2] = 1.5;
+  assert.throws(() => features.rawIds({ asset }, 0), /non-integer/);
+});
+test('percent-encoded binary data: URI feature images decode to their exact bytes (review 5)', async () => {
+  const { deflateSync } = await import('node:zlib');
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
+    return n >>> 0;
+  });
+  const crc = (b) => (b.reduce((c, x) => crcTable[(c ^ x) & 255] ^ (c >>> 8), 0xffffffff) ^ 0xffffffff) >>> 0;
+  const chunk = (type, data) => {
+    const body = new Uint8Array([...new TextEncoder().encode(type), ...data]),
+      out = new DataView(new ArrayBuffer(body.length + 8));
+    out.setUint32(0, data.length);
+    new Uint8Array(out.buffer).set(body, 4);
+    out.setUint32(body.length + 4, crc(body));
+    return [...new Uint8Array(out.buffer)];
+  };
+  const ihdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0];
+  const png = Uint8Array.from([
+    0x89,
+    0x50,
+    0x4e,
+    0x47,
+    0x0d,
+    0x0a,
+    0x1a,
+    0x0a,
+    ...chunk('IHDR', ihdr),
+    ...chunk('IDAT', deflateSync(Uint8Array.of(0, 7, 0, 0, 255))),
+    ...chunk('IEND', []),
+  ]);
+  const uri = 'data:image/png,' + [...png].map((b) => '%' + b.toString(16).padStart(2, '0')).join('');
+  const model = { asset: { doc: { textures: [{ source: 0 }], images: [{ uri }] } } };
+  const features = new TileFeatures({ use() {}, removePlugin() {} });
+  await features.prepareImage({ model, context: {} }, { texture: { index: 0 } });
+  assert.equal(features.images.get(model).get(0).data[0], 7);
 });

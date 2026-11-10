@@ -3,6 +3,8 @@ import type { GLTFAsset } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
 import { ACCESSOR_WIDTHS } from '../../shared/accessor.js';
 import { rawAccessor } from './raw-accessor.js';
+import { applyUV, uvRows } from './uv-transform.js';
+import { dataURI } from './data-uri.js';
 import { parseJSON } from '../../shared/json.js';
 import { readResponse } from '../../shared/loading.js';
 import {
@@ -243,12 +245,7 @@ export class PropertyTextures {
       throw new TypeError(
         'Metadata texture transform needs finite scale/offset/rotation; correct KHR_texture_transform',
       );
-    const x = coordinate[0] * scale[0],
-      y = coordinate[1] * scale[1],
-      point = [
-        offset[0] + Math.cos(angle) * x - Math.sin(angle) * y,
-        offset[1] + Math.sin(angle) * x + Math.cos(angle) * y,
-      ];
+    const point = applyUV(uvRows(scale, offset, angle), coordinate[0], coordinate[1]);
     const texture = this.asset.doc.textures?.[binding.index];
     if (!texture) throw new TypeError('Property texture index is missing; add the referenced glTF texture');
     const sampler = this.asset.doc.samplers?.[texture.sampler ?? -1],
@@ -406,45 +403,6 @@ export function readPropertyMetadata(asset: GLTFAsset, options: PropertyReadOpti
       );
     },
   };
-}
-function dataURI(uri: string, maximum: number): Uint8Array | undefined {
-  if (!uri.startsWith('data:')) return undefined;
-  const comma = uri.indexOf(',');
-  if (comma < 0) throw new TypeError('Metadata data URI has no comma; provide a complete encoded resource');
-  const payload = uri.slice(comma + 1);
-  if (uri.slice(0, comma).includes(';base64')) {
-    const clean = payload.replace(/\s/g, ''),
-      size = Math.floor((clean.length * 3) / 4) - (clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0);
-    if (size > maximum)
-      throw new RangeError(
-        'Metadata data URI exceeds maximumBytes; reduce the embedded resource or raise its byte limit',
-      );
-    const text = atob(clean);
-    return Uint8Array.from(text, (c) => c.charCodeAt(0));
-  }
-  const bytes = new Uint8Array(Math.min(maximum, payload.length * 3));
-  let at = 0;
-  for (let i = 0; i < payload.length; ) {
-    let part: Uint8Array;
-    if (payload[i] === '%') {
-      const hex = payload.slice(i + 1, i + 3);
-      if (!/^[\da-f]{2}$/i.test(hex))
-        throw new TypeError('Metadata data URI has an invalid escape; percent-encode complete bytes');
-      part = Uint8Array.of(parseInt(hex, 16));
-      i += 3;
-    } else {
-      const point = payload.codePointAt(i)!;
-      part = new TextEncoder().encode(String.fromCodePoint(point));
-      i += point > 65535 ? 2 : 1;
-    }
-    if (at + part.length > bytes.length)
-      throw new RangeError(
-        'Metadata data URI exceeds maximumBytes; reduce the embedded resource or raise its byte limit',
-      );
-    bytes.set(part, at);
-    at += part.length;
-  }
-  return bytes.subarray(0, at);
 }
 /** Loads external schemas and referenced metadata images with cancellation, preserving raw PNG channels exactly. */
 export async function loadPropertyMetadata(

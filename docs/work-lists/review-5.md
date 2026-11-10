@@ -20,3 +20,19 @@ that landed from the evening of 2026-11-09 to 2026-11-10.
 | road | bb024b8db | packages/road/src/structures.ts:70 | Doc only: TunnelOpening.boundary runs from the driver's right edge, not the left | doc corrected | 63f8570af |
 | road | 0344e2b1d | | none found | Mac sweep clean: CPU 51; browser-check (WebGPU and compat) | |
 | procedural | 0c689841e, 6ab64e777 | | none found | Mac sweep clean: CPU 117; poisson, textures, caves, tree-mesh and textures-pbr browser suites on WebGPU and WebGL2 (mip area filter checked by hand for NPOT 3, 5, 7 to 1, 2, 3) | |
+
+
+## Lane E
+
+Packages, in order: tiles, splats, ui, labels, html, selection, viewcube. Scope as lane D: each package's list 2 and 3
+feat and fix commits from the evening of 2026-11-09 to 2026-11-10 (`--since=2026-11-10T00:00:00Z`).
+
+| Package | Commit | File:line | Defect | Input and wrong output | Fix |
+| --- | --- | --- | --- | --- | --- |
+| tiles | b47fdef13 | packages/tiles/src/properties.ts:246 | Property-texture KHR_texture_transform used the transposed rotation (u' = c·u − s·v), not the sign gltf-pro renders with (checked there against Khronos TextureTransformTest/MultiTest), so metadata was read from a different texel than the one drawn | 2x2 texture (10,20/30,40), clamp, `{offset:[0,1], rotation:π/2}`, uv (0.75, 0.25): read 30, drawn texel 10. Fix: one shared affine (`src/uv-transform.ts`) | this commit |
+| tiles | 81a6e2c1a | packages/tiles/src/features.ts:255 | Same transposed rotation in feature-ID texture picking | `{rotation:π/2, scale:[2,1]}`, uv (0.1, 0.3): picked (−0.3, 0.2), drawn (0.3, −0.2), so `resolve()` returned the wrong feature | this commit |
+| tiles | 81a6e2c1a | packages/tiles/src/features.ts:456 | Highlight WGSL `offset + R*uv*scale` scales after rotating (WGSL `*` is left to right) and kept the wrong sign, so the GPU highlight lit a different feature from the CPU pick | same input: shader sampled (−0.6, 0.1), CPU (−0.3, 0.2). Fix: shader emits the shared affine rows | this commit |
+| tiles | 81a6e2c1a | packages/tiles/src/features.ts:197 | FLOAT feature-ID attributes (allowed by EXT_mesh_features; legacy b3dm `_BATCHID` is commonly FLOAT) read as raw uint32 bits | FLOAT ids [0,1,2,3] gave [0, 1065353216, 1073741824, 1077936128]. Fix: decode 5126 as float, refuse non-integers | this commit |
+| tiles | 81a6e2c1a | packages/tiles/src/features.ts:228 | Percent-encoded (RFC 2397) data: URI feature images went through `decodeURIComponent`, which reads bytes as UTF-8 | `data:image/png,%89PNG...` threw `URIError: URI malformed`. Fix: the byte-exact decoder from properties, moved to `src/data-uri.ts` | this commit |
+| tiles | 3d0de41dc | packages/tiles/src/imagery.ts:614, terrain.ts:505 | EPSG:3857 quantized-mesh v was spaced evenly in Mercator Y; the quantized-mesh 1.0 format says v is a linear interpolation between the tile's south and north latitudes (the projection only sets the rectangle). The old test asserted the wrong reading and is replaced | root 3857 tile, vertex v=24000: latitude placed by Mercator spacing instead of `south + v/32767·(north − south)` (tile 1/0/1 at v=16383: 66.51° instead of 42.52°, about 2,670 km off). `meshB3dm`'s `latitudeAt` parameter is removed | this commit |
+| tiles | | | Mac sweep | CPU 121 pass; browser 23 checks, 19 WGSL modules, 0 errors on Metal. No compat run (no `--compat` mode in tiles) | clean |

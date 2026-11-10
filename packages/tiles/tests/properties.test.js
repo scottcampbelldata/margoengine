@@ -328,3 +328,43 @@ test('source triangle strips, fans and indexed lists use the correct corner orde
   metadata = readPropertyMetadata(f.asset, { image: () => image });
   assert.equal(metadata.sample(0, 0, 0, [1, 0, 0])[0].value, 40);
 });
+test('property texture KHR_texture_transform rotation matches the gltf-pro renderer texel for texel (review 5)', async () => {
+  const { textureCoordinates } = await import('../../gltf-pro/dist/index.js');
+  const schema = { classes: { c: { properties: { value: { type: 'SCALAR', componentType: 'UINT8' } } } } };
+  // 2x2 image, top row first: TL=10 TR=20 / BL=30 BR=40; clamp to edge.
+  const image = { width: 2, height: 2, data: new Uint8Array([10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0]) };
+  const texel = ([u, v]) => {
+    const at = (x) => Math.min(1, Math.floor(Math.max(0, Math.min(1, x)) * 2));
+    return image.data[(at(v) * 2 + at(u)) * 4];
+  };
+  for (const transform of [
+    { offset: [0, 1], rotation: Math.PI / 2 },
+    { offset: [0.2, 0.9], rotation: 1, scale: [2, 0.5] },
+  ])
+    for (const uv of [
+      [0.75, 0.25],
+      [0.1, 0.3],
+      [0.6, 0.9],
+    ]) {
+      const doc = {
+        extensions: {
+          EXT_structural_metadata: {
+            schema,
+            propertyTextures: [
+              {
+                class: 'c',
+                properties: { value: { index: 0, channels: [0], extensions: { KHR_texture_transform: transform } } },
+              },
+            ],
+          },
+        },
+        textures: [{ source: 0, sampler: 0 }],
+        samplers: [{ wrapS: 33071, wrapT: 33071 }],
+        meshes: [{ primitives: [{ extensions: { EXT_structural_metadata: { propertyTextures: [0] } } }] }],
+      };
+      const texture = readPropertyMetadata({ doc, maxBytes: 1024 }, { image: () => image }).propertyTextures[0];
+      const m = textureCoordinates({ extensions: { KHR_texture_transform: transform } }).transform;
+      const drawn = [m[0] * uv[0] + m[1] * uv[1] + m[2], m[4] * uv[0] + m[5] * uv[1] + m[6]];
+      assert.equal(texture.get(uv, 'value'), texel(drawn), `${JSON.stringify(transform)} at ${uv}`);
+    }
+});

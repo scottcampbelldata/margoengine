@@ -6,6 +6,8 @@ import { SRGBToLinear } from '@margoengine/math/color';
 import { readStructuralMetadata, type FeatureIdSet, type PropertyTable } from './metadata.js';
 import type { TilesDecorationContext, TilesContentDecoration, TilesContentDecorator } from './renderer.js';
 import { rawAccessor } from './raw-accessor.js';
+import { applyUV, uvRows, uvRowsWGSL } from './uv-transform.js';
+import { dataURI } from './data-uri.js';
 import type { TilesetTile } from './tileset.js';
 import {
   featureImage,
@@ -200,10 +202,21 @@ export class TileFeatures implements EnginePlugin, Disposable {
     const bytes = rawAccessor(model.asset, index, { accessor: (i) => this.options.accessor?.(model, i) }),
       definition = model.asset.doc.accessors![index];
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-      size = definition.componentType === 5121 ? 1 : definition.componentType === 5123 ? 2 : 4;
-    return Uint32Array.from({ length: definition.count }, (_, i) =>
-      size === 1 ? view.getUint8(i) : size === 2 ? view.getUint16(i * 2, true) : view.getUint32(i * 4, true),
-    );
+      type = definition.componentType;
+    // EXT_mesh_features allows FLOAT feature IDs and legacy b3dm _BATCHID is commonly FLOAT (5126).
+    return Uint32Array.from({ length: definition.count }, (_, i) => {
+      const id =
+        type === 5121
+          ? view.getUint8(i)
+          : type === 5123
+            ? view.getUint16(i * 2, true)
+            : type === 5126
+              ? view.getFloat32(i * 4, true)
+              : view.getUint32(i * 4, true);
+      if (!Number.isInteger(id) || id < 0)
+        throw new TypeError('Feature ID attribute holds a non-integer ID; store whole non-negative feature IDs');
+      return id;
+    });
   }
   private selected(entry: Entry): SetInfo | undefined {
     const set = this.options.set ?? 0;
@@ -232,12 +245,7 @@ export class TileFeatures implements EnginePlugin, Disposable {
       let bytes: Uint8Array | undefined;
       if (definition?.bufferView !== undefined) bytes = entry.model.asset.view(definition.bufferView);
       else if (definition?.uri?.startsWith('data:')) {
-        const uri = definition.uri,
-          comma = uri.indexOf(',');
-        const text = uri.slice(0, comma).includes(';base64')
-          ? atob(uri.slice(comma + 1))
-          : decodeURIComponent(uri.slice(comma + 1));
-        bytes = Uint8Array.from(text, (c) => c.charCodeAt(0));
+        bytes = dataURI(definition.uri, Infinity);
       } else if (definition?.uri && entry.context.fetch) {
         const signal = entry.context.signal ?? new AbortController().signal;
         bytes = await entry.context.fetch(new URL(definition.uri, entry.context.tile.contentUrls[0]).href, signal);
@@ -267,12 +275,7 @@ export class TileFeatures implements EnginePlugin, Disposable {
       angle = t?.rotation ?? 0;
     if (scale.length !== 2 || offset.length !== 2 || ![...scale, ...offset, angle].every(Number.isFinite))
       throw new TypeError('Feature texture transform needs finite scale, offset and rotation');
-    const x = uv[0] * scale[0],
-      y = uv[1] * scale[1];
-    return [
-      offset[0] + Math.cos(angle) * x - Math.sin(angle) * y,
-      offset[1] + Math.sin(angle) * x + Math.cos(angle) * y,
-    ];
+    return applyUV(uvRows(scale, offset, angle), uv[0], uv[1]);
   }
   private id(entry: Entry, set: SetInfo, hit: TileFeaturePick): number | undefined {
     if (entry.context.kind === 'instances') return hit.instanceId === undefined ? undefined : set.ids?.[hit.instanceId];
@@ -452,8 +455,7 @@ export class TileFeatures implements EnginePlugin, Disposable {
       shift = t?.offset ?? [0, 0],
       angle = t?.rotation ?? 0;
     this.transformed(set, [0, 0]);
-    const number = (v: number) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
-    const coordinateCode = `(vec2f(${shift.map(number).join(',')})+mat2x2f(vec2f(${number(Math.cos(angle))},${number(Math.sin(angle))}),vec2f(${number(-Math.sin(angle))},${number(Math.cos(angle))}))*uv(i,${coordinate}.0)*vec2f(${scale.map(number).join(',')}))`;
+    const coordinateCode = uvRowsWGSL(uvRows(scale, shift, angle), `uv(i,${coordinate}.0)`);
     const code = `let tileFeatureBytes=vec4u(round(textureSampleLevel(materialTexture${slot},materialSampler${slot},${coordinateCode},0.0)*255.0));
       let tileFeatureId=${channels.map((c, i) => `(tileFeatureBytes[${c}] << ${i * 8}u)`).join(' | ')};
       if(tileFeatureId==(u32(materialFactors[${offset}].x)|(u32(materialFactors[${offset}].y)<<16u))){s.base*=materialFactors[${offset + 1}];if(s.base.a<=0.0){discard;}}`;

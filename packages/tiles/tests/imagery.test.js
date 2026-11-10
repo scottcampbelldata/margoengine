@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { wmsURL, wmtsURL, terrainRectangle, terrainImagery } from '../dist/imagery.js';
-import { parseQuantizedMesh, meshB3dm } from '../dist/terrain.js';
+import { parseQuantizedMesh } from '../dist/terrain.js';
 import { parseB3dm, ecefToCartographic } from '../dist/index.js';
 import { GLTFAsset } from '../../gltf-pro/dist/index.js';
 import { glbChunks } from '../../shared/glb.js';
@@ -153,22 +153,28 @@ test('slippyMap terrain URL flips north-origin y and missing metadata fails expl
   await assert.rejects(broken.fetch(broken.url.replace('tileset.json', '0/0/0.json')), /omitted metadata/);
   broken.dispose();
 });
-test('Mercator quantized v is interpolated in projected space before ECEF placement', () => {
+test('EPSG:3857 quantized-mesh v interpolates latitude linearly between the tile edges, as the spec says (review 5)', async () => {
+  // quantized-mesh 1.0: v values between the edges are "a linear interpolation between the latitudes of the Southern
+  // and Northern edges"; the layer projection only decides the tile rectangle (one root tile for EPSG:3857).
+  const fetch = async (url) =>
+    url.endsWith('layer.json')
+      ? new Response(JSON.stringify({ tiles: ['{z}/{x}/{y}.terrain'], projection: 'EPSG:3857', maxzoom: 0 }))
+      : new Response(tile);
+  const source = await terrainImagery('https://terrain.test/layer.json', { fetch });
+  const root = await (await source.fetch(source.url)).json(),
+    branch = await (await source.fetch(root.root.children[0].content.uri)).json(),
+    gltf = parseB3dm(new Uint8Array(await (await source.fetch(branch.root.content.uri)).arrayBuffer())).gltf;
+  source.dispose();
   const mesh = parseQuantizedMesh(tile),
-    rect = terrainRectangle(2, 1, 2, 'EPSG:3857'),
-    south = 0,
-    north = Math.PI / 2;
-  const bytes = meshB3dm(mesh, rect, undefined, 0, (f) => Math.atan(Math.sinh(south + (north - south) * f))),
-    gltf = parseB3dm(bytes).gltf,
+    rect = terrainRectangle(0, 0, 0, 'EPSG:3857'),
     chunks = glbChunks(gltf),
     doc = JSON.parse(new TextDecoder().decode(chunks[0].data)),
     asset = new GLTFAsset(doc, [], chunks[1].data),
     positions = asset.accessor(doc.meshes[0].primitives[0].attributes.POSITION, 'VEC3');
   let vertex = 0;
   for (let i = 1; i < mesh.v.length; i++)
-    if (Math.abs(mesh.v[i] - 16384) < Math.abs(mesh.v[vertex] - 16384)) vertex = i;
+    if (Math.abs(mesh.v[i] - 24000) < Math.abs(mesh.v[vertex] - 24000)) vertex = i;
   const p = positions.subarray(vertex * 3, vertex * 3 + 3),
-    world = [p[0] + mesh.center[0], -p[2] + mesh.center[1], p[1] + mesh.center[2]],
-    latitude = ecefToCartographic(...world).latitude;
-  assert.ok(Math.abs(latitude - Math.atan(Math.sinh(((mesh.v[vertex] / 32767) * Math.PI) / 2))) < 2e-7);
+    latitude = ecefToCartographic(p[0] + mesh.center[0], -p[2] + mesh.center[1], p[1] + mesh.center[2]).latitude;
+  assert.ok(Math.abs(latitude - (rect[1] + (mesh.v[vertex] / 32767) * (rect[3] - rect[1]))) < 2e-7, `${latitude}`);
 });

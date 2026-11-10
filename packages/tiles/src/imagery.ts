@@ -611,14 +611,11 @@ export async function terrainImagery(
       const drape = options.imagery?.length
         ? await compositeImagery(options.imagery, rectangle, z, outer, requestSignal, options.imagerySize)
         : undefined;
-      const south = mercator(rectangle[1]),
-        north = mercator(rectangle[3]);
       const body = meshB3dm(
         mesh,
         rectangle,
         drape,
         ((LEVEL_ZERO_ERROR * (projection === 'EPSG:3857' ? 2 : 1)) / 2 ** z) * (options.skirt ?? 2),
-        projection === 'EPSG:3857' ? (fraction) => Math.atan(Math.sinh(south + (north - south) * fraction)) : undefined,
       );
       const held = cache.get(key(z, x, y));
       if (held) {
