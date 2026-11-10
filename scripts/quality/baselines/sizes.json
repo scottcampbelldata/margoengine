@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13798772,
+  "total": 13808478,
   "history": [
     {
       "date": "2026-10-24",
@@ -7227,6 +7227,12 @@
       "commit": "batch-185-job-3",
       "reason": "New optional shader/editor-pass 0 to 33103 B gzip, ceiling 34097 B. Reuses the full NodeEditor and graph compiler; inherits the same materials/gltf-pro preview dependencies already accepted for shader/editor and shader/graph. Splitting the shared canvas/compiler would duplicate validation and authoring state; core/stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "57d8d3296",
+      "reason": "New optional post/selective-bloom: 0 to 9423 B gzip. Reuses full bloom with mask extraction and HDR recomposition; splitting duplicates ownership. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8537,6 +8543,7 @@
     "@margoengine/vfx/shapes": 3848,
     "@margoengine/shader/editor-pass": 34097,
     "leak @margoengine/shader/editor-pass -> @margoengine/gltf-pro/model": 1,
-    "leak @margoengine/shader/editor-pass -> @margoengine/materials": 1
+    "leak @margoengine/shader/editor-pass -> @margoengine/materials": 1,
+    "@margoengine/post/selective-bloom": 9706
   }
 }

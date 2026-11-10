@@ -1,3 +1,4 @@
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 // Real-GPU check of Outline on a cube, built packages. Takes the GPU lock itself around the browser.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
@@ -27,6 +28,7 @@ try {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
+  if (compatRun()) await page.addInitScript(compatShim);
   await page.goto('http://127.0.0.1:5343/packages/post/test/outline-browser.html');
   const result = await page.evaluate(async () => {
     const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),

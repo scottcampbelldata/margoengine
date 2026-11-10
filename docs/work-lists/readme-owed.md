@@ -855,3 +855,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 270 job 3): document generated vfx/shapes alias; examples deferred.
 - @margoengine/shader (batch 185 job 3): PassNodeEditor post/compute modes, named resources, save/load, input labels, caller-owned hot reload and bounded expression limits; graph input/presentation hooks.
 - margoengine (batch 185 job 3): generated shader/editor-pass alias.
+- @margoengine/post: document selective-bloom mask ownership, ordering, inverted/background selection, HDR stack composition and disposal.

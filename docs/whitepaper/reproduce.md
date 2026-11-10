@@ -3487,3 +3487,4 @@ Batch 270 job 3: build packages, run node --test --test-timeout=120000 packages/
 
 ## Batch 185 pass authoring
 After build:packages run node --test packages/shader/test/editor-pass.test.js. Under the shared GPU lock run node packages/shader/test/editor-pass-check.mjs, then the same command with --compat. Expected post centre pixels: [128,94,69], [255,188,137], [64,47,34], then restored full colour. Compute output is [i*scale,2*scale,4*scale,0.5] for i 0..23 and scales 0.5 and 0.25. Existing editor-check.mjs covers the shared canvas's gesture/keyboard path; run on both backends for presentation changes.
+Batch 191 job 1: build packages, then node --test --test-timeout=120000 packages/post/test/selective-bloom.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/selective-bloom-browser.mjs (repeat with --compat). Original analytic fixtures need no external data.

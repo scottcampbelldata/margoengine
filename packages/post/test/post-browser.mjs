@@ -1,3 +1,4 @@
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 // Shared harness for the post effects' real-GPU checks, built packages: takes the GPU lock, serves the repository with
 // Vite on `port`, starts the browser the test file opens with `open` (each test names its own browser), loads the
 // 320 x 240 canvas of post-browser.html and hands `run` the page and a canvas screenshot decoder. Any page error or
@@ -31,6 +32,7 @@ export async function postBrowser(owner, port, open, run, { seconds = 120 } = {}
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
+    if (compatRun()) await page.addInitScript(compatShim);
     await page.goto(`http://127.0.0.1:${port}/packages/post/test/post-browser.html`);
     const shot = async () => decodePNG(await page.locator('canvas').screenshot());
     await run(page, shot);

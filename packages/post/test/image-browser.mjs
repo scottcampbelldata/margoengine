@@ -1,3 +1,4 @@
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 // Run under scripts/gpu-lock.mjs. Original deterministic HDR fixture, not a borrowed asset/reference image.
 import assert from 'node:assert/strict';
 import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
@@ -22,6 +23,7 @@ const context = {
     await closeAll({ browser, servers: [server] });
   },
 };
+if (compatRun()) await page.addInitScript(compatShim);
 await page.goto('http://127.0.0.1:5341/packages/post/test/image-browser.html');
 const hardware = await page.evaluate(async () => {
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
