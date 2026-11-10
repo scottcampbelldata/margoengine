@@ -1442,3 +1442,19 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/taa: document that reset() and reset(viewId) restart jitter as well as discard history; see docs/taa-reset.md.
 - @margoengine/cache: the two service worker examples are ```js but contain TypeScript (type FetchEvent, as); no sections for ./stream and ./decoded (batch 132 audit).
+
+- @margoengine/sciviz: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/points: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/lines: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/labels: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/compute: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/loaders: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/video: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+
+- @margoengine/html: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.

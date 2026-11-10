@@ -30,6 +30,8 @@ export function trackPipelines() {
  * Calls `frame()` (render a frame and wait for the GPU) until two frames in a row started no pipeline, left none
  * compiling and saw `ready()` hold; the last of them was drawn with every pipeline in place. Resolves the milliseconds
  * it took. Throws after `timeoutMs` (default 20 s) naming what was still pending (`describe()` adds the page's own).
+ * @param {() => void | Promise<void>} frame
+ * @param {{ ready?: () => boolean, timeoutMs?: number, describe?: () => string }} [options]
  */
 export async function waitForPipelines(frame, { ready = () => true, timeoutMs = 20000, describe = () => '' } = {}) {
   trackPipelines();

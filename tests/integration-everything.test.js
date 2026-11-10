@@ -46,6 +46,7 @@ test('everything test pages and their imports enter the GPU footprint', { timeou
   const footprint = ctx.footprints['gpu/root/test:integration:browser'];
   assert.ok(footprint, 'integration suite must be registered');
   assert.ok(footprint.files.has('examples/test-pages/integration-game.html'));
+  assert.ok(footprint.files.has('examples/test-pages/integration-sciviz.html'));
   for (const name of [
     'gltf',
     'animation',
@@ -58,6 +59,14 @@ test('everything test pages and their imports enter the GPU footprint', { timeou
     'controls',
     'ui',
     'save',
+    'sciviz',
+    'points',
+    'lines',
+    'labels',
+    'compute',
+    'loaders',
+    'video',
+    'html',
   ])
     assert.ok(footprint.packages.has(`@margoengine/${name}`), name);
 });

@@ -1,0 +1,146 @@
+[
+  {
+    "backend": "webgpu",
+    "id": "sciviz",
+    "before": [
+      [
+        64,
+        128,
+        192,
+        255
+      ],
+      [
+        54,
+        102,
+        135,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "after": [
+      [
+        64,
+        128,
+        192,
+        255
+      ],
+      [
+        54,
+        102,
+        135,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "draws": 1,
+    "state": {
+      "points": 4,
+      "loadedPoints": 3,
+      "computeSum": 20,
+      "video": true,
+      "labels": true,
+      "html": true
+    },
+    "resources": {
+      "created": 73,
+      "live": []
+    },
+    "errors": [],
+    "restored": true,
+    "disposed": true
+  },
+  {
+    "backend": "webgl2-compat",
+    "id": "sciviz",
+    "before": [
+      [
+        64,
+        128,
+        192,
+        255
+      ],
+      [
+        54,
+        102,
+        135,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "after": [
+      [
+        64,
+        128,
+        192,
+        255
+      ],
+      [
+        54,
+        102,
+        135,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ],
+      [
+        16,
+        24,
+        32,
+        255
+      ]
+    ],
+    "draws": 1,
+    "state": {
+      "points": 4,
+      "loadedPoints": 3,
+      "computeSum": 20,
+      "video": true,
+      "labels": true,
+      "html": true
+    },
+    "resources": {
+      "created": 77,
+      "live": []
+    },
+    "errors": [],
+    "restored": true,
+    "disposed": true
+  }
+]

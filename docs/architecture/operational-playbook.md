@@ -7153,3 +7153,6 @@ The ROOT test:integration:browser gate resolves each test page into its public p
 
 ### Section 5 evidence: deterministic TAA reset (2026-11-10)
 TAA keeps its Halton sample phase separate from motion frame identity. Explicit and projection resets now restart samples, matching restored views. The exact two-view regression fails without this repair; full product elimination and uniform captures isolated the difference to jitter. No core/stage code or import boundary changed. Sources, reproduction and limits: docs/taa-reset.md.
+
+### Sections 4.1 and 5: J6 scientific dashboard
+The integration ROOT footprint now includes sciviz, points, lines, labels, compute, loaders, video and html. Native and compatibility probes, parser/compute values, point/line draw counters, DOM removal and device-resource teardown are checked. The shared readiness helper's boolean predicate type has a failing-before-fix TypeScript regression; its runtime wait is unchanged. Reproduction, authored-input scope and device limits: docs/integration-sciviz.md.

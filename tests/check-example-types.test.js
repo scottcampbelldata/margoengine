@@ -3,7 +3,7 @@
 // `npm run build:packages` (verify builds before the tests run): the examples read the packages through their dist types.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import test from 'node:test';
 import { checkExampleTypes } from '../scripts/check-example-types.mjs';
@@ -65,6 +65,22 @@ test('a project that never finishes is ended at its time limit and reported as f
     assert.match(result.message, /hung/);
   } finally {
     rmSync(hung.dir, { recursive: true, force: true });
+  }
+});
+
+test('GPU readiness accepts predicates whose result changes during resource restoration', async () => {
+  const fixture = plant(
+    "import { waitForPipelines } from '../../scripts/support/gpu-ready.js';\n" +
+      'let available = false;\nvoid waitForPipelines(async () => { available = true; }, { ready: () => available });\n',
+  );
+  const config = JSON.parse(readFileSync(join(fixture.dir, 'tsconfig.json'), 'utf8'));
+  config.compilerOptions.allowJs = true;
+  writeFileSync(join(fixture.dir, 'tsconfig.json'), JSON.stringify(config));
+  try {
+    const [result] = await checkExampleTypes({ ids: ['planted'], projects: fixture.projects });
+    assert.equal(result.ok, true, result.output);
+  } finally {
+    rmSync(fixture.dir, { recursive: true, force: true });
   }
 });
 

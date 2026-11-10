@@ -61,4 +61,9 @@ export const PROJECTS = [
     config: 'examples/integration/game/tsconfig.json',
     entries: () => ['examples/integration/game.ts'],
   },
+  {
+    id: 'integration-sciviz',
+    config: 'examples/integration/sciviz/tsconfig.json',
+    entries: () => ['examples/integration/sciviz.ts'],
+  },
 ];

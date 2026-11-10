@@ -38,3 +38,5 @@ No companion implementation was consulted. README snippets are composed within t
 The existing example-selection regression used cameras as a narrow fixture after its affected workspace count
 grew to 14, above the existing 12-package safety threshold. It now proves the same narrow selection with sciviz
 and additionally asserts the correct full selection for cameras; the threshold and selection code are unchanged.
+
+The scientific dashboard scene is documented in [integration-sciviz.md](integration-sciviz.md); run with --scene=sciviz. It composes sciviz, points, lines, labels, compute, loaders, video and html on the same engine.
