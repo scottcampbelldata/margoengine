@@ -1,5 +1,23 @@
 # Clean room
 
+## Batch 256 job 2: multi-process room presence
+
+Sources compared before implementation: Leslie Lamport, *Time, Clocks, and the
+Ordering of Events in a Distributed System* (1978), https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/Time-Clocks-and-the-Ordering-of-Events-in-a-Distributed-System.pdf
+(authoritative ordering of capacity decisions); Gray and Cheriton, *Leases*
+(1989), cited in job 1 (crashed-owner expiry); SQLite authors, *Write-Ahead
+Logging* and *RETURNING* (accessed 2026-11-10), https://sqlite.org/wal.html and
+https://sqlite.org/lang_returning.html (shared local-process store and atomic
+request consumption); Colyseus team, *Presence* and *Scalability* (accessed
+2026-11-10), https://docs.colyseus.io/server/presence and
+https://docs.colyseus.io/scalability (public room-owner routing behavior).
+Combined design: replaceable presence/store contracts, expiring owner snapshots,
+unique process incarnations, atomic once-only request claims, bounded polling
+with cancellation, authoritative reservations and public endpoint routing.
+SQLite WAL is a same-host adapter; other shared stores implement PresenceStore
+or RoomPresence. No distributed-consensus or cross-host SQLite claim. No source
+or companion code read; no rival dependency, new asset demo or timing claim.
+
 ## Batch 256 job 1: room lobby and one-time seats
 
 Research compared before implementation: Cary G. Gray and David R. Cheriton,

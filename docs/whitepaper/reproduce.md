@@ -1,5 +1,11 @@
 # Reproducing Margo's numbers
 
+Batch 256 job 2: after building packages, run
+`node --test --test-timeout=30000 packages/netcode/tests/presence.test.js`.
+It creates a temporary SQLite file and two Node processes within the worktree's
+test-results directory, routes a reservation and joins the correct WebSocket.
+No GPU or wall-clock speed assertion is involved.
+
 Batch 256 job 1: build packages, then run
 `node --test --test-timeout=120000 packages/netcode/tests/lobby.test.js`.
 All lobby correctness evidence uses CPU fixtures and the existing room wire

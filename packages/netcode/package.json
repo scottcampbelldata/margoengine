@@ -82,6 +82,10 @@
     "./lobby": {
       "types": "./dist/lobby.d.ts",
       "import": "./dist/lobby.js"
+    },
+    "./presence": {
+      "types": "./dist/presence.d.ts",
+      "import": "./dist/presence.js"
     }
   },
   "files": [

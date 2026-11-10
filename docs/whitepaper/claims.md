@@ -1,5 +1,14 @@
 # Claims and evidence
 
+Batch 256 job 2: `packages/netcode/tests/presence.test.js` covers two RoomServer
+instances, detached/filterable listings, remote owner refusal after capacity is
+reserved, lease expiry, atomic claims, namespace isolation, cancellation/timeouts,
+handler errors, failed-heartbeat shutdown ordering and shared SQLite connections.
+Two real child processes share a WAL database; one reserves the other's room and
+a real WebSocket client joins that owner and receives its state. Closing an owner
+withdraws its routes. This proves the batch's multi-process discovery/join row
+against the documented Colyseus ownership model, not distributed simulation.
+
 Batch 256 job 1: lobby tests (`packages/netcode/tests/lobby.test.js`) establish
 metadata isolation/filtering, private/locked/full exclusion, capacity including
 reconnect holds, one-time credentials, immutable matched identity, cancellation,

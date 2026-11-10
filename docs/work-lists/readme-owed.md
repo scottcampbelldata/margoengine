@@ -46,3 +46,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 | @margoengine/navmesh | queries partial route/path, nearest endpoint metric, optional Crowd surface, agent.partial and partial-arrival replanning | batch-252 job 2 |
+| @margoengine/netcode | presence: RoomNode run/close, remote routed reservations, lease defaults, PresenceStore adapter contract, same-host SQLite and network-store integration | batch-256 job 2 |
+| margoengine | Generated netcode/presence alias | batch-256 job 2 |

@@ -1,5 +1,26 @@
 # Design envelope
 
+Batch 256 presence: `@margoengine/netcode/presence` exposes RoomPresence,
+PresenceStore, MemoryPresence, StorePresence, openSqlitePresence and RoomNode.
+Run each node's `run({ signal })` promise and handle its rejection; `close()` or
+`await using` withdraws it after in-flight heartbeat/service tasks have stopped.
+Lease defaults to 10 seconds, heartbeat to 1 second (strictly shorter than lease),
+IPC timeout to 5 seconds and poll interval to 20 ms. List snapshots are eventually
+consistent; `sync()` refreshes them immediately. Remote reserve always executes
+on the room owner and returns its endpoint and one-time join credential. Failed
+or uncertain RPCs are never replayed. A cancellation after the owner claims a
+request may leave its reserved seat until normal reservation expiry. Private
+and full rooms remain routable by id but are hidden from public list results.
+The shared-store adapter requires atomic take and expiry-aware reads. The supplied
+SQLite WAL adapter uses Node's lazy built-in sqlite module and a local file shared
+by processes on one host; network filesystems and multi-host SQLite are unsupported.
+Implement the public store/presence contract for a network database. The control
+plane is trusted server code; applications authenticate matchmaking endpoints.
+Presence entry gzip is 6,219 B (new entry, previously absent), ceiling 6,475 B.
+The optional entry retains the complete shared-store adapter and native SQLite
+path; splitting would add another public adapter entry without reducing room
+control-plane work. Core and stage stay unchanged at 23,950 B combined gzip.
+
 Batch 256 lobby: `@margoengine/netcode/lobby` provides `LobbyRoom` and `RoomLobby`.
 List results contain room id/name, detached scalar metadata, connected clients,
 reserved/reconnecting seats and capacity. Name and metadata filters are exact;

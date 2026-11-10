@@ -1982,6 +1982,10 @@
       "types": "./dist/netcode/lobby.d.ts",
       "import": "./dist/netcode/lobby.js"
     },
+    "./netcode/presence": {
+      "types": "./dist/netcode/presence.d.ts",
+      "import": "./dist/netcode/presence.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"
