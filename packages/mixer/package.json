@@ -66,6 +66,10 @@
     "./dynamics": {
       "types": "./dist/dynamics.d.ts",
       "import": "./dist/dynamics.js"
+    },
+    "./pitch": {
+      "types": "./dist/pitch.d.ts",
+      "import": "./dist/pitch.js"
     }
   },
   "files": [

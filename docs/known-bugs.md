@@ -4676,3 +4676,7 @@ Batch 243 job 3 cold compatibility compilation defect: canonical mesh-pbr-lobes-
 
 
 - Batch 236 job 2, unlanded cover prototype: branch batch-236-cover-unfinished (3dd7f226a). Repro: build that branch and run packages/weather/tests/parity-browser.mjs cover under the shared GPU lock. Native map exposure [0,1,1,1] and core shelter pass, but 2,135 of 11,564 sheltered pixels on imported gltf-pro surfaces change. The covered shader and bindings are present; the group-2 draw/map integration cause is not yet isolated. Parked under lane debugging cap, never pushed as a completed feature; exact shader and logs remain in lane private/. Continue with gltf-pro group-2 data/coordinate inspection, not a weaker test.
+Batch 212 pitch: no open defect found in transposition ratios, source-clock/quantum invariance, feedback, prefilter or lifecycle tests. Window coloration and residual aliases are documented algorithm limits.
+
+Build-phase follow-up (batch 212, outside pitch landing): hold a disposed Bus after inserting a stage; Bus.teardown clears inserts but retains its insertEdges node-reference array. Clear those references in the fix phase and prove released ownership.
+Build-phase follow-up (batch 212 analyser): queue a meter report, call reset(), then deliver the queued report; read() can briefly show pre-reset frames because messages carry no reset generation. Add generation-tagged reset/report handling in the fix phase.

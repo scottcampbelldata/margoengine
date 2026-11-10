@@ -2310,6 +2310,10 @@
       "types": "./dist/mixer/dynamics.d.ts",
       "import": "./dist/mixer/dynamics.js"
     },
+    "./mixer/pitch": {
+      "types": "./dist/mixer/pitch.d.ts",
+      "import": "./dist/mixer/pitch.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"

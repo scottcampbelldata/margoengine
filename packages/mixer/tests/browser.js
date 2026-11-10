@@ -20,6 +20,7 @@ import { createBusStereo } from '@margoengine/mixer/stereo';
 import { createBusAnalyser } from '@margoengine/mixer/analyser';
 import { createFX, createBusFX } from '@margoengine/mixer/fx';
 import { createBusDynamics, createMultibandCompressor } from '@margoengine/mixer/dynamics';
+import { createBusPitchShift } from '@margoengine/mixer/pitch';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -445,6 +446,26 @@ export async function runChecks() {
     play(context,sine(1000,.1,.2)).connect(multiband.input);multiband.output.connect(context.destination);
     const out=await context.startRendering();
     near(measure(out.getChannelData(0),2400,4800).rms,.2/Math.sqrt(2),1e-6,'phase-aligned crossover magnitude');
+  });
+  await check('pitch shift transposes without changing the audio clock and supports sample-clock automation', async () => {
+    const hz=(data,from,to)=>{
+      const crossings=[];for(let i=from+1;i<to;i++)if(data[i-1]<=0&&data[i]>0)crossings.push(i-1-data[i-1]/(data[i]-data[i-1]));
+      return (crossings.length-1)*rate/(crossings.at(-1)-crossings[0]);
+    };
+    for(const pitch of [-12,0,7,12]){
+      const context=new OfflineAudioContext(2,rate,rate);using mixer=new Mixer(context);
+      using stage=await createBusPitchShift(mixer.master,{pitch});
+      const input=sine(400,1,.2);play(context,input).connect(mixer.master.input);
+      const out=await context.startRendering();assert(out.length===input.length,'same output duration');
+      near(hz(out.getChannelData(0),12000,46000),400*2**(pitch/12),.05,`pitch ${pitch} output frequency`);
+      if(pitch===0)assert(out.getChannelData(0).every((v,i)=>v===input[i]),'unison is bit-identical');
+      assert(out.getChannelData(0).every((v,i)=>v===out.getChannelData(1)[i]),'pitch read-head phase linked across channels');
+    }
+    const context=new OfflineAudioContext(2,rate,rate);using mixer=new Mixer(context);
+    using stage=await createBusPitchShift(mixer.master,{pitch:-12});stage.setPitch(12,{at:.5});
+    play(context,sine(400,1,.2)).connect(mixer.master.input);const out=await context.startRendering();
+    near(hz(out.getChannelData(0),12000,22000),200,.05,'first scheduled pitch');
+    near(hz(out.getChannelData(0),33000,46000),800,.05,'pitch automation on source clock');
   });
   device?.destroy();
   return { checks, backend };

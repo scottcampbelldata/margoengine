@@ -743,3 +743,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/weather (batch 236 job 3): document /lens LensDrops in PostStack, refraction/streaks, wetness source, time/seed determinism, defaults and optical/half-float tier limits; examples deferred.
 - margoengine (batch 236 job 3): document weather/lens forwarding entry; examples deferred.
+- @margoengine/mixer (batch 212 pitch): document createPitchShift/createBusPitchShift, semitones/audio-clock automation, window/delay/feedback/wet defaults, bounded wet delay/tail, unison identity and alias/formant limits.
+
+- margoengine (batch 212 pitch): document generated mixer/pitch alias.
