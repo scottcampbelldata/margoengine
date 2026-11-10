@@ -4182,3 +4182,6 @@ Optional `/stats` builds asymmetric x/y error bars, box/violin plots, area and s
 ### Batch 274 job 3: complete optional CPU SIMD execution
 
 Claim: compute/cpu-wasm executes the existing built-in CPU numerical API through Margo-authored Rust/Wasm with explicit SIMD for independent lanes, while preserving the JavaScript CPU results on the same host. Proof: packages/compute/tests/cpu-wasm.test.js (exact paired comparisons and actual SIMD work count), cpu-cases.js (the original CPU assertions run against both factories), and cpu-wasm-browser.mjs (59 parity checks on each GPU route). Rust native checks cover wrapping/conversion, ordered sums and stable sort. Supported limits are in docs/limits.md. This is no claim of elapsed-time improvement, native GPU acceleration or arbitrary WGSL interpretation.
+
+### Batch 195 job 2: optional resource knobs
+Claim: texture and target sizes and VFX birth rates change live with reversible quality ladders; MSAA selection takes effect only at engine creation. Proof: packages/quality/test/knobs.test.js validates contracts/ownership; knobs-browser.mjs checks actual texture pixels, target dimensions/colour, particle GPU counts and observed pipeline sample counts on both backends. This is functional evidence, not a speed, memory or energy claim. Runtime hardware MSAA reconfiguration is an accepted limit in docs/limits.md.

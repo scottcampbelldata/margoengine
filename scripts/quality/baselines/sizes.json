@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14246345,
+  "total": 14248782,
   "history": [
     {
       "date": "2026-10-24",
@@ -7525,6 +7525,12 @@
       "commit": "003abfa2d",
       "reason": "Batch274-job3-new-optional-CPU-SIMD-backend-0-to-40235-B-gzip-shared-context-preserves-validation-and-ownership-splitting-would-duplicate-the-facade-core-stage-unchanged-24209-B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-195-knobs",
+      "reason": "New optional quality/knobs: 0 to 2181 B min+gzip (ceiling 2437 B); umbrella alias 60 B. Live raster prefiltering, resource ownership, particle birth ladders and honest deferred MSAA are one cohesive feature; splitting would complicate resource restoration without quality gain. Core + stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8887,6 +8893,7 @@
     "@margoengine/cutscene/scroll": 2304,
     "@margoengine/sciviz/stats": 6975,
     "@margoengine/sciviz/omezarr": 21492,
-    "@margoengine/compute/cpu-wasm": 41443
+    "@margoengine/compute/cpu-wasm": 41443,
+    "@margoengine/quality/knobs": 2437
   }
 }

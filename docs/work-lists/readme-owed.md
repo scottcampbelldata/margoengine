@@ -1017,3 +1017,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/decoders (batch 274 job 3 gate registration): list the existing HDR6 worker/GPU readback driver registered in test:browser:hdr6.
 
 - margoengine (batch 274 job 3): document the generated compute/cpu-wasm subpath and main's environment/reflector-pbr subpath in the README phase.
+
+- @margoengine/quality (batch 195 job 2): document /knobs live raster/target bindings, particle rate ladder, disposal/device restore and deferred MSAA prepare then Engine.create with no live hardware-change claim.
+- margoengine (batch 195 job 2): document generated quality/knobs alias in the README phase.

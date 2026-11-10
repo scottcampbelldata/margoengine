@@ -2882,6 +2882,10 @@
       "types": "./dist/quality/events.d.ts",
       "import": "./dist/quality/events.js"
     },
+    "./quality/knobs": {
+      "types": "./dist/quality/knobs.d.ts",
+      "import": "./dist/quality/knobs.js"
+    },
     "./ragdoll": {
       "types": "./dist/ragdoll.d.ts",
       "import": "./dist/ragdoll.js"

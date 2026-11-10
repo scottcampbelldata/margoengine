@@ -3,6 +3,8 @@
 // A triangle overdrawn 400 times, the whole page: a light scene that still reads above the timer step (about 0.07 ms here). ?nofeature hides timestamp-query.
 import {applyQualityTier,watchQuality} from '/packages/quality/dist/index.js';
 const params=new URLSearchParams(location.search),canvas=document.querySelector('canvas'),errors=[],doneTimes=[],speed=params.has('speed');
+// The compatibility shim installs GPU constructors on its first adapter request. Snapshot the actual backend's prototypes.
+await navigator.gpu.requestAdapter();
 const wrapped=()=>[GPUAdapter.prototype.requestDevice,GPUQueue.prototype.submit,GPUDevice.prototype.createCommandEncoder];
 const plain=wrapped();
 window.tier=applyQualityTier();
