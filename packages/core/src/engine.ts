@@ -169,10 +169,21 @@ const storeQuaternion = (store: TransformStore, id: number, q: ArrayLike<number>
   t.qw[id] = w;
   // A clamp by compares, not Math.max and Math.min: V8 13 (Node 24) Maglev calls them, boxing their numbers. The
   // value is finite (a unit quaternion), so the compares give the same number, -0 included.
-  const sinPitch = 2 * (x * z + w * y);
+  const sinPitch = 2 * (x * z + w * y),
+    zSin = 2 * (w * z - x * y),
+    zCos = 1 - 2 * (y * y + z * z);
   lanes[lane + 1] = Math.asin(sinPitch > 1 ? 1 : sinPitch < -1 ? -1 : sinPitch);
+  // Gimbal lock (Shoemake, "Euler Angle Conversion", Graphics Gems IV, 1994): when cos(pitch), the length of
+  // (zSin, zCos), is below 16 float epsilons, X and Z turn about the same axis and both atan2 pairs are near (0, 0).
+  // X takes 0 and Z the whole turn: for R = Rx Ry Rz at pitch +90 degrees q = (sin h, cos h, sin h, cos h) / sqrt 2
+  // with h = (X + Z) / 2, at -90 degrees Z - X = 2 atan2(qz, qw), so Z = 2 atan2(qz, qw) in both cases.
+  if (zSin * zSin + zCos * zCos < 3.6e-12) {
+    lanes[lane] = 0;
+    lanes[lane + 2] = 2 * Math.atan2(z, w);
+    return;
+  }
   lanes[lane] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
-  lanes[lane + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+  lanes[lane + 2] = Math.atan2(zSin, zCos);
 };
 /**
  * 1 when the instance row at float `o` needs back faces drawn: double-sided (float 22 is 1 or 1.25, single-sided 0 or
@@ -1012,8 +1023,12 @@ export class Engine {
     if (this.exact) return; // exactSize: the caller owns canvas.width and canvas.height
     // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels; the light tier caps DPR at margoLow.
     const dpr = Math.min(globalThis.devicePixelRatio ?? 1, globalThis.margoLow || 2, 4 / sceneSamples()),
-      width = Math.max(1, Math.min(4096, Math.round(this.canvas.clientWidth * dpr) || this.canvas.width)),
-      height = Math.max(1, Math.min(4096, Math.round(this.canvas.clientHeight * dpr) || this.canvas.height));
+      wide = Math.round(this.canvas.clientWidth * dpr) || this.canvas.width,
+      tall = Math.round(this.canvas.clientHeight * dpr) || this.canvas.height,
+      // One scale for both sides keeps the CSS aspect when the longer side passes 4096: 5120 x 1440 is 4096 x 1152.
+      fit = Math.min(1, 4096 / Math.max(wide, tall)),
+      width = Math.max(1, Math.round(wide * fit)),
+      height = Math.max(1, Math.round(tall * fit));
     if (this.canvas.width !== width) this.canvas.width = width;
     if (this.canvas.height !== height) this.canvas.height = height;
   }

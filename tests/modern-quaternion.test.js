@@ -95,6 +95,44 @@ test('a rotation component write matches setRotation and setQuaternion keeps the
   }
 });
 
+test('setQuaternion at pitch +-90 degrees keeps the roll in the Euler lanes, so a no-op rotation write holds', async () => {
+  // Gimbal lock (Shoemake 1994): X and Z both read atan2(0, 0) = 0 before, dropping the combined turn, so
+  // rotation.x = rotation.x turned [0.5, 0.5, 0.5, 0.5] into [0, 0.707, 0, 0.707].
+  const engine = await engineFor(1),
+    mesh = engine.createMesh(),
+    read = () => lanes.map((lane) => engine.store.transforms[lane][mesh.id]),
+    same = (a, b) => {
+      const sign = Math.sign(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]) || 1;
+      return a.every((value, i) => Math.abs(value - sign * b[i]) < 2e-6);
+    },
+    poles = [
+      [0.5, 0.5, 0.5, 0.5],
+      [0.5, -0.5, -0.5, 0.5],
+      [-0.5, 0.5, -0.5, 0.5],
+      [Math.sin(2) * Math.SQRT1_2, Math.cos(2) * Math.SQRT1_2, Math.sin(2) * Math.SQRT1_2, Math.cos(2) * Math.SQRT1_2],
+      [
+        Math.sin(1.4) * Math.SQRT1_2,
+        -Math.cos(1.4) * Math.SQRT1_2,
+        -Math.sin(1.4) * Math.SQRT1_2,
+        Math.cos(1.4) * Math.SQRT1_2,
+      ],
+    ];
+  try {
+    for (const q of poles) {
+      mesh.setQuaternion(q);
+      const stored = read();
+      for (const axis of ['x', 'y', 'z']) {
+        mesh.rotation[axis] = mesh.rotation[axis];
+        assert.ok(same(read(), stored), `${q} after rotation.${axis} write: ${read()}`);
+      }
+      assert.ok(Math.abs(Math.abs(mesh.rotation.y) - Math.PI / 2) < 1e-6);
+      assert.equal(mesh.rotation.x, 0);
+    }
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('fixed kernel layout publishes hierarchy matrices into the existing JavaScript views', async () => {
   const engine = await engineFor(2),
     store = engine.store,

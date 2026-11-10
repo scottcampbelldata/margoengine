@@ -230,7 +230,7 @@ engine.start();
 ## Pixel-perfect rendering
 
 By default the backbuffer follows the canvas's CSS size times the device pixel ratio (at most 2, and at most 4096 per
-side) and desktop scenes use 4x MSAA. Pixel art and pixel-perfect 2D need the opposite, so `exactSize` turns both off:
+side, both sides scaled together so the aspect ratio holds) and desktop scenes use 4x MSAA. Pixel art and pixel-perfect 2D need the opposite, so `exactSize` turns both off:
 
 ```ts
 import { Engine } from '@margoengine/core';

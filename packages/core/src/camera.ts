@@ -153,9 +153,11 @@ export class Camera {
     )
       throw rangeError('Invalid fit', 'camera');
     const target: Vec3 = min.map((v, i) => (v + max[i]) / 2) as unknown as Vec3,
-      radius = Math.max(this.near * 2, Math.hypot(...max.map((v, i) => (v - min[i]) / 2))),
+      radius = Math.hypot(...max.map((v, i) => (v - min[i]) / 2)),
       angle = Math.atan(Math.tan((this.fov * Math.PI) / 360) * Math.min(1, aspect)),
-      distance = (radius * padding) / Math.sin(angle),
+      // The padded bounding sphere touches the narrower half-angle; a tiny part or a wide fov would put that sphere
+      // behind the near plane, so the eye backs off until the padded sphere starts past `near`.
+      distance = Math.max(radius / Math.sin(angle), radius + this.near) * padding,
       direction = this.position.map((v, i) => v - this.target[i]),
       length = Math.hypot(...direction);
     if (!length || distance + radius >= this.far) throw rangeError('Bounds exceed far: raise camera.far', 'camera');

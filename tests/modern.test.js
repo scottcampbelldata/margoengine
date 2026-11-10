@@ -794,6 +794,41 @@ test('CAD controls orbit an arbitrary pivot, pan, smooth zoom, fit portrait boun
   assert.equal(listeners.size, 0);
   assert.equal(element.style.touchAction, 'auto');
 });
+test('fitToBoundingBox frames by the true bounding sphere and keeps the whole box past near', () => {
+  // Before: the radius was raised to 2 near (a 2 cm part sat 0.44 away, 11x its sphere fit) and nothing kept the box
+  // past near, so at fov 120 the nearest corner of a 0.35 box was 0.082 from the eye, inside near 0.1.
+  const corners = (min, max) =>
+      [0, 1, 2, 3, 4, 5, 6, 7].map((k) => [k & 1 ? max[0] : min[0], k & 2 ? max[1] : min[1], k & 4 ? max[2] : min[2]]),
+    check = (camera, min, max) => {
+      camera.update(1, true);
+      const m = camera.matrix,
+        eye = camera.position,
+        axis = camera.target.map((v, i) => v - eye[i]),
+        length = Math.hypot(...axis);
+      for (const c of corners(min, max)) {
+        const depth = c.reduce((sum, v, i) => sum + (v - eye[i]) * axis[i], 0) / length,
+          w = m[3] * c[0] + m[7] * c[1] + m[11] * c[2] + m[15];
+        assert.ok(depth > camera.near, `corner ${c} at depth ${depth}, near ${camera.near}`);
+        assert.ok(Math.abs((m[0] * c[0] + m[4] * c[1] + m[8] * c[2] + m[12]) / w) < 1);
+        assert.ok(Math.abs((m[1] * c[0] + m[5] * c[1] + m[9] * c[2] + m[13]) / w) < 1);
+      }
+      return Math.hypot(...eye.map((v, i) => v - camera.target[i]));
+    };
+  for (const fov of [100, 120, 170]) {
+    const camera = new Camera({ fov, position: [1, 1, 1] });
+    camera.fitToBoundingBox([-0.175, -0.175, -0.175], [0.175, 0.175, 0.175], { duration: 0 });
+    check(camera, [-0.175, -0.175, -0.175], [0.175, 0.175, 0.175]);
+  }
+  const small = new Camera({ position: [1, 1, 1] }),
+    radius = Math.hypot(0.01, 0.01, 0.01);
+  small.fitToBoundingBox([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], { duration: 0 });
+  // The sphere fit (0.038) would put it inside near, so the eye stops at (radius + near) * padding, not 0.44.
+  assert.ok(Math.abs(check(small, [-0.01, -0.01, -0.01], [0.01, 0.01, 0.01]) - (radius + 0.1) * 1.1) < 1e-9);
+  const tiny = new Camera({ position: [0, 0, 1], near: 0.001 });
+  tiny.fitToBoundingBox([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], { duration: 0, padding: 1 });
+  assert.ok(Math.abs(check(tiny, [-0.01, -0.01, -0.01], [0.01, 0.01, 0.01]) - radius / Math.sin(Math.PI / 6)) < 1e-9);
+});
+
 test('Reversed float depth separates sub-millimeter surfaces at industrial range', () => {
   const camera = new Camera({ position: [0, 0, 0], target: [0, 0, -1], near: 0.001, far: 10000 });
   camera.update(1, true);

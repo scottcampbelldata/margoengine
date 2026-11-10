@@ -15,6 +15,9 @@ test('HiDPI desktop MSAA avoids supersampling while phones retain DPR 2', async 
       { ua: 'Android', dpr: 1, backend: 'webgpu', css: [390, 844], expected: [390, 844] },
       { ua: 'Desktop', dpr: 2, backend: 'webgl2', css: [1440, 900], expected: [1440, 900] },
       { ua: 'iPhone Mobile', dpr: 3, backend: 'webgl2', css: [390, 844], expected: [780, 1688] },
+      // Past 4096 both sides scale together, keeping the CSS aspect (each side clamped alone gave 4096 x 1440).
+      { ua: 'Desktop', dpr: 1, backend: 'webgpu', css: [5120, 1440], expected: [4096, 1152] },
+      { ua: 'Desktop', dpr: 1, backend: 'webgl2', css: [1000, 6000], expected: [683, 4096] },
     ]) {
       Object.defineProperty(globalThis, 'devicePixelRatio', { configurable: true, value: dpr });
       Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: ua } });
