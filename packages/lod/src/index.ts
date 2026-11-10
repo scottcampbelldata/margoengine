@@ -930,8 +930,12 @@ export class LODSystem implements EnginePlugin {
   onDeviceRestored(): void {
     this.release();
   }
-  /** Removes the keeper meshes and GPU resources; level objects keep their current visibility. Imposters are not disposed. */
+  /**
+   * Detaches from its scene and removes the keeper meshes and GPU resources; level objects keep their current
+   * visibility. Imposters are not disposed.
+   */
   dispose(): void {
+    const engine = this.engine;
     this.fading.clear();
     this.release();
     for (const keeper of this.keepers.values()) keeper.dispose();
@@ -944,6 +948,8 @@ export class LODSystem implements EnginePlugin {
     this.proxies.length = 0;
     this.count = 0;
     this.engine = undefined;
+    // engine.removePlugin calls dispose again, which finds nothing left to free.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
