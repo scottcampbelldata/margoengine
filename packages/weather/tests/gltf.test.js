@@ -22,7 +22,7 @@ test('uniforms track weather, model attachment is reversible, and restoration re
   const written = [], destroyed = [];
   const engine = { gpu: { createBuffer: () => ({ destroy() { destroyed.push(1); } }), queue: {
     writeBuffer: (_b, _o, data) => written.push([...data]),
-  } }, removePlugin() {} };
+  } }, sceneOf() {} };
   const weather = { wetness: 0.4, state: { rain: 0.7 }, snowCover: 0.8 };
   const effect = new GLTFWeather({ puddles: { weather }, snow: { weather } });
   effect.setup(engine);

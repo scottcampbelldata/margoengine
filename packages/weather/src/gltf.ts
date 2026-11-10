@@ -137,7 +137,7 @@ export class GLTFWeather implements EnginePlugin {
     this.uniform = undefined;
     this.puddles.dispose();
     this.snow.dispose();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.disposed = true;
   }
 

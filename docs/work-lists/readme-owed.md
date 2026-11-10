@@ -1229,3 +1229,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/clustered | Many lights: example of `Clustered.attach(engine, {maxLights: 20000})` and `AreaLights.attach(engine, {lights, maxLights: 256})` | batch-53 job 2 |
 
 - @margoengine/pixel (review 3 P1): document zero-lerp stationary axes across the full finite nonnegative update delta domain; examples deferred.
+
+- @margoengine/weather (review 2): document direct GLTFWeather/PrecipitationCover disposal in secondary scenes and retained caller models; examples deferred.

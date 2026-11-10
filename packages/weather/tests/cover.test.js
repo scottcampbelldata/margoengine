@@ -14,7 +14,7 @@ function capture(){
 
 test('the capture runs before core and imported surfaces on their first frame, without installing lens effects',()=>{
  const source=capture(),cover=new PrecipitationCover(source),passes=[];
- cover.setup({removePlugin(){}});cover.registerPasses({add(p){passes.push(p);}});
+ cover.setup({sceneOf(){}});cover.registerPasses({add(p){passes.push(p);}});
  assert.deepEqual(passes.map(p=>p.name),['weather:cover-map','weather:cover-surfaces']);
  assert.ok(passes[0].order < -1);assert.ok(passes[1].order > -1 && passes[1].order < 0);
  cover.onPreUpdate(0.25);assert.deepEqual(source.passes,[0.25]);
@@ -23,7 +23,7 @@ test('the capture runs before core and imported surfaces on their first frame, w
 });
 
 test('the same depth test masks wetness, rings, snow colour and vertex depth in both shader groups',()=>{
- const cover=new PrecipitationCover(capture());cover.setup({removePlugin(){}});
+ const cover=new PrecipitationCover(capture());cover.setup({sceneOf(){}});
  const source='weather_puddle_surface(i.position,n,c,r,m,true,u);weather_snow_at(i.position.xz,n.y,c);weather_snow_depth(p.xz,n.y,u);';
  for(const group of [0,2]){
   const shader=cover.shader(source,group);

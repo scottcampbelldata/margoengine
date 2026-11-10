@@ -137,7 +137,7 @@ export class PrecipitationCover implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.capture.dispose?.();
     this.cache.clear();
   }
