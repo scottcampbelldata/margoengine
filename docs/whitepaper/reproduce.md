@@ -3988,6 +3988,10 @@ or add timings to the historical ledger.
 
 ### Batch 162 geometry, math and raycast work counts
 
+For the hull eye and parametric samples, after the package build run
+`node --test --test-timeout=120000 packages/geometry/tests/convex-workcount.test.js packages/geometry/tests/parametric-workcount.test.js`.
+This checks nine parent output digests and exact coordinate read counts.
+
 For mergeVertices hash factors, after the package build run
 `node --test --test-timeout=120000 packages/geometry/tests/merge-vertices-workcount.test.js`.
 This checks 16 parent output digests and exact `Math.imul` call counts.

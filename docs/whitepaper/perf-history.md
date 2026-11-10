@@ -3336,6 +3336,10 @@ Native API counts and task outputs are retained without timing samples or ledger
 updates. Six initial calls passed on Margo and both black-box reference backends.
 No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.md).
 
+### Batch 162 jobs 4 and 5: hull eye and parametric samples (2026-11-10)
+
+`perf(geometry): keep each hull face's farthest outside point` removes the eye rescan (30,785 fewer plane distances for a 20,000-point ball) and the per-member copy of coplanar groups; `perf(geometry): check parametric samples without a temporary array` halves coordinate reads per sample and removes its temporary array. Output matches nine parent digests in convex-workcount.test.js and parametric-workcount.test.js. [Methods](batch-162-workcounts.md#row-47-hull-eye-and-parametric-samples). Timing pending the quiet rerun; no runtime speed ratio claimed.
+
 ### Batch 162 job 3: mergeVertices hash factors (2026-11-10)
 
 `perf(geometry): reuse mergeVertices hash factors` computes each per-axis hash factor once per vertex: 48 to 9 `Math.imul` calls per unmatched vertex, with identical bucket keys, scan order and output (16 parent digests in merge-vertices-workcount.test.js). [Methods](batch-162-workcounts.md#row-45-mergevertices-hash-factors). Timing pending the quiet rerun; no runtime speed ratio claimed.

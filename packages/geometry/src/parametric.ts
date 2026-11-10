@@ -43,11 +43,17 @@ export function parametricGeometry(fn: ParametricFunction, slices = 8, stacks = 
     target[0] = target[1] = target[2] = 0;
     const result = fn(u, v, target),
       point = result === undefined || result === null ? target : result;
-    if (!point || point.length !== 3 || ![point[0], point[1], point[2]].every(Number.isFinite))
+    if (!point || point.length !== 3)
       throw new RangeError(`parametricGeometry fn(${u}, ${v}) is not a finite point; return [x, y, z]`);
-    out[0] = point[0];
-    out[1] = point[1];
-    out[2] = point[2];
+    // Each coordinate is read once and checked without a temporary array.
+    const x = point[0],
+      y = point[1],
+      z = point[2];
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z))
+      throw new RangeError(`parametricGeometry fn(${u}, ${v}) is not a finite point; return [x, y, z]`);
+    out[0] = x;
+    out[1] = y;
+    out[2] = z;
   };
   // dP/du x dP/dv at (u, v) into normals at `at`; false when the derivatives are parallel or zero.
   const normal = (u: number, v: number, at: number): boolean => {

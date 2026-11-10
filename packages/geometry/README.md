@@ -121,8 +121,10 @@ const sticker = decalGeometry(wallGeometry, wallMatrix, [0, 1, 0.1], [0, 0, 0, 1
 - `convexGeometry(points)`: quickhull (Barber, Dobkin and Huhdanpaa 1996) with a tolerance scaled to the coordinates.
   Duplicates and points inside or on a face or edge are dropped; coplanar triangles merge into one flat face with one
   normal. UVs project each face onto the bounding-box side it faces. Fewer than four points, or points that do not
-  span a volume, throw `RangeError`.
+  span a volume, throw `RangeError`. Each face keeps its farthest outside point as points are assigned, so picking
+  the next eye measures nothing twice.
 - `parametricGeometry(fn, slices = 8, stacks = 8)`: `fn(u, v)` returns `[x, y, z]` or writes its third argument.
+  Each returned coordinate is read once and must be finite.
   Normals are `dP/du x dP/dv` by central differences, so a surface whose parameters turn counter-clockwise seen from
   outside faces out; at poles the normal is taken a small step inside the parameter square. Seams are not welded.
 - `decalGeometry(target, matrix, position, orientation, size, {offset, backfaces})`: `orientation` is a quaternion

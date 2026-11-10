@@ -4732,6 +4732,10 @@ Both cache classes retain omitted 304 lifetime policy. Evidence: the two parent-
 
 Delayed hit bookkeeping preserves eviction and replacement outcomes. Evidence: all four regressions in packages/cache/test/stale-touch.test.js fail on the parent; packages/cache/test/stale-touch.js supplies the identical race proof to packages/cache/scripts/test-browser.js on real IndexedDB. They verify exact retained byte/file counts, byte-budget eviction after reloading a file, the old in-flight response and the replacement's body, ETag and content type. Reproduce after build with node --test packages/cache/test/stale-touch.test.js and npm run test:browser --workspace @margoengine/cache. Sources: docs/clean-room.md, Asset-cache delayed hit bookkeeping.
 
+### Batch 162 hull and parametric operation counts (2026-11-10)
+
+convexGeometry picks each eye from distances it already measured: 1,830,369 instead of 1,922,724 coordinate reads for 20,000 points in a ball. parametricGeometry reads each sample's three coordinates once with no temporary array (225 instead of 450 reads for a 4 x 2 sphere). Nine parent digests prove identical output. [Evidence and reproduction](batch-162-workcounts.md#row-47-hull-eye-and-parametric-samples). Timing pending the quiet rerun.
+
 ### Batch 162 mergeVertices operation count (2026-11-10)
 
 mergeVertices makes 9 spatial-hash `Math.imul` calls per unmatched vertex instead of 48 (576 instead of 3,072 for 64 separate vertices), and never more than before on an early match. Sixteen parent byte digests prove identical output. [Evidence and reproduction](batch-162-workcounts.md#row-45-mergevertices-hash-factors). Timing pending the quiet rerun.

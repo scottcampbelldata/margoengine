@@ -72,6 +72,26 @@ Proof: `npm run build:packages`, then `node --test --test-timeout=120000 package
 Both count assertions fail on the parent (3,072 and 99 calls); 16 parent SHA-256 digests in `packages/geometry/tests/fixtures/merge-vertices-workcount.json` cover tolerance 0, 1e-4 and 0.1, position-only merging, normals, UVs, tangents, groups, degenerate removal, cell boundaries and a 32-bit hash collision.
 Research: Teschner et al. 2003 hash the three integer cell coordinates with three large primes combined by XOR; the per-axis products are independent of the other axes, which is what makes them reusable across the 27 neighbor cells.
 
+## Row 4.7: hull eye and parametric samples
+
+Cause, hull: `assign` measures a point against every candidate face and gives it to the farthest, but when a face was later processed its whole outside set was measured again to find the eye. Each face now keeps its farthest outside point as points arrive; strictly greater keeps the first of equal distances, exactly what the ordered rescan chose, and both use the same distance function on the same values.
+Coplanar merging also built each face group with `[...group, face]`, copying the list once per member; it now appends.
+Fixed in `perf(geometry): keep each hull face's farthest outside point` (Batch 162 job 4).
+
+Cause, parametric: every sample built `[x, y, z]` to run `every(Number.isFinite)` and then read the three coordinates again to copy them. It now reads each coordinate once into locals, checks them and copies them. Fixed in `perf(geometry): check parametric samples without a temporary array` (Batch 162 job 5). A surface function whose result has impure index getters is now read once per coordinate instead of twice; values and errors are otherwise unchanged.
+
+| Case | Parent | Current |
+|---|---:|---:|
+| `convexGeometry`, 20,000 points in a ball: coordinate reads | 1,922,724 | 1,830,369 |
+| `parametricGeometry`, 4 x 2 sphere: coordinate reads (75 samples) | 450 | 225 |
+| temporary arrays per parametric sample | 1 | 0 |
+
+The hull's remaining reads are the assignment of every point to its farthest face, the visibility walk and the new faces' planes; Barber, Dobkin and Huhdanpaa (1996) need all three. The p-geometry-misc Klein surface takes 5 samples per vertex, so its 16,641 vertices no longer allocate 83,205 temporary arrays.
+The rounded box is unchanged. Trade-off: two numbers per hull face. This is an operation count, not a runtime or rival speed claim. Timing pending the quiet rerun.
+
+Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/geometry/tests/convex-workcount.test.js packages/geometry/tests/parametric-workcount.test.js`.
+Both count assertions fail on the parent. Five hull digests (a ball, a sphere surface, a duplicated 5 x 5 x 5 grid with coplanar faces, equal-distance ties and an offset, anisotropic cloud) cover `convexGeometry` streams and `convexHullTriangles` indices; four parametric digests cover array, target and Float32Array results, poles and the scene's Klein bottle.
+
 ## Research consulted
 
 - Steve Marschner, Cornell CS4620, *Triangle meshes I* (2019), [course notes](https://www.cs.cornell.edu/courses/cs4620/2019fa/slides/04trimesh1.pdf): mesh parameterization and cylindrical coordinates.
