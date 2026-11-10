@@ -14895,6 +14895,22 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
 - Aseprite group compositing: header flag 2 says groups composite separately first; the parser multiplies a group's
   opacity into its children (documented in the README, not fixed).
 
+## Batch 132 audit: behavior (fixed and open)
+
+Fixed with regressions in `packages/behavior/tests/audit-132.test.js` (all 3 fail on the code before the fix):
+`FlowField.stamp` undo wrote back the costs it saw when it was placed, so overlapping stamps undone oldest first left
+the newer stamp's "before" behind: on a 6x1 field, a wall at cells 2-3 and mud (10) at cells 3-4, undone wall then
+mud, left cell 3 at 255 (a permanent wall). Live stamps are now kept oldest first and an undone stamp hands its saved
+cost to the next stamp over the same cell; a second undo call does nothing. `flock` with `separationRadius` above
+`radius` dropped every neighbour beyond `radius` before the separation test, so boids 2.5 apart with radius 2 and
+separationRadius 3 never pushed apart; the grid cell is now the larger radius and each rule tests its own.
+
+Open: `flock` and `separation` skip a neighbour at distance 0, so two boids spawned on the same point with the same
+velocity never part (repro: `flock({x:[0,0], y:[0,0], z:[0,0], vx:[1,1], vy:[0,0], vz:[0,0]}, 2)` for any number of
+steps keeps x[0] === x[1]); Reynolds 1987 gives no direction for a zero offset, and any fixed choice breaks the
+row-order independence `flock` promises. `avoidObstacles` scales its push by `1 + (reach - along) / reach` and
+`min(1, clearance / radius + 0.5)`, Margo's own heuristic with no source or measurement behind the 0.5.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -21812,20 +21828,9 @@ hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` c
 `/shadows`; the full list is in [SCENE.md](SCENE.md)). Optional parts load only when a component needs them, so an
 unused feature costs nothing.
 
-Installed alone (plus the packages your subpaths name, such as `@margoengine/controls` for `OrbitControls`), it builds
-with Vite, webpack, Turbopack (Next.js), Rollup and esbuild and keeps the build to what you import. The cube page with orbit controls requests 94,251 B gzip at load
-and 101,202 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 66% of that; Margo's part
-(core, stage, bindings) is 25,949 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page).
-
-
-**What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
-controls, physics, XR and Next.js notes, the rule for React state against the frame loop, and a troubleshooting list.
-For a textured, shadowed scene with click-to-select, follow the [React first scene guide](../../docs/guides/react-first-scene.md).
-
-Contents: [Install](#install), [First scene](#first-scene), [Components](#components), [Models and environment](#models-and-environment),
-[Batching, views, lights and voxels](#batching-views-lights-and-voxels), [Hooks](#hooks), [Controls](#controls),
-[Physics](#physics), [XR](#xr), [Next.js](#nextjs), [State vs the frame loop](#state-vs-the-frame-loop),
-[Build warnings](#build-warnings), [Testing and size](#testing-and-size), [Troubleshooting](#troubleshooting).
+Start with the scene below, then add optional controls, models and materials as needed. Each binding lives
+at the subpath named for its package; [SCENE.md](SCENE.md) lists the optional peers. For a textured,
+shadowed scene with click-to-select, follow the [React first scene guide](../../docs/guides/react-first-scene.md).
 
 ## Install
 
@@ -21850,9 +21855,9 @@ npm pkg set type=module
 npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugin-react typescript @types/react @types/react-dom
 ```
 
-On the machine that wrote this page, packing took about a minute and the install 8 seconds. Add an `index.html` with
+Add an `index.html` with
 `<div id="root"></div>` and `<script type="module" src="/src/main.tsx"></script>`, put the first scene below in
-`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`.
+`src/main.tsx`, and run `npm exec -- vite`.
 
 **Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
 `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
@@ -21868,10 +21873,8 @@ without the optional peers; options typed by a peer you have not installed are `
 A box lit by the default sun, with a click handler:
 
 ```tsx
-import { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from 'margoengine/react';
-import { Model } from 'margoengine/react/gltf-pro';
 
 export function App() {
   return (
@@ -21881,15 +21884,27 @@ export function App() {
           <BoxGeometry args={[1, 1, 1]} />
           <PbrMaterial color="#84d6bd" />
         </Mesh>
-        <Suspense fallback={null}>
-          <Model src="/model.glb" />
-        </Suspense>
       </Stage>
     </Canvas>
   );
 }
 
 createRoot(document.getElementById('root')!).render(<App />);
+```
+
+This first scene needs no model or texture files. For a reader moving from another renderer, `Mesh`,
+`BoxGeometry`, `PbrMaterial` and the stage camera fill the familiar roles; Canvas owns the renderer and cleanup.
+
+## Components
+
+`Stage` configures the existing canvas stage and renders its children once that stage is available. Its `camera` prop updates the active camera; `shadows` uses the canvas's existing optional `@margoengine/shadows` lifecycle. Install that peer when enabling shadows. Canvas still creates and disposes the single engine and stage.
+
+`Mesh` and `Model` accept `onClick`, `onPointerOver`, and `onPointerOut`. The canvas dispatches hits from its existing `engine.pick`; a click requires no more than three CSS pixels of total pointer movement, so OrbitControls drags do not click. Handlers receive `nativeEvent`, the hit mesh as `object`, `mesh`, and `target`, canvas-local `x`/`y`, and `clientX`/`clientY`.
+
+`Group` is a geometry-free `Mesh` for parent transforms. Lowercase exports are aliases of the same hook-based components: `mesh === Mesh`, `group === Group`, `boxGeometry === BoxGeometry`, and `meshStandardMaterial === PbrMaterial`. Use a namespace in JSX:
+
+```tsx
+import * as Margo from 'margoengine/react';
 ```
 
 [README continues: https://margoengine.com/llms/packages/react.md]

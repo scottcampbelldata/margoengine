@@ -611,11 +611,13 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
   for (let i = 0; i < count; i++)
     if (![x[i], y[i], z[i], vx[i], vy[i], vz[i]].every(Number.isFinite))
       throw new RangeError(`Flock boid ${i} has a non-finite position or velocity; give every boid finite numbers`);
-  // Uniform grid keyed by integer cell; cells hold boid indices in row order.
-  const cells = new Map<string, number[]>(),
+  // Uniform grid keyed by integer cell; cells hold boid indices in row order. A cell spans the larger of the two radii,
+  // so the 27 cells around a boid hold every neighbour either rule can feel.
+  const reach = Math.max(radius, separationRadius),
+    cells = new Map<string, number[]>(),
     key = (cx: number, cy: number, cz: number): string => `${cx},${cy},${cz}`;
   for (let i = 0; i < count; i++) {
-    const k = key(Math.floor(x[i] / radius), Math.floor(y[i] / radius), Math.floor(z[i] / radius));
+    const k = key(Math.floor(x[i] / reach), Math.floor(y[i] / reach), Math.floor(z[i] / reach));
     let cell = cells.get(k);
     if (!cell) cells.set(k, (cell = []));
     cell.push(i);
@@ -629,9 +631,9 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
     return [(dx / l) * max - vx[i], (dy / l) * max - vy[i], (dz / l) * max - vz[i]];
   };
   for (let i = 0; i < count; i++) {
-    const cx = Math.floor(x[i] / radius),
-      cy = Math.floor(y[i] / radius),
-      cz = Math.floor(z[i] / radius);
+    const cx = Math.floor(x[i] / reach),
+      cy = Math.floor(y[i] / reach),
+      cz = Math.floor(z[i] / reach);
     let sx = 0,
       sy = 0,
       sz = 0,
@@ -654,14 +656,15 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
               oy = y[i] - y[j],
               oz = z[i] - z[j],
               d2 = ox * ox + oy * oy + oz * oz;
-            if (d2 >= r2) continue;
-            ax += vx[j];
-            ay += vy[j];
-            az += vz[j];
-            mx += x[j];
-            my += y[j];
-            mz += z[j];
-            n++;
+            if (d2 < r2) {
+              ax += vx[j];
+              ay += vy[j];
+              az += vz[j];
+              mx += x[j];
+              my += y[j];
+              mz += z[j];
+              n++;
+            }
             if (d2 < s2 && d2 > 0) {
               sx += ox / d2;
               sy += oy / d2;
@@ -670,10 +673,10 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
             }
           }
         }
-    if (!n) continue;
+    if (!n && !ns) continue;
     const s = ns ? steer(sx, sy, sz, i) : [0, 0, 0],
-      a = steer(ax, ay, az, i),
-      c = steer(mx / n - x[i], my / n - y[i], mz / n - z[i], i);
+      a = n ? steer(ax, ay, az, i) : [0, 0, 0],
+      c = n ? steer(mx / n - x[i], my / n - y[i], mz / n - z[i], i) : [0, 0, 0];
     const f = truncate(
       [s[0] * ws + a[0] * wa + c[0] * wc, s[1] * ws + a[1] * wa + c[1] * wc, s[2] * ws + a[2] * wa + c[2] * wc],
       maxForce,

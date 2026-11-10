@@ -5471,3 +5471,20 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
 - `BlendLayer` and `SkeletalLayer` multiply issue two draws per sprite or triangle; speed unmeasured.
 - Aseprite group compositing: header flag 2 says groups composite separately first; the parser multiplies a group's
   opacity into its children (documented in the README, not fixed).
+
+## Batch 132 audit: behavior (fixed and open)
+
+Fixed with regressions in `packages/behavior/tests/audit-132.test.js` (all 3 fail on the code before the fix):
+`FlowField.stamp` undo wrote back the costs it saw when it was placed, so overlapping stamps undone oldest first left
+the newer stamp's "before" behind: on a 6x1 field, a wall at cells 2-3 and mud (10) at cells 3-4, undone wall then
+mud, left cell 3 at 255 (a permanent wall). Live stamps are now kept oldest first and an undone stamp hands its saved
+cost to the next stamp over the same cell; a second undo call does nothing. `flock` with `separationRadius` above
+`radius` dropped every neighbour beyond `radius` before the separation test, so boids 2.5 apart with radius 2 and
+separationRadius 3 never pushed apart; the grid cell is now the larger radius and each rule tests its own.
+
+Open: `flock` and `separation` skip a neighbour at distance 0, so two boids spawned on the same point with the same
+velocity never part (repro: `flock({x:[0,0], y:[0,0], z:[0,0], vx:[1,1], vy:[0,0], vz:[0,0]}, 2)` for any number of
+steps keeps x[0] === x[1]); Reynolds 1987 gives no direction for a zero offset, and any fixed choice breaks the
+row-order independence `flock` promises. `avoidObstacles` scales its push by `1 + (reach - along) / reach` and
+`min(1, clearance / radius + 0.5)`, Margo's own heuristic with no source or measurement behind the 0.5.
+

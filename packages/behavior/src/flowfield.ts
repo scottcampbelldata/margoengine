@@ -68,6 +68,8 @@ export class FlowField {
   private readonly heapCells: Int32Array;
   private readonly heapAt: Int32Array;
   private heapSize = 0;
+  // Live cost stamps, oldest first: each maps a cell to the cost it replaced.
+  private readonly stamps: Map<number, number>[] = [];
 
   /** @throws TypeError or RangeError for a malformed option. */
   constructor(options: FlowFieldOptions) {
@@ -141,7 +143,9 @@ export class FlowField {
   /**
    * Replace the costs of a rectangle of cells and rebuild, for a building dropped on the map. `x` and `z` are world
    * positions of the rectangle's low corner.
-   * @returns A function that puts the old costs back and rebuilds.
+   * @returns A function that puts the old costs back and rebuilds. Overlapping stamps may be undone in any order: a
+   * cell still under a later stamp keeps that stamp's cost, and the cost from before the first stamp returns when the
+   * last one covering the cell is undone. A second call does nothing.
    */
   stamp(x: number, z: number, cellsX: number, cellsZ: number, cost: number): () => void {
     this.checkCost(cost);
@@ -151,16 +155,25 @@ export class FlowField {
       throw new RangeError('Flow field stamp size must be two whole numbers of 1 or more');
     const startX = Math.floor((x - this.minX) / this.cell);
     const startZ = Math.floor((z - this.minZ) / this.cell);
-    const saved: number[] = [];
+    const saved = new Map<number, number>();
     for (let row = Math.max(0, startZ); row < Math.min(this.depth, startZ + cellsZ); row++)
       for (let column = Math.max(0, startX); column < Math.min(this.width, startX + cellsX); column++) {
         const at = row * this.width + column;
-        saved.push(at, this.cost[at] as number);
+        saved.set(at, this.cost[at] as number);
         this.cost[at] = cost;
       }
+    this.stamps.push(saved);
     this.rebuild();
     return () => {
-      for (let i = 0; i < saved.length; i += 2) this.cost[saved[i] as number] = saved[i + 1] as number;
+      const index = this.stamps.indexOf(saved);
+      if (index < 0) return;
+      this.stamps.splice(index, 1);
+      for (const [at, old] of saved) {
+        // A later stamp over this cell saved this stamp's cost as its "before"; hand it the real one instead.
+        const later = this.stamps.slice(index).find((stamp) => stamp.has(at));
+        if (later) later.set(at, old);
+        else this.cost[at] = old;
+      }
       this.rebuild();
     };
   }
