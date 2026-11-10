@@ -3120,3 +3120,48 @@ than either prebuilt target. The measured native corpus linear-memory peak remai
 The partial cold/RSS evidence above remains incomplete, not a passing replacement
 gate. Optional entry transfer sizes and landing checks are retained separately in
 results/batch-133-landing.json once measured.
+
+### Batch 134 consumed-output lifetime and raw-level capacity (report25)
+
+The private draft frees a consumed output before allocating its replacement.
+A thread-local allocator regression fails before repair at589824 live bytes
+and passes at327680 for the same three complete256x256 RGBA decodes. This
+proves one removed overlapping output allocation, not a timing result or a
+complete explanation of process RSS. A separate checked raw-level reservation
+accepts the valid1x16384x2049 layout (134283264bytes) without lifting the128MiB
+compressed-input cap. Actual Wasm decodes all2049layers exactly; malformed
+layouts, invalid counts and pixel-limit violations refuse before allocation.
+
+The original173 fresh-process pairs now record0 RSS and0 Wasm high-water
+losses, with all2289 scalar image hashes unchanged and every output retained.
+Previous failed pairs and every current pair remain in the receipt. No forced
+GC, normalization, timingAB or measurement repeated for a better number.
+BC outputs remain identical across98pairs/1296images; the11 original-source
+losses remain open under BC1 RGB / BC3 RGBA per-file SSE, new<=old, zero
+tolerance. All11 improve payload SSE; zero added payload error still loses
+7/98 source pairs. That is diagnostic evidence, not authority to extend
+Scott's scalar ruling to color and not a lower bound for arbitrary encoders.
+
+Current private draft204197raw/73198gzip9B (previous203110/73104), not the
+final optional entry. ETC2/EAC still lacks hardware upload proof: OpenGL
+selected software and was refused; real A6000 D3D11 rendered its exact
+control but has no ETC extension, so0/993 uploaded. Prior Vulkan loading
+failure remains unresolved. Remaining formats/public integration/prebuilt
+removal and speed-phase timing debt remain open.
+[Full receipt](results/batch-134-allocation-checkpoint.json).
+
+BC1 target2 compares RGB; BC3 target3 compares RGBA against unchanged original-source references, summed over all mip/layer/face images. Each pair must have new SSE<=old SSE, zero tolerance. All11 losses:
+
+| File | Target | Source SSE old | Source SSE new | Payload SSE old | Payload SSE new | Zero-added payload source SSE |
+|---|---:|---:|---:|---:|---:|---:|
+| donmccurdy-ktx2_array_etc1s.ktx2 | 2 | 1010703.3503723145 | 1729463.8972473145 | 173210 | 34507 | 1620158.1159973145 |
+| donmccurdy-ktx2_array_etc1s.ktx2 | 3 | 1010703.3503723145 | 1729463.8972473145 | 173210 | 34507 | 1620158.1159973145 |
+| donmccurdy-ktx2_cubemap_etc1s.ktx2 | 2 | 806903.63513183594 | 1303434.7210693359 | 128827 | 25103 | 1229137.5648193359 |
+| donmccurdy-ktx2_cubemap_etc1s.ktx2 | 3 | 806903.63513183594 | 1303434.7210693359 | 128827 | 25103 | 1229137.5648193359 |
+| KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Dot_C.ktx2 | 2 | 2634603.1309201233 | 2871546.9141232483 | 546031 | 308211 | 2885462.0488888733 |
+| KhronosGroup-Models_CarConcept_glTF-KTX-BasisU-Draco_Dot_C.ktx2 | 3 | 2634603.1309201233 | 2871546.9141232483 | 546031 | 308211 | 2885462.0488888733 |
+| KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_BaseColor.ktx2 | 2 | 41655209.594558179 | 41917660.232840955 | 3187345 | 2207569 | 39903328.427400053 |
+| KhronosGroup-Models_FlightHelmet_glTF-KTX-BasisU_FlightHelmet_Materials_LensesMat_BaseColor.ktx2 | 3 | 34286519898.705208 | 34286782349.343491 | 3187345 | 2207569 | 34284768017.538052 |
+| Margo-ktx2-gpu-alpha-uastc-zstd.ktx2 | 3 | 7395636.9354094062 | 7925574.7628630195 | 882974 | 618366 | 7397798.3111208472 |
+| seaside-rocks01-normal.basis | 2 | 22855676494.651619 | 22868942053.472664 | 5263469 | 5033592 | 22724560614.445404 |
+| seaside-rocks01-normal.basis | 3 | 45867149954.651627 | 45967296533.472672 | 5683536 | 5120191 | 45819783427.445412 |

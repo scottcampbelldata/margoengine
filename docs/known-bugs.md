@@ -45,27 +45,28 @@ paths now release every acquired buffer/texture and renderer registration, prese
 Native fallback refuses with linked unsupported before allocation. mesh-ownership.test.js fails on all four
 old paths and passes the corrected build. This CPU checkpoint does not claim full job 3 GPU acceptance.
 
-### Open: batch 134 private replacement RSS and raw-level capacity
+### Fixed in private draft: batch 134 raw-level capacity and memory acceptance
 
-Report24 removes the full decoded JS Zstd level and per-image input copies:
-inflation writes directly into borrowed owned Wasm input and checked ranges
-handle layers/faces/mips. All173 fresh-process scalar pairs retain exact
-outputs and pass Wasm high water. Strict RSS losses fall from25 to2; one of
-the original25 remains. Current losses: array UASTC BC4,88,788 old/89,104 new
-KiB; LensesMat normal R11,94,416 old/95,248 new KiB. These are failures, not
-busy-machine timing waivers. Exact RSS includes host allocator/JIT and
-committed Wasm pages; the residual cause is not yet isolated. Never force GC,
-discard outputs, relax a bar or repeat measurements to get a better number.
+Report25 frees the consumed Wasm output before encoding a new output. The
+allocator regression fails on report24 at589824 live bytes and passes at327680
+for identical complete decoding work. Layout-checked raw-level reservation
+accepts134283264bytes for1x16384x2049layers, with all2049 actual-Wasm image
+outputs exact. The128MiB compressed-input cap and dimension/image/pixel limits
+remain unchanged. Invalid layouts and limits refuse before allocation.
 
-The new contiguous owned raw-level reserve also inherits basis_input's128MiB
-compressed-input cap. A1x16384 UASTC array with2049 layers has134,283,264 raw
-bytes, while each image needs65,536. Its dimensions/image/pixel limits fit,
-but the new full-level reservation refuses. Add a separately checked decoded
-level reservation with a layout/boundary regression; preserve the compressed
-input limit rather than raising it. The private replacement remains unaccepted.
-[Current evidence](whitepaper/results/batch-134-owned-zstd-checkpoint.json)
-retains every pair; [original diagnosis](whitepaper/results/batch-134-corpus-uploads-memory.json)
-retains the25 initial losses and storage-normalized control.
+The same173 fresh-process pairs, with all outputs retained and2289 hashes
+unchanged, now have0 RSS losses and0 Wasm high-water losses. The two
+previous misses pass: array UASTC BC4,88764 old/87560 newKiB; LensesMat normal
+R11,94960 old/93024 newKiB. Original report24 failures remain published:
+88788/89104 and94416/95248KiB respectively. This establishes the current
+strict per-pair result; it does not decompose JIT/allocator/RSS causality or
+prove a universal process-memory bound. No GC, normalization, discarded
+outputs, timing waiver or rerun to obtain a better number was used.
+
+[Current evidence](whitepaper/results/batch-134-allocation-checkpoint.json)
+contains all pairs and frozen source/artifact pins; prior25loss and2loss
+receipts remain available. Final missing-target/public-API memory acceptance
+remains open and the prebuilt decoder remains retained.
 
 ### Open: batch 134 BC1/BC3 source quality and remaining targets
 

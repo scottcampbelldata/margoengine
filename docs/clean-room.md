@@ -4660,3 +4660,55 @@ executes the actual draw writer at [3,4,0,2.5], huge and tiny directions, checks
 exact float32-normalized XYZ, intensity and caller input. It fails before and
 passes after. This runtime check joins check:merge through the package tests;
 no tolerance or GPU assertion is changed.
+
+### Batch 134 raw-level layout and consumed-output allocation, report25
+
+Research precedes this private optional-draft change. Mark Callow/Khronos,
+*KTX File Format Specification*2.0.4 (2025), sections3.9.7/levelImages reread:
+https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html . A reflated level
+contains every layer and face, so its reservation is derived from the checked
+block layout instead of reusing the compressed-file byte limit. The128MiB
+compressed-input cap,16384dimension,4096images and128Mi-pixel admission stay.
+Rust Project, *Vec API Reference*1.99.1 (2026), clear/capacity/reservation/drop
+sections read: https://doc.rust-lang.org/std/vec/struct.Vec.html . clear retains
+capacity; all encoders return a freshly allocated output. The private ABI now
+drops the consumed output before encoding its replacement. A native allocator
+regression measures simultaneous live bytes, without clocks or forced GC.
+
+Compared scientific sources: Zoe Paraskevopoulou, Michael Fitzgibbons, Michelle
+Thalakottur, Noble Mushtak, Jose Sulaiman Mazur and Amal Ahmed, *RichWasm:
+Bringing Safe, Fine-Grained, Shared-Memory Interoperability Down to WebAssembly*
+(2024), abstract only, https://arxiv.org/abs/2401.08287 ; Xinyu Zeng, Ruijun Meng,
+Martin Prammer, Wes McKinney, Jignesh M. Patel, Andrew Pavlo and Huanchen Zhang,
+*F3: The Open-Source Data File Format for the Future* (SIGMOD2025), selected6.3
+input/output and lifetime paragraphs, https://db.cs.cmu.edu/papers/2025/zeng-sigmod2025.pdf .
+Combine explicit guest-buffer ownership and deterministic allocation lifetime;
+no ISA, Arrow layout, runtime implementation or companion code adopted. Neither
+paper was read in full for this checkpoint. No foreign implementation/source
+repository was read. Private source/artifact pins and regression evidence are
+in whitepaper/results/batch-134-allocation-checkpoint.json.
+
+For ETC2/EAC upload evidence, Khronos WebGL Working Group (Jeff Gilbert and
+members), *WEBGL_compressed_texture_etc*, revision7 (2016), read in full:
+https://registry.khronos.org/webgl/extensions/WEBGL_compressed_texture_etc/ .
+Compared Kelsey Gilbert/Khronos, *WebGL2 Specification*, June2026 editor draft,
+selected compressed-texture and framebuffer sections:
+https://registry.khronos.org/webgl/specs/latest/2.0/ . Format tokens, complete
+block byte lengths, extension gating and integer render/readback follow these
+standards. CPU normative sample references are prepared outside the GPU lock.
+The extension specifically says browsers should not advertise decompression
+fallbacks. The OpenGL launch selected SwiftShader and was refused; selecting
+D3D11 gives the real NVIDIA RTX A6000 and its exact render/readback control,
+but no ETC extension. This is0/993 ETC2/EAC images uploaded, not hardware proof.
+No repeat of the unavailable Vulkan path, no software acceptance or bar change.
+
+Additional search review: Daniel Lehmann, Johannes Kinder and Michael Pradel,
+*Everything Old is New Again: Binary Security of WebAssembly* (USENIX Security
+2020), conference abstract only, https://www.usenix.org/conference/usenixsecurity20/presentation/lehmann .
+Its warning that Wasm isolation alone does not establish source-level memory
+safety supports retaining explicit checked layouts and ranges; it supplies no
+allocator or codec algorithm here. Not a full-paper review. Search results
+exposed implementation references/snippets; no such page or companion code
+was opened or used. The block-layout formula was already present in Margo's
+own checked KTX parser and was revalidated against KTX2.0.4, not inferred from
+an implementation search result.

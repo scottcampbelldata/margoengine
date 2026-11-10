@@ -3254,3 +3254,32 @@ gate. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json
 Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
 for a destructured direction alias, matching core's unit-direction contract.
 No core/stage changes or pixel tolerances are involved.
+
+### Batch 134 consumed-output lifetime and raw-level capacity (report25)
+
+The private draft frees a consumed output before allocating its replacement.
+A thread-local allocator regression fails before repair at589824 live bytes
+and passes at327680 for the same three complete256x256 RGBA decodes. This
+proves one removed overlapping output allocation, not a timing result or a
+complete explanation of process RSS. A separate checked raw-level reservation
+accepts the valid1x16384x2049 layout (134283264bytes) without lifting the128MiB
+compressed-input cap. Actual Wasm decodes all2049layers exactly; malformed
+layouts, invalid counts and pixel-limit violations refuse before allocation.
+
+The original173 fresh-process pairs now record0 RSS and0 Wasm high-water
+losses, with all2289 scalar image hashes unchanged and every output retained.
+Previous failed pairs and every current pair remain in the receipt. No forced
+GC, normalization, timingAB or measurement repeated for a better number.
+BC outputs remain identical across98pairs/1296images; the11 original-source
+losses remain open under BC1 RGB / BC3 RGBA per-file SSE, new<=old, zero
+tolerance. All11 improve payload SSE; zero added payload error still loses
+7/98 source pairs. That is diagnostic evidence, not authority to extend
+Scott's scalar ruling to color and not a lower bound for arbitrary encoders.
+
+Current private draft204197raw/73198gzip9B (previous203110/73104), not the
+final optional entry. ETC2/EAC still lacks hardware upload proof: OpenGL
+selected software and was refused; real A6000 D3D11 rendered its exact
+control but has no ETC extension, so0/993 uploaded. Prior Vulkan loading
+failure remains unresolved. Remaining formats/public integration/prebuilt
+removal and speed-phase timing debt remain open.
+[Full receipt](whitepaper/results/batch-134-allocation-checkpoint.json).

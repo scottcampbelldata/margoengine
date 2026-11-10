@@ -2293,3 +2293,43 @@ GPU reads. Retain both reports because the canonical output path is reused.
 The expanded grid retains every existing case and adds unsigned bit-31/MAX
 comparison, replacement and change/reset at both sample counts. Research and
 numeric translation rationale: ../clean-room.md, stencil reference repair.
+
+### Batch 134 report25 allocation checkpoint
+
+This is private-draft evidence, not a shipped replacement or final acceptance.
+Use the lane's frozen report25 crate/adapter/artifact pins from
+results/batch-134-allocation-checkpoint.json. The candidate source snapshot is
+the lane-local report25-frozen snapshot; keep it and all failed evidence.
+The published prebuilt remains in use until every format and gate passes.
+
+Run the private Cargo release tests, including the thread-local live allocator
+regression and raw-level layout boundaries. Build the same release Wasm, then
+run Node with --experimental-strip-types --test --test-timeout=120000 on
+the lane-local owned-zstd-report24.test.mjs and raw-level-report25.test.mjs.
+The latter decodes every image of a2049layer array above the compressed-input
+byte cap; it does not reduce the work to one image or raise that cap.
+
+report25-memory.mjs runs all173 original old/new pairs in fresh child processes,
+checks input pins and2289 output hashes and retains every image buffer. The
+full-process peak RSS bar and Wasm high-water bar are both new<=old per pair,
+zero tolerance. No forced GC, altered imports, discard, source normalization,
+timing comparisons or repeat-until-pass measurement. Keep prior report24 misses
+beside the new table; a later machine run does not erase them.
+report25-bc-identity.mjs checks all1296 BC images against the saved report24 hashes;
+original-source metrics/readers remain unchanged. The receipt includes all11
+BC1 RGB/BC3 RGBA source-bar losses, payload diagnostics and7 zero-added-payload
+source losses. Neither diagnostic changes a bar or proves an arbitrary-encoder
+source-error lower bound.
+
+Run whole-container-fuzz-report25-corpus.mjs for the unchanged51seeds and
+report25-hostile.mjs for bounded actual-Wasm random-block/range/video probes.
+Pin both the adapter and Wasm before any seed. These campaigns remain bounded,
+with final missing-target/public-API fuzz acceptance still owed.
+For ETC2/EAC, prepare normative samples with report25-prepare-etc-uploads.mjs
+outside the GPU lock; report25-etc-webgl-uploads.mjs takes the real hardware
+compressed-upload/render/integer-readback path only when the ETC extension is
+exposed. Software is refused. A6000 D3D11 has no extension, so its exact red
+render control is useful hardware-selection evidence and is not ETC proof.
+The GPU leaf uses one shared slot, --wait-max=60, a bounded command maximum;
+never wrap preparation, build, CPU tests or waits in that lock.
+Timing, cold/warm/startup and paired A/B debt stay in the deferred speed phase.
