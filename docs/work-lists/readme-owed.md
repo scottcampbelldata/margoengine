@@ -133,3 +133,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/react | Material lifecycle proof observes current plugin identities, including StrictMode name reuse. | Batch 262 job 3 |
 
 - @margoengine/audio/binaural: BinauralAudio first/second/third order AmbiX, inherited Audio transport, field rotation, HRTF graph costs and browser-dependent localization.
+- @margoengine/worker (batch 257 job 1): document /rpc typed RpcClient, exposeRpc handlers/context, rpcTransfer and RpcPool; defaults, ownership, queue limits, cancellation, deadlines and failure/disposal examples.
+
+- margoengine (batch 257 job 1): cover the generated worker/rpc alias with the worker RPC documentation.

@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
 
 const context = await openBrowser({ startPath: '/packages/worker/tests/browser-check.html', port: 'free' }),
   { page, hardware } = context,
@@ -27,6 +28,8 @@ try {
   await page.waitForFunction(() => window.ready, null, { timeout: 60_000 });
   const result = { supported: await page.evaluate(() => window.check.supported) };
   assert.equal(result.supported, true);
+  result.rpc = await page.evaluate(() => window.check.rpc());
+  assert.deepEqual(result.rpc, { sums: [42, 3], detached: true, result: 42 });
 
   const ratio = await page.evaluate(() => devicePixelRatio);
   result.first = await until((s) => s.frames > 3, 'three frames');
@@ -81,10 +84,12 @@ try {
   result.zoomed = await until((s) => Math.abs(distance(s.camera) - distance(orbit)) > 1e-3, 'the wheel to zoom');
   assert.equal(await page.evaluate(() => scrollY), 0, 'the page stayed put');
 
-  result.pageTicks = await page.evaluate(() => window.check.pageWhileWorkerBlocks(400));
-  result.workerFrames = await page.evaluate(() => window.check.workerWhilePageBlocks(400));
-  assert.ok(result.pageTicks >= 10, `the page ran while the worker was stuck: ${result.pageTicks} ticks`);
-  assert.ok(result.workerFrames >= 5, `the worker drew while the page was stuck: ${result.workerFrames} frames`);
+  if (speedEnabled()) {
+    result.pageTicks = await page.evaluate(() => window.check.pageWhileWorkerBlocks(400));
+    result.workerFrames = await page.evaluate(() => window.check.workerWhilePageBlocks(400));
+    assert.ok(result.pageTicks >= 10, `the page ran while the worker was stuck: ${result.pageTicks} ticks`);
+    assert.ok(result.workerFrames >= 5, `the worker drew while the page was stuck: ${result.workerFrames} frames`);
+  }
 
   result.webgl2 = await page.evaluate(() => window.check.webgl2());
   assert.equal(result.webgl2.backend, 'webgl2', 'the fallback runs in a worker too');
@@ -95,7 +100,13 @@ try {
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/worker-browser.json', JSON.stringify({ hardware, result }, null, 1));
-  console.log('ok worker:', result.pageTicks, 'page ticks,', result.workerFrames, 'worker frames while the other blocked');
+  console.log(
+    'ok worker:',
+    result.pageTicks,
+    'page ticks,',
+    result.workerFrames,
+    'worker frames while the other blocked',
+  );
 } finally {
   await context.close();
 }

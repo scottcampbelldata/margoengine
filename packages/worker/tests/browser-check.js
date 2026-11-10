@@ -1,5 +1,6 @@
 // The page of browser-check.mjs: a real Worker draws on a real transferred canvas; browser-check-worker.js is its other end.
 import { transferCanvas, workerCanvasSupported } from '/packages/worker/dist/index.js';
+import { RpcPool } from '/packages/worker/dist/rpc.js';
 
 const asked = new Map();
 let next = 0;
@@ -35,6 +36,17 @@ const open = (backend, element) => {
 const gpu = await open('webgpu', document.getElementById('gpu'));
 
 window.check = {
+  async rpc() {
+    const pool = new RpcPool(() => new Worker('/packages/worker/tests/rpc-worker.js', { type: 'module' }), { size: 2 });
+    try {
+      const sums = await Promise.all([pool.call('sum', [20, 22]), pool.call('sum', [1, 2])]);
+      const buffer = new Uint8Array([41]).buffer;
+      const output = await pool.call('buffer', [buffer], { transfer: [buffer] });
+      return { sums, detached: buffer.byteLength === 0, result: new Uint8Array(output)[0] };
+    } finally {
+      pool.dispose();
+    }
+  },
   supported: workerCanvasSupported(),
   ask: (command, value) => ask(gpu.worker, command, value),
   resize(width, height) {

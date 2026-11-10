@@ -2206,6 +2206,7 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 ## 5. Current evidence gaps
 
 Batch 253 input evidence: `packages/input/test/input-browser.mjs` acquires native pointer lock from a click, drives a mesh transform through vector and locked mouse action channels, checks rendered pixel movement, then checks return after release. WebGPU and WebGL2 compatibility both pass. The package's `test:browser` registers this rendering proof in the GPU suite; changed-package GPU checks use a shared slot only. Physical XR controllers, hand tracking and raw mouse fidelity still need hardware acceptance; CPU fixtures cover their action/replay contracts and raw capability negotiation. No new rendering algorithm or speed claim.
+Batch 257 job 1: worker RPC adds typed task dispatch and fixed FIFO pools without renderer changes. CPU proof covers actual worker transfer, cancellation, concurrency and transport errors; the worker GPU fixture also checks browser RPC. Existing thread-independence timing budgets are deferred by speedEnabled() during the build phase, with their original bars in docs/work-lists/speed-phase.md. Render, pick, sizing and input assertions still run on both backends.
 
 Batch 273 array-layer repair separates adapter capacity from the unrequested
 device default. The optional compatibility adapter reports GL's actual array
