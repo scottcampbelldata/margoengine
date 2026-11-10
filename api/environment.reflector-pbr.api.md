@@ -157,7 +157,7 @@ class SceneTarget {
   readonly resolvedDepth: GPUTexture;
   readonly depthSource?: GPUTextureView;
   begin(context: Context): void;
-  resolve(encoder: GPUCommandEncoder, final?: boolean): void;
+  resolve(encoder: GPUCommandEncoder, final?: boolean, depth?: boolean): void;
   copyDepth(encoder: GPUCommandEncoder, view: GPUTextureView, count: number, format?: GPUTextureFormat): void;
   restore(context: Context): void;
   present(context: Context): void;
