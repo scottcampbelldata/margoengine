@@ -1,3 +1,4 @@
+import { instrumentMeadow } from './support/meadow-audit.mjs';
 import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -434,56 +435,9 @@ try {
       ],
     };
   }, speedEnabled());
-  const instrument = () => {
-    window.meadowAudit = {
-      live: new Set(),
-      textures: [],
-      samples: [],
-      boundSamples: new Set(),
-      created: 0,
-      frames: 0,
-      grass: [],
-    };
-    const pipelines = new WeakMap();
-    for (const name of ['createBuffer', 'createTexture', 'createRenderPipeline', 'createBindGroup']) {
-      const original = GPUDevice.prototype[name];
-      GPUDevice.prototype[name] = function (desc) {
-        const audit = window.meadowAudit,
-          result = original.call(this, desc);
-        audit.created++;
-        if (name === 'createRenderPipeline') {
-          const samples = desc.multisample?.count ?? 1;
-          pipelines.set(result, samples);
-          audit.samples.push(samples);
-        }
-        if (name === 'createTexture') audit.textures.push(desc.sampleCount ?? 1);
-        if (name === 'createBuffer' || name === 'createTexture') {
-          audit.live.add(result);
-          const destroy = result.destroy.bind(result);
-          result.destroy = () => {
-            audit.live.delete(result);
-            destroy();
-          };
-        }
-        return result;
-      };
-    }
-    const set = GPURenderPassEncoder.prototype.setPipeline;
-    GPURenderPassEncoder.prototype.setPipeline = function (pipeline) {
-      window.meadowAudit.boundSamples.add(pipelines.get(pipeline));
-      return set.call(this, pipeline);
-    };
-    const write = GPUQueue.prototype.writeBuffer;
-    GPUQueue.prototype.writeBuffer = function (buffer, offset, data, ...rest) {
-      if (buffer.label === 'grass:frame') {
-        window.meadowAudit.grass = Array.from(data);
-        window.meadowAudit.frames++;
-      }
-      return write.call(this, buffer, offset, data, ...rest);
-    };
-  };
+
   const { page } = browser;
-  await page.addInitScript(instrument);
+  await page.addInitScript(instrumentMeadow);
   await page.setViewportSize({ width: 1280, height: 800 });
   // Desktops start on the light tier (1x MSAA); the 4x checks below need the full tier.
   await page.goto('http://127.0.0.1:5193/examples/windy-meadow.html?quality=high');
@@ -584,7 +538,7 @@ try {
       reducedMotion: 'reduce',
     });
   try {
-    await mobileContext.addInitScript(instrument);
+    await mobileContext.addInitScript(instrumentMeadow);
     const mobile = await mobileContext.newPage();
     mobile.on('pageerror', (e) => errors.push(e.message));
     mobile.on('console', (m) => {

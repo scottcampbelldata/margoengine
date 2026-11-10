@@ -11,6 +11,8 @@ K2 React packed tests: component lifecycle tests continue to import the installe
 
 K2 React lifecycle: portal worlds retain their committed resource through StrictMode replay and release after real unmount; decal parenting follows the live mesh ref and live parent registry. The packed suite exercises React 18.3.1, while workspace CPU/browser checks use the installed React 19 version. Private shader fixtures are bundled test support, not a new public gltf-pro API or shipped source file.
 
+K2 grass harness: prototype counters are installed after adapter resolution and once per active device prototype. This is test-only instrumentation; package entries and scene rendering are unchanged. Native and full WebGL2 compatibility retain the same more-than-five-frame assertion and 30000 ms page budget.
+
 ## Batch 187: existing lightmap parity entries and opaque visibility
 
 Batch 54 already supplies indexed mesh baking on UV1 (the second UV set), progressive WebGPU compute with a live

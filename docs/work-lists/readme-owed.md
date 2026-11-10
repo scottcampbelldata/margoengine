@@ -13,6 +13,8 @@
 - @margoengine/react (fixes K2 job 2): document packed-consumer test dependencies and the repository-root override for contributor-script tests; README examples remain deferred.
 - @margoengine/react (K2 packed follow-up): cover portal/decal ownership across React 18 and 19 StrictMode replay; examples deferred.
 
+- @margoengine/creative (K2 job 3): the meadow test audit now follows the active device classes on native and compatibility; no feature or README example changes.
+
 - @margoengine/clustered (batch 186 job 1): document /area-shapes AreaShapes, disk/sphere LTC and castShadow settings, shared LocalShadows casters, four shaped plus four rectangular shadow slots, radius-scaled PCSS and defaults; examples deferred.
 - margoengine (batch 186 job 1): document clustered/area-shapes forwarding entry; examples deferred.
 
