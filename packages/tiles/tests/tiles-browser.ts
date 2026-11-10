@@ -2,7 +2,8 @@
 // tiles, anchored in ECEF at 40 N 75.6 W) streamed by TilesRenderer through gltf-pro and drawn by the engine.
 // tests/tiles-browser.mjs drives it and checks the numbers. Built imports, so it uses the published package boundary.
 import { Engine } from '../../core/dist/extension.js';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { TileFeatures } from '../dist/features.js';
+import { parseGLTFAsync, GLTFAsset } from '../../gltf-pro/dist/index.js';
 import { gaussianSplats, readGaussianSplats } from '../../gltf-pro/dist/splats.js';
 import { glbChunks } from '../../shared/glb.js';
 import { i3dm } from '../dist/i3dm.js';
@@ -89,6 +90,108 @@ function snapshot() {
 }
 
 async function run(name: string): Promise<unknown> {
+  if (name === 'features') {
+    const from = errors.length;
+    const url =
+      '/examples/assets/3d-tiles/EXT_structural_metadata/FeatureIdAttributeAndPropertyTable/FeatureIdAttributeAndPropertyTable.gltf';
+    const doc = await (await fetch(url)).json();
+    const primitive = doc.meshes[0].primitives[0],
+      accessor = doc.accessors[primitive.attributes._FEATURE_ID_0],
+      view = doc.bufferViews[accessor.bufferView];
+    const raw = Uint8Array.from(atob(doc.buffers[view.buffer].uri.split(',')[1]), (c) => c.charCodeAt(0));
+    for (let i = 0; i < accessor.count; i++) raw[(view.byteOffset ?? 0) + i * (view.byteStride ?? 1)] = i % 3;
+    doc.buffers[view.buffer].uri = 'data:application/octet-stream;base64,' + btoa(String.fromCharCode(...raw));
+    const bytes = new TextEncoder().encode(JSON.stringify(doc)),
+      model = await parseGLTFAsync(engine, bytes);
+    const p = model.primitives[0],
+      v = p.vertices.slice();
+    for (let i = 0; i < v.length; i += 20) {
+      const x = v[i],
+        y = v[i + 1],
+        n = Math.hypot(x * 0.6, y * 0.6, 1);
+      v.set([(x * 0.6) / n, (y * 0.6) / n, 1 / n], i + 4);
+    }
+    model.writeGeometry([{ vertices: v, indices: p.indices }]);
+    engine.camera.position = [0.5, 0.5, 2];
+    engine.camera.target = [0.5, 0.5, 0];
+    await frame();
+    const before = pixels();
+    const features = new TileFeatures(engine);
+    const tile = { id: 0, contentUrls: [new URL(url, location.href).href] } as any;
+    const decoration = await features.decorate({
+      kind: 'model',
+      model,
+      content: { type: 'gltf', gltf: bytes, byteLength: bytes.length },
+      tile,
+    });
+    const feature = features.resolve({ primitive: p, faceIndex: 0, barycoord: [0.8, 0.1, 0.1] })!;
+    features.highlight(feature, [1, 1, 1, 1]);
+    await frame();
+    const white = pixels();
+    let maxDifference = 0,
+      visible = 0;
+    for (let i = 0; i < white.length; i++) {
+      maxDifference = Math.max(maxDifference, Math.abs(white[i] - before[i]));
+      if (i % 4 !== 3 && before[i] > 10) visible++;
+    }
+    features.highlight(feature, [1, 0, 0, 1]);
+    await frame();
+    const red = pixels();
+    let changed = 0;
+    for (let i = 0; i < red.length; i += 4) if (red[i + 1] + 10 < before[i + 1]) changed++;
+    decoration.dispose();
+    features.dispose();
+    await frame();
+    const restored = pixels();
+    let restoreDifference = 0;
+    for (let i = 0; i < restored.length; i++)
+      restoreDifference = Math.max(restoreDifference, Math.abs(restored[i] - before[i]));
+    // Exercise the UINT32 comparison and transformed UV shader on the same real sample.
+    const set = primitive.extensions.EXT_mesh_features.featureIds[0];
+    delete set.attribute;
+    delete set.propertyTable;
+    set.texture = {
+      index: 0,
+      channels: [0, 1, 2, 3],
+      extensions: { KHR_texture_transform: { offset: [0.5, 0], scale: [0, 0], rotation: 0.3, texCoord: 2 } },
+    };
+    const pos = p.definition.attributes.POSITION!;
+    p.definition.attributes.TEXCOORD_2 = pos;
+    const originalAccessor = model.asset.accessor.bind(model.asset);
+    model.asset.accessor = ((index: unknown, type?: string) =>
+      index === pos && type === 'VEC2'
+        ? new Float32Array(v.length / 10)
+        : originalAccessor(index, type)) as typeof model.asset.accessor;
+    model.asset.doc.textures = [{ source: 0 }];
+    const textureBytes = new TextEncoder().encode(JSON.stringify({ ...doc, textures: [{ source: 0 }] }));
+    const textures = new TileFeatures(engine, {
+      image: () => ({ width: 1, height: 1, data: new Uint8Array([254, 255, 255, 255]) }),
+    });
+    const textureDecoration = await textures.decorate({
+      kind: 'model',
+      model,
+      content: { type: 'gltf', gltf: textureBytes, byteLength: textureBytes.length },
+      tile,
+    });
+    const textureFeature = textures.resolve({ primitive: p, faceIndex: 0, barycoord: [0.8, 0.1, 0.1] })!;
+    textures.highlight(textureFeature, [0, 1, 0, 1]);
+    await frame();
+    const allocated = textureDecoration.bytes;
+    textureDecoration.dispose();
+    textures.dispose();
+    model.dispose();
+    engine.camera.position = [0, 120, 1800];
+    engine.camera.target = [0, 0, 0];
+    return {
+      errors: errors.slice(from),
+      visible,
+      changed,
+      maxDifference,
+      restoreDifference,
+      id: textureFeature.id,
+      allocated,
+    };
+  }
   if (name === 'imagery') {
     const from = errors.length;
     const png = async (color: string) => {

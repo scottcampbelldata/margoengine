@@ -522,6 +522,7 @@ export interface PBRTransparency {
 }
 
 export interface PreparedGeometry {
+    interpolatedDirections?: boolean;
     vertices: Float32Array;
     indices: Uint32Array;
     uvs?: Float32Array;
@@ -557,7 +558,11 @@ export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'ext
 
 export function textureTransform(x?: TextureTransform, texCoord?: number): number[];
 
-export function validatePreparedGeometry(data: { vertices: Float32Array; indices: Uint32Array }): void;
+export function validatePreparedGeometry(data: {
+  vertices: Float32Array;
+  indices: Uint32Array;
+  interpolatedDirections?: boolean;
+}): void;
 
 export function viewGLTFCamera(model: PBRModel, camera?: number | GLTFCamera): void;
 

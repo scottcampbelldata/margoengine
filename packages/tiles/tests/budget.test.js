@@ -95,3 +95,16 @@ test("budget: the renderer counts a tile's GPU bytes by default, its file with b
     /Invalid budget/,
   );
 });
+
+test('budget refreshes live geometry and decoration allocations before refinement, including grouped content', async () => {
+  const made = model();
+  const { renderer } = await oneTile(undefined, () => made);
+  const before = renderer.tileset.bytes;
+  const p = renderer.tileset.root.renderable;
+  assert.ok(p.bytes > 0);
+  made.primitives[0].vertices = new Float32Array(2000);
+  renderer.update();
+  assert.equal(renderer.tileset.bytes, before + 2000 * 4);
+  assert.equal(renderer.tileset.root.renderable.bytes, renderer.tileset.bytes);
+  renderer.dispose();
+});

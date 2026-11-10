@@ -449,6 +449,7 @@ class PBRInstances {
 }
 
 interface PreparedGeometry {
+    interpolatedDirections?: boolean;
     vertices: Float32Array;
     indices: Uint32Array;
     uvs?: Float32Array;

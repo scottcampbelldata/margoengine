@@ -190,6 +190,9 @@ interface TilesContentDecoration {
 }
 
 type TilesDecorationContext = {
+    signal?: AbortSignal;
+    fetch?: (url: string, signal: AbortSignal) => Promise<Uint8Array>;
+} & ({
     kind: 'model';
     model: TilesModel;
     content: ModelContent;
@@ -204,7 +207,7 @@ type TilesDecorationContext = {
     model: TilesModel;
     content: InstancesContent;
     tile: TilesetTile;
-};
+});
 
 interface TilesModel {
     readonly root: Mesh;

@@ -113,15 +113,19 @@ export const i3dm: TilesInstancesDrawer = async (
     nodes = byNode.size;
     host.place(root, host.contentMatrix(tile, [rtc[0] + center[0], rtc[1] + center[1], rtc[2] + center[2]], false));
     root.visible = false;
-    decoration = host.decorate?.({ kind: 'instances', model, content, tile });
+    decoration = await host.decorate?.({ kind: 'instances', model, content, tile, signal, fetch: host.fetch });
+    signal.throwIfAborted();
   } catch (error) {
+    decoration?.dispose();
     model.dispose();
     throw error;
   }
   // Under budget 'gpu': the model once, plus each node's instance rows (24 float32 per instance, as PBRInstances holds).
   const rows = host.budget === 'gpu' ? nodes * content.length * 24 * 4 : 0;
   return {
-    bytes: host.measure(model, content.byteLength) + rows + (decoration?.bytes ?? 0),
+    get bytes() {
+      return host.measure(model, content.byteLength) + rows + (decoration?.bytes ?? 0);
+    },
     get visible() {
       return model.root.visible;
     },

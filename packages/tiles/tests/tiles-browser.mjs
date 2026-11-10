@@ -41,6 +41,18 @@ try {
   await page.waitForFunction(() => window.tilesFixture, null, { timeout: CASE_TIMEOUT });
   assert.equal(hardware.webgpu?.fallback, false, 'Physical WebGPU adapter required');
 
+  const features = await call((n) => window.tilesFixture.run(n), 'features');
+  assert.deepEqual(features.errors, []);
+  check(
+    'feature highlight preserves smooth shading, restores the authored surface and shades exact UINT32 texture IDs',
+    features.visible > 500 &&
+      features.changed > 50 &&
+      features.maxDifference <= 1 &&
+      features.restoreDifference === 0 &&
+      features.id === 4294967294 &&
+      features.allocated === 36,
+    features,
+  );
   const city = (results.city = await call((n) => window.tilesFixture.run(n), 'city'));
   assert.deepEqual(city.errors, [], 'city: WebGPU or engine errors');
   const depths = Object.keys(city.depths).map(Number);

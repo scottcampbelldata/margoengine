@@ -424,6 +424,7 @@ export class Tileset {
       throw new RangeError('Invalid view.screenHeight; pass the drawing-buffer height in pixels');
     if (view.planes !== undefined && view.planes.length < 24)
       throw new RangeError('Invalid view.planes; pass 24 numbers (6 planes)');
+    this.bytes = [...this.ready].reduce((sum, tile) => sum + (tile.renderable?.bytes ?? 0), 0);
     this.frame++;
     this.queue.begin();
     this.pending = 0;
@@ -824,7 +825,9 @@ function group(renderables: TileRenderable[]): TileRenderable {
   if (renderables.length === 1) return renderables[0];
   let visible = false;
   return {
-    bytes: renderables.reduce((sum, r) => sum + r.bytes, 0),
+    get bytes() {
+      return renderables.reduce((sum, r) => sum + r.bytes, 0);
+    },
     get visible() {
       return visible;
     },

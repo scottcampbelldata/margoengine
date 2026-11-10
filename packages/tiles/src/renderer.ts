@@ -26,12 +26,18 @@ export interface TilesContentDecoration {
   dispose(): void;
 }
 /** A loaded content item exposed to an optional decorator, before the tile becomes visible. */
-export type TilesDecorationContext =
+export type TilesDecorationContext = {
+  signal?: AbortSignal;
+  fetch?: (url: string, signal: AbortSignal) => Promise<Uint8Array>;
+} & (
   | { kind: 'model'; model: TilesModel; content: ModelContent; tile: TilesetTile }
   | { kind: 'points'; cloud: unknown; content: PointsContent; tile: TilesetTile }
-  | { kind: 'instances'; model: TilesModel; content: InstancesContent; tile: TilesetTile };
+  | { kind: 'instances'; model: TilesModel; content: InstancesContent; tile: TilesetTile }
+);
 /** Optional entry hook for feature styling and selection. No optional implementation is imported by tiles root. */
-export type TilesContentDecorator = (context: TilesDecorationContext) => TilesContentDecoration;
+export type TilesContentDecorator = (
+  context: TilesDecorationContext,
+) => TilesContentDecoration | Promise<TilesContentDecoration>;
 
 /** A floating origin (such as `FloatingOrigin` from `@margoengine/cameras/origin`): float64 placement around the camera. */
 export interface TilesOrigin {
@@ -54,7 +60,7 @@ export interface TilesModel {
 /** What a content drawer (such as `i3dm` from `@margoengine/tiles/i3dm`) gets from the renderer. */
 export interface TilesContentHost {
   /** Decorates content using the renderer option, if provided. */
-  decorate(context: TilesDecorationContext): TilesContentDecoration | undefined;
+  decorate(context: TilesDecorationContext): TilesContentDecoration | Promise<TilesContentDecoration> | undefined;
   readonly engine: EngineKernel;
   /** The tileset JSON's URL. */
   readonly url: string;
@@ -337,14 +343,26 @@ export class TilesRenderer implements EnginePlugin {
         model.root.visible = false;
         let decoration: TilesContentDecoration | undefined;
         try {
-          decoration = this.decorate?.({ kind: 'model', model, content, tile });
+          decoration = await this.decorate?.({
+            kind: 'model',
+            model,
+            content,
+            tile,
+            signal,
+            fetch: (url, signal) => this.tileset.fetchBytes(url, signal),
+          });
+          signal.throwIfAborted();
         } catch (error) {
+          decoration?.dispose();
           this.origin?.forget(model.root);
           model.dispose();
           throw error;
         }
+        const renderer = this;
         return {
-          bytes: this.measure(model, content.byteLength) + (decoration?.bytes ?? 0),
+          get bytes() {
+            return renderer.measure(model, content.byteLength) + (decoration?.bytes ?? 0);
+          },
           get visible() {
             return model.root.visible;
           },
@@ -384,8 +402,17 @@ export class TilesRenderer implements EnginePlugin {
         cloud.visible = false;
         let decoration: TilesContentDecoration | undefined;
         try {
-          decoration = this.decorate?.({ kind: 'points', cloud, content, tile });
+          decoration = await this.decorate?.({
+            kind: 'points',
+            cloud,
+            content,
+            tile,
+            signal,
+            fetch: (url, signal) => this.tileset.fetchBytes(url, signal),
+          });
+          signal.throwIfAborted();
         } catch (error) {
+          decoration?.dispose();
           host.remove(cloud);
           this.origin?.forget(anchor);
           anchor.dispose();
@@ -420,7 +447,9 @@ export class TilesRenderer implements EnginePlugin {
         }
         let visible = false;
         return {
-          bytes: parts.reduce((sum, p) => sum + p.bytes, 0),
+          get bytes() {
+            return parts.reduce((sum, p) => sum + p.bytes, 0);
+          },
           get visible() {
             return visible;
           },

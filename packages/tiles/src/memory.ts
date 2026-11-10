@@ -11,6 +11,7 @@ export interface MeasurableModel {
   image?(index: number): unknown;
 }
 interface MeasurablePrimitive {
+  readonly buffers?: { readonly vertex: { readonly size: number }; readonly index: { readonly size: number } };
   readonly vertices?: ArrayBufferView;
   readonly indices?: ArrayBufferView;
   readonly uvs?: ArrayBufferView;
@@ -52,13 +53,18 @@ function imageBytes(image: unknown): number {
  */
 export function modelGpuBytes(model: MeasurableModel): number | undefined {
   if (!Array.isArray(model.primitives)) return undefined;
+  const buffers = new Set<{ readonly size: number }>();
   const arrays = new Set<ArrayBufferView>(),
     textures = new Set<number>();
   for (const primitive of [...model.primitives, ...(model.pointsAndLines ?? [])]) {
-    for (const array of [primitive.vertices, primitive.indices, primitive.uvs]) if (array) arrays.add(array);
+    if (primitive.buffers) {
+      buffers.add(primitive.buffers.vertex);
+      buffers.add(primitive.buffers.index);
+      if (primitive.uvs) arrays.add(primitive.uvs);
+    } else for (const array of [primitive.vertices, primitive.indices, primitive.uvs]) if (array) arrays.add(array);
     for (const map of primitive.material?.maps ?? []) if (map) textures.add(map.index);
   }
-  let bytes = 0;
+  let bytes = [...buffers].reduce((sum, buffer) => sum + buffer.size, 0);
   for (const array of arrays) bytes += array.byteLength;
   const defs = model.asset?.doc?.textures ?? [],
     images = new Set<number>();

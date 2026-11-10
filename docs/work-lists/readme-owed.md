@@ -339,3 +339,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated mesh-edit/section alias in the README phase (batch 224 job 1).
 - @margoengine/scene (batch 226 clone): document cloneSubtree defaults, resource sharing/lifetimes, exact local transforms, structured metadata, ownership and rollback with examples in the README phase.
 - margoengine (batch 226 clone): document scene/clone generated alias in the README phase.
+
+- @margoengine/tiles: cover tiles/features decoration, ray-hit resolution, legacy/structural IDs, exact decoded accessor bytes, UV transforms, reversible highlight and live budgets.
+- @margoengine/gltf-pro: cover convex interpolatedDirections prepared geometry and adding later UV buffers with writeGeometry.
+
+- margoengine: cover the generated tiles/features alias.

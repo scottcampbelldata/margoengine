@@ -463,7 +463,11 @@ function sameView(
   for (let i = 0; i < 16; i++) if (data[i] !== Math.fround(matrix[i])) return false;
   for (let i = 0; i < 3; i++) if (data[32 + i] !== Math.fround(position[i])) return false;
   for (let i = 0; i < 4; i++)
-    if (data[36 + i] !== Math.fround(i < 3 ? direction[i] / k : direction[i]) || data[40 + i] !== Math.fround(radiance[i])) return false;
+    if (
+      data[36 + i] !== Math.fround(i < 3 ? direction[i] / k : direction[i]) ||
+      data[40 + i] !== Math.fround(radiance[i])
+    )
+      return false;
   return true;
 }
 /** Draws of a run gathered into one instanced draw (draw-batch.ts). */
@@ -1078,6 +1082,8 @@ function checkLaterUVs({ vertices, uvs }: PreparedGeometry): void {
 }
 /** Packed geometry: 20 floats per vertex and uint32 indices; `topology` as on PBRPrimitive (absent: a triangle list). */
 export interface PreparedGeometry {
+  /** Convex interpolants of authored unit normals/tangents, for triangle clipping. Normalize only in the fragment shader. Default false. */
+  interpolatedDirections?: boolean;
   vertices: Float32Array;
   indices: Uint32Array;
   /** TEXCOORD_2 and 3, four floats a vertex, when a material of the primitive reads either. */
@@ -1950,7 +1956,9 @@ function transform(node: Mesh, def: GLTFNode): void {
       );
     const trs = splitTRS(m);
     if (!trs.ok)
-      throw trs.reason === 'singular' ? new RangeError('Singular glTF matrix') : new Error('Sheared matrices are unsupported');
+      throw trs.reason === 'singular'
+        ? new RangeError('Singular glTF matrix')
+        : new Error('Sheared matrices are unsupported');
     node.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else
     node
@@ -2484,8 +2492,6 @@ export class PBRModel implements EnginePlugin {
       )
         throw new RangeError('A ranged PBR geometry write keeps the vertex and index counts; omit the range to resize');
       if (g.uvs) checkLaterUVs(g);
-      if (g.uvs && !p.uvs)
-        throw new TypeError('This primitive has no TEXCOORD_2 or 3 buffer; remove uvs from the write');
       if (p.uvs && !g.uvs && g.vertices.length !== p.vertices.length)
         throw new RangeError(
           'A primitive with TEXCOORD_2 or 3 keeps its vertex count; pass uvs with the write to resize it',
@@ -2563,7 +2569,18 @@ export class PBRModel implements EnginePlugin {
         range && [range.start * 20, range.count * 20],
       );
       r.index = place(r, r.index, g.indices, GPUBufferUsage.INDEX, range && [0, 0]);
-      if (g.uvs) r.uvs = place(r, r.uvs!, g.uvs, GPUBufferUsage.VERTEX);
+      if (g.uvs) {
+        if (r.uvs) r.uvs = place(r, r.uvs, g.uvs, GPUBufferUsage.VERTEX);
+        else {
+          r.uvs = r.device.createBuffer({
+            size: g.uvs.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+          });
+          r.device.queue.writeBuffer(r.uvs, 0, g.uvs as Float32Array<ArrayBuffer>);
+          written.set(g.uvs, r.uvs);
+          claimed.add(r.uvs);
+        }
+      }
       if (!range && r.wireframe) {
         dropped.add(r.wireframe.index);
         r.wireframe = undefined;

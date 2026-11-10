@@ -3414,6 +3414,10 @@
       "types": "./dist/tiles/ion.d.ts",
       "import": "./dist/tiles/ion.js"
     },
+    "./tiles/features": {
+      "types": "./dist/tiles/features.d.ts",
+      "import": "./dist/tiles/features.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

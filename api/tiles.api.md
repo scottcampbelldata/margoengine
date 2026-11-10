@@ -229,9 +229,12 @@ export interface TilesContentDecoration {
     dispose(): void;
 }
 
-export type TilesContentDecorator = (context: TilesDecorationContext) => TilesContentDecoration;
+export type TilesContentDecorator = (context: TilesDecorationContext) => TilesContentDecoration | Promise<TilesContentDecoration>;
 
 export type TilesDecorationContext = {
+    signal?: AbortSignal;
+    fetch?: (url: string, signal: AbortSignal) => Promise<Uint8Array>;
+} & ({
     kind: 'model';
     model: TilesModel;
     content: ModelContent;
@@ -246,7 +249,7 @@ export type TilesDecorationContext = {
     model: TilesModel;
     content: InstancesContent;
     tile: TilesetTile;
-};
+});
 
 export interface TilesFrame {
     readonly selected: readonly TilesetTile[];
@@ -545,6 +548,14 @@ interface ImplicitContext {
 }
 
 interface MeasurablePrimitive {
+    readonly buffers?: {
+        readonly vertex: {
+            readonly size: number;
+        };
+        readonly index: {
+            readonly size: number;
+        };
+    };
     readonly vertices?: ArrayBufferView;
     readonly indices?: ArrayBufferView;
     readonly uvs?: ArrayBufferView;
@@ -563,7 +574,7 @@ interface TextureJSON {
 }
 
 interface TilesContentHost {
-    decorate(context: TilesDecorationContext): TilesContentDecoration | undefined;
+    decorate(context: TilesDecorationContext): TilesContentDecoration | Promise<TilesContentDecoration> | undefined;
     readonly engine: EngineKernel;
     readonly url: string;
     loadModel(gltf: Uint8Array, signal: AbortSignal): Promise<TilesModel>;

@@ -190,7 +190,7 @@ interface TilesContentDecoration {
 }
 
 interface TilesContentHost {
-    decorate(context: TilesDecorationContext): TilesContentDecoration | undefined;
+    decorate(context: TilesDecorationContext): TilesContentDecoration | Promise<TilesContentDecoration> | undefined;
     readonly engine: EngineKernel;
     readonly url: string;
     loadModel(gltf: Uint8Array, signal: AbortSignal): Promise<TilesModel>;
@@ -205,6 +205,9 @@ interface TilesContentHost {
 }
 
 type TilesDecorationContext = {
+    signal?: AbortSignal;
+    fetch?: (url: string, signal: AbortSignal) => Promise<Uint8Array>;
+} & ({
     kind: 'model';
     model: TilesModel;
     content: ModelContent;
@@ -219,7 +222,7 @@ type TilesDecorationContext = {
     model: TilesModel;
     content: InstancesContent;
     tile: TilesetTile;
-};
+});
 
 interface TilesModel {
     readonly root: Mesh;

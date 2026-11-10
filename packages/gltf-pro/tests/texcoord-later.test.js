@@ -114,23 +114,22 @@ test('a file that only carries later UV sets pays nothing', async () => {
 });
 
 test('a material variant on a later set is enough, and the physical shader picks it up', async () => {
-  const { engine, model } = await load(
-    {},
-    (doc) => {
-      doc.materials.push({ pbrMetallicRoughness: { baseColorTexture: { index: 0, texCoord: 2 } } });
-      doc.extensions = { KHR_materials_variants: { variants: [{ name: 'a' }] } };
-      doc.meshes[0].primitives[0].extensions = {
-        KHR_materials_variants: { mappings: [{ material: 1, variants: [0] }] },
-      };
-    },
-  );
+  const { engine, model } = await load({}, (doc) => {
+    doc.materials.push({ pbrMetallicRoughness: { baseColorTexture: { index: 0, texCoord: 2 } } });
+    doc.extensions = { KHR_materials_variants: { variants: [{ name: 'a' }] } };
+    doc.meshes[0].primitives[0].extensions = {
+      KHR_materials_variants: { mappings: [{ material: 1, variants: [0] }] },
+    };
+  });
   assert.equal(model.primitives[0].uvs.length, 16);
   model.dispose();
   engine.dispose();
   const physical = await load(
     {
       pbrMetallicRoughness: { baseColorTexture: { index: 0, texCoord: 3 } },
-      extensions: { KHR_materials_sheen: { sheenColorFactor: [1, 1, 1], sheenColorTexture: { index: 0, texCoord: 2 } } },
+      extensions: {
+        KHR_materials_sheen: { sheenColorFactor: [1, 1, 1], sheenColorTexture: { index: 0, texCoord: 2 } },
+      },
     },
     undefined,
     { materials: extendedMaterials },
@@ -235,4 +234,14 @@ test('the worker budget counts later sets: their bytes are geometry too', () => 
     () => prepareAsset(new GLTFAsset(doc, buffers, undefined, {}, 300), []),
     /geometry exceeds byte budget/,
   );
+});
+
+test('writeGeometry allocates a later UV buffer for an optional material extension on an existing model', async () => {
+  const { model } = await load({ pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1] } });
+  const p = model.primitives[0];
+  assert.equal(p.uvs, undefined);
+  const uvs = new Float32Array(p.vertices.length / 5).fill(0.25);
+  model.writeGeometry([{ vertices: p.vertices, indices: p.indices, uvs }]);
+  assert.equal(p.uvs, uvs);
+  model.dispose();
 });

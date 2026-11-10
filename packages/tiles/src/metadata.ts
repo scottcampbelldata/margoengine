@@ -344,7 +344,14 @@ export interface FeatureIdSet {
   /** The `_FEATURE_ID_n` vertex attribute, when the IDs are per vertex. */
   readonly attribute?: number;
   /** The feature ID texture, when the IDs are in a texture (read the texture yourself; see the README). */
-  readonly texture?: { index: number; texCoord?: number; channels?: number[] };
+  readonly texture?: {
+    index: number;
+    texCoord?: number;
+    channels?: number[];
+    extensions?: {
+      KHR_texture_transform?: { offset?: number[]; scale?: number[]; rotation?: number; texCoord?: number };
+    };
+  };
   /** The property table these IDs index. */
   readonly propertyTable?: PropertyTable;
   /** One ID per vertex (attribute or implicit sets; undefined for a texture set). */
@@ -371,6 +378,8 @@ export interface StructuralMetadata {
 
 /** Options of {@link readStructuralMetadata}. */
 export interface StructuralMetadataOptions {
+  /** Original packed scalar attribute bytes, including decoded or sparse accessors. */
+  accessor?: (index: number) => Uint8Array;
   /** Bytes of an external buffer (`buffers[i].uri` that is not a data URI). Default: such buffers are missing. */
   buffer?: (index: number, uri: string) => Uint8Array | undefined;
 }
@@ -455,6 +464,15 @@ export function readStructuralMetadata(gltf: Uint8Array, options: StructuralMeta
     if (!accessor || accessor.type !== 'SCALAR' || !ACCESSOR[accessor.componentType])
       throw new TypeError(`Feature ID accessor ${accessorIndex} must be a SCALAR of a glTF component type`);
     const out = new Uint32Array(count);
+    if (options.accessor) {
+      const bytes = options.accessor(accessorIndex),
+        [size, read] = ACCESSOR[accessor.componentType],
+        data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      if (accessor.count !== count || bytes.byteLength !== count * size)
+        throw new RangeError('Feature ID count must match vertices; correct the accessor');
+      for (let i = 0; i < count; i++) out[i] = read(data, i * size);
+      return out;
+    }
     if (accessor.bufferView === undefined) return out;
     const [size, read] = ACCESSOR[accessor.componentType],
       view = json.bufferViews![accessor.bufferView],

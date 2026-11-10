@@ -4393,3 +4393,5 @@ No open defect found in the requested row. Unrepresentable local shear is an exp
 
 ### Batch 226 clone
 No open defect found in the requested shared-geometry/material subtree-copy row. Plugin, animation and constraints remain owned by their packages and are outside mesh cloning.
+
+Outside batch 239: an extra forced-compat run of scripts/gltf-pro-materials-gpu-check.js exceeds the WebGL2 fragment texture-unit limit in the extended material plus all lighting composition. Native official material checks pass; the changed feature shader passes both backends. Cause: this worst-case combined resource plan needs more fragment textures than the compatibility adapter exposes. Track a capability-aware resource plan in the owning rendering packages during the fix phase.

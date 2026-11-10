@@ -65,6 +65,10 @@
     "./ion": {
       "types": "./dist/ion.d.ts",
       "import": "./dist/ion.js"
+    },
+    "./features": {
+      "types": "./dist/features.d.ts",
+      "import": "./dist/features.js"
     }
   },
   "files": [

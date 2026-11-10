@@ -43,6 +43,14 @@ export interface FeatureIdSet {
         index: number;
         texCoord?: number;
         channels?: number[];
+        extensions?: {
+            KHR_texture_transform?: {
+                offset?: number[];
+                scale?: number[];
+                rotation?: number;
+                texCoord?: number;
+            };
+        };
     };
     readonly propertyTable?: PropertyTable;
     readonly ids?: Uint32Array;
@@ -91,6 +99,7 @@ export interface StructuralMetadata {
 }
 
 export interface StructuralMetadataOptions {
+    accessor?: (index: number) => Uint8Array;
     buffer?: (index: number, uri: string) => Uint8Array | undefined;
 }
 
