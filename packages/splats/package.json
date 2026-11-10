@@ -65,6 +65,10 @@
     "./data": {
       "types": "./dist/data.d.ts",
       "import": "./dist/data.js"
+    },
+    "./progressive": {
+      "types": "./dist/progressive.d.ts",
+      "import": "./dist/progressive.js"
     }
   },
   "files": [

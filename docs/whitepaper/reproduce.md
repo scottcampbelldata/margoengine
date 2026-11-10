@@ -3198,3 +3198,8 @@ After build:packages run `node --test --test-timeout=60000 packages/tilemap/test
 
 ### Batch 261 distance labels
 After build: node --test --test-timeout=120000 packages/labels/tests/*.test.js. The changed DOM-layout path is rendered by node scripts/gpu-lock.mjs run --owner=labels-distance --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only. The optional GPU label shader is unchanged; job 1 retains its separate full GPU test page.
+
+### Batch 238 progressive splats
+After build:packages, run node --test --test-timeout=60000 packages/splats/test/progressive.test.js. Run packages/splats/test/gpu/check.mjs through gpu-lock with owner codex-batch238, --gpu=splats-render-readback, --max=8 and --wait-max=60, once normally and once with --compat. The GPU check loads the existing MIT raccoon splat fixture in two delayed pieces, draws while the source is suspended, and checks all 8,385 records are visible at completion. No benchmark required.
+
+Compatibility upload regression: node --test --test-timeout=120000 packages/webgl2-compat/test/bitmap-straight.test.js packages/webgl2-compat/test/external-image.test.js, plus the unchanged exact WebP channel assertions in the two splats GPU runs above. No timing bar.

@@ -16,11 +16,14 @@ import { SplatBrush } from '../../dist/brush.js';
 import { SplatPicking } from '../../dist/pick.js';
 import { Picking } from '../../../selection/dist/index.js';
 import { SplatSequence, SplatSkin } from '../../dist/animate.js';
+import { loadProgressiveSplats } from '../../dist/progressive.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
 addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
-let engine, canvas, extras = [];
+let engine,
+  canvas,
+  extras = [];
 const draw = async () => {
   engine.render({ delta: 1 / 60 });
   await engine.gpu.queue.onSubmittedWorkDone();
@@ -68,17 +71,29 @@ function later({ z = 0, x, size = 1.6, order = 5, color = [0, 0, 1, 1], at = [0,
               key,
               (pipeline = device.createRenderPipeline({
                 layout: 'auto',
-                vertex: { module, entryPoint: 'v', buffers: [{ arrayStride: 16, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }] },
+                vertex: {
+                  module,
+                  entryPoint: 'v',
+                  buffers: [{ arrayStride: 16, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }],
+                },
                 fragment: { module, entryPoint: 'f', targets: [{ format: c.format }] },
                 primitive: { topology: 'triangle-strip' },
                 multisample: c.descriptor.multisample,
-                depthStencil: { format: c.descriptor.depthStencil.format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+                depthStencil: {
+                  format: c.descriptor.depthStencil.format,
+                  depthWriteEnabled: false,
+                  depthCompare: 'greater-equal',
+                },
               })),
             );
           const stencil = c.descriptor.depthStencil.format.includes('stencil'),
             pass = c.encoder.beginRenderPass({
               colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-              depthStencilAttachment: { view: c.depth, depthReadOnly: true, ...(stencil ? { stencilReadOnly: true } : {}) },
+              depthStencilAttachment: {
+                view: c.depth,
+                depthReadOnly: true,
+                ...(stencil ? { stencilReadOnly: true } : {}),
+              },
             });
           pass.setPipeline(pipeline);
           pass.setVertexBuffer(0, vertices);
@@ -122,11 +137,18 @@ window.check = {
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
     if (o.orthographic) CameraProjection.attach(engine).mode = 'orthographic';
     if (o.before !== undefined) {
-      const wall = createMesh(engine, planeGeometry(1.6, 1.6), new Material({ shading: 'basic', color: [0.4, 0.4, 0.4] }));
+      const wall = createMesh(
+        engine,
+        planeGeometry(1.6, 1.6),
+        new Material({ shading: 'basic', color: [0.4, 0.4, 0.4] }),
+      );
       wall.root.setPosition([0, 0, o.before]);
     }
     const cloud = o.none ? undefined : Splats.attach(engine, data);
-    const depth = o.depth && cloud ? SplatDepth.attach(engine, cloud, o.threshold === undefined ? {} : { threshold: o.threshold }) : undefined;
+    const depth =
+      o.depth && cloud
+        ? SplatDepth.attach(engine, cloud, o.threshold === undefined ? {} : { threshold: o.threshold })
+        : undefined;
     if (o.after !== undefined) later({ z: o.after });
     if (o.afterX !== undefined) later({ x: at[0] + o.afterX, size: 3, at });
     if (o.disposeDepth) depth.dispose();
@@ -167,9 +189,16 @@ window.check.lod = async (o) => {
       const children = [];
       if (level < 2) {
         const step = size / 4;
-        for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) children.push(make(x0 + a * step, z0 + b * step, step, level + 1));
+        for (let a = 0; a < 4; a++)
+          for (let b = 0; b < 4; b++) children.push(make(x0 + a * step, z0 + b * step, step, level + 1));
       }
-      nodes[at] = { center: [x0 + size / 2, 0, z0 + size / 2], radius: (size / 2) * Math.SQRT2, error: level < 2 ? size / 64 : 0, count: level < 2 ? 4096 : per, children };
+      nodes[at] = {
+        center: [x0 + size / 2, 0, z0 + size / 2],
+        radius: (size / 2) * Math.SQRT2,
+        error: level < 2 ? size / 64 : 0,
+        count: level < 2 ? 4096 : per,
+        children,
+      };
       return at;
     };
     make(0, 0, side * 4, 0);
@@ -232,7 +261,11 @@ window.check.lod = async (o) => {
     // The pool as one plain cloud: hidden splats (as Splats.reserve makes them) with each drawn node at its placement.
     const n = lod.cloud.count,
       k = source.coefficients * 3,
-      data = { positions: new Float32Array(n * 3), covariances: new Float32Array(n * 6), colors: new Float32Array(n * 4) },
+      data = {
+        positions: new Float32Array(n * 3),
+        covariances: new Float32Array(n * 6),
+        colors: new Float32Array(n * 4),
+      },
       signal = new AbortController().signal;
     if (k) data.sphericalHarmonics = new Float32Array(n * k);
     for (let i = 0; i < n; i++) data.covariances[i * 6] = data.covariances[i * 6 + 3] = data.covariances[i * 6 + 5] = 1;
@@ -276,7 +309,10 @@ window.check.set = async (o) => {
   for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) sum[k] += a.positions[i * 3 + k];
   const at = sum.map((s) => s / n),
     move = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.01, 0.02, 0, 1],
-    tint = { ...a, colors: a.colors.map((v, i) => (i % 4 === 3 ? v : i % 4 === 1 ? Math.min(1, v * 1.5 + 0.2) : v * 0.3)) },
+    tint = {
+      ...a,
+      colors: a.colors.map((v, i) => (i % 4 === 3 ? v : i % 4 === 1 ? Math.min(1, v * 1.5 + 0.2) : v * 0.3)),
+    },
     b = transformSplats(tint, move);
   engine = await Engine.create(canvas, {
     backend: 'webgpu',
@@ -290,7 +326,10 @@ window.check.set = async (o) => {
     Splats.attach(engine, b);
   } else if (o.mode === 'merged') Splats.attach(engine, mergeSplats(a, b));
   else {
-    const set = SplatSet.attach(engine, { capacity: 3 * n, coefficients: a.sphericalHarmonics ? a.sphericalHarmonics.length / n / 3 : 0 });
+    const set = SplatSet.attach(engine, {
+      capacity: 3 * n,
+      coefficients: a.sphericalHarmonics ? a.sphericalHarmonics.length / n / 3 : 0,
+    });
     // A placeholder first, removed again, so the first member goes into a freed range.
     set.add(a).remove();
     const first = set.add(a),
@@ -320,11 +359,21 @@ window.check.relight = async (o) => {
   normals.forEach((nv, i) => {
     positions.set([(i % 4) * 0.3 - 0.45, Math.floor(i / 4) * 0.3 - 0.3, 0], i * 3);
     // Covariance 0.01 (I - nn^T) + 1e-6 nn^T: flat across the normal; a zero normal is a round splat.
-    for (const [k, r, c] of [[0, 0, 0], [1, 0, 1], [2, 0, 2], [3, 1, 1], [4, 1, 2], [5, 2, 2]])
+    for (const [k, r, c] of [
+      [0, 0, 0],
+      [1, 0, 1],
+      [2, 0, 2],
+      [3, 1, 1],
+      [4, 1, 2],
+      [5, 2, 2],
+    ])
       covariances[i * 6 + k] = (r === c ? 0.01 : 0) - (0.01 - 1e-6) * nv[r] * nv[c];
     colors.set([0.2 + 0.1 * (i % 3), 0.5, 0.8 - 0.05 * i, 0.9], i * 4);
   });
-  engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0], near: 0.05, far: 100 } });
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [0, 0, 3], target: [0, 0, 0], near: 0.05, far: 100 },
+  });
   engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
   engine.lighting.direction.set(o.direction);
   engine.lighting.radiance.set(o.radiance);
@@ -362,18 +411,42 @@ window.check.splatShadow = async (o) => {
       lo.push(v[Math.floor(count * 0.05)]);
       hi.push(v[Math.floor(count * 0.95)]);
     }
-    const a = filterSplats(full, (i) => [0, 1, 2].every((k) => full.positions[i * 3 + k] >= lo[k] && full.positions[i * 3 + k] <= hi[k]));
+    const a = filterSplats(full, (i) =>
+      [0, 1, 2].every((k) => full.positions[i * 3 + k] >= lo[k] && full.positions[i * 3 + k] <= hi[k]),
+    );
     const s = 1.2 / Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
-      m = [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, (-s * (lo[0] + hi[0])) / 2, 1 - (s * (lo[1] + hi[1])) / 2, (-s * (lo[2] + hi[2])) / 2, 1];
+      m = [
+        s,
+        0,
+        0,
+        0,
+        0,
+        s,
+        0,
+        0,
+        0,
+        0,
+        s,
+        0,
+        (-s * (lo[0] + hi[0])) / 2,
+        1 - (s * (lo[1] + hi[1])) / 2,
+        (-s * (lo[2] + hi[2])) / 2,
+        1,
+      ];
     data = transformSplats(a, m);
   } else {
     const ring = [];
     for (let r = 0; r <= 0.15; r += 0.03) {
       const steps = Math.max(1, Math.round((2 * Math.PI * r) / 0.03));
-      for (let t = 0; t < steps; t++) ring.push([r * Math.cos((t * 2 * Math.PI) / steps), r * Math.sin((t * 2 * Math.PI) / steps)]);
+      for (let t = 0; t < steps; t++)
+        ring.push([r * Math.cos((t * 2 * Math.PI) / steps), r * Math.sin((t * 2 * Math.PI) / steps)]);
     }
     const count = ring.length;
-    data = { positions: new Float32Array(count * 3), covariances: new Float32Array(count * 6), colors: new Float32Array(count * 4) };
+    data = {
+      positions: new Float32Array(count * 3),
+      covariances: new Float32Array(count * 6),
+      colors: new Float32Array(count * 4),
+    };
     ring.forEach(([x, z], i) => {
       data.positions.set([x, 1, z], i * 3);
       data.covariances.set([0.0004, 0, 0, 1e-6, 0, 0.0004], i * 6);
@@ -389,7 +462,11 @@ window.check.splatShadow = async (o) => {
   // Toward the sun: up and toward +x, so a shadow falls toward -x by 0.6 per unit of height.
   engine.lighting.direction.set([0.6, 1, 0, 3]);
   const ground = engine.createMesh().setGeometry(box()).setScale([4, 0.02, 4]).setPosition([0, -0.01, 0]);
-  const shadows = Shadows.attach(engine, { resolution: 2048, filter: 'hard', bounds: { min: [-2, -0.1, -2], max: [2, 1.6, 2] } });
+  const shadows = Shadows.attach(engine, {
+    resolution: 2048,
+    filter: 'hard',
+    bounds: { min: [-2, -0.1, -2], max: [2, 1.6, 2] },
+  });
   shadows.add(ground, { static: true });
   const cloud = Splats.attach(engine, data);
   const lit = SplatLighting.attach(engine, cloud, { relight: false, threshold: o.threshold });
@@ -416,7 +493,11 @@ window.check.brush = async (o) => {
   } else {
     const n = 66,
       sh = o.sh ? new Float32Array(n * 12) : undefined;
-    data = { positions: new Float32Array(n * 3), covariances: new Float32Array(n * 6), colors: new Float32Array(n * 4) };
+    data = {
+      positions: new Float32Array(n * 3),
+      covariances: new Float32Array(n * 6),
+      colors: new Float32Array(n * 4),
+    };
     for (let i = 0; i < n; i++) {
       const grid = i < 64,
         p = grid ? [-0.7 + (i % 8) * 0.2, -0.7 + Math.floor(i / 8) * 0.2, 0] : [0.1, 0.1, i === 64 ? 0.5 : -0.5];
@@ -468,7 +549,14 @@ window.check.brush = async (o) => {
     else if (op === 'paint') out.push(brush.paint(a[0], a[1], a[2]) === brush);
   }
   await draw();
-  return { out, frame: [w, h], points: (o.points ?? []).map(pixel), input: [...data.colors], url: canvas.toDataURL('image/png'), count: cloud.count };
+  return {
+    out,
+    frame: [w, h],
+    points: (o.points ?? []).map(pixel),
+    input: [...data.colors],
+    url: canvas.toDataURL('image/png'),
+    count: cloud.count,
+  };
 };
 // ./pick: the brush's grid (64 red splats at z 0, a blue one in front of the grid splat at (0.1, 0.1), index 64, one
 // behind it, 65) with a plane mesh at z 0.25 over x and y from -0.05 to 0.45, picked through Picking. Each world point
@@ -481,10 +569,17 @@ window.check.splatPick = async (o) => {
   canvas = document.body.appendChild(document.createElement('canvas'));
   canvas.style.cssText = 'width:256px;height:256px;display:block';
   const n = 66,
-    data = { positions: new Float32Array(n * 3), covariances: new Float32Array(n * 6), colors: new Float32Array(n * 4) };
+    data = {
+      positions: new Float32Array(n * 3),
+      covariances: new Float32Array(n * 6),
+      colors: new Float32Array(n * 4),
+    };
   for (let i = 0; i < n; i++) {
     const grid = i < 64;
-    data.positions.set(grid ? [-0.7 + (i % 8) * 0.2, -0.7 + Math.floor(i / 8) * 0.2, 0] : [0.1, 0.1, i === 64 ? 0.5 : -0.5], i * 3);
+    data.positions.set(
+      grid ? [-0.7 + (i % 8) * 0.2, -0.7 + Math.floor(i / 8) * 0.2, 0] : [0.1, 0.1, i === 64 ? 0.5 : -0.5],
+      i * 3,
+    );
     data.covariances.set([0.0009, 0, 0, 0.0009, 0, 0.0009], i * 6);
     data.colors.set(i === 64 ? [0, 0, 1, 0.95] : [1, 0, 0, 0.95], i * 4);
   }
@@ -525,7 +620,11 @@ window.check.splatPick = async (o) => {
     const brush = SplatBrush.attach(engine, cloud);
     await draw();
     const [w, h] = brush.frame;
-    brush.select({ x: (pixels[0][0] * w) / canvas.clientWidth, y: (pixels[0][1] * h) / canvas.clientHeight, radius: 1 });
+    brush.select({
+      x: (pixels[0][0] * w) / canvas.clientWidth,
+      y: (pixels[0][1] * h) / canvas.clientHeight,
+      radius: 1,
+    });
     brush.erase('selection');
     await draw();
   }
@@ -582,7 +681,10 @@ window.check.antialias = async () => {
   canvas?.remove();
   canvas = document.body.appendChild(document.createElement('canvas'));
   canvas.style.cssText = 'width:128px;height:128px;display:block';
-  engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0], far: 100 } });
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [0, 0, 3], target: [0, 0, 0], far: 100 },
+  });
   engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
   const cloud = Splats.attach(engine, {
       positions: new Float32Array([0, 0, 0, 0, 0, -20, 0, 0, 0]),
@@ -606,5 +708,34 @@ window.check.antialias = async () => {
   cloud.antialias = true;
   const on = await opacities();
   return { off, on, flag: cloud.antialias };
+};
+window.check.progressive = async () => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:128px;height:128px;display:block';
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    preserveDrawingBuffer: true,
+    camera: { position: [0, 0, 3], target: [0, 0, 0] },
+  });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  const bytes = new Uint8Array(await (await fetch('/packages/splats/test/fixtures/raccoon-v2.splat')).arrayBuffer());
+  let early;
+  async function* network() {
+    yield bytes.subarray(0, 4096);
+    await waitForPipelines(draw);
+    early = canvas.toDataURL();
+    yield bytes.subarray(4096);
+  }
+  const cloud = await loadProgressiveSplats(engine, network(), { format: 'splat', count: 8385 });
+  await waitForPipelines(draw);
+  const result = await cloud.read();
+  return {
+    early,
+    final: canvas.toDataURL(),
+    count: result.positions.length / 3,
+    visible: result.colors.filter((_, i) => i % 4 === 3 && result.colors[i] > 0).length,
+  };
 };
 window.ready = true;

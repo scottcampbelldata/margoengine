@@ -3728,3 +3728,8 @@ The optional plane entry places a complete tile map on an affine 3D plane and sh
 
 ### Batch 261 distance policy correctness
 Independent near/far opacity and scale curves clamp, show conditions include endpoints, and distance scaling precedes collision layout. Unit tests assert exact endpoint/midpoint behavior, style restoration and still-frame zero writes. Native WebGPU/WebGL2 browser tests assert doubled DOM width, half opacity, near hiding and recovery. No timing claim.
+
+### Progressive splat capture loading
+splats/progressive yields complete PLY/splat/SPZ records before EOF. Tests preserve every final attribute from the real Niantic raccoon fixtures against the existing whole-file parsers for SPZ versions 2, 3 and 4, PLY and splat. Partial coarse order is opacity-weighted volume among available records; no global ordering of unreceived bytes is claimed. GPU proof draws the partial real capture before releasing remaining source bytes. See packages/splats/test/progressive.test.js and packages/splats/test/gpu/check.mjs. No timing or memory reduction claim.
+
+Batch 238 compatibility regression: unchanged whole straight-alpha ImageBitmaps avoid Canvas2D quantization. Exact SOG WebP writer/browser-GPU checks now retain every channel on 61x23, 64x64 and 7x5 images, including low and zero alpha, on native WebGPU and compatibility. Proof: bitmap-straight.test.js and the existing data webp assertions in splats/test/gpu/check.mjs.

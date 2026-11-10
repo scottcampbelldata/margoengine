@@ -2138,9 +2138,16 @@ export function copyExternalImage(
   let image = source.source,
     sx = sourceX,
     sy = sourceY;
-  // WebGL ignores unpack flip and alpha flags for ImageBitmap. A drawable
-  // canvas restores those operations, after cropping the requested rectangle.
-  if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) {
+  // A whole, unchanged bitmap can be uploaded directly. Drawing it through a
+  // 2D canvas irreversibly quantizes straight RGB when alpha is small (and loses
+  // RGB entirely at alpha zero). Keep that path only when a transform is needed.
+  // WebGL ignores unpack flip and alpha flags for ImageBitmap, so transformed
+  // copies still need a drawable source before applying those unpack flags.
+  if (
+    typeof ImageBitmap !== 'undefined' &&
+    image instanceof ImageBitmap &&
+    (source.flipY || destination.premultipliedAlpha || sx || sy || w !== image.width || h !== image.height)
+  ) {
     const canvas =
       typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
     canvas.width = w;

@@ -26,9 +26,11 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error') pageErrors.push(m.text());
   });
-  await page.waitForFunction(() => window.ready, null, { timeout: 30000 }).catch((error) => {
-    throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
-  });
+  await page
+    .waitForFunction(() => window.ready, null, { timeout: 30000 })
+    .catch((error) => {
+      throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
+    });
   const image = async (o) => {
     await page.evaluate((options) => window.check.build(options), o);
     const url = await page.evaluate(() => window.check.pixels());
@@ -52,7 +54,11 @@ try {
       // Before the cloud: the plane in front hides the splat, with or without SplatDepth; behind, the splat is on top.
       const wallFront = await shot({ ...o, before: 0.5, none: true });
       for (const depth of [false, true]) {
-        assert.deepEqual(await shot({ ...o, before: 0.5, depth }), wallFront, `${tag} depth ${depth}: plane in front hides the splat`);
+        assert.deepEqual(
+          await shot({ ...o, before: 0.5, depth }),
+          wallFront,
+          `${tag} depth ${depth}: plane in front hides the splat`,
+        );
         const over = await shot({ ...o, before: -0.5, depth });
         assert.ok(over[0] - over[1] > 150, `${tag} depth ${depth}: the splat covers the plane behind it, ${over}`);
       }
@@ -69,14 +75,22 @@ try {
       // of opacity 0.4 stays under the default threshold 0.5 and writes nothing, and writes at threshold 0.3.
       assert.deepEqual(await shot({ ...o, after: -0.5, depth: true, threshold: 1 }), blue, `${tag}: threshold 1`);
       assert.deepEqual(await shot({ ...o, after: -0.5, depth: true, disposeDepth: true }), blue, `${tag}: disposed`);
-      assert.deepEqual(await shot({ ...o, after: -0.5, depth: true, opacity: 0.4 }), blue, `${tag}: opacity 0.4 under 0.5`);
+      assert.deepEqual(
+        await shot({ ...o, after: -0.5, depth: true, opacity: 0.4 }),
+        blue,
+        `${tag}: opacity 0.4 under 0.5`,
+      );
       assert.deepEqual(
         await shot({ ...o, after: -0.5, depth: true, opacity: 0.4, threshold: 0.3 }),
         await shot({ ...o, opacity: 0.4 }),
         `${tag}: opacity 0.4 over threshold 0.3`,
       );
       // A disposed cloud leaves SplatDepth with nothing to write and no error.
-      assert.deepEqual(await shot({ ...o, after: -0.5, depth: true, disposeCloud: true }), blue, `${tag}: disposed cloud`);
+      assert.deepEqual(
+        await shot({ ...o, after: -0.5, depth: true, disposeCloud: true }),
+        blue,
+        `${tag}: disposed cloud`,
+      );
     }
 
   // ./depth, real capture: a later plane behind the raccoon slab. Off, it covers every pixel; on, every pixel is either
@@ -127,7 +141,12 @@ try {
       if (d) differ++;
       most = Math.max(most, d);
     }
-    report['lod capture'] = { full: { ...full, url: undefined, reference: undefined }, far: { ...far, url: undefined }, differ, most };
+    report['lod capture'] = {
+      full: { ...full, url: undefined, reference: undefined },
+      far: { ...far, url: undefined },
+      differ,
+      most,
+    };
     assert.deepEqual(full.errors, [], 'no load failed');
     assert.equal(full.drawn, full.total, 'maxError 0 draws every leaf splat');
     assert.equal(full.leaves, full.selected.length, 'maxError 0 draws leaves only');
@@ -150,7 +169,10 @@ try {
     report['lod stand-in'] = { ...big, url: undefined, moved: { ...big.moved, url: undefined } };
     assert.equal(big.total, 16777216);
     assert.deepEqual(big.errors, []);
-    assert.ok(big.drawn <= 2097152 && big.moved.drawn <= 2097152, `within the budget: ${big.drawn}, ${big.moved.drawn}`);
+    assert.ok(
+      big.drawn <= 2097152 && big.moved.drawn <= 2097152,
+      `within the budget: ${big.drawn}, ${big.moved.drawn}`,
+    );
     assert.ok(big.leaves > 0, 'leaves near the camera are drawn');
     assert.notDeepEqual(big.selected, big.moved.selected, 'a moved camera streams another cut');
   }
@@ -178,16 +200,39 @@ try {
     const apart = compare(separate.image, merged.image),
       together = compare(set.image, merged.image),
       after = compare(moved.image, merged.image);
-    report[`set ${samples}x`] = { apart, together, after, firsts: set.firsts, used: set.used, channels: merged.image.data.length };
-    assert.ok(apart.far > 100, `${samples}x: separate clouds blend in the wrong order, ${apart.far} channels off by more than 8`);
+    report[`set ${samples}x`] = {
+      apart,
+      together,
+      after,
+      firsts: set.firsts,
+      used: set.used,
+      channels: merged.image.data.length,
+    };
+    assert.ok(
+      apart.far > 100,
+      `${samples}x: separate clouds blend in the wrong order, ${apart.far} channels off by more than 8`,
+    );
     assert.equal(together.differ, 0, `${samples}x: the set draws the merged cloud, ${together.differ} channels apart`);
-    assert.equal(after.differ, 0, `${samples}x: setMatrix and a removed member leave the same picture, ${after.differ} apart`);
+    assert.equal(
+      after.differ,
+      0,
+      `${samples}x: setMatrix and a removed member leave the same picture, ${after.differ} apart`,
+    );
     assert.deepEqual(set.firsts, [0, set.used / 2], 'the freed placeholder range is reused, members in add order');
   }
   // ./lighting, relight: every splat's colour after the pass is its colour times core's diffuse terms, with the normal
   // its flat axis turned to the camera; a round splat takes the view direction; relight false leaves it as it was.
   {
-    const normals = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [0, 1, 0], [0.6, 0.8, 0], [0, 0.6, -0.8], [0.48, 0.6, 0.64], [0, 0, 0]];
+    const normals = [
+      [0, 0, 1],
+      [0, 0, -1],
+      [1, 0, 0],
+      [0, 1, 0],
+      [0.6, 0.8, 0],
+      [0, 0.6, -0.8],
+      [0.48, 0.6, 0.64],
+      [0, 0, 0],
+    ];
     const o = { normals, direction: [0.3, 0.5, 0.8, 3], radiance: [1, 0.9, 0.8, 0.2], ambient: [0.5, 0.6, 1] };
     const r = await page.evaluate((options) => window.check.relight(options), o);
     const off = await page.evaluate((options) => window.check.relight(options), { ...o, relight: false });
@@ -202,7 +247,8 @@ try {
       if (n[0] * eye[0] + n[1] * eye[1] + n[2] * eye[2] < 0) n = n.map((v) => -v);
       const nl = Math.max(0, (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]) / ll);
       for (let k = 0; k < 3; k++) {
-        const want = r.input[i * 4 + k] * ((o.radiance[k] * o.direction[3] * nl) / Math.PI + o.radiance[3] * o.ambient[k]);
+        const want =
+          r.input[i * 4 + k] * ((o.radiance[k] * o.direction[3] * nl) / Math.PI + o.radiance[3] * o.ambient[k]);
         worst = Math.max(worst, Math.abs(r.colors[i * 4 + k] - want));
         assert.equal(off.colors[i * 4 + k], Math.fround(r.input[i * 4 + k]), 'relight false keeps the colour');
       }
@@ -216,7 +262,12 @@ try {
   // the ground there is as lit as everywhere else. Pixels far from the cloud and its shadow do not change.
   for (const capture of [false, true]) {
     const shot = async (cast) =>
-      decodePNG(Buffer.from((await page.evaluate((o) => window.check.splatShadow(o), { cast, capture })).url.split(',')[1], 'base64'));
+      decodePNG(
+        Buffer.from(
+          (await page.evaluate((o) => window.check.splatShadow(o), { cast, capture })).url.split(',')[1],
+          'base64',
+        ),
+      );
     const off = await shot(false),
       on = await shot(true);
     const changed = [];
@@ -240,9 +291,18 @@ try {
     cy /= darker || 1;
     const offset = Math.hypot(cx - off.width / 2, cy - off.height / 2),
       spread = Math.max(...changed.map(([x, y]) => Math.hypot(x - cx, y - cy)));
-    report[`lighting shadow ${capture ? 'capture' : 'disc'}`] = { darker, brighter, changed: changed.length, offset, spread };
+    report[`lighting shadow ${capture ? 'capture' : 'disc'}`] = {
+      darker,
+      brighter,
+      changed: changed.length,
+      offset,
+      spread,
+    };
     // The capture (8,385 splats) is a thin figure: its shadow is a line drawing, not a filled shape.
-    assert.ok(darker > (capture ? 60 : 200), `${capture ? 'the capture' : 'the disc'} shadows the ground: ${darker} pixels darker`);
+    assert.ok(
+      darker > (capture ? 60 : 200),
+      `${capture ? 'the capture' : 'the disc'} shadows the ground: ${darker} pixels darker`,
+    );
     assert.equal(brighter, 0, 'casting never lightens a pixel');
     // The sun is 31 degrees off vertical, so the shadow sits beside the cloud (at the centre) and nothing else changes.
     assert.ok(offset > 10, `the shadow lands beside the cloud, ${offset} px from it`);
@@ -279,30 +339,53 @@ try {
     assert.equal(corner, 0, 'the corner splat');
     assert.equal(behind, 36, 'after erasing the front splat the grid splat behind it is nearest');
     const left = Array.from({ length: 64 }, (_, i) => i).filter((i) => i % 8 < 4 && i !== 0);
-    assert.deepEqual(selected, [...left, 36, 65].sort((a, b) => a - b), 'select replace, add and subtract');
+    assert.deepEqual(
+      selected,
+      [...left, 36, 65].sort((a, b) => a - b),
+      'select replace, add and subtract',
+    );
     for (let i = 0; i < 66; i++) {
       const got = committed.colors.slice(i * 4, i * 4 + 4),
         erased = i === 64 || selected.includes(i),
         green = !erased && i < 64 && i % 8 >= 4;
-      const want = erased ? [...r.input.slice(i * 4, i * 4 + 3), 0] : green ? [0, 1, 0, r.input[i * 4 + 3]] : r.input.slice(i * 4, i * 4 + 4);
+      const want = erased
+        ? [...r.input.slice(i * 4, i * 4 + 3), 0]
+        : green
+          ? [0, 1, 0, r.input[i * 4 + 3]]
+          : r.input.slice(i * 4, i * 4 + 4);
       assert.deepEqual(got, want.map(Math.fround), `splat ${i} after erase and paint`);
     }
     const img = await decodePNG(Buffer.from(r.url.split(',')[1], 'base64')),
-      at = ([x, y]) => [...img.data.subarray((Math.floor(y) * img.width + Math.floor(x)) * 4, (Math.floor(y) * img.width + Math.floor(x)) * 4 + 3)];
+      at = ([x, y]) => [
+        ...img.data.subarray(
+          (Math.floor(y) * img.width + Math.floor(x)) * 4,
+          (Math.floor(y) * img.width + Math.floor(x)) * 4 + 3,
+        ),
+      ];
     const [gone, painted, kept] = r.points.map(at);
     report['edit image'] = { gone, painted, kept };
-    assert.ok(gone[0] < 40 && painted[1] > 150 && painted[0] < 60 && kept[0] > 150, `erased, painted and kept splats draw so: ${gone} ${painted} ${kept}`);
+    assert.ok(
+      gone[0] < 40 && painted[1] > 150 && painted[0] < 60 && kept[0] > 150,
+      `erased, painted and kept splats draw so: ${gone} ${painted} ${kept}`,
+    );
   }
   // ./edit, SH cloud: paint sets the DC term to the blended colour and fades the higher bands by the strength.
   {
-    const r = await page.evaluate((o) => window.check.brush(o), { sh: true, steps: [['paint', 'all', [0, 0, 1], 0.5], ['commit']] }),
+    const r = await page.evaluate((o) => window.check.brush(o), {
+        sh: true,
+        steps: [['paint', 'all', [0, 0, 1], 0.5], ['commit']],
+      }),
       { colors, sh } = r.out[1];
     let worst = 0;
     for (let i = 0; i < 66; i++)
       for (let k = 0; k < 3; k++) {
         const c = r.input[i * 4 + k],
           want = c + (k === 2 ? 1 - c : -c) * 0.5;
-        worst = Math.max(worst, Math.abs(colors[i * 4 + k] - want), Math.abs(0.5 + 0.2820947918 * sh[i * 12 + k] - want));
+        worst = Math.max(
+          worst,
+          Math.abs(colors[i * 4 + k] - want),
+          Math.abs(0.5 + 0.2820947918 * sh[i * 12 + k] - want),
+        );
         for (let j = 1; j < 4; j++) worst = Math.max(worst, Math.abs(sh[i * 12 + j * 3 + k] - 0.05));
       }
     report['edit sh'] = { worst };
@@ -322,7 +405,10 @@ try {
     }
     report['edit capture'] = { index, selected: selected.length, wrong };
     assert.ok(index >= 0, 'a splat at the centre of the capture');
-    assert.ok(selected.length > 20 && selected.length < r.input.length / 8, `the brush selects a patch: ${selected.length}`);
+    assert.ok(
+      selected.length > 20 && selected.length < r.input.length / 8,
+      `the brush selects a patch: ${selected.length}`,
+    );
     assert.equal(wrong, 0, 'exactly the selected splats are erased');
   }
   // Root `antialias` (Mip-Splatting's 2D filter): off, every splat keeps opacity 0.9; on, an isotropic splat of screen
@@ -345,7 +431,8 @@ try {
   // moving 1 along x and joint 1 turning 90 degrees about z poses each splat by its blended matrix, A S A^T.
   {
     const r = await page.evaluate((o) => window.check.animate(o), { sequence: 0.3 }),
-      close = (a, b, what) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-5, `${what} ${i}: ${v} against ${b[i]}`));
+      close = (a, b, what) =>
+        a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-5, `${what} ${i}: ${v} against ${b[i]}`));
     close(r.positions, [-0.38, 0, 0, 0.12, 0.2, 0, 0.62, 0, 0], 'sequence centre');
     close(r.covariances.slice(0, 6), [0.0031, 0, 0, 0.001, 0, 0.001], 'sequence covariance');
     close(r.colors.slice(0, 4), [0.76, 0, 0, 0.9], 'sequence colour');
@@ -386,8 +473,14 @@ try {
             usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
           }),
           row = Math.ceil((width * 4) / 256) * 256,
-          buffer = device.createBuffer({ size: row * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        device.queue.copyExternalImageToTexture({ source: bitmap }, { texture, premultipliedAlpha: false }, [width, height]);
+          buffer = device.createBuffer({
+            size: row * height,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+          });
+        device.queue.copyExternalImageToTexture({ source: bitmap }, { texture, premultipliedAlpha: false }, [
+          width,
+          height,
+        ]);
         const encoder = device.createCommandEncoder();
         encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: row }, [width, height]);
         device.queue.submit([encoder.finish()]);
@@ -401,7 +494,9 @@ try {
       return out;
     }, images);
     report['data webp'] = wrong;
-    images.forEach(({ width, height }, i) => assert.deepEqual(wrong[i], [width, height, 0], `WebP ${width} x ${height}`));
+    images.forEach(({ width, height }, i) =>
+      assert.deepEqual(wrong[i], [width, height, 0], `WebP ${width} x ${height}`),
+    );
   }
   // ./pick: one depth test with meshes. The front splat beats the plane behind it, the plane beats the grid splat
   // behind it, a gap and the background miss; pickMany answers what engine.pick answers; a threshold over the splats'
@@ -421,13 +516,35 @@ try {
         erased = await page.evaluate((o) => window.check.splatPick(o), { points, orthographic, erase: true });
       report[`pick ${tag}`] = { ...r, strict: strict.one, erased: erased.one };
       assert.deepEqual(r.one, [64, 'mesh', 0, -1], `${tag}: picking.pick takes the nearest of splats and meshes`);
-      assert.deepEqual(r.meshes, ['cloud', 'mesh', 'cloud', -1], `${tag}: engine.pick answers the stand-in mesh for a splat`);
+      assert.deepEqual(
+        r.meshes,
+        ['cloud', 'mesh', 'cloud', -1],
+        `${tag}: engine.pick answers the stand-in mesh for a splat`,
+      );
       assert.deepEqual(r.many, r.one, `${tag}: pickMany answers as picking.pick`);
       assert.deepEqual(r.after, ['mesh', 'mesh', -1, -1], `${tag}: after dispose the splats are not picked`);
-      assert.deepEqual(strict.one, ['mesh', 'mesh', -1, -1], `${tag}: no splat reaches opacity 0.99, so the plane is hit`);
-      assert.deepEqual(erased.one, ['mesh', 'mesh', 0, -1], `${tag}: a splat the brush erased on the GPU is not picked`);
+      assert.deepEqual(
+        strict.one,
+        ['mesh', 'mesh', -1, -1],
+        `${tag}: no splat reaches opacity 0.99, so the plane is hit`,
+      );
+      assert.deepEqual(
+        erased.one,
+        ['mesh', 'mesh', 0, -1],
+        `${tag}: a splat the brush erased on the GPU is not picked`,
+      );
     }
   }
+  const streamed = await page.evaluate(() => window.check.progressive());
+  const earlyImage = await decodePNG(Buffer.from(streamed.early.split(',')[1], 'base64'));
+  assert.equal(streamed.count, 8385);
+  assert.equal(streamed.visible, 8385);
+  assert.notEqual(streamed.early, streamed.final, 'later bytes visibly refine the streamed real capture');
+  assert.ok(
+    earlyImage.data.some((v, i) => i % 4 !== 3 && v > 10),
+    'partial capture draws before the remaining network bytes',
+  );
+  report.progressive = { count: streamed.count, visible: streamed.visible };
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));
   assert.deepEqual(errors.concat(pageErrors), [], 'no GPU or shader errors');

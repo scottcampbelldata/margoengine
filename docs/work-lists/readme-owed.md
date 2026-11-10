@@ -544,3 +544,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/labels (batch 261 job 2): document DistanceLabels per-label policies, clamped opacity/scale, inclusive ranges, composition, original-opacity restoration and evaluateLabelDistance for GPU consumers.
 - margoengine (batch 261 job 2): document labels/distance alias.
+
+- @margoengine/splats: document /progressive readSplatsProgressive and loadProgressiveSplats, early frames with engine.start(), count and batchSize, cancellation, SPZ base preview/final SH, retained bytes and available-record coarse ordering.
+
+- @margoengine/webgl2-compat: document direct full-image straight-alpha bitmap copies and the existing Canvas2D path for crop, flip and requested premultiplication.
+- margoengine: document the generated /splats/progressive alias alongside the scoped entry.

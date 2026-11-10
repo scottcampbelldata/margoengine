@@ -36,12 +36,12 @@ export async function parseSpz(
       ? new Uint8Array(input)
       : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
   if (file.length >= 8 && new DataView(file.buffer, file.byteOffset).getUint32(0, true) === 0x5053474e)
-    return decode(await unpackV4(file, options.signal), 4);
+    return decodeSpzBody(await unpackV4(file, options.signal), 4);
   if (file.length < 2 || file[0] !== 0x1f || file[1] !== 0x8b)
     throw new RangeError(
       'Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz.',
     );
-  return decode(await inflate(file, 'gzip', options.signal), 3);
+  return decodeSpzBody(await inflate(file, 'gzip', options.signal), 3);
 }
 
 /**
@@ -119,7 +119,7 @@ function checkHeader(count: number, degree: number) {
 }
 
 /** Decodes the SPZ body (gzip bodies hold versions 2-3, unpacked version 4 files version 4): a 16-byte header (magic, version, count, degree, fractional bits) and the attributes. */
-function decode(bytes: Uint8Array, newest: 3 | 4): SplatData {
+export function decodeSpzBody(bytes: Uint8Array, newest: 3 | 4): SplatData {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length < 16 || view.getUint32(0, true) !== 0x5053474e)
     throw new RangeError('Not an SPZ file: the magic number is wrong; check that the file is complete.');
