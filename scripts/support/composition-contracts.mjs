@@ -25,20 +25,14 @@ export const C2 = [
   'lighting2d',
   'xr',
 ];
-export const implementedC2 = [
-  'post',
-  'taa',
-  'dof',
-  'tonemap',
-  'shadows',
-  'clustered',
-  'toon',
-  'transitions',
-  'lines',
-  'points',
-  'labels',
-  'text',
-];
+export const implementedC2 = C2;
+export const commonC2 = ['core', 'post', 'webgl2-compat'];
+
+export function selectCompositionRows(matrix, packages) {
+  const names = packages?.map((name) => name.replace('@margoengine/', ''));
+  if (!names || commonC2.some((name) => names.includes(name))) return matrix.rows;
+  return matrix.rows.filter((row) => row.members.some((member) => names.includes(member)));
+}
 export const pairKey = (a, b) => JSON.stringify([a, b].sort());
 
 export function missingTuples(members, rows) {

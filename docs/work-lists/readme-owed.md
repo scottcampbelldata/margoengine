@@ -1409,3 +1409,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/rigging: MToon maps from retained Node pixels.
 - @margoengine/react: independent retained-pixel copies for cached model mounts.
 - Python notebook test harness: document event-driven server readiness and bounded camera/selection output polling in the README phase.
+
+- Integration C2 harness: document 24 adapters, 34 rows, all 276 pairs, numeric depth/state/XR probes, package row selection and Windows tracer ANGLE Vulkan routing during the README phase.

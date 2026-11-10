@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
-import { pairCoverage } from './support/composition-contracts.mjs';
+import { pairCoverage, selectCompositionRows } from './support/composition-contracts.mjs';
 import { compatArgs, groupRows, runScene } from './support/composition-run.mjs';
 import { exitOnHelp } from './support/help.mjs';
 
@@ -16,7 +16,7 @@ const packages = process.argv
   ?.slice(11)
   .split(',')
   .map((p) => p.replace('@margoengine/', ''));
-const rows = matrix.rows.filter((row) => !packages || row.members.some((m) => packages.includes(m)));
+const rows = selectCompositionRows(matrix, packages);
 assert.ok(rows.length, 'No composition scenes selected');
 const release = await acquire({ owner: 'composition-browser', waitMax: 1 });
 const results = [];
@@ -40,6 +40,7 @@ try {
       await browser.page.goto(new URL(`/tests/composition/${row.id}.html`, browser.page.url()).href);
       await browser.page.waitForFunction(() => !!window.composition, null, { timeout: 60_000 });
       for (const samples of [1, 4]) {
+        console.log(`RUN ${row.id} ${compat ? 'webgl2-compat' : 'webgpu'} ${samples}x ${row.members.join('+')}`);
         const page = browser.page;
         const result = await runScene(() => page.evaluate((samples) => window.composition.run(samples), samples), {
           label: `${row.id} ${compat ? 'webgl2-compat' : 'webgpu'}${args.length ? ` (${args.join(' ')})` : ''} ${samples}x ${row.members.join('+')}`,

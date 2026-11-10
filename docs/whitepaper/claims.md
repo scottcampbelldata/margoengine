@@ -4567,3 +4567,20 @@ Throughput/load/memory comparisons remain scheduled for the quiet speed phase.
 PNG and JPEG glTF images load without createImageBitmap using the existing optional image decoder. Evidence: node-images.test.js covers data URI, bufferView and fetched images, exact retained/uploaded bytes, colour-space selection, mip allocation, restoration, abort and invalid input. test-node-images.mjs uses the real Node binding and exact uniform-colour reference renders. test-pixel-images.mjs compares PNG bitmap/pixel uploads and restored models pixel for pixel on both backends. This claim covers these fixtures, not equality of all JPEG decoders or browser support for every optional image codec.
 Entry byte evidence: the quality bundle method measures gltf-pro/model at 60,402 bytes gzip on the parent sources and 60,566 on the repaired sources (+164). This is a byte count, not a timing or speed claim.
 
+
+
+### Integration J2: full 24-member C2 composition
+
+34 sparse rows pass on native WebGPU and full WebGL2 compatibility at 1x and 4x
+MSAA: 136 cases and 276/276 positive pairs, with independent four-state binary
+coverage over the same adapter rows. Six RGBA probes, numeric reversed depth,
+exact scene draw counts, target/MSAA/viewport/scissor restoration and simulated
+XR sessions drawing real eye textures are asserted, with no collected errors.
+[All numeric results](results/integration-j2-composition.json) retain backend,
+row, sample count and explicit ANGLE Vulkan arguments for Windows tracer rows.
+[Methods and clean-room sources](../integration-composition.md) bound the claim:
+common core/post depth/stack/backend infrastructure is always present, only the
+listed settings/probes are proven, XR delivery is simulated, and C1/C3-C10,
+physical headsets, every option/pixel and higher-order interactions are outside
+scope. The known ANGLE D3D11 tracer shader-link defect remains parked; no
+assertion exception was used. No package source/API, core/stage or speed claim.

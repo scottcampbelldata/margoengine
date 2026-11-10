@@ -7045,7 +7045,20 @@ reproduction are recorded in docs/conventions.md under API lock.
 
 ### Section 5 evidence: C2 composition J2
 
-The initial executable set covers post/FXAA, TAA, DOF and Tonemap (six positive pairs). Four material probes, two background probes, core drawCalls, validation scopes and rejection/error collectors provide value evidence. The 24-member generator proves 276 positive pairs and all four presence states on the CPU; remaining GPU adapters are still missing. No C1 fixture shape or lifetime harness changes. Research, reproduction and limits: docs/integration-composition.md.
+The completed 24-member executable set draws 34 sparse rows on native WebGPU
+and full WebGL2 compatibility at 1x/4x, all 136 cases passing. It covers all
+276 positive pairs and four binary adapter states; core, post depth/stack and
+the selected backend are common infrastructure. Six RGBA probes, six numeric
+reversed-depth probes, exact draw counts, target/MSAA/viewport/scissor restoration,
+empty error collectors and real simulated-session XR eye textures supply value
+evidence. Physical headset behaviour, every option/pixel and higher-order
+interactions remain outside this claim. On Windows only voxel-pathtracer rows
+use ANGLE Vulkan because of the parked D3D11 shader-link defect; each scene has
+the upstream 150 s coded stall limit. No exception or tolerance change was used.
+The 63 affected CPU tests and scene type-check pass. No package implementation,
+core/stage source, C1 fixture shape or lifetime harness change. Research,
+reproduction and raw numeric evidence: docs/integration-composition.md and
+docs/whitepaper/results/integration-j2-composition.json.
 
 ## Section 5 evidence: batch 176 tensor fields
 The optional tensor entry owns a scaled CPU/GPU symmetric eigensolver, an instanced glyph pipeline, deterministic Euler/FACT tracking, hyperstreamline meshes and a shared-factorization ordinary least-squares DWI fit. Core and stage are unchanged. Packed GPU eigenvalues/FA and eigenvectors feed one vertex-stage instanced draw without a full eigen readback; the status buffer alone is read for convergence. On replacement devices the layer rebuilds from its owned CPU snapshot. CPU tests compare the complete native OpenNeuro crop to independent NumPy lstsq/eigh results, reconstruct signed/repeated spectra, conserve straight fibre lengths and transverse ellipse radii, and inject allocation failures. Browser tests exercise real DWI glyphs and fibres on both GPU backends, verify eigen residual bounds, measure one instanced draw, preserve exact sharp-glyph pole symmetry, compare signed/absolute spectra, check bit-identical restoration and unit-scale lighting invariance. Remaining evidence is the quiet speed suite and further anatomical validation, neither a present claim.

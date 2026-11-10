@@ -3910,3 +3910,22 @@ UASTC Zstandard packing reran, and lossless raw equality binds the retained metr
 The final data output is measured directly through the independent transcoder.
 GPU: node scripts/gpu-package-tests.mjs --no-build --only=exporters, shared lock,
 both backends. No verify, README gate or throughput benchmark is needed here.
+
+
+### Integration J2 C2 composition
+
+From the repository root, build with `npm run build:packages`. Run
+`node --test --test-timeout=120000 tests/composition-generator.test.js tests/composition-run.test.js tests/check-merge-affected.test.js`
+(63 tests), then
+`node node_modules/typescript/bin/tsc -p tests/composition/tsconfig.json`.
+Run the browser suite under its bounded shared GPU lease:
+`node scripts/gpu-lock.mjs run --owner=j2-reproduce --max=10 --wait-max=5 -- node scripts/composition-browser-tests.mjs`.
+It draws all 34 rows on both backends at 1x/4x, writes every probe into
+`test-results/composition.json` and reports 276/276 pairs only after all 136 cases
+pass. Compare with [the recorded results](results/integration-j2-composition.json).
+On Windows voxel-pathtracer compatibility rows automatically use ANGLE Vulkan;
+other compatibility rows keep default D3D11. The raw report records those args.
+The local evidence uses NVIDIA RTX A6000 driver 617.42. No benchmark or physical
+headset is required for this bounded, simulated-session correctness claim.
+[Methods, oracle values and limits](../integration-composition.md) specify the
+common infrastructure and everything outside the claim.

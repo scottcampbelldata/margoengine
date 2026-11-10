@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { C2, coveringArray, missingTuples, pairCoverage } from '../scripts/support/composition-contracts.mjs';
+import {
+  C2,
+  coveringArray,
+  missingTuples,
+  pairCoverage,
+  selectCompositionRows,
+} from '../scripts/support/composition-contracts.mjs';
 
 test('all 276 C2 pairs cover all four binary states with sparse deterministic rows', () => {
   const rows = coveringArray(C2);
@@ -35,6 +41,17 @@ test('committed pages and manifest match the generator exactly', () => {
   const matrix = JSON.parse(readFileSync(new URL('./composition/generated.json', import.meta.url)));
   for (const { id, members } of matrix.rows) {
     const source = readFileSync(new URL(`./composition/${id}.ts`, import.meta.url), 'utf8');
-    for (const member of members) assert.ok(source.includes(`'@margoengine/${member}'`));
+    for (const member of members) assert.match(source, new RegExp(`'@margoengine/${member}(?:/[^']+)?'`));
   }
+});
+
+test('common device and depth dependencies keep every row; members select only their rows', () => {
+  const matrix = { rows: coveringArray(C2).map((members) => ({ members })) };
+  for (const name of ['post', '@margoengine/core', 'webgl2-compat'])
+    assert.equal(selectCompositionRows(matrix, [name]), matrix.rows);
+  assert.deepEqual(
+    selectCompositionRows(matrix, ['@margoengine/taa']),
+    matrix.rows.filter((row) => row.members.includes('taa')),
+  );
+  assert.deepEqual(selectCompositionRows(matrix, ['sciviz']), []);
 });

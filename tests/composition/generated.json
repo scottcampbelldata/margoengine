@@ -31,17 +31,34 @@
     "taa",
     "dof",
     "tonemap",
+    "oit",
     "shadows",
     "clustered",
+    "pixel",
+    "creative",
     "toon",
     "transitions",
+    "scenery",
+    "voxel-pathtracer",
+    "water",
+    "sky",
+    "vfx",
     "lines",
     "points",
     "labels",
-    "text"
+    "text",
+    "sprites",
+    "splats",
+    "lighting2d",
+    "xr"
+  ],
+  "common": [
+    "core",
+    "post",
+    "webgl2-compat"
   ],
   "coverage": {
-    "covered": 66,
+    "covered": 276,
     "total": 276
   },
   "rows": [
@@ -52,111 +69,336 @@
         "taa",
         "dof",
         "tonemap",
-        "shadows"
+        "oit"
       ]
     },
     {
       "id": "c2-002",
       "members": [
         "post",
+        "shadows",
         "clustered",
-        "toon",
-        "transitions",
-        "lines"
+        "pixel",
+        "creative"
       ]
     },
     {
       "id": "c2-003",
       "members": [
         "post",
-        "taa",
-        "points",
-        "labels",
-        "text"
+        "toon",
+        "transitions",
+        "scenery",
+        "voxel-pathtracer"
       ]
     },
     {
       "id": "c2-004",
       "members": [
-        "taa",
-        "dof",
-        "clustered",
-        "toon",
-        "points"
+        "post",
+        "water",
+        "sky",
+        "vfx",
+        "lines"
       ]
     },
     {
       "id": "c2-005",
       "members": [
-        "taa",
-        "dof",
-        "transitions",
-        "lines",
-        "labels"
+        "post",
+        "points",
+        "labels",
+        "text",
+        "sprites"
       ]
     },
     {
       "id": "c2-006",
       "members": [
-        "dof",
-        "tonemap",
-        "shadows",
-        "clustered",
-        "text"
+        "post",
+        "taa",
+        "splats",
+        "lighting2d",
+        "xr"
       ]
     },
     {
       "id": "c2-007",
       "members": [
-        "tonemap",
+        "taa",
         "shadows",
         "toon",
-        "transitions",
-        "labels"
+        "water",
+        "points"
       ]
     },
     {
       "id": "c2-008",
       "members": [
-        "tonemap",
-        "shadows",
+        "taa",
+        "clustered",
         "transitions",
-        "lines",
-        "points"
+        "sky",
+        "labels"
       ]
     },
     {
       "id": "c2-009",
       "members": [
-        "clustered",
-        "labels"
+        "taa",
+        "pixel",
+        "scenery",
+        "vfx",
+        "text"
       ]
     },
     {
       "id": "c2-010",
       "members": [
-        "toon",
-        "transitions",
+        "taa",
+        "creative",
+        "voxel-pathtracer",
         "lines",
-        "text"
+        "sprites"
       ]
     },
     {
       "id": "c2-011",
       "members": [
-        "shadows"
+        "dof",
+        "shadows",
+        "transitions",
+        "vfx",
+        "sprites"
       ]
     },
     {
       "id": "c2-012",
       "members": [
-        "tonemap"
+        "dof",
+        "clustered",
+        "toon",
+        "lines",
+        "text"
       ]
     },
     {
       "id": "c2-013",
       "members": [
-        "lines"
+        "dof",
+        "pixel",
+        "voxel-pathtracer",
+        "water",
+        "labels"
+      ]
+    },
+    {
+      "id": "c2-014",
+      "members": [
+        "dof",
+        "creative",
+        "scenery",
+        "sky",
+        "points"
+      ]
+    },
+    {
+      "id": "c2-015",
+      "members": [
+        "dof",
+        "tonemap",
+        "shadows",
+        "scenery",
+        "splats"
+      ]
+    },
+    {
+      "id": "c2-016",
+      "members": [
+        "dof",
+        "tonemap",
+        "clustered",
+        "voxel-pathtracer",
+        "lighting2d"
+      ]
+    },
+    {
+      "id": "c2-017",
+      "members": [
+        "dof",
+        "tonemap",
+        "pixel",
+        "toon",
+        "xr"
+      ]
+    },
+    {
+      "id": "c2-018",
+      "members": [
+        "tonemap",
+        "creative",
+        "transitions",
+        "water",
+        "text"
+      ]
+    },
+    {
+      "id": "c2-019",
+      "members": [
+        "tonemap",
+        "oit",
+        "pixel",
+        "sky",
+        "sprites"
+      ]
+    },
+    {
+      "id": "c2-020",
+      "members": [
+        "tonemap",
+        "oit",
+        "clustered",
+        "vfx",
+        "points"
+      ]
+    },
+    {
+      "id": "c2-021",
+      "members": [
+        "tonemap",
+        "oit",
+        "shadows",
+        "lines",
+        "labels"
+      ]
+    },
+    {
+      "id": "c2-022",
+      "members": [
+        "oit",
+        "creative",
+        "toon",
+        "vfx",
+        "splats"
+      ]
+    },
+    {
+      "id": "c2-023",
+      "members": [
+        "oit",
+        "pixel",
+        "transitions",
+        "lines",
+        "lighting2d"
+      ]
+    },
+    {
+      "id": "c2-024",
+      "members": [
+        "oit",
+        "clustered",
+        "scenery",
+        "water",
+        "xr"
+      ]
+    },
+    {
+      "id": "c2-025",
+      "members": [
+        "oit",
+        "shadows",
+        "voxel-pathtracer",
+        "sky",
+        "text"
+      ]
+    },
+    {
+      "id": "c2-026",
+      "members": [
+        "shadows",
+        "creative",
+        "labels",
+        "lighting2d",
+        "xr"
+      ]
+    },
+    {
+      "id": "c2-027",
+      "members": [
+        "clustered",
+        "water",
+        "sprites",
+        "splats",
+        "lighting2d"
+      ]
+    },
+    {
+      "id": "c2-028",
+      "members": [
+        "pixel",
+        "transitions",
+        "voxel-pathtracer",
+        "points",
+        "splats"
+      ]
+    },
+    {
+      "id": "c2-029",
+      "members": [
+        "toon",
+        "scenery",
+        "sky",
+        "labels",
+        "lighting2d"
+      ]
+    },
+    {
+      "id": "c2-030",
+      "members": [
+        "toon",
+        "scenery",
+        "lines",
+        "sprites",
+        "xr"
+      ]
+    },
+    {
+      "id": "c2-031",
+      "members": [
+        "transitions",
+        "voxel-pathtracer",
+        "sky",
+        "vfx",
+        "xr"
+      ]
+    },
+    {
+      "id": "c2-032",
+      "members": [
+        "sky",
+        "lines",
+        "points",
+        "labels",
+        "splats"
+      ]
+    },
+    {
+      "id": "c2-033",
+      "members": [
+        "vfx",
+        "points",
+        "labels",
+        "text",
+        "lighting2d"
+      ]
+    },
+    {
+      "id": "c2-034",
+      "members": [
+        "points",
+        "text",
+        "splats",
+        "xr"
       ]
     }
   ]

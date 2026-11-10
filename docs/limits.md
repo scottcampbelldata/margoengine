@@ -6419,7 +6419,7 @@ Diffusion fitting is ordinary, unconstrained log-linear least squares, never a w
 
 Tensor optional entry: new 0 to 27,622 B gzip, ceiling 28,451 B. The bytes keep fitting, eigensystems, glyphs and tracking in one coherent coordinate/lifetime contract; mandatory companion entry splits would add wiring without improving results. Core plus stage remains 24,209 B.
 
-Integration J2 second set: 12 C2 members, 13 rows, 66/276 positive pairs pass both backends at 1x/4x. Eight newly exercised members are shadows, clustered, toon, transitions, lines, points, labels and text. Remaining 12 members still need GPU adapters. C2 is not yet complete.
+Integration J2 second set historically covered 12 C2 members in 13 rows and 66/276 positive pairs. The full set below supersedes that intermediate coverage.
 
 ### Batch 176: molecules
 sciviz/molecule consumes structures returned by loaders/pdb and loaders/mmcif and supplies an opaque, 3D linear-axis MoleculeLayer. Coordinates and radii are angstroms. Default ball-and-stick uses 0.3 times each van der Waals atom radius, bondRadius 0.2 angstrom; space-filling uses full van der Waals radii and no bonds; licorice uses bondRadius for both atom spheres and bonds. atomScale applies to ball-and-stick only. atomIndices defaults to all atoms and displays a bond only when both ends are selected. Empty selections allocate/draw nothing. The layer owns its snapshot, restores GPU resources and supports Symbol.dispose. GPU buffer size/binding limits are enforced; rendering uses float32 precision, so coordinates should stay near the molecular origin. Native WebGPU and compatibility WebGL2 are supported; native WebGL2 requires a separate backend implementation and is rejected before allocation.
@@ -6465,3 +6465,21 @@ AVIF review L2 (2026-11-10): OBU reserved header/extension bits are ignored as r
 
 Without createImageBitmap, gltf-pro lazily calls the existing decoders/image entry and retains RGBA8 rows with straight alpha. Browser bitmaps stay the default when available. PNG/JPEG data URIs, buffer views and fetched images use the same download and decoded-image limits as before; GPU dimensions still obey maxTextureDimension2D. The existing optional decoder owns its supported coding subsets and failures. Raw pixels stay in CPU memory for clone/device restoration, width * height * 4 bytes per image, plus independent React mount copies. Material uploads generate the same full mip chain as bitmaps; uploadImage itself returns a caller-owned single-level texture, as before. CPU decode time is not benchmarked in the build phase.
 The Node image repair changes the gltf-pro/model entry from 60,402 to 60,566 bytes gzip (+164), measured by the quality bundle method against the parent source. Its optional ceiling rises from 60,429 with the normal 3% margin. Splitting would require caller configuration and duplicate loading/upload/restoration paths for 164 bytes. Core and stage bytes are unchanged.
+
+
+### Integration J2 full C2 coverage
+
+All 24 adapter members execute in 34 sparse rows: 136/136 cases on native WebGPU
+and full WebGL2 compatibility at 1x/4x MSAA, covering 276/276 positive pairs and
+all four binary adapter states. Common core/post depth/stack/backend plumbing is
+present even when a corresponding adapter state is absent. Assertions cover six
+RGBA probes, six reversed-depth values (1e-6), exact scene draw counts, render
+target/MSAA/viewport/scissor restoration, empty validation/error collectors and
+simulated XR delivery into real 96x96 eye texture layers. Physical headset
+certification, untested options, every pixel and higher-order interactions are
+outside this result. Windows compatibility tracer rows use ANGLE Vulkan; the
+parked ANGLE D3D11 tracer shader-link defect remains. The per-scene limit is 150 s
+and the full GPU hold is 10 minutes. No timing assertion, speed claim, package API
+or package source/size change. Evidence and reproduction:
+[integration composition](integration-composition.md) and
+[raw results](whitepaper/results/integration-j2-composition.json).

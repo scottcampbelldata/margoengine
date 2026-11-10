@@ -3,9 +3,10 @@ import { FXAA } from '@margoengine/post';
 import { TAA } from '@margoengine/taa';
 import { DOF } from '@margoengine/dof';
 import { Tonemap } from '@margoengine/tonemap';
-import { Shadows } from '@margoengine/shadows';
+import { OIT } from '@margoengine/oit';
+import { addMesh } from '@margoengine/oit/meshes';
 import { expose } from './harness.ts';
 expose(
-  { 'id': 'c2-001', 'members': ['post', 'taa', 'dof', 'tonemap', 'shadows'] },
-  { post: FXAA, taa: TAA, dof: DOF, tonemap: Tonemap, shadows: Shadows },
+  { 'id': 'c2-001', 'members': ['post', 'taa', 'dof', 'tonemap', 'oit'] },
+  { 'post': FXAA, 'taa': TAA, 'dof': DOF, 'tonemap': Tonemap, 'oit': { OIT, addMesh } },
 );
