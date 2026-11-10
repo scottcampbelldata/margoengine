@@ -224,7 +224,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/webgl2-compat | Stencil-aspect sampling extension, coded capability refusal, depth restoration and ordinary-view aliases. | Batch 262 job 4 |
 | margoengine | Generated aliases for APIs already on main: save/scene-state, audio/binaural, materials/serialization, save/materials, shader/serialization and xr/locomotion; also inspector/textures. | Batch 262 job 4 |
 
-- @margoengine/stats: document /geometry counters, topology registration, indexed vertex semantics, indirect metadata, unknown bundle work, frame reset, panel, report and disposal.
+- @margoengine/stats: document /geometry counters, topology registration, indexed vertex semantics, indirect metadata, unknown bundle work, frame reset, panel, report and disposal. DONE (stats-prose-phase; examples tracked separately)
 - margoengine: document /stats/geometry alias.
 | @margoengine/input | haptics: native triggerRumble parameters/defaults, capabilities, completion/preemption, AbortSignal/timeout, reset ownership and physical acceptance | batch-253 job 5 |
 | margoengine | Generated input/haptics alias plus restored existing audio/binaural, materials/serialization, save/materials, save/scene-state and shader/serialization mirrors | batch-253 job 5 |
@@ -237,7 +237,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/ecs (batch 249 job 1): objects entry, objectField factories, mixed ObjectComponent fields, identity, packed row lifetime and touch.
 - margoengine (batch 249 job 1): generated ecs/objects alias.
 
-- @margoengine/stats: document /gl asynchronous frame/pass timing, early plugin registration, explicit scopes, disjoint/loss handling, limits, unavailable state, draw counts, reports, panel and disposal.
+- @margoengine/stats: document /gl asynchronous frame/pass timing, early plugin registration, explicit scopes, disjoint/loss handling, limits, unavailable state, draw counts, reports, panel and disposal. DONE (stats-prose-phase; examples tracked separately)
 - margoengine: document /stats/gl alias.
 - @margoengine/xr: document xr/ar-extra session negotiation, DOM overlay root ownership, current/legacy image targets, copied observations, mesh visualization and persistent anchor lifetime/abort cleanup.
 
@@ -286,7 +286,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/xr | Core version guard declarations at XR attachment boundaries. | version-guard |
 
-- @margoengine/stats: document /panels attach and custom samples, four metric sources, defaults, units/averages/peaks, GPU pass names and async cadence, memory scope, null gaps, borrowed versus owned Stats and disposal.
+- @margoengine/stats: document /panels attach and custom samples, four metric sources, defaults, units/averages/peaks, GPU pass names and async cadence, memory scope, null gaps, borrowed versus owned Stats and disposal. DONE (stats-prose-phase; examples tracked separately)
 - margoengine: document /stats/panels alias.
 | @margoengine/water | Optional caustics entry, source-ready scheduling, receiver projection, shadows, limits and lifecycle | Batch 234 caustics |
 | margoengine | water/caustics optional facade | Batch 234 caustics |
@@ -1519,3 +1519,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/webgl2-compat: add bias/offset footprint regression coverage and test:gpu:bias reproduction to examples in the README phase; the incorrect mip-blending prose is corrected by review5 now.
 - @margoengine/inspector: optional-entry copy-paste examples and their runtime validation remain owed; round 3 instruction prohibits writing/fixing examples and check:readme-run. Prose coverage is complete.
+
+- @margoengine/stats: geometry, gl and panels copy-paste examples and runtime validation remain owed under the round 3 prohibition on README examples and check:readme-run.

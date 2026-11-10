@@ -2,7 +2,7 @@
 
 Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stats` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
+Depends on `@margoengine/math`, with `@margoengine/core` as a peer. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;
 DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
@@ -258,3 +258,99 @@ They are null before a valid sample and when timing is cleared. They can correla
 events with samples; temporal proximity alone does not establish a cause.
 
 `dispose()` removes the overlay, timer and plugin and destroys owned GPU resources.
+
+## Submitted geometry counters
+
+Import `GeometryStats` from `@margoengine/stats/geometry` (or `margoengine/stats/geometry`).
+`GeometryStats.attach(engine, options)` counts draw arguments on WebGPU and native
+WebGL2 without reading geometry back. `toJSON()` copies the current frame's triangles,
+vertices, instances, drawCalls and unknownDraws. `view(stats)` adds a row to an existing
+Stats overlay, refreshed every 150 ms.
+
+Vertices means submitted vertex/index references multiplied by instance count. Indexed
+draws count repeated indices, rather than unique vertices. Triangle lists count
+floor(count/3) triangles per instance; triangle strips and WebGL triangle fans count
+max(0,count-2). Line and point primitives contribute vertices but no triangles. A draw
+with zero count or zero instances still contributes a draw call, with no geometry.
+Triangle counts are assembled candidates before primitive restart, degeneracy, clipping
+or culling; they are not a count of visible rasterized triangles.
+
+With a custom WebGPU loop, call `trackDevice(device)` before creating pipelines to
+capture their topology, or `pipeline(existingPipeline, topology)` for an earlier pipeline.
+Unregistered pipelines default to triangle-list. Call `track(encoder)` before recording
+its render passes, or `trackGL(context)` for native GL commands. `beginFrame()` resets
+the counters once per custom frame. The engine attachment resets once per task so
+multiple engine views in that task contribute to the same frame.
+
+Indirect GPU arguments are opaque. The optional `indirect(buffer, offset, indexed)`
+callback supplies CPU metadata `{count, instances}` at draw time; it is not cached.
+Without it, an indirect draw contributes to drawCalls and unknownDraws, without invented
+geometry counts. Each opaque executed render bundle contributes one unknownDraws entry;
+its internal draws are outside drawCalls and geometry totals. This counter is not a
+measurement of unique geometry, visibility or GPU vertex-cache work. Dispose it to
+restore its device/context wrappers, remove its overlay row and detach the plugin.
+
+## Asynchronous native WebGL2 timing
+
+Import `GLStats` from `@margoengine/stats/gl` or `margoengine/stats/gl`. Attach it before
+other optional plugins register passes so their pass names are captured automatically.
+It wraps native draws and uses EXT_disjoint_timer_query_webgl2 when available. Its
+`drawCalls` includes arrays, elements, range-elements and instanced calls. Those counters
+remain useful when `supported` is false and GPU timing is unavailable.
+
+For a custom loop, construct a GLStats, call `track(gl)`, and pair `beginFrame()` with
+`endFrame()`. Passing gl directly to beginFrame also starts tracking it. A false return
+means timing did not start; still end the frame to close the scope. Pair non-nested
+`beginPass(name)` and `endPass()`, or use `pass(name, synchronousFunction)` to close the
+scope even when the function throws. Call `poll()` from a later task/frame to collect
+only queries whose results are available. No synchronous GPU wait is introduced.
+
+`frameMilliseconds` is the sum of measured frame segments; `passes` holds completed
+named intervals, in milliseconds. `sampleId` advances on a valid completed sample;
+the current draw count can therefore belong to a newer frame than the GPU timings.
+`toJSON()` returns a copy and `view(stats)` adds a 150 ms overlay row. Default
+`maxPasses` is 128 (allowed 1..128); maxPendingFrames is 4 (allowed 1..8). Excess pending
+frames or an existing external timer query increase droppedFrames instead of nesting
+queries. Exceeding the pass limit invalidates that sample.
+
+Disjoint or lost-context samples clear timing to null and discard their pass list.
+Null means unavailable, rather than zero GPU work. Pending queries retain the last
+completed timing. After context restoration, track the restored context again to
+reacquire its extension. Disposal restores owned wrappers, deletes owned queries,
+removes the optional overlay row and detaches the plugin.
+
+## Four metric histories
+
+Import `StatsPanels` from `@margoengine/stats/panels` or `margoengine/stats/panels`.
+`StatsPanels.attach(engine, options)` combines FPS, CPU milliseconds, GPU milliseconds
+and memory into fixed-capacity histories. `samples` defaults to 120 (2..4096),
+`refreshMilliseconds` to 150 (16..60000), and an owned overlay's parent to document.body.
+Pass an existing `stats` to borrow its overlay; otherwise the panels create their own.
+
+FPS comes from Stats frame sampling; CPU time comes from FramePhases' completed task.
+WebGPU GPU time is the sum of profiled pass timestamps, with profiling attempted every
+15 encoders and read back asynchronously. Request timestamp-query in Engine.create's
+features for supported adapters. WebGL2 uses GLStats and its asynchronous timer queries.
+Neither metric measures presentation latency. Named GPU passes and their times come
+from the same completed sample: WebGPU uses descriptor labels (or generated render/
+compute names), while WebGL2 uses the registered pass names. Passes that already own
+WebGPU timestampWrites are excluded from the panels' profiler. Pending reads reuse the
+last completed sample; do not interpret every graph point as a new GPU measurement.
+
+Memory defaults to descriptor-based GPU resource tracking on WebGPU, observing only
+resources created after attachment. On other backends it uses browser JS heap size
+when exposed, otherwise null. These are different scopes, neither is process memory
+or driver allocation. `memory: () => numberOrNull` supplies an application sampler in
+bytes. Graph labels show MiB; reports retain bytes. Labels include latest, average and
+peak over finite values retained in the history. Null values produce gaps and are
+excluded from averages, rather than being plotted as zero.
+
+For a custom loop, construct StatsPanels and call `sample` with fps, cpuMilliseconds,
+gpuMilliseconds and memoryBytes, plus optional named passes. Samples must be finite
+and nonnegative; only GPU and memory may be null. `sample` updates the rings separately
+from DOM/canvas work; `refresh()` redraws immediately, alongside the refresh timer.
+`toJSON()` returns oldest-first arrays with null gaps and a copy of the latest pass list.
+
+Disposal removes histories, timer, owned phase/timing/memory trackers and the panels
+plugin. A borrowed Stats remains alive and its original graph display is restored;
+an owned Stats is disposed with the panels. Engine disposal performs this cleanup too.
