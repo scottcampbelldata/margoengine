@@ -54,6 +54,10 @@
     "./opfs": {
       "types": "./dist/opfs.d.ts",
       "import": "./dist/opfs.js"
+    },
+    "./signed": {
+      "types": "./dist/signed.d.ts",
+      "import": "./dist/signed.js"
     }
   },
   "files": [

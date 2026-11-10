@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12121228,
+  "total": 12124065,
   "history": [
     {
       "date": "2026-10-24",
@@ -5414,6 +5414,12 @@
       "commit": "fdbd648f3",
       "reason": "New optional sprites/slice: 0 to 8587 B gzip, ceiling 8845 B. Fixed corners, repeat/scroll, seamless smooth sampling and stable resize share one instanced pipeline. A split duplicates the layer. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "2f9dec9e1",
+      "reason": "Batch 255 job 4: new optional signed safe storage entry, 0 to 2581 B gzip; complete safe frame and key authentication with two-copy recovery in one entry. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5559,6 +5565,7 @@
     "@margoengine/compute/subgroups": 2537,
     "@margoengine/controls": 27517,
     "@margoengine/controls/arcball": 8637,
+    "@margoengine/controls/collide": 7341,
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/fly": 3047,
     "@margoengine/controls/globe": 3902,
@@ -5904,6 +5911,7 @@
     "@margoengine/netcode/interest": 2516,
     "@margoengine/netcode/lobby": 4439,
     "@margoengine/netcode/node": 6457,
+    "@margoengine/netcode/presence": 6475,
     "@margoengine/netcode/relay": 3617,
     "@margoengine/netcode/rollback": 3437,
     "@margoengine/netcode/rooms": 6007,
@@ -6046,6 +6054,7 @@
     "@margoengine/save/opfs": 1763,
     "@margoengine/save/remote": 3411,
     "@margoengine/save/safe": 2102,
+    "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19252,
     "@margoengine/scatter/imposter": 2968,
@@ -6065,6 +6074,7 @@
     "@margoengine/sciviz": 51813,
     "@margoengine/sciviz/bricks": 27589,
     "@margoengine/sciviz/colormaps": 17381,
+    "@margoengine/sciviz/derive": 4249,
     "@margoengine/sciviz/fallback": 2258,
     "@margoengine/sciviz/flow": 8854,
     "@margoengine/sciviz/formats": 14262,
@@ -6143,6 +6153,7 @@
     "@margoengine/sprites/billboard": 5389,
     "@margoengine/sprites/shader": 1222,
     "@margoengine/sprites/skeletal": 5526,
+    "@margoengine/sprites/slice": 8845,
     "@margoengine/stage": 3222,
     "@margoengine/stage/effects": 764,
     "@margoengine/stage/environment": 784,
@@ -6373,6 +6384,7 @@
     "leak @margoengine/blender/live -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/pbr-ext -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,
+    "leak @margoengine/controls/collide -> @margoengine/bvh": 1,
     "leak @margoengine/controls/drag -> @margoengine/bvh": 1,
     "leak @margoengine/controls/third-person -> @margoengine/bvh": 1,
     "leak @margoengine/controls/walk -> @margoengine/bvh": 1,
@@ -6431,11 +6443,6 @@
     "margoengine/game": 996,
     "margoengine/react/instances": 318,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/controls/collide": 7341,
-    "leak @margoengine/controls/collide -> @margoengine/bvh": 1,
-    "@margoengine/netcode/presence": 6475,
-    "@margoengine/sciviz/derive": 4249,
-    "@margoengine/sprites/slice": 8845
+    "margoengine/web": 577
   }
 }

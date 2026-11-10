@@ -48,6 +48,42 @@ try {
     deleted: true,
     absent: null,
   });
+  await page.evaluate(async () => {
+    const { indexedDBStorage, saveGame } = await import('/packages/save/dist/index.js');
+    const { signedStorage } = await import('/packages/save/dist/signed.js');
+    const key = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
+    const signed = signedStorage(indexedDBStorage({ database: 'save-signed-check' }), key);
+    for (const title of ['trusted older', 'trusted newer'])
+      await saveGame(signed, 'game', { format: 'margo-save', version: 1, entities: [], meta: { title } });
+  });
+  await page.reload();
+  const signedResult = await page.evaluate(async () => {
+    const { indexedDBStorage, loadGame } = await import('/packages/save/dist/index.js');
+    const { signedStorage } = await import('/packages/save/dist/signed.js');
+    const key = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
+    const disk = indexedDBStorage({ database: 'save-signed-check' });
+    const recovered = [],
+      signed = signedStorage(disk, key, { onRecover: (r) => recovered.push(r.copy) });
+    const before = (await loadGame(signed, 'game')).meta.title;
+    const edited = await disk.read('game~b');
+    edited[edited.length - 5] ^= 1;
+    await disk.write('game~b', edited);
+    const after = (await loadGame(signed, 'game')).meta.title;
+    const check = await signed.check('game');
+    await disk.write('other~a', await disk.read('game~a'));
+    const copied = await signed.read('other').then(
+      () => 'accepted',
+      (error) => error.code,
+    );
+    return { before, after, check, recovered, copied };
+  });
+  assert.deepEqual(signedResult, {
+    before: 'trusted newer',
+    after: 'trusted older',
+    check: { ok: true, good: 1, bad: 1, generation: 1 },
+    recovered: ['game~b'],
+    copied: 'failed',
+  });
   const durability = await page.evaluate(async () => {
     const { indexedDBStorage, saveGame, webStorage } = await import('/packages/save/dist/index.js'),
       { safeStorage } = await import('/packages/save/dist/safe.js');

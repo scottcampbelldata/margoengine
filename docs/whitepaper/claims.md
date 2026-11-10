@@ -3018,3 +3018,8 @@ middle regions, clips final repeats to target dimensions and scrolls atlas fills
 Proof: packages/sprites/tests/slice.test.js and slice-check.mjs. Instances stay
 bounded by nine per image, regardless of repeat count. This is a deterministic
 work-count claim, not a measured speed claim. Core/stage are unchanged.
+
+
+### Authenticated safe saves (batch 255 job 4)
+
+save/signed binds format, physical key and complete generation/payload frame with WebCrypto HMAC-SHA-256, then delegates redundant-copy recovery to safeStorage. Tests in packages/save/tests/signed.test.js independently recompute stored tags with node:crypto, flip every stored byte, swap roles/keys, reject wrong keys and CRC-valid unsigned edits, and observe cancellation during crypto. The real browser safe-check.mjs checks IndexedDB persistence across reload and recovers the trusted older copy after tampering. This is integrity with an application-managed shared secret, not encryption or rollback protection.

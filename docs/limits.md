@@ -3659,3 +3659,10 @@ including ordinary sprites and atlas pages. Linear filtering uses premultiplied
 linear-light sampling. There is no CPU pixel loop and no Wasm module. The new
 entry is 8,587 B gzip (previously absent); core + stage remains 23,950 B, source
 unchanged. No optional ceiling is lowered or quality removed to reduce bytes.
+
+
+### Signed safe saves (batch 255 job 4)
+
+The optional save/signed entry exposes signedStorage(storage, key, options), returning the full SafeStorage read/write/delete/keys/check interface. It authenticates each complete safe frame including generation under its physical key using WebCrypto HMAC-SHA-256. Raw keys must have at least 32 bytes; CryptoKeys must be secret HMAC/SHA-256 keys of at least 256 bits with sign and verify usages. Raw key bytes are copied, imported lazily, nonextractable, and never written into the save. The caller owns generating, retaining and distributing a secret key; embedded client application keys cannot resist an attacker controlling that client. Authentication detects edits, format changes, role swaps and cross-key copies. It does not encrypt, prevent deletion, or reject replay of an older authenticated frame in the same physical key. Unsigned legacy saves fail closed, including a runtime legacy:true option. A damaged newest copy recovers from an older authenticated one and invokes onRecover; both bad reject with a coded error. Crypto awaits observe AbortSignal before storage writes. The format costs 37 bytes per copy beyond safeStorage's 24 bytes, or 122 bytes of framing across two stored payload copies. The default provider is globalThis.crypto.subtle; options.subtle supports an explicit provider. Existing safe verify/onRecover options apply. README work is owed in docs/work-lists/readme-owed.md.
+
+Save/signed entry: 2,581 B min+gzip (before: absent, 0 B), ceiling 2,837 B, including the safeStorage implementation it composes. Core plus stage stays 23,950 B. Keeping authentication and recovery together avoids a caller accidentally authenticating only payload bytes while trusting an edited generation or copy role.

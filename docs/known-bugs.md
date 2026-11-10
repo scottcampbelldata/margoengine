@@ -4101,3 +4101,5 @@ the linked sciviz RangeError before any GPU allocation. derive.test.js checks bo
 The numerical/consumer limits are in limits.md and the sciviz README; no algorithm is weakened.
 
 Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.
+
+Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.

@@ -2518,6 +2518,10 @@
       "types": "./dist/save/opfs.d.ts",
       "import": "./dist/save/opfs.js"
     },
+    "./save/signed": {
+      "types": "./dist/save/signed.d.ts",
+      "import": "./dist/save/signed.js"
+    },
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"

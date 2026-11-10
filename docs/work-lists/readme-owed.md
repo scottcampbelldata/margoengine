@@ -53,3 +53,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Cover the sciviz/derive alias in the README phase. | Batch 171 job 4 |
 | @margoengine/sprites | SliceLayer/addSlice: fixed borders, stretch/repeat, scrolling, partial tiles, resize, transforms and pages; SpriteInput dx/dy gradients before masking | batch-245 job 1 |
 | margoengine | Document the sprites/slice alias and its optional imports | batch-245 job 1 |
+
+
+| @margoengine/save | signed: signedStorage with raw/CryptoKey keys, safe recovery/check, injected WebCrypto, secret ownership, no unsigned legacy, replay/confidentiality limits | batch-255 job 4 |
+| margoengine | Generated save/signed alias | batch-255 job 4 |
