@@ -15,7 +15,7 @@ test('all worktrees and direct tests resolve the same external assets without an
   );
   assert.equal(externalAssetRoot({ MARGO_SPLAT_SAMPLES: 'test-results/override' }), resolve('test-results/override'));
   assert.ok(SERIAL.includes('node scripts/support/external-test-assets.mjs'));
-  assert.equal(externalAssets.length, 460);
+  assert.equal(externalAssets.length, 647);
   for (const file of [
     'video/flower.mp4',
     'ply-horse/horse.ply',
@@ -51,6 +51,23 @@ test('all worktrees and direct tests resolve the same external assets without an
         !file.includes('..') && /^[a-f0-9]{64}$/.test(sha256) && size > 0 && url.startsWith('https://'),
     ),
   );
+});
+
+test('every file a listed conformance index names is itself in the download manifest', () => {
+  const have = new Set(externalAssets.map(({ file }) => file));
+  const indexes = externalAssets.filter(({ file }) => file.endsWith('-index.json'));
+  assert.ok(indexes.some(({ file }) => file === 'interactivity/invalid/invalid-index.json'));
+  for (const { file } of indexes) {
+    const family = file.split('/')[0];
+    const missing = [];
+    for (const entry of JSON.parse(readFileSync(requireExternalAssets(file), 'utf8')))
+      for (const [kind, name] of Object.entries(entry.variants ?? {})) {
+        // A plain glTF variant sits beside the entry; binary and oracle variants sit in a folder named by the kind.
+        const named = `${family}/${entry.name}/${kind === 'glTF' ? '' : kind + '/'}${name}`;
+        if (!have.has(named)) missing.push(named);
+      }
+    assert.deepEqual(missing.slice(0, 5), [], `${file} names ${missing.length} files the manifest never fetches`);
+  }
 });
 
 test('missing, partial, changed and LFS-only external caches fail loudly with the recovery command', () => {

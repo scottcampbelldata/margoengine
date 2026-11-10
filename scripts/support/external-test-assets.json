@@ -426,6 +426,1128 @@
     "size": 94739
   },
   {
+    "file": "interactivity/invalid/extension/A1a_graphs_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A1a_graphs_empty.gltf",
+    "sha256": "3c2daa460106ba04f85c868b808f3662de1e8f99c420357f49871421b6f7d7d3",
+    "size": 722
+  },
+  {
+    "file": "interactivity/invalid/extension/A1b_graphs_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A1b_graphs_missing.gltf",
+    "sha256": "d8e7d16e7232e2aab587410eb440d0c5ed7f475aca1ab5d8c880f669c1152869",
+    "size": 703
+  },
+  {
+    "file": "interactivity/invalid/extension/A1c_graphs_not_array.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A1c_graphs_not_array.gltf",
+    "sha256": "e60bc7da9c614050fe47374d679faa8103c2357e2735e9aceb3bd9ba5953e972",
+    "size": 2479
+  },
+  {
+    "file": "interactivity/invalid/extension/A2a_default_graph_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A2a_default_graph_negative.gltf",
+    "sha256": "b933d4f47ca1464f96e668f7807e73ab8b22a9b45f5d4bd70ba0a6d2929a7916",
+    "size": 2668
+  },
+  {
+    "file": "interactivity/invalid/extension/A2b_default_graph_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A2b_default_graph_fractional.gltf",
+    "sha256": "355aea9ffed67b0eef1b4d1c042d3c8b051565c7c89e8cc8d89cda469b49d18f",
+    "size": 2671
+  },
+  {
+    "file": "interactivity/invalid/extension/A2c_default_graph_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A2c_default_graph_string.gltf",
+    "sha256": "331c281a6ba2636a1f4ad4e6ddebbeb2f8da2014aed363ee0805f7d91d8c6eb1",
+    "size": 2697
+  },
+  {
+    "file": "interactivity/invalid/extension/A3_default_graph_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A3_default_graph_out_of_range.gltf",
+    "sha256": "99af573337788504fe22fc5e3737302e05b802a5200a39fad577a60a9bc84456",
+    "size": 2703
+  },
+  {
+    "file": "interactivity/invalid/extension/A4_default_graph_invalid.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/extension/A4_default_graph_invalid.gltf",
+    "sha256": "16c3a010661e8ed38664480099c1b43c10b8649bb9ceb4cf8aca26cb5cecc2d2",
+    "size": 4606
+  },
+  {
+    "file": "interactivity/invalid/types/B1a_unknown_signature.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B1a_unknown_signature.gltf",
+    "sha256": "2c33f6f783202806d2982501e0ff8bfa6b92ac348bd8f2971785206e3fa5b598",
+    "size": 2694
+  },
+  {
+    "file": "interactivity/invalid/types/B1b_signature_wrong_case.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B1b_signature_wrong_case.gltf",
+    "sha256": "326d9ba34952fe681d5554ab0f0eb1f9a807427da0f98e71239a000035ea9166",
+    "size": 2655
+  },
+  {
+    "file": "interactivity/invalid/types/B2a_duplicate_signature.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B2a_duplicate_signature.gltf",
+    "sha256": "a60619dd7ecc8a1ade44bd94d4efbd2b0379f16afa7b207003dcde9c282ec603",
+    "size": 2667
+  },
+  {
+    "file": "interactivity/invalid/types/B2b_duplicate_signature_with_extras.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B2b_duplicate_signature_with_extras.gltf",
+    "sha256": "8770181da34b3d08bb5e469f2d656353d3faab77b7774d3656c56ddc9c236190",
+    "size": 2810
+  },
+  {
+    "file": "interactivity/invalid/types/B3a_types_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B3a_types_empty.gltf",
+    "sha256": "efa1aadd58fbed9198e367d64c75f7851cc86cbef802cce8cae0c6259c615971",
+    "size": 2214
+  },
+  {
+    "file": "interactivity/invalid/types/B3b_signature_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B3b_signature_missing.gltf",
+    "sha256": "fd4c9a6918cc85cded6a3345ffac5b0125b41d960f42967d19304d9f6f54c60d",
+    "size": 2654
+  },
+  {
+    "file": "interactivity/invalid/types/B3c_signature_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B3c_signature_not_string.gltf",
+    "sha256": "ff10cee935261d59fe3a6841496317494a8e8ae8cc476452cb9b8ee00e259a8e",
+    "size": 2706
+  },
+  {
+    "file": "interactivity/invalid/types/B3d_type_not_object.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/types/B3d_type_not_object.gltf",
+    "sha256": "0f4a05874d7b7437cb724bb721ff00e0c4d7b0df93dcc5c47e692c34d467af20",
+    "size": 2689
+  },
+  {
+    "file": "interactivity/invalid/variables/C1_variable_type_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C1_variable_type_out_of_range.gltf",
+    "sha256": "7557897a278904e49d9ef483afa6e2114cf588dc51e010545fb3f5c313ce7f44",
+    "size": 2618
+  },
+  {
+    "file": "interactivity/invalid/variables/C2a_float3_value_too_short.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C2a_float3_value_too_short.gltf",
+    "sha256": "c4b51849e4635ac1ee03693d7a862903b73a6e74ce604cccb9b10136ecb04b4c",
+    "size": 2666
+  },
+  {
+    "file": "interactivity/invalid/variables/C2b_float4x4_value_nine_elements.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C2b_float4x4_value_nine_elements.gltf",
+    "sha256": "2f087779fce00dbbfa9dc2ba1239fb5e23920428382746091fea561861b562ca",
+    "size": 2819
+  },
+  {
+    "file": "interactivity/invalid/variables/C2c_bool_value_two_elements.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C2c_bool_value_two_elements.gltf",
+    "sha256": "1c212eecf30fdfc29f5b7f7a82e82a6626bd788ada7d224ab12208c9b13bf5d7",
+    "size": 2663
+  },
+  {
+    "file": "interactivity/invalid/variables/C3a_bool_value_number.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C3a_bool_value_number.gltf",
+    "sha256": "b68ca0783f45bb4f4f6f83c597ade96b37ad7a47eb9767267b7e64b734345f8c",
+    "size": 2639
+  },
+  {
+    "file": "interactivity/invalid/variables/C3b_bool_value_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C3b_bool_value_string.gltf",
+    "sha256": "383143901f018b48e2319aeb327d1995530d7f7ec66f99d079bf527daf9f579c",
+    "size": 2658
+  },
+  {
+    "file": "interactivity/invalid/variables/C4a_float_value_null.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C4a_float_value_null.gltf",
+    "sha256": "7c5f1766855c91315bda6b3618ad51e758ff856ed9810a282d01b9ec7463cd5a",
+    "size": 2651
+  },
+  {
+    "file": "interactivity/invalid/variables/C4b_float_value_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C4b_float_value_string.gltf",
+    "sha256": "074d16845b29053382f4da74fea8900c892c4f310ca07666576f849b7f223d2a",
+    "size": 2658
+  },
+  {
+    "file": "interactivity/invalid/variables/C4c_float2_value_bool_element.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C4c_float2_value_bool_element.gltf",
+    "sha256": "7b86b70bcee19b1611e26eb3d00b9c9d0ec86929d0a73a0707fcf3a8492d475b",
+    "size": 2685
+  },
+  {
+    "file": "interactivity/invalid/variables/C5a_int_value_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C5a_int_value_fractional.gltf",
+    "sha256": "9dfc8d61ddf995cfad8786c1dad59f5c03911e9536974f9473526c522ab28ea6",
+    "size": 2642
+  },
+  {
+    "file": "interactivity/invalid/variables/C5b_int_value_exceeds_int32.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C5b_int_value_exceeds_int32.gltf",
+    "sha256": "d36298d737719a4771aa9ebc1292117fa25787866c55770f33960f7cf4d2c5f3",
+    "size": 2663
+  },
+  {
+    "file": "interactivity/invalid/variables/C6a_ref_value_missing_leading_slash.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C6a_ref_value_missing_leading_slash.gltf",
+    "sha256": "78c4509680c00caa84b545aaff0f0dfe1f827b7be62b6b9f765f30c07d5f5224",
+    "size": 2664
+  },
+  {
+    "file": "interactivity/invalid/variables/C6b_ref_value_invalid_escape.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C6b_ref_value_invalid_escape.gltf",
+    "sha256": "0eb5e323255b7b4c2de78c6cf11d7e28ae41e4043e24954701f883959e1f12e4",
+    "size": 2670
+  },
+  {
+    "file": "interactivity/invalid/variables/C6c_ref_value_number.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C6c_ref_value_number.gltf",
+    "sha256": "1ba76d572cd7ec820b08e1533d3db4f67dedece07128c81f52359a7ee2e66618",
+    "size": 2636
+  },
+  {
+    "file": "interactivity/invalid/variables/C7a_variables_without_types.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C7a_variables_without_types.gltf",
+    "sha256": "8172cfa9c06dd58c30de94b0b3d42669e28edc128b1ee6ab1252abf8ba245084",
+    "size": 2576
+  },
+  {
+    "file": "interactivity/invalid/variables/C7b_variable_value_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C7b_variable_value_empty.gltf",
+    "sha256": "622d296a206b091ec7ca081fdd93904be44fb89897b06bb7384fe325d7f01394",
+    "size": 2582
+  },
+  {
+    "file": "interactivity/invalid/variables/C7c_variable_name_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C7c_variable_name_not_string.gltf",
+    "sha256": "a2076d1704ca7da44026470ddc4fdd34dee829e7fe604fa114da7b06b6425fa8",
+    "size": 2646
+  },
+  {
+    "file": "interactivity/invalid/variables/C7d_variables_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C7d_variables_empty.gltf",
+    "sha256": "391adc8694e6bca164184818174be2a590d41591a9457259315ed53df59fa493",
+    "size": 2203
+  },
+  {
+    "file": "interactivity/invalid/variables/C8a_variable_type_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C8a_variable_type_missing.gltf",
+    "sha256": "5268fc5ae9b20f0cb564370b1fbc7f79163ebef86094e9b03826674f499bf92b",
+    "size": 2588
+  },
+  {
+    "file": "interactivity/invalid/variables/C8b_variable_type_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C8b_variable_type_negative.gltf",
+    "sha256": "28032fdb83782ae3a7e241c125994a3f81c937e1d03971f53288294864f3ecfa",
+    "size": 2616
+  },
+  {
+    "file": "interactivity/invalid/variables/C8c_variable_type_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/variables/C8c_variable_type_fractional.gltf",
+    "sha256": "10ce6475599990324803cf2cd722eaf6534246d6f16de6e0918b1af5d0ccfaa9",
+    "size": 2619
+  },
+  {
+    "file": "interactivity/invalid/events/D1_duplicate_event_id.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D1_duplicate_event_id.gltf",
+    "sha256": "91780aafd343670ec619eff60ab60e6d0beed972f5b894cd6e1cb561f510b206",
+    "size": 2186
+  },
+  {
+    "file": "interactivity/invalid/events/D2_event_value_named_event.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D2_event_value_named_event.gltf",
+    "sha256": "d67be9109c261f3c2b18cbae94b9385464f2f40baa89c320f5576e1ea6a0f9b4",
+    "size": 2440
+  },
+  {
+    "file": "interactivity/invalid/events/D3a_event_value_type_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D3a_event_value_type_out_of_range.gltf",
+    "sha256": "5f1638d63a201d20d3350dda1b5905f3ea0196558c3da365120b7b9a570b023f",
+    "size": 2421
+  },
+  {
+    "file": "interactivity/invalid/events/D3b_event_value_type_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D3b_event_value_type_missing.gltf",
+    "sha256": "12e15826d4848cbae715b4c1559a94b8289e1900b79eea9cc6f009ba5f1e4574",
+    "size": 2391
+  },
+  {
+    "file": "interactivity/invalid/events/D4a_event_value_int_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D4a_event_value_int_fractional.gltf",
+    "sha256": "37f9df7e626e5dd059257e725197d511243d0f4da6fa6851cb20f922647a87b5",
+    "size": 2465
+  },
+  {
+    "file": "interactivity/invalid/events/D4b_event_value_wrong_length.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D4b_event_value_wrong_length.gltf",
+    "sha256": "4ec92deb4dbfd6d85cfd0f00f7b52007295ae41638424739f8a012598f5a4ef4",
+    "size": 2501
+  },
+  {
+    "file": "interactivity/invalid/events/D5a_event_id_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D5a_event_id_not_string.gltf",
+    "sha256": "a607e5dd421bb6ace93b3582ab6a7056d85a4e5b95f5c8d37a66ec9d2d42c3ad",
+    "size": 2403
+  },
+  {
+    "file": "interactivity/invalid/events/D5b_event_values_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D5b_event_values_empty.gltf",
+    "sha256": "ddeddaad0383bbf283f7a4be77104957150e56e1e258f2d4111d84b0fd08f6e4",
+    "size": 2258
+  },
+  {
+    "file": "interactivity/invalid/events/D5c_event_name_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/events/D5c_event_name_not_string.gltf",
+    "sha256": "436fb35bd822e7b7faddf53e03d4a1ea1fb233f1085b0ab51d17fc5bd2f23b28",
+    "size": 2446
+  },
+  {
+    "file": "interactivity/invalid/declarations/E1a_op_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E1a_op_missing.gltf",
+    "sha256": "f1251add6c595ced0ecac866e90f26e16c7b9fe303b3e82ed79f2c5991a62e91",
+    "size": 2574
+  },
+  {
+    "file": "interactivity/invalid/declarations/E1b_op_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E1b_op_not_string.gltf",
+    "sha256": "7d3eb6a26e76debc08d34c9ccc17650ca875b619c12a9a1b83d48ab010a9cfbc",
+    "size": 2617
+  },
+  {
+    "file": "interactivity/invalid/declarations/E2a_unknown_op_without_extension.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E2a_unknown_op_without_extension.gltf",
+    "sha256": "cdda44febeed9c001d695528c9271e7bc00649778f401dedc421df60cb82be81",
+    "size": 2636
+  },
+  {
+    "file": "interactivity/invalid/declarations/E2b_op_wrong_case.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E2b_op_wrong_case.gltf",
+    "sha256": "b6198dbbb672883cc943efcd44e6d84d78f41779e7f12322d5ddb163505052a9",
+    "size": 2631
+  },
+  {
+    "file": "interactivity/invalid/declarations/E2c_unused_unknown_declaration.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E2c_unused_unknown_declaration.gltf",
+    "sha256": "0a2d4e0add676ddc69b6233ce2e8bdec7d3c9b891635fbe9535a70e24e6b3c69",
+    "size": 2708
+  },
+  {
+    "file": "interactivity/invalid/declarations/E3a_spec_op_with_input_value_sockets.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E3a_spec_op_with_input_value_sockets.gltf",
+    "sha256": "0e420960b44953f6185ce757ceb13232ca950301e7734bc244ac0cea69993a4b",
+    "size": 2830
+  },
+  {
+    "file": "interactivity/invalid/declarations/E3b_spec_op_with_output_value_sockets.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E3b_spec_op_with_output_value_sockets.gltf",
+    "sha256": "0aff754a914ad339b40e0db653ede8a5833a860706f74a71a6d1c6f95ab343fd",
+    "size": 2767
+  },
+  {
+    "file": "interactivity/invalid/declarations/E4a_ext_input_socket_type_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E4a_ext_input_socket_type_out_of_range.gltf",
+    "sha256": "0f6d2c3f2a34d739b16df1d1386974b029c181370499a3d1663d5914348da9c3",
+    "size": 2889
+  },
+  {
+    "file": "interactivity/invalid/declarations/E4b_ext_output_socket_type_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E4b_ext_output_socket_type_out_of_range.gltf",
+    "sha256": "34b283c2128438664d50a2473ee557b2475a3542fb682c227652a9311914331e",
+    "size": 2891
+  },
+  {
+    "file": "interactivity/invalid/declarations/E4c_ext_socket_type_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E4c_ext_socket_type_missing.gltf",
+    "sha256": "c3bed6a5aef48adcede37fe1ac6ce836f9a7600c0dec5b9e934ac9066e9cee90",
+    "size": 2831
+  },
+  {
+    "file": "interactivity/invalid/declarations/E4d_ext_input_sockets_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E4d_ext_input_sockets_empty.gltf",
+    "sha256": "4d4602d7e4c70c392f7529cd41ba885464899d067debe0b0a912caccf2c28b30",
+    "size": 2794
+  },
+  {
+    "file": "interactivity/invalid/declarations/E5a_duplicate_declaration.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E5a_duplicate_declaration.gltf",
+    "sha256": "ec1480f7268f9df922a2610e2304f7dbbf6d712f7ef34aa07c51e9562172b31e",
+    "size": 2657
+  },
+  {
+    "file": "interactivity/invalid/declarations/E5b_duplicate_extension_declaration.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E5b_duplicate_extension_declaration.gltf",
+    "sha256": "e47e33d17d69087c2b537259dbd65344da7392ea0a992ec01fd79b1ca4959a0a",
+    "size": 3235
+  },
+  {
+    "file": "interactivity/invalid/declarations/E5c_duplicate_extension_declaration_other_outputs.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E5c_duplicate_extension_declaration_other_outputs.gltf",
+    "sha256": "98d8739e2c4bb56dc265e8f53bf1bffba83ace6e342fa630474e2128c87a4cab",
+    "size": 3318
+  },
+  {
+    "file": "interactivity/invalid/declarations/E5d_duplicate_extension_declaration_reordered_inputs.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E5d_duplicate_extension_declaration_reordered_inputs.gltf",
+    "sha256": "27171b7090d8f68c5d6a31a944546e8fead094f7e74bf06faac98e79b5a1c3fe",
+    "size": 3641
+  },
+  {
+    "file": "interactivity/invalid/declarations/E6_extension_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E6_extension_not_string.gltf",
+    "sha256": "441d47dbfe887d5b3bbd723d6f75b020f0d93d5e9f05170a53d7838605397f97",
+    "size": 2783
+  },
+  {
+    "file": "interactivity/invalid/declarations/E7a_ext_output_sockets_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E7a_ext_output_sockets_missing.gltf",
+    "sha256": "7ebab27a2e480e5c0bdf164bc9cde00b440cfdafda26139441ee3d700dd36ebb",
+    "size": 3491
+  },
+  {
+    "file": "interactivity/invalid/declarations/E7b_ext_output_socket_not_declared.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E7b_ext_output_socket_not_declared.gltf",
+    "sha256": "27a9d313204a57bfe746084d3dc71101ace3df1acb02da39eea261804cf21b03",
+    "size": 3876
+  },
+  {
+    "file": "interactivity/invalid/declarations/E7c_ext_output_socket_wrong_case.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E7c_ext_output_socket_wrong_case.gltf",
+    "sha256": "1f23f18a069bb5678faa3c6ef57154a8510f09921848471eb29444ce1716eb6e",
+    "size": 3968
+  },
+  {
+    "file": "interactivity/invalid/declarations/E7d_ext_output_socket_implicit_value.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E7d_ext_output_socket_implicit_value.gltf",
+    "sha256": "e03026da85e5d027e7b963cda24bc18a0dbb523f56b8bec01ee2f99c9cbad711",
+    "size": 3902
+  },
+  {
+    "file": "interactivity/invalid/declarations/E7e_ext_output_socket_declared_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E7e_ext_output_socket_declared_wrong_type.gltf",
+    "sha256": "bfbce69e0ec95cc53134c5abe5029fb0186f468c6036443e94a4d6c3358ede23",
+    "size": 3972
+  },
+  {
+    "file": "interactivity/invalid/declarations/E8a_ext_input_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E8a_ext_input_socket_missing.gltf",
+    "sha256": "bff9dd8e667936ae54a7d66135fc2009cd12ad2e49969698ea06effff181f199",
+    "size": 2749
+  },
+  {
+    "file": "interactivity/invalid/declarations/E8b_ext_input_socket_type_differs.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/declarations/E8b_ext_input_socket_type_differs.gltf",
+    "sha256": "20548476e1d14f503e6d7bc9e617e4e9905e53e49f4335d0f441b402a0c71c07",
+    "size": 2949
+  },
+  {
+    "file": "interactivity/invalid/nodes/F1a_declaration_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F1a_declaration_out_of_range.gltf",
+    "sha256": "45ff93735a1f9cb18264f513bda98d159eb877ea68623f4894fa4442ec7d1c2a",
+    "size": 2699
+  },
+  {
+    "file": "interactivity/invalid/nodes/F1b_declaration_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F1b_declaration_missing.gltf",
+    "sha256": "088ef50da1f0f8108b770a1b17e5db4810c37b9a8e65502cdf80189e4ee66997",
+    "size": 2654
+  },
+  {
+    "file": "interactivity/invalid/nodes/F1c_declaration_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F1c_declaration_negative.gltf",
+    "sha256": "492e3d824bb2530182b18bc1c0746b9bd6876a1b0a5d14c5d33289bdaaefddce",
+    "size": 2689
+  },
+  {
+    "file": "interactivity/invalid/nodes/F1d_nodes_without_declarations.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F1d_nodes_without_declarations.gltf",
+    "sha256": "f44f1c56f7b3f944bfc6a4f06072806c7d905370e99cecdc8a388332c1190e83",
+    "size": 2456
+  },
+  {
+    "file": "interactivity/invalid/nodes/F2_value_with_node_and_value.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F2_value_with_node_and_value.gltf",
+    "sha256": "7c3c24e47e61ea665b5f615bdd36ab28195a2e2aafa1358e77878d19513cc78f",
+    "size": 2816
+  },
+  {
+    "file": "interactivity/invalid/nodes/F3a_value_ref_forward.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F3a_value_ref_forward.gltf",
+    "sha256": "e64d21a196deeed859d742aad83b60248a924d0a36de32f6df7567c20fa71ffb",
+    "size": 2657
+  },
+  {
+    "file": "interactivity/invalid/nodes/F3b_value_ref_self.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F3b_value_ref_self.gltf",
+    "sha256": "59445068a325ca4792177e78c60e75d77eaa4383dee3265572f11aaf27d2afdc",
+    "size": 2657
+  },
+  {
+    "file": "interactivity/invalid/nodes/F3c_value_ref_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F3c_value_ref_negative.gltf",
+    "sha256": "c50f8640386a0c03cf379fbec855dcedb30221c7777ee12a76e2b94acc5a8005",
+    "size": 2685
+  },
+  {
+    "file": "interactivity/invalid/nodes/F4a_value_ref_unknown_socket.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F4a_value_ref_unknown_socket.gltf",
+    "sha256": "28879abd277f7fa59eb28f6d31b380659f2d8943efdce243256ec6e0ed21f225",
+    "size": 2807
+  },
+  {
+    "file": "interactivity/invalid/nodes/F4b_value_ref_implicit_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F4b_value_ref_implicit_socket_missing.gltf",
+    "sha256": "a8cddb8b010fc46654cf2a253e8d9b3651e4d51dcdfbda5e0ddfc4202d1e8078",
+    "size": 2490
+  },
+  {
+    "file": "interactivity/invalid/nodes/F4c_value_ref_socket_wrong_case.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F4c_value_ref_socket_wrong_case.gltf",
+    "sha256": "a338e06366f4cc74f4a276cd0d54a6ae6338758798e9d8f51b4c5bc0afd1676c",
+    "size": 2515
+  },
+  {
+    "file": "interactivity/invalid/nodes/F5_value_ref_type_mismatch.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F5_value_ref_type_mismatch.gltf",
+    "sha256": "a6f58e6dea33147d6ab73a1657b417ccb43fb70a5c692dddad542f66333cf493",
+    "size": 2794
+  },
+  {
+    "file": "interactivity/invalid/nodes/F6a_inline_type_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F6a_inline_type_out_of_range.gltf",
+    "sha256": "332df25826d176846e1c62d5f9fc1d8efd080f9866771f6232f7af309e66d83e",
+    "size": 2687
+  },
+  {
+    "file": "interactivity/invalid/nodes/F6b_inline_type_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F6b_inline_type_missing.gltf",
+    "sha256": "ae3c62bfc49e34bb76a4dc44f9ffc1d05ad3d2dfdf27cf014a41ec00e44a0f57",
+    "size": 2659
+  },
+  {
+    "file": "interactivity/invalid/nodes/F6c_type_default_without_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F6c_type_default_without_type.gltf",
+    "sha256": "f643c109b003f14d3942957e16d2af5f8ece9cfe815a87a8987112493e6a62c9",
+    "size": 2627
+  },
+  {
+    "file": "interactivity/invalid/nodes/F6d_inline_type_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F6d_inline_type_negative.gltf",
+    "sha256": "8e2c20919badbba260ec9a32ecac969c39b036172ce6b7eb3f6199e25b09490f",
+    "size": 2691
+  },
+  {
+    "file": "interactivity/invalid/nodes/F7a_inline_value_wrong_length.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F7a_inline_value_wrong_length.gltf",
+    "sha256": "79e2ba8ba5fcdc9f846499e110f463e8b041283d0eebeba1341357f641c735cd",
+    "size": 2684
+  },
+  {
+    "file": "interactivity/invalid/nodes/F7b_inline_int_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F7b_inline_int_fractional.gltf",
+    "sha256": "0489598325ab1d661af3af7777df52ec97041b34828555d1bf28bd60b145df58",
+    "size": 2695
+  },
+  {
+    "file": "interactivity/invalid/nodes/F7c_inline_bool_number.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F7c_inline_bool_number.gltf",
+    "sha256": "7af2587206995107e30cdb0102dbacec0442e0694993c8c21b2ca6c23be1916e",
+    "size": 2797
+  },
+  {
+    "file": "interactivity/invalid/nodes/F8a_input_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F8a_input_socket_missing.gltf",
+    "sha256": "67459f3a5c597406332592245ef307b7baac8a4cb1fb0d7459de5506e149126a",
+    "size": 2507
+  },
+  {
+    "file": "interactivity/invalid/nodes/F8b_input_socket_wrong_case.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F8b_input_socket_wrong_case.gltf",
+    "sha256": "9d7a00410d1f56d6a184ce248c1abe2ae6f1c68e7db787b127a1f163468623af",
+    "size": 2685
+  },
+  {
+    "file": "interactivity/invalid/nodes/F8c_values_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F8c_values_missing.gltf",
+    "sha256": "b0d0d1e326f57530f149ca9a62f5d39ecf08a064e41e68e90298d2581b16cef4",
+    "size": 2321
+  },
+  {
+    "file": "interactivity/invalid/nodes/F9a_mismatching_input_types.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F9a_mismatching_input_types.gltf",
+    "sha256": "5035dec54dc68f1431b7fa9323fbd4478e1608cce3fbd80043e77ee1e05e64d5",
+    "size": 2665
+  },
+  {
+    "file": "interactivity/invalid/nodes/F9b_branch_condition_float.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F9b_branch_condition_float.gltf",
+    "sha256": "2913038d4d9574faa032a6f97537f22a852b56651c1e6dfc7cd87ad7dc2ea457",
+    "size": 2773
+  },
+  {
+    "file": "interactivity/invalid/nodes/F9c_unsupported_input_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F9c_unsupported_input_type.gltf",
+    "sha256": "6368ab20297ab0af07298ff542e01eba40727b051c42de47b4acb0d7e037f528",
+    "size": 2505
+  },
+  {
+    "file": "interactivity/invalid/nodes/F10a_flow_backward.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F10a_flow_backward.gltf",
+    "sha256": "5545c0bc49217b51dd870f801e318415f508c214a2cfe7be898df05dd5b49ef7",
+    "size": 2479
+  },
+  {
+    "file": "interactivity/invalid/nodes/F10b_flow_self.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F10b_flow_self.gltf",
+    "sha256": "8420daa9e4925130f8d6d384b0db6479aa4c49a83687ea28f5d2949dfb40dc1a",
+    "size": 2362
+  },
+  {
+    "file": "interactivity/invalid/nodes/F10c_flow_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F10c_flow_out_of_range.gltf",
+    "sha256": "05d56ac13cd613a2cd730a69b0b41e9443d6bd72473a4b611b6f402f2b2fca68",
+    "size": 2402
+  },
+  {
+    "file": "interactivity/invalid/nodes/F10d_flow_backward_into_signal_chain.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F10d_flow_backward_into_signal_chain.gltf",
+    "sha256": "55e4b75cf77bc946791a8c5d9c1b6cb14e1bfe131be9ce26eb2022009cab996f",
+    "size": 2410
+  },
+  {
+    "file": "interactivity/invalid/nodes/F11a_flow_without_node.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F11a_flow_without_node.gltf",
+    "sha256": "52aaa4a3c8874bab32fba6da71ccade96c6c96633cc98882ee77025c35952765",
+    "size": 2384
+  },
+  {
+    "file": "interactivity/invalid/nodes/F11b_flow_socket_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F11b_flow_socket_not_string.gltf",
+    "sha256": "3bd55eeb7a42d0834cfeda735d704ada8fd1a3dcfb9a492912542a053fe49b54",
+    "size": 2422
+  },
+  {
+    "file": "interactivity/invalid/nodes/F11c_flow_node_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F11c_flow_node_negative.gltf",
+    "sha256": "7ae2dde942d74d760b7cd38557825e6054ae685b7f5d58971f99810a0b7b0818",
+    "size": 2370
+  },
+  {
+    "file": "interactivity/invalid/nodes/F11d_flows_empty_object.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F11d_flows_empty_object.gltf",
+    "sha256": "99585370971658a23b93cda81430a05e61d4bb22e92d955f150e5a1346023ed2",
+    "size": 2396
+  },
+  {
+    "file": "interactivity/invalid/nodes/F11e_values_empty_object.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F11e_values_empty_object.gltf",
+    "sha256": "af4d02226b413e199acf257d2f7adb9157c471905b9758d0bc913d7762413496",
+    "size": 2768
+  },
+  {
+    "file": "interactivity/invalid/nodes/F11f_configuration_empty_object.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F11f_configuration_empty_object.gltf",
+    "sha256": "252137a14ddb4b784e3704676c7e7b5e990b4272334541176ad8e3a903d8ae52",
+    "size": 2789
+  },
+  {
+    "file": "interactivity/invalid/nodes/F12a_configuration_property_not_object.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F12a_configuration_property_not_object.gltf",
+    "sha256": "62fe4b4d60ca6b0faeeb92f07a62373145ef8c07a468693d09b566a731d46311",
+    "size": 2564
+  },
+  {
+    "file": "interactivity/invalid/nodes/F12b_configuration_value_empty.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F12b_configuration_value_empty.gltf",
+    "sha256": "653ae91cb1a65aa537b786b671cfbf94fd896c1929bf0f5b3ae37f2f86192af0",
+    "size": 2604
+  },
+  {
+    "file": "interactivity/invalid/nodes/F12c_configuration_value_not_array.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F12c_configuration_value_not_array.gltf",
+    "sha256": "566d1be0b3f7e118a4d53dc18c1a6e49ee65fb33ead74bde06b4a082df6f7cf7",
+    "size": 2631
+  },
+  {
+    "file": "interactivity/invalid/nodes/F13a_extra_value_socket_invalid_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F13a_extra_value_socket_invalid_type.gltf",
+    "sha256": "86beb6ed28c7935774eb45d7c674da11e357ecddec14f14d3c2c751aa3efede1",
+    "size": 2851
+  },
+  {
+    "file": "interactivity/invalid/nodes/F13b_extra_value_socket_forward_ref.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F13b_extra_value_socket_forward_ref.gltf",
+    "sha256": "28943061a86132589c3a90ac82cf2cc61d9598b3a2ee0f7c91a6322854be1123",
+    "size": 2831
+  },
+  {
+    "file": "interactivity/invalid/nodes/F13c_extra_flow_backward.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/nodes/F13c_extra_flow_backward.gltf",
+    "sha256": "bdfc537c8a174a240f17c62889459d7489442dfcf6b95bf7d84228403361d4ca",
+    "size": 2934
+  },
+  {
+    "file": "interactivity/invalid/operations/G1a_variable_get_config_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G1a_variable_get_config_missing.gltf",
+    "sha256": "defa830600bd9ef27e935cd1ba12c9f7423b51277c737502f1da79d8fb7220b7",
+    "size": 2445
+  },
+  {
+    "file": "interactivity/invalid/operations/G1b_variable_get_index_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G1b_variable_get_index_out_of_range.gltf",
+    "sha256": "377ff6c8f6ff752d2de985dc03b6cba3fbfff6f0b09494263879bb4e26a3e507",
+    "size": 2644
+  },
+  {
+    "file": "interactivity/invalid/operations/G1c_variable_get_index_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G1c_variable_get_index_negative.gltf",
+    "sha256": "8a1608715fbdaa06598d0554ac7109d084184bddde34fee156286cd38ec5dd67",
+    "size": 2617
+  },
+  {
+    "file": "interactivity/invalid/operations/G1d_variable_get_index_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G1d_variable_get_index_fractional.gltf",
+    "sha256": "77bab4e356ca978e3ce397df7e3f005d1d820d205ce8e710acc7c073e1bf9acc",
+    "size": 2620
+  },
+  {
+    "file": "interactivity/invalid/operations/G1e_variable_get_index_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G1e_variable_get_index_string.gltf",
+    "sha256": "b4ffb2f512e27292d12f0c2c859a8baa08316a898a5fce523eee100064370118",
+    "size": 2624
+  },
+  {
+    "file": "interactivity/invalid/operations/G1f_variable_get_without_variables.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G1f_variable_get_without_variables.gltf",
+    "sha256": "883b0ddf5e32b5b267c8431b1924a1e9b7ddaf2f684a0a9007406c1424c188f7",
+    "size": 2478
+  },
+  {
+    "file": "interactivity/invalid/operations/G2a_variable_set_config_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G2a_variable_set_config_missing.gltf",
+    "sha256": "11e96f490c618102cba12be2534d7c8d4e3a1a1abacaea3f0466af530696c70a",
+    "size": 2806
+  },
+  {
+    "file": "interactivity/invalid/operations/G2b_variable_set_index_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G2b_variable_set_index_out_of_range.gltf",
+    "sha256": "5a92233a3cc48cc6ebd59b07c603bb1e843e2879d8d7d5899ee696cec5edcf38",
+    "size": 3002
+  },
+  {
+    "file": "interactivity/invalid/operations/G2c_variable_set_index_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G2c_variable_set_index_negative.gltf",
+    "sha256": "071b68a174627acd61110eeccf6d23e5ec92f1b2f807c5d1e283592160353358",
+    "size": 2973
+  },
+  {
+    "file": "interactivity/invalid/operations/G2d_variable_set_one_index_invalid.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G2d_variable_set_one_index_invalid.gltf",
+    "sha256": "4338777bde29cb1d686d0daeda53ccf8dc5c5a23e38920ae9f3423c5a6439f08",
+    "size": 3173
+  },
+  {
+    "file": "interactivity/invalid/operations/G2e_variable_set_value_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G2e_variable_set_value_socket_missing.gltf",
+    "sha256": "144428cc651d99cd790608ebaff3887107abbecb1081fa40040b1b6a264c8954",
+    "size": 2800
+  },
+  {
+    "file": "interactivity/invalid/operations/G2f_variable_set_value_socket_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G2f_variable_set_value_socket_wrong_type.gltf",
+    "sha256": "278e339b0b92bae6e748413683c97c818dff8ee449483487bc5c9076b2cf9410",
+    "size": 3008
+  },
+  {
+    "file": "interactivity/invalid/operations/G3a_variable_interpolate_int_variable.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3a_variable_interpolate_int_variable.gltf",
+    "sha256": "d24007b95d39fe1d87bada01017b7b8aeacc02da00d3d94b70c309d640637d91",
+    "size": 3710
+  },
+  {
+    "file": "interactivity/invalid/operations/G3b_variable_interpolate_bool_variable.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3b_variable_interpolate_bool_variable.gltf",
+    "sha256": "8e0cae761476b47a820af70995e8aba0ab8250dc5bbd2ea1a6d4ec886f48e3cb",
+    "size": 3717
+  },
+  {
+    "file": "interactivity/invalid/operations/G3c_variable_interpolate_useSlerp_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3c_variable_interpolate_useSlerp_missing.gltf",
+    "sha256": "5bd268914d658a287c959fbca331dac1579d3b6b079e22d1256055f8fbb7a446",
+    "size": 3678
+  },
+  {
+    "file": "interactivity/invalid/operations/G3d_variable_interpolate_useSlerp_on_float3.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3d_variable_interpolate_useSlerp_on_float3.gltf",
+    "sha256": "0866382894a943d91aa2b7e4beff367408817d880fd466435fae56f9d2b5802e",
+    "size": 3847
+  },
+  {
+    "file": "interactivity/invalid/operations/G3e_variable_interpolate_useSlerp_not_bool.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3e_variable_interpolate_useSlerp_not_bool.gltf",
+    "sha256": "b0cb6ae868ed9ac83373e09b4b8110e2c54e62631e198728a92e05bd3348c9ff",
+    "size": 3800
+  },
+  {
+    "file": "interactivity/invalid/operations/G3f_variable_interpolate_index_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3f_variable_interpolate_index_out_of_range.gltf",
+    "sha256": "1081cb79a11f19eb6e3c02263c304c51cf8b61948c73eb1edc1032371d66d1b1",
+    "size": 3842
+  },
+  {
+    "file": "interactivity/invalid/operations/G3g_variable_interpolate_p1_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3g_variable_interpolate_p1_missing.gltf",
+    "sha256": "5e8365c81f5e6b489249814e7a98d116cab92ec5530148625088881211fb3db4",
+    "size": 3631
+  },
+  {
+    "file": "interactivity/invalid/operations/G3h_variable_interpolate_value_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G3h_variable_interpolate_value_wrong_type.gltf",
+    "sha256": "d68b4cf7d89c44319cc8f6da2ff51efc9f22003ea82636a8bc4db97bea5fc998",
+    "size": 3823
+  },
+  {
+    "file": "interactivity/invalid/operations/G4a_pointer_get_pointer_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4a_pointer_get_pointer_missing.gltf",
+    "sha256": "6e695bdf61e9c99a2793c69249fac61f00de07320254f96b6e7907ee3523e5eb",
+    "size": 2508
+  },
+  {
+    "file": "interactivity/invalid/operations/G4b_pointer_get_pointer_not_string.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4b_pointer_get_pointer_not_string.gltf",
+    "sha256": "66971d4e66e63d4815b916a6d2fc4e681525637b4b66c3dbdc283e8d6b62fc79",
+    "size": 2629
+  },
+  {
+    "file": "interactivity/invalid/operations/G4c_pointer_get_type_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4c_pointer_get_type_missing.gltf",
+    "sha256": "4855cf119123d15f07d795d17a65e0c2337e070acfd7d89e688785d32ef65752",
+    "size": 2526
+  },
+  {
+    "file": "interactivity/invalid/operations/G4d_pointer_get_type_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4d_pointer_get_type_out_of_range.gltf",
+    "sha256": "959b8ab1baff1bf99492351ca23d70d02db397ac47b41e79f7b87bb6bbfedc16",
+    "size": 2692
+  },
+  {
+    "file": "interactivity/invalid/operations/G4e_pointer_get_type_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4e_pointer_get_type_negative.gltf",
+    "sha256": "f451117893a5b83dff0f50e7735b86cc6f28b885fc67e33cdbec494ec21a475a",
+    "size": 2655
+  },
+  {
+    "file": "interactivity/invalid/operations/G4f_pointer_get_type_fractional.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4f_pointer_get_type_fractional.gltf",
+    "sha256": "62e77adacf76bed9a677c5e9f16a80597c3b44a9dfefdf55424dec4fef00ceb6",
+    "size": 2658
+  },
+  {
+    "file": "interactivity/invalid/operations/G4g_pointer_get_template_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4g_pointer_get_template_socket_missing.gltf",
+    "sha256": "31912b278ce1f6376d57b8daa72cbf4801d81f89de0dde0beab827eaccc04ee8",
+    "size": 2772
+  },
+  {
+    "file": "interactivity/invalid/operations/G4h_pointer_get_int_param_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4h_pointer_get_int_param_wrong_type.gltf",
+    "sha256": "4c08a115dc6dd29725169f72d1f9974c61a206a540f69ae7abce5f4d17249dd6",
+    "size": 2972
+  },
+  {
+    "file": "interactivity/invalid/operations/G4i_pointer_get_ref_param_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G4i_pointer_get_ref_param_wrong_type.gltf",
+    "sha256": "b83e117bc8027f1857fc822b170f832272ac94bdddf16461dd2c89efc32d86fe",
+    "size": 2948
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-01_pointer_template_invalid_escape.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-01_pointer_template_invalid_escape.gltf",
+    "sha256": "7cc36c65df176791d35eae4ee3047077fe5af642dd9f3a7396f41dbffa1f5ae6",
+    "size": 2762
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-02_pointer_template_duplicate_int_params.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-02_pointer_template_duplicate_int_params.gltf",
+    "sha256": "87dbb79c721bd3fd720582ace4a3ad39aa601445e1b54f73f3715f18448f756f",
+    "size": 2798
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-03_pointer_template_duplicate_mixed_params.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-03_pointer_template_duplicate_mixed_params.gltf",
+    "sha256": "aaad72219f56a2d3b487b6e12f8cc634dfbdf776a908c8dcf20852102ca0ae14",
+    "size": 2800
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-04_pointer_template_lone_square_bracket.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-04_pointer_template_lone_square_bracket.gltf",
+    "sha256": "5e008271a5b4119e7d00230e65d9eef2a155256243c43c4ed7fab2c16539ca80",
+    "size": 2750
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-05_pointer_template_lone_curly_bracket.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-05_pointer_template_lone_curly_bracket.gltf",
+    "sha256": "d81e16686ada3ad302214095b518c04fba709d7e941f07bb54751860a4409ac0",
+    "size": 2751
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-06_pointer_template_empty_square_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-06_pointer_template_empty_square_param.gltf",
+    "sha256": "8f73227a82abc8c6e90c63ed459f5bdcf19b1400c5d10d5641c823d39260df7e",
+    "size": 2753
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-07_pointer_template_empty_curly_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-07_pointer_template_empty_curly_param.gltf",
+    "sha256": "9ba377fb0dd16bd5c009857596a3f4cd2680bd1cb2e358e032a085901dedc722",
+    "size": 2755
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-08_pointer_template_unterminated_square_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-08_pointer_template_unterminated_square_param.gltf",
+    "sha256": "01d5dc5ea5e85785bfaec76f633aa6af129ffc9561b9d4b50dac89f0c3c9157b",
+    "size": 2765
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-09_pointer_template_unterminated_curly_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-09_pointer_template_unterminated_curly_param.gltf",
+    "sha256": "09e863efc34af9a61649d7159a7d704bd50b4e890c41ab4ee2a3e39d218667f6",
+    "size": 2766
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-10_pointer_template_square_in_square_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-10_pointer_template_square_in_square_param.gltf",
+    "sha256": "649a63b11151c7d21d6fc46054a19f699d624f368ded0e053217173f93296062",
+    "size": 2771
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-11_pointer_template_curly_in_square_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-11_pointer_template_curly_in_square_param.gltf",
+    "sha256": "aa438a945554fbb34535537619163ac588f98a79e2df61f31a62434a09139f30",
+    "size": 2772
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-12_pointer_template_square_in_curly_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-12_pointer_template_square_in_curly_param.gltf",
+    "sha256": "b6c1268b01d98a61598d1e93d23a410f3b2c8a501a266de6d1f2fb03ca18233c",
+    "size": 2773
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-13_pointer_template_curly_in_curly_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-13_pointer_template_curly_in_curly_param.gltf",
+    "sha256": "d6144e52cedd7b468145fe5c35b234140d1811048b70321bb7fb8feaa7d9db10",
+    "size": 2774
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-14_pointer_template_closing_square_in_square_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-14_pointer_template_closing_square_in_square_param.gltf",
+    "sha256": "504cd2c62f02e98f919e4314600d48076e312d1dfa0ada040c99d4824df2032d",
+    "size": 2771
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-15_pointer_template_closing_curly_in_square_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-15_pointer_template_closing_curly_in_square_param.gltf",
+    "sha256": "d52a9803d28e2ff7b37a6f53fc9a9e30d7721061e0ed118f266ca7fffbca75ee",
+    "size": 2772
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-16_pointer_template_closing_square_in_curly_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-16_pointer_template_closing_square_in_curly_param.gltf",
+    "sha256": "b2e13b07ba1ed7d18def3cd5bd27dd284e0035a9bce7e51dc5448a8f622dce79",
+    "size": 2773
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-17_pointer_template_closing_curly_in_curly_param.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-17_pointer_template_closing_curly_in_curly_param.gltf",
+    "sha256": "cfeee795beeee671cfe2f06dc49bc766d26b99de0ac54b33087d65d17349ac16",
+    "size": 2774
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-18_pointer_template_odd_literal_open_square.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-18_pointer_template_odd_literal_open_square.gltf",
+    "sha256": "03281eb0905acdd03f29177b92f663b5818fcd491a01428fbad5345df02f56f3",
+    "size": 2786
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-19_pointer_template_odd_literal_open_curly.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-19_pointer_template_odd_literal_open_curly.gltf",
+    "sha256": "1092311081c29de0e753787623554822189ab0872906a34e2c3c4228b3cc0694",
+    "size": 2791
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-20_pointer_template_odd_literal_close_square.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-20_pointer_template_odd_literal_close_square.gltf",
+    "sha256": "3317cde00f85a976d18247be58833eedbe37c80aadd5d3f0c7b6a895fa526945",
+    "size": 2780
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-21_pointer_template_odd_literal_close_curly.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-21_pointer_template_odd_literal_close_curly.gltf",
+    "sha256": "01e7318f1ee21b8eb93fbe43e95d0553933191a3f4d9c4f2e39909157ca1b880",
+    "size": 2783
+  },
+  {
+    "file": "interactivity/invalid/operations/G5-22_pointer_template_missing_leading_slash.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G5-22_pointer_template_missing_leading_slash.gltf",
+    "sha256": "dcf53ea0e4bc95efc4915f1de7069da09b3c99540f9c351841619e47c002fb45",
+    "size": 2747
+  },
+  {
+    "file": "interactivity/invalid/operations/G6a_pointer_set_template_int_param_value.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G6a_pointer_set_template_int_param_value.gltf",
+    "sha256": "eeb2a8a90387a16e7021590764ce15685aa5e11299c98d07e5c15f3ca086a108",
+    "size": 2909
+  },
+  {
+    "file": "interactivity/invalid/operations/G6b_pointer_set_template_ref_param_value.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G6b_pointer_set_template_ref_param_value.gltf",
+    "sha256": "a995a3c8bbd90e0909ac1d67c81b3f43613deae2aec341ce120e725156994f60",
+    "size": 2911
+  },
+  {
+    "file": "interactivity/invalid/operations/G6c_pointer_set_value_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G6c_pointer_set_value_missing.gltf",
+    "sha256": "d06c9a783650bdf3677657e786c1a1eed19fd6ed5318a583e13fe49b6422ffeb",
+    "size": 2659
+  },
+  {
+    "file": "interactivity/invalid/operations/G6d_pointer_set_value_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G6d_pointer_set_value_wrong_type.gltf",
+    "sha256": "f78579b8bfab43c8b386a9719c7c71161142e4c338c20cdcabb10370807ff0c5",
+    "size": 2902
+  },
+  {
+    "file": "interactivity/invalid/operations/G7a_pointer_interpolate_template_param_value.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7a_pointer_interpolate_template_param_value.gltf",
+    "sha256": "647220e7e59f28b5cc2176ae79909d46ed76bce8fd3c65ee224d9516debf6d3a",
+    "size": 3631
+  },
+  {
+    "file": "interactivity/invalid/operations/G7b_pointer_interpolate_template_param_duration.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7b_pointer_interpolate_template_param_duration.gltf",
+    "sha256": "9be577dc24471105543acc047568fb887a25aa72cda0cc85bb43c9c7eb93cfb0",
+    "size": 3640
+  },
+  {
+    "file": "interactivity/invalid/operations/G7c_pointer_interpolate_template_param_p1.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7c_pointer_interpolate_template_param_p1.gltf",
+    "sha256": "378fddb7063e98280438a856408db33535f6276dbdc6ee2034bd00bdfb64bd82",
+    "size": 3624
+  },
+  {
+    "file": "interactivity/invalid/operations/G7d_pointer_interpolate_template_param_p2.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7d_pointer_interpolate_template_param_p2.gltf",
+    "sha256": "5f13ec832bb21559a09034b7299ff22265e538a9c7ddc61a7e3b2545fba0be12",
+    "size": 3622
+  },
+  {
+    "file": "interactivity/invalid/operations/G7e_pointer_interpolate_type_int.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7e_pointer_interpolate_type_int.gltf",
+    "sha256": "1523fa257d759e15d39ff106964d843622ada16f03c6897bdc2b932abfbe14d0",
+    "size": 3557
+  },
+  {
+    "file": "interactivity/invalid/operations/G7f_pointer_interpolate_type_bool.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7f_pointer_interpolate_type_bool.gltf",
+    "sha256": "04d05542b0115c186028e18c8908f59612b4eec8479d968616af76efd25ba6ce",
+    "size": 3562
+  },
+  {
+    "file": "interactivity/invalid/operations/G7g_pointer_interpolate_duration_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G7g_pointer_interpolate_duration_missing.gltf",
+    "sha256": "ceb72560e345e007c420baf8c194b357492aa7facd128f502c50a5ce65d8f767",
+    "size": 3476
+  },
+  {
+    "file": "interactivity/invalid/operations/G8a_event_receive_config_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G8a_event_receive_config_missing.gltf",
+    "sha256": "5d10a0960bbcde3850a47db80d0bbac5c77cc6ee2fa6d502d0a2ef64436e5ab0",
+    "size": 2544
+  },
+  {
+    "file": "interactivity/invalid/operations/G8b_event_receive_index_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G8b_event_receive_index_out_of_range.gltf",
+    "sha256": "32eb0c97f1fac33894abca682bbdcb5021ec75b627b41fd53496acd0c55c3f52",
+    "size": 2746
+  },
+  {
+    "file": "interactivity/invalid/operations/G8c_event_receive_index_negative.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G8c_event_receive_index_negative.gltf",
+    "sha256": "4868ca013ea85006c7dd043f1597377b9b61da55f5cc3de00af9a8312c2c993b",
+    "size": 2707
+  },
+  {
+    "file": "interactivity/invalid/operations/G9a_event_send_config_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G9a_event_send_config_missing.gltf",
+    "sha256": "a0239a1babe14e3b523cbdfeedab746beea8445ea213df11aa22e5b7fbed94c2",
+    "size": 2715
+  },
+  {
+    "file": "interactivity/invalid/operations/G9b_event_send_index_out_of_range.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G9b_event_send_index_out_of_range.gltf",
+    "sha256": "03c8ffebff62cbda2e7763a6d0d30890669971a366323d6645d74e6743052416",
+    "size": 2917
+  },
+  {
+    "file": "interactivity/invalid/operations/G9c_event_send_value_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G9c_event_send_value_missing.gltf",
+    "sha256": "feb80c7f0a83f3bef60257f8e62e7bfb478705cd8069e2476dd6da73837a5dfc",
+    "size": 2723
+  },
+  {
+    "file": "interactivity/invalid/operations/G9d_event_send_value_wrong_type.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/G9d_event_send_value_wrong_type.gltf",
+    "sha256": "e2dc5f1170ef08c613dc57dd8babdef53e167c9ae445ae44017f1a43bf1d66d7",
+    "size": 2921
+  },
+  {
+    "file": "interactivity/invalid/operations/H1a_math_switch_selection_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H1a_math_switch_selection_missing.gltf",
+    "sha256": "3a5886d15ec689aca1c0000a16718f7ba5239a95b96d45e727fb66bceeed06d4",
+    "size": 3015
+  },
+  {
+    "file": "interactivity/invalid/operations/H1b_math_switch_selection_float.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H1b_math_switch_selection_float.gltf",
+    "sha256": "a6d4edc20a9192a3d353271c2176570e0bd49da0b97ded5e66f81cd6c2aa3d5b",
+    "size": 3173
+  },
+  {
+    "file": "interactivity/invalid/operations/H1c_math_switch_default_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H1c_math_switch_default_missing.gltf",
+    "sha256": "73d3eb00316f1f909f4090fa8a69c77babafb3ffaa14afc22a12b3d9347be7c2",
+    "size": 3011
+  },
+  {
+    "file": "interactivity/invalid/operations/H1d_math_switch_case_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H1d_math_switch_case_socket_missing.gltf",
+    "sha256": "524d12d710c8c7f9b718bd920ddc98fb978c620a6d713531394d22fb0ac558c3",
+    "size": 3069
+  },
+  {
+    "file": "interactivity/invalid/operations/H1e_math_switch_case_type_differs.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H1e_math_switch_case_type_differs.gltf",
+    "sha256": "c6a4524af5ce63c78ecf851142cd172edceed500925beea83e377888b58fb985",
+    "size": 3203
+  },
+  {
+    "file": "interactivity/invalid/operations/H2a_flow_switch_selection_float.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H2a_flow_switch_selection_float.gltf",
+    "sha256": "18182166a4d6df0ea0f7e1db432db372b091e20d6988eea72bc110f10a171295",
+    "size": 2735
+  },
+  {
+    "file": "interactivity/invalid/operations/H2b_flow_switch_selection_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H2b_flow_switch_selection_missing.gltf",
+    "sha256": "f5d0cae759228d1e3cc16c371b77f87a6ca8509cc73497adbe46952c03a82e68",
+    "size": 2535
+  },
+  {
+    "file": "interactivity/invalid/operations/H3_debug_log_param_socket_missing.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/invalid/operations/H3_debug_log_param_socket_missing.gltf",
+    "sha256": "5d58b12c58714349878c05c647364e79de787535ffdc55753ccfb07a8407ade6",
+    "size": 2555
+  },
+  {
     "file": "interactivity/math/Inf/glTF-Binary/Inf.glb",
     "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Test-Assets-Interactivity/f99d9b6/Tests/Interactivity/math/Inf/glTF-Binary/Inf.glb",
     "sha256": "af932a80b80c5e82d7bb8885d9753e2071054d70c2d3ff8a40854d144ee8113d",
