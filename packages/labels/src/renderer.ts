@@ -703,7 +703,8 @@ export class LabelRenderer implements EnginePlugin {
   dispose(): void {
     const engine = this.engine;
     this.engine = null;
-    if (engine && !engine.disposed && engine.hasPlugin?.(this.name)) engine.removePlugin(this.name);
+    // The scene this renderer was attached to, not whichever scene is active now.
+    if (engine && !engine.disposed) engine.sceneOf(this)?.removePlugin(this.name);
     for (const item of [...this.labels, ...this.objects]) this.remove(item);
     this.root?.remove();
     this.root = null;

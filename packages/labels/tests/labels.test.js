@@ -491,6 +491,7 @@ test('LabelRenderer direct disposal unregisters its pass and allows a replacemen
   const engine = fakeEngine(Camera),
     plugins = new Map();
   engine.hasPlugin = (name) => plugins.has(name);
+  engine.sceneOf = (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined);
   engine.removePlugin = (name) => {
     const plugin = plugins.get(name);
     plugins.delete(name);

@@ -145,6 +145,10 @@ export function fakeEngine(
       },
     },
     passes,
+    // As core: the scene a plugin is attached to. Nothing is registered with this fake engine.
+    sceneOf() {
+      return undefined;
+    },
     frame() {
       engine.camera.update(width / height, backend === 'webgpu');
       for (const pass of passes) pass.execute({});
