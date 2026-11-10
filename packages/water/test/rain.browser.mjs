@@ -17,6 +17,10 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text());
 });
+// The frame scenes put the sun in the mirror direction of the view's centre (camera at 0, 3, 6 looking at the origin),
+// so the water shows the sun's glint where the rings and splashes tilt the surface: their change is then measured on a
+// lit surface, not on a dim sky reflection, and holds the floors set before the first run (rings 0.5, splashes 0.2).
+const GLINT = [0, 0.45, -0.9, 3];
 const shot = (name) =>
   page.locator('canvas').screenshot(name ? { path: `test-results/water-rain-${name}-${mode}.png` } : {});
 
@@ -147,7 +151,7 @@ ${rainShader(0)}
   assert.ok(worst < 2e-4, `rain reference error ${worst}`);
   assert.deepEqual(gpu.values.slice(-8), [0, 0, 0, 0, 0, 0, 0, 0], 'wide footprints fade the rings out');
 
-  await page.evaluate(async () => {
+  await page.evaluate(async (glint) => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const canvas = document.createElement('canvas');
@@ -164,9 +168,10 @@ ${rainShader(0)}
       segments: 64,
       waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
     });
+    engine.lighting.direction.set(glint);
     engine.render({ delta: 0 });
     window.rainTest = { engine, water };
-  });
+  }, GLINT);
   const plain = await shot();
   const orders = await page.evaluate(async () => {
     const t = window.rainTest;
@@ -225,7 +230,7 @@ ${rainShader(0)}
   // Splashes alone (ring strength 0) move a Ripples field: two identical scenes, one in rain and one dry, differ
   // only through the splashes the wet one sends into the field.
   const splashScene = async (wet) => {
-    const calls = await page.evaluate(async (wet) => {
+    const calls = await page.evaluate(async ([wet, glint]) => {
       const { EngineKernel } = await import('/packages/core/dist/index.js');
       const { Water } = await import('/packages/water/dist/index.js');
       const { WaterRain } = await import('/packages/water/dist/rain.js');
@@ -244,6 +249,7 @@ ${rainShader(0)}
         segments: 64,
         waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
       });
+      engine.lighting.direction.set(glint);
       const field = Ripples.attach(engine, { surface: water, size: 16, resolution: 64, followCamera: false });
       const places = [];
       const disturb = field.disturb.bind(field);
@@ -260,7 +266,7 @@ ${rainShader(0)}
       for (let i = 0; i < 8; i++) engine.render({ delta: 1 / 30 });
       window.rainTest = { engine, rain, field };
       return places;
-    }, wet);
+    }, [wet, GLINT]);
     const image = await shot(wet ? 'splashes' : undefined);
     const validation = await page.evaluate(async () => {
       const t = window.rainTest;
@@ -300,8 +306,8 @@ ${rainShader(0)}
     ringChange = change(p, w),
     splashes = change(c, s);
   assert.ok(zero.most <= 1, `rain 0 matches the plain frame (largest change ${zero.most})`);
-  assert.ok(ringChange.mean > 0.1, `rain 1 rings change the water (mean ${ringChange.mean})`);
-  assert.ok(splashes.mean > 0.03, `splashes move the ripple field (mean ${splashes.mean})`);
+  assert.ok(ringChange.mean > 0.5, `rain 1 rings change the water (mean ${ringChange.mean})`);
+  assert.ok(splashes.mean > 0.2, `splashes move the ripple field (mean ${splashes.mean})`);
   assert.deepEqual(errors, []);
   const report = { hardware, referenceError: worst, rings, ringsMean: ringChange.mean, splashMean: splashes.mean };
   console.log(JSON.stringify(report));
