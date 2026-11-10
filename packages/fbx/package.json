@@ -97,8 +97,8 @@
     "build": "node ../../scripts/build-optional.js fbx",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node test/textures-browser.mjs",
-    "test:gpu:legacy": "node test/legacy-browser.mjs",
-    "test:gpu:surfaces": "node test/surfaces-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/fbx/test/textures-browser.mjs",
+    "test:gpu:legacy": "cd ../.. && node packages/fbx/test/legacy-browser.mjs",
+    "test:gpu:surfaces": "cd ../.. && node packages/fbx/test/surfaces-browser.mjs"
   }
 }

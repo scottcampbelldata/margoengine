@@ -78,7 +78,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:outside": "node test/outside/check.mjs",
     "prepack": "npm run build",
-    "test:browser": "node test/inspect-browser.mjs"
+    "test:browser": "cd ../.. && node packages/fsm/test/inspect-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": 2

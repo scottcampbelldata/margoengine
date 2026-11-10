@@ -61,7 +61,7 @@
     "build": "node ../../scripts/build-optional.js kinematics-constraints",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",
-    "test:limits:browser": "node tests/limits-browser.mjs",
+    "test:limits:browser": "cd ../.. && node packages/kinematics-constraints/tests/limits-browser.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {
