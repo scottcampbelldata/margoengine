@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14734538,
+  "total": 14735724,
   "history": [
     {
       "date": "2026-10-24",
@@ -8225,6 +8225,12 @@
       "commit": "d3cdb99ca",
       "reason": "batch 132 fsm audit (lane H): fsm/scxml 7750 to 7761 B gzip for refusing SCXML transitions whose exit and entry Margo cannot keep, and the m:stay round-trip mark",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "ece8f6c9d",
+      "reason": "list 5 R6: culling readbacks report what the WebGL2 layer draws; headless H.264 SPS states the encoder's reported range (row 11)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8652,7 +8658,7 @@
     "@margoengine/headless/null": 2977,
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,
-    "@margoengine/headless/video": 7872,
+    "@margoengine/headless/video": 9058,
     "@margoengine/html": 7487,
     "@margoengine/html/blend": 3698,
     "@margoengine/html/inline": 2744,

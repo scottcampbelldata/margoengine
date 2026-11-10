@@ -23,6 +23,42 @@ Batch 190 job 2: no open defect found in float32 weighted accumulation. The entr
 
 Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
 
+### Radeon 680M: pixel's `screen` blend lands one step below the exact result (list 5 R6 row 14, 2026-11-10, open)
+
+- **What:** `packages/pixel/tests/browser-check.js`, case `screen`, on the Beelink (Radeon 680M, RDNA2, driver
+  32.0.21030.2001, Chrome on D3D12): 80 pixels one step below the CPU image, the first at (44, 4), red 157 where the
+  CPU image has 158. The other blend cases pass.
+- **Repro:** source 151 composited over destination 16 with `screen`, the fixed-function blend `color: one,
+  one-minus-src` of `LayerCompositor` (`packages/pixel/src/index.ts`). Exact: 151 + 16 x (1 - 151/255) = 151 + 16 x
+  104/255 = 157.5255, which the CPU model rounds to 158. The 680M writes 157, as if it took the destination product
+  (6.5255) to a whole byte before the add.
+- **Cause:** below Margo, in the blend unit's precision. WebGPU leaves blend arithmetic precision undefined, so a GPU
+  may round the intermediate product; every whole-byte `screen` result is at least 1/510 of a step from x.5, so a GPU
+  that blends in float gets the CPU image exactly, and this one does not. The test's tolerance and the test stay as
+  they are (Scott's ruling, 2026-11-10).
+- **Why the blend stays in the blend unit:** an exact blend in the shader needs the destination as a texture, and the
+  compositor does not have it: `composite()` draws every layer, in order, into the frame's colour attachment in one
+  render pass, so the destination of a `screen` layer is that pass's own attachment (a canvas texture configured by
+  core for rendering only, and multisampled when the engine is). Reading it would need, per `screen` layer, the pass
+  ended, the covered region copied (or resolved) to a texture, and a new pass begun, or the whole composite moved to
+  an extra target: a new copy and an extra render pass per frame, which Scott's ruling (2026-11-10) does not allow.
+
+### The transitions GLSL oracle and the WGSL port disagree at a texel edge (list 5 R6 row 21, 2026-11-10, open)
+
+- **What:** `packages/transitions` `test:gpu` (`test/glsl-browser.js`) on the Beelink (Radeon 680M): fixture `matrix`
+  at p = 0.25, texel (12, 2) channel 0: the native WebGL2 oracle gives 145, the WGSL port 133.
+- **Repro:** the rotated lookup of `matrix` lands at x = 10.99938 texels of a nearest-filtered gradient, 6e-4 of a texel
+  below the edge between texels 10 and 11. 133 is texel 10 (167 and 32 mixed at 0.25), 145 is texel 11.
+- **Cause:** the two read the texture differently near an edge. The oracle samples through the hardware (GL `NEAREST`):
+  a sampler snaps the coordinate to its subtexel grid (1/256 of a texel in D3D11) and on this GPU the snap rounds up to
+  texel 11. The product's `sample()` (`src/custom-code.ts`, `src/builtin.ts`) floors exactly with `textureLoad`, and the
+  harness mirrors the product, so it reads texel 10. Neither is wrong for its own rule; a lookup within one snap step of
+  an edge picks a different texel.
+- **Not done:** a harness that samples through a nearest sampler would pass, but the product does not sample that way,
+  so the harness would no longer test the product (manager's ruling, 2026-11-10). Fixing it means choosing one rule for
+  the product: keep the exact floor (and give the oracle comparison a documented edge allowance) or sample through a
+  nearest sampler as GLSL transitions do.
+
 ### Radeon 680M: the 4x MSAA resolve rounds an exact .5 average by draw history (list 5 R6 row 8, 2026-11-10, worked around in the checks)
 
 - **What:** `packages/culling` `dynamic-check.mjs`, `parts-check.mjs` and `lod-check.mjs` on the Beelink (Radeon 680M,
