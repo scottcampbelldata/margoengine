@@ -1,0 +1,44 @@
+{
+  "accessed": "2026-11-10",
+  "sources": [
+    {
+      "file": "ne_110m_admin_0_countries.zip",
+      "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+      "license": "Public domain",
+      "terms": "https://www.naturalearthdata.com/about/terms-of-use/",
+      "bytes": 214976,
+      "sha256": "0f243aeac8ac6cf26f0417285b0bd33ac47f1b5bdb719fd3e0df37d03ea37110"
+    },
+    {
+      "file": "cb_2024_us_state_20m.zip",
+      "url": "https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_20m.zip",
+      "license": "US government public domain",
+      "terms": "https://www.census.gov/about/policies/copyright.html",
+      "bytes": 187671,
+      "sha256": "7bc773d83c01b6df69b8aada9c2b5983d97f22f4551947cc5c00b87c663223ef"
+    }
+  ],
+  "processing": "From repository root, expand the two archives into test-results/batch180-ne and test-results/batch180-census, then node examples/assets/sciviz/geo-vector/prepare.mjs. No coordinate simplification. Country key ADM0_A3, name ADMIN, value POP_EST; state key GEOID, name NAME, value ALAND in square metres. Demo applies log10(value+1).",
+  "derived": [
+    {
+      "file": "countries.geojson",
+      "bytes": 428320,
+      "sha256": "9b382f237162d9ea38dd8215aaba71c36410d80a667b2fdc613bc468bfc75d39"
+    },
+    {
+      "file": "countries-values.json",
+      "bytes": 5443,
+      "sha256": "2c33beed05cdce51df708ff6d101aba8d1299598c249994e30f831a976076988"
+    },
+    {
+      "file": "states.geojson",
+      "bytes": 360726,
+      "sha256": "b016ee62de709722708573942e9c57cc9c9ac365ce171743c552405c8d42a847"
+    },
+    {
+      "file": "states-values.json",
+      "bytes": 1798,
+      "sha256": "f386fb4b4165be9448f9116669b544ac3837bbb86c722f9114adf5014f4d8ed7"
+    }
+  ]
+}

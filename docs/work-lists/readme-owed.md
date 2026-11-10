@@ -1136,3 +1136,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 181 job 2): document /monitor, installFigureStats/fig.stats, live allocation semantics, custom/table adapters, cancellation, versioned JSON sweeps and deferred timings; README examples deferred.
 - @margoengine/points (batch 181 job 2): explain the internal per-cloud inventory used by sciviz/monitor, lazy GPU allocation and release; README examples deferred.
 - @margoengine/lines (batch 181 job 2): explain the internal per-line inventory used by sciviz/monitor, retained capacity and release; README examples deferred.
+- @margoengine/sciviz and margoengine/sciviz/geo-vector: Batch 180 job 2: lazy GeoJSON/TopoJSON/MVT parsing, joins, labels, arcs, projected bins and flat/globe layers, budgets/cancellation and restore. Demo examples/sciviz-geo-vector.html. No README examples written in the build phase.

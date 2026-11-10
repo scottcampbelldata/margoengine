@@ -57,7 +57,7 @@ export function project(
   if (projection === 'plate') return [lon / 180, lat / 180, height / WGS84.a];
   if (projection !== 'mercator') throw rangeError(`Unknown projection ${String(projection)}`, 'sciviz');
   const clamped = Math.max(-MERCATOR_MAX_LAT, Math.min(MERCATOR_MAX_LAT, lat)) * RAD;
-  return [lon / 180, Math.log(Math.tan(Math.PI / 4 + clamped / 2)) / Math.PI, height / WGS84.a];
+  return [lon / 180, Math.asinh(Math.tan(clamped)) / Math.PI, height / WGS84.a];
 }
 
 /** The inverse of {@link project} for the planes: data `[x, y]` to `[lon, lat]` in degrees. */

@@ -3488,8 +3488,8 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 158085,
-        "gzip": 56339
+        "raw": 160072,
+        "gzip": 56817
       },
       "./bricks": {
         "raw": 66283,
@@ -3504,12 +3504,12 @@
         "gzip": 13846
       },
       "./geo": {
-        "raw": 9597,
-        "gzip": 4206
+        "raw": 9587,
+        "gzip": 4197
       },
       "./graph": {
-        "raw": 51946,
-        "gzip": 22505
+        "raw": 52105,
+        "gzip": 22568
       },
       "./grids": {
         "raw": 56536,
@@ -3556,8 +3556,8 @@
         "gzip": 3993
       },
       "./atmosphere": {
-        "raw": 79656,
-        "gzip": 32468
+        "raw": 79646,
+        "gzip": 32459
       },
       "./pipeline": {
         "raw": 4558,
@@ -3628,8 +3628,8 @@
         "gzip": 8220
       },
       "./geo-lod": {
-        "raw": 18073,
-        "gzip": 7261
+        "raw": 18063,
+        "gzip": 7253
       },
       "./charts-extra": {
         "raw": 16984,
@@ -3650,6 +3650,54 @@
       "./pointcloud": {
         "raw": 47150,
         "gzip": 21055
+      },
+      "./hdf5": {
+        "raw": 22870,
+        "gzip": 8990
+      },
+      "./cgns": {
+        "raw": 48612,
+        "gzip": 18306
+      },
+      "./xdmf": {
+        "raw": 51348,
+        "gzip": 19254
+      },
+      "./exodus": {
+        "raw": 53497,
+        "gzip": 20029
+      },
+      "./openfoam": {
+        "raw": 28689,
+        "gzip": 10566
+      },
+      "./ensight": {
+        "raw": 31246,
+        "gzip": 11539
+      },
+      "./geo-vector": {
+        "raw": 61206,
+        "gzip": 25913
+      },
+      "./format": {
+        "raw": 18847,
+        "gzip": 7306
+      },
+      "./categorical": {
+        "raw": 47909,
+        "gzip": 21766
+      },
+      "./tetvolume": {
+        "raw": 16047,
+        "gzip": 6322
+      },
+      "./parcoords": {
+        "raw": 23818,
+        "gzip": 8860
+      },
+      "./monitor": {
+        "raw": 5795,
+        "gzip": 2534
       }
     },
     "@margoengine/selection": {

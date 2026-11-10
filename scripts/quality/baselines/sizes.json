@@ -7630,6 +7630,12 @@
       "commit": "batch-181-job2",
       "grew": 1,
       "reason": "Batch 181 job 2 after rebase: sciviz root 56553 -> 56668 B gzip, ceiling 56635 -> 58369. The 115 B supplies owner inventory access and waits for submitted work before PNG usage promotion expires a compatibility canvas target. Splitting these owner hooks and the existing export lifecycle would expose private bookkeeping and leave unsafe capture ordering. Monitor final 2534 B stays inside 2714; core plus stage remains 24209 B unchanged."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c3f95201b",
+      "reason": "Batch 180 job 2: new optional vector geography entry 0 to 25913 B gzip, ceiling 26691 B; coherent retained renderer and bounded geography preparation, topology, joins and bins; core plus stage unchanged 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9018,7 +9024,8 @@
     "@margoengine/sciviz/categorical": 22371,
     "@margoengine/sciviz/tetvolume": 6578,
     "@margoengine/sciviz/parcoords": 9126,
-    "@margoengine/sciviz/monitor": 2714
+    "@margoengine/sciviz/monitor": 2714,
+    "@margoengine/sciviz/geo-vector": 26691
   },
-  "total": 14499569
+  "total": 14526260
 }

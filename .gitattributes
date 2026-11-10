@@ -85,3 +85,5 @@ examples/assets/sciviz/clip/ct-org-0-samples.bin -text
 examples/assets/sciviz/datasets/** -text
 
 examples/assets/sciviz/pointcloud/*.laz -text
+examples/assets/sciviz/geo-vector/*.geojson text eol=lf
+examples/assets/sciviz/geo-vector/*.json text eol=lf

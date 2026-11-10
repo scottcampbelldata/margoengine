@@ -3752,3 +3752,4 @@ and bytes, browser, GPU and CPU utilization. Original asset hashes/provenance st
 the assets; NYC TLC source.json includes its exact query and terms. Default scene ceilings
 are censored correctness observations. Timed mode is refused until speed-phase.json ends
 deferral; the exact outstanding scale and format matrix is in work-lists/speed-phase.md.
+Batch 180 job 2 vector geography: build packages, then node --test --test-timeout=120000 packages/sciviz/tests/geo-vector.test.js. Render correctness: node scripts/gpu-lock.mjs run --owner=<lane> --wait-max=60 --max=1 -- node packages/sciviz/scripts/browser-root.mjs tests/geo-vector-browser.mjs. Both backends write test-results/sciviz-geo-vector.json and use examples/sciviz-geo-vector.html. Asset reconstruction commands, original/derived hashes and fields are in examples/assets/sciviz/geo-vector/source.json and prepare.mjs. No benchmark or timing claim.

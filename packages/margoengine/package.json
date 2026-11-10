@@ -3539,6 +3539,14 @@
       "types": "./dist/sciviz/parcoords.d.ts",
       "import": "./dist/sciviz/parcoords.js"
     },
+    "./sciviz/monitor": {
+      "types": "./dist/sciviz/monitor.d.ts",
+      "import": "./dist/sciviz/monitor.js"
+    },
+    "./sciviz/geo-vector": {
+      "types": "./dist/sciviz/geo-vector.d.ts",
+      "import": "./dist/sciviz/geo-vector.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

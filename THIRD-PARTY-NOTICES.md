@@ -395,3 +395,8 @@ Batch 181 monitor fixtures: examples/assets/sciviz/limits/taxi.csv contains 1024
 Terms of Use (https://data.cityofnewyork.us/stories/s/Terms-of-Use/k9k7-3cje), not asserted
 CC0. Exact source query, SHA-256 and selection are in limits/source.json. Standard-data
 exception only; no external software implementation or other repository file is included.
+### Batch 180 vector-geography data
+
+Natural Earth 110m admin 0 countries: https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip, public domain, https://www.naturalearthdata.com/about/terms-of-use/.
+US Census Bureau 2024 1:20m cartographic state boundaries derived from MAF/TIGER: https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_20m.zip, US government public domain, https://www.census.gov/about/policies/copyright.html.
+Original archives, derived geometry and POP_EST/ALAND tables: examples/assets/sciviz/geo-vector/. Exact hashes and processing in source.json and prepare.mjs. No third-party implementation code.
