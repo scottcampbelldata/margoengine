@@ -61,6 +61,22 @@ test('ambient occlusion darkens corners next to filled cells and stays 1 in the 
   assert.ok(Math.min(...step.ao) < 1);
 });
 
+test('ambient occlusion splits each quad along its darker diagonal (Lysenko 2013)', () => {
+  const source = grid([3, 3, 2], [1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1]),
+    { ao, indices } = meshGrid(source, { ambientOcclusion: true }).mesh;
+  let unequal = 0;
+  for (let q = 0; q < indices.length / 6; q++) {
+    const t = indices.subarray(q * 6, q * 6 + 6),
+      diagonal = [t[0], t[2]],
+      other = [0, 1, 2, 3].map((k) => q * 4 + k).filter((v) => !diagonal.includes(v)),
+      sum = (vs) => vs.reduce((total, v) => total + Math.round((ao[v] - 0.4) * 5), 0);
+    assert.deepEqual([t[3], t[4]], diagonal, `quad ${q} triangles share the diagonal`);
+    if (sum(diagonal) !== sum(other)) unequal++;
+    assert.ok(sum(diagonal) <= sum(other), `quad ${q} split along its brighter diagonal`);
+  }
+  assert.ok(unequal > 4, `only ${unequal} quads with unequal diagonals; the grid no longer tests the rule`);
+});
+
 test('smoothing averages across greedy T junctions and keeps creases', () => {
   const source = grid([3, 2, 2], new Array(12).fill(1));
   source.voxels[1] = 0;

@@ -476,7 +476,13 @@ function greedy(
               // Corner AO level 0-3 (rule: Lysenko 2013, 0fps.net); the 0.4-1.0 light mapping is Margo design.
               if (shade) out.ao.push(0.4 + ((corners >>> ((a ? (b ? 2 : 1) : b ? 3 : 0) * 2)) & 3) * 0.2);
             }
-            out.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+            // Lysenko 2013: with unequal corner light the split diagonal changes the interpolated shading, so split
+            // along the darker diagonal (a00 + a11 > a01 + a10 flips the quad); equal sums keep the 0-2 split.
+            // Compared as the integer levels 0-3, so float rounding of the 0.4-1.0 light never breaks a tie.
+            const level = (k: number) => Math.round((out.ao[out.ao.length - 4 + k] - 0.4) * 5);
+            if (shade && level(0) + level(2) > level(1) + level(3))
+              out.indices.push(base + 1, base + 2, base + 3, base + 1, base + 3, base);
+            else out.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
             out.palette.push(Math.abs(face));
             stats.triangles += 2;
             stats.vertices += 4;
