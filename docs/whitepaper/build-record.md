@@ -4799,3 +4799,20 @@ Four jobs in `@margoengine/inspector`, each adding to the inspector without chan
 | 4 | Plugin and pass graph view | DONE | 5be47e01d | `FrameReport.plugins` lists every plugin in attach order with its passes and `onPreUpdate` time (LIM-570). |
 
 Left for later: job 3's run against a real phone or headset browser, relay stream reconnects and remote hierarchy editing (docs/work-lists/finish-later.md, 107.3). README examples are owed (docs/work-lists/readme-owed.md).
+
+## List 3 batch 66: water (2026-11-10)
+
+Eight requested jobs for @margoengine/water. Jobs 1, 2, 3, 4, 6 and 7 were built on the Beelink; jobs 5 and 8 on the M6 Mac mini (list 2, lane K). Every entry is optional; core and stage source are unchanged.
+
+| Job | Status | Commit | Entry and evidence |
+| --- | --- | --- | --- |
+| 1. Planar reflections | DONE | e444915b5 | water/reflector; planar captures of nearby objects |
+| 2. Flow maps for rivers | DONE | 57d8d3296 | water/flow; flow-map river shading |
+| 3. FFT ocean spectrum | DONE | 1aa76ee38, 3cce41de8 | water/fft |
+| 4. Height and buoyancy queries | DONE | 77377f8d9, 3cce41de8 | water/query |
+| 5. Underwater rendering | DONE | ee255b572 | water/underwater; extinction within 0.0007 relative on Metal WebGPU and compat |
+| 6. Caustics | DONE | 3369f2e4f | water/caustics |
+| 7. Wakes and object interaction | DONE | fbf4775c3 | water/ripples (not /wakes) |
+| 8. Flowing rivers on steep beds | DONE | this commit | water/rivers; GPU against float64 model within 9.2e-6 m, 0.168 ms against 0.155 ms per frame on 256 x 256 (M6 Mac mini, loaded) |
+
+Job 5 landed with push-anyway (Scott, 2026-11-10) after its gates had passed except the then known-red webgl2-compat isolation step. Job 8 landed by the fast landing flow: water package tests (55 pass) and the rivers, coast, still, flow and bodies GPU checks on Metal WebGPU, rivers also with --compat. README examples are owed (readme-owed.md); leftovers are in finish-later.md (66.5, 66.8). No test, tolerance or budget was loosened. This commit sets row 66 done.

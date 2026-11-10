@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14532038,
+  "total": 14535376,
   "history": [
     {
       "date": "2026-10-24",
@@ -7745,6 +7745,12 @@
       "commit": "9f5e8b30d",
       "reason": "clustered/shadows and terrain/stream: drawLocalShadow hook and terrain local shadow caster, batch 52 job 2",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d188e1b01",
+      "reason": "list 3 batch 66 job 8: new optional entry water/rivers",
+      "grew": 1
     }
   ],
   "items": {
@@ -8988,6 +8994,7 @@
     "@margoengine/water/query": 4719,
     "@margoengine/water/reflector": 2660,
     "@margoengine/water/ripples": 3940,
+    "@margoengine/water/rivers": 3338,
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/underwater": 7161,
     "@margoengine/weather": 5230,

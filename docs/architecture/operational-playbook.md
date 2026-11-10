@@ -6741,3 +6741,5 @@ water/underwater is an HDR PostStack stage plus an order-1 surface pass that reu
 
 
 Review 3 T1 evidence: optional GLSL transition lowering now preserves the source language scalar result for aggregate equality. The WGSL type checker rejected all three original vector/matrix/nested-structure fixtures before the fix; they now join the existing native GLSL pixel oracle grid. Core, stage and rendering backend code are unchanged. Evidence: 28 focused and 56 affected CPU tests pass; both GPU routes compare 26 GLSL fixtures and 19,968 pixels to native GLSL with the original one-byte bar, plus the unchanged preset/live/mask/viewport/restoration grids.
+
+List 3 batch 66 job 8: water/rivers swaps Water's coastal flow and integrate kernels through an internal WeakMap bridge (query-state.ts riverKernels); CoastalFlow rebuilds when the attached kernels change, so attach and dispose each restart the flow from the terrain. Sources are a 272 B uniform at binding 5, rewritten each frame. The integrate kernel is one template (integrateShader) shared by both solvers.

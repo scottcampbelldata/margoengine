@@ -18,7 +18,7 @@ import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shar
 export type { FogLike } from '../../shared/fog.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
-import { queryStates, surfacePasses } from './query-state.js';
+import { queryStates, riverKernels, surfacePasses } from './query-state.js';
 import { surfaceEffects } from './surface-effects.js';
 import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
@@ -1038,11 +1038,19 @@ export class Water implements EnginePlugin {
           'state',
           'Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side; return one from options.terrain.heightmap',
         );
-      if (this.coastal?.terrain !== terrain) {
+      const river = riverKernels.get(this);
+      if (this.coastal?.terrain !== terrain || this.coastal?.river !== river) {
         this.spray?.dispose();
         this.spray = undefined;
         this.coastal?.dispose();
-        this.coastal = new CoastalFlow(c.device, this.uniform!, terrain, this.fillCells(terrain), this.options.still);
+        this.coastal = new CoastalFlow(
+          c.device,
+          this.uniform!,
+          terrain,
+          this.fillCells(terrain),
+          this.options.still,
+          river,
+        );
         if (this.options.spray) this.spray = new Spray(c.device, this.uniform!, this.coastal);
         this.values[101] = this.values[98] / terrain.width;
         this.values[102] = this.values[99] / terrain.height;

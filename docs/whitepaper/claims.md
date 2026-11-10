@@ -4385,3 +4385,7 @@ water/scatter makes backlit wave crests glow with a tint, in shadow-map visibili
 
 ### Batch 64 job 6: procedural grass blades
 scatter/grass draws meadows with no mesh input: the vertex stage builds each blade of an instance's clump from a hashed Bezier spine. Proof: packages/scatter/test/grass.test.js (ring encoding, conservative cull box, shape validation, the pose wrapper) and packages/scatter/test/grass.browser.mjs on real WebGPU (diffuse and PBR shaders compile and draw; 16 blades a clump cover over 3 times the pixels of 1 on identical instance rings; doubled height covers more). Picture stand-in: procedural meadow, no reference image from another tool. No speed claim.
+
+### List 3 batch 66 job 8: steep-bed rivers (2026-11-10)
+
+Optional water/rivers runs Water's terrain-coupled shallow water over waterfalls and steep chutes with hydrostatically reconstructed pipes, a Froude and Courant velocity cap and up to 16 inflows. Proof: packages/water/test/rivers.browser.mjs on the M6 Mac mini (Metal WebGPU and the compatibility layer) matches an independent float64 model on a 10 m fall and chute within 9.2e-6 m after 1920 substeps (bound 1e-3), water reaches the chute (0.173 m on both), and dispose hands the coast back dry. A lake at rest on a stepped bed stays exactly at rest (packages/water/test/rivers.test.js). Measured cost on a 256 x 256 map, 8 substeps, M6 Mac mini Metal WebGPU while other lanes ran: 0.168 ms per frame against 0.155 ms for Water's own 3-substep coast (diagnostic, not a release timing).

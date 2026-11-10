@@ -23,3 +23,12 @@ export interface QueryState {
   field?: GPUBuffer;
 }
 export const queryStates = new WeakMap<object, () => QueryState | undefined>();
+/** Optional water/rivers kernels replacing Water's coastal flow and integrate steps (internal bridge). */
+export interface RiverKernels {
+  readonly flow: string;
+  readonly integrate: string;
+  readonly substeps: number;
+  /** [count, 0, 0, 0] then [x, z, discharge, radius] per source; uploaded every frame. */
+  readonly sources: Float32Array;
+}
+export const riverKernels = new WeakMap<object, RiverKernels>();

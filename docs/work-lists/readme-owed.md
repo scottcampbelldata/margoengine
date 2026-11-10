@@ -1203,3 +1203,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/clustered | shadows: copy-paste example of `LocalShadows.add(terrain)` and the `drawLocalShadow({context, pass, matrix, layer})` hook (reversed depth, per-layer uniforms, every-frame redraw without `shadowVersion`) | batch-52 job 2 |
 | @margoengine/terrain | Shadows: `drawLocalShadow` casting into clustered `LocalShadows` point, spot, directional and area maps | batch-52 job 2 |
+
+- @margoengine/water and margoengine (list 3 batch 66 job 8): document /rivers attach on a Water with a terrain coast, sources/substeps/maxFroude, setSources without restart, dispose returns the coast to Water's solver; examples deferred.

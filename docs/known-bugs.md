@@ -4963,3 +4963,8 @@ Batch 177 job 5: no open correctness defect in the checked live-data paths. Sour
 
 packages/water/test/query.browser.mjs wrote docs/whitepaper/results/batch234-water-query-<mode>.json on every GPU run, so a landing's refresh found a tracked file changed and stopped. It now writes test-results/water-query-<mode>.json; the committed record stays as recorded. Regression: packages/water/test/results-path.test.js fails on any water browser check that writes under docs/.
 Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative delta, but with lerp=0 and delta=Number.MAX_VALUE, delta*60 overflows and 1**Infinity is NaN, publishing [NaN,NaN] instead of keeping the camera fixed. Repro: PixelCamera({width:16,height:16}), PixelFollow({camera,target:{x:30,y:40},lerp:0}), update(Number.MAX_VALUE). Cause: overflow in the smoothing exponent. Private failing regression: lane Q private/review-3-pixel-follow.test.js. Fix the smoothing calculation without narrowing accepted deltas; cover zero/unit lerp and extreme finite inputs. Awaiting the next review context.
+
+
+### Open: Water's own coast flow is unbounded on steep falls (list 3 batch 66 job 8)
+
+Water's built-in surface-driven pipe drives each pipe with the full surface difference, so water over a 10 m fall reaches 240 m/s (one cell per step, 1/dt at 240 steps per second) and can overshoot the Courant bound. It stays as it is for coasts and gentle beds; for rivers over falls and steep chutes attach @margoengine/water/rivers, which caps the same fall at 6.75 m/s. Regression: packages/water/test/rivers.test.js "the surface-driven coast pipe exceeds the Courant bound over the same fall" records both.

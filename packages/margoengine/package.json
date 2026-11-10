@@ -4927,6 +4927,10 @@
       "types": "./dist/water/underwater.d.ts",
       "import": "./dist/water/underwater.js"
     },
+    "./water/rivers": {
+      "types": "./dist/water/rivers.d.ts",
+      "import": "./dist/water/rivers.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

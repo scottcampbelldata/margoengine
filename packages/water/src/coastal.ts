@@ -1,7 +1,8 @@
 import { group, compute } from '../../shared/gpu.js';
+import type { RiverKernels } from './query-state.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number; COPY_DST: number };
-declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
+declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number; UNIFORM: number; COPY_DST: number };
 export const waterFrame = `
 struct Wave {wave:vec4f,shape:vec4f}
 struct Light {direction:vec4f,radiance:vec4f}
@@ -101,9 +102,11 @@ fn surface(p:vec2i)->vec2f {let v=textureLoad(state,p,0);return vec2f(v.x+v.y,v.
  let outgoing=(q.x+q.y)/frame.flow.y+(q.z+q.w)/frame.flow.z;
  q*=min(1.0,v.x/max(0.000001,dt*outgoing));textureStore(next,p,q);
 }`;
-const integrate =
+// \`dt\` and \`inflow\` (a binding-5 source term, water/rivers) let an optional solver reuse this step unchanged.
+export const integrateShader = (dt = 'frame.flow.x', inflow = '') =>
   waterFrame +
   ocean +
+  inflow +
   `
 @group(0) @binding(1) var state:texture_2d<f32>;
 @group(0) @binding(2) var flux:texture_2d<f32>;
@@ -111,13 +114,13 @@ const integrate =
 @group(0) @binding(4) var<storage,read> connected:array<u32>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
  let size=vec2i(textureDimensions(state));let p=vec2i(id.xy);if(any(p>=size)){return;}
- let v=textureLoad(state,p,0);let q=textureLoad(flux,p,0);let dt=frame.flow.x;
+ let v=textureLoad(state,p,0);let q=textureLoad(flux,p,0);let dt=${dt};
  var incoming=vec4f(0);
  if(p.x>0){incoming.x=textureLoad(flux,p-vec2i(1,0),0).y;}
  if(p.x<size.x-1){incoming.y=textureLoad(flux,p+vec2i(1,0),0).x;}
  if(p.y>0){incoming.z=textureLoad(flux,p-vec2i(0,1),0).w;}
  if(p.y<size.y-1){incoming.w=textureLoad(flux,p+vec2i(0,1),0).z;}
- var h=max(0.0,v.x+dt*((incoming.x+incoming.y-q.x-q.y)/frame.flow.y+(incoming.z+incoming.w-q.z-q.w)/frame.flow.z));
+ var h=max(0.0,v.x+dt*((incoming.x+incoming.y-q.x-q.y)/frame.flow.y+(incoming.z+incoming.w-q.z-q.w)/frame.flow.z)${inflow ? '+dt*inflow(p,size)' : ''});
  // Drive open sea near every beach; isolated basins retain conservative flow.
  if(connected[id.y*u32(size.x)+id.x+1u]==0u){let weight=smoothstep(0.65,2.4,max(0.0,frame.settings.y-v.y));h=mix(h,max(0.0,oceanHeight(p,size)-v.y),(1.0-exp(-dt*4.0))*weight);}
  if(p.x==0||p.y==0||p.x==size.x-1||p.y==size.y-1){h=max(0.0,oceanHeight(p,size)-v.y);}
@@ -133,6 +136,7 @@ const integrate =
  let foam=max(clamp(carried/max(0.003,h),0.0,1.0)*exp(-dt*0.8),breaker);
  textureStore(next,p,vec4f(h,v.y,foam,breaker));
 }`;
+const integrate = integrateShader();
 
 /** The fill texel value of a cell with no fill: below any water surface. */
 export const NO_FILL = -1e30;
@@ -159,6 +163,8 @@ export class CoastalFlow {
   private readonly filling?: GPUComputePipeline;
   private readonly fillGroup?: GPUBindGroup;
   current = 0;
+  private device?: GPUDevice;
+  private sources?: GPUBuffer;
   constructor(
     device: GPUDevice,
     uniform: GPUBuffer,
@@ -167,6 +173,8 @@ export class CoastalFlow {
     fill?: Float32Array,
     // No flow: the first step's state stands.
     private readonly still = false,
+    // water/rivers: steep-bed flow, sources and substeps in place of the coastal ones.
+    readonly river?: RiverKernels,
   ) {
     try {
       this.connected = device.createBuffer({
@@ -192,8 +200,15 @@ export class CoastalFlow {
       this.views = this.states.map((t) => t.createView());
       const fluxViews = this.fluxes.map((t) => t.createView());
       this.initializer = compute(device, initialize);
-      this.flowing = compute(device, flow);
-      this.integrating = compute(device, integrate);
+      this.flowing = compute(device, river?.flow ?? flow);
+      this.integrating = compute(device, river?.integrate ?? integrate);
+      if (river) {
+        this.device = device;
+        this.sources = device.createBuffer({
+          size: river.sources.byteLength,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+      }
       const topologyModule = device.createShaderModule({ code: topology });
       this.connector = device.createComputePipeline({
         layout: 'auto',
@@ -243,6 +258,7 @@ export class CoastalFlow {
             fluxViews[1 - i],
             this.views[1 - i],
             { buffer: this.connected },
+            ...(this.sources ? [{ buffer: this.sources }] : []),
           ]),
         );
       }
@@ -277,8 +293,9 @@ export class CoastalFlow {
       pass.end();
       return;
     }
+    if (this.river) this.device!.queue.writeBuffer(this.sources!, 0, this.river.sources as Float32Array<ArrayBuffer>);
     // shortcut: three substeps suit coastal cells >= 0.5m, increase substeps for finer maps.
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (this.river?.substeps ?? 3); i++) {
       pass.setPipeline(this.flowing);
       pass.setBindGroup(0, this.flowGroups[this.current]);
       pass.dispatchWorkgroups(x, y);
@@ -292,6 +309,7 @@ export class CoastalFlow {
   dispose(): void {
     this.connected?.destroy();
     this.fillTexture?.destroy();
+    this.sources?.destroy();
     for (let i = 0; i < this.states.length; i++) this.states[i].destroy();
     for (let i = 0; i < this.fluxes.length; i++) this.fluxes[i].destroy();
   }

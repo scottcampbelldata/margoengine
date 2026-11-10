@@ -64,3 +64,7 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 51.3 | environment | Fog multiple scattering: spread into shadowed froxels, clustered lights, a check against a reference renderer, and a re-read of Hillaire 2020 sec. 5.5 in full; GPU cost not timed. |
 | 52.2 | clustered | Integrated maps (`ClusteredOptions.shadows`) still reject `drawShadow` sources; only `LocalShadows` takes the `drawLocalShadow` hook |
 | 52.2 | clustered | Hook sources (`drawLocalShadow`) are not culled by bounds: every re-rendered layer calls the hook |
+| 66.8 | @margoengine/water | rivers: add a bed-slope source term (subcell reconstruction) so chute fronts on beds steeper than the depth per cell run at the slope's gravity component (about 2 m/s on a 0.5 slope today), and check it against an analytic dam break on a slope |
+| 66.8 | @margoengine/water | rivers: Manning bed friction; only the shared 0.12 /s flux decay today |
+| 66.8 | @margoengine/water | rivers: cost measured only on a 256 x 256 map on the M6 Mac mini; measure 1024 x 1024 and substep scaling |
+| 66.8 | @margoengine/water | rivers: drive water/flow surface shading from the solver's pipe flux instead of a separate flow field |

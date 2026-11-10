@@ -3779,3 +3779,7 @@ Build packages, run `node --test packages/inspector/test/shaders.test.js`, then 
 Build packages. CPU: node --test packages/water/test/underwater.test.js. GPU: node packages/water/test/underwater.browser.mjs, then again with --compat after the script path; results land in test-results/water-underwater-<mode>.json.
 ### Batch 107 job 3
 Build packages, run `node --test packages/inspector/test/remote.test.js` (starts the relay on 127.0.0.1 and talks to it with Node fetch), then under the shared GPU lock `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:remote`.
+
+### List 3 batch 66 job 8: steep-bed rivers
+
+Build packages. CPU: node --test packages/water/test/rivers.test.js. GPU: node packages/water/test/rivers.browser.mjs, then again with --compat after the script path; results land in test-results/water-rivers-<mode>.json (summary with GPU against model error, chute depth and the 256 x 256 cost).
