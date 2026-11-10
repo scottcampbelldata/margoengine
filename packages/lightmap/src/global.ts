@@ -235,10 +235,11 @@ async function paths(
         const direction = cosine(normals, from, random),
           // No near cutoff: the origin is already off the surface, and a cutoff lets a ray born within it of a
           // neighbouring wall skip that wall and leak out at the corner (the furnace test's regression).
-          hit = t.all.raycastFirst({ origin, direction }, { far: 1e6, side: 'front' }),
+          hit = t.all.raycastFirst({ origin, direction }, { far: 1e6, side: 'double' }),
           seen = hit ? hit.faceIndex >> 1 : -1;
-        // A miss, or the path's own planar quad (only by rounding), ends the path.
-        if (seen < 0 || seen === q) break;
+        // Opaque backs stop visibility too, but only the front emits or reflects toward the receiver.
+        // A miss, or the path's own planar quad (only by rounding), also ends the path.
+        if (seen < 0 || seen === q || !hit!.frontFace) break;
         const j = texelAt(seen, hit!.point);
         for (let c = 0; c < 3; c++) {
           gathered[i * 3 + c] += through[c] * radiance[j * 3 + c];
@@ -327,7 +328,7 @@ async function finish(
           if (!(lambert > 0 && facing > 0)) continue;
           if (
             t.shadow?.intersectsSegment(p, target, {
-              side: 'front',
+              side: 'double',
               includeFace: (face) => t.quad(face) !== quad[i] && t.quad(face) !== from,
             })
           )
@@ -367,12 +368,12 @@ async function finish(
         q = quad[i];
       for (let n = 0; n < o.bounceRays; n++) {
         const direction = cosine(normals, i, random),
-          hit = t.all.raycastFirst({ origin, direction }, { far: 1e6, side: 'front' }),
+          hit = t.all.raycastFirst({ origin, direction }, { far: 1e6, side: 'double' }),
           seen = hit ? hit.faceIndex >> 1 : -1;
         tried[q]++;
         for (let c = 0; c < 3; c++) {
           // Cosine sampling: the mean incoming radiance times pi is irradiance (legacy drops the pi). A miss adds 0.
-          const incoming = seen >= 0 && seen !== q ? outgoing[seen * 3 + c] : 0;
+          const incoming = seen >= 0 && seen !== q && hit!.frontFace ? outgoing[seen * 3 + c] : 0;
           added[i * 3 + c] += (incoming / o.bounceRays) * (physical ? Math.PI : 1);
           // The next order's source: albedo times the mean over every ray, misses included.
           next[q * 3 + c] += (incoming * albedo[i * 3 + c] * (1 - metal[i]) - next[q * 3 + c]) / tried[q];

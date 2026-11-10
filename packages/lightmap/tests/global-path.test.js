@@ -53,6 +53,32 @@ function texels(out, positions, k) {
 }
 const average = (list) => list.reduce((sum, t) => sum + t.value, 0) / list.length;
 
+test('opaque back faces stop area shadows and diffuse paths without emitting through the surface', async () => {
+  const receiver = face([0, 0, 0], [0.25, 0, 0], [0, 0, 0.25], [0, 1, 0]),
+    // The receiver lies behind this opaque surface. Its front faces the light, away from the receiver.
+    cover = face([0, 1, 0], [4, 0, 0], [0, 0, 4], [0, 1, 0]),
+    positions = new Float32Array([...receiver, ...cover]),
+    options = {
+      texelsPerUnit: 2,
+      padding: 1,
+      aoRays: 1,
+      radiometry: 'physical',
+      areaLights: [{ position: [0, 2, 0], direction: [0, -1, 0], width: 1, height: 1 }],
+      areaSamples: 16,
+      bounceRays: 32,
+      seed: 1,
+    };
+  for (const bounceMode of ['quad', 'path']) {
+    const direct = await bakeGlobalLightmap({ positions }, { ...options, bounceMode, bounces: 0 });
+    assert.equal(average(texels(direct, positions, 0)), 0, `${bounceMode}: back face blocks the light`);
+    const bounced = await bakeGlobalLightmap(
+      { positions, emission: new Float32Array([0, 0, 0, 10, 10, 10]) },
+      { ...options, bounceMode, bounces: 2 },
+    );
+    assert.equal(average(texels(bounced, positions, 0)), 0, `${bounceMode}: back face blocks outgoing radiance`);
+  }
+});
+
 test('a closed furnace: eight path bounces give the exact geometric series on every texel', async () => {
   const positions = cube(),
     rho = 0.5,

@@ -1,5 +1,16 @@
 # Claims and evidence
 
+## Batch 187: lightmap visibility
+
+Opaque back faces block area-light visibility and diffuse gathers. Front-side emission cannot pass through their
+backs. Evidence: global-path.test.js tests both bounce modes and direct/indirect terms; global-browser.mjs compares
+unblocked and blocked baked-light pixels on native and compatibility rendering, with no validation errors or retained
+meshes required. The existing path-bounce, mesh, directional and progressive-bake features come from Batch 54.
+The Cornell comparison is an improvement with a residual loss, not an accuracy-parity claim: the recorded baseline
+MAE 0.069543 becomes 0.048730 with path mode, one bounce and 32 bounce rays (versus the baseline's quad mode and 16).
+The maximum error falls from 0.900128 to 0.353979. All 881 reference texels are retained; no timing was measured.
+
+
 Review 3 (2026-11-10): attaching MToon preserves standard PBR/unlit primitives in
 the same model. Evidence: packages/rigging/tests/mtoon.test.js captures visible
 body/outline pipelines across opaque, mask and blend queues;

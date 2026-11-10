@@ -1,4 +1,14 @@
 
+
+## Batch 187: opaque visibility in global lightmap bakes (section 5 supplement)
+
+Area shadow segments and quad/path bounce rays test both sides of opaque quads. A back hit terminates a diffuse
+path without supplying front-side radiance; quad gathers likewise read zero there. The regression in
+packages/lightmap/tests/global-path.test.js fails on the preceding implementation (0.231373 direct irradiance
+through a back-facing cover, expected zero) and covers direct shadows and emitting covers in both bounce modes.
+packages/lightmap/tests/global-browser.mjs draws an unblocked control and the blocked bake on the native and WebGL2
+compatibility backends, including pixel, validation and teardown assertions. No GPU algorithm or backend changed.
+
 ### Section 5 evidence: HDR6 (batch 203, 2026-11-10)
 
 Optional decoders/ktx2-hdr6 owns its clean-room Rust/Wasm codec and worker assets; no core, stage or rendering backend changes. All 75 UASTC HDR6 configurations and both stream versions match independent ASTC, half-float and RGB9E5 output records. GPU upload/readback covers the real HDR image on WebGPU and WebGL2 (393,216 exact bytes each); native and compatibility browser suites cover emitted production worker/Wasm assets. HDR6 CPU tests cover malformed dimensions, indices and seek tables, pooling, transfer, abort and disposal. Throughput evidence remains deferred to the speed phase.

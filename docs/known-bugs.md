@@ -2073,6 +2073,12 @@ Measured but not fixed. Their history, sources and rerun commands are in
   Cause: Margo gathers only 16 cosine rays from each texel using a single mean outgoing radiance per quad,
   whereas Cycles integrates spatially varying transport. Area sampling and 8-bit irradiance quantization also
   contribute; their individual shares of the error are not isolated. Publishing the number does not close it.
+  Batch 187 fixes a separate cause: area shadow rays and diffuse gathers culled opaque back faces, allowing light
+  through the tops of the blocks onto floor texels inside them. Both sides now block visibility; only front hits
+  supply outgoing radiance. With the unchanged frozen 881-texel reference, physical path mode, seed 1, 16 area
+  samples, one bounce and 32 bounce rays, MAE is 0.048730 (relative 0.148184), maximum 0.353979. This is still an
+  open accuracy difference, not parity: finite ray counts, cached texel-centre direct illumination, RGBA8 output
+  and the reference's diffuse-event convention remain to be isolated in the fix phase. No reference was replaced.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node

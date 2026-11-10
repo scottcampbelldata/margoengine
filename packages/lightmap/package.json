@@ -84,6 +84,8 @@
     "build": "node ../../scripts/build-optional.js lightmap",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node tests/gpu.browser.mjs"
+    "test:gpu": "node tests/gpu.browser.mjs",
+    "test:browser:global": "node tests/global-browser.mjs",
+    "test:browser:global:compat": "node tests/global-browser.mjs --compat"
   }
 }

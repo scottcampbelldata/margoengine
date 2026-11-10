@@ -1,5 +1,24 @@
 # Clean room
 
+### Batch 187: opaque lightmap visibility
+
+Research compared James T. Kajiya, The Rendering Equation (SIGGRAPH, 1986),
+https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/86kajiyaRenderingEquation.pdf,
+with Eric Veach, Robust Monte Carlo Methods for Light Transport Simulation (Stanford dissertation, 1997),
+https://graphics.stanford.edu/papers/veach_thesis/thesis.pdf (geometric visibility and section 2.6 sampling).
+Kajiya separates geometric visibility from scattering support: an opaque obstruction must stop a connection regardless
+of winding, while the oriented surface's outgoing radiance is only read on its front. Veach's variance discussion
+motivated comparing seed averages during diagnosis, without treating finite-sample error as proof of a transport bug.
+The actual regression is deterministic back-face leakage. Implementation is Margo-authored, using MeshBVH's existing
+double-side and frontFace APIs. No companion code or other renderer source was read. No new asset or demo was added.
+Feature comparison used public descriptions only: ProgressiveLightMap documentation (zalo/three.js contributors,
+https://threejs.org/docs/pages/ProgressiveLightMap.html, accessed 2026-11-10) describes mesh-wise accumulation each frame;
+PlayCanvas contributors' Runtime Lightmaps and Lightmapping Settings (accessed 2026-11-10),
+https://developer.playcanvas.com/user-manual/graphics/lighting/runtime-lightmaps/ and
+https://developer.playcanvas.com/user-manual/editor/interface/settings/lightmapping/, describe second-UV baking and
+one dominant direction for bump response. Existing Batch 54 APIs already supply these requested behaviours.
+
+
 ## Batch 177 job 2: statistical charts and shared CPU mathematics
 
 Research combined B. W. Silverman, 1986, *Density Estimation for Statistics and Data Analysis*, bandwidth 0.9 min(sample SD,IQR/1.34) n^-1/5 as documented by [NIST kernel width](https://itl.nist.gov/div898/software/dataplot/refman1/auxillar/kernwidt.htm); W. S. Cleveland, 1979, *Robust Locally Weighted Regression and Smoothing Scatterplots*, [paper](https://www.stat.cmu.edu/~rnugent/PCMI2016/papers/LowessCleveland.pdf), tricube local-linear fitting and bisquare residual weights; D. B. Carr, R. J. Littlefield, W. L. Nicholson and J. S. Littlefield, 1987, *Scatterplot Matrix Techniques for Large N*, [DOI](https://doi.org/10.1080/01621459.1987.10478445), hexagonal aggregation rather than overplotted samples. Coordinates use our independently derived axial/cube nearest-cell rounding and expose original membership.

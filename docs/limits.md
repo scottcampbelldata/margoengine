@@ -1,5 +1,20 @@
 # Design envelope
 
+## Batch 187: existing lightmap parity entries and opaque visibility
+
+Batch 54 already supplies indexed mesh baking on UV1 (the second UV set), progressive WebGPU compute with a live
+texture and AbortSignal, per-texel path bounces in ./global, and dominant-direction maps in ./directional. No duplicate
+entries were added. The opaque visibility correction changes ./global from 7,770 to 7,781 gzip bytes (minified entry,
+bare imports external); its existing 8,007-byte ceiling holds. Existing mesh/gpu/directional entries measure
+3,128/7,722/4,215 bytes by the same method. Core and stage sources are unchanged.
+
+Opaque quad backs now block area-light shadow segments and diffuse paths in both quad and path modes. Their back
+sides supply no emission or reflected light. This matches the existing direct point/spot/directional baker's two-sided
+shadow visibility. Alpha omission and glass transport retain their explicit visibility rules. Surface transport still
+uses the stored texel's front normal and diffuse radiance; it does not add two-sided emission or a new material model.
+The historical Cornell loss remains open as detailed in known-bugs.md; this change makes no accuracy-parity claim.
+
+
 Batch 175 job 1: sciviz/omezarr opens OME-NGFF 0.4/Zarr2 and 0.5/Zarr3 multiscales with named spatial/time/channel axes, composed dataset/group scale and translation, one bricked source per stored level, and a dyadic renderer adapter. Reads retain source coordinates; stored LOD samples use nearest-neighbour physical-coordinate sampling, not a claim that arbitrary stored pyramids equal on-the-fly box averaging. Supply volume.bounds and a known range when attaching its source to brickedVolume. Each level also exposes its existing ZarrArray for typed exact-region reads. Rendering is float32; 64-bit integer Zarr reads use the existing Float64 representation and are exact only through 2^53. Arrays are 2D through 5D; renderer volumes need three nondegenerate dimensions. Unknown nonsingleton axes require selection before use. Channel and image default to zero; frame comes from BrickRequest. No IO or GPU allocations occur on import.
 
 HTTP/S3 stores support absolute and suffix Range reads, credential headers, missing-key-only 404 handling and lifetime/request cancellation. Defaults: maxBytes and maxDecodedBytes 67,108,864 bytes each, channel 0, image 0, 16 cached Zarr shard indexes and no cached payloads. A server ignoring Range may return at most maxBytes. Shard indexes use bytes (either endian) plus optional CRC32C; inner shapes must divide shard shape. Standard one-level sharding is supported; nested sharding and codecs outside the documented pipeline reject. Blosc1 supports memcpy, BloscLZ, LZ4/LZ4HC, zlib and zstd, byte and bit shuffle; extended Blosc2 filter pipelines and legacy Snappy reject. Zstd dictionary frames retain the existing decoder's explicit unsupported result. LZ4 includes numcodecs length-prefixed blocks and N5 Java streams with 28-bit seeded xxHash checksums. N5 fixed-size scalar blocks support raw, gzip, bzip2, XZ, LZ4, Blosc and zstd; variable-length/object blocks are not scalar-volume arrays. Precomputed supports raw, grayscale/RGB JPEG and compressed_segmentation, unsharded and identity-hashed sharded scales; other image/segmentation encodings and Murmur-hashed shards reject explicitly. These limits concern codec/storage variants, not silent missing-data fallbacks.
