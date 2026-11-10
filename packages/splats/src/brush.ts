@@ -307,7 +307,7 @@ export class SplatBrush implements EnginePlugin {
   dispose(): void {
     if (this.dead) return;
     this.dead = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     for (const b of [this.uniform, this.result, this.mask]) b?.destroy();
     this.uniform = this.result = this.mask = this.pipeline = this.group = this.device = this.engine = undefined;
   }

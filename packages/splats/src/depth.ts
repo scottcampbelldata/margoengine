@@ -165,7 +165,7 @@ export class SplatDepth implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.uniform?.destroy();
     this.uniform = this.group = this.engine = undefined;
     this.pipelines.clear();

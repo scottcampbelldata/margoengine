@@ -484,7 +484,7 @@ export class SplatLod implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.abort.abort(new MargoError('disposed', 'The SplatLod was disposed'));
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     this.cloud.dispose();
     this.loaded.clear();

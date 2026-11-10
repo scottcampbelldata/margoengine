@@ -268,7 +268,7 @@ export class SplatLighting implements EnginePlugin {
   dispose(): void {
     if (this.dead) return;
     this.dead = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.uniform?.destroy();
     this.casterUniform?.destroy();
     this.uniform = this.casterUniform = this.engine = this.compute = this.group = this.shadow = undefined;

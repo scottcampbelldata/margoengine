@@ -17,7 +17,9 @@ function rig(count = 3) {
     engine = {
       backend: 'webgpu',
       gpu: gpu.device,
-      removePlugin() {},
+      sceneOf() {
+        return { removePlugin() {} };
+      },
       createMesh() {
         const mesh = {
           dispose() {
@@ -59,11 +61,21 @@ const floats = (hex) => new Float32Array(new Uint8Array(Buffer.from(hex, 'hex'))
 
 test('the projection is one function the colour pass and the pick share', () => {
   assert.match(project, /fn projectSplat\(index:u32\)->Projected/);
-  assert.match(project, /let projected=projectSplat\(index\);\n {2}ellipses\[index\]=projected\.ellipse;keys\[index\]=vec2u\(projected\.key,index\);/);
-  assert.equal(project.split('evaluated[index]=vec4f(color(index),world.w);').length, 2, 'the fog edit still finds its line');
+  assert.match(
+    project,
+    /let projected=projectSplat\(index\);\n {2}ellipses\[index\]=projected\.ellipse;keys\[index\]=vec2u\(projected\.key,index\);/,
+  );
+  assert.equal(
+    project.split('evaluated[index]=vec4f(color(index),world.w);').length,
+    2,
+    'the fog edit still finds its line',
+  );
   assert.match(splatPickShader, /fn projectSplat\(index:u32\)->Projected/);
   assert.doesNotMatch(splatPickShader, /read_write/, 'a vertex shader reads storage only');
-  assert.match(splatPickShader, /let alpha=min\(0\.99,i\.opacity\*exp\(power\)\);if\(alpha<max\(pick\.threshold,1\.0\/255\)\)\{discard;\}return pick\.first\+i\.splat;/);
+  assert.match(
+    splatPickShader,
+    /let alpha=min\(0\.99,i\.opacity\*exp\(power\)\);if\(alpha<max\(pick\.threshold,1\.0\/255\)\)\{discard;\}return pick\.first\+i\.splat;/,
+  );
 });
 
 test('a pick draws every splat once into the tile, and hits map back to splats', () => {
@@ -125,7 +137,10 @@ test('thresholds outside 0 to 1, an unattached cloud and a disposed one are hand
   const { cloud, host, overlays, pick, meshes } = rig();
   assert.throws(() => SplatPicking.attach(host, cloud, { threshold: 1.5 }), RangeError);
   assert.throws(() => SplatPicking.attach(host, cloud, { threshold: Number.NaN }), RangeError);
-  assert.throws(() => SplatPicking.attach(host, Splats.reserve(1)), (e) => e.code === 'state');
+  assert.throws(
+    () => SplatPicking.attach(host, Splats.reserve(1)),
+    (e) => e.code === 'state',
+  );
   assert.equal(meshes.length, 0, 'a refused attach leaves no mesh');
   const picking = SplatPicking.attach(host, cloud);
   assert.throws(() => (picking.threshold = -0.1), RangeError);

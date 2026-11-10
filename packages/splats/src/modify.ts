@@ -285,7 +285,7 @@ export class SplatModifier implements EnginePlugin {
     }
     if (owners.get(this.cloud) === this) owners.delete(this.cloud);
     this.signal?.removeEventListener('abort', this.abort!);
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;
   }

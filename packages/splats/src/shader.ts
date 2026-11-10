@@ -11,7 +11,8 @@ struct Ellipse {center:vec4f,axes:vec4f}`;
 // 0.3 px^2 dilation is the 3DGS asset convention (Kerbl et al. 2023) that trained files expect. Anti-aliasing
 // (counts.z = 1) scales opacity by sqrt(det(S) / det(S + 0.3 I)), so the dilated Gaussian keeps the energy of the
 // undilated one and a sub-pixel splat fades instead of growing: the 2D Mip filter of Yu et al. 2024, "Mip-Splatting:
-// Alias-free 3D Gaussian Splatting" (CVPR), eq. 9, with the 0.3 px^2 low-pass the files were trained with.
+// Alias-free 3D Gaussian Splatting" (CVPR), eq. 10 (eq. 9 is its 3D smoothing filter), with the 0.3 px^2 low-pass the
+// files were trained with. Neither paper states 0.3: Yu et al. eq. 5 writes the dilation with a scalar s.
 /** The two inputs the projection reads (bindings 1 and 2), read only, so a vertex shader can project as well. */
 export const projectInputs = `
 @group(0) @binding(1) var<storage,read> positions:array<vec4f>;
