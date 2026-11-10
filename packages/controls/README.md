@@ -696,3 +696,206 @@ collision, no inertia; dragging a point onto sky leaves it at the last valid
 surface hit. Altitude/tilt constraints take precedence over pixel anchoring.
 Use one camera controller at a time. GPU tests use synthetic geometry as
 correctness fixtures, not as an asset demonstration.
+
+
+## Orbit collision: optional /collide
+
+Import OrbitControls or MapControls from `@margoengine/controls/collide` to shorten
+the camera arm against explicit mesh/model blockers. The ordinary root controls
+keep their existing behavior. `colliders` defaults to [] (no blockers); null tests
+every visible scene mesh/model. Supply a Raycaster to configure layers, side and
+filter; the default raycaster tests both triangle sides. Hidden objects follow
+the raycaster's visibility rules. Skinned geometry is tested in its bind pose.
+
+Each collision update samples five rays: the center and four near-plane corners.
+This is sampled camera clearance, not a swept volume or character collision solver.
+`clearance` defaults to 0.01 world units before the closest hit. Obstruction shortens
+the arm immediately; `returnTime` (0.2 seconds) eases it back when clear, or 0 restores
+it immediately. Both options require finite nonnegative values. The requested orbit
+distance remains available as desiredDistance; armLength reports the actual distance
+and rays reports 0 with no blockers or 5 when testing. The inherited orbit/map input,
+damping and limits still apply. Dispose to release the control's input/update plugin.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {OrbitControls} from '@margoengine/controls/collide';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {camera: {position: [0, 0, 5], target: [0, 0, 0]}});
+const wall = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial()).setPosition([0, 0, 3]).setScale([4, 4, 0.2]);
+const orbit = new OrbitControls(engine, {colliders: [wall], clearance: 0.02, returnTime: 0.2});
+orbit.update(1 / 60);
+if (orbit.armLength >= orbit.desiredDistance || orbit.rays !== 5) throw new Error('Camera arm was not shortened');
+engine.render();
+orbit.colliders = []; // The requested distance now restores over subsequent updates.
+orbit.update(1 / 60);
+orbit.dispose(); engine.dispose(); canvas.remove();
+```
+
+## Bounding-box editing: optional /box-gizmo
+
+`BoxGizmo` attaches to one live core mesh with geometry from its engine. Eight
+corner handles scale; twelve edge handles rotate about their local axes. Call
+handles() for world-space positions with stable corner-0..7 and edge-0..11 ids.
+handleSize is 12 CSS pixels by default. uniformScaling defaults true; false scales
+each screen-visible local axis. scaleFromCenter defaults false, keeping the opposite
+corner fixed while scaling; true uses the center. Edge rotation uses the center.
+scaleSnap is a scale-ratio step and rotationSnap is radians; both default null and
+require positive finite values when set. Negative/zero crossing scales are prevented.
+
+Pointer input picks handles automatically. beginDrag(x,y,id?), dragTo(x,y) and
+endDrag() expose the same operation in CSS pixels. cancelDrag(), Escape or pointer
+cancellation restores the original transform. dragging-changed, start, end, change
+and objectChange events let an app suspend camera input and group its own undo.
+refreshBounds() rescans local geometry vertices after geometry edits. detach ends
+an active edit and clears the target. Disposal disconnects input, restores its owned
+touch-action style and removes the overlay/update plugins; mesh ownership stays with
+the app. A parent with rotated nonuniform scaling can introduce shear outside the
+mesh's position/quaternion/scale representation.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {BoxGizmo} from '@margoengine/controls/box-gizmo';
+import {OrbitControls} from '@margoengine/controls';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas);
+const mesh = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+const orbit = new OrbitControls(engine);
+const gizmo = new BoxGizmo(engine, {scaleSnap: 0.1, rotationSnap: Math.PI / 12});
+gizmo.attach(mesh);
+gizmo.addEventListener('dragging-changed', event => {orbit.enabled = !event.value;});
+console.log(gizmo.handles()); // Eight corners and twelve edges.
+gizmo.refreshBounds();
+engine.render();
+// Keep attached while editing; at teardown:
+gizmo.dispose(); orbit.dispose(); engine.dispose(); canvas.remove();
+```
+
+## Product and scroll presentations: optional /presentation
+
+This entry uses the optional `@margoengine/tween` peer for its springs. Importing
+root controls does not import it. PresentationControls rotates a live product mesh
+from the same engine; an empty product root is supported when it has drawable
+descendants. By default only a product/descendant hit starts dragging; global: true
+accepts the whole element. polar limits local X rotation to [-PI/2,PI/2], azimuth
+defaults to unbounded local Y, and both intervals must contain zero. speed defaults
+1, zoom defaults 1 (scale at the polar limit), and snap defaults false (true springs
+back to the starting pose on release). spring defaults are stiffness 170, damping
+26 and precision 0.000001; duration/bounce Spring options may be supplied instead.
+angles reads current pitch/yaw. reset(immediate=false) returns to the initial pose.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {PresentationControls} from '@margoengine/controls/presentation';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas);
+const product = engine.createMesh();
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial()).setParent(product);
+const controls = new PresentationControls(engine, product, {snap: true, polar: [-0.4, 0.4], zoom: 1.1});
+controls.reset(true);
+engine.render();
+controls.dispose(); engine.dispose(); canvas.remove();
+```
+
+ScrollArea requires a mounted canvas. It creates a focusable native scroll viewport
+and content slot above it, temporarily positioning a static parent. pages defaults
+1, distance 1, horizontal false and prepend false; pages must be finite >=1 and
+distance finite >0. Dispose ScrollControls before disposing the area; the area owns
+only its DOM and parent positioning, never the canvas or content supplied by the app.
+
+ScrollControls accepts a native scroller or a wheel surface (default engine canvas).
+pages/distance/horizontal have the same defaults; infinite defaults false, damping
+0.2 seconds, maxSpeed Infinity and eps 0.00001. Native scroll uses the element's
+actual scroll extent. Wheel-only progress uses pages, distance and viewport size.
+Infinite progress wraps offset into [0,1) while retaining movement through the seam.
+delta is signed progress change. setProgress(progress,immediate=false) drives it in
+code. range(from,length,margin=0), curve(...) and visible(...) derive normalized
+section progress, a bell-shaped value and membership, respectively.
+
+PathControls (also MotionPathControls) samples any path with at(t), using uniform
+arc length when length and atDistance are available, including a Spline. By default
+it drives the camera, looks along the path, loops, starts at offset 0 and smooths
+progress for 0.1 seconds; maxSpeed is Infinity, lookAhead 0.001 and focusDamping
+0.1 seconds. Set object for a mesh target, scroll for shared progress, or write
+current yourself. focus accepts a world point or live mesh. loop: false clamps
+endpoints. Use one owner for a camera/mesh transform; do not attach orbit and path
+controls to the same camera at once. Dispose controls to remove listeners/update
+plugins; paths and product meshes remain caller-owned.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Spline} from '@margoengine/splines';
+import {ScrollArea, ScrollControls, PathControls} from '@margoengine/controls/presentation';
+const host = document.body.appendChild(document.createElement('div'));
+host.style.cssText = 'width:480px;height:320px';
+const canvas = host.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const area = new ScrollArea(canvas, {pages: 3});
+area.content.textContent = 'Scroll to travel along the path';
+const scroll = new ScrollControls(engine, {element: area.element, damping: 0});
+const spline = new Spline([[0, 1, 5], [2, 2, 4], [4, 1, 2]]);
+const point = new Float64Array(3);
+const curve = {
+  length: spline.length,
+  at: (t: number) => {spline.at(t, point); return point;},
+  atDistance: (distance: number) => {spline.atDistance(distance, point); return point;},
+};
+const path = new PathControls(engine, curve, {scroll, loop: false, focus: [0, 0, 0]});
+scroll.setProgress(0.5, true);
+path.update(1);
+console.log(scroll.range(0.25, 0.5), scroll.curve(0.25, 0.5), scroll.visible(0.25, 0.5));
+engine.render();
+path.dispose(); scroll.dispose(); area.dispose(); engine.dispose(); host.remove();
+```
+
+## Device look: optional /device-orientation
+
+DeviceOrientationControls uses the window's deviceorientation sensor events by
+default, with screen-orientation compensation. Sensor angles are degrees; alphaOffset
+is a world-up yaw in radians (default 0). smoothTime defaults 0.1 seconds, with 0
+applying samples immediately. relative defaults true: the first sample aligns to the
+current camera. recenter() aligns the next sample again. relative: false uses the
+sensor reference directly. permission is prompt, granted, denied or unsupported;
+absolute reports the latest event's reference mode. Null/nonfinite samples are ignored.
+
+Serve from a secure context on sensor-capable hardware. Call requestPermission from
+a real user gesture, before unrelated awaits. It resolves to a granted boolean and
+defaults to a 10000 ms timeout; timeout or signal abort rejects and prevents late
+activation. A denied/unsupported sensor does not move the camera. Disconnect/dispose
+cancels a pending permission operation, removes listeners and releases its update
+plugin. A source may be injected for deterministic event replay; such a replay does
+not prove hardware permissions or phone/headset behavior.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {DeviceOrientationControls} from '@margoengine/controls/device-orientation';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas);
+const controls = new DeviceOrientationControls(engine, {smoothTime: 0.1});
+const controller = new AbortController();
+const button = document.body.appendChild(document.createElement('button'));
+button.textContent = 'Enable device look';
+button.addEventListener('click', () => {
+  void controls.requestPermission({signal: controller.signal, timeout: 10000})
+    .then(granted => {button.textContent = granted ? 'Device look enabled' : 'Sensor unavailable';})
+    .catch(error => {button.textContent = String(error);});
+});
+engine.start(); // Keep the page alive for the user gesture and sensor updates.
+addEventListener('pagehide', () => {
+  controller.abort(); controls.dispose(); engine.dispose(); button.remove(); canvas.remove();
+}, {once: true});
+```
+
+## Core compatibility and composed scenes
+
+The package build records its required core version. Attaching a control checks the
+engine's local core registry before accessing runtime state. A mismatched version
+or a second core module instance throws a coded version error linking to
+https://margoengine.com/errors#version. Resolve all packages to the same verified
+core build; rebuilding/reinstalling aligned packages fixes the cause. There is no
+global registry and importing a control does not attach it.
+
+Works with the [J6 game composition](../../docs/integration-everything.md) and the
+[public CAD-format viewer](../../docs/integration-engineering.md), whose documented
+fixtures check device restoration and disposal on WebGPU and WebGL2 compatibility.
+The viewer exercises orthographic navigation profile attachment, not every gesture.

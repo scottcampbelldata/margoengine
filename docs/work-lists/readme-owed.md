@@ -103,7 +103,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/save | opfs: namespace/directory defaults, binary and empty saves, atomic close, cancellation boundary, key limit and cross-tab last-close-wins | batch-255 job 3 |
 | margoengine | Generated save/opfs alias | batch-255 job 3 |
-- @margoengine/controls: document /collide OrbitControls and MapControls, explicit blockers, five-ray sampling, clearance, restoration, filters and disposal.
+- @margoengine/controls: document /collide OrbitControls and MapControls, explicit blockers, five-ray sampling, clearance, restoration, filters and disposal. DONE (controls-readme-phase).
 - margoengine: document the generated /controls/collide alias.
 
 
@@ -119,7 +119,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/save | signed: signedStorage with raw/CryptoKey keys, safe recovery/check, injected WebCrypto, secret ownership, no unsigned legacy, replay/confidentiality limits | batch-255 job 4 |
 | margoengine | Generated save/signed alias | batch-255 job 4 |
-- @margoengine/controls: document /box-gizmo attach, handles, uniform/per-axis corner scaling, pivots, edge rotation, snapping, cancellation, bounds refresh and cleanup.
+- @margoengine/controls: document /box-gizmo attach, handles, uniform/per-axis corner scaling, pivots, edge rotation, snapping, cancellation, bounds refresh and cleanup. DONE (controls-readme-phase).
 - margoengine: document the generated /controls/box-gizmo alias.
 
 | @margoengine/navmesh | queries seeded randomPoint, strict randomPointAroundCircle, rejection bound, distanceToWall and partial seam intervals | batch-252 job 3 |
@@ -135,7 +135,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/navmesh | wasm worker builders, returned work counts, separate asset hosting, abort/deadline, SIMD requirement and tiled runtime rebuild behavior | batch-252 job 4 |
 | margoengine | Generated navmesh/wasm alias | batch-252 job 4 |
-- @margoengine/controls: document /presentation product picking, springs, bounded rotation, snap-back/polar zoom, ScrollArea ownership, native/wheel/infinite scroll, helpers, Spline paths, mesh/camera targets, focus and cleanup; note the optional tween peer.
+- @margoengine/controls: document /presentation product picking, springs, bounded rotation, snap-back/polar zoom, ScrollArea ownership, native/wheel/infinite scroll, helpers, Spline paths, mesh/camera targets, focus and cleanup; note the optional tween peer. DONE (controls-readme-phase).
 - margoengine: document /controls/presentation alias.
 | @margoengine/behavior | triggers: sphere/box contact semantics, TriggerSystem update events, shared-board per-agent keys, namespaces, mutation/deletion/disable and disposal | batch-251 job 5 |
 | margoengine | Generated behavior/triggers alias | batch-251 job 5 |
@@ -170,7 +170,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/audio/pan: StereoAudio pan -1..1, native AudioParam automation, non-positional mono/stereo input and disposal.
 
-- @margoengine/controls: document /device-orientation, user-gesture permission, secure context, AbortSignal/timeout, relative alignment, screen compensation, yaw offset, recenter, smoothing and disposal.
+- @margoengine/controls: document /device-orientation, user-gesture permission, secure context, AbortSignal/timeout, relative alignment, screen compensation, yaw offset, recenter, smoothing and disposal. DONE (controls-readme-phase).
 - margoengine: document /controls/device-orientation alias.
 
 | @margoengine/sciviz | Document atmosphere globe creation, UTC solar time, metre heights, wind units, scalar/point/cloud layers, disposal and model limits. | Batch 171 job 6 DONE (sciviz-readme-phase) |
@@ -268,7 +268,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/core | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/math | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/bvh | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
-| @margoengine/controls | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/controls | Core version guard build declarations, attachment rejection and linked version errors. | version-guard DONE (controls-readme-phase) |
 | @margoengine/creative | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/decoders | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/environment | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
@@ -621,7 +621,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated culling/sort alias (batch 223 job 3).
 - @margoengine/react: controls-extra KeyboardControls/useKeyboardControls, ScrollControls/useScroll/Scroll (mesh and HTML), PresentationControls, optional controls peer and cleanup. DONE (react-readme-phase).
 - margoengine: react/controls-extra umbrella alias and native SpringOptions naming.
-- @margoengine/controls: PresentationControls accepts geometry-free product roots and picks their live nested descendants.
+- @margoengine/controls: PresentationControls accepts geometry-free product roots and picks their live nested descendants. DONE (controls-readme-phase).
 - @margoengine/fbx (batch 205 job 3): document legacyFBX opt-in 6.x ASCII/binary, legacy Takes/skin/morph/material semantics, worker composition and supported interpolation/budgets.
 - @margoengine/scatter and margoengine: document /textured TexturedScatter whole-model placements, glTF normal/base MASK materials, shadows.add(scatter.model), embedded instances, node-pose capture, updates, limits and disposal.
 
@@ -1446,7 +1446,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/input: add J6 game Works with line for the integration group in docs/integration-everything.md after the build phase.
 
-- @margoengine/controls: add J6 game Works with line for the integration group in docs/integration-everything.md after the build phase.
+- @margoengine/controls: add J6 game Works with line for the integration group in docs/integration-everything.md after the build phase. DONE (controls-readme-phase).
 
 - @margoengine/ui: add J6 game Works with line for the integration group in docs/integration-everything.md after the build phase.
 
@@ -1483,7 +1483,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/cameras: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
-- @margoengine/controls: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+- @margoengine/controls: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase. DONE (controls-readme-phase).
 
 - @margoengine/lod: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
