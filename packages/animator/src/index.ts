@@ -264,6 +264,7 @@ export class Animator implements EnginePlugin {
   private readonly fadeSteps: Array<(position: number[][], rotation: number[][], state: string, time: number) => void> =
     [];
   private disposed = false;
+  private readonly disposeSteps = new Set<() => void>();
   private readonly triggers = new Set<string>();
   private readonly durations = new Map<string, number>();
   private readonly events = new Map<string, AnimatorEvent[]>();
@@ -759,6 +760,19 @@ export class Animator implements EnginePlugin {
   restScale(index: number): readonly number[] {
     return this.rest.scale[index];
   }
+  /** @internal Uses the owner's loaded pose for a detached evaluator, without touching the scene. */
+  copyRestFrom(owner: Animator): void {
+    copyPose(owner.rest, this.rest, this.weightNodes);
+    this.current = clone(this.rest);
+  }
+  /** @internal Registers optional layer cleanup with the owner. Returns its remover. */
+  onDispose(step: () => void): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; create a live Animator');
+    this.disposeSteps.add(step);
+    return () => {
+      this.disposeSteps.delete(step);
+    };
+  }
   /** @internal Commits a node rotation through `writeRotation` (or `Mesh.setQuaternion`), as the pose and foot IK do. */
   writeNodeRotation(node: Mesh, rotation: readonly number[]): void {
     this.commitRotation(node, rotation);
@@ -778,7 +792,8 @@ export class Animator implements EnginePlugin {
     this.animation.playing = false;
     this.unsubscribe = this.animation.model.onDispose(() => this.dispose());
   }
-  onPreUpdate(delta: number): void {
+  /** @internal poseOnly evaluates a detached layer graph without writing nodes or taking playback ownership. */
+  onPreUpdate(delta: number, poseOnly = false): Pose | undefined {
     if (this.rotationWriteActive)
       throw new MargoError(
         'state',
@@ -791,7 +806,7 @@ export class Animator implements EnginePlugin {
     }
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid animator delta; pass a finite delta of 0 or more seconds');
-    this.animation.playing = false;
+    if (!poseOnly) this.animation.playing = false;
     for (const v of Object.values(this.parameters))
       if (!Number.isFinite(v))
         throw new RangeError('Invalid blend parameter; set every animator.parameters value to a finite number');
@@ -886,6 +901,7 @@ export class Animator implements EnginePlugin {
       }
     for (let i = 0; i < this.lateSteps.length; i++) this.lateSteps[i](pose, step);
     this.current = pose;
+    if (poseOnly) return pose;
     const nodes = this.animation.model.nodes;
     for (let i = 0; i < nodes.length; i++) this.applyNode(nodes[i], pose, i);
     const primitives = this.animation.model.primitives;
@@ -1114,6 +1130,8 @@ export class Animator implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const step of this.disposeSteps) step();
+    this.disposeSteps.clear();
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.unsubscribe?.();
     this.unsubscribe = undefined;

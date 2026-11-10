@@ -6082,3 +6082,6 @@ keeps near-depth tests conservative under oblique transforms. CPU tests pin
 uniform alignment, padding, all three shader paths and 100 transformed-corner
 comparisons. The licensed Cesium rod fixture compares culled and original pixels
 on native and full WebGL2 routes; no core/stage or backend code changes.
+### Section 5 evidence: animator graph layers (batch 211 job 1)
+
+Detached graph evaluation writes only a borrowed local pose. Ordered masked override/additive composition precedes the owner's node commit and existing IK/skinning, so no extra palette or GPU pass is introduced. CPU tests cover independent state/clock/trigger flow and loaded-pose references; GPU tests render existing CC0 Fox through WebGPU and WebGL2 compatibility. No timing claim or hardware-tier change.

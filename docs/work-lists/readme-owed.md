@@ -515,3 +515,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 207 job 3): document blender/meshopt alias.
 
 | @margoengine/tilemap | tiled: XML/JSON templates/maps/tilesets, baseUrl/resolve/cancellation, gid remapping, image and text layers, inherited tint, sparse collections; autotile: WangGrid, WangRuleSet and resolveWang | batch-246 job 2 |
+- @margoengine/animator (batch 211 job 1): document /layers addStateLayer, independent graph controls, masks/live weight, override/additive order, pause/speed, loaded references and lifetime; examples deferred.
+- margoengine (batch 211 job 1): document generated animator/layers alias.

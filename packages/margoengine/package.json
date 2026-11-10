@@ -138,6 +138,10 @@
       "types": "./dist/animator/spline-ik.d.ts",
       "import": "./dist/animator/spline-ik.js"
     },
+    "./animator/layers": {
+      "types": "./dist/animator/layers.d.ts",
+      "import": "./dist/animator/layers.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

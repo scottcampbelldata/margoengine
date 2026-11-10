@@ -104,9 +104,11 @@ class Animator implements EnginePlugin {
     restRotation(index: number): readonly number[];
     restPosition(index: number): readonly number[];
     restScale(index: number): readonly number[];
+    copyRestFrom(owner: Animator): void;
+    onDispose(step: () => void): () => void;
     writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
     setup(engine: Engine): void;
-    onPreUpdate(delta: number): void;
+    onPreUpdate(delta: number, poseOnly?: boolean): Pose | undefined;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13063463,
+  "total": 13073899,
   "history": [
     {
       "date": "2026-10-24",
@@ -6556,6 +6556,11 @@
       "commit": "batch-246-job-2",
       "reason": "Optional tilemap/tiled 4264 to 7227 B min+gzip; ceiling 4540 to 7483 B. Autotile 1349 to 1831 B; ceiling 1605 to 2087 B. Templates, XML and JSON share semantic validation/resource resolution; Wang matching belongs beside terrain rules. Splitting would duplicate these boundaries. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-211",
+      "reason": "New optional animator/layers 0 -> 10132 B gzip (10436 B ceiling): independent complete graph playback and ordered pose composition reuse AnimatorGraph. Splitting graph state across entries would complicate ownership."
     }
   ],
   "items": {
@@ -7752,6 +7757,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/animator/layers": 10436
   }
 }

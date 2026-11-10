@@ -3160,3 +3160,6 @@ After build: node --test --test-timeout=120000 packages/blender/tests/meshopt.te
 
 ### Batch 246 job 2
 After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/tiled*.test.js packages/tilemap/test/autotile.test.js`. The job 1 objects-check.mjs command on both backends now also reads imported XML template and image-layer pixels. Documents and texels are deterministic in-test fixtures.
+### Batch 211 job 1
+
+Build packages; run node --test packages/animator/test/layers.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch211 --wait-max=60 --max=4 -- npm.cmd run test:gpu --workspace @margoengine/animator; repeat with MARGO_COMPAT=1. Layers use the existing Khronos Fox CC0 file, and synthetic CPU poses supply exact independent numerical oracles.

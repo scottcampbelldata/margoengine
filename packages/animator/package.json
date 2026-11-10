@@ -25,7 +25,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js ../../tests/modern-animator*.test.js ../../tests/modern-game.test.js",
-    "test:gpu": "cd ../.. && node packages/animator/test/scene-owner-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/animator/test/scene-owner-browser.mjs && node packages/animator/test/layers-browser.mjs",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -65,6 +65,10 @@
     "./spline-ik": {
       "types": "./dist/spline-ik.d.ts",
       "import": "./dist/spline-ik.js"
+    },
+    "./layers": {
+      "types": "./dist/layers.d.ts",
+      "import": "./dist/layers.js"
     }
   },
   "files": [

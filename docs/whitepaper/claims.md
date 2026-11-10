@@ -3690,3 +3690,6 @@ The optional meshopt entry compresses geometry with Margo's existing encoder and
 
 ### Batch 246 job 2: Tiled import parity row
 Templates, image layers, text objects and Wang sets are imported rather than warned away. Tests cover XML/JSON, template-only and existing tileset remapping, instance overrides, relative resources, cached loads, pending abort, cycles, sparse images, style defaults and exact eight-slot mixed Wang matching. Imported image/template output has exact GPU readback on native WebGPU and WebGL2 compatibility. Proof: packages/tilemap/test/tiled-full.test.js, tiled.test.js and objects-check.mjs. No speed claim or claim that fromTMX can restore data its input omitted.
+### Batch 211 job 1: state machines per layer
+
+animator/layers composes independently switching graph layers over locomotion, using masks and fractional override/additive weights. Proof: packages/animator/test/layers.test.js (transition, clocks, ordering, late install, cleanup) and test/layers-browser.mjs (real Fox skin rendering). No speed or visual-quality superiority claim. Public layer behaviour compared against PlayCanvas Layers and Masks; research record in docs/clean-room.md.
