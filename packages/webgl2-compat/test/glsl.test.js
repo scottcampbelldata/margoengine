@@ -29,6 +29,26 @@ for (const [dimension, coords, offset] of [
       });
     }
 
+for (const [dimension, coords, offset] of [
+  ['2d', 'p.xy*0.123', 'vec2i(1)'],
+  ['2d_array', 'p.xy*0.123, 0', 'vec2i(1)'],
+  ['3d', 'p.xyz*0.123', 'vec3i(1)'],
+])
+  for (const shifted of [false, true])
+    test(`explicit-gradient ${dimension} sampling offset=${shifted} keeps hardware footprint selection`, () => {
+      // A float LOD estimate disagreed with the sampler's snapped LOD next to an integer level, so materials
+      // stochasticTiling (gradients from dpdx and dpdy) differed from a plain textureSample read on compat only.
+      const d = dimension === '3d' ? 'vec3f' : 'vec2f',
+        uv = coords.split(',')[0];
+      const source = `${V}\n@group(0) @binding(0) var t:texture_${dimension}<f32>; @group(0) @binding(1) var s:sampler;
+    @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {let d:${d}=${uv};return textureSampleGrad(t,s,${coords},dpdx(d),dpdy(d)${shifted ? `,${offset}` : ''});}`;
+      const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+      assert.equal(f.textures.length, 1);
+      assert.equal(f.textures[0].mipFilter, undefined);
+      assert.match(f.source, shifted ? /textureGradOffset\(/ : /textureGrad\(/);
+      assert.doesNotMatch(f.source, /log2\(|textureLod\(/);
+    });
+
 test('isotropic sampling carries the live sampler mip state and blends integer-level samples', () => {
   const source = `${V}\n@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
     @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(t,s,p.xy,2.125);}`;

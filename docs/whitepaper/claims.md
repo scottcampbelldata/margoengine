@@ -4696,6 +4696,10 @@ On the recorded RTX A6000, the public product scene combines gltf-pro, materials
 
 On RTX A6000, 20 oblique bias/offset/filter probes (1280 f32 words) match native WebGPU bits on ANGLE D3D11 and Vulkan. This is a fixture-specific result, not a universal filtering guarantee. Methods and reproduction: [bias sampling](../review5-compat-bias.md).
 
+### webgl2-compat explicit-gradient sampling
+
+On RTX A6000 with ANGLE D3D11, `textureSampleGrad` with `dpdx`/`dpdy` gradients returns the same f32 bits as `textureSample` and as native WebGPU, on an oblique and a near-integer-LOD footprint, both filters, with and without offset; materials stochasticTiling matches the plain read on solid mip levels on both backends. Fixture-specific, not a universal filtering guarantee. Proof: webgl2-compat `implicitFootprint` and `mipFiltering` in test/features-browser.mjs, materials test:gpu:features stochastic.
+
 ### Prefiltered IBL metadata capacity (2026-11-10)
 
 The encoder checks the complete u32 KTX2 key/value length before source mip access and output allocation. Evidence: packages/environment/tests/prefiltered.test.js has a parent-failing dimension-only regression for 8192/16384 and a 4096 control, plus unchanged bit-preserving round trips and malformed-file tests. Reproduce after package build with node --test packages/environment/tests/prefiltered.test.js. No multi-GiB input or output is allocated by the overflow regression. Sources and derivation: docs/clean-room.md, Prefiltered IBL metadata capacity.

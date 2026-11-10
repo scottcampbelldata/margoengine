@@ -173,10 +173,25 @@ const cases = {
       // Compare IEEE-754 bits rather than a float tolerance, including bias zero versus unbiased sampling.
       results[`${filter}/${bias ?? 'implicit'}/${offset}`] = [...new Uint32Array(new Float32Array(values).buffer)];
       }
+      // Explicit gradients from dpdx and dpdy are the implicit footprint, on the oblique map above and on a straight one
+      // whose LOD is a hair under 2 (the sampler snaps the fraction and mixes in 1/256 of level 1; a float LOD does not).
+      for (const filter of ['nearest', 'linear']) for (const [map, uv] of [['oblique', 'vec2f(0.173,0.124)*p.x+vec2f(-0.063,0.186)*p.y'], ['near', 'p.xy*0.24996']]) for (const call of ['implicit', 'grad']) for (const offset of [false, true]) {
+      const sampler = device.createSampler({ minFilter: filter, magFilter: filter, mipmapFilter: filter });
+      const shift = offset ? ',vec2i(1,-1)' : '';
+      const values = await shade(device, { w: 4, h: 4,
+        code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+          @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {
+            let uv=${uv};
+            return ${call === 'grad' ? `textureSampleGrad(t,s,uv,dpdx(uv),dpdy(uv)${shift})` : `textureSample(t,s,uv${shift})`};
+          }`,
+        entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }],
+      });
+      results[`${filter}/${map}-${call}/${offset}`] = [...new Uint32Array(new Float32Array(values).buffer)];
+      }
       return results;
     } finally { texture.destroy(); }
   },
-  /** Explicit mip weights use an unfiltered oracle; implicit requests use the native hardware sampler. */
+  /** Explicit level weights use an unfiltered oracle; every footprint request uses the native hardware sampler. */
   async mipFiltering(device) {
     const texture = device.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
     for (let m = 0; m < 5; m++) {
@@ -201,9 +216,9 @@ const cases = {
         // These mips are spatially constant. The specified footprints give LOD 2 + bias, or 2.5
         // for implicit sampling; the explicit-level and explicit-gradient requests span 2..3.
         const oracleLod = mode === 'implicit' ? '2.5' : lod;
-        // Hardware implicit LOD has finite fraction precision; the layer must match native sampling.
-        // Keep the analytic oracle for explicit levels and gradients; bias uses implicit derivatives too.
-        const hardware = mode === 'implicit' || mode === 'bias';
+        // Hardware footprint LOD has finite fraction precision; the layer must match native sampling.
+        // Keep the analytic oracle for explicit levels; bias and explicit gradients are footprints too.
+        const hardware = mode === 'implicit' || mode === 'bias' || mode === 'grad';
         const expr = device.gl || hardware ? sample : `oracle(${oracleLod})`;
         results[`${filter}/${mode}`] = await shade(device, { w: 9, h: 2,
           code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;

@@ -2020,11 +2020,14 @@ export class StageEmitter {
       case 'textureSampleGrad': {
         // GL implementations may compress the transition between mip levels (Radeon/ANGLE D3D11 returns
         // 0.8125, not 0.75, between white and black at LOD 2.25). Keep spatial filtering in the hardware,
-        // but interpolate requested levels/gradients for isotropic, matching-min/mag filters ourselves.
-        // Implicit sampling must retain the hardware footprint: a Euclidean derivative estimate can choose a
-        // different mip from the native sampler (J6 ToyCar normal map), changing every later lighting pass.
+        // but interpolate requested levels for isotropic, matching-min/mag filters ourselves.
+        // Every footprint (implicit, biased or explicit gradients) keeps the hardware's LOD selection: a
+        // Euclidean derivative estimate can choose a different mip from the native sampler (J6 ToyCar normal
+        // map), and the hardware snaps the LOD fraction, so a float LOD just under 2 reads level 2 alone where
+        // the sampler mixes in 1/256 of level 1. textureSampleGrad(dpdx(uv), dpdy(uv)) then matches
+        // textureSample bit for bit, as it does natively (materials stochasticTiling relies on it).
         const exactMip =
-          (name === 'textureSampleLevel' || name === 'textureSampleGrad') &&
+          name === 'textureSampleLevel' &&
           tt.shape === 'sampled' &&
           (tt.dimension !== 'cube' || name === 'textureSampleLevel');
         const t = this.combined(texArg, rest[0], exactMip, undefined, exactMip, exactMip);
