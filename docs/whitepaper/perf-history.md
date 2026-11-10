@@ -3244,6 +3244,10 @@ Native API counts and task outputs are retained without timing samples or ledger
 updates. Six initial calls passed on Margo and both black-box reference backends.
 No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.md).
 
+### Batch 162 job 2: lathe and tube angular columns (2026-11-10)
+
+`perf(geometry): reuse lathe and tube angular columns` reduces their p-extrude angular sin/cos work from 33,954 to 292 calls without changing extrusion, curve/frame work or geometry output. Seven parent byte digests and the parent-failing work-count assertion are in sweep-workcount.test.js. Additional per-call tables are 2,064 and 272 bytes at those resolutions. [Methods and sources](batch-162-workcounts.md#row-42-lathe-and-tube-angular-reuse). Timing pending the quiet rerun; no runtime speed ratio claimed.
+
 ### Batch 162 job 1: primitive angular columns (2026-11-10)
 
 `perf(geometry): reuse primitive angular columns` removes repeated trigonometric evaluations: 12,452 to 654 sin/cos calls for the sphere, capped cylinder, capsule and torus in one p-primitives iteration. Every geometry byte and group matches 13 parent snapshots. Per-call Float64 table trade-off and research: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun; no benchmark run or speed ratio claimed.

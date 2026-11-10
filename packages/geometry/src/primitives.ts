@@ -501,7 +501,8 @@ export function latheGeometry(
     throw new RangeError(`latheGeometry got ${points.length} profile point(s); pass at least two [x, y] points`);
   const sweep = Math.min(Math.max(phiLength, 0), TAU),
     last = points.length - 1,
-    mesh = new Mesh();
+    mesh = new Mesh(),
+    angular = angles(cols, sweep, phiStart);
   // Profile normals: a segment going (dx, dy) has normal (dy, -dx), weighted by its length; ends take their segment's.
   const normals = points.map((_, j) => {
     let x = 0,
@@ -513,9 +514,8 @@ export function latheGeometry(
   });
   for (let j = 0; j <= last; j++)
     for (let c = 0; c <= cols; c++) {
-      const a = phiStart + (c / cols) * sweep,
-        s = Math.sin(a),
-        k = Math.cos(a),
+      const s = angular[c * 2],
+        k = angular[c * 2 + 1],
         [x, y] = points[j],
         [nx, ny] = normals[j];
       mesh.add(x * s, y, x * k, nx * s, ny, nx * k, c / cols, j / last);
@@ -539,7 +539,8 @@ export function tubeGeometry(
   const along = count(tubularSegments, 1),
     around = count(radialSegments, 1),
     frames = path.computeFrenetFrames(along, closed),
-    mesh = new Mesh();
+    mesh = new Mesh(),
+    angular = angles(around, TAU);
   let first: number[][] = [];
   for (let i = 0; i <= along; i++) {
     const ring: number[][] = [];
@@ -549,9 +550,8 @@ export function tubeGeometry(
         N = frames.normals[i],
         B = frames.binormals[i];
       for (let j = 0; j <= around; j++) {
-        const v = (j / around) * TAU,
-          cv = -Math.cos(v),
-          sv = Math.sin(v),
+        const cv = -angular[j * 2 + 1],
+          sv = angular[j * 2],
           d = [cv * N[0] + sv * B[0], cv * N[1] + sv * B[1], cv * N[2] + sv * B[2]],
           l = Math.hypot(d[0], d[1], d[2]) || 1;
         ring.push([d[0] / l, d[1] / l, d[2] / l, centre[0], centre[1], centre[2]]);

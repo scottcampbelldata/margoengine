@@ -3962,6 +3962,10 @@ or add timings to the historical ledger.
 
 ### Batch 162 geometry, math and raycast work counts
 
+For lathe/tube angular reuse, after the package build run
+`node --test --test-timeout=120000 packages/geometry/tests/sweep-workcount.test.js`.
+This checks seven parent geometry stream digests and exact angular call counts.
+
 [Work-count methods](batch-162-workcounts.md) give the unchanged scenes, deterministic assertions, parent byte checks, trade-offs and sources. Build with npm run build:packages, then run node --test --test-timeout=120000 packages/geometry/tests/primitive-workcount.test.js for primitive columns. Timing pending the quiet rerun; do not enable the deferred speed suite for this evidence.
 
 ### Batch 169 UI layout work count

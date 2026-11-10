@@ -33,9 +33,30 @@ reuse the angular values, without recurrences or approximate trigonometry that w
 The BVH, spatial hash and hull papers below address different workloads and do not justify changing primitive topology.
 Clean room: no engine implementation or companion source was read or copied.
 
+## Row 4.2: lathe and tube angular reuse
+
+Cause: lathe recomputed each revolution angle for every profile point; tube recomputed each radial angle for every ring.
+Fixed in `perf(geometry): reuse lathe and tube angular columns` (Batch 162 job 2). Reuse the same per-call Float64 table
+as row 4.1. Curve sampling, parallel transport/Frenet frames, closed-seam reuse, normalization and extrusion stay intact.
+For the unchanged `p-extrude` resolutions, lathe's 64-point profile and 128 angular segments need 258 sin/cos calls
+instead of 16,512. Tube's 513 rings with 16 radial segments need 34 radial sin/cos calls instead of 17,442.
+Frame and curve work is additional and unchanged. Combined angular calls fall from 33,954 to 292; this does not count
+the extrusion or imply a whole-scene speedup. Timing pending the quiet rerun.
+
+The tables cost 2,064 bytes for that lathe and 272 bytes for that tube, collectible after each call. No retained cache,
+approximation, lower segment count, optional dependency or public API is added. The Cornell parameterization notes
+below support the separable angular/profile evaluation; caching retains exact sin/cos arguments instead of using
+an incremental rotation recurrence that would change floating-point bits.
+
+Reproduce after `npm run build:packages`:
+`node --test --test-timeout=120000 packages/geometry/tests/sweep-workcount.test.js`.
+Seven parent SHA-256 checks cover every geometry stream for full/partial/collapsed profiles, straight and curved
+open tubes and a closed curved tube. A straight tube isolates radial work from frame rotations. The parent fails
+the angular-count assertion (16,512 rather than 258 on lathe); all seven parent byte checks pass on both versions.
+
 ## Research consulted
 
-- Cornell CS4620, *Triangle meshes I* (2019), [course notes](https://www.cs.cornell.edu/courses/cs4620/2019fa/slides/04trimesh1.pdf): mesh parameterization and cylindrical coordinates.
+- Steve Marschner, Cornell CS4620, *Triangle meshes I* (2019), [course notes](https://www.cs.cornell.edu/courses/cs4620/2019fa/slides/04trimesh1.pdf): mesh parameterization and cylindrical coordinates.
 - Ingo Wald, *On fast Construction of SAH-based Bounding Volume Hierarchies* (2007), [paper](https://publications.sci.utah.edu/publications/wald07/fastbuild.pdf): binned construction.
 - Henri Ylitie, Tero Karras and Samuli Laine, *Efficient Incoherent Ray Traversal on GPUs Through Compressed Wide BVHs* (2017), [paper](https://research.nvidia.com/sites/default/files/publications/ylitie2017hpg-paper.pdf): traversal and memory traffic trade-offs.
 - Alexander Majercik, Cyril Crassin, Peter Shirley and Morgan McGuire, *A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering* (2018), [JCGT](https://jcgt.org/published/0007/03/04/): ray/box arithmetic.
