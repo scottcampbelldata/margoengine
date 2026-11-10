@@ -458,3 +458,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/animation: document /discrete-tracks typed constructors, hold-left sampling, buffers/edits/JSON, safe binding, createDiscreteClip, plain roots, winner semantics, constant clips and disposal; refresh mixer bytes (batch 210 job 3).
 - margoengine: document animation/discrete-tracks alias (batch 210 job 3).
+- @margoengine/tiles: cover tiles/fade construction, decorate then attach, monotonic simulation clock, hierarchy reversals, ADD, live retention budgets and composing feature/style decoration.
+- @margoengine/points: cover optional live PointsMaterial.ditherFade coverage intervals and unchanged alpha/depth defaults.
+- @margoengine/splats: cover setDitherFade original-order content ranges, lazy four-byte masks, global sorting, quantization and device restoration.
+- margoengine: cover the generated tiles/fade alias.

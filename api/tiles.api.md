@@ -249,6 +249,12 @@ export type TilesDecorationContext = {
     model: TilesModel;
     content: InstancesContent;
     tile: TilesetTile;
+} | {
+    kind: 'splats';
+    model: TilesModel;
+    content: ModelContent;
+    tile: TilesetTile;
+    fade: (lower: number, upper: number) => void;
 });
 
 export interface TilesFrame {
@@ -356,6 +362,9 @@ export class Tileset {
 }
 
 export interface TilesetEvents {
+    selection: {
+        selected: readonly TilesetTile[];
+    };
     tileload: {
         tile: TilesetTile;
     };

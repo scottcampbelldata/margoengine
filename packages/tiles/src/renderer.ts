@@ -33,6 +33,13 @@ export type TilesDecorationContext = {
   | { kind: 'model'; model: TilesModel; content: ModelContent; tile: TilesetTile }
   | { kind: 'points'; cloud: unknown; content: PointsContent; tile: TilesetTile }
   | { kind: 'instances'; model: TilesModel; content: InstancesContent; tile: TilesetTile }
+  | {
+      kind: 'splats';
+      model: TilesModel;
+      content: ModelContent;
+      tile: TilesetTile;
+      fade: (lower: number, upper: number) => void;
+    }
 );
 /** Optional entry hook for feature styling and selection. No optional implementation is imported by tiles root. */
 export type TilesContentDecorator = (

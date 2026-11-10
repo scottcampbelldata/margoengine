@@ -1,3 +1,4 @@
+import { ditherWGSL } from '../../shared/screen-door.js';
 import { MargoError } from '@margoengine/math/errors';
 import { fogWgsl } from '../../shared/fog.js';
 import { surfaceEntry } from '../../shared/pass.js';
@@ -55,6 +56,7 @@ const CORNERS=array<vec2f,4>(vec2f(-1.0,-1.0),vec2f(1.0,-1.0),vec2f(-1.0,1.0),ve
 /** Point cloud shader: one instanced quad per point, read from storage buffers through the shuffled slot order. */
 export const pointShader: string =
   frameWgsl +
+  ditherWGSL +
   /* wgsl */ `
 struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f,planes:array<vec4f,6>}
 @group(1) @binding(0) var<uniform> cloud:Cloud;
@@ -99,6 +101,8 @@ ${pointColorWgsl}
 
 struct Surface{color:vec4f,nz:f32}
 fn surface(i:VOut)->Surface{
+  if(cloud.flags.z!=0u||cloud.flags.w!=1065353216u){let fade=(f32(margoDitherRank(i.clip.xy))+0.5)/16.0;
+  if(fade<bitcast<f32>(cloud.flags.z)||fade>=bitcast<f32>(cloud.flags.w)){discard;}}
   let r=max(i.info.x,1e-4);
   let uv=vec2f(0.5+0.5*i.quad.x/r,0.5-0.5*i.quad.y/r);
   // The map spans the point's diameter: one mip per halving of texels per pixel. A map without mips stays at level 0.
@@ -235,7 +239,13 @@ export function surfaceShader(kind: 'point' | 'sprite', declarations: string, ad
     declarations +
     code +
     'fn margoViewDepth(p:vec4f)->f32{return select(1.0/p.w,frame.right.w+(1.0-p.z)/frame.depth.y,frame.depth.w>0.5);}\n' +
-    surfaceEntry(declarations, 'i:VOut', kind === 'point' ? 'surface(i).color' : 'margoShade(i)', 'i.clip', 'margoViewDepth(i.clip)')
+    surfaceEntry(
+      declarations,
+      'i:VOut',
+      kind === 'point' ? 'surface(i).color' : 'margoShade(i)',
+      'i.clip',
+      'margoViewDepth(i.clip)',
+    )
   );
 }
 /**
@@ -267,7 +277,10 @@ export function edited(code: string, edits: readonly (readonly [string, string])
 /** `code`, a point shader, with its eye-dome depth output packed by {@link depthPacking}. */
 export const packedDepthPoints = (code: string): string =>
   edited(code, [
-    ['struct EdlOut{@location(0) color:vec4f,@location(1) depth:f32}', 'struct EdlOut{@location(0) color:vec4f,@location(1) depth:vec4f}'],
+    [
+      'struct EdlOut{@location(0) color:vec4f,@location(1) depth:f32}',
+      'struct EdlOut{@location(0) color:vec4f,@location(1) depth:vec4f}',
+    ],
     ['@location(1) edl:f32,@builtin(frag_depth)', '@location(1) edl:vec4f,@builtin(frag_depth)'],
     ['return EdlOut(s.color,i.info.y);', 'return EdlOut(s.color,packDepth(i.info.y));'],
     [

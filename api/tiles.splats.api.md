@@ -21,6 +21,7 @@ export class TileSplats {
     get count(): number;
     add(placed: PlacedSplats): Entry;
     show(entry: Entry, visible: boolean): void;
+    fade(entry: Entry, lower: number, upper: number): void;
     remove(entry: Entry): void;
     flush(): void;
 }
@@ -56,6 +57,7 @@ class BatchTable {
 
 interface Cloud {
     readonly count: number;
+    setDitherFade?(first: number, count: number, lower: number, upper: number): unknown;
     dispose(): void;
 }
 
@@ -77,6 +79,12 @@ interface DracoPointsData {
 interface Entry {
     placed: PlacedSplats;
     visible: boolean;
+    range?: readonly [number, number];
+    spans?: Array<{
+        cloud: Cloud;
+        first: number;
+        count: number;
+    }>;
 }
 
 class FeatureTable {
@@ -222,6 +230,12 @@ type TilesDecorationContext = {
     model: TilesModel;
     content: InstancesContent;
     tile: TilesetTile;
+} | {
+    kind: 'splats';
+    model: TilesModel;
+    content: ModelContent;
+    tile: TilesetTile;
+    fade: (lower: number, upper: number) => void;
 });
 
 interface TilesModel {

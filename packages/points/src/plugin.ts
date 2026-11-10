@@ -1181,7 +1181,8 @@ export class PointsPlugin implements EnginePlugin {
     // Clipping planes: count in flags.y (bit 16: intersection), planes from byte 128, unused slots zeroed.
     const planes = m['clipping'];
     u[25] = planes.length / 4 + (m.clipIntersection ? 65536 : 0);
-    u[26] = u[27] = 0;
+    f[26] = m.ditherFade?.[0] ?? 0;
+    f[27] = m.ditherFade?.[1] ?? 1;
     f.set(planes, 32);
     f.fill(0, 32 + planes.length);
     let changed = false;

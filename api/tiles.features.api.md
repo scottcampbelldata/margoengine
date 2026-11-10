@@ -223,6 +223,12 @@ type TilesDecorationContext = {
     model: TilesModel;
     content: InstancesContent;
     tile: TilesetTile;
+} | {
+    kind: 'splats';
+    model: TilesModel;
+    content: ModelContent;
+    tile: TilesetTile;
+    fade: (lower: number, upper: number) => void;
 });
 
 interface TilesModel {

@@ -291,3 +291,47 @@ test('splat tiles: past the per-cloud limit the visible splats start another clo
     [5, 4],
   );
 });
+
+test('per-content fade intervals survive globally merged cloud rebuilds and update without resorting or rebuilding', () => {
+  let offset = [0, 0, 0];
+  const calls = [],
+    clouds = [];
+  const host = { engine: {}, onUpdate: () => () => {}, offset: () => offset };
+  const scene = new TileSplats(host, (_engine, data) => {
+    const c = { count: data.positions.length / 3, setDitherFade: (...args) => calls.push(args), dispose() {} };
+    clouds.push(c);
+    return c;
+  });
+  const data = {
+    positions: new Float32Array([0, 0, 0]),
+    covariances: new Float32Array([1, 0, 0, 1, 0, 1]),
+    colors: new Float32Array([1, 0, 0, 1]),
+  };
+  const a = scene.add({ anchor: [0, 0, 0], data }),
+    b = scene.add({ anchor: [0, 0, 0], data });
+  scene.fade(a, 0.5, 1);
+  scene.fade(b, 0, 0.5);
+  scene.show(a, true);
+  scene.show(b, true);
+  scene.flush();
+  assert.equal(scene.clouds.length, 1);
+  assert.deepEqual(calls, [
+    [0, 1, 0.5, 1],
+    [1, 1, 0, 0.5],
+  ]);
+  scene.fade(a, 0.75, 1);
+  assert.equal(scene.builds, 1);
+  assert.deepEqual(calls.at(-1), [0, 1, 0.75, 1]);
+  const count = calls.length;
+  scene.fade(a, 0.75, 1);
+  assert.equal(calls.length, count, 'stable intervals upload no bytes');
+  offset = [1000, 0, 0];
+  scene.flush();
+  assert.equal(scene.builds, 2);
+  assert.deepEqual(calls.slice(-2), [
+    [0, 1, 0.75, 1],
+    [1, 1, 0, 0.5],
+  ]);
+  scene.remove(a);
+  scene.remove(b);
+});

@@ -4,11 +4,13 @@
 // @margoengine/splats draws them. Every visible tile's splats go into one cloud, rebuilt after an update that changed
 // which tiles show, so splats of neighbouring and overlapping tiles sort together instead of tile by tile. Written from
 // the 3D Tiles 1.1 specification (glTF content, tile transforms, REPLACE refinement) and the KHR_gaussian_splatting README.
+import { MargoError } from '@margoengine/math/errors';
+import { checkDitherRange } from '../../shared/screen-door.js';
 import type { EngineKernel } from '@margoengine/core';
 import type { SplatData } from '@margoengine/splats/data';
 import type { ModelContent } from './formats.js';
 import { type TileMatrix, multiply } from './matrix.js';
-import type { TilesContentHost, TilesModelDrawer } from './renderer.js';
+import type { TilesContentHost, TilesModelDrawer, TilesContentDecoration } from './renderer.js';
 import type { TileRenderable, TilesetTile } from './tileset.js';
 
 /** Most splats one @margoengine/splats cloud takes; past it the visible splats start another cloud. */
@@ -85,11 +87,14 @@ export function mergePlaced(parts: readonly PlacedSplats[], offset: ArrayLike<nu
 /** The part of a @margoengine/splats cloud the scene uses. */
 interface Cloud {
   readonly count: number;
+  setDitherFade?(first: number, count: number, lower: number, upper: number): unknown;
   dispose(): void;
 }
 interface Entry {
   placed: PlacedSplats;
   visible: boolean;
+  range?: readonly [number, number];
+  spans?: Array<{ cloud: Cloud; first: number; count: number }>;
 }
 
 /**
@@ -129,6 +134,20 @@ export class TileSplats {
     entry.visible = visible;
     this.dirty = true;
   }
+  /** Sets one tile content interval without rebuilding or independently sorting its splats. */
+  fade(entry: Entry, lower: number, upper: number): void {
+    checkDitherRange([lower, upper]);
+    if (entry.range?.[0] === lower && entry.range[1] === upper) return;
+    entry.range = [lower, upper];
+    for (const span of entry.spans ?? []) {
+      if (!span.cloud.setDitherFade)
+        throw new MargoError(
+          'unsupported',
+          'Splat fading needs setDitherFade in the owning splat cloud; update the custom cloud adapter',
+        );
+      span.cloud.setDitherFade(span.first, span.count, lower, upper);
+    }
+  }
   remove(entry: Entry): void {
     if (!this.entries.delete(entry)) return;
     if (entry.visible) this.dirty = true;
@@ -147,7 +166,8 @@ export class TileSplats {
     this.dirty = false;
     this.built = [offset[0], offset[1], offset[2]];
     this.release();
-    const shown: PlacedSplats[][] = [[]];
+    for (const entry of this.entries) entry.spans = [];
+    const shown: Entry[][] = [[]];
     let size = 0;
     for (const entry of this.entries) {
       if (!entry.visible) continue;
@@ -156,11 +176,34 @@ export class TileSplats {
         shown.push([]);
         size = 0;
       }
-      shown[shown.length - 1].push(entry.placed);
+      shown[shown.length - 1].push(entry);
       size += count;
     }
     if (!shown[0].length) return;
-    this.clouds = shown.map((parts) => this.attach(this.host.engine, mergePlaced(parts, offset)));
+    this.clouds = shown.map((parts) => {
+      const cloud = this.attach(
+        this.host.engine,
+        mergePlaced(
+          parts.map((e) => e.placed),
+          offset,
+        ),
+      );
+      let first = 0;
+      for (const entry of parts) {
+        const count = entry.placed.data.positions.length / 3;
+        entry.spans!.push({ cloud, first, count });
+        if (entry.range) {
+          if (!cloud.setDitherFade)
+            throw new MargoError(
+              'unsupported',
+              'Splat fading needs setDitherFade in the owning splat cloud; update the custom cloud adapter',
+            );
+          cloud.setDitherFade(first, count, ...entry.range);
+        }
+        first += count;
+      }
+      return cloud;
+    });
     this.builds++;
   }
   private release(): void {
@@ -242,12 +285,42 @@ export const splats: TilesModelDrawer = async (
   const entries = splatScene ? placed.map((p) => splatScene.add(p)) : [];
   // Under budget 'gpu': the meshes, plus about 128 bytes a splat of @margoengine/splats buffers and its harmonics.
   // Under 'content': the file. The splats' CPU arrays kept for rebuilds are not GPU memory and are not counted.
-  let bytes = host.measure(model, content.byteLength);
+  let bytes = 0;
   if (host.budget === 'gpu')
     for (const { data } of placed)
       bytes += (data.positions.length / 3) * 128 + (data.sphericalHarmonics?.byteLength ?? 0);
+  let decoration: TilesContentDecoration | undefined;
+  try {
+    decoration = await host.decorate?.({
+      kind: 'splats',
+      model,
+      content,
+      tile,
+      signal,
+      fetch: host.fetch,
+      fade: (lower, upper) => {
+        for (const entry of entries) splatScene!.fade(entry, lower, upper);
+      },
+    });
+    signal.throwIfAborted();
+  } catch (error) {
+    decoration?.dispose();
+    for (const entry of entries) splatScene!.remove(entry);
+    host.forget(model.root);
+    model.dispose();
+    throw error;
+  }
   return {
-    bytes,
+    get bytes() {
+      return (
+        host.measure(model, content.byteLength) +
+        bytes +
+        (decoration?.bytes ?? 0) +
+        (host.budget === 'gpu'
+          ? entries.reduce((sum, e) => sum + (e.range ? (e.placed.data.positions.length / 3) * 4 : 0), 0)
+          : 0)
+      );
+    },
     get visible() {
       return model.root.visible;
     },
@@ -256,6 +329,7 @@ export const splats: TilesModelDrawer = async (
       for (const entry of entries) splatScene!.show(entry, value);
     },
     dispose: () => {
+      decoration?.dispose();
       for (const entry of entries) splatScene!.remove(entry);
       host.forget(model.root);
       model.dispose();

@@ -3546,6 +3546,10 @@
       "types": "./dist/tiles/features.d.ts",
       "import": "./dist/tiles/features.js"
     },
+    "./tiles/fade": {
+      "types": "./dist/tiles/fade.d.ts",
+      "import": "./dist/tiles/fade.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

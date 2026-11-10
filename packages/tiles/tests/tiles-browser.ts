@@ -2,6 +2,7 @@
 // tiles, anchored in ECEF at 40 N 75.6 W) streamed by TilesRenderer through gltf-pro and drawn by the engine.
 // tests/tiles-browser.mjs drives it and checks the numbers. Built imports, so it uses the published package boundary.
 import { Engine } from '../../core/dist/extension.js';
+import { TilesFade, ditherRank } from '../dist/fade.js';
 import { TileFeatures } from '../dist/features.js';
 import { parseGLTFAsync, GLTFAsset } from '../../gltf-pro/dist/index.js';
 import { gaussianSplats, readGaussianSplats } from '../../gltf-pro/dist/splats.js';
@@ -90,6 +91,162 @@ function snapshot() {
 }
 
 async function run(name: string): Promise<unknown> {
+  if (name === 'fade') {
+    const from = errors.length;
+    const url =
+      '/examples/assets/3d-tiles/EXT_structural_metadata/FeatureIdAttributeAndPropertyTable/FeatureIdAttributeAndPropertyTable.gltf';
+    const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const root = {
+      boundingVolume: { sphere: [0.5, 0.5, 0, 2] },
+      geometricError: 1000,
+      content: { uri: 'a.gltf' },
+      children: [{ boundingVolume: { sphere: [0.5, 0.5, 0, 2] }, geometricError: 0, content: { uri: 'a.gltf' } }],
+    };
+    const data = memoryFetch(
+      new Map([
+        [
+          'tileset.json',
+          new TextEncoder().encode(JSON.stringify({ asset: { version: '1.1' }, geometricError: 1000, root })),
+        ],
+        ['a.gltf', bytes],
+      ]),
+    );
+    let time = 0;
+    const fade = new TilesFade({ duration: 1, clock: () => time });
+    engine.camera.position = [0.5, 0.5, 2];
+    engine.camera.target = [0.5, 0.5, 0];
+    tiles = await TilesRenderer.load(engine, data.url, {
+      fetch: data.fetch,
+      frame: 'local',
+      maximumScreenSpaceError: 1e9,
+      decorate: fade.decorate,
+    });
+    fade.attach(tiles);
+    await converge();
+    const before = pixels();
+    tiles.tileset.maximumScreenSpaceError = 0;
+    await converge();
+    tiles.tileset.memoryBudget = 1;
+    time = 0.5;
+    await frame();
+    const middle = pixels();
+    const parentRetained = tiles.tileset.root.renderable?.visible === true;
+    let difference = 0,
+      litCount = 0;
+    for (let i = 0; i < before.length; i++) {
+      difference = Math.max(difference, Math.abs(before[i] - middle[i]));
+      if (i % 4 !== 3 && before[i] > 10) litCount++;
+    }
+    time = 1.1;
+    await frame();
+    const evicted = tiles.tileset.root.state === 'unloaded';
+    fade.dispose();
+    tiles.dispose();
+    const host = PointsPlugin.attach(engine);
+    const point = host.add(
+      new PointCloud({
+        positions: new Float32Array([0.5, 0.5, 0]),
+        material: { size: 128, minPixelSize: 128, maxPixelSize: 128, shape: 'square' },
+      }),
+    );
+    await frame();
+    const fullPoint = pixels();
+    point.material.ditherFade = [0, 0.5];
+    await frame();
+    const halfPoint = pixels();
+    point.material.ditherFade = [0, 0];
+    await frame();
+    const noPoint = pixels();
+    let pointPixels = 0,
+      pointHalf = 0,
+      pointZero = 0,
+      pointWrong = 0;
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        if (fullPoint[i] + fullPoint[i + 1] + fullPoint[i + 2] > 10) {
+          pointPixels++;
+          const present = halfPoint[i] + halfPoint[i + 1] + halfPoint[i + 2] > 10;
+          if (present) pointHalf++;
+          if (present !== ditherRank(x, y) < 8) pointWrong++;
+        }
+        if (noPoint[i] + noPoint[i + 1] + noPoint[i + 2] > 10) pointZero++;
+      }
+    host.dispose();
+    const cube = new Uint8Array(
+      await (await fetch('/examples/assets/3d-tiles/GaussianSplats/sh_unit_cube/0/0.glb')).arrayBuffer(),
+    );
+    const chunks = glbChunks(cube),
+      doc = JSON.parse(new TextDecoder().decode(chunks[0].data)),
+      asset = new GLTFAsset(doc, [], chunks[1].data, { splats: gaussianSplats }, 2 ** 30),
+      splatsData = await readGaussianSplats(asset, doc.meshes[0].primitives[0]);
+    engine.camera.position = [3, 2, 4];
+    engine.camera.target = [0, 0, 0];
+    const cloud = Splats.attach(engine, splatsData);
+    await frame();
+    const fullSplat = pixels();
+    cloud.setDitherFade(0, cloud.count, 0, 0.5);
+    await frame();
+    const halfSplat = pixels();
+    let splatPixels = 0,
+      splatHalf = 0,
+      splatWrong = 0;
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        if (fullSplat[i] + fullSplat[i + 1] + fullSplat[i + 2] > 10) {
+          splatPixels++;
+          const present = halfSplat[i] + halfSplat[i + 1] + halfSplat[i + 2] > 10;
+          if (present) splatHalf++;
+          if (present !== ditherRank(x, y) < 8) splatWrong++;
+        }
+      }
+    const fadeBytes = cloud.ditherFadeBytes;
+    cloud.dispose();
+    engine.camera.position = [0, 0, 3];
+    engine.camera.target = [0, 0, 0];
+    const sorted = Splats.attach(engine, {
+      positions: new Float32Array([0, 0, 0, 0, 0, -1]),
+      covariances: new Float32Array([0.1, 0, 0, 0.1, 0, 0.1, 0.1, 0, 0, 0.1, 0, 0.1]),
+      colors: new Float32Array([1, 0, 0, 1, 0, 1, 0, 1]),
+    });
+    sorted.setDitherFade(0, 1, 0, 0.5);
+    sorted.setDitherFade(1, 1, 0.5, 1);
+    await frame();
+    const sortedPixels = pixels();
+    let sortedChecked = 0,
+      sortedWrong = 0;
+    for (let y = H / 2 - 10; y < H / 2 + 10; y++)
+      for (let x = W / 2 - 10; x < W / 2 + 10; x++) {
+        const i = (y * W + x) * 4;
+        const red = sortedPixels[i] > sortedPixels[i + 1];
+        if (sortedPixels[i] + sortedPixels[i + 1] > 10) {
+          sortedChecked++;
+          if (red !== ditherRank(x, y) < 8) sortedWrong++;
+        }
+      }
+    sorted.dispose();
+    engine.camera.position = [0, 120, 1800];
+    engine.camera.target = [0, 0, 0];
+    return {
+      errors: errors.slice(from),
+      difference,
+      litCount,
+      parentRetained,
+      evicted,
+      pointPixels,
+      pointHalf,
+      pointZero,
+      pointWrong,
+      splatPixels,
+      splatHalf,
+      splatWrong,
+      fadeBytes,
+      sortedChecked,
+      sortedWrong,
+      count: splatsData.positions.length / 3,
+    };
+  }
   if (name === 'features') {
     const from = errors.length;
     const url =

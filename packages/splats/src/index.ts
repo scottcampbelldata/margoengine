@@ -1,3 +1,4 @@
+import { checkDitherRange, ditherWGSL } from '../../shared/screen-door.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import {
@@ -70,6 +71,8 @@ export class Splats implements EnginePlugin {
   // positions, covariances, colors and SH on the GPU, for `write` and `clear`.
   private inputs: GPUBuffer[] = [];
   private uniform?: GPUBuffer;
+  private fadeData?: Uint32Array;
+  private fadeBuffer?: GPUBuffer;
   private index?: GPUBuffer;
   private projected?: GPUBuffer;
   private evaluated?: GPUBuffer;
@@ -191,6 +194,46 @@ export class Splats implements EnginePlugin {
     if (all && k) q.writeBuffer(sh, first * k * 12, this.sh as Float32Array<ArrayBuffer>, first * k * 3, n * k * 3);
     return this;
   }
+  /** GPU bytes of the optional per-splat screen-door intervals; zero until enabled. */
+  get ditherFadeBytes(): number {
+    return this.fadeData?.byteLength ?? 0;
+  }
+  /** Sets coverage [lower,upper] for an original-order content range. Default full coverage; no opacity or sort edits. */
+  setDitherFade(first: number, count: number, lower = 0, upper = 1): this {
+    this.range(first, count);
+    checkDitherRange([lower, upper]);
+    if (!this.fadeData) {
+      this.fadeData = new Uint32Array(this.count).fill(4096);
+      this.record = undefined;
+      this.renders.clear();
+    }
+    const a = Math.ceil(Math.fround(lower) * 16 - 0.5),
+      b = Math.ceil(Math.fround(upper) * 16 - 0.5),
+      packed = Math.max(0, a) | (Math.max(0, b) << 8);
+    this.fadeData.fill(packed, first, first + count);
+    if (this.device) {
+      if (!this.fadeBuffer) this.prepareFade();
+      else if (count)
+        this.device.queue.writeBuffer(
+          this.fadeBuffer,
+          first * 4,
+          this.fadeData as Uint32Array<ArrayBuffer>,
+          first,
+          count,
+        );
+    }
+    return this;
+  }
+  private prepareFade(): void {
+    if (!this.fadeData || !this.device || this.fadeBuffer) return;
+    const d = this.device;
+    this.fadeBuffer = d.createBuffer({
+      size: this.fadeData.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.buffers.push(this.fadeBuffer);
+    d.queue.writeBuffer(this.fadeBuffer, 0, this.fadeData as Uint32Array<ArrayBuffer>);
+  }
   /**
    * The cloud as data, after any edits or poses made on the GPU (`./edit`, `./animate`): when attached, centres,
    * covariances, opacities, colours and SH are read back into the copy kept for device restoration first. For export
@@ -309,6 +352,7 @@ export class Splats implements EnginePlugin {
       if (data) d.queue.writeBuffer(b, 0, data as Float32Array<ArrayBuffer>);
       return b;
     };
+    this.prepareFade();
     this.uniform = buffer(192, GPUBufferUsage.UNIFORM);
     this.index = buffer(24, GPUBufferUsage.INDEX, new Uint32Array([0, 1, 2, 2, 1, 3]));
     // Positions, colours and SH can be read back (`read`) after GPU edits such as ./edit's brush.
@@ -467,11 +511,32 @@ export class Splats implements EnginePlugin {
     pass.dispatchWorkgroups(x, y);
   }
   /** Pipeline and group 0 for this target, and for `hook` when given. */
+  private fadeShader(code: string): string {
+    if (!this.fadeData) return code;
+    return (
+      ditherWGSL +
+      '\n@group(0) @binding(4) var<storage,read> fadeRanges:array<u32>;\n' +
+      code
+        .replace('@location(1) color:vec4f}', '@location(1) color:vec4f,@location(3) @interpolate(flat) margoFade:u32}')
+        .replace(
+          '@location(1) color:vec4f,@location(2) margoDepth:f32}',
+          '@location(1) color:vec4f,@location(2) margoDepth:f32,@location(3) @interpolate(flat) margoFade:u32}',
+        )
+        .replace('o.corner=corner;', 'o.corner=corner;o.margoFade=fadeRanges[index];')
+        .replace(
+          'let power=-4.5*dot(i.corner,i.corner);',
+          'let fade=margoDitherRank(i.clip.xy);if(fade<(i.margoFade&255u)||fade>=(i.margoFade>>8u)){discard;}let power=-4.5*dot(i.corner,i.corner);',
+        )
+    );
+  }
   private pipeline(c: Context, key: string, hook?: SurfaceTransparency): NonNullable<Splats['record']> {
+    key += this.fadeData ? '|dither' : '';
     let record = this.renders.get(key);
     if (record) return record;
     const declarations = hook?.surface(1),
-      module = c.device.createShaderModule({ code: declarations ? transparentRender(declarations) : render }),
+      module = c.device.createShaderModule({
+        code: this.fadeShader(declarations ? transparentRender(declarations) : render),
+      }),
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
@@ -492,7 +557,13 @@ export class Splats implements EnginePlugin {
       pipeline,
       group: c.device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
-        entries: [this.uniform!, this.projected!, this.evaluated!, this.keys[0]].map((buffer, binding) => ({
+        entries: [
+          this.uniform!,
+          this.projected!,
+          this.evaluated!,
+          this.keys[0],
+          ...(this.fadeBuffer ? [this.fadeBuffer] : []),
+        ].map((buffer, binding) => ({
           binding,
           resource: { buffer },
         })),
@@ -594,6 +665,7 @@ export class Splats implements EnginePlugin {
     this.compatSort = undefined;
     this.renders.clear();
     this.record = undefined;
+    this.fadeBuffer = undefined;
     this.uniform = this.index = this.projected = this.evaluated = undefined;
     this.projection = undefined;
     this.projectionGroup = undefined;

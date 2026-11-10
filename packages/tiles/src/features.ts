@@ -56,7 +56,7 @@ interface SetInfo {
   index: number;
 }
 interface Entry {
-  context: TilesDecorationContext & { kind: 'model' | 'instances' };
+  context: TilesDecorationContext & { kind: 'model' | 'instances' | 'splats' };
   model: PBRModel;
   primitive: PBRPrimitive;
   sets: SetInfo[];
@@ -101,7 +101,7 @@ export class TileFeatures implements EnginePlugin, Disposable {
     if (context.kind === 'points') return prior ?? { bytes: 0, dispose() {} };
     const model = context.model as PBRModel;
     try {
-      const bytes = context.kind === 'model' ? context.content.gltf : undefined;
+      const bytes = context.kind === 'model' || context.kind === 'splats' ? context.content.gltf : undefined;
       const metadata = bytes
         ? readStructuralMetadata(bytes, {
             buffer: (i) => model.asset.buffers[i],

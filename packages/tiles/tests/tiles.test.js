@@ -654,3 +654,18 @@ test('tileset: a relative tileset URL resolves against the page, and so do its t
     else delete globalThis.location;
   }
 });
+
+test('ready REPLACE fallback parents are evictable after descendants cover them, while visible transitions retain them', async () => {
+  const { tileset } = await loadCity({
+    city: { levels: 2, size: 100, height: 5 },
+    tileset: { maximumScreenSpaceError: 0, memoryBudget: 1e9 },
+  });
+  const far = view([0, 30, 100]);
+  await converge(tileset, far);
+  assert.ok(tileset.progress.ready > 0);
+  tileset.memoryBudget = 1;
+  await converge(tileset, far);
+  assert.equal(tileset.root.state, 'unloaded');
+  assert.ok(tileset.progress.selected > 0);
+  tileset.dispose();
+});

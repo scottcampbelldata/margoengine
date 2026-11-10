@@ -1,3 +1,4 @@
+import { checkDitherRange } from '../../shared/screen-door.js';
 import { parseColor, type ColorInput } from './color.js';
 
 /**
@@ -203,6 +204,8 @@ export type PointShading = 'flat' | 'sphere';
  * size, or an unknown sizeUnits, shape or shading throw a RangeError.
  */
 export interface PointsMaterialOptions extends BaseMaterialOptions {
+  /** Optional screen-door coverage [lower,upper], both in [0,1]. Default full coverage. */
+  ditherFade?: readonly [number, number];
   /** Point diameter: pixels, or world units when `sizeUnits` is 'world'. Per-point sizes multiply it. Default 4. */
   size?: number;
   /** 'pixels' keeps a constant screen size; 'world' attenuates with distance. Default 'pixels'. */
@@ -225,6 +228,8 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
 
 /** Point cloud material. Read every frame; change fields freely. */
 export class PointsMaterial extends BaseMaterial {
+  /** Live optional screen-door coverage interval, [0,1] when unset. */
+  ditherFade?: readonly [number, number];
   size = 4;
   sizeUnits: 'pixels' | 'world' = 'pixels';
   minPixelSize = 1;
@@ -257,12 +262,14 @@ export class PointsMaterial extends BaseMaterial {
     if (options.vertexColors !== undefined) this.vertexColors = options.vertexColors;
     if (options.shading !== undefined) this.shading = options.shading;
     if (options.edl !== undefined) this.edl = options.edl;
+    if (options.ditherFade !== undefined) this.ditherFade = options.ditherFade;
     this.validate();
     return this;
   }
 
   override validate(): void {
     super.validate();
+    if (this.ditherFade) checkDitherRange(this.ditherFade);
     if (!(this.size >= 0) || !Number.isFinite(this.size)) throw new RangeError('size must be finite and non-negative');
     if (!(this.minPixelSize >= 0) || !(this.maxPixelSize >= this.minPixelSize) || !Number.isFinite(this.maxPixelSize))
       throw new RangeError('Need 0 <= minPixelSize <= maxPixelSize');

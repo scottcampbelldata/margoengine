@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12962374,
+  "total": 12969048,
   "history": [
     {
       "date": "2026-10-24",
@@ -6463,6 +6463,18 @@
       "commit": "batch210-discrete",
       "reason": "New discrete-tracks 0 -> 2280 B gzip, ceiling 2536 B; mixer 4158 -> 4805 B, ceiling 4414 -> 5061 B. Typed buffers, safe bindings and categorical winner selection preserve value types and live ownership. One shared scheduler avoids duplicated action lifetime; standalone tracks stay free of rendering imports. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch239",
+      "reason": "@margoengine/tiles/fade: new optional entry 0 to 1759 B min+gzip. Complete feature lifecycle and exact decoding stay together; a split would duplicate bindings and ownership. Core plus stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch239-job4",
+      "reason": "Per-content point and sorted-splat coverage hooks and tile lifecycle stay in their owning optional packages. Measured min+gzip before/after: {\"points/surfels\":{\"before\":14674,\"after\":14933},\"points/pick\":{\"before\":5267,\"after\":5759},\"splats/index\":{\"before\":30679,\"after\":31291},\"splats/lod\":{\"before\":29246,\"after\":29793},\"splats/set\":{\"before\":28036,\"after\":28564},\"tiles/splats\":{\"before\":1580,\"after\":2060},\"tiles/fade\":{\"before\":0,\"after\":1766}}. Splitting roots would duplicate material validation, cloud ownership and sorting; no core/stage source change.",
+      "grew": 6
     }
   ],
   "items": {
@@ -7035,9 +7047,9 @@
     "@margoengine/points/las lazy LAZ decoder": 8779,
     "@margoengine/points/laz": 8872,
     "@margoengine/points/octree": 9267,
-    "@margoengine/points/pick": 5274,
+    "@margoengine/points/pick": 6015,
     "@margoengine/points/potree": 17694,
-    "@margoengine/points/surfels": 14851,
+    "@margoengine/points/surfels": 15381,
     "@margoengine/post": 42249,
     "@margoengine/post/afterimage": 6079,
     "@margoengine/post/anamorphic": 6742,
@@ -7229,15 +7241,15 @@
     "@margoengine/sky/volumetric-clouds": 7571,
     "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
-    "@margoengine/splats": 31273,
+    "@margoengine/splats": 32230,
     "@margoengine/splats/animate": 20263,
     "@margoengine/splats/data": 22135,
     "@margoengine/splats/depth": 2119,
     "@margoengine/splats/edit": 3856,
     "@margoengine/splats/lighting": 3606,
-    "@margoengine/splats/lod": 29695,
+    "@margoengine/splats/lod": 30687,
     "@margoengine/splats/pick": 3573,
-    "@margoengine/splats/set": 28476,
+    "@margoengine/splats/set": 29421,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
     "@margoengine/splines/fit": 3250,
@@ -7315,7 +7327,7 @@
     "@margoengine/tiles/metadata": 5175,
     "@margoengine/tiles/properties": 7615,
     "@margoengine/tiles/s2": 3004,
-    "@margoengine/tiles/splats": 1822,
+    "@margoengine/tiles/splats": 2316,
     "@margoengine/tiles/style": 10057,
     "@margoengine/tiles/terrain": 5974,
     "@margoengine/tonemap": 12561,
@@ -7653,6 +7665,7 @@
     "@margoengine/road/lanes": 2579,
     "@margoengine/ui/editor": 4906,
     "leak @margoengine/ui/editor -> @margoengine/text": 1,
-    "@margoengine/animation/discrete-tracks": 2536
+    "@margoengine/animation/discrete-tracks": 2536,
+    "@margoengine/tiles/fade": 2015
   }
 }

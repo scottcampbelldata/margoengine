@@ -41,6 +41,25 @@ try {
   await page.waitForFunction(() => window.tilesFixture, null, { timeout: CASE_TIMEOUT });
   assert.equal(hardware.webgpu?.fallback, false, 'Physical WebGPU adapter required');
 
+  const fade = await call((n) => window.tilesFixture.run(n), 'fade');
+  assert.deepEqual(fade.errors, []);
+  check(
+    'replacement fade retains and evicts streaming meshes with complementary coverage; point and sorted splat masks match the same ordered ranks',
+    fade.litCount > 500 &&
+      fade.difference <= 1 &&
+      fade.parentRetained &&
+      fade.evicted &&
+      fade.pointPixels === 16384 &&
+      fade.pointHalf === 8192 &&
+      fade.pointZero === 0 &&
+      fade.pointWrong === 0 &&
+      fade.splatPixels > 100 &&
+      fade.splatWrong === 0 &&
+      fade.fadeBytes === fade.count * 4 &&
+      fade.sortedChecked === 400 &&
+      fade.sortedWrong === 0,
+    fade,
+  );
   const features = await call((n) => window.tilesFixture.run(n), 'features');
   assert.deepEqual(features.errors, []);
   check(

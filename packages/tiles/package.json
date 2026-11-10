@@ -69,6 +69,10 @@
     "./features": {
       "types": "./dist/features.d.ts",
       "import": "./dist/features.js"
+    },
+    "./fade": {
+      "types": "./dist/fade.d.ts",
+      "import": "./dist/fade.js"
     }
   },
   "files": [

@@ -233,6 +233,7 @@ type PointShape = 'square' | 'round';
 type PointsBlending = 'normal' | 'additive';
 
 class PointsMaterial extends BaseMaterial {
+    ditherFade?: readonly [number, number];
     size: number;
     sizeUnits: 'pixels' | 'world';
     minPixelSize: number;
@@ -249,6 +250,7 @@ class PointsMaterial extends BaseMaterial {
 }
 
 interface PointsMaterialOptions extends BaseMaterialOptions {
+    ditherFade?: readonly [number, number];
     size?: number;
     sizeUnits?: 'pixels' | 'world';
     sizeAttenuation?: boolean;

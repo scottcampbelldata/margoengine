@@ -239,6 +239,8 @@ export interface TilesProgress {
 
 /** Events of a `Tileset`. */
 export interface TilesetEvents {
+  /** Visibility is selected, before eviction; optional transitions may retain visible outgoing content. */
+  selection: { selected: readonly TilesetTile[] };
   tileload: { tile: TilesetTile };
   tileunload: { tile: TilesetTile };
   error: { tile?: TilesetTile; error: Error };
@@ -434,6 +436,7 @@ export class Tileset {
     for (const tile of this.shown) if (!drawn.has(tile) && tile.renderable) tile.renderable.visible = false;
     for (const tile of selected) if (tile.renderable) tile.renderable.visible = true;
     this.shown = selected;
+    this.emit('selection', { selected });
     this.evict();
     this.overBudget = this.bytes > this.memoryBudget;
     if (!this.controller.signal.aborted) this.queue.flush();
@@ -509,10 +512,10 @@ export class Tileset {
       content &&
       contentVisible &&
       (!this.skipLevelOfDetail || sse <= this.maximumScreenSpaceError * this.skipScreenSpaceErrorFactor);
-    if (fallback) this.want(tile, [0, tile.depth]);
     let covered = true;
     for (const child of tile.children) covered = this.visit(child, view, selected) && covered;
     if (covered) return true;
+    if (fallback) this.want(tile, [0, tile.depth]);
     if (content && contentVisible && tile.state === 'ready') {
       // A child is still missing: draw this tile instead of a partial set of descendants (no holes, no overlap).
       selected.length = mark;
@@ -626,7 +629,7 @@ export class Tileset {
 
   private evict(): void {
     if (this.bytes <= this.memoryBudget) return;
-    const candidates = [...this.ready].filter((tile) => tile.lastUsed !== this.frame);
+    const candidates = [...this.ready].filter((tile) => tile.lastUsed !== this.frame && !tile.renderable?.visible);
     candidates.sort((a, b) => a.lastUsed - b.lastUsed || b.depth - a.depth);
     for (const tile of candidates) {
       if (this.bytes <= this.memoryBudget) break;
