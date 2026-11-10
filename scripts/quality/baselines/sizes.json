@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12959191,
+  "total": 12962374,
   "history": [
     {
       "date": "2026-10-24",
@@ -6457,6 +6457,12 @@
       "commit": "batch-259",
       "reason": "Optional ui/editor: absent to 4650 B gzip, ceiling 0 to 4906 B. Reuse shared widget/text ownership and existing engine renderers instead of duplicating rendering, focus or layout. Splitting would complicate the optional API and require duplicate state. Core/stage untouched.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch210-discrete",
+      "reason": "New discrete-tracks 0 -> 2280 B gzip, ceiling 2536 B; mixer 4158 -> 4805 B, ceiling 4414 -> 5061 B. Typed buffers, safe bindings and categorical winner selection preserve value types and live ownership. One shared scheduler avoids duplicated action lifetime; standalone tracks stay free of rendering imports. Core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7602,7 +7608,7 @@
     "@margoengine/selection/hit-details": 15453,
     "@margoengine/ui/curved": 1692,
     "leak @margoengine/ui/curved -> @margoengine/text": 1,
-    "@margoengine/animation/mixer": 4414,
+    "@margoengine/animation/mixer": 5061,
     "leak @margoengine/animation/mixer -> @margoengine/gltf-pro/model": 1,
     "@margoengine/mesh-edit/boolean-batch": 10775,
     "@margoengine/scene/tags": 2932,
@@ -7646,6 +7652,7 @@
     "margoengine/selection/area": 317,
     "@margoengine/road/lanes": 2579,
     "@margoengine/ui/editor": 4906,
-    "leak @margoengine/ui/editor -> @margoengine/text": 1
+    "leak @margoengine/ui/editor -> @margoengine/text": 1,
+    "@margoengine/animation/discrete-tracks": 2536
   }
 }

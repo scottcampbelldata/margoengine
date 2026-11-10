@@ -32,7 +32,8 @@
     "test:gpu:geometry-cache": "cd ../.. && node scripts/animation-geometry-cache-tests.js",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:mixer": "cd ../.. && node packages/animation/tests/mixer-browser.mjs",
-    "test:gpu:playback": "cd ../.. && node packages/animation/tests/playback-browser.mjs"
+    "test:gpu:playback": "cd ../.. && node packages/animation/tests/playback-browser.mjs",
+    "test:gpu:discrete": "cd ../.. && node packages/animation/tests/discrete-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -95,6 +96,10 @@
     "./playback": {
       "types": "./dist/playback.d.ts",
       "import": "./dist/playback.js"
+    },
+    "./discrete-tracks": {
+      "types": "./dist/discrete-tracks.d.ts",
+      "import": "./dist/discrete-tracks.js"
     }
   },
   "files": [

@@ -98,6 +98,10 @@
       "types": "./dist/animation/playback.d.ts",
       "import": "./dist/animation/playback.js"
     },
+    "./animation/discrete-tracks": {
+      "types": "./dist/animation/discrete-tracks.d.ts",
+      "import": "./dist/animation/discrete-tracks.js"
+    },
     "./animator": {
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
@@ -1798,6 +1802,10 @@
       "types": "./dist/loaders/vtk-legacy.d.ts",
       "import": "./dist/loaders/vtk-legacy.js"
     },
+    "./loaders/geo": {
+      "types": "./dist/loaders/geo.d.ts",
+      "import": "./dist/loaders/geo.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
@@ -3001,6 +3009,10 @@
     "./selection/area": {
       "types": "./dist/selection/area.d.ts",
       "import": "./dist/selection/area.js"
+    },
+    "./selection/highlight": {
+      "types": "./dist/selection/highlight.d.ts",
+      "import": "./dist/selection/highlight.js"
     },
     "./shader": {
       "types": "./dist/shader.d.ts",
@@ -4265,10 +4277,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./loaders/geo": {
-      "types": "./dist/loaders/geo.d.ts",
-      "import": "./dist/loaders/geo.js"
     }
   },
   "dependencies": {

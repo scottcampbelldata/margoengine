@@ -12,6 +12,7 @@ import type { PBRModel } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { rangeError } from '../../shared/errors.js';
+import type { DiscreteClip, BoundDiscreteTrack, DiscreteValue } from './discrete-tracks.js';
 const invalid = (message: string) => Object.assign(rangeError(message, 'arguments'), { code: 'arguments' });
 
 /** Play once, clamping at the directional endpoint. */
@@ -27,9 +28,9 @@ export const AdditiveAnimationBlendMode = 2501;
 /** Supported action loop modes. */
 export type ActionLoop = typeof LoopOnce | typeof LoopRepeat | typeof LoopPingPong;
 /** A parsed glTF clip or a code-authored keyframe clip. */
-export type ActionClip = Animation['clips'][number] | KeyframeClip;
-/** A model, its existing Animation, or a code-authored Skeleton. */
-export type MixerRoot = Animation | PBRModel | Skeleton;
+export type ActionClip = Animation['clips'][number] | KeyframeClip | DiscreteClip;
+/** A model, existing Animation, Skeleton, or object hosting bound property tracks. */
+export type MixerRoot = object;
 type Path = 'translation' | 'rotation' | 'scale' | 'weights';
 type Envelope = { start: number; duration: number; from: number; to: number };
 type Binding = {
@@ -43,6 +44,16 @@ type Binding = {
   write(value: Float64Array): void;
 };
 type Channel = { binding: Binding; sample(time: number): ArrayLike<number> };
+type DiscreteBinding = {
+  base: DiscreteValue;
+  value: DiscreteValue;
+  total: number;
+  winner: number;
+  applied: boolean;
+  channel: BoundDiscreteTrack;
+};
+type DiscreteChannel = { binding: DiscreteBinding; sample(time: number): DiscreteValue };
+const isDiscrete = (clip: ActionClip): clip is DiscreteClip => 'kind' in clip && clip.kind === 'discrete';
 const finite = (n: number, label: string, min = -Infinity): number => {
   if (!Number.isFinite(n) || n < min) throw invalid(`Invalid ${label}; pass a finite number >= ${min}`);
   return n;
@@ -100,11 +111,14 @@ export class AnimationAction {
     private readonly root: MixerRoot,
     readonly blendMode = NormalAnimationBlendMode,
     private readonly channels: Channel[] = [],
+    private readonly discrete: DiscreteChannel[] = [],
   ) {}
   /** Start/resume without resetting the clock. */
   play(): this {
     this.mixer.assertLive();
+    this.mixer.assertRootLive(this.root);
     if (!this.scheduled) this.mixer.activate(this.channels.map((c) => c.binding));
+    if (!this.scheduled) this.mixer.activateDiscrete(this.discrete.map((c) => c.binding));
     this.scheduled = true;
     return this;
   }
@@ -112,6 +126,7 @@ export class AnimationAction {
   stop(): this {
     this.scheduled = false;
     this.mixer.deactivate(this.channels.map((c) => c.binding));
+    this.mixer.deactivateDiscrete(this.discrete.map((c) => c.binding));
     return this.reset();
   }
   /** Rewind, enable, unpause and clear envelopes. */
@@ -290,7 +305,8 @@ export class AnimationAction {
       const next = finite(this.time + delta * rate, 'advanced action time');
       if (this.loop === LoopOnce || duration === 0) {
         this.time = Math.max(0, Math.min(duration, next));
-        if (next >= duration || next < 0) this.finish();
+        if ((next >= duration || next < 0) && (duration > 0 || this.loop === LoopOnce || this.repetitions !== Infinity))
+          this.finish();
       } else {
         const crossings = Math.floor(next / duration);
         const terminal = this.loops + Math.abs(crossings) >= this.repetitions;
@@ -311,10 +327,17 @@ export class AnimationAction {
     if (weight > 0)
       for (const channel of this.channels)
         this.mixer.accumulate(channel.binding, channel.sample(sample), weight, this.blendMode);
+    if (weight > 0)
+      for (const channel of this.discrete)
+        this.mixer.accumulateDiscrete(channel.binding, channel.sample(sample), weight);
   }
   /** @internal Binding ownership for cache eviction. */
   uses(binding: Binding): boolean {
     return this.channels.some((c) => c.binding === binding);
+  }
+  /** @internal Categorical binding ownership for activation and cache eviction. */
+  usesDiscrete(binding: DiscreteBinding): boolean {
+    return this.discrete.some((c) => c.binding === binding);
   }
   /** @internal Reset cycle bookkeeping for absolute seeks. */
   rewind(): void {
@@ -335,9 +358,10 @@ export class AnimationMixer implements EnginePlugin {
   /** Global signed rate. Default 1. */
   timeScale = 1;
   private readonly actions: AnimationAction[] = [];
-  private readonly players = new Map<MixerRoot, Animation | Skeleton>();
+  private readonly players = new Map<MixerRoot, Animation | Skeleton | undefined>();
   private readonly owned = new Set<Animation>();
   private readonly bindings = new Map<object, Map<string, Binding>>();
+  private readonly discreteBindings = new Map<object, Map<string, DiscreteBinding>>();
   private engine?: Engine;
   private disposed = false;
   private readonly additive = new Map<Binding, { value: ArrayLike<number>; weight: number }[]>();
@@ -354,6 +378,22 @@ export class AnimationMixer implements EnginePlugin {
         'AnimationMixer is disposed; create a new mixer; see https://margoengine.com/errors#disposed',
       );
   }
+  /** @internal A disposed model/player cannot start another action. */
+  assertRootLive(root: MixerRoot): void {
+    const player = this.players.get(root);
+    if (player instanceof Animation) {
+      if (player.model.disposed)
+        throw new MargoError(
+          'disposed',
+          'Mixer root is disposed; use a live model; see https://margoengine.com/errors#disposed',
+        );
+      player.captureState();
+    }
+  }
+  private rootAlive(root: MixerRoot): boolean {
+    const player = this.players.get(root);
+    return !(player instanceof Animation) || !player.model.disposed;
+  }
   /** @internal Capture original values when a property's first action starts. */
   activate(bindings: readonly Binding[]): void {
     for (const b of bindings)
@@ -363,23 +403,39 @@ export class AnimationMixer implements EnginePlugin {
   deactivate(bindings: readonly Binding[]): void {
     for (const b of bindings)
       if (b.applied && !this.actions.some((a) => a.isScheduled() && a.uses(b))) {
-        b.write(b.base);
+        if (this.actions.some((a) => a.uses(b) && this.rootAlive(a.getRoot()))) b.write(b.base);
         b.applied = false;
       }
   }
-  private player(root: MixerRoot): Animation | Skeleton {
+  /** @internal Capture categorical originals on first activation. */
+  activateDiscrete(bindings: readonly DiscreteBinding[]): void {
+    for (const b of bindings)
+      if (!this.actions.some((a) => a.isScheduled() && a.usesDiscrete(b))) b.base = b.channel.read();
+  }
+  /** @internal Restore categorical originals on last deactivation. */
+  deactivateDiscrete(bindings: readonly DiscreteBinding[]): void {
+    for (const b of bindings)
+      if (b.applied && !this.actions.some((a) => a.isScheduled() && a.usesDiscrete(b))) {
+        if (this.actions.some((a) => a.usesDiscrete(b) && this.rootAlive(a.getRoot()))) b.channel.write(b.base);
+        b.applied = false;
+      }
+  }
+  private player(root: MixerRoot): Animation | Skeleton | undefined {
+    if (this.players.has(root)) return this.players.get(root);
     let player = this.players.get(root);
     if (!player) {
-      if (
-        !(root instanceof Skeleton) &&
-        !(root instanceof Animation) &&
-        (!root || !Array.isArray(root.nodes) || !root.root?.scene)
-      )
-        throw invalid('Invalid mixer root; pass a Skeleton, Animation or PBRModel');
+      if (!root || typeof root !== 'object')
+        throw invalid('Invalid mixer root; pass an object, model, Skeleton or Animation');
       if (root instanceof Skeleton || root instanceof Animation) player = root;
-      else {
-        player = new Animation(root);
-        root.root.scene.use(player);
+      else if (Array.isArray((root as PBRModel).nodes) && (root as PBRModel).root?.scene) {
+        const model = root as PBRModel;
+        if (model.disposed)
+          throw new MargoError(
+            'disposed',
+            'Mixer root is disposed; use a live model; see https://margoengine.com/errors#disposed',
+          );
+        player = new Animation(model);
+        model.root.scene.use(player);
       }
       if (player instanceof Animation) {
         player.playing = false;
@@ -413,11 +469,21 @@ export class AnimationMixer implements EnginePlugin {
     if (![NormalAnimationBlendMode, AdditiveAnimationBlendMode].includes(blendMode))
       throw invalid('Invalid blend mode; choose NormalAnimationBlendMode or AdditiveAnimationBlendMode');
     const resolved = this.resolve(clip, root);
+    this.assertRootLive(root);
+    if (isDiscrete(resolved) && blendMode === AdditiveAnimationBlendMode)
+      throw invalid('Categorical tracks have no additive arithmetic; use NormalAnimationBlendMode');
     let action = this.actions.find(
       (a) => a.getClip() === resolved && a.getRoot() === root && a.blendMode === blendMode,
     );
     if (!action) {
-      action = new AnimationAction(this, resolved, root, blendMode, this.bind(resolved, root));
+      action = new AnimationAction(
+        this,
+        resolved,
+        root,
+        blendMode,
+        this.bind(resolved, root),
+        this.bindDiscrete(resolved),
+      );
       this.actions.push(action);
     }
     return action;
@@ -440,8 +506,8 @@ export class AnimationMixer implements EnginePlugin {
     finite(this.time + step, 'mixer time');
     this.time += step;
     const removed = this.actions.filter((a) => {
-      const root = a.getRoot();
-      return !(root instanceof Skeleton) && (root instanceof Animation ? root.model.disposed : root.disposed);
+      const player = this.players.get(a.getRoot());
+      return player instanceof Animation && player.model.disposed;
     });
     for (const action of removed) this.actions.splice(this.actions.indexOf(action), 1);
     for (const [target, map] of this.bindings) {
@@ -450,6 +516,17 @@ export class AnimationMixer implements EnginePlugin {
       if (!map.size) this.bindings.delete(target);
     }
     this.additive.clear();
+    for (const [target, map] of this.discreteBindings) {
+      for (const [key, b] of map)
+        if (removed.some((a) => a.usesDiscrete(b)) && !this.actions.some((a) => a.usesDiscrete(b))) map.delete(key);
+      if (!map.size) this.discreteBindings.delete(target);
+    }
+    for (const map of this.discreteBindings.values())
+      for (const b of map.values()) {
+        b.total = 0;
+        b.winner = -Infinity;
+        b.value = b.base;
+      }
     for (const map of this.bindings.values())
       for (const binding of map.values()) {
         binding.total = 0;
@@ -487,6 +564,13 @@ export class AnimationMixer implements EnginePlugin {
         b.write(b.value);
         b.applied = active;
       }
+    for (const map of this.discreteBindings.values())
+      for (const b of map.values()) {
+        const active = b.total > 0;
+        if (!active && !b.applied) continue;
+        b.channel.write(!active || Math.max(0, 1 - b.total) > b.winner ? b.base : b.value);
+        b.applied = active;
+      }
     return this;
   }
   /** Seek global playback from the beginning, scaling by timeScale. */
@@ -513,6 +597,10 @@ export class AnimationMixer implements EnginePlugin {
     for (const [target, map] of this.bindings) {
       for (const [key, binding] of map) if (!this.actions.some((a) => a.uses(binding))) map.delete(key);
       if (!map.size) this.bindings.delete(target);
+    }
+    for (const [target, map] of this.discreteBindings) {
+      for (const [key, b] of map) if (!this.actions.some((a) => a.usesDiscrete(b))) map.delete(key);
+      if (!map.size) this.discreteBindings.delete(target);
     }
   }
   /** Remove all actions using a clip. */
@@ -547,6 +635,7 @@ export class AnimationMixer implements EnginePlugin {
     this.actions.length = 0;
     this.players.clear();
     this.bindings.clear();
+    this.discreteBindings.clear();
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
@@ -596,6 +685,7 @@ export class AnimationMixer implements EnginePlugin {
     return binding;
   }
   private bind(clip: ActionClip, root: MixerRoot): Channel[] {
+    if (isDiscrete(clip)) return [];
     const player = this.player(root),
       channels: Channel[] = [];
     const code = (clip.tracks[0] && 'target' in clip.tracks[0]) || 'properties' in clip;
@@ -617,7 +707,7 @@ export class AnimationMixer implements EnginePlugin {
           path === 'scale',
           () => player.getPose(index)[key],
         );
-      } else {
+      } else if (player instanceof Animation) {
         const index = 'node' in raw ? raw.node : player.model.nodes.findIndex((n) => n.name === raw.target);
         if (index < 0) continue;
         const node = player.model.nodes[index];
@@ -655,7 +745,8 @@ export class AnimationMixer implements EnginePlugin {
                   : [t.qx[id], t.qy[id], t.qz[id], t.qw[id]],
           );
         }
-      }
+      } else
+        throw invalid('Transform tracks need a Skeleton or Animation root; use bound property tracks on plain objects');
       if ('node' in raw) {
         const out = new Float32Array(raw.width);
         channels.push({
@@ -688,6 +779,31 @@ export class AnimationMixer implements EnginePlugin {
     );
     const out = new Float64Array(track.size);
     channels.push({ binding, sample: (time) => sampleKeyframes(track, time, out) });
+  }
+  private bindDiscrete(clip: ActionClip): DiscreteChannel[] {
+    if (!isDiscrete(clip)) return [];
+    return clip.tracks.map((channel) => {
+      let map = this.discreteBindings.get(channel.target);
+      if (!map) this.discreteBindings.set(channel.target, (map = new Map()));
+      let binding = map.get(channel.property);
+      if (!binding) {
+        const base = channel.read();
+        binding = { base, value: base, total: 0, winner: -Infinity, applied: false, channel };
+        map.set(channel.property, binding);
+      } else if (typeof binding.base !== typeof channel.read())
+        throw invalid('Categorical binding types disagree; use the same value type for one property');
+      return { binding, sample: (time) => channel.sample(time) };
+    });
+  }
+  /** @internal Categorical winner selection never averages booleans or string indices. */
+  accumulateDiscrete(binding: DiscreteBinding, value: DiscreteValue, weight: number): void {
+    if ((typeof value !== 'boolean' && typeof value !== 'string') || typeof value !== typeof binding.base)
+      throw invalid('Categorical channel changed value type; return the original boolean or string type');
+    binding.total += weight;
+    if (weight >= binding.winner) {
+      binding.winner = weight;
+      binding.value = value;
+    }
   }
 }
 let serial = 0;

@@ -455,3 +455,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 233 job 2): road/lanes alias after build phase.
 - @margoengine/ui (batch 259 job 4): document /editor LayoutDocument/LayoutEditor, app-owned preview renderer, source/property/tree edits, history, validation, save/open and disposal in the README phase.
 - margoengine (batch 259 job 4): document ui/editor alias and browser editor entry page in the README phase.
+
+- @margoengine/animation: document /discrete-tracks typed constructors, hold-left sampling, buffers/edits/JSON, safe binding, createDiscreteClip, plain roots, winner semantics, constant clips and disposal; refresh mixer bytes (batch 210 job 3).
+- margoengine: document animation/discrete-tracks alias (batch 210 job 3).
