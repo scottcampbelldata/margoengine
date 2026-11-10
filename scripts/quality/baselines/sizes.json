@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13427187,
+  "total": 13442802,
   "history": [
     {
       "date": "2026-10-24",
@@ -6930,6 +6930,18 @@
       "commit": "a0a01e36c",
       "reason": "Batch 231 attributes entry 0 to 2063 B gzip (ceiling 2319); live row updates and shared colour/shadow shader inputs use one buffer per batch. Root 19262 to 19306 B within its existing ceiling; core/stage unchanged. Splitting would complicate layout ownership.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-206-preview",
+      "reason": "Independent opacity plus arbitrary numeric primvars, topology expansion and main/worker material hooks. [{\"key\":\"@margoengine/usdz/preview-surface\",\"before\":0,\"bytes\":4750,\"ceiling\":5006},{\"key\":\"@margoengine/usdz dist/workers/usdz.js\",\"before\":121784,\"bytes\":127697,\"ceiling\":131528}]; splitting would duplicate shared schema and interpolation code.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-206-preview",
+      "reason": "Independent opacity plus arbitrary numeric primvars, topology expansion and main/worker material hooks. [{\"key\":\"@margoengine/usdz\",\"before\":12708,\"bytes\":12743,\"ceiling\":13126},{\"key\":\"@margoengine/usdz/worker\",\"before\":13771,\"bytes\":13796,\"ceiling\":14210}]; splitting would duplicate shared schema and interpolation code.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7925,18 +7937,18 @@
     "@margoengine/ui/react": 33009,
     "@margoengine/ui/world": 9836,
     "@margoengine/ui/world-gl": 7816,
-    "@margoengine/usdz": 12708,
-    "@margoengine/usdz dist/workers/usdz.js": 121784,
+    "@margoengine/usdz": 13126,
+    "@margoengine/usdz dist/workers/usdz.js": 131528,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/compose": 19101,
-    "@margoengine/usdz/curves": 3523,
+    "@margoengine/usdz/curves": 3531,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7905,
     "@margoengine/usdz/shapes": 1457,
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
-    "@margoengine/usdz/worker": 13771,
+    "@margoengine/usdz/worker": 14210,
     "@margoengine/vfx": 32070,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
@@ -8187,6 +8199,7 @@
     "@margoengine/rigging/vrma": 6295,
     "@margoengine/text/selection": 958,
     "@margoengine/cameras/panorama": 2742,
-    "@margoengine/scatter/attributes": 2319
+    "@margoengine/scatter/attributes": 2319,
+    "@margoengine/usdz/preview-surface": 5006
   }
 }

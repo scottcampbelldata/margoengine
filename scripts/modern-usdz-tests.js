@@ -54,6 +54,99 @@ def PointInstancer "Scatter" {
     }
   });
   assert.deepEqual(scatter, { sharedMeshes: 1, instances: 2, changed: true });
+  const previewBytes = Array.from((await import('../packages/usdz/tests/preview-fixture.js')).previewFixture());
+  const previewResult = await page.evaluate(async (bytes) => {
+    const { Engine } = await import('/packages/core/dist/index.js');
+    const { engineRuntime } = await import('/packages/core/dist/extension.js');
+    const { parseUSDZ } = await import('/packages/usdz/dist/index.js');
+    const { parseUSDInWorker } = await import('/packages/usdz/dist/worker.js');
+    const { previewSurface } = await import('/packages/usdz/dist/preview-surface.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [0, 0, 5], target: [0, 0, 0] },
+    });
+    try {
+      const results = [];
+      for (const worker of [false, true]) {
+        const options = { extensions: [previewSurface()] },
+          input = new Uint8Array(bytes);
+        const model = worker
+          ? await parseUSDInWorker(engine, input, options)
+          : await (await parseUSDZ(input, options)).create(engine);
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        const rendered = canvas.toDataURL();
+        const bitmap = model.image(0),
+          c = new OffscreenCanvas(1, 1),
+          ctx = c.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0);
+        const alpha = ctx.getImageData(0, 0, 1, 1).data[3];
+        const material = model.primitives[0].material;
+        results.push({ alpha, shader: !!material.shading, maskUV: material.pickMask.texCoord, rendered });
+        model.destroy();
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        results[results.length - 1].changed = rendered !== canvas.toDataURL();
+        results[results.length - 1].disposed = !engine.plugins.has('usd-preview-opacity-0');
+      }
+      return results;
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, previewBytes);
+  for (const r of previewResult) {
+    assert.equal(r.alpha, 128);
+    assert.equal(r.shader, true);
+    assert.equal(r.maskUV, 1);
+    assert.equal(r.changed, true);
+    assert.equal(r.disposed, true);
+  }
+  assert.equal(previewResult[0].rendered, previewResult[1].rendered);
+  const readerText = (await import('../packages/usdz/tests/preview-fixture.js')).previewReaderFixture();
+  const readerResult = await page.evaluate(async (text) => {
+    const { Engine } = await import('/packages/core/dist/index.js'),
+      { engineRuntime } = await import('/packages/core/dist/extension.js');
+    const { parseUSDA } = await import('/packages/usdz/dist/index.js'),
+      { previewSurface } = await import('/packages/usdz/dist/preview-surface.js');
+    const { parseUSDInWorker } = await import('/packages/usdz/dist/worker.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [0, 0, 5], target: [0, 0, 0] },
+    });
+    try {
+      const outcomes = [];
+      for (const worker of [false, true]) {
+        const options = { extensions: [previewSurface()] };
+        const model = worker
+          ? await parseUSDInWorker(engine, text, options)
+          : await parseUSDA(text, options).create(engine);
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        const rendered = canvas.toDataURL();
+        const count = model.primitives[0].definition.extras.usdPreviewValues.inputs.length;
+        model.destroy();
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        outcomes.push({ count, changed: rendered !== canvas.toDataURL(), rendered });
+      }
+      return outcomes;
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, readerText);
+  for (const result of readerResult) {
+    assert.equal(result.count, 11);
+    assert.equal(result.changed, true);
+  }
+  assert.equal(readerResult[0].rendered, readerResult[1].rendered);
   const curvesResult = await page.evaluate(async () => {
     const { Engine } = await import('/packages/core/dist/index.js');
     const { parseUSDA } = await import('/packages/usdz/dist/index.js');

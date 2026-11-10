@@ -20,7 +20,7 @@ import type {
   USDIssue,
 } from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
-import { LinearToSRGB } from '@margoengine/math/color';
+import { LinearToSRGB, SRGBToLinear } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
 /** Parse limits and loading hooks for the USD readers. Every limit is checked while parsing; a breach throws a `LoaderError` with code `limit`. */
@@ -128,6 +128,7 @@ function bytes(input: BinaryInput): Uint8Array {
 interface DisplayStream {
   values: ArrayLike<number>;
   indices?: ArrayLike<number>;
+  constant?: boolean;
 }
 function numeric(value: unknown, size?: number): ArrayLike<number> {
   if (!Array.isArray(value) && !ArrayBuffer.isView(value)) fail('expected numeric stream');
@@ -395,7 +396,13 @@ export class USDAsset {
     const images = await this.images({ signal });
     try {
       signal?.throwIfAborted();
-      const model = parseGLTF(engine, this.document, this.buffers, images);
+      const decoders = Object.assign(
+        {},
+        ...(await Promise.all(
+          (this.extensions as readonly ExtensionHooks[]).map((extension) => extension.decoders?.() ?? {}),
+        )),
+      );
+      const model = parseGLTF(engine, this.document, this.buffers, images, decoders);
       try {
         for (const extension of this.extensions as readonly ExtensionHooks[]) await extension.created?.(engine, model);
         signal?.throwIfAborted();
@@ -421,9 +428,32 @@ export class USDAsset {
     try {
       for (const source of this.sources) {
         signal?.throwIfAborted();
-        if (source.path)
-          images.push(source.linearColor ? await encoded(await decode(source.path)) : await decode(source.path));
-        else {
+        if (source.path) {
+          let bitmap = await decode(source.path);
+          if (source.opacity) {
+            try {
+              const canvas = new OffscreenCanvas(bitmap.width, bitmap.height),
+                context = canvas.getContext('2d')!;
+              context.drawImage(bitmap, 0, 0);
+              const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height);
+              for (let i = 0; i < pixels.data.length; i += 4) {
+                let value = pixels.data[i + source.opacity.channel] / 255;
+                if (source.opacity.srgb && source.opacity.channel !== 3) value = SRGBToLinear(value);
+                const alpha = Math.round(
+                  255 * Math.max(0, Math.min(1, value * source.opacity.scale + source.opacity.bias)),
+                );
+                pixels.data.set([255, alpha, 255, alpha], i);
+              }
+              context.putImageData(pixels, 0, 0);
+              bitmap.close();
+              bitmap = await createImageBitmap(canvas);
+            } catch (error) {
+              bitmap.close();
+              throw error;
+            }
+          }
+          images.push(source.linearColor ? await encoded(bitmap) : bitmap);
+        } else {
           const rough = source.roughness ? await decode(source.roughness.path) : undefined;
           let metal: ImageBitmap | undefined;
           try {
@@ -625,10 +655,13 @@ function asset(
     if (!doc.extensionsUsed.includes('KHR_texture_transform')) doc.extensionsUsed.push('KHR_texture_transform');
     return { index, extensions: { KHR_texture_transform: where.transform } };
   };
-  const surfacer = hooks(options).find((hook) => hook.surface),
+  const surfacers = hooks(options).filter((hook) => hook.surface),
     materialIds = new Map<string, number>(),
     // Per material: the fallback colour and opacity of the display primvars it reads, and the primvar its maps sample.
-    displays = new Map<number, { color?: number[]; opacity?: number[]; uv?: string }>();
+    displays = new Map<
+      number,
+      { color?: number[]; opacity?: number[]; colorName?: string; opacityName?: string; uv?: string }
+    >();
   /** The primvar a texture reads, through its UsdTransform2d when it has one. */
   const uvPrimvar = (shader: string): string | undefined => {
     let node = connection(shader, 'inputs:st')?.split('.outputs:')[0];
@@ -647,25 +680,35 @@ function asset(
       if (target && (!composed || specs[target]) && (!binding || rel?.bindMaterialAs === 'strongerThanDescendants'))
         binding = target;
     }
-    if (binding && surfacer) {
+    if (binding && surfacers.length) {
       if (materialIds.has(binding)) return materialIds.get(binding)!;
-      const made = surfacer.surface!({
-        specs,
-        document: doc,
-        path: binding,
-        attr: attrs,
-        connection,
-        has: (file) => entries.has(file),
-        image,
-        soft,
-      });
-      if (made) {
-        const id =
-          doc.materials.push(made.network ? { ...made.material, extras: { materialX: made.network } } : made.material) -
-          1;
-        materialIds.set(binding, id);
-        displays.set(id, { uv: made.uv });
-        return id;
+      for (const surfacer of surfacers) {
+        const made = surfacer.surface!({
+          specs,
+          document: doc,
+          path: binding,
+          attr: attrs,
+          connection,
+          has: (file) => entries.has(file),
+          resolve: (file) => (root === undefined ? file : pathName(file, root)),
+          image,
+          soft,
+        });
+        if (made) {
+          const id =
+            doc.materials.push(
+              made.network ? { ...made.material, extras: { materialX: made.network } } : made.material,
+            ) - 1;
+          materialIds.set(binding, id);
+          displays.set(id, {
+            uv: made.uv,
+            color: made.color?.fallback,
+            opacity: made.opacity?.fallback,
+            colorName: made.color?.name,
+            opacityName: made.opacity?.name,
+          });
+          return id;
+        }
       }
     }
     let shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
@@ -782,8 +825,8 @@ function asset(
   /** The mesh's display primvar, or the reader's fallback as one constant value when the mesh authors none. */
   const displayStream = (path: string, name: string, fallback: number[], width: number): DisplayStream => {
     const value = attrs(path, 'primvars:' + name);
-    return value === undefined
-      ? { values: fallback }
+    return value == null || value === ''
+      ? { values: fallback, constant: true }
       : {
           values: numeric(value),
           indices: attrs(path, 'primvars:' + name + ':indices') as ArrayLike<number> | undefined,
@@ -825,6 +868,7 @@ function asset(
       else subsetsOf.set(owner, [path]);
     }
   const scenes = hooks(options).filter((hook) => hook.scene),
+    geometryReaders = hooks(options).some((hook) => hook.geometry),
     shaper = hooks(options).find((hook) => hook.shape),
     sceneMeshes: SceneMesh[] = [],
     opOrder = (path: string): unknown => attrs(path, 'xformOpOrder') ?? specs[path].fields.xformOpOrder,
@@ -949,15 +993,16 @@ function asset(
         normals = new Float32Array(triangles * 9),
         uvs = uv ? new Float32Array(triangles * 6) : undefined,
         indices = new Uint32Array(triangles * 3),
-        vertexOf = scenes.length ? new Uint32Array(triangles * 3) : undefined,
+        vertexOf = scenes.length || geometryReaders ? new Uint32Array(triangles * 3) : undefined,
         firstTriangle = new Uint32Array(faceCount + 1),
         colors = reads.color || reads.opacity ? new Float32Array(triangles * 12) : undefined,
         shaped = (stream: DisplayStream, width: number, property: string): DisplayStream =>
-          shape ? { values: reshaped(stream.values, width, property, stream.indices) } : stream,
-        tint = reads.color && shaped(displayStream(path, 'displayColor', reads.color, 3), 3, 'primvars:displayColor'),
+          shape && !stream.constant ? { values: reshaped(stream.values, width, property, stream.indices) } : stream,
+        colorName = reads.colorName ?? 'displayColor',
+        opacityName = reads.opacityName ?? 'displayOpacity',
+        tint = reads.color && shaped(displayStream(path, colorName, reads.color, 3), 3, 'primvars:' + colorName),
         fade =
-          reads.opacity &&
-          shaped(displayStream(path, 'displayOpacity', reads.opacity, 1), 1, 'primvars:displayOpacity');
+          reads.opacity && shaped(displayStream(path, opacityName, reads.opacity, 1), 1, 'primvars:' + opacityName);
       const sample = (
         stream: ArrayLike<number>,
         width: number,
@@ -1050,19 +1095,21 @@ function asset(
             }
             if (colors) {
               const entry = (stream: DisplayStream, width: number, property: string): number => {
-                const i = stream.indices
-                  ? stream.indices[sample(stream.indices, 1, corner, vertex, f, property)]
-                  : sample(stream.values, width, corner, vertex, f, property);
+                const i = stream.constant
+                  ? 0
+                  : stream.indices
+                    ? stream.indices[sample(stream.indices, 1, corner, vertex, f, property)]
+                    : sample(stream.values, width, corner, vertex, f, property);
                 if (!Number.isSafeInteger(i) || i < 0 || i * width + width > stream.values.length)
                   fail('display primvar index outside stream');
                 return i * width;
               };
               colors.fill(1, at * 4, at * 4 + 4);
               if (tint) {
-                const i = entry(tint, 3, 'primvars:displayColor');
+                const i = entry(tint, 3, 'primvars:' + colorName);
                 for (let d = 0; d < 3; d++) colors[at * 4 + d] = tint.values[i + d];
               }
-              if (fade) colors[at * 4 + 3] = fade.values[entry(fade, 1, 'primvars:displayOpacity')];
+              if (fade) colors[at * 4 + 3] = fade.values[entry(fade, 1, 'primvars:' + opacityName)];
             }
             indices[at] = at;
             if (vertexOf) vertexOf[at] = vertex;

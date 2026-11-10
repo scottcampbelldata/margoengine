@@ -7,7 +7,13 @@ import type { USDExtension, USDOptions } from './index.js';
 import type { ExtensionHooks } from './extension.js';
 
 async function finish(engine: EngineKernel, prepared: PreparedGLTF, options: USDOptions): Promise<PBRModel> {
-  const model = modelFromPrepared(engine, prepared, options.signal);
+  const decoders = Object.assign(
+    {},
+    ...(await Promise.all(
+      ((options.extensions ?? []) as readonly ExtensionHooks[]).map((extension) => extension.decoders?.() ?? {}),
+    )),
+  );
+  const model = modelFromPrepared(engine, prepared, options.signal, decoders);
   try {
     for (const extension of (options.extensions ?? []) as readonly ExtensionHooks[])
       await extension.created?.(engine, model);

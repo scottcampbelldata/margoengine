@@ -121,6 +121,8 @@ export interface USDImagePlacement {
 /** An image of the document: one file, or two packed as a glTF metal and rough texture. */
 export interface USDImage {
   path?: string;
+  /** Optional scalar-channel conversion for independently sampled opacity; writes green and alpha. */
+  opacity?: { channel: number; scale: number; bias: number; srgb: boolean };
   /** The file's colours are linear, where a base colour texture is read as sRGB. */
   linearColor?: boolean;
   roughness?: { path: string; channel: number };
@@ -140,6 +142,8 @@ export interface SurfaceRead {
   connection(path: string, name: string): string | undefined;
   /** True when the file can be read. */
   has(file: string): boolean;
+  /** An asset path resolved relative to its owning layer. */
+  resolve(file: string): string;
   /** Adds a texture and gives its glTF texture info. */
   image(
     source: USDImage,
@@ -150,6 +154,9 @@ export interface SurfaceRead {
 /** A material the surface hook made. */
 export interface USDSurface {
   material: GLTFMaterial;
+  /** Arbitrary named linear color and opacity primvar readers. */
+  color?: { name: string; fallback: number[] };
+  opacity?: { name: string; fallback: number[] };
   /** The primvar its textures read. */
   uv?: string;
   /** Kept on the material's `extras.materialX`. */
@@ -157,6 +164,8 @@ export interface USDSurface {
 }
 /** What an extension does: each hook runs at its step of the import. */
 export interface ExtensionHooks extends USDExtension {
+  /** Lazily supplies optional PBR material readers before direct or worker model construction. */
+  decoders?(): Promise<NonNullable<Parameters<typeof import('@margoengine/gltf-pro/model').parseGLTF>[4]>>;
   /** Attaches optional renderers after model creation, on the main thread, including worker loads. */
   created?(engine: EngineKernel, model: PBRModel): void | Promise<void>;
   /** Prepares optional prim schemas before the mesh walk, within the reader's geometry budgets. */

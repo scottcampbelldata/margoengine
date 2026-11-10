@@ -707,3 +707,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/scatter (batch 231 job 4): document AttributedScatter, initial batch arrays, set/getColorAt, set/getAttributeAt, attributeIndex, custom WGSL appearance contract and restoration/memory limits.
 - margoengine (batch 231 job 4): document scatter/attributes alias.
 >>>>>>> d70b0d2eb (feat(scatter): add live per-instance colour and shader attributes)
+- @margoengine/usdz (batch 206 job 4): previewSurface(), separate opacity textures, arbitrary numeric readers, fallbacks/interpolation, resource limits, worker and device lifetime.
+- @margoengine/gltf-pro (batch 206 job 4): uploadImage external-image texture usages and caller-owned texture lifetime.

@@ -303,6 +303,12 @@ interface USDExtension {
 
 interface USDImage {
     path?: string;
+    opacity?: {
+        channel: number;
+        scale: number;
+        bias: number;
+        srgb: boolean;
+    };
     linearColor?: boolean;
     roughness?: {
         path: string;

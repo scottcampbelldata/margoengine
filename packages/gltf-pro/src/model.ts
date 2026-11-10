@@ -3068,7 +3068,7 @@ export class PBRModel implements EnginePlugin {
       texture = device.createTexture({
         size,
         format: srgb ? 'rgba8unorm-srgb' : 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       });
     try {
       device.queue.copyExternalImageToTexture({ source: image }, { texture }, size);

@@ -15,6 +15,7 @@ import { materialX } from './materialx.js';
 import { pointInstancers } from './instancer.js';
 import { implicitShapes } from './shapes.js';
 import { curveGeometry } from './curve-geometry.js';
+import { previewSurface } from './preview-surface.js';
 
 const known: Record<string, (options?: never) => USDExtension> = {
   compose: composition,
@@ -26,6 +27,7 @@ const known: Record<string, (options?: never) => USDExtension> = {
   instancer: pointInstancers,
   shapes: implicitShapes,
   curves: curveGeometry,
+  'preview-surface': previewSurface,
 };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {

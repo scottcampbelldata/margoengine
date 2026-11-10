@@ -70,6 +70,10 @@
     "./curves": {
       "types": "./dist/curves.d.ts",
       "import": "./dist/curves.js"
+    },
+    "./preview-surface": {
+      "types": "./dist/preview-surface.d.ts",
+      "import": "./dist/preview-surface.js"
     }
   },
   "scripts": {

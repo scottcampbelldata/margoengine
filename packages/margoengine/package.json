@@ -3082,6 +3082,10 @@
       "types": "./dist/scatter/occlusion.d.ts",
       "import": "./dist/scatter/occlusion.js"
     },
+    "./scatter/attributes": {
+      "types": "./dist/scatter/attributes.d.ts",
+      "import": "./dist/scatter/attributes.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
@@ -4006,6 +4010,10 @@
       "types": "./dist/usdz/curves.d.ts",
       "import": "./dist/usdz/curves.js"
     },
+    "./usdz/preview-surface": {
+      "types": "./dist/usdz/preview-surface.d.ts",
+      "import": "./dist/usdz/preview-surface.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"
@@ -4569,10 +4577,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./scatter/attributes": {
-      "types": "./dist/scatter/attributes.d.ts",
-      "import": "./dist/scatter/attributes.js"
     }
   },
   "dependencies": {
