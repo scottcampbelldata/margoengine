@@ -132,7 +132,13 @@ test('fractional-microsecond edit offsets round once, and edit boundaries compar
     using start = await openVideo(
       mp4Fixture({ signed: false, edit: true, timeScale: 3000000, sampleDelta: 10001, editStart: 10002 }),
     );
-    assert.equal(start.frameCount, 4, 'a sample one third of a microsecond before the edit stays outside');
+    // The sample one third of a microsecond before the edit start is the one presented across it, so it is shown
+    // from the edit start (QuickTime edit list semantics) instead of being dropped, which left 4 frames.
+    assert.equal(start.frameCount, 5, 'the sample covering the edit start is shown from the edit start');
+    assert.deepEqual(
+      Array.from({ length: start.frameCount }, (_, i) => start.timestamp(i)),
+      [0.05, 0.053333, 0.056667, 0.060001, 0.063334],
+    );
     using end = await openVideo(
       mp4Fixture({
         signed: false,
@@ -155,4 +161,23 @@ test('decode timestamp collisions outside an edit cannot impersonate its first v
       ),
       { code: 'unsupported' },
     );
+  }));
+
+test('an edit that starts inside a sample shows that sample from the edit start', () =>
+  mocks(async () => {
+    // PTS 0, 100, 200, 300, 400 ms; the edit plays media 150..400 ms at movie 50 ms. Sample 100 covers 150 and was dropped,
+    // so seek(0.05) returned the 200 ms picture and the first 50 ms of the edit showed the wrong frame.
+    using video = await openVideo(mp4Fixture({ edit: true, editStart: 150 }));
+    assert.deepEqual(
+      Array.from({ length: video.frameCount }, (_, i) => video.timestamp(i)),
+      [0.05, 0.1, 0.2],
+    );
+    const first = await video.seek(0.06);
+    assert.equal(first.timestamp, 100000);
+    first.close();
+    // Every sample before the edit start: the last one still covers it for its decode duration (400..500 ms).
+    using tail = await openVideo(mp4Fixture({ edit: true, editStart: 450 }));
+    assert.equal(tail.frameCount, 1);
+    assert.equal(tail.timestamp(0), 0.05);
+    await assert.rejects(openVideo(mp4Fixture({ edit: true, editStart: 500 })), { code: 'failed' });
   }));

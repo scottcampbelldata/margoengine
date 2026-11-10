@@ -277,10 +277,22 @@ export function readMP4(bytes: Uint8Array, fragments?: (input: FragmentInput) =>
       return (BigInt(samples[i]!.pts) - start) * movie;
     };
   const order = samples.map((_, i) => i).filter((i) => at(i) >= 0n && (limit === undefined || at(i) < limit));
+  // An edit starts at media time mediaStart (QuickTime File Format, edit list table: "the starting time within the
+  // media of this edit segment"). When no sample begins exactly there, the sample presented across that instant is
+  // what the movie shows from the edit's start, so it stays visible with its time clamped to the edit start. The last
+  // sample covers its decode duration (ctts: "At the last displayed frame, the decode duration is used").
+  if (!samples.some((_, i) => at(i) === 0n)) {
+    let cover = -1;
+    for (let i = 0; i < samples.length; i++)
+      if (at(i) < 0n && (cover < 0 || samples[i]!.pts > samples[cover]!.pts)) cover = i;
+    const last = cover >= 0 && !samples.some((_, i) => at(i) > 0n);
+    if (cover >= 0 && (!last || samples[cover]!.pts + samples[cover]!.duration > mediaStart)) order.push(cover);
+  }
   order.sort((a, b) => samples[a]!.pts - samples[b]!.pts);
   if (!order.length) invalid();
   const times = order.map((i) => {
-    const value = Number(((at(i) + BigInt(leadTicks) * track) * 1000000n + denominator / 2n) / denominator);
+    const shown = at(i) < 0n ? 0n : at(i);
+    const value = Number(((shown + BigInt(leadTicks) * track) * 1000000n + denominator / 2n) / denominator);
     return Number.isSafeInteger(value) ? value / 1000000 : invalid();
   });
   for (const s of samples) {
