@@ -1,5 +1,5 @@
 import { LoaderError } from './types.js';
-import { toBytes, type BinaryInput } from './util.js';
+import { toBytes, throwIfAborted, type BinaryInput } from './util.js';
 import {
   buildGeo,
   geoLimit,
@@ -92,6 +92,7 @@ function dbf(
 }
 /** Reads Shapefile points, multipoints, polylines, polygons and multipatches, including Z/M and optional dBASE. */
 export function parseShapefile(input: BinaryInput, options: ShapefileOptions = {}): GeoResult {
+  throwIfAborted(options.signal, GEO);
   const bytes = toBytes(input, GEO),
     maxBytes = geoLimit(options, 'maxBytes', 256 << 20),
     maxFeatures = geoLimit(options, 'maxFeatures', 100000);

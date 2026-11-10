@@ -3,6 +3,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseGeoJSON, parseGPX, parseKML, parseShapefile, parseMVT } from '@margoengine/loaders/geo';
 const enc = (s) => new TextEncoder().encode(s);
+
+for (const parse of [parseShapefile, parseMVT, parseGPX, parseKML])
+  test(`${parse.name} rejects a pre-aborted signal before converting binary input`, () => {
+    const signal = AbortSignal.abort('vector parsing cancelled');
+    for (const input of [new Uint8Array([128]), null])
+      assert.throws(() => parse(input, { signal }), { code: 'aborted' }, parse.name);
+  });
+
+test('pre-aborted GeoJSON parsing does not invoke caller object conversion', () => {
+  const signal = AbortSignal.abort('vector parsing cancelled');
+  let converted = false;
+  assert.throws(
+    () => parseGeoJSON({ toJSON() { converted = true; return {}; } }, { signal }),
+    { code: 'aborted' },
+  );
+  assert.equal(converted, false, 'cancellation precedes caller object conversion');
+});
+
 const outer = [
     [0, 0],
     [10, 0],

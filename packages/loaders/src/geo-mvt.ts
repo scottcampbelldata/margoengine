@@ -1,5 +1,5 @@
 import { LoaderError } from './types.js';
-import { toBytes, type BinaryInput } from './util.js';
+import { toBytes, throwIfAborted, type BinaryInput } from './util.js';
 import {
   buildGeo,
   geoLimit,
@@ -224,6 +224,7 @@ function feature(
 }
 /** Reads MVT 1/2 protobuf vector tiles, preserving layers, tags, IDs, multipart lines and polygon holes. */
 export function parseMVT(input: BinaryInput, options: MVTOptions = {}): GeoResult {
+  throwIfAborted(options.signal, GEO);
   const bytes = toBytes(input, GEO),
     max = geoLimit(options, 'maxBytes', 256 << 20),
     maxFeatures = geoLimit(options, 'maxFeatures', 100000);

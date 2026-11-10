@@ -3954,6 +3954,13 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Vector parser pre-abort ordering (2026-11-10)
+GeoJSON, GPX, KML, Shapefile and MVT reject a pre-aborted signal with the existing
+LoaderError code aborted before binary conversion, decoding or caller toJSON
+serialization. This does not introduce asynchronous interruption into synchronous
+decoding. Existing format limits, validation and output are unchanged. Regression:
+packages/loaders/tests/geo.test.js.
+
 ## Point octree load concurrency (2026-11-10)
 OctreeCloud maxConcurrentLoads must be a positive safe integer. Omitted or
 undefined keeps the default four. Wrong types throw TypeError; zero, negative,

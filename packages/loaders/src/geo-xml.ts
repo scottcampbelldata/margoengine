@@ -1,5 +1,5 @@
 import { LoaderError } from './types.js';
-import { toBytes, type BinaryInput } from './util.js';
+import { toBytes, throwIfAborted, type BinaryInput } from './util.js';
 import { readXMLTree, decodeXML, type XMLElement } from './xml.js';
 import {
   buildGeo,
@@ -17,6 +17,7 @@ const content = (e: XMLElement, name: string): string | undefined => child(e, na
 const all = (e: XMLElement, name: string): XMLElement[] =>
   e.children.flatMap((c) => [...(c.name === name ? [c] : []), ...all(c, name)]);
 function xml(input: BinaryInput | string, options: GeoOptions): XMLElement {
+  throwIfAborted(options.signal, GEO);
   const source = typeof input === 'string' ? geoText(input, options) : decodeXML(toBytes(input, GEO));
   geoText(typeof input === 'string' ? input : toBytes(input, GEO), options);
   const root = readXMLTree(source, GEO);

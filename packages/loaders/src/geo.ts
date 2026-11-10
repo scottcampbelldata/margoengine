@@ -1,5 +1,5 @@
 import { LoaderError } from './types.js';
-import { toBytes, type BinaryInput } from './util.js';
+import { toBytes, throwIfAborted, type BinaryInput } from './util.js';
 import {
   buildGeo,
   geoLimit,
@@ -17,6 +17,7 @@ export { parseMVT, type MVTOptions } from './geo-mvt.js';
 
 /** Reads GeoJSON geometry, Feature or FeatureCollection into mixed vector primitives. No projection is applied. */
 export function parseGeoJSON(input: BinaryInput | string | object, options: GeoOptions = {}): GeoResult {
+  throwIfAborted(options.signal, GEO);
   let source: unknown;
   try {
     const value =
