@@ -21,7 +21,7 @@ await runSuite(
       const lit = await decodePNG(Buffer.from(row.lit.split(',')[1], 'base64'));
       const light = Array.from(lit.data.slice(offset, offset + 3));
       const expected = light.map((x) => Math.round(255 * encode(decode(128 / 255) + decode(x / 255))));
-      console.log({ samples: row.samples, layers: row.layers, actual, expected });
+      console.log({ samples: row.samples, layers: row.layers, taa: row.taa, actual, expected });
       assert.ok(
         actual.every((x, k) => Math.abs(x - expected[k]) <= 1),
         'native glass must add light in linear values',

@@ -6,7 +6,8 @@ import {instancedGLTF} from '/tests/support/instanced-gltf.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 window.nativeGlass=async()=>{
  const rows=[];
- for(const samples of [1,4])for(const layers of [1,2]){
+ // taa: TAA's scene capture (order -70) owns the live color before native glass begins (-64).
+ for(const [samples,layers,taa] of [[1,1],[1,2],[4,1],[4,2],[4,1,true],[1,1,true]]){
   const canvas=document.body.appendChild(document.createElement('canvas'));
   const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
   try{
@@ -15,11 +16,12 @@ window.nativeGlass=async()=>{
     emissiveFactor:[0.1,0.15,0.2],extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_ior:{ior:1}},
    }});
    parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
+   if(taa){const {TAA}=await import('/packages/taa/dist/index.js');TAA.attach(engine);}
    await waitForPipelines(async()=>{engine.render({culling:false,samples});await engine.gpu.queue.onSubmittedWorkDone();});
    const png=canvas.toDataURL('image/png');
    engine.scene.background='#000000';
    await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
-   rows.push({samples,layers,png,lit:canvas.toDataURL('image/png')});
+   rows.push({samples,layers,taa:!!taa,png,lit:canvas.toDataURL('image/png')});
   }finally{engine.dispose();canvas.remove();}
  }
  return rows;

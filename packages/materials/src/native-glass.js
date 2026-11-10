@@ -80,9 +80,13 @@ class NativeGlass {
         throw error;
       }
     }
+    frames.set(c, this);
+    // A scene capture that began earlier (TAA's, at order -70) already owns the live color, and its later passes
+    // check that they still do. copy() reads that capture's resolved color, so leave the target alone.
+    this.redirected = !sceneTarget(c);
+    if (!this.redirected) return;
     this.original = c.color;
     c.color = this.colorView;
-    frames.set(c, this);
   }
   copy(c) {
     // A borrowed package capture may own the live color (for example materials' opaque capture).
@@ -108,8 +112,8 @@ class NativeGlass {
   }
   present(c) {
     if (frames.get(c) !== this) return;
-    if (this.multisample) c.encoder.beginRenderPass(this.resolution).end();
-    {
+    if (this.redirected) {
+      if (this.multisample) c.encoder.beginRenderPass(this.resolution).end();
       const pass = c.encoder.beginRenderPass({
         label: 'native-glass:present',
         colorAttachments: [{ view: this.original, loadOp: 'load', storeOp: 'store' }],
