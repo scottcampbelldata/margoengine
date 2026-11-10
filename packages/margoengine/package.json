@@ -4194,6 +4194,10 @@
       "types": "./dist/video/alpha.d.ts",
       "import": "./dist/video/alpha.js"
     },
+    "./video/dome": {
+      "types": "./dist/video/dome.d.ts",
+      "import": "./dist/video/dome.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"

@@ -45,6 +45,10 @@
     "./alpha": {
       "types": "./dist/alpha.d.ts",
       "import": "./dist/alpha.js"
+    },
+    "./dome": {
+      "types": "./dist/dome.d.ts",
+      "import": "./dist/dome.js"
     }
   },
   "files": [
@@ -65,7 +69,7 @@
     "build": "node ../../scripts/build-optional.js video",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node test/material-check.mjs && node test/record-check.mjs && node test/panorama-check.mjs && node test/codecs-check.mjs && node test/alpha-check.mjs",
+    "test:gpu": "node test/material-check.mjs && node test/record-check.mjs && node test/panorama-check.mjs && node test/codecs-check.mjs && node test/alpha-check.mjs && node test/dome-check.mjs",
     "test:gpu:owners": "node test/scene-owner-browser.mjs"
   }
 }

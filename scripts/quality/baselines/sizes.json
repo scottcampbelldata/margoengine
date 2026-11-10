@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13652731,
+  "total": 13654757,
   "history": [
     {
       "date": "2026-10-24",
@@ -7109,6 +7109,12 @@
       "commit": "31be4102f",
       "reason": "Batch 214 job 2: new optional limits entry, absent to 1212 B gzip for Euler, hinge and cone/twist legality. Root 11567 to 11687 B remains within its 11751 B ceiling. Core plus stage remains 24209 B. Splitting this small standalone validator would add loading complexity without improving isolation.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e0c40332b",
+      "reason": "Batch 269 adds optional stereo and half-dome video projection; no core or stage changes",
+      "grew": 1
     }
   ],
   "items": {
@@ -8395,6 +8401,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/voxel-net/rooms": 19966,
-    "@margoengine/kinematics-constraints/joint-limits": 1468
+    "@margoengine/kinematics-constraints/joint-limits": 1468,
+    "@margoengine/video/dome": 2026
   }
 }

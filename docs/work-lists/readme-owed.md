@@ -797,3 +797,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/kinematics-constraints (batch 214 job 2): document /joint-limits, JointLimitSet, local/rest-relative rotations, Euler order, hinge/cone bounds, jointLimitPredicate and SolveOptions.acceptPose.
 - margoengine (batch 214 job 2): document kinematics-constraints/joint-limits alias.
+- @margoengine/video (batch 269 job 2): document /dome videoDomeMaterial, mono/side-by-side/top-bottom, eye, 180/360 angles, sphere orientation, black rear, half-texel borders, source ownership and compat; point ordinary map/repeat/mips users to materials.Texture. Examples deferred.
+- margoengine (batch 269 job 2): document generated video/dome alias; examples deferred.
