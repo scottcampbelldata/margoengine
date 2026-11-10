@@ -392,3 +392,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: generated controls/globe export ordering refreshed while landing voxel-pathtracer BLAS dependencies.
 - @margoengine/headless: deferred README-only node-check.mjs bundled in test:gpu; ffmpeg is absent from PATH. Rendering correctness in browser-check.mjs passed during the BLAS dependent gate.
 - @margoengine/react: browser binding and instance checks now launch from the repository root; README runtime work stays deferred.
+- @margoengine/sciviz: document /contour CPU/GPU multi-level isosurfaces and isolines, contourOperator, pulling cell assumptions, precision bound, cancellation and NASA demo.
+- margoengine: document generated sciviz/contour alias with the owning sciviz contour entry.

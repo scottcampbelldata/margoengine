@@ -2918,6 +2918,10 @@
       "types": "./dist/sciviz/pipeline.d.ts",
       "import": "./dist/sciviz/pipeline.js"
     },
+    "./sciviz/contour": {
+      "types": "./dist/sciviz/contour.d.ts",
+      "import": "./dist/sciviz/contour.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

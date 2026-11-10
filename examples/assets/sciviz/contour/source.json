@@ -1,0 +1,10 @@
+{
+  "title": "NASA TMR three-dimensional bump SA FUN3D eddy viscosity slice x=0.3",
+  "url": "https://www.nasa.gov/wp-content/uploads/2026/01/mut-0-3-fun3d-sa-dat.zip",
+  "reference": "https://tmbwg.github.io/turbmodels/bump3d_sa.html",
+  "license": "US government public domain",
+  "sha256": "d5e0c1d3af72fcb6d13eb5bc50685eb67e4bb6d92abfca77bdefeb4235652d06",
+  "bytes": 1475217,
+  "nodes": 20449,
+  "cells": 20166
+}

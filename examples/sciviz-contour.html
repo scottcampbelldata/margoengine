@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NASA grid contours | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
+<body><header><h1>Contours of a NASA FUN3D solution</h1><p>Eddy viscosity ratio on the published x=0.3 slice of the three-dimensional bump. The original 20,166 quadrilaterals are triangulated with shared diagonals.</p></header>
+<div class="controls"><label>Level multiplier <input id="level" type="range" min="0.5" max="2" step="0.1" value="1"></label><label>Intersection backend <select id="backend"><option value="gpu">GPU</option><option value="cpu">CPU</option></select></label></div>
+<div class="view"><canvas id="viewport" aria-label="NASA FUN3D eddy viscosity isolines"></canvas></div><p id="status" data-webgpu-status role="status">Loading NASA solution...</p>
+<footer>NASA TMR FUN3D SA bump solution. US government public domain. This is the published surface slice, not an invented volume. <a href="https://tmbwg.github.io/turbmodels/bump3d_sa.html">Source</a>.</footer>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js'; needsWebGPU('#viewport').then(ok=>ok&&import('./sciviz-contour.ts'));</script></body></html>

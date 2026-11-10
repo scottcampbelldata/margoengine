@@ -3028,3 +3028,4 @@ comparison lane and scalar tail. Also retain the existing mesh, mesh-attributes
 and composed compatibility GPU suites. Do not rerun the known native full-
 composition failure or full-package README deadline to green; lane-U owns both.
 No timing/benchmark command is needed for these correctness proofs.
+Batch 172 contours: build packages, run node --test packages/sciviz/tests/contour.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=6 --wait-max=60 -- node packages/sciviz/tests/contour-browser.mjs. Serve examples/sciviz-contour.html to switch CPU/GPU intersections and level multiplier on the original NASA quad slice. The browser report includes maximum coordinate difference, the computed bound, primitive counts and visible pixel counts for each backend. No timing benchmark is involved.

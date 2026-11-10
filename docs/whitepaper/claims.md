@@ -3537,3 +3537,5 @@ mesh-instances tests. This closes only the shared-instance implementation gap;
 triangle NEE/RIS, independent guiding, many-light lobes/scattering, RIS naming
 and equal-cost work, and root emitter-MIS suite coverage remain open. Full-package
 README and native full-composition acceptance remain blocked in lane-U.
+### Batch 172 grid contours
+The optional contour entry produces multiple unstructured-grid isosurfaces/isolines with consistent shared-face diagonals, gradient normals and source IDs. Proof: packages/sciviz/tests/contour.test.js checks all tetra sign cases and analytic mixed cell sections; contour-browser.mjs compares real GPU interpolation to CPU coordinates within the documented float envelope on both backends and renders the attributed NASA slice. GPU topology and gradient preparation currently run on the CPU. No speed or full volume CFD dataset claim.

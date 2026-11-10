@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12776344,
+  "total": 12779667,
   "history": [
     {
       "date": "2026-10-24",
@@ -6334,6 +6334,12 @@
       "commit": "batch-259",
       "reason": "Optional ui/keyboard: absent to 1514 B gzip, ceiling 0 to 1770 B. Reuse shared widget/text ownership and existing engine renderers instead of duplicating rendering, focus or layout. Splitting would complicate the optional API and require duplicate state. Core/stage untouched.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "4f7774957",
+      "reason": "Batch 172 job 2: new optional sciviz/contour entry 0 to 3067 B min+gzip, ceiling 3323 B. Owns consistent pulling triangulation, multi-level surfaces/lines, gradient normals, CPU/GPU intersections, bounded readback, cancellation and pipeline adapter. Splitting would divide shared topology and precision ownership without reducing the complete operation. Core + stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7492,6 +7498,7 @@
     "@margoengine/selection/xray": 12692,
     "@margoengine/exporters/textures": 10316,
     "@margoengine/ui/keyboard": 1770,
-    "leak @margoengine/ui/keyboard -> @margoengine/text": 1
+    "leak @margoengine/ui/keyboard -> @margoengine/text": 1,
+    "@margoengine/sciviz/contour": 3323
   }
 }
