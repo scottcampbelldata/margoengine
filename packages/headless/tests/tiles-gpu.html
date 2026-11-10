@@ -1,0 +1,52 @@
+<!doctype html><html><body><script type="module">
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
+import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
+import { createHeadlessCanvas, installGPU, readPixels } from '../src/index.ts';
+import { renderTiled, renderTiles } from '../src/tiles.ts';
+window.capture = async (backend) => {
+  const installed = installGPU({ gpu: navigator.gpu }),
+    canvas = backend === 'webgpu' ? createHeadlessCanvas({ width: 131, height: 97 }) : document.createElement('canvas');
+  canvas.width = 131; canvas.height = 97;
+  const engine = await Engine.create(canvas, { backend, exactSize: true, fallback: webglRenderer }), errors = [];
+  if (engine.gpu) engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  try {
+    if (backend !== 'webgpu') {
+      try { await renderTiled(engine, { width: 131, height: 97 }); }
+      catch (error) { return { code: error.code }; }
+      throw Error('Expected WebGL2 refusal');
+    }
+    const camera = new Camera({ position:[2,1.4,3] });
+    engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color:'#84d6bd' }));
+    engine.render({ camera });
+    const reference = await readPixels(engine),
+      tiled = await renderTiled(engine, { width:131, height:97, tileSize:48, camera }),
+      sampled = await renderTiled(engine, { width:131, height:97, tileSize:48, samples:4, camera });
+    let largest = 0, sum = 0, changed = 0;
+    for (let i=0; i<tiled.data.length; i++) {
+      const d = Math.abs(reference.data[i]-tiled.data[i]);
+      largest = Math.max(largest,d); sum += d;
+      if (tiled.data[i] !== sampled.data[i]) changed++;
+    }
+    // A poster wider than the real GPU texture limit: stream with bounded memory.
+    const width = engine.gpu.limits.maxTextureDimension2D + 1;
+    let pixels = 0, maxTile = 0;
+    for await (const tile of renderTiles(engine, { width, height:3, tileSize:512, camera })) {
+      pixels += tile.width * tile.height;
+      maxTile = Math.max(maxTile, tile.width, tile.height);
+    }
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { largest, mean:sum/tiled.data.length, changed, pixels, width, maxTile,
+      restored:[canvas.width,canvas.height], errors };
+  } finally { engine.dispose(); installed.dispose(); }
+};
+window.compatCapture = async () => {
+  const compat = await import('@margoengine/webgl2-compat');
+  await compat.install({ force:true });
+  try { return await window.capture('webgpu'); }
+  finally { compat.uninstall(); }
+};
+window.ready = true;
+</script></body></html>
+
+
+

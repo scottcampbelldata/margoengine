@@ -1434,6 +1434,10 @@
       "types": "./dist/headless/formats.d.ts",
       "import": "./dist/headless/formats.js"
     },
+    "./headless/tiles": {
+      "types": "./dist/headless/tiles.d.ts",
+      "import": "./dist/headless/tiles.js"
+    },
     "./html": {
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"

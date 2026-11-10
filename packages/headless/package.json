@@ -47,6 +47,10 @@
     "./formats": {
       "types": "./dist/formats.d.ts",
       "import": "./dist/formats.js"
+    },
+    "./tiles": {
+      "types": "./dist/tiles.d.ts",
+      "import": "./dist/tiles.js"
     }
   },
   "files": [

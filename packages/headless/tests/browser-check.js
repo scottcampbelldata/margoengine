@@ -1,5 +1,5 @@
 // The same scene on a page canvas and on the stand-in, each on its own engine and device of the same adapter.
-import { Camera, Engine, PbrMaterial, box } from '../../core/src/index.ts';
+import { Camera, Engine, PbrMaterial, box } from '@margoengine/core';
 import { createHeadlessCanvas, installGPU, readPixels, toPNG } from '../src/index.ts';
 import { encodeEXR, encodeJPEG, encodeWebP, readTexture } from '../src/formats.ts';
 import { parseEXR } from '../../environment/src/exr.ts';

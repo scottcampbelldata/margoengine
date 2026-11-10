@@ -414,3 +414,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/blender (batch 207 job 1): document object_animation export option (default false), objects entry, local hierarchy, empty pivots, action/NLA-slot sampling, constraints, signed scale, scene restoration and generated-instance limits.
 - margoengine (batch 207 job 1): document blender/objects alias and regenerated upstream selection/hit-details alias.
+
+- @margoengine/headless: document /tiles renderTiles streaming, renderTiled assembly, sample-count AA, padding, cancellation, WebGPU-only readback and temporal-filter limits.
+- margoengine: document headless/tiles as the one-install alias of @margoengine/headless/tiles.

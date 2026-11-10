@@ -3050,3 +3050,7 @@ Build packages, then run node --test --test-timeout=30000 packages/animation/tes
 
 ## Batch 207 job 1
 Build packages, then node --test --test-timeout=120000 packages/blender/tests/objects.test.js. Regenerate the CC0 Blender oracle with C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_objects.py -- test-results/blender-objects. Run node scripts/gpu-lock.mjs run --owner=objects --max=2 --wait-max=60 -- node packages/blender/tests/objects-browser.mjs, then the same command with --compat on the browser script. Each browser run renders and compares actual Animation.seek/model node matrices, checks validation and disposal. No timing measurement.
+
+
+### Batch 209 tiled still correctness
+After build:packages, run node --test --test-timeout=120000 packages/headless/tests/tiles.test.js. Run node scripts/gpu-lock.mjs run --owner=tiles-proof --gpu=tiles-render-and-readback --wait-max=1200 --max=240 -- node packages/headless/tests/tiles-gpu.mjs for exact single/tiled comparison, four samples and streamed output past the real texture limit. No benchmark or README runner is involved.

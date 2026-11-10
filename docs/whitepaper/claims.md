@@ -3562,3 +3562,8 @@ animation/playback adds finished and loop notifications, a renewable finished pr
 
 ## Batch 207 job 1: object animation and kept hierarchy
 blender/objects exports object actions with ancestor/empty pivots, parent links, parent inverses, constraints and signed scale, reusing glTF animation playback. objects.test.js and objects-browser.mjs compare 1728 world-matrix components against Blender's independently evaluated worlds across all frames of three actions. CPU bound 3e-6; both GPU backends report 4.77e-7, no validation errors, all mesh handles released. This closes the object-action/parent-link row supported by glTF web libraries and Verge3D object clips; it does not claim general procedural instance animation or continuous-time equivalence. Sizes and accepted differences: docs/limits.md.
+
+
+### Batch 209: headless poster rendering
+The optional /tiles entry renders and reads bounded tiles while output can exceed maxTextureDimension2D. CPU fixtures prove coverage, odd edges, linear-light alpha averaging, cancellation and cleanup. packages/headless/tests/tiles-gpu.mjs compares a 131x97 cube tiled at 48 pixels with a whole-frame readback, exactly; four samples change edge coverage; a three-row poster exceeds the real device width limit. WebGL2 returns coded unsupported. This is correctness evidence, not a speed measurement.
+The same tile proof also passes on the full WebGL2 compatibility layer: exact pixels, four-sample coverage, 8,193-pixel width and no validation errors. The small WebGL2 preview remains unsupported.

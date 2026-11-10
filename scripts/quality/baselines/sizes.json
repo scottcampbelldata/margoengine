@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12837584,
+  "total": 12840050,
   "history": [
     {
       "date": "2026-10-24",
@@ -6381,6 +6381,11 @@
       "date": "2026-11-10",
       "commit": "batch-207",
       "reason": "New blender/objects entry: 0 to 4945 gzip bytes, ceiling 5201. Reuses the anim converter and existing PBR model dependency instead of duplicating animation/model ownership. Core plus stage unchanged at 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "reason": "Batch 209 tiles new optional entry: absent to 2210 B gzip, ceiling 2466 B. Streaming subfrusta and linear-alpha supersampling stay coherent; splitting would add loading plumbing. Core plus stage 24209 B unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7551,6 +7556,7 @@
     "@margoengine/animation/playback": 2073,
     "leak @margoengine/animation/playback -> @margoengine/gltf-pro/model": 1,
     "@margoengine/blender/objects": 5201,
-    "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1
+    "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1,
+    "@margoengine/headless/tiles": 2466
   }
 }
