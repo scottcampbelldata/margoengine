@@ -32,6 +32,7 @@ const files = {
     '/cache-files/chair.glb': glb,
     '/cache-files/a': Buffer.alloc(100, 1),
     '/cache-files/b': Buffer.alloc(100, 2),
+    '/cache-files/variants': Buffer.alloc(100, 5),
     '/cache-files/c': Buffer.alloc(100, 3),
     '/cache-files/huge': Buffer.alloc(400, 4),
   },
@@ -71,6 +72,7 @@ const server = await createServer({
           response.setHeader('etag', etag);
           response.setHeader('accept-ranges', 'bytes');
           response.setHeader('content-type', 'application/octet-stream');
+          if (path === '/cache-files/variants') response.setHeader('vary', 'Accept-Language');
           if (request.headers['if-none-match'] === etag) {
             response.statusCode = 304;
             return response.end();
@@ -208,6 +210,14 @@ try {
   const order = await call('evictionOrder', 'order');
   assert.deepEqual(order, { evicted: 1, usage: { bytes: 200, files: 2 }, a: 100, b: 'TypeError' });
   report.evictionOrder = order;
+
+  const variants = await call('evictionVariants');
+  assert.deepEqual(variants, [
+    { bytes: 600, files: 6 },
+    { bytes: 100, files: 1 },
+    { bytes: 100, files: 1 },
+  ]);
+  report.evictionVariants = variants;
 
   // 6. 2,000 stored files, then 30 more writes under a full budget: the records each write reads.
   const plain = await call('evictionReads', 'plain', false, 2000, 30),

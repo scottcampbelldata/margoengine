@@ -6,6 +6,14 @@ const USED = 'used',
 const isEntry = (value: unknown): value is AssetCacheEntry =>
   typeof (value as AssetCacheEntry | null)?.size === 'number';
 const count = (value: unknown) => (typeof value === 'number' ? value : 0);
+interface Removal {
+  total: IDBRequest;
+  files: IDBRequest;
+  keys: Set<IDBValidKey>;
+  pending: number;
+  bytes: number;
+  count: number;
+}
 
 /**
  * Eviction for caches of tens of thousands of files (map tiles): an IndexedDB index on each entry's last use and a
@@ -16,6 +24,7 @@ const count = (value: unknown) => (typeof value === 'number' ? value : 0);
  * open the database and goes to the network.
  */
 export function evictionIndex(): AssetCacheEviction {
+  const removals = new WeakMap<IDBObjectStore, Removal>();
   return {
     version: 2,
     upgrade(meta, old) {
@@ -64,16 +73,28 @@ export function evictionIndex(): AssetCacheEviction {
       };
     },
     remove(meta, data, key) {
-      const old = meta.get(key),
-        total = meta.get(TOTAL),
-        files = meta.get(FILES);
-      files.onsuccess = () => {
+      let batch = removals.get(meta);
+      if (!batch) {
+        batch = { total: meta.get(TOTAL), files: meta.get(FILES), keys: new Set(), pending: 0, bytes: 0, count: 0 };
+        removals.set(meta, batch);
+      }
+      if (batch.keys.has(key)) return;
+      batch.keys.add(key);
+      batch.pending++;
+      const removal = batch,
+        old = meta.get(key);
+      old.onsuccess = () => {
         if (isEntry(old.result)) {
-          meta.put(count(total.result) - old.result.size, TOTAL);
-          meta.put(count(files.result) - 1, FILES);
+          removal.bytes += old.result.size;
+          removal.count++;
         }
         meta.delete(key);
         data.delete(key);
+        if (--removal.pending === 0) {
+          meta.put(count(removal.total.result) - removal.bytes, TOTAL);
+          meta.put(count(removal.files.result) - removal.count, FILES);
+          removals.delete(meta);
+        }
       };
     },
     usage(meta, done) {

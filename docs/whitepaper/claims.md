@@ -4655,3 +4655,7 @@ On RTX A6000, 20 oblique bias/offset/filter probes (1280 f32 words) match native
 ### Prefiltered IBL metadata capacity (2026-11-10)
 
 The encoder checks the complete u32 KTX2 key/value length before source mip access and output allocation. Evidence: packages/environment/tests/prefiltered.test.js has a parent-failing dimension-only regression for 8192/16384 and a 4096 control, plus unchanged bit-preserving round trips and malformed-file tests. Reproduce after package build with node --test packages/environment/tests/prefiltered.test.js. No multi-GiB input or output is allocated by the overflow regression. Sources and derivation: docs/clean-room.md, Prefiltered IBL metadata capacity.
+
+### Indexed cache variant deletion (2026-11-10)
+
+Deleting a URL with multiple Vary representations leaves the indexed byte and file totals equal to the retained contents. Evidence: packages/cache/test/eviction.test.js covers two and five variants, unrelated data and repeated deletion; packages/cache/scripts/test-browser.js checks five variants on real IndexedDB. Reproduce after build with node --test packages/cache/test/eviction.test.js and npm run test:browser --workspace @margoengine/cache. The browser suite needs no graphics backend; no rendering or speed claim is added. Sources: docs/clean-room.md, Cache eviction removal totals.

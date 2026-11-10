@@ -5421,9 +5421,7 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 
 ### Open: cache findings not fixed in the audit
 
-- evictionIndex `remove()` per key in one transaction reads the totals before any put lands: deleting a URL with two
-  `Vary` entries leaves `usage()` at `{bytes: 100, files: 1}` with nothing stored (packages/cache/src/eviction.ts
-  `remove`, called per key from index.ts `delete`). Fix: one read and one put of the totals for all keys.
+- Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - `serve()` puts the entry back blind: a hit looked up before a queued write evicts it brings back a record without
   bytes (maxBytes 150, two 100-byte files: usage 200 bytes, 2 files). Fix: get then put in one transaction, only if the
   record exists, as RangeCache `touch` does.

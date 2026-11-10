@@ -4,9 +4,43 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AssetCache } from '../dist/index.js';
 import { evictionIndex } from '../dist/eviction.js';
+import { varyKeys } from '../dist/vary.js';
 import { base, bytes, fakeIndexedDB, read, server } from './support.js';
 
 const tick = () => new Promise((r) => setTimeout(r, 2));
+
+test('deleting every Vary entry updates indexed usage once for the complete set', async () => {
+  for (const variants of [2, 5]) {
+    globalThis.indexedDB = fakeIndexedDB();
+    const network = server({
+      '/variants': { body: bytes(100), headers: { vary: 'Accept-Language' } },
+      '/other': { body: bytes(50) },
+    });
+    const cache = new AssetCache({
+      name: `delete-variants-${variants}`,
+      fetch: network,
+      keys: varyKeys(),
+      eviction: evictionIndex(),
+    });
+    for (let i = 0; i < variants; i++) {
+      await read(await cache.fetch(base + 'variants', { headers: { 'accept-language': `lang-${i}` } }));
+      await cache.flush();
+    }
+    await read(await cache.fetch(base + 'other'));
+    await cache.flush();
+    assert.equal((await cache.usage()).bytes, variants * 100 + 50);
+    assert.equal((await cache.usage()).files, variants + 1);
+    for (let i = 0; i < 2; i++) {
+      await cache.delete(base + 'variants');
+      assert.deepEqual(await cache.usage(), { bytes: 50, files: 1, quota: undefined, usage: undefined });
+    }
+    network.offline = true;
+    await assert.rejects(cache.fetch(base + 'variants', { headers: { 'accept-language': 'lang-0' } }), TypeError);
+    assert.deepEqual(await read(await cache.fetch(base + 'other')), bytes(50));
+    cache.dispose();
+    await cache.flush();
+  }
+});
 
 test('the least recently used files are evicted, as without the index; a file over the budget is not stored', async () => {
   globalThis.indexedDB = fakeIndexedDB();

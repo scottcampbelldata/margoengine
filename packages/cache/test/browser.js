@@ -2,6 +2,7 @@
 // serves the files, counts the requests that reach the server and takes the browser offline between calls.
 import { AssetCache } from '../dist/index.js';
 import { evictionIndex } from '../dist/eviction.js';
+import { varyKeys } from '../dist/vary.js';
 import { RangeCache } from '../dist/ranges.js';
 import { StreamingAssetCache } from '../dist/stream.js';
 import { DecodedAssetCache } from '../dist/decoded.js';
@@ -217,6 +218,27 @@ window.cacheChecks = {
       digest: await hex(body),
       stats: { ...ranges.stats },
     };
+  },
+
+  /** Delete all negotiated copies together; keep unrelated bytes and indexed totals consistent. */
+  async evictionVariants() {
+    const cache = new AssetCache({ name: 'delete-variants', keys: varyKeys(), eviction: evictionIndex() });
+    for (const lang of ['en', 'fr', 'de', 'es', 'it']) {
+      await read(
+        await cache.fetch(new URL('/cache-files/variants', location.href), { headers: { 'accept-language': lang } }),
+      );
+      await cache.flush();
+    }
+    await read(await cache.fetch(new URL('/cache-files/b', location.href)));
+    await cache.flush();
+    const before = await cache.usage();
+    await cache.delete(new URL('/cache-files/variants', location.href));
+    const after = await cache.usage();
+    await cache.delete(new URL('/cache-files/variants', location.href));
+    const repeated = await cache.usage();
+    cache.dispose();
+    await cache.flush();
+    return [before, after, repeated].map(({ bytes, files }) => ({ bytes, files }));
   },
 
   /** a, b, a, c, then a file over the 250-byte budget, with the index: what is evicted and what is left. */

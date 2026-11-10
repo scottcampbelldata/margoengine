@@ -6597,3 +6597,7 @@ Notebook/share backend ownership (review5, 2026-11-10): the isolated sciviz entr
 ### Prefiltered IBL metadata capacity (2026-11-10)
 
 The optional environment/prefiltered encoder refuses KTX2 key/value data above 4,294,967,295 bytes with RangeError before reading cube mips or allocating output. The total includes the metadata length word, key, payload and padding. A complete 8192-edge source cube needs at least 4,294,967,548 metadata bytes, even with a 1x1 BRDF LUT; 8192 and 16384 source edges cannot be saved in this lossless embedded-source format. Source edges through 4096 remain representable with every supported LUT edge (1..4096); this is a format capacity statement, not a promise of available memory or device support. Specular level byte offsets remain u64.
+
+### Indexed cache variant deletion (2026-11-10)
+
+The optional cache/eviction index coalesces removals in the same object-store transaction: each key is counted once, and byte/file totals are read and written once for the batch. AssetCache.delete(url) removes all Vary representations and associated records while preserving unrelated entries and exact usage. Repeated deletion does not subtract absent entries. Public interfaces and cache schema/version are unchanged. Evidence: packages/cache/test/eviction.test.js and the real IndexedDB evictionVariants browser case.
