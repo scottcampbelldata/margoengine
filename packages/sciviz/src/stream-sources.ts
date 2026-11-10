@@ -17,10 +17,7 @@ const limit = (v = 16 * 1024 * 1024) => {
   if (!Number.isSafeInteger(v) || v < 1) throw rangeError('Set maxBytes to a positive safe integer', 'sciviz');
   return v;
 };
-const decode = <T>(options: SourceOptions<T>, text: string): Promise<T> => {
-  options.signal?.throwIfAborted();
-  const value = options.parse ? options.parse(text) : (JSON.parse(text) as T),
-    signal = options.signal;
+const abortable = <T>(value: T | PromiseLike<T>, signal?: AbortSignal): Promise<T> => {
   if (!signal) return Promise.resolve(value);
   return new Promise<T>((resolve, reject) => {
     const cleanup = () => signal.removeEventListener('abort', abort),
@@ -42,6 +39,25 @@ const decode = <T>(options: SourceOptions<T>, text: string): Promise<T> => {
     );
   });
 };
+const decode = <T>(options: SourceOptions<T>, text: string): Promise<T> => {
+  options.signal?.throwIfAborted();
+  return abortable(options.parse ? options.parse(text) : (JSON.parse(text) as T), options.signal);
+};
+async function* abortableChunks(source: AsyncIterable<Uint8Array>, signal?: AbortSignal): AsyncGenerator<Uint8Array> {
+  const iterator = source[Symbol.asyncIterator]();
+  let ended = false;
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const next = await abortable(iterator.next(), signal);
+      signal?.throwIfAborted();
+      if (next.done) { ended = true; return; }
+      yield next.value;
+    }
+  } finally {
+    if (!ended && iterator.return) await abortable(iterator.return(), signal);
+  }
+}
 const combined = (signal: AbortSignal | undefined, own: AbortSignal) => (signal ? AbortSignal.any([signal, own]) : own);
 class Queue<T> {
   readonly values: T[] = [];
@@ -165,7 +181,7 @@ export async function* parseServerEvents<T = unknown>(
     id = '',
     retry: number | undefined,
     dataBytes = 0;
-  for await (const chunk of chunks) {
+  for await (const chunk of abortableChunks(chunks, options.signal)) {
     options.signal?.throwIfAborted();
     buffer += decoder.decode(chunk, { stream: true });
     let index: number;

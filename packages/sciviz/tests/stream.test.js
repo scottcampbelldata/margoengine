@@ -308,3 +308,50 @@ test('USGS feed fixture is unmodified and pinned by source SHA-256', () => {
   assert.equal(data.features.length, source.count);
   assert.ok(data.features.some((f) => Number.isFinite(f.properties.time) && Number.isFinite(f.properties.mag)));
 });
+
+test('SSE abort settles pending reads and cleanup without waiting for the source', async () => {
+  const { setImmediate: immediate } = await import('node:timers/promises');
+  const controller = new AbortController(), reason = new Error('cancel SSE');
+  let finish, returned = 0;
+  const chunks = {
+    [Symbol.asyncIterator]() {
+      return {
+        next() { return new Promise(resolve => { finish = resolve; }); },
+        return() { returned++; return new Promise(() => {}); },
+      };
+    },
+  };
+  const iterator = parseServerEvents(chunks, { signal: controller.signal });
+  let outcome = 'pending';
+  const pending = iterator.next().then(() => { outcome = 'resolved'; }, error => {
+    assert.equal(error, reason); outcome = 'aborted';
+  });
+  controller.abort(reason);
+  await immediate();
+  const observed = outcome;
+  finish({ done: true });
+  await pending;
+  assert.equal(observed, 'aborted');
+  assert.equal(returned, 1);
+});
+
+test('SSE preserves normal source exhaustion and closes a returned iterator once', async () => {
+  let returned = 0;
+  const chunks = {
+    [Symbol.asyncIterator]() {
+      let count = 0;
+      return {
+        async next() { return count++ === 0 ? { done: false, value: new TextEncoder().encode('data: 1\n\n') } : { done: true }; },
+        async return() { returned++; return { done: true }; },
+      };
+    },
+  };
+  const normal = [];
+  for await (const event of parseServerEvents(chunks)) normal.push(event.data);
+  assert.deepEqual(normal, [1]);
+  assert.equal(returned, 0);
+  const early = parseServerEvents(chunks);
+  await early.next();
+  await early.return();
+  assert.equal(returned, 1);
+});

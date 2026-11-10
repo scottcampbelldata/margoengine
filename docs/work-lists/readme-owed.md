@@ -1236,3 +1236,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - Batch 178 job 4, @margoengine/sciviz (and margoengine/sciviz/colormaps alias): construction names, Tol category domains, Machado diagnostics, colorScale domain/range and bins, exceptional colours, encodingLegend sizes/shapes and export/state parity. README examples deferred during the build phase.
 
 - @margoengine/water (review 2): document live Caustics/Ripples composition across attachment and removal; examples deferred.
+
+- @margoengine/sciviz (review 3 SV2): document pending SSE byte-read cancellation, exact abort reasons and caller-owned iterator cleanup; examples deferred.
