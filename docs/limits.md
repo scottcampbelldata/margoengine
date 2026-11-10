@@ -6746,3 +6746,4 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | ui `GlWorldPanels` | Preview route | None: route added (2 backend tests) | `packages/ui/tests/world-gl-browser.js` (preview and WebGPU pixels), `tests/world-gl.test.js` |
 | stats `GeometryStats`, `GLStats`, `StatsPanels` | Preview route | None: routes added (1, 2, 1 backend tests); new preview regression | `packages/stats/test/preview.test.js`, `packages/stats/test/gl.test.js` |
 
+Batch 164 row 9.5 retains shadowed temporal froxel injection, four-tap integration and per-sample compositing. The rival uses a half-resolution raymarch, so GPU workloads differ. Numeric grid comparison changes only CPU preparation; no speed gain or rival parity is claimed. [Evidence](whitepaper/batch-164-workcounts.md).

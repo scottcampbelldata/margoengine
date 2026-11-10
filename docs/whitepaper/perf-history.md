@@ -3580,3 +3580,6 @@ WrongDocumentError under the test harness's Chromium, and sky's browser check is
 
 Helpers ran the read-only `git stash list` several times and `npx prettier` or `npx biome` three times, against our own
 rules (no `git stash` and no `npx` in any form). None changed the repository.
+## Batch 164 fog preparation (2026-11-10)
+
+`perf(environment): compare froxel grid dimensions without serialization` removes 15 grid serializations in the 12-frame explicit-grid story, with exact GPU commands and uniform bytes in four variants. Row 9.5 retains the measured loss; shadowed temporal froxels versus a half-resolution raymarch remain different workloads. Timing pending the quiet rerun. [Reproduce](batch-164-workcounts.md).

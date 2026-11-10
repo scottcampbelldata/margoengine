@@ -4107,3 +4107,4 @@ Follow [the complete external-install and three-scene commands](../sciviz-rivals
 ## Batch 182 sciviz comparison
 
 `npm run build:packages`, then `npm run sciviz:compare -- --runs=1` (installs the six rivals under engine-bench/batch-182 if missing; no clock). `--list` prints every case and scale, `--cases=volume/vtk,graph/cosmograph` picks cases, `--output=` moves the records (default test-results/bp-182/compare). The timed run needs `MARGO_SPEED_PHASE=active` and `--runs=7`, takes the GPU alone and walks every scale. Accuracy: `node --test packages/sciviz/tests/analytic-references.test.js`.
+Batch 164 fog: [full command-tape and real-GPU commands, preserved workloads and clean-room sources](batch-164-workcounts.md#row-95-froxel-preparation).

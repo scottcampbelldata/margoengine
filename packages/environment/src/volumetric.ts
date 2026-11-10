@@ -24,6 +24,7 @@ import { alphaBlend, groupCode, overlayPass, type SurfaceTransparency } from '..
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+const defaultGrid = [160, 90, 64] as const, white = [1, 1, 1], jitterBases = [2, 3, 5];
 
 /** What VolumetricFog reads from `Shadows` (@margoengine/shadows) or `Clustered` (@margoengine/clustered): their WGSL and bindings. */
 export interface VolumetricLightSource {
@@ -296,7 +297,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
   private uniform?: GPUBuffer;
   private sampler?: GPUSampler;
   private textures: GPUTexture[] = [];
-  private gridKey = '';
+  private gridSize: readonly number[] = [];
   private computeKey = '';
   private inject?: GPUComputePipeline;
   private integrateStep?: GPUComputePipeline;
@@ -375,7 +376,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
 
   private validate(): void {
     const o = this.options,
-      grid = o.grid ?? [160, 90, 64];
+      grid = o.grid ?? defaultGrid;
     const scalars: [number | undefined, number, number, number][] = [
       [o.density, 0.02, 0, 1e3],
       [o.heightFalloff, 0, 0, 1e3],
@@ -481,7 +482,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     }
     for (const texture of this.textures) texture.destroy();
     this.textures = textures;
-    this.gridKey = grid.join();
+    this.gridSize = size;
     this.injectGroups = [];
     this.integrateGroups = [];
     this.compositeGroup = this.entries = undefined;
@@ -533,8 +534,9 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
         'VolumetricFog needs scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first or pass options.depth',
       );
     if (!invertMatrix(c.camera.matrix, this.inverse)) return false;
-    const grid = o.grid ?? [160, 90, 64];
-    if (grid.join() !== this.gridKey) this.allocate(device, grid);
+    const grid = o.grid ?? defaultGrid;
+    if (grid[0] !== this.gridSize[0] || grid[1] !== this.gridSize[1] || grid[2] !== this.gridSize[2])
+      this.allocate(device, grid);
     const lights = o.lights?.pbr(1).declarations,
       shadows = o.shadows?.pbr(lights ? 2 : 1).declarations,
       medium = o.volumes?.medium(1 + +!!lights + +!!shadows),
@@ -592,7 +594,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     v[45] = o.density ?? 0.02;
     v[46] = o.heightFalloff ?? 0;
     v[47] = o.height ?? 0;
-    v.set(o.color ?? [1, 1, 1], 48);
+    v.set(o.color ?? white, 48);
     v[51] = o.anisotropy ?? 0.5;
     v[55] = o.multipleScattering ?? 0;
     const lighting = this.engine!.lighting,
@@ -611,7 +613,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     v[63] = 1 / (o.noiseScale ?? 8);
     v[67] = +(c.format === 'rgba16float' || c.format === 'rgba32float');
     const frame = (this.frameIndex % 16) + 1;
-    for (let i = 0; i < 3; i++) v[68 + i] = temporal > 0 ? halton(frame, [2, 3, 5][i]) - 0.5 : 0;
+    for (let i = 0; i < 3; i++) v[68 + i] = temporal > 0 ? halton(frame, jitterBases[i]) - 0.5 : 0;
     v[71] = +transparents;
     v[72] = rect?.[2] ?? c.width;
     v[73] = rect?.[3] ?? c.height;
@@ -774,7 +776,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     if (this.disposed || c.device !== this.device) return;
     if (!fogged) {
       // Not fogged this frame: the colours pass through (jitter.w 0), read from a volume that must exist to bind.
-      if (!view.textures.length) view.allocate(c.device, this.options.grid ?? [160, 90, 64]);
+      if (!view.textures.length) view.allocate(c.device, this.options.grid ?? defaultGrid);
       c.device.queue.writeBuffer(view.uniform!, 284, this.off);
     }
     this.format = c.format as GPUTextureFormat;
@@ -799,7 +801,8 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     this.uniform?.destroy();
     this.textures = [];
     this.uniform = this.sampler = this.inject = this.integrateStep = undefined;
-    this.gridKey = this.computeKey = '';
+    this.gridSize = [];
+    this.computeKey = '';
     this.injectGroups = [];
     this.integrateGroups = [];
     this.lightGroup = this.shadowGroup = this.mediumGroup = this.compositeGroup = this.entries = undefined;

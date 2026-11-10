@@ -651,9 +651,13 @@ decodes every lower level. Scanline files are passed to `parseEXR`, so it reads 
 
 ```ts
 import {parseTiledEXR} from 'margoengine/environment/exr-tiled';
-const bytes = await (await fetch('/texture-mips.exr')).arrayBuffer();
+import {encodeEXR} from 'margoengine/environment/exr-write';
+// A self-contained scanline input also works; replace bytes with your tiled EXR bytes.
+const bytes = await encodeEXR({width: 2, height: 2, channels: [
+  {name: 'Y', type: 'FLOAT', data: new Float32Array([0, 0.25, 0.5, 1])},
+]});
 const image = parseTiledEXR(bytes, {levels: 'all'});
-console.log(image.tiling?.levelMode, image.levels.map((l) => `${l.width}x${l.height}`)); // MIPMAP_LEVELS ['1024x512', ...]
+console.log(image.levels.map((l) => `${l.width}x${l.height}`)); // ['2x2']
 ```
 
 `parseTiledEXR` is synchronous and clean-room, and decodes every mip or rip level. It refuses PXR24, B44, B44A, DWAA
@@ -841,3 +845,24 @@ npm run test:reflection-shapes:browser --workspace @margoengine/environment
 The review56 proof compares matching partial-view frames. Two deliberate unscoped
 surface controls must leak pixels; the six repaired viewport/scissor cases preserve
 every outside RGB component exactly on both backends.
+
+## Froxel fog with scene depth
+
+```js
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { Tonemap } from '@margoengine/tonemap';
+import { VolumetricFog } from '@margoengine/environment/volumetric';
+
+const engine = await Engine.create(document.querySelector('canvas'), {
+  camera: { position: [3, 2, 5], target: [0, 0, 0] },
+});
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#4090c0' }));
+Tonemap.attach(engine);
+const fog = VolumetricFog.attach(engine, { density: 0.03, grid: [160, 90, 64] });
+fog.options.density = 0.04;
+```
+
+The grid is compared by its three numeric dimensions each frame, including in-place
+edits. Resize and device restoration rebuild the same volume resources. Injection,
+temporal reprojection, the four-tap integration and the composite keep their full
+workload; this scheduling change claims no measured speed gain.
