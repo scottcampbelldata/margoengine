@@ -79,7 +79,7 @@ async function step(i) {
   edit();
   await draw();
   await draw();
-  return { label, kept: await mesh.readTriangles(), total: geometry.indices.length / 3, clusters: mesh.meshlets.count };
+  return { label, kept: await mesh.readTriangles(), total: geometry.indices.length / 3, clusters: mesh.meshlets.count, part: geometry.indices.length / 3 };
 }
 // Three balls as parts of one MeshletMesh, one of them mirrored, against three core meshes.
 const spot = (x, z, flip = 1) => [flip, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, z, 1];
@@ -110,7 +110,7 @@ async function instances() {
     label: 'three parts',
     kept: await mesh.readTriangles(),
     total: (geometry.indices.length / 3) * 3,
-    clusters: mesh.meshlets.count,
+    clusters: mesh.meshlets.count, part: geometry.indices.length / 3,
   };
 }
 // A ball with a wall hiding its left half, Hi-Z against none, and the same picture as core.
@@ -141,7 +141,7 @@ async function occlusion() {
   await draw();
   await draw();
   await draw();
-  return { label: 'behind a wall', kept: await mesh.readTriangles(), total: frustum, clusters: mesh.meshlets.count };
+  return { label: 'behind a wall', kept: await mesh.readTriangles(), total: frustum, clusters: mesh.meshlets.count, part: geometry.indices.length / 3 };
 }
 // A ball casting on a floor: the shadow frame keeps only clusters in each cascade, and the picture is core's.
 async function shadowed() {
@@ -175,7 +175,7 @@ async function shadowed() {
     label: 'shadow pass',
     kept: await mesh.readShadowTriangles(0),
     total: (geometry.indices.length / 3) * 2,
-    clusters: mesh.meshlets.count,
+    clusters: mesh.meshlets.count, part: geometry.indices.length / 3,
   };
 }
 // The same frame again with nothing changed: the kept clusters must come out in the same order, so the pixels repeat.

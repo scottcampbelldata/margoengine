@@ -267,3 +267,17 @@ test('the cluster cull keeps clusters in cluster order: test, scan, copy, and no
     "the clusters' words start after the one part's draw arguments",
   );
 });
+
+test('on the WebGL2 layer the triangle readback counts every part kept, whole', async () => {
+  const h = harness('margo-webgl2'),
+    m = new MeshletMesh([
+      { geometry: box(), material: new PbrMaterial(), transforms: new Float32Array([...identity, ...identity]) },
+    ]);
+  h.engine.use(m);
+  h.engine.frameGraph.execute(h.context);
+  const triangles = box().indices.length / 3;
+  assert.equal(await m.readTriangles(), (await m.readCounts())[0] * triangles);
+  assert.equal(await m.readShadowTriangles(0), 2 * triangles);
+  m.setVisible(0, 1, false);
+  assert.equal(await m.readShadowTriangles(0), triangles);
+});

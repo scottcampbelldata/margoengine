@@ -207,7 +207,8 @@ A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInst
   core mesh, a model, a materials mesh or a Terrain. Give it the large things: an occluder draws depth-only every frame,
   so it hides at once, in the frame it moves. Cut-out, blended, displaced and clipped primitives and back faces do not
   occlude. With no occluder nothing is built and nothing is paid. `culled.removeOccluder(wall)` stops it.
-- WebGL2 compatibility layer: nothing is culled and every row draws, the same image. The `@margoengine/webgl2-compat/preview` renderer
+- WebGL2 compatibility layer: nothing is culled and every row draws, the same image, and `readCounts()` says so: every row
+  of each instanced primitive and 1 for each plain one. The `@margoengine/webgl2-compat/preview` renderer
   is not supported (`MargoError` `'unsupported'`).
 
 ## Shadows per cascade: `CascadeParts` and `CascadeInstances`
@@ -229,7 +230,7 @@ Shadows.attach(engine).add(parts);
 
 `readCascades()` resolves the casters kept per cascade in the last shadow frame. Each list costs one u32 per slot per cascade.
 Lists too large to bind, the WebGL2 layer, and a pass with no `prepareShadow` in its frame all draw every caster, as the
-plain classes do. Parts keep their sphere for this test whatever `bounds` says.
+plain classes do. With no lists (too large to bind, or the WebGL2 layer) `readCascades()` resolves an empty array. Parts keep their sphere for this test whatever `bounds` says.
 
 
 ## Levels of detail: `LodInstances`
@@ -259,7 +260,7 @@ trees.setVisible(1, false);
 
 `minRadius` is in CSS pixels, each level below the one before; an instance under the last level's value draws nothing (the
 default 0 draws it however small). The first level's bounding sphere stands for every level, so the others must fit in it.
-`readCounts()` resolves the instances drawn per level. Each level holds a list of every instance, 96 bytes each. Instances
+`readCounts()` resolves the instances drawn per level (on the WebGL2 layer, every shown instance at the first level). Each level holds a list of every instance, 96 bytes each. Instances
 cast no shadows through this class, and the WebGL2 layer draws every shown instance at the first level.
 
 
@@ -296,7 +297,8 @@ its own, so four cascades hold four more regions per part. A pick draws the whol
 
 `maxVertices` (default 64) and `maxTriangles` (124) set the cluster size, next to the options of `CulledParts`, whose picking and
 part culling it keeps. `buildMeshlets(geometry)` gives the clusters alone. `readTriangles()` resolves how many triangles the last
-frame kept over all parts, and `readShadowTriangles(cascade)` the same for a shadow pass. The WebGL2 layer draws the whole mesh.
+frame kept over all parts, and `readShadowTriangles(cascade)` the same for a shadow pass. The WebGL2 layer draws the whole mesh, and both count every
+part drawn whole.
 
 
 ## Moving objects: `DynamicInstances`
@@ -377,6 +379,8 @@ above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-b
   (`occluderSize`, default 8 px of bounding-sphere radius). Worth it for dense or enclosed assemblies; on an open
   layout the depth prepass and pyramid cost more than they save (numbers below).
 - `'none'`: draw every part that is not hidden.
+- WebGL2 compatibility layer: the frustum and screen-size tests run on the CPU against bounding spheres, so
+  `'occlusion'` culls against the frustum only and `bounds: 'box'` tests spheres: the same image with more drawn.
 
 Both tests start from a part's bounding sphere. `bounds: 'box'` adds its oriented box, the geometry's box under the part's
 matrix, for assemblies of long or thin parts, whose spheres reach far past them:

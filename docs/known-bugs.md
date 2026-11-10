@@ -23,6 +23,29 @@ Batch 190 job 2: no open defect found in float32 weighted accumulation. The entr
 
 Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
 
+### Radeon 680M: the 4x MSAA resolve rounds an exact .5 average by draw history (list 5 R6 row 8, 2026-11-10, worked around in the checks)
+
+- **What:** `packages/culling` `dynamic-check.mjs`, `parts-check.mjs` and `lod-check.mjs` on the Beelink (Radeon 680M,
+  driver 32.0.21030.2001, Chrome on D3D12) found 1-level channel differences on 6 to 67 resolved pixels between the
+  culled engine and core, which draws the same instances in another order once a mesh hides.
+- **Cause:** below Margo. The multisampled colour samples of both engines are equal bit for bit (read before the
+  resolve); only the resolved pixel differs, where the four samples average to exactly x.5 and the resolve rounds it
+  one way or the other depending on what was drawn before. WebGPU does not define the resolve's rounding.
+- **Workaround:** those checks compare the samples before the resolve (`test/gpu/msaa-samples.js`, `msaa.mjs`; Scott's
+  decision 2026-11-09), with a control that drops one box from the culled engine alone and must show. `meshlets-check`
+  compares A and B without MSAA instead. On the WebGL2 layer the resolved frames are compared as before.
+
+### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
+
+- **What:** on the WebGL2 layer, which runs no level or cluster kernel and culls no loaded model, `MeshletMesh`
+  `readTriangles()` and `readShadowTriangles()` returned 0, `LodInstances.readCounts()` returned 0 for every level and
+  `CulledModels.readCounts()` an empty map, although every frame matched core. Found by the compat runs of
+  `meshlets-check.mjs`, `lod-check.mjs` and `models-plain-check.mjs`, which skipped or failed on every machine.
+- **Fix:** the readbacks report what the layer draws: every part kept, whole (the shadow pass: every shown part), every
+  shown instance at the first level, and every row of each primitive `CulledModels` would cull (1 for a plain one). The
+  checks assert that under `--compat` instead of skipping. Regression tests in `packages/culling/test/meshlets.test.js`,
+  `lod.test.js` and `models.test.js`.
+
 ### WebKit draws its own MediaRecorder VP8 WebM 10 levels too bright (batch 121, 2026-11-10)
 
 - **What:** `packages/video/test/record-check.mjs` fails in Playwright WebKit 2370 on the Apple M6: a recording of #336699

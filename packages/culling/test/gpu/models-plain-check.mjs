@@ -1,8 +1,5 @@
 // Real-GPU check for CulledModels on primitives without instances: engine A culls, engine B draws everything. Every step's
 // frames must match to the byte, on a grid of materials meshes with a Hi-Z wall and on the real NodePerformanceTest.glb, 10,000 primitives.
-// Under MARGO_COMPAT=1 CulledModels culls nothing on the WebGL2 layer and every row draws (README "Loaded models and
-// materials meshes", src/models.ts): every frame must still match core and be lit, no primitive has cull records, and
-// the counts of dropped primitives are skipped with a printed note.
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/models-plain-check.mjs
 import assert from 'node:assert/strict';
@@ -33,20 +30,23 @@ try {
         let differing = 0,
           lit = 0;
         for (let k = 0; k < a.data.length; k += 4) {
-          if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2])
-            differing++;
+          if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;
           if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 60) lit++;
         }
-        console.log(
-          `${scene} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${r.drawn} of ${r.primitives} drawn`,
-        );
+        console.log(`${scene} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${r.drawn} of ${r.primitives} drawn`);
         assert.equal(differing, 0, `${r.label}: culled frame differs`);
         assert.ok(lit > 500, `${r.label}: scene not visible`);
         seen.push(r);
       }
       if (compat) {
-        console.log(`${scene}: compat culls nothing, the drop counts skipped`);
-        for (const r of seen) assert.equal(r.primitives, 0, `compat: ${r.label}: no cull records on the WebGL2 layer`);
+        // The WebGL2 layer culls nothing and every primitive draws (README, "Loaded models and materials meshes"), and
+        // readCounts() says so: 1 for each plain primitive and every row of an instanced one, the same in every view.
+        const all = seen[0].drawn;
+        assert.ok(all >= seen[0].primitives, `compat: every primitive draws (${all} of ${seen[0].primitives})`);
+        for (const r of scene === 'grid' ? seen.slice(0, -1) : seen)
+          assert.equal(r.drawn, all, `${r.label}: compat: nothing is culled (${r.drawn} against ${all})`);
+        assert.equal(seen[0].primitives, scene === 'grid' ? 146 : 10000);
+        if (scene === 'grid') assert.equal(seen.at(-1).primitives, 0, 'a removed model has no records');
       } else if (scene === 'grid') {
         assert.equal(seen[0].primitives, 146);
         assert.ok(seen[1].drawn < seen[0].drawn / 2, `close up most primitives drop (${seen[1].drawn})`);
@@ -57,10 +57,7 @@ try {
         assert.equal(seen.at(-1).primitives, 0, 'a removed model has no records');
       } else {
         assert.equal(seen[0].primitives, 10000);
-        assert.ok(
-          seen[1].drawn < seen[0].drawn / 2,
-          `close up most primitives drop (${seen[1].drawn} of ${seen[0].drawn})`,
-        );
+        assert.ok(seen[1].drawn < seen[0].drawn / 2, `close up most primitives drop (${seen[1].drawn} of ${seen[0].drawn})`);
         assert.ok(seen.at(-1).drawn > seen[1].drawn, `back out they draw again (${seen.at(-1).drawn})`);
       }
       assert.deepEqual(await page.evaluate(() => window.check.errors), []);

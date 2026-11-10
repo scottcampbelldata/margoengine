@@ -93,6 +93,20 @@ test('on the WebGL2 layer every shown instance draws the first level, without co
   assert.equal(h.pipelines.filter((p) => p.compute).length, 3, 'compiled, never dispatched');
 });
 
+// List 5 R6: readCounts() read the level kernel's counts, which the layer never writes, so lod-check under --compat read
+// "drawn 0,0,0" while every shown instance drew at the first level. It now reports that.
+test('on the WebGL2 layer readCounts reports every shown instance at the first level', async () => {
+  const h = harness('margo-webgl2'),
+    lod = new LodInstances(options(3));
+  h.engine.use(lod);
+  lod.setVisible(1, false);
+  h.run();
+  assert.deepEqual(await lod.readCounts(), [2, 0]);
+  lod.setVisible(1, true);
+  h.run();
+  assert.deepEqual(await lod.readCounts(), [3, 0]);
+});
+
 test('a level that cannot be retained releases the levels taken, once each, and the error reaches the caller', () => {
   const h = harness(),
     retained = [],

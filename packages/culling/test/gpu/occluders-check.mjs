@@ -37,11 +37,15 @@ try {
       total = r.total;
     }
     if (compat) {
-      console.log('compat has no Hi-Z, "the walls hide the parts" and "a hidden wall stops occluding" skipped');
-      assert.equal(drawn[0], total, `compat: behind the walls every part draws (${drawn[0]} of ${total})`);
-    } else assert.ok(drawn[0] < 100, `the walls hide the parts (${drawn[0]} drawn)`);
-    assert.ok(drawn[2] > 300, `over the walls the parts draw (${drawn[2]} drawn)`);
-    if (!compat) assert.ok(drawn[4] > drawn[3] + 10, `a hidden wall stops occluding (${drawn[4]} against ${drawn[3]})`);
+      // On the WebGL2 layer 'occlusion' culls against the frustum only (README, "Modes"): no occluder hides a part, so
+      // the crowd in view behind the walls draws whole and hiding a wall changes nothing.
+      assert.equal(drawn[0], total, `compat: the walls hide nothing (${drawn[0]} of ${total} drawn)`);
+      assert.equal(drawn[4], drawn[3], `compat: a hidden wall changes nothing (${drawn[4]} against ${drawn[3]})`);
+    } else {
+      assert.ok(drawn[0] < 100, `the walls hide the parts (${drawn[0]} drawn)`);
+      assert.ok(drawn[2] > 300, `over the walls the parts draw (${drawn[2]} drawn)`);
+      assert.ok(drawn[4] > drawn[3] + 10, `a hidden wall stops occluding (${drawn[4]} against ${drawn[3]})`);
+    }
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);
     assert.deepEqual(pageErrors, []);
   } finally {

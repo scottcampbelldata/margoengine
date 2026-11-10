@@ -1,13 +1,15 @@
 // Real-GPU check for @margoengine/culling's DynamicInstances: engine A draws boxes through it, engine B draws the same
 // boxes as plain core meshes (each instance's matrix is read from B's mesh, so both draw the same floats). Every step's
 // frames must be identical (moves, hides, deletes, adds, camera moves; then all again with shadows cast and received),
-// the GPU must drop boxes in a partial view, and the instance pick must name the box engine.pick names. A bulk list of
-// 200,000 rows must compact the same rows in order with the look-back scan and with its fallback alone.
+// compared sample by sample before the 4x resolve (msaa.mjs), the GPU must drop boxes in a partial view, and the
+// instance pick must name the box engine.pick names. A box dropped from A alone must show as differing samples. A bulk
+// list of 200,000 rows must compact the same rows in order with the look-back scan and with its fallback alone.
 // Run from the repository root after building packages, holding a GPU slot:
 //   node packages/culling/test/gpu/dynamic-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { decodePNG } from '../../../../tests/support/png.js';
+import { frameDiff } from './msaa.mjs';
 
 for (const shadows of [false, true]) {
   const context = await openBrowser({ startPath: '/packages/culling/test/gpu/index.html', port: 5281 }),
@@ -27,26 +29,13 @@ for (const shadows of [false, true]) {
     let partial = 0;
     for (let i = 0; i < steps; i++) {
       const r = await page.evaluate((n) => window.check.step(n), i),
-        [a, b] = [await shot('a'), await shot('b')];
-      let differing = 0,
-        lit = 0;
-      const at = [];
-      for (let k = 0; k < a.data.length; k += 4) {
-        if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) {
-          differing++;
-          if (at.length < 6)
-            at.push([
-              (k / 4) % a.width,
-              Math.floor(k / 4 / a.width),
-              [...a.data.subarray(k, k + 3)],
-              [...b.data.subarray(k, k + 3)],
-            ]);
-        }
-        if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 120) lit++;
-      }
+        a = await shot('a'),
+        { differing, at, pixels, mode } = await frameDiff(page, shot);
+      let lit = 0;
+      for (let k = 0; k < a.data.length; k += 4) if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 120) lit++;
       if (differing) console.log('differing pixels (x, y, instances, core):', JSON.stringify(at));
       console.log(
-        `step ${i}: ${r.label}: ${differing} of ${a.data.length / 4} pixels differ, ${lit} lit; GPU drew ${r.drawn} of ${r.alive}`,
+        `step ${i}: ${r.label}: ${differing} of ${pixels} pixels differ (${mode}), ${lit} lit; GPU drew ${r.drawn} of ${r.alive}`,
       );
       assert.equal(differing, 0, `${r.label}: instance frame differs from core meshes`);
       assert.ok(lit > 1500, `${r.label}: scene not visible`);
@@ -54,6 +43,13 @@ for (const shadows of [false, true]) {
       if (r.drawn < r.alive * 0.5) partial++;
     }
     assert.ok(partial > 0, 'the GPU dropped boxes in a partial view');
+    // Control: one box in view dropped from A alone, as a wrong cull would, must show; then it comes back.
+    const dropped = await page.evaluate(() => window.check.drop(true)),
+      control = await frameDiff(page, shot);
+    console.log(`control: box ${dropped} dropped from the instances only: ${control.differing} pixels differ (${control.mode})`);
+    assert.ok(dropped !== null && control.differing > 20, `a dropped box shows (${control.differing} pixels)`);
+    await page.evaluate(() => window.check.drop(false));
+    assert.equal((await frameDiff(page, shot)).differing, 0, 'the box back: frames equal again');
     if (!shadows) {
       const bulk = await page.evaluate(() => window.check.bulk());
       console.log('bulk compaction', JSON.stringify(bulk));

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
+import { frameDiff } from './msaa.mjs';
 
 const release = await acquire({ owner: 'culling-parts' });
 const unlit = new Map();
@@ -27,21 +28,19 @@ try {
         const steps = await page.evaluate(() => window.check.steps);
         for (let i = 0; i < steps; i++) {
           const r = await page.evaluate((n) => window.check.step(n), i),
-            [a, b] = [await shot('a'), await shot('b')];
-          let differing = 0,
-            darker = 0,
+            a = await shot('a'),
+            { differing, mode } = await frameDiff(page, shot);
+          let darker = 0,
             lit = 0;
           const key = `${culling} ${i}`,
             before = unlit.get(key);
           for (let k = 0; k < a.data.length; k += 4) {
-            if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2])
-              differing++;
             if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 120) lit++;
             if (before && before[k] > a.data[k] + 10) darker++;
           }
           if (!shadows) unlit.set(key, a.data);
           console.log(
-            `${shadows ? 'shadows' : 'plain'} ${culling} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${darker} darker than unshadowed, ${r.alive} alive, ${r.drawn} drawn`,
+            `${shadows ? 'shadows' : 'plain'} ${culling} step ${i} ${r.label}: ${differing} differ (${mode}), ${lit} lit, ${darker} darker than unshadowed, ${r.alive} alive, ${r.drawn} drawn`,
           );
           assert.equal(differing, 0, `${r.label}: parts differ from core meshes`);
           assert.ok(lit > 1500, `${r.label}: scene not visible`);

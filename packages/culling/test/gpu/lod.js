@@ -79,6 +79,8 @@ const steps = [
   [
     'moved to the far end',
     () => {
+      // Half a column aside, so no other instance stands on the same spot and order() names each record once.
+      spots[1][0] += 1.5;
       spots[1][2] = spots[count - 1][2];
       lod.setTransform(1, matrix(spots[1]));
     },

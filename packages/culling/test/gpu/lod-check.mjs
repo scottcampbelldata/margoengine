@@ -2,7 +2,7 @@
 // on the CPU. Frames must match to the byte, and a redraw of an unchanged frame must keep each level's instances in
 // instance order, to the byte (batch 132: an atomicAdd slot per instance reordered them from frame to frame on the M6).
 // Under MARGO_COMPAT=1 the WebGL2 layer has no compute and draws every shown instance at the first level by design, so
-// core's side draws the same and "every level drew" is skipped with a printed note.
+// core's side draws the same, and readCounts() must say every shown instance drew at the first level.
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/lod-check.mjs
 import assert from 'node:assert/strict';
@@ -10,6 +10,7 @@ import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
+import { frameDiff } from './msaa.mjs';
 
 const compat = compatRun(),
   release = await acquire({ owner: 'culling-lod' });
@@ -56,17 +57,17 @@ try {
     const seen = [0, 0, 0];
     for (let i = 0; i < steps; i++) {
       const r = await page.evaluate((n) => window.check.step(n), i),
-        [a, b] = [await shot('a'), await shot('b')],
-        n = differing(a, b);
+        n = (await frameDiff(page, shot)).differing;
       console.log(`step ${i} ${r.label}: ${n} differ, drawn ${r.counts}, of ${r.expected} in front`);
       await repeats(r.label);
       assert.equal(n, 0, `${r.label}: frame differs from core`);
+      if (compat) assert.deepEqual(r.counts, r.expected, `${r.label}: compat: every shown instance at the first level`);
       r.counts.forEach((c, l) => {
         assert.ok(c <= r.expected[l], `${r.label}: level ${l} drew more than the scene holds`);
         seen[l] += c;
       });
     }
-    if (compat) console.log('compat draws every shown instance at the first level, "every level drew" skipped');
+    if (compat) assert.ok(seen[0] > 0 && seen.slice(1).every((c) => c === 0), `compat: the first level only (${seen})`);
     else
       assert.ok(
         seen.every((c) => c > 0),

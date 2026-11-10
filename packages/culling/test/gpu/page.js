@@ -189,6 +189,15 @@ async function bulk() {
   const n = 200_000,
     lists = [0, 1].map(() => DynamicInstances.attach(c, { geometry, material: white, capacity: n }));
   lists[1].wait = 0;
+  // The WebGL2 layer draws these lists through the CPU route (compat.js, README "Moving objects"), which loads by import()
+  // after attach; until it has, a frame runs the kernel on the layer's CPU tier, where the fallback alone (wait 0) counts
+  // every earlier block again, 782 x 781 / 2 blocks, past the tier's work budget, so nothing it wrote lands. The case
+  // starts once both routes are in, as an application's frames run after the first.
+  if (globalThis.__margoCompat)
+    for (let tries = 0; !lists.every((list) => list['route']); tries++) {
+      if (tries === 300) throw new Error('the WebGL2 route of DynamicInstances did not load');
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
   for (const list of lists) {
     for (let r = 0; r < n; r++) list.addInstance([0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0.2, 0, (r % 500) * 0.5 - 125, 0, Math.floor(r / 500) * 0.5 - 100, 1]);
     for (let r = 0; r < n; r += 7) list.setVisibleAt(r, false);
@@ -220,5 +229,17 @@ async function bulk() {
     shown,
   };
 }
-window.check = { setup, step, steps: steps.length, picks, bulk, errors };
+// The check's control: hide the instance under the canvas centre in A only (true), or show it again (false). Returns
+// the box's index, or null when no instance is there.
+let hidden = null;
+async function drop(on) {
+  if (on) {
+    const p = await crowd.pick(240, 160);
+    hidden = p === null ? null : ids.indexOf(p);
+    if (hidden !== null) crowd.setVisibleAt(ids[hidden], false);
+  } else if (hidden !== null) crowd.setVisibleAt(ids[hidden], true);
+  await draw();
+  return hidden;
+}
+window.check = { setup, step, steps: steps.length, picks, drop, bulk, errors };
 window.ready = true;

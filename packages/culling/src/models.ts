@@ -256,10 +256,14 @@ export class CulledModels implements EnginePlugin {
     if (this.models.delete(model)) for (const primitive of model.primitives) this.drop(primitive);
     return this;
   }
-  /** Rows drawn per culled primitive in the latest submitted frame, 0 or 1 for a plain one (a GPU readback; for tests and tools). */
+  /**
+   * Rows drawn per culled primitive in the latest submitted frame, 0 or 1 for a plain one (a GPU readback; for tests and
+   * tools). On the WebGL2 layer, which culls nothing, every row of every primitive it would cull: each one draws.
+   */
   async readCounts(): Promise<Map<CullablePrimitive, number>> {
     const d = this.device;
     if (!d) throw new MargoError('state', 'CulledModels is not attached; attach it to an engine first');
+    if (this.compat && !this.shape) return this.drawsAll();
     const entries: [CullablePrimitive, GPUBuffer, number][] = [
         ...[...this.slots].map(([p, s]): [CullablePrimitive, GPUBuffer, number] => [p, s.args, 4]),
         ...[...this.records].map(([p, r]): [CullablePrimitive, GPUBuffer, number] => [p, r.args, r.offset + 4]),
@@ -279,6 +283,21 @@ export class CulledModels implements EnginePlugin {
     } finally {
       read.destroy();
     }
+  }
+
+  // The WebGL2 layer's counts: the primitives the WebGPU cull would take (skinned, morphed and emptied ones it leaves
+  // alone), each drawing all its rows, or 1 for a plain one.
+  private drawsAll(): Map<CullablePrimitive, number> {
+    const counts = new Map<CullablePrimitive, number>();
+    for (const model of this.models.keys()) {
+      if (model.disposed) continue;
+      for (const primitive of model.primitives) {
+        if (primitive.deformed) continue;
+        if (!primitive.instances) counts.set(primitive, 1);
+        else if (primitive.instances.count) counts.set(primitive, primitive.instances.count);
+      }
+    }
+    return counts;
   }
 
   setup(engine: Engine): void {

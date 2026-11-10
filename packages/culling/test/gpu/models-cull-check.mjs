@@ -5,9 +5,11 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
+import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'culling-models' });
+const compat = compatRun(),
+  release = await acquire({ owner: 'culling-models' });
 try {
   for (const shadows of [false, true]) {
     const context = await openBrowser({ startPath: '/packages/culling/test/gpu/models-cull.html', port: 5284 }),
@@ -37,7 +39,11 @@ try {
         assert.ok(lit > 500, `${r.label}: scene not visible`);
         drawn.push(r);
       }
-      assert.ok(drawn[1].drawn < drawn[1].total / 2, `close up most rows drop (${drawn[1].drawn})`);
+      // The WebGL2 layer culls nothing and every row draws (README, "Loaded models and materials meshes"); readCounts()
+      // says so.
+      if (compat)
+        for (const r of drawn.slice(0, -1)) assert.equal(r.drawn, r.total, `${r.label}: compat: every row draws (${r.drawn})`);
+      else assert.ok(drawn[1].drawn < drawn[1].total / 2, `close up most rows drop (${drawn[1].drawn})`);
       assert.equal(drawn.at(-1).primitives, 0, 'a removed model has no lists');
       assert.deepEqual(await page.evaluate(() => window.check.errors), []);
       assert.deepEqual(pageErrors, []);

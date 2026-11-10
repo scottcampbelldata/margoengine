@@ -117,6 +117,29 @@ test('on the WebGL2 layer nothing is culled', () => {
   assert.equal(p.redirect, undefined);
 });
 
+// List 5 R6: readCounts() gave an empty map there, so models-plain-check under --compat read "0 of 0 drawn" for a grid
+// that drew all 146 primitives. It now reports what the layer draws: every row of every primitive it would cull.
+test('on the WebGL2 layer readCounts reports every row and plain primitive drawn', async () => {
+  const h = harness();
+  h.engine.gpu.adapterInfo = { vendor: 'margo-webgl2' };
+  const rows = primitive(),
+    plain = primitive({ instances: undefined }),
+    skinned = primitive({ deformed: {} }),
+    empty = primitive({ instances: { count: 0, capacity: 4, upload: () => ({ size: 384 }) } }),
+    model = { primitives: [rows, plain, skinned, empty] },
+    plugin = CulledModels.attach(h.engine, [model]);
+  h.run();
+  assert.deepEqual(
+    [...(await plugin.readCounts())],
+    [
+      [rows, 300],
+      [plain, 1],
+    ],
+  );
+  plugin.remove(model);
+  assert.equal((await plugin.readCounts()).size, 0, 'a removed model has no counts');
+});
+
 test('bad input is refused', () => {
   assert.throws(() => new CulledModels({ minRadius: -1 }), /minRadius/);
   const plugin = new CulledModels();

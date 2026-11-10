@@ -1,9 +1,5 @@
 // Real-GPU check for CulledMeshes' occlusion: engine A culls, engine B draws everything. Every step's frames must match
 // to the byte, and behind the wall the plugin must draw far fewer instances than there are.
-// Under MARGO_COMPAT=1 the WebGL2 layer's route (src/compat.ts) has no Hi-Z, so occlusion culls against the frustum and
-// screen size only (README "Occlusion for core meshes": the same image with more drawn). Every frame must still match
-// core, a view with the whole crowd in the frustum draws every instance, a view into the crowd still drops some, and
-// the three occlusion counts are skipped with a printed note.
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/meshes-occlusion-check.mjs
 import assert from 'node:assert/strict';
@@ -41,9 +37,11 @@ try {
       total = r.total;
     }
     if (compat) {
-      console.log('compat culls against the frustum only (no Hi-Z), the three occlusion counts skipped');
-      assert.equal(drawn[0], total, `compat: behind the wall every instance draws (${drawn[0]} of ${total})`);
-      assert.ok(Math.min(...drawn) < total / 2, `compat: the frustum still drops instances (${drawn})`);
+      // The WebGL2 layer culls by frustum and screen size only (README, "Occlusion for core meshes"): behind the wall the
+      // whole crowd is in view and draws, and inside it the frustum still drops what is behind the camera.
+      assert.equal(drawn[0], total, `compat: occlusion hides nothing (${drawn[0]} of ${total} drawn)`);
+      assert.equal(drawn.at(-1), total, `compat: back behind the wall, all draw (${drawn.at(-1)})`);
+      assert.ok(Math.min(...drawn) < total / 2, `compat: the frustum still culls (${Math.min(...drawn)} of ${total})`);
     } else {
       assert.ok(drawn[0] < 200, `the wall hides the crowd (${drawn[0]} drawn)`);
       assert.ok(drawn[2] > drawn[0] + 300, `the crowd draws from the side (${drawn[2]} drawn)`);

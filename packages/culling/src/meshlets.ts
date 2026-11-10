@@ -311,13 +311,26 @@ export class MeshletMesh extends CulledParts {
     super(batches, options);
     this.meshlets = buildMeshlets(batches[0].geometry, { maxVertices, maxTriangles });
   }
-  /** Indices the last frame kept over all parts, as triangles. A GPU readback; for tests and tools. */
+  /**
+   * Indices the last frame kept over all parts, as triangles. A GPU readback; for tests and tools. On the WebGL2 layer,
+   * which has no cluster kernel, the whole mesh of every part the part cull kept.
+   */
   async readTriangles(): Promise<number> {
+    if (!this.clusters && this.device && compatTier(this.device) === 'webgl2')
+      return (await this.readCounts())[0] * this.triangles();
     return this.readKept(this.clusters?.args, 0, this.slots);
   }
-  /** As {@link readTriangles}, for one cascade of the last shadow frame. */
+  /** As {@link readTriangles}, for one cascade of the last shadow frame; on the WebGL2 layer every shown part whole. */
   async readShadowTriangles(cascade: number): Promise<number> {
+    if (!this.shadowClusters && this.device && compatTier(this.device) === 'webgl2') {
+      let shown = 0;
+      for (let i = 0; i < this.slots; i++) if (this.hidden[i] === 0) shown++;
+      return shown * this.triangles();
+    }
     return this.readKept(this.shadowClusters?.args, cascade * this.slots, this.slots);
+  }
+  private triangles(): number {
+    return this.batches[0].geometry.indices.length / 3;
   }
   private async readKept(args: GPUBuffer | undefined, first: number, count: number): Promise<number> {
     const d = this.device;

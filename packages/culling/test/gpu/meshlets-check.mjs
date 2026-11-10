@@ -10,7 +10,7 @@
 // is A again with the default 4x MSAA, and each step redraws both A and R and compares each to its last frame.
 //
 // Under MARGO_COMPAT=1 the WebGL2 layer draws the whole mesh by design (no cluster cull), so the check asserts the frame
-// matches core and skips "clusters drop triangles" with a printed note.
+// matches core and that the triangle readback counts each part kept, whole.
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/meshlets-check.mjs
 import assert from 'node:assert/strict';
@@ -41,9 +41,14 @@ try {
         `${label}: a redraw of ${'ar'[k]} differs (${differing(before[k], after[k])} pixels)`,
       );
   };
-  // The WebGL2 layer draws every triangle by design, so under compat only the picture and the repeat are checked.
+  // The kernel keeps some clusters and drops others; the WebGL2 layer has none and draws each part it keeps whole, `part`
+  // triangles (README, "One large mesh, cluster by cluster").
   const drops = (r) => {
-    if (compat) console.log(`${r.label}: compat draws the whole mesh, "clusters drop triangles" skipped`);
+    if (compat)
+      assert.ok(
+        r.kept > 0 && r.kept <= r.total && r.kept % r.part === 0,
+        `${r.label}: compat: whole parts drawn (${r.kept} of ${r.total}, parts of ${r.part})`,
+      );
     else assert.ok(r.kept > 0 && r.kept < r.total, `${r.label}: clusters drop triangles (${r.kept})`);
   };
   const differing = (x, y) => {

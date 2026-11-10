@@ -215,11 +215,19 @@ export class LodInstances implements EnginePlugin {
     this.hiddenHigh = Math.max(this.hiddenHigh, index + 1);
     return this;
   }
-  /** Instances drawn per level in the last frame, most detailed first. A GPU readback; for tests and tools. */
+  /**
+   * Instances drawn per level in the last frame, most detailed first. A GPU readback; for tests and tools. On the WebGL2
+   * layer, which has no level kernel, every shown instance at the first level.
+   */
   async readCounts(): Promise<number[]> {
     const d = this.device,
       gpu = this.gpu;
     if (!d || !gpu) return this.levels.map(() => 0);
+    if (this.compat) {
+      let shown = 0;
+      for (let i = 0; i < this.count; i++) if (!this.hidden[i]) shown++;
+      return this.levels.map((_, l) => (l === 0 ? shown : 0));
+    }
     const size = gpu.counts.size,
       staging = d.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
       encoder = d.createCommandEncoder();
