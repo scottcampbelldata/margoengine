@@ -198,8 +198,13 @@ export function connectEmbed(options: EmbedOptions): EmbedClient {
     if (!item) return;
     pending.delete(message.id);
     item.cleanup();
-    if (message.error) item.reject(Object.assign(new Error(message.error.message), { code: message.error.code }));
-    else item.resolve(message.state);
+    if (message.error) {
+      // Rebuild the peer's error with its code; a message that already ends with its help link keeps that link.
+      const text = String(message.error.message),
+        link = /; see https:\/\/margoengine\.com\/errors#([\w-]+)$/.exec(text),
+        error = fault('failed', link ? text.slice(0, link.index) : text, link?.[1] ?? 'sciviz');
+      item.reject(Object.assign(error, { code: message.error.code ?? 'failed' }));
+    } else item.resolve(message.state);
   };
   window.addEventListener('message', listener);
   const dispose = () => {

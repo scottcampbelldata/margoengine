@@ -216,7 +216,7 @@ export class ChartPolish extends EventTarget {
   constructor(figure: Figure, options: ChartPolishOptions = {}) {
     super();
     if (chartDataAdapters.has(figure))
-      throw fault('attached', 'Reuse the existing chart controller or dispose it first', 'sciviz');
+      throw fault('state', 'Reuse the existing chart controller or dispose it first', 'sciviz');
     options.signal?.throwIfAborted();
     minorTicks([0, 1], options.minor ?? 4);
     numberFormatter(options.xFormat);

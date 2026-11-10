@@ -2,12 +2,12 @@ import type { GLTFDocument } from '../../shared/gltf.js';
 import { glbChunks, isGLB } from '../../shared/glb.js';
 import { parseJSON } from '../../shared/json.js';
 import { readResponse } from '../../shared/loading.js';
-import { fault } from '../../shared/errors.js';
+import { fault, typeError } from '../../shared/errors.js';
 import { optionalPackage } from './feature.js';
 
 /** Inspect the container's feature declarations; the selected loader owns validation and external resources. */
 export async function gltfRoute(target: URL, signal: AbortSignal) {
-  if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
+  if (!['http:', 'https:'].includes(target.protocol)) throw typeError('glTF URL must use HTTP(S)', 'arguments');
   const get = globalThis.fetch,
     response = await get(target, { signal }),
     bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'glTF download' }),
