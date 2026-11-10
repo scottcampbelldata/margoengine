@@ -9072,8 +9072,8 @@
         "gzip": 7292
       },
       "./table": {
-        "raw": 32797,
-        "gzip": 12324
+        "raw": 33881,
+        "gzip": 12655
       },
       "./math": {
         "raw": 10549,
@@ -9226,6 +9226,10 @@
       "./projections": {
         "raw": 5483,
         "gzip": 2328
+      },
+      "./series": {
+        "raw": 36375,
+        "gzip": 13801
       }
     },
     "@margoengine/selection": {

@@ -1,4 +1,5 @@
 // Clean-room Arrow IPC reader from Apache Arrow's columnar format and FlatBuffers metadata schemas.
+import { collectBatches } from './table-batches.js';
 import { decodeColumnarBlock } from '@margoengine/decoders/snappy';
 import { ColumnarTable, type TableColumn, type TableValue } from './table.js';
 import { invalidTable as bad, scalarColumn, tableLimits, type TableReadOptions } from './table-read.js';
@@ -66,16 +67,23 @@ function primitive(bytes: Uint8Array, field: Field, count: number, little: boole
   });
 }
 
-/** @internal */
-export async function arrowTable(bytes: Uint8Array, options: TableReadOptions): Promise<ColumnarTable> {
-  const file = new TextDecoder().decode(bytes.subarray(0, 6)) === 'ARROW1', whole = new Flat(bytes);
-  let at = file ? 8 : 0, end = bytes.length, fields: Field[] | undefined, little = true, total = 0;
+/** @internal Decode one record batch at a time without retaining prior observations. */
+export async function* arrowBatches(read: (offset: number, length: number) => Promise<Uint8Array>, size: number, options: TableReadOptions): AsyncGenerator<ColumnarTable> {
+  const first = await read(0, Math.min(8, size)), file = new TextDecoder().decode(first.subarray(0, 6)) === 'ARROW1';
+  let at = file ? 8 : 0, end = size, fields: Field[] | undefined, little = true, total = 0, emitted = false;
   const dictionaries = new Map<number, TableValue[]>(), columns: Record<string, TableValue[]> = Object.create(null);
   if (file) {
-    if (bytes.length < 18 || new TextDecoder().decode(bytes.subarray(-6)) !== 'ARROW1') bad('Arrow footer magic is missing');
-    const footerSize = whole.u32(bytes.length - 10); end = bytes.length - 10 - footerSize;
+    if (size < 18) bad('Arrow file is truncated');
+    const tail = await read(size - 10, 10);
+    if (new TextDecoder().decode(tail.subarray(4)) !== 'ARROW1') bad('Arrow footer magic is missing');
+    end = size - 10 - new DataView(tail.buffer, tail.byteOffset, 10).getUint32(0, true);
     if (end < 8) bad('Arrow footer exceeds file');
   }
+  const materialize = () => {
+    const result: Record<string, TableColumn> = Object.create(null);
+    for (const field of fields!) if (columns[field.name]) result[field.name] = scalarColumn(columns[field.name], field.unit, field.bits === 64 && field.type !== 3 ? field.signed ? 'i64' : 'u64' : undefined);
+    return new ColumnarTable(result);
+  };
   const decode = async (f: Flat, header: number, body: Uint8Array, layout: Field[]): Promise<TableValue[][]> => {
     const count = f.scalar(header, 0, 8), nodes = f.vector(header, 1, 16), buffers = f.vector(header, 2, 16), compression = f.table(header, 3);
     tableLimits(options, body.length, count);
@@ -125,12 +133,16 @@ export async function arrowTable(bytes: Uint8Array, options: TableReadOptions): 
   };
   while (at < end) {
     options.signal?.throwIfAborted();
-    let size = whole.u32(at); at += 4; if (size === 0xffffffff) { size = whole.u32(at); at += 4; }
-    if (!size) break;
-    if (at + size > end) bad('Arrow message metadata is truncated');
-    const f = new Flat(bytes.subarray(at, at + size)), root = f.ref(0), type = f.scalar(root, 1, 1), header = f.table(root, 2), bodySize = f.scalar(root, 3, 8);
-    at += size; if (bodySize < 0 || at + bodySize > end) bad('Arrow message body is truncated');
-    const body = bytes.subarray(at, at + bodySize); at += bodySize;
+    if (at + 4 > end) bad('Arrow message prefix is truncated');
+    let prefix = new Flat(await read(at, 4)), length = prefix.u32(0); at += 4;
+    if (length === 0xffffffff) { if (at + 4 > end) bad('Arrow continuation is truncated'); prefix = new Flat(await read(at, 4)); length = prefix.u32(0); at += 4; }
+    if (!length) break;
+    tableLimits(options, length);
+    if (at + length > end) bad('Arrow message metadata is truncated');
+    const f = new Flat(await read(at, length)), root = f.ref(0), type = f.scalar(root, 1, 1), header = f.table(root, 2), bodySize = f.scalar(root, 3, 8);
+    at += length; tableLimits(options, bodySize);
+    if (bodySize < 0 || at + bodySize > end) bad('Arrow message body is truncated');
+    const body = await read(at, bodySize); at += bodySize;
     if (type === 1) {
       if (fields) bad('Multiple Arrow schemas in one stream');
       ({ fields, little } = schema(f, header));
@@ -144,11 +156,16 @@ export async function arrowTable(bytes: Uint8Array, options: TableReadOptions): 
     } else if (type === 3) {
       if (!fields) bad('Arrow record before schema');
       const data = await decode(f, header, body, fields); total += f.scalar(header, 0, 8); tableLimits(options, 0, total);
-      fields.forEach((field, k) => { const target = columns[field.name]; if (target) for (const value of data[k]) target.push(value); });
+      fields.forEach((field, k) => { if (columns[field.name]) columns[field.name] = data[k]; });
+      emitted = true; yield materialize();
+      for (const name of Object.keys(columns)) columns[name] = [];
     } else bad(`Unsupported Arrow message ${type}`);
   }
   if (!fields) bad('Arrow schema is missing');
-  const result: Record<string, TableColumn> = Object.create(null);
-  for (const field of fields) if (columns[field.name]) result[field.name] = scalarColumn(columns[field.name], field.unit, field.bits === 64 && field.type !== 3 ? field.signed ? 'i64' : 'u64' : undefined);
-  return new ColumnarTable(result);
+  if (!emitted) yield materialize();
+}
+
+/** @internal */
+export async function arrowTable(bytes: Uint8Array, options: TableReadOptions): Promise<ColumnarTable> {
+  return collectBatches(arrowBatches(async (at, n) => bytes.subarray(at, at + n), bytes.length, options));
 }

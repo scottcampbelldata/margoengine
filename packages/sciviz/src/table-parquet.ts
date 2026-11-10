@@ -1,5 +1,6 @@
 // Clean room from the Apache Parquet format specification and Thrift Compact protocol description.
 import { decodeColumnarBlock, type ColumnarCodec } from '@margoengine/decoders/snappy';
+import { collectBatches } from './table-batches.js';
 import { crc32 } from '../../shared/crc32.js';
 import { ColumnarTable, type TableColumn, type TableValue } from './table.js';
 import { invalidTable as bad, scalarColumn, tableLimits, type TableReadOptions } from './table-read.js';
@@ -139,21 +140,26 @@ function field(meta: Meta): Field {
   return { name: text(meta[4]), type, optional: number(meta[3]) === 1, width: meta[2] === undefined ? 0 : number(meta[2]), utf8, unsigned: integer ? !object(logical[10])[2] : converted >= 11 && converted <= 14, unit, decimal };
 }
 
-/** @internal */
-export async function parquetTable(bytes: Uint8Array, options: TableReadOptions): Promise<ColumnarTable> {
+/** @internal Footer-driven row groups; projected column chunks are fetched independently. */
+export async function* parquetBatches(read: (offset: number, length: number) => Promise<Uint8Array>, size: number, options: TableReadOptions): AsyncGenerator<ColumnarTable> {
   const magic = (b: Uint8Array) => new TextDecoder().decode(b) === 'PAR1';
-  if (bytes.length < 12 || !magic(bytes.subarray(0, 4)) || !magic(bytes.subarray(-4))) bad('Parquet PAR1 magic is missing (encrypted files are unsupported)');
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), footerSize = view.getUint32(bytes.length - 8, true), footerStart = bytes.length - 8 - footerSize;
+  if (size < 12 || !magic(await read(0, 4))) bad('Parquet PAR1 magic is missing (encrypted files are unsupported)');
+  const tail = await read(size - 8, 8);
+  if (!magic(tail.subarray(4))) bad('Parquet footer magic is missing');
+  const footerSize = new DataView(tail.buffer, tail.byteOffset, 8).getUint32(0, true), footerStart = size - 8 - footerSize;
   if (footerStart < 4) bad('Parquet footer exceeds input');
-  const cursor = new Cursor(bytes.subarray(footerStart, bytes.length - 8)), metadata = cursor.meta();
+  tableLimits(options, footerSize);
+  const cursor = new Cursor(await read(footerStart, footerSize)), metadata = cursor.meta();
   if (cursor.at !== cursor.bytes.length || ![1, 2].includes(number(metadata[1]))) bad('Parquet footer length/version is invalid');
   const schema = array(metadata[2]); if (schema.length < 1 || number(object(schema[0])[5]) !== schema.length - 1) bad('Parquet table schema must contain flat scalar columns');
   const fields = schema.slice(1).map((v) => field(object(v))), rows = number(metadata[3]); tableLimits(options, 0, rows);
   if (new Set(fields.map((f) => f.name)).size !== fields.length || fields.some((f) => !f.name)) bad('Parquet needs unique named columns');
   for (const name of options.columns ?? []) if (!fields.some((f) => f.name === name)) bad(`Parquet column ${name} does not exist`);
-  const result: Record<string, TableColumn> = Object.create(null); let groupRows = 0;
+  let groupRows = 0;
   const columns = new Map(fields.filter((f) => !options.columns || options.columns.includes(f.name)).map((f) => [f.name, [] as TableValue[]]));
   for (const groupValue of array(metadata[4])) {
+    for (const values of columns.values()) values.length = 0;
+    const result: Record<string, TableColumn> = Object.create(null);
     options.signal?.throwIfAborted(); const group = object(groupValue), n = number(group[3]), chunks = array(group[1]);
     if (n < 0 || groupRows + n > rows || chunks.length !== fields.length) bad('Parquet row group counts do not match schema/footer'); groupRows += n;
     for (let k = 0; k < fields.length; k++) {
@@ -164,10 +170,12 @@ export async function parquetTable(bytes: Uint8Array, options: TableReadOptions)
       const codec = codecs[number(m[4])]; if (!codec) bad(`Unsupported Parquet compression codec ${number(m[4])}`);
       let at = number(m[11] ?? m[9]), seen = 0; const end = at + number(m[7]); let dictionary: TableValue[] | undefined;
       if (at < 4 || end > footerStart || end < at) bad('Parquet column chunk exceeds file bounds');
+      tableLimits(options, end - at);
+      const chunkStart = at, chunkBytes = await read(at, end - at);
       while (at < end && seen < n) {
-        options.signal?.throwIfAborted(); const header = new Cursor(bytes.subarray(at, end)), h = header.meta(), type = number(h[1]), decodedSize = number(h[2]), size = number(h[3]); at += header.at;
+        options.signal?.throwIfAborted(); const header = new Cursor(chunkBytes.subarray(at - chunkStart)), h = header.meta(), type = number(h[1]), decodedSize = number(h[2]), size = number(h[3]); at += header.at;
         tableLimits(options, decodedSize); if (size < 0 || at + size > end) bad('Parquet page exceeds chunk');
-        const compressed = bytes.subarray(at, at + size); at += size;
+        const compressed = chunkBytes.subarray(at - chunkStart, at - chunkStart + size); at += size;
         if (h[4] !== undefined && crc32(compressed) !== (number(h[4]) >>> 0)) bad('Parquet page checksum mismatch');
         if (type === 1) continue;
         if (type === 2) {
@@ -198,8 +206,18 @@ export async function parquetTable(bytes: Uint8Array, options: TableReadOptions)
       }
       if (seen !== n) bad('Parquet column row count is incomplete');
     }
+    for (const f of fields) if (columns.has(f.name)) result[f.name] = scalarColumn(columns.get(f.name)!, f.unit, f.type === 2 || f.type === 3 ? f.unsigned ? 'u64' : 'i64' : undefined);
+    yield new ColumnarTable(result);
   }
   if (groupRows !== rows) bad('Parquet row group total disagrees with footer');
-  for (const f of fields) if (columns.has(f.name)) result[f.name] = scalarColumn(columns.get(f.name)!, f.unit, f.type === 2 || f.type === 3 ? f.unsigned ? 'u64' : 'i64' : undefined);
-  return new ColumnarTable(result);
+  if (!array(metadata[4]).length) {
+    const result: Record<string, TableColumn> = Object.create(null);
+    for (const f of fields) if (columns.has(f.name)) result[f.name] = scalarColumn([], f.unit, f.type === 2 || f.type === 3 ? f.unsigned ? 'u64' : 'i64' : undefined);
+    yield new ColumnarTable(result);
+  }
+}
+
+/** @internal */
+export async function parquetTable(bytes: Uint8Array, options: TableReadOptions): Promise<ColumnarTable> {
+  return collectBatches(parquetBatches(async (at, n) => bytes.subarray(at, at + n), bytes.length, options));
 }

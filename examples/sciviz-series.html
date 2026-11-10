@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GW150914 time series | Margo Engine</title>
+<style>body{margin:24px auto;padding:0 24px;max-width:1100px;font:16px/1.5 system-ui;color:#243c4d;background:#f7f9fa}.plot{position:relative;width:100%;height:320px;background:white;border:1px solid #dae2e6}section{min-width:0}canvas{display:block;width:100%;height:100%}button,select{font:inherit;padding:7px 12px;margin:5px 4px 10px 0}.spectral{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}@media(max-width:700px){.spectral{grid-template-columns:minmax(0,1fr)}}label{display:inline-block}</style>
+<h1>Four seconds around GW150914</h1>
+<p>LIGO Hanford H1 strain, 4096 samples per second. LIGO Scientific Collaboration and Virgo Collaboration, GWOSC, CC BY 4.0. <a href="/packages/sciviz/tests/fixtures/series/source.json">Source, sample bounds and SHA-256</a>.</p>
+<p>Each Range request loads part of the recording. The line redraws after each decoded batch. M4 keeps the first, last, minimum and maximum original sample in each pixel column. Min-max and LTTB are alternatives; every method retains the original samples for selection. Drag a box to count all observations inside it, including samples absent from the display line.</p>
+<label>Format <select id="format"><option>csv</option><option>arrow</option><option>parquet</option></select></label>
+<label>Line sampling <select id="method"><option value="m4">M4</option><option value="min-max">Min-max</option><option value="lttb">LTTB with extrema</option></select></label>
+<button id="reload">Reload recording</button><button id="zoom">Event window</button><button id="reset">Full recording</button><button id="stop">Stop loading</button>
+<p id="status" role="status">Opening strain data</p><p id="selection" role="status">No selection</p>
+<div class="plot"><canvas id="viewport"></canvas></div>
+<p>Raw strain is shown without whitening or filtering. The spectra use original observations, periodic Hann windows and per-window mean removal. Colour is one-sided PSD in dB relative to strain squared per Hz. These views demonstrate data handling, not a detection analysis.</p>
+<div class="spectral"><section><h2>Power spectrum</h2><div class="plot"><canvas id="spectrum"></canvas></div></section><section><h2>Spectrogram</h2><div class="plot"><canvas id="spectrogram"></canvas></div></section></div>
+<script type="module" src="./sciviz-series.ts"></script></html>

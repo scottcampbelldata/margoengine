@@ -3870,3 +3870,6 @@ Batch 180 job 4 integration note: the default ANGLE D3D11 atmosphere spec captur
 
 
 Batch 274 ONNX trees/SVM: the existing ONNX Node and Chromium commands also run onnx-ml.test.js and the 52 shared analytic cases. Regenerate references with packages/compute/scripts/onnx-oracle-cases.mjs, execute onnx-oracle.py through the external environment recorded in clean-room.md, then onnx-oracle-record.mjs. The recorder fails on unexpected provider errors; deprecated legacy ML5 refusals retain analytic coverage. Normative-output metadata retains the original provider bytes and names the measured contract difference. Fixed comparison tolerances are unchanged.
+
+## Batch 175 job 4: time series
+Build packages, then run `node --test --test-timeout=120000 packages/sciviz/tests/series.test.js` and `node scripts/gpu-lock.mjs run --owner=series-reproduce --wait-max=60 --max=5 -- node packages/sciviz/tests/series-browser.mjs`. The latter checks both backends, exact original selection after Figure zoom/box selection, format-native progressive records, PSD of a 1e-21 tone, STFT and rendered pixels/cancellation/resize. It writes test-results/series/{webgpu,webgl2}.{json,png}. Demo: examples/sciviz-series.html. Pinned source licence, SHA-256 and standard writer settings: packages/sciviz/tests/fixtures/series/source.json. No speed run is needed during the build phase.

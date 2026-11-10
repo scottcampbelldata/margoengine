@@ -1,0 +1,22 @@
+{
+  "url": "https://gwosc.org/s/events/GW150914/H-H1_LOSC_4_V2-1126259446-32.txt.gz",
+  "license": "CC BY 4.0",
+  "attribution": "LIGO Scientific Collaboration and Virgo Collaboration, Gravitational Wave Open Science Center, GW150914 H1 strain",
+  "originalGzipSHA256": "f8357860261bb39859e8c92308e065ff984ccb23cc3a81f73e4b2671f1737df2",
+  "csvSHA256": "86bc60644d2825d3d25a39aea04942a26cc2a85a2c2100aacc73a4e1479ee954",
+  "sourceSampleRateHz": 4096,
+  "sourceStartGPS": 1126259446,
+  "eventGPS": 1126259462.43,
+  "firstSourceSample": 57344,
+  "rows": 16384,
+  "processing": "Four seconds, original binary64 strain values and seconds relative to event. No whitening or filtering.",
+  "referenceWriter": {
+    "pyarrow": "21.0.0",
+    "arrowBatchRows": 1024,
+    "parquetRowGroupRows": 2048
+  },
+  "derivedSHA256": {
+    "gw150914.arrow": "82ebc2064d3f65a54e6a2bac1173ddf39bd1d231ddfaa908c55643ab610abc99",
+    "gw150914.parquet": "1fee6c6ff249f9556a5a6b1ba1e53a1221701dfa79e1fec2dc8ce86600d9b1f8"
+  }
+}

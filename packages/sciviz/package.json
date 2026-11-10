@@ -327,6 +327,10 @@
     "./projections": {
       "types": "./dist/projections.d.ts",
       "import": "./dist/projections.js"
+    },
+    "./series": {
+      "types": "./dist/series.d.ts",
+      "import": "./dist/series.js"
     }
   },
   "files": [
@@ -403,6 +407,7 @@
     "test:browser:density-scale": "node scripts/browser-root.mjs tests/density-scale-browser.mjs",
     "test:browser:notebook": "node scripts/browser-root.mjs tests/notebook-browser.mjs",
     "test:browser:graph-gpu": "node scripts/browser-root.mjs tests/graph-gpu-browser.mjs",
-    "test:browser:cf": "node scripts/browser-root.mjs tests/cf-browser.mjs"
+    "test:browser:cf": "node scripts/browser-root.mjs tests/cf-browser.mjs",
+    "test:browser:series": "node scripts/browser-root.mjs tests/series-browser.mjs"
   }
 }

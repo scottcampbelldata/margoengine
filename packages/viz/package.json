@@ -2198,6 +2198,10 @@
     "./stage": {
       "types": "./dist/stage.d.ts",
       "import": "./dist/stage.js"
+    },
+    "./sciviz/series": {
+      "types": "./dist/sciviz/series.d.ts",
+      "import": "./dist/sciviz/series.js"
     }
   },
   "dependencies": {

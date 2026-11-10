@@ -5238,6 +5238,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./sciviz/series": {
+      "types": "./dist/sciviz/series.d.ts",
+      "import": "./dist/sciviz/series.js"
     }
   },
   "dependencies": {

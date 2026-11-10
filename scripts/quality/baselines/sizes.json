@@ -7960,6 +7960,12 @@
       "commit": "4df9d321a",
       "reason": "Review H2 physical grid validation: sciviz/mrc 2949 -> 3171 B gzip; preserve signed axes and reject unsupported transforms before allocation. Keep validation shared in the optional helpers; splitting it would add loading/API complexity and permit inconsistent bounds. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "1b6728218",
+      "reason": "Batch 175 job 4 adds optional series entry, 0 to 13801 B gzip; coherent progressive readers, original selection and FFT/STFT; no core or stage growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -9393,7 +9399,8 @@
     "@margoengine/compute/quant": 4183,
     "@margoengine/sciviz/graph-gpu": 14129,
     "@margoengine/sciviz/cf": 14872,
-    "@margoengine/sciviz/projections": 2584
+    "@margoengine/sciviz/projections": 2584,
+    "@margoengine/sciviz/series": 14169
   },
-  "total": 15392864
+  "total": 15407033
 }

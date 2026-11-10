@@ -1346,3 +1346,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/compute (batch 274 ONNX follow-up): document TreeEnsemble variants, SVM kernels/calibration, legacy ML5 compatibility, pairwise score shapes and provider differences in the README phase.
+
+- @margoengine/sciviz (batch 175 job 4): document /series Range/CORS/immutability, async format batches, owned TimeSeries, M4/min-max/LTTB limits, exact original selection events, progressive binding/cancellation and physical-unit FFT/STFT defaults.
+- margoengine (batch 175 job 4): document generated sciviz/series optional alias.
+- @margoengine/viz (batch 175 job 4): document generated sciviz/series optional alias.

@@ -2304,6 +2304,11 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### Batch 175 job 4: original time series and spectral units
+
+The optional series entry shares the existing Arrow/Parquet scalar decoders, retaining only format state between progressive batches. Exact scientific selection visits owned binary64 observations, independently of the line display reduction. M4 raster checks include independent integer-column pixel coverage and viewport neighbours. FFT/STFT use compute/fft; normalization before f32 upload and binary64 PSD readback preserves tiny GWOSC strain power. CPU analytic tones, original-data format equivalence and two-backend real-data render/selection/cancellation/resize checks are in series.test.js and series-browser.mjs. Fractional antialiasing is outside M4's pixel model, all loaded original observations remain resident for exact selection, and throughput timing remains owed in speed-phase.md. No core or stage rendering changes. See docs/sciviz-series.md for sources, limits and evidence.
+
+
 ### 5. Stage GPU inventory registration (2026-11-10)
 
 Stage declares `test:gpu:viewer-extras`, so the global browser inventory and selected GPU plans agree. The leaf exercises native WebGPU and WebGL2 compatibility, exact viewer pixels, animation, variants, picking, hotspots and element lifecycle. `tests/modern-extension-suite.test.js` now checks every package `test/gpu/*-check.mjs` against that package's declared GPU scripts; the added assertion fails on the unregistered stage leaf before the fix. Existing check:merge inventory coverage remains active. No rendering code or public API changes.
