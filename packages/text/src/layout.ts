@@ -316,7 +316,7 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
     let rtl = o.direction === 'rtl';
     if (o.direction === 'auto')
       for (const item of items)
-        if (item.bidi !== 'N') {
+        if (isStrong(item)) {
           rtl = item.bidi === 'R';
           break;
         }
@@ -517,13 +517,91 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
   };
 }
 
-/** Simplified Unicode bidi: strong R and L classes, neutrals between equal directions take that direction, others the base. */
+/**
+ * Number and separator types of UAX #9 (Unicode Bidirectional Algorithm, revision 52, table 4) for a cluster's first
+ * code point, and AL for Arabic-script letters: European digits EN (ASCII, superscripts, Extended Arabic-Indic,
+ * fullwidth), Arabic-Indic digits and number signs AN, separators ES and CS, terminators ET. Null for every other cluster.
+ */
+function weakType(cluster: string): 'EN' | 'AN' | 'ES' | 'CS' | 'ET' | 'AL' | null {
+  const c = cluster.codePointAt(0)!;
+  if ((c >= 0x30 && c <= 0x39) || c === 0xb2 || c === 0xb3 || c === 0xb9 || (c >= 0x6f0 && c <= 0x6f9)) return 'EN';
+  if (c === 0x2070 || (c >= 0x2074 && c <= 0x2079) || (c >= 0x2080 && c <= 0x2089) || (c >= 0xff10 && c <= 0xff19))
+    return 'EN';
+  if ((c >= 0x660 && c <= 0x669) || c === 0x66b || c === 0x66c || (c >= 0x600 && c <= 0x605) || c === 0x6dd)
+    return 'AN';
+  if (c === 0x2b || c === 0x2d || c === 0x2212 || c === 0xff0b || c === 0xff0d) return 'ES';
+  if (c === 0x2c || c === 0x2e || c === 0x2f || c === 0x3a || c === 0xa0 || c === 0x60c || c === 0x202f) return 'CS';
+  if (c === 0x23 || c === 0x24 || c === 0x25 || (c >= 0xa2 && c <= 0xa5) || c === 0xb0 || c === 0xb1 || c === 0x66a)
+    return 'ET';
+  if ((c >= 0x2030 && c <= 0x2034) || (c >= 0x20a0 && c <= 0x20cf)) return 'ET';
+  if (
+    (c >= 0x608 && c <= 0x74f && c !== 0x609 && c !== 0x60a && c !== 0x60c && c !== 0x60e && c !== 0x60f) ||
+    (c >= 0x750 && c <= 0x7bf) ||
+    (c >= 0x860 && c <= 0x8ff) ||
+    (c >= 0xfb50 && c <= 0xfdff) ||
+    (c >= 0xfe70 && c <= 0xfeff)
+  )
+    return bidiClass(cluster) === 'R' ? 'AL' : null;
+  return null;
+}
+
+/** Whether a cluster decides a paragraph's direction (rule P2: the first L, R or AL; numbers do not). */
+const isStrong = (item: Item): boolean => {
+  if (item.bidi === 'N') return false;
+  const weak = weakType(item.cluster);
+  return weak === null || weak === 'AL';
+};
+
+/**
+ * Simplified Unicode bidi (UAX #9 revision 52) for one line without explicit embeddings or isolates: weak types W2 to
+ * W7 (numbers after Arabic letters become Arabic numbers, separators between numbers and terminators next to them join
+ * the number, European numbers after L text become L), bracket pairs (N0, simplified), neutrals (N1, numbers acting as
+ * R; N2) and implicit levels (I1, I2: numbers always rise above the paragraph level).
+ */
 function resolveLevels(items: Item[], base: number): number[] {
-  const strong = items.map((item) => item.bidi),
-    n = items.length,
-    levels = new Array<number>(n);
+  const n = items.length,
+    levels = new Array<number>(n),
+    sos: 'R' | 'L' = base === 1 ? 'R' : 'L';
+  type Type = 'R' | 'L' | 'N' | 'EN' | 'AN' | 'ES' | 'CS' | 'ET' | 'AL';
+  const types: Type[] = items.map((item) => (item.space ? 'N' : (weakType(item.cluster) ?? item.bidi)));
+  // W2: a European number after Arabic letters is an Arabic number. W3: AL becomes R.
+  let last: Type = sos;
+  for (let i = 0; i < n; i++) {
+    const t = types[i];
+    if (t === 'L' || t === 'R' || t === 'AL') last = t;
+    else if (t === 'EN' && last === 'AL') types[i] = 'AN';
+  }
+  for (let i = 0; i < n; i++) if (types[i] === 'AL') types[i] = 'R';
+  // W4: one separator between two numbers of the same type joins them (ES only between European numbers).
+  for (let i = 1; i + 1 < n; i++) {
+    const t = types[i],
+      a = types[i - 1],
+      b = types[i + 1];
+    if (t === 'ES' && a === 'EN' && b === 'EN') types[i] = 'EN';
+    else if (t === 'CS' && a === b && (a === 'EN' || a === 'AN')) types[i] = a;
+  }
+  // W5: a run of terminators next to a European number joins it. W6: other separators and terminators are neutral.
+  for (let i = 0; i < n; i++) {
+    if (types[i] !== 'ET') continue;
+    let j = i;
+    while (j < n && types[j] === 'ET') j++;
+    const joins = (i > 0 && types[i - 1] === 'EN') || (j < n && types[j] === 'EN');
+    for (let k = i; k < j; k++) types[k] = joins ? 'EN' : 'N';
+    i = j - 1;
+  }
+  for (let i = 0; i < n; i++) if (types[i] === 'ES' || types[i] === 'CS' || types[i] === 'ET') types[i] = 'N';
+  // W7: a European number after L text (or at the start of a left-to-right line) is L.
+  last = sos;
+  for (let i = 0; i < n; i++) {
+    const t = types[i];
+    if (t === 'L' || t === 'R') last = t;
+    else if (t === 'EN' && last === 'L') types[i] = 'L';
+  }
+  // Numbers act as R for brackets and neutrals; `number` keeps them apart for the implicit levels.
+  const number = types.map((t) => t === 'EN' || t === 'AN'),
+    strong: Array<'R' | 'L' | 'N'> = types.map((t) => (t === 'EN' || t === 'AN' ? 'R' : (t as 'R' | 'L' | 'N')));
   const levelOf = (cls: 'R' | 'L') => (cls === 'R' ? 1 : base === 1 ? 2 : 0);
-  const baseClass = base === 1 ? 'R' : 'L';
+  const baseClass = sos;
   // Rule N0, simplified: a matched bracket pair takes the base direction when it encloses base-direction text,
   // otherwise the opposite direction when it encloses that and the text before the pair runs that way too.
   const stack: number[] = [];
@@ -559,7 +637,8 @@ function resolveLevels(items: Item[], base: number): number[] {
   for (let i = 0; i < n; i++) {
     if (strong[i] !== 'N') {
       previous = strong[i] as 'R' | 'L';
-      levels[i] = levelOf(previous);
+      // I1 and I2: numbers end two levels above an even paragraph and one above an odd one, so always at level 2.
+      levels[i] = number[i] ? 2 : levelOf(previous);
       continue;
     }
     let j = i;

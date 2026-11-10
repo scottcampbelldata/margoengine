@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14727068,
+  "total": 14730973,
   "history": [
     {
       "date": "2026-10-24",
@@ -8189,6 +8189,12 @@
       "commit": "bc5d6f52b",
       "reason": "batch 164: SceneTarget.resolve depth flag in shared msaa (+5 B transitions)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "81847a4dd",
+      "reason": "batch 132 text bidi fix (UAX 9 weak types); layout corpus hash re-recorded",
+      "grew": 7
     }
   ],
   "items": {
@@ -8749,7 +8755,7 @@
     "@margoengine/materials/transmission": 8350,
     "@margoengine/materials/transmission-layers": 5193,
     "@margoengine/math": 21032,
-    "@margoengine/math/affine": 3936,
+    "@margoengine/math/affine": 4209,
     "@margoengine/math/billboard": 2974,
     "@margoengine/math/box3": 2581,
     "@margoengine/math/capsule": 4386,
@@ -8771,7 +8777,7 @@
     "@margoengine/math/plane": 2101,
     "@margoengine/math/project": 1277,
     "@margoengine/math/quat": 1602,
-    "@margoengine/math/quaternion": 1617,
+    "@margoengine/math/quaternion": 1886,
     "@margoengine/math/ray": 2468,
     "@margoengine/math/sh": 1614,
     "@margoengine/math/sphere": 2260,
@@ -9264,13 +9270,13 @@
     "@margoengine/terrain/rvt": 6595,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 12713,
-    "@margoengine/text": 17109,
-    "@margoengine/text/animate": 11783,
-    "@margoengine/text/curve": 10802,
+    "@margoengine/text": 17967,
+    "@margoengine/text/animate": 12416,
+    "@margoengine/text/curve": 11401,
     "@margoengine/text/extrude": 15305,
-    "@margoengine/text/fit": 10636,
+    "@margoengine/text/fit": 11271,
     "@margoengine/text/msdf": 4494,
-    "@margoengine/text/rich": 11403,
+    "@margoengine/text/rich": 12041,
     "@margoengine/text/selection": 958,
     "@margoengine/tilemap": 7435,
     "@margoengine/tilemap/autotile": 2087,

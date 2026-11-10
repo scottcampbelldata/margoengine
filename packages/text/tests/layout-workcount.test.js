@@ -27,8 +27,11 @@ test('35 multilingual layouts retain every output byte from the parent', () => {
       bytes += result.length;
       hash.update(result);
     }
-  assert.equal(bytes, 387896);
-  assert.equal(hash.digest('hex'), 'b671ae6317ed56c5fc4a7dfc9681af9327008300d9e28b2844bd90e8f9c99dcf');
+  // Re-recorded 2026-11-10 (batch 132 audit, lane I): UAX #9 weak types moved '(123)' next to the Hebrew in
+  // 'abc \u05d0\u05d1\u05d2 (123) xyz' (variants 0, 1 and 4), as the annex's rules N0 and N1 require. Was 387896 bytes,
+  // b671ae63...; every other layout is unchanged (text.test.js holds the bidi cases).
+  assert.equal(bytes, 387926);
+  assert.equal(hash.digest('hex'), '7e59f19aa9447b8bc856261c1b27de1ab34913f3f90c3a29c99a7298e8883fdc');
 });
 
 test('measurer edits between calls are visible', () => {

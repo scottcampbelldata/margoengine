@@ -816,3 +816,24 @@ test('ligatures joins Latin words only when asked', () => {
   close(caretRect(l, 3).x, l.glyphs[0].x + l.glyphs[0].carets[2][1], 'latin caret');
   assert.throws(() => layout('a', { ligatures: 1 }), TypeError);
 });
+
+// UAX #9 (revision 52) weak types: rules W2 to W7, N1 with numbers acting as R, I1 and I2, and P2 skipping numbers.
+test('bidi numbers follow UAX #9: they attach to right-to-left text, keep Arabic-Indic order and do not set direction', () => {
+  const cl = (text) =>
+    layout(text)
+      .glyphs.map((g) => g.cluster)
+      .join('');
+  // N1: the space between Hebrew and a European number takes R, so the number sits on the Hebrew's left.
+  assert.equal(cl('abc שלום 123'), 'abc 123 םולש');
+  // Arabic-Indic digits are AN: they read left to right inside Arabic text.
+  assert.equal(cl('سلام ١٢٣'), '١٢٣ سلام');
+  // P2: numbers are not strong, so the first strong character (Hebrew) makes the paragraph right to left.
+  const lead = layout('123 שלום');
+  assert.equal(lead.lines[0].rtl, true);
+  assert.equal(lead.glyphs.map((g) => g.cluster).join(''), 'םולש 123');
+  // The annex's list example: a comma and space between numbers take the run's direction (N1).
+  assert.equal(cl('א 123, 456'), '456 ,123 א');
+  // W4 and W5: a single separator inside a number and a terminator next to it join the number.
+  assert.equal(cl('א 1,000.5 ב'), 'ב 1,000.5 א');
+  assert.equal(cl('א $100'), '$100 א');
+});
