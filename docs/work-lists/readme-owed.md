@@ -140,3 +140,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | tiles/imagery generated optional re-export | batch 239 job 3 |
 | @margoengine/input | layout: KeyboardLabels refresh/label/change/error, map support and permissions fallback, race/cancellation/disposal, Unicode key prompts | batch-253 job 4 |
 | margoengine | Generated input/layout alias | batch-253 job 4 |
+
+- @margoengine/materials: document serialization entry, versioned complete parameter libraries, embedded/URL textures, features, shared resources and external resource codecs.
+- @margoengine/shader: document serialization codecs for compiled node/lighting programs, live shared uniforms, storage inputs and raw shader bindings.
+- @margoengine/save: document optional materials capture/restore, assigning restored slots, lazy shader codecs, aborts and resource resolvers.

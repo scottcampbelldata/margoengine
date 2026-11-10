@@ -96,6 +96,10 @@
     "./stochastic": {
       "types": "./dist/stochastic.d.ts",
       "import": "./dist/stochastic.js"
+    },
+    "./serialization": {
+      "types": "./dist/serialization.d.ts",
+      "import": "./dist/serialization.js"
     }
   },
   "files": [

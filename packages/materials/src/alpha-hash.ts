@@ -66,6 +66,14 @@ export function alphaHash(options: AlphaHashOptions = {}): MaterialFeature {
     text = scale.toExponential();
   return {
     name: 'alphaHash',
+    serialization: () => ({ scale, cutoff }),
+    captureState: (material) => raised.has(material),
+    restoreState(material, state) {
+      if (typeof state !== 'boolean')
+        throw new TypeError('Invalid alphaHash attachment state; restore its captured boolean');
+      if (state) raised.add(material);
+      else raised.delete(material);
+    },
     shader: (source) => hashed(source, text),
     attach(material) {
       if (material.alphaTest === 0) {

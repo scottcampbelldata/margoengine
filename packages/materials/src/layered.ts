@@ -249,6 +249,7 @@ ${slots
   let users = 0;
   return {
     name: 'layered',
+    serialization: () => ({ layers, detail }),
     layers,
     detail,
     shader,

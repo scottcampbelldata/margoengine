@@ -53,6 +53,7 @@ export function objectNormal(options: ObjectNormalOptions = {}): MaterialFeature
   if (up !== 'y' && up !== 'z') throw new TypeError("objectNormal up must be 'y' or 'z'; pass the axis the baker used");
   return {
     name: 'objectNormal',
+    serialization: () => ({ up }),
     shader: (source, _group, material: Material) => (material.normalMap ? mapped(source, up) : source),
   };
 }

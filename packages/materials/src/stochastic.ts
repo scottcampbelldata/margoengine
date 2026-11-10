@@ -121,6 +121,7 @@ export function stochasticTiling(options: StochasticOptions = {}): MaterialFeatu
     cached = new Map<string, string>();
   return {
     name: 'stochasticTiling',
+    serialization: () => ({ cellSize, blend, maps: [...maps] }),
     shader(source, _group, material: Material) {
       const list = material.features;
       if (list.findIndex((v) => v.name === 'layered') > list.findIndex((v) => v.name === 'stochasticTiling'))

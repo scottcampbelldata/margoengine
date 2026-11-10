@@ -38,7 +38,13 @@ export interface EyeFeature extends MaterialFeature {
   /** Linear colour of the iris. */
   irisColor: [number, number, number];
 }
-const code = (group: number, mapped: boolean, ior: string, f0: string, mapPupil: string) => `struct MargoEyeRows {iris:vec4f, shape:vec4f}
+const code = (
+  group: number,
+  mapped: boolean,
+  ior: string,
+  f0: string,
+  mapPupil: string,
+) => `struct MargoEyeRows {iris:vec4f, shape:vec4f}
 @group(${group}) @binding(132) var<uniform> margoEyeRows:MargoEyeRows;
 ${mapped ? `@group(${group}) @binding(133) var margoEyeMap:texture_2d<f32>;\n@group(${group}) @binding(134) var margoEyeSampler:sampler;\n` : ''}var<private> margoEyeCornea:f32;
 var<private> margoEyeLook:vec3f;
@@ -97,8 +103,9 @@ export function eye(options: EyeOptions = {}): EyeFeature {
   within(depth, 0, 1, 'eye depth');
   within(ior, 1, 3, 'eye ior');
   if (!Array.isArray(center) || center.length !== 3 || !center.every((v) => Number.isFinite(Math.fround(v))))
-    throw new TypeError('eye center must be three finite numbers; pass a point in the mesh\'s axes');
-  if (irisMap !== undefined && typeof irisMap?.bind !== 'function') throw new TypeError('eye irisMap must be a Texture; pass one');
+    throw new TypeError("eye center must be three finite numbers; pass a point in the mesh's axes");
+  if (irisMap !== undefined && typeof irisMap?.bind !== 'function')
+    throw new TypeError('eye irisMap must be a Texture; pass one');
   // Any direction across the axis: the iris has no up of its own.
   const across = Math.abs(look[1]) > 0.9 * Math.hypot(...look) ? [1, 0, 0] : [0, 1, 0],
     side = [
@@ -114,6 +121,13 @@ export function eye(options: EyeOptions = {}): EyeFeature {
     pupil = 0.3;
   const feature: EyeFeature = {
     name: 'eye',
+    serialization: () => ({
+      ...options,
+      irisColor: [...feature.irisColor],
+      pupil: feature.pupil,
+      axis: [...look],
+      center: [...center],
+    }),
     irisColor: [...(options.irisColor ?? [0.16, 0.3, 0.42])],
     get pupil() {
       return pupil;
@@ -146,7 +160,10 @@ export function eye(options: EyeOptions = {}): EyeFeature {
         buffers.set(
           device,
           (held = {
-            buffer: device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+            buffer: device.createBuffer({
+              size: data.byteLength,
+              usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            }),
             last: new Float32Array(data.length).fill(Number.NaN),
           }),
         );

@@ -434,6 +434,9 @@ export class Material {
 }
 
 export interface MaterialFeature {
+    serialization?(): unknown;
+    captureState?(material: Material): unknown;
+    restoreState?(material: Material, state: unknown): void;
     readonly name: string;
     shader(code: string, group: number, material: Material): string;
     tangentFrame?: boolean;

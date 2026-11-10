@@ -840,6 +840,8 @@ export interface Host {
 }
 /** A bound GPU resource (texture, buffer, frame input). `declare` writes its WGSL variables; `entries` returns one resource per binding. */
 export interface Resource {
+  /** Owner metadata for optional material serialization; GPU handles are never inferred. */
+  readonly source?: unknown;
   readonly prefix: string;
   readonly bindings: number;
   declare(name: string, group: number, binding: number, compute: boolean): string;

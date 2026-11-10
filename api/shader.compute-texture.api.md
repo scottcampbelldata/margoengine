@@ -248,6 +248,7 @@ class Program {
 type R = 'r' | 'g' | 'b' | 'a';
 
 interface Resource {
+    readonly source?: unknown;
     readonly prefix: string;
     readonly bindings: number;
     declare(name: string, group: number, binding: number, compute: boolean): string;

@@ -74,6 +74,10 @@
     "./subgroups": {
       "types": "./dist/subgroups.d.ts",
       "import": "./dist/subgroups.js"
+    },
+    "./serialization": {
+      "types": "./dist/serialization.d.ts",
+      "import": "./dist/serialization.js"
     }
   },
   "files": [

@@ -45,6 +45,7 @@ function sampled(
   if (!r) {
     r = {
       id: unique(),
+      source,
       prefix: 'ndt',
       bindings: 2,
       declare: (name, group, binding) =>

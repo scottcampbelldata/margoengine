@@ -1448,6 +1448,12 @@ export type MapSlot = (typeof mapSlots)[number];
  * assigned through `Material.features`. It costs a material that does not list it nothing: its WGSL lives in its entry.
  */
 export interface MaterialFeature {
+  /** Portable owner options. Custom features can instead supply a serialization codec. */
+  serialization?(): unknown;
+  /** Optional private state of this feature's attachment to one material. */
+  captureState?(material: Material): unknown;
+  /** Restore the state returned by captureState after attachment. */
+  restoreState?(material: Material, state: unknown): void;
   /** What it is: a material holds one feature of each name. */
   readonly name: string;
   /** Edits the material's finished shader (`group` is its bind group). The text a feature writes is fixed at creation; assign a new feature to change it. */

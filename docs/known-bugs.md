@@ -4099,9 +4099,10 @@ Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails Rigged
 Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
 text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 
-### Batch 255 save capture blockers
+### Batch 255 save capture owner gaps resolved
 
-- Job 1 remains unbuilt: captureScene reduces every material to the core fields (packages/save/src/engine.ts material block). Repro: capture a textured/emissive optional material; it is not restored as that kind. A lossless implementation for every kind also needs shader-owned serialization: NodeMaterial discards its constructor node roots (packages/shader/src/material.ts constructor); surfaceGraph exists only for createGraphMaterial. This lane's save-only scope cannot add that owning-package API. No partial materials entry is shipped.
+Jobs 1 and 2 now have owner-backed optional capture APIs. Custom procedural/GPU resources retain explicit application bindings; no current built-in material or playback feature is omitted.
+
 
 ### Fixed: derived-grid validation coerced nonnumeric primitives before its diagnostic
 
@@ -4181,3 +4182,4 @@ the optional finalizer before mutation. Regression: the invalid history finalize
 case in packages/inspector/test/edit.test.js fails without the validation.
 
 Fixed in batch 262: the React after-scene readiness fixture counted historical plugin instances whenever their name was currently attached. Reused materials:opaque-color names could count twice with no material installation, publish ready too soon, then report 0 instead of 1. It now reads the current engine.plugins identities. Regression: packages/react/tests/plugin-state.test.js and the unchanged installation assertion in packages/react/scripts/test-after-scene-browser.js. The latter passed once on clean main 5d6e5facd, failed with the rebased fixture, and passes after the observation fix; no assertion or timeout was loosened.
+- Batch 255 follow-up (rule 21): save/scene-state shadow restoration uses Object.assign on bound settings. Repro: an unsigned snapshot with an own __proto__ key changes the settings prototype; cause is the assignment setter. Use own data-property definitions in the fix phase, with a regression test. Playback and light lists are unaffected.

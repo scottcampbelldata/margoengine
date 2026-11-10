@@ -49,8 +49,12 @@ fn margoHairLight(n:vec3f,v:vec3f,l:vec3f,base:vec3f)->vec3f {
  */
 export function hair(options: HairOptions = {}): MaterialFeature {
   const { direction: along = 'v', shift = 0.09, width = 0.12, specular = 1, strands = 200, jitter = 0.06 } = options;
-  for (const [v, label] of [[shift, 'shift'], [jitter, 'jitter']] as const)
-    if (typeof v !== 'number' || !(v >= -1 && v <= 1)) throw new RangeError(`hair ${label} must be radians from -1 to 1; pass a small angle`);
+  for (const [v, label] of [
+    [shift, 'shift'],
+    [jitter, 'jitter'],
+  ] as const)
+    if (typeof v !== 'number' || !(v >= -1 && v <= 1))
+      throw new RangeError(`hair ${label} must be radians from -1 to 1; pass a small angle`);
   within(width, 0, 1, 'hair width');
   within(strands, 0, 1e6, 'hair strands');
   if (typeof specular !== 'number' || !(specular >= 0) || !Number.isFinite(specular))
@@ -63,13 +67,19 @@ export function hair(options: HairOptions = {}): MaterialFeature {
     cached = new Map<string, string>();
   return {
     name: 'hair',
+    serialization: () => ({ direction: axis ? [...axis] : along, shift, width, specular, strands, jitter }),
     tangentFrame: !axis,
     shader(source) {
       let out = cached.get(source);
       if (out !== undefined) return out;
       out = shaded(source, 'margoHairLight', statements, 'hair');
       if (axis)
-        out = vertexFields(out, '@location(13) margoHairAxis:vec3f', `o.margoHairAxis=(margoObjectModel*vec4f(${vec3(axis)},0)).xyz;`, 'hair');
+        out = vertexFields(
+          out,
+          '@location(13) margoHairAxis:vec3f',
+          `o.margoHairAxis=(margoObjectModel*vec4f(${vec3(axis)},0)).xyz;`,
+          'hair',
+        );
       out = wgsl + out;
       if (cached.size >= 16) cached.clear();
       cached.set(source, out);

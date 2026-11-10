@@ -111,6 +111,7 @@ export function skin(options: SkinOptions = {}): MaterialFeature {
     cached = new Map<string, string>();
   return {
     name: 'skin',
+    serialization: () => ({ unitsPerMeter }),
     shader(source, group) {
       const id = group + source;
       let out = cached.get(id);
