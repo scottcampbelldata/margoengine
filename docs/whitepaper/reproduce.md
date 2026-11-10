@@ -3343,3 +3343,5 @@ Build packages, then node --test packages/usdz/tests/preview-surface.test.js pac
 
 Job 0 conflict-marker reproduction: `node --test --test-timeout=120000 tests/hygiene-conflict-markers.test.js`, then `npm run hygiene`. The regression builds a worktree-local Git fixture containing tracked markers, safe near-matches, binary and LFS content; removing the scanner or hygiene invocation makes it fail. No GPU is used.
 Batch 248 job 3: `node --test --test-timeout=120000 packages/text/tests/msdf.test.js`; run the existing text browser suite under the shared GPU lock, once natively and once with --compat. The center of the RGB interpolation diagnostic must be white, while both exterior probes stay dark. No performance benchmark.
+## Batch 212 job 3: modulation and colour
+Build packages; node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js tests/umbrella.test.js. Run the shared GPU-locked mixer/scripts/test-browser.js as in job 1. Its JSON-effects check renders every algorithm and all native oversampling choices on both backends.

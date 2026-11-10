@@ -18,6 +18,7 @@ import { createRoomReverb, roomImpulseResponse } from '@margoengine/mixer/reflec
 import { measureLoudness, normalizeLoudness } from '@margoengine/mixer/loudness';
 import { createBusStereo } from '@margoengine/mixer/stereo';
 import { createBusAnalyser } from '@margoengine/mixer/analyser';
+import { createFX, createBusFX } from '@margoengine/mixer/fx';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -398,6 +399,33 @@ export async function runChecks() {
     near(reading.momentary, reference.momentary, 1e-6, 'live momentary LUFS');
     near(reading.shortTerm, reference.shortTerm, 1e-6, 'live short-term LUFS');
     for (let c = 0; c < 2; c++) assert(out.getChannelData(c).every((v, i) => v === b.getChannelData(c)[i]), 'analysis output preserves samples');
+  });
+  await check('JSON modulation and colour effects render analytic signals on the audio thread', async () => {
+    for (const spec of [{type:'chorus',depth:0,time:0.01,mix:1}, {type:'flanger',depth:0,time:0.001,mix:1},
+      {type:'vibrato',depth:0,time:0.005,mix:1}, {type:'phaser',depth:0,mix:0}, {type:'auto-filter',mix:0},
+      {type:'tremolo',rate:0,phase:90,depth:1,spread:0}, {type:'bitcrusher',bits:4},
+      {type:'auto-pan',rate:0,phase:90,depth:1}]) {
+      const context = new OfflineAudioContext(2, 4800, rate);
+      using mixer = new Mixer(context);
+      using stage = await createBusFX(mixer.master, JSON.parse(JSON.stringify([spec])));
+      play(context,constant(.1,.3)).connect(mixer.master.input);
+      const out = await context.startRendering();
+      const expected = spec.type==='bitcrusher'?.25:spec.type==='auto-pan'?.6:.3;
+      near(out.getChannelData(spec.type==='auto-pan'?1:0)[3000],expected,1e-6,`${spec.type} wet signal`);
+      if(spec.type==='auto-pan')near(out.getChannelData(0)[3000],0,1e-7,'auto-pan left');
+    }
+    for (const oversample of ['none','2x','4x']) {
+      const context = new OfflineAudioContext(1, 4800, rate);
+      using stage = await createFX(context,{type:'distortion',amount:.4,oversample});
+      play(context,constant(.1,.25)).connect(stage.input);stage.output.connect(context.destination);
+      const out = await context.startRendering();
+      near(out.getChannelData(0)[3000],41*.25/(1+40*.25),1e-5,`rational distortion ${oversample}`);
+    }
+    const context = new OfflineAudioContext(1, 4800, rate);
+    using shaper = await createFX(context,{type:'waveshaper',curve:[-1,0,1]});
+    const data=sine(1000,.1,.2);play(context,data).connect(shaper.input);shaper.output.connect(context.destination);
+    const out = await context.startRendering();
+    out.getChannelData(0).forEach((v,i)=>near(v,data[i],1e-7,'authored identity curve'));
   });
   device?.destroy();
   return { checks, backend };

@@ -707,3 +707,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/usdz (batch 206 job 4): previewSurface(), separate opacity textures, arbitrary numeric readers, fallbacks/interpolation, resource limits, worker and device lifetime.
 - @margoengine/gltf-pro (batch 206 job 4): uploadImage external-image texture usages and caller-owned texture lifetime.
 - @margoengine/text (batch 248 job 3): replace old median-reduction wording, document raw MSDF sampling, scalar fallback, MTSDF alpha, RGBA atlas/memory and lazy PNG decoder dependency; no examples written in build phase.
+- @margoengine/mixer (batch 212 fx): document JSON FXSpec variants, defaults, createFX/createFXChain/createBusFX, automation, ownership, wet endpoints, delay interpolation, sample/bit reduction and native oversampling.
+
+- margoengine (batch 212 fx): document the generated mixer/fx alias.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13442802,
+  "total": 13446738,
   "history": [
     {
       "date": "2026-10-24",
@@ -6942,6 +6942,12 @@
       "commit": "batch-206-preview",
       "reason": "Independent opacity plus arbitrary numeric primvars, topology expansion and main/worker material hooks. [{\"key\":\"@margoengine/usdz\",\"before\":12708,\"bytes\":12743,\"ceiling\":13126},{\"key\":\"@margoengine/usdz/worker\",\"before\":13771,\"bytes\":13796,\"ceiling\":14210}]; splitting would duplicate shared schema and interpolation code.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch212-fx",
+      "reason": "Optional fx; @margoengine/mixer/fx: ceiling 0 to 3936, measured 3680. Keep one shared routing lifetime and K-weighting design rather than duplicate state. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8200,6 +8206,7 @@
     "@margoengine/text/selection": 958,
     "@margoengine/cameras/panorama": 2742,
     "@margoengine/scatter/attributes": 2319,
-    "@margoengine/usdz/preview-surface": 5006
+    "@margoengine/usdz/preview-surface": 5006,
+    "@margoengine/mixer/fx": 3936
   }
 }

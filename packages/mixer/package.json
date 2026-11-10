@@ -58,6 +58,10 @@
     "./analyser": {
       "types": "./dist/analyser.d.ts",
       "import": "./dist/analyser.js"
+    },
+    "./fx": {
+      "types": "./dist/fx.d.ts",
+      "import": "./dist/fx.js"
     }
   },
   "files": [
