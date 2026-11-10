@@ -58,14 +58,14 @@ export interface BusAnalyser extends Disposable {
 
 const processor = `class MeterProcessor extends AudioWorkletProcessor {
   constructor(options) {
-    super(); this.o = options.processorOptions; this.active = true; this.reset();
-    this.port.onmessage = e => { if (e.data === 'reset') this.reset(); else this.active = false; };
+    super(); this.o = options.processorOptions; this.active = true; this.generation = 0; this.reset();
+    this.port.onmessage = e => { if (e.data === 'reset') { this.generation++; this.reset(); } else this.active = false; };
   }
   reset() {
     const o = this.o;
     this.frames = 0; this.at = 0; this.partial = 0;
     this.energy = new Float64Array(Math.round(3 * sampleRate));
-    this.m = 0; this.s = 0;
+    this.m = 0; this.s = 0; this.mLive = 0; this.sLive = 0;
     this.states = Array.from({length:o.channels}, () => [new Float64Array(4), new Float64Array(4)]);
     this.squares = new Float64Array(o.channels); this.peaks = new Float64Array(o.channels);
   }
@@ -87,13 +87,25 @@ const processor = `class MeterProcessor extends AudioWorkletProcessor {
         energy += v*v*weight;
       }
       const old400 = (this.at - n400 + this.energy.length) % this.energy.length;
-      this.m += energy - this.energy[old400]; this.s += energy - this.energy[this.at];
+      // Running window sums, plus exact counts of nonzero samples in each window: once a loud passage has left a
+      // window its sum is exactly 0 again instead of the rounding left by adding and removing it.
+      const leaving = this.energy[old400], expiring = this.energy[this.at];
+      this.m += energy - leaving; this.s += energy - expiring;
+      this.mLive += (energy !== 0) - (leaving !== 0); this.sLive += (energy !== 0) - (expiring !== 0);
+      if (this.mLive === 0) this.m = 0;
+      if (this.sLive === 0) this.s = 0;
       this.energy[this.at] = energy; this.at = (this.at+1) % this.energy.length;
+      if (this.at === 0) {
+        // Once per 3 s ring, resum both windows so rounding cannot build up over a long session.
+        let m = 0, s = 0;
+        for (let k = 0; k < this.energy.length; k++) { s += this.energy[k]; if (k >= this.energy.length - n400) m += this.energy[k]; }
+        this.m = m; this.s = s;
+      }
       this.frames++; this.partial++;
       if (this.partial === o.intervalFrames) {
         const rms = Array.from(this.squares, v => Math.sqrt(v / this.partial));
         const level = p => p > 0 ? -.691 + 10*Math.log10(p) : -Infinity;
-        this.port.postMessage({frames:this.frames, rms, peak:Array.from(this.peaks), db:rms.map(v=>v>0?20*Math.log10(v):-Infinity),
+        this.port.postMessage({generation:this.generation, frames:this.frames, rms, peak:Array.from(this.peaks), db:rms.map(v=>v>0?20*Math.log10(v):-Infinity),
           momentary:this.frames>=n400?level(Math.max(0,this.m)/n400):-Infinity,
           shortTerm:this.frames>=this.energy.length?level(Math.max(0,this.s)/this.energy.length):-Infinity});
         this.squares.fill(0); this.peaks.fill(0); this.partial=0;
@@ -130,8 +142,14 @@ export async function createAnalyser(context: BaseAudioContext, options: Analyse
   let disposed = false;
   const empty = (): MeterReading => ({ frames: 0, rms: Array(channels).fill(0), peak: Array(channels).fill(0),
     db: Array(channels).fill(-Infinity), momentary: -Infinity, shortTerm: -Infinity });
-  let reading = empty();
-  output.port.onmessage = event => { if (!disposed) reading = event.data as MeterReading; };
+  let reading = empty(), generation = 0;
+  // Reports carry the count of resets the audio thread had seen; one posted before it received the latest reset()
+  // is stale and must not restore the old readings.
+  output.port.onmessage = event => {
+    if (disposed || event.data.generation !== generation) return;
+    const { generation: _, ...report } = event.data as MeterReading & { generation: number };
+    reading = report;
+  };
   const alive = () => { if (disposed) throw new MargoError('disposed', 'Analyser is disposed; create a new analyser'); };
   const data = (channel: number, target: Float32Array<ArrayBuffer> | undefined, size: number) => {
     alive(); bounded(channel, 0, channels - 1, 'Analyser channel');
@@ -153,7 +171,7 @@ export async function createAnalyser(context: BaseAudioContext, options: Analyse
       if (!Number.isInteger(bin)) throw new RangeError('FFT bin needs an integer; use a spectrum index');
       return bin * context.sampleRate / fftSize;
     },
-    reset() { alive(); reading = empty(); output.port.postMessage('reset'); },
+    reset() { alive(); generation++; reading = empty(); output.port.postMessage('reset'); },
     dispose() {
       if (disposed) return; disposed = true;
       for (const n of [input, output, splitter, sink, ...analysers]) n.disconnect();

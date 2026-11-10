@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14654334,
+  "total": 14654680,
   "history": [
     {
       "date": "2026-10-24",
@@ -8003,6 +8003,12 @@
       "commit": "fc56c6323",
       "reason": "Node pixel loading and validation: model entry 60402 to 60566 bytes gzip (+164). Raise the optional model ceiling from 60429 with normal headroom. A split would require caller configuration and duplicate loading, upload and restoration paths for 164 bytes. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "749ddfd7e",
+      "reason": "R5 mixer analyser fixes",
+      "grew": 1
     }
   ],
   "items": {
@@ -8620,7 +8626,7 @@
     "@margoengine/mesh-edit/section": 5555,
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 7340,
-    "@margoengine/mixer/analyser": 3167,
+    "@margoengine/mixer/analyser": 3513,
     "@margoengine/mixer/dynamics": 3112,
     "@margoengine/mixer/fx": 3936,
     "@margoengine/mixer/loudness": 2362,
