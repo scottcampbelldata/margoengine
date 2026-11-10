@@ -2,6 +2,7 @@
 // report the same 52 coefficients from 0 to 1, one per facial movement. This entry reads a frame in any of their
 // shapes, smooths it, and drives what a character has: morph targets found by their names, or a VRM avatar's expressions.
 // The 52 names are Apple's published ARFaceAnchor.BlendShapeLocation identifiers.
+import type { EnginePlugin } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import type { Animator } from '@margoengine/animator';
 import type { VRMHandle } from './vrm.js';
@@ -87,9 +88,7 @@ const fold = (name: string): string => name.replace(/[^a-zA-Z0-9]/g, '').toLower
 const SPELLINGS: readonly (readonly [string, FaceShape])[] = FACE_SHAPES.flatMap((shape) => {
   const folded = fold(shape),
     short = folded.replace(/left$/, 'l').replace(/right$/, 'r');
-  return short === folded
-    ? [[folded, shape] as const]
-    : [[folded, shape] as const, [short, shape] as const];
+  return short === folded ? [[folded, shape] as const] : [[folded, shape] as const, [short, shape] as const];
 }).sort((a, b) => b[0].length - a[0].length);
 
 /**
@@ -148,7 +147,8 @@ export class FaceMapper {
     else
       for (const [shape, value] of Object.entries(gain)) {
         if (!INDEX.has(shape)) throw new RangeError(`Face gain names ${shape}; use a name from FACE_SHAPES`);
-        if (!(value >= 0 && value < Infinity)) throw new RangeError(`Face gain of ${shape} must be finite and 0 or more`);
+        if (!(value >= 0 && value < Infinity))
+          throw new RangeError(`Face gain of ${shape} must be finite and 0 or more`);
       }
   }
 
@@ -285,7 +285,10 @@ export function addFace(animation: Animator['animation'], options: AddFaceOption
         targets.push({ node: nodeIndex, target, shape: INDEX.get(shape)! });
       });
   if (!vrm && !targets.length)
-    throw new MargoError('state', 'This model has no morph target named like a face shape; pass map, or vrm for an avatar');
+    throw new MargoError(
+      'state',
+      'This model has no morph target named like a face shape; pass map, or vrm for an avatar',
+    );
   const driven = new Set(targets.map((t) => t.shape)),
     matched = vrm ? [] : FACE_SHAPES.filter((_, i) => driven.has(i)),
     missing = vrm ? [] : FACE_SHAPES.filter((_, i) => !driven.has(i)),
@@ -302,8 +305,10 @@ export function addFace(animation: Animator['animation'], options: AddFaceOption
   let remove: (() => void) | null;
   if (animator) remove = animator.addSolver(update);
   else {
-    engine.use({ name, setup() {}, onPreUpdate: update });
-    remove = () => engine.removePlugin(name);
+    const plugin: EnginePlugin = { name, setup() {}, onPreUpdate: update };
+    engine.use(plugin);
+    // The scene it was attached to, not whichever scene is active when it stops.
+    remove = () => engine.sceneOf(plugin)?.removePlugin(name);
   }
   const stop = (): void => {
     remove?.();

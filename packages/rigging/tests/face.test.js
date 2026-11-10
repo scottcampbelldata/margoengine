@@ -163,7 +163,11 @@ function foxWithNames(names) {
   mesh.primitives[0].targets = names.map(() => ({ POSITION: accessor }));
   mesh.weights = names.map(() => 0);
   mesh.extras = { targetNames: names };
-  return { doc, buffers: [new Uint8Array(bin), new Uint8Array(delta.buffer)], node: doc.nodes.findIndex((n) => n.mesh === 0) };
+  return {
+    doc,
+    buffers: [new Uint8Array(bin), new Uint8Array(delta.buffer)],
+    node: doc.nodes.findIndex((n) => n.mesh === 0),
+  };
 }
 
 test('stand-in morph targets found by name, map for the rest, and back to neutral', async (t) => {
@@ -213,4 +217,28 @@ test('Seed-san: tracker frames drive a real avatar through its expressions', asy
   vrm.update(1 / 60);
   assert.equal(primitive.weights[bind.index], 0);
   vrm.dispose();
+});
+
+// Wrong-scene dispose: `engine.removePlugin(name)` acts on the active scene, so stopping a face attached from another
+// scene removed the active scene's same-name plugin and left the face's own plugin running.
+test("dispose removes the face plugin from its own scene, not the active scene's same-name plugin", async (t) => {
+  const f = foxWithNames(['ARKit_jawOpen']),
+    { engine, animation } = await host(t, f.doc, f.buffers),
+    other = engine.createScene('other');
+  let face;
+  other.use({
+    name: 'within',
+    setup() {
+      face = addFace(animation, { smoothing: 0 });
+    },
+  });
+  other.removePlugin('within');
+  const name = [...other.plugins.keys()].find((key) => key.startsWith('face:'));
+  assert.ok(name, 'the face plugin is in the second scene');
+  const kept = { name, disposed: 0, setup() {}, dispose: () => kept.disposed++ };
+  engine.use(kept);
+  face.dispose();
+  assert.equal(engine.plugins.get(name), kept, 'the active scene lost its own same-name plugin');
+  assert.equal(kept.disposed, 0);
+  assert.equal(other.plugins.has(name), false, 'the disposed face stayed in its scene');
 });

@@ -4,6 +4,7 @@
 // override and accumulation rules, gaze by its LookAt space and range maps, spring bones through ./springs.js, in the
 // order the specification recommends (LookAt, expressions, spring bones).
 import type { Vec3 } from '@margoengine/math';
+import type { EnginePlugin } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import {
   axisAngleToQuaternion,
@@ -897,8 +898,10 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
   let remove: (() => void) | null;
   if (animator) remove = animator.addSolver(update);
   else {
-    engine.use({ name, setup() {}, onPreUpdate: update });
-    remove = () => engine.removePlugin(name);
+    const plugin: EnginePlugin = { name, setup() {}, onPreUpdate: update };
+    engine.use(plugin);
+    // The scene it was attached to, not whichever scene is active when it stops.
+    remove = () => engine.sceneOf(plugin)?.removePlugin(name);
   }
   const stop = (): void => {
     remove?.();
