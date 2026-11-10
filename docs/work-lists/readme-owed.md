@@ -621,3 +621,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/lines (batch 227 job 3): document /debug immediate lifetime, depth/width/colour grouping, limits, persistent ArcLine, planar tilt and spherical arc defaults and degeneracies; examples deferred.
 - margoengine (batch 227 job 3): document lines/debug forwarding; generator also restores the missing clustered/shapes forwarding file required by umbrella consistency tests.
+
+- @margoengine/splats and margoengine: document /formats parseKsplat, parseCompressedPly and encodePly, supported revisions, SH, colour conversion, binary/ASCII export, opacity endpoints, synchronous decoding and existing covariance regularization.

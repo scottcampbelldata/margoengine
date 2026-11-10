@@ -3273,3 +3273,6 @@ After build, run node --test --test-timeout=120000 packages/labels/tests/callout
 
 ### Immediate debug and arc correctness (batch 227 job 3)
 After building, run node --test --test-timeout=120000 packages/lines/tests/debug.test.js. Under a shared GPU lock run node packages/lines/scripts/test-browser.js and then the same command with --compat. The debug check verifies one-frame pixels, zero-delta clearing, depthTest behavior, pick-safe queues, immediate/persistent arc apex pixels, persistent picking, multi-view retention and restoration. CPU checks include buffer reuse, style draw counts, queue overflow, tilted/vertical planar arcs, spherical radii, coincident directions and exact/near antipodes. Fixtures are authored synthetic correctness data, with no downloaded demo assets.
+
+### Batch 238 formats
+Build packages, then node --test --test-timeout=120000 packages/splats/test/formats.test.js. The KSplat fixture source and exact regeneration arguments are in packages/splats/test/fixtures/NOTICE.md; rivals run in their external benchmark folder only. GPU: use gpu-lock run --owner=codex-batch238 --gpu=splats-format-render --max=2 --wait-max=60 -- node packages/splats/test/gpu/formats-check.mjs, normally and with --compat. All four render inputs derive from the existing MIT raccoon capture. No timed suite.

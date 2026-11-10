@@ -2229,6 +2229,8 @@ Batch 231 surface placement adds CPU world-area and inverse-transpose normal pre
 Batch 206 curves: CPU basis/cardinality/width tests plus direct and worker GPU creation on WebGPU and compatibility exercise optional Lines/Points ownership and teardown. Existing Lines Stroke supplies per-point widths. World diameters use maximum transform-axis length under anisotropic scale; no elliptical cross sections are claimed. See docs/limits.md.
 
 
+Batch 238 formats: the CPU container readers reuse existing normalized quaternion covariance and linear SH conversion. Independent packed-word tests cover all compressed PLY fields; real KSplat getter samples cover all three compression levels. formats-check.mjs renders real derivatives and a PLY export on WebGPU and compatibility, without adding GPU mathematics or passes. No speed or memory reduction proof is claimed.
+
 Batch 232 lunar GPU maths: `scenery/moon` uses ray/sphere intersection at the far
 plane with read-only reversed-Z depth, sRGB texture decoding, world-space lunar
 north and a Lambert terminator plus complementary Earth phase. CPU and GPU

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13309738,
+  "total": 13330585,
   "history": [
     {
       "date": "2026-10-24",
@@ -6781,6 +6781,12 @@
       "commit": "c1fd9ad4d",
       "reason": "lightmap/probes: new entry, irradiance probes baked from the lightmap scene (batch 54 job 7)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e06607e5b",
+      "reason": "Batch238-formats-0-to-20239B-shared-attribute-and-covariance-conversion-no-core-growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -7635,6 +7641,7 @@
     "@margoengine/splats/data": 22135,
     "@margoengine/splats/depth": 2119,
     "@margoengine/splats/edit": 3856,
+    "@margoengine/splats/formats": 20847,
     "@margoengine/splats/lighting": 3606,
     "@margoengine/splats/lod": 30687,
     "@margoengine/splats/pick": 3573,

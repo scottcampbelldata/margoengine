@@ -3406,6 +3406,10 @@
       "types": "./dist/splats/progressive.d.ts",
       "import": "./dist/splats/progressive.js"
     },
+    "./splats/formats": {
+      "types": "./dist/splats/formats.d.ts",
+      "import": "./dist/splats/formats.js"
+    },
     "./splines": {
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"

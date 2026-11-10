@@ -17,6 +17,7 @@ import { SplatPicking } from '../../dist/pick.js';
 import { Picking } from '../../../selection/dist/index.js';
 import { SplatSequence, SplatSkin } from '../../dist/animate.js';
 import { loadProgressiveSplats } from '../../dist/progressive.js';
+import { parseKsplat, encodePly } from '../../dist/formats.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
@@ -120,7 +121,11 @@ window.check = {
       camera = { position: [0, 0, 4], target: [0, 0, 0], near: 0.05, far: 100 },
       at = [0, 0, 0];
     if (o.capture) {
-      data = await loadCapture();
+      data =
+        o.ksplat === undefined
+          ? await loadCapture()
+          : parseKsplat(await (await fetch(`/packages/splats/test/fixtures/raccoon-${o.ksplat}.ksplat`)).arrayBuffer());
+      if (o.plyExport) data = parsePly(encodePly(data));
       const n = data.positions.length / 3,
         sum = [0, 0, 0];
       for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) sum[k] += data.positions[i * 3 + k];

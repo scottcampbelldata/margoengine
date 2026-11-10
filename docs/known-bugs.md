@@ -4568,3 +4568,5 @@ No open correctness defect identified. The planar assignment replaces independen
 ### Labels GPU finish-phase edge cases (batch 261)
 - In-flight font cancellation: start GPULabelLayer.create with a Font whose load promise is pending, then abort its signal. Creation stays pending until Font.load resolves because cancellation is checked only before/after loading. Make the caller's wait abortable while retaining shared font loading in the fix phase.
 - Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
+
+Batch 238 formats: no open format defect found by the malformed-input, real-data getter, SH and PLY round-trip checks. Existing transformed-bitmap alpha precision follow-up above remains outside these CPU entries.

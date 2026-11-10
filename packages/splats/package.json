@@ -69,6 +69,10 @@
     "./progressive": {
       "types": "./dist/progressive.d.ts",
       "import": "./dist/progressive.js"
+    },
+    "./formats": {
+      "types": "./dist/formats.d.ts",
+      "import": "./dist/formats.js"
     }
   },
   "files": [
