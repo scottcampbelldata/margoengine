@@ -655,8 +655,10 @@ export class SkeletalLayer implements EnginePlugin {
   /** Takes a mesh out; false when it is not in this layer. */
   remove(mesh: SkinnedMesh): boolean {
     if (mesh.owner !== this) return false;
+    const index = this.list.indexOf(mesh);
+    if (index < 0) return false;
     mesh.owner = undefined;
-    this.list.splice(this.list.indexOf(mesh), 1);
+    this.list.splice(index, 1);
     return true;
   }
   setup(engine: Engine): void {

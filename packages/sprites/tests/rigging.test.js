@@ -95,6 +95,30 @@ const mesh = (s) =>
     joints: new Array(16).fill(0),
     weights: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
   });
+
+test('removing a skeleton slot attachment preserves its owner and ordinary layer meshes', () => {
+  const skeleton = arm(),
+    attachment = mesh(skeleton),
+    ordinary = mesh(skeleton),
+    layer = new SkeletalLayer({ atlas: { width: 1, height: 1, data: new Uint8Array(4) } });
+  skeleton.addSlot({ name: 'slot', bone: 'root', attachments: { attachment }, attachment: 'attachment' });
+  try {
+    layer.addSkeleton(skeleton);
+    assert.equal(layer.remove(attachment), false);
+    assert.equal(attachment.owner, layer);
+    layer.add(ordinary);
+    assert.equal(layer.remove(attachment), false);
+    assert.deepEqual(layer.meshes, [ordinary]);
+    assert.equal(attachment.owner, layer);
+    assert.equal(layer.removeSkeleton(skeleton), true);
+    assert.equal(attachment.owner, undefined);
+    assert.equal(layer.remove(ordinary), true);
+    assert.equal(layer.remove(ordinary), false);
+    assert.deepEqual(layer.meshes, []);
+  } finally {
+    layer.dispose();
+  }
+});
 test('slots swap and hide attachments; draw-order keys seek backwards to setup state', () => {
   const s = arm(),
     red = mesh(s),

@@ -1059,3 +1059,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/webgl2-compat (batch 271 job 1 fix): note that a 3D texture slice drawn beside a depth or stencil attachment goes through a 2D stand-in (two blits per such pass; ANGLE Direct3D 11 drops those draws otherwise).
 - @margoengine/creative and margoengine (batch 271 job 1): document /targets-depth DepthTextureRenderTarget depth options and defaults, reversed-Z clear, 4x resolve (volume scratch copy), depthTexture(), generateMipmaps after mip 0, 256 MiB cap, restore and both GPU backends; examples deferred.
 - margoengine (batch 1 job 2): document the package-local npm test command and complete tests/*.test.js discovery; README examples deferred.
+
+
+- @margoengine/sprites (review 2): clarify that remove removes individually added meshes; removeSkeleton owns slot attachment removal.
