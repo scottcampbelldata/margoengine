@@ -91,19 +91,29 @@ export function mergeVertices(data: GeometryData, options: MergeVerticesOptions 
     return true;
   };
   const sameCell = (a: number, b: number) => a === b || (a !== a && b !== b);
+  // Hash factors per axis offset. Each is computed at the first point the neighbor scan needs it and reused
+  // afterwards, so a scan never makes more Math.imul calls than recomputing them would, and an unmatched vertex
+  // makes 9 instead of 48 (Teschner et al. 2003 hash, exact cell checks unchanged).
+  const factorY = new Int32Array(3),
+    factorZ = new Int32Array(3);
   for (let i = 0; i < count; i++) {
     const cx = Math.floor(P[i * 3] / cell),
       cy = Math.floor(P[i * 3 + 1] / cell),
       cz = Math.floor(P[i * 3 + 2] / cell);
-    let match = -1;
-    search: for (let dx = -1; dx <= 1; dx++)
+    let match = -1,
+      centerX = 0;
+    search: for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx,
+        factorX = Math.imul(x, 73856093);
+      if (dx === 0) centerX = factorX;
       for (let dy = -1; dy <= 1; dy++) {
-        const x = cx + dx,
-          y = cy + dy,
-          hash = Math.imul(x, 73856093) ^ Math.imul(y, 19349663);
+        const y = cy + dy;
+        if (dx === -1) factorY[dy + 1] = Math.imul(y, 19349663);
+        const hash = factorX ^ factorY[dy + 1];
         for (let dz = -1; dz <= 1; dz++) {
-          const z = cz + dz,
-            bucket = buckets.get(hash ^ Math.imul(z, 83492791));
+          const z = cz + dz;
+          if (dx === -1 && dy === -1) factorZ[dz + 1] = Math.imul(z, 83492791);
+          const bucket = buckets.get(hash ^ factorZ[dz + 1]);
           if (!bucket) continue;
           for (let n = 0; n < bucket.length; n++) {
             const j = bucket[n],
@@ -120,13 +130,15 @@ export function mergeVertices(data: GeometryData, options: MergeVerticesOptions 
           }
         }
       }
+    }
     if (match < 0) {
+      // The full scan ran, so the center factors are all set.
       match = kept.length;
       kept.push(i);
       keptX.push(cx);
       keptY.push(cy);
       keptZ.push(cz);
-      const key = Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663) ^ Math.imul(cz, 83492791),
+      const key = centerX ^ factorY[1] ^ factorZ[1],
         bucket = buckets.get(key);
       if (bucket) bucket.push(match);
       else buckets.set(key, [match]);

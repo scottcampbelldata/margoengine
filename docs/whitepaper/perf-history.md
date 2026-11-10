@@ -3336,6 +3336,10 @@ Native API counts and task outputs are retained without timing samples or ledger
 updates. Six initial calls passed on Margo and both black-box reference backends.
 No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.md).
 
+### Batch 162 job 3: mergeVertices hash factors (2026-11-10)
+
+`perf(geometry): reuse mergeVertices hash factors` computes each per-axis hash factor once per vertex: 48 to 9 `Math.imul` calls per unmatched vertex, with identical bucket keys, scan order and output (16 parent digests in merge-vertices-workcount.test.js). [Methods](batch-162-workcounts.md#row-45-mergevertices-hash-factors). Timing pending the quiet rerun; no runtime speed ratio claimed.
+
 ### Batch 162 job 2: lathe and tube angular columns (2026-11-10)
 
 `perf(geometry): reuse lathe and tube angular columns` reduces their p-extrude angular sin/cos work from 33,954 to 292 calls without changing extrusion, curve/frame work or geometry output. Seven parent byte digests and the parent-failing work-count assertion are in sweep-workcount.test.js. Additional per-call tables are 2,064 and 272 bytes at those resolutions. [Methods and sources](batch-162-workcounts.md#row-42-lathe-and-tube-angular-reuse). Timing pending the quiet rerun; no runtime speed ratio claimed.

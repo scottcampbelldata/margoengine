@@ -54,6 +54,24 @@ Seven parent SHA-256 checks cover every geometry stream for full/partial/collaps
 open tubes and a closed curved tube. A straight tube isolates radial work from frame rotations. The parent fails
 the angular-count assertion (16,512 rather than 258 on lathe); all seven parent byte checks pass on both versions.
 
+## Row 4.5: mergeVertices hash factors
+
+Cause: the neighbor scan rebuilt the x/y hash pair for each of the 9 (dx, dy) columns and the z factor for each of the 27 cells, then hashed the vertex's own cell again on insertion: 48 `Math.imul` calls for every vertex that found no match.
+Fixed in `perf(geometry): reuse mergeVertices hash factors` (Batch 162 job 3). Each axis keeps three factors in a per-call `Int32Array(3)`; a factor is computed the first time the scan reaches it and reused afterwards, and insertion reuses the center factors. XOR is exact, so every bucket key is the same integer as before.
+The scan still visits the same 27 cells in the same order, keeps the exact per-cell check that rejects 32-bit hash collisions and compares the same attributes.
+
+| Case | Parent `Math.imul` calls | Current calls |
+|---|---:|---:|
+| 64 vertices in separate cells | 3,072 | 576 |
+| unmatched, match in the first scanned cell, unmatched | 99 | 21 |
+
+Because a factor is only computed where the parent would first have computed the same value, an early match never costs more calls than before (3 for a match in the first scanned cell, as on the parent).
+Trade-off: two 12-byte `Int32Array` scratch arrays per call, nothing retained. This is an operation count, not a runtime or rival speed claim. Timing pending the quiet rerun.
+
+Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/geometry/tests/merge-vertices-workcount.test.js`.
+Both count assertions fail on the parent (3,072 and 99 calls); 16 parent SHA-256 digests in `packages/geometry/tests/fixtures/merge-vertices-workcount.json` cover tolerance 0, 1e-4 and 0.1, position-only merging, normals, UVs, tangents, groups, degenerate removal, cell boundaries and a 32-bit hash collision.
+Research: Teschner et al. 2003 hash the three integer cell coordinates with three large primes combined by XOR; the per-axis products are independent of the other axes, which is what makes them reusable across the 27 neighbor cells.
+
 ## Research consulted
 
 - Steve Marschner, Cornell CS4620, *Triangle meshes I* (2019), [course notes](https://www.cs.cornell.edu/courses/cs4620/2019fa/slides/04trimesh1.pdf): mesh parameterization and cylindrical coordinates.

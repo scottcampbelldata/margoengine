@@ -3988,6 +3988,10 @@ or add timings to the historical ledger.
 
 ### Batch 162 geometry, math and raycast work counts
 
+For mergeVertices hash factors, after the package build run
+`node --test --test-timeout=120000 packages/geometry/tests/merge-vertices-workcount.test.js`.
+This checks 16 parent output digests and exact `Math.imul` call counts.
+
 For lathe/tube angular reuse, after the package build run
 `node --test --test-timeout=120000 packages/geometry/tests/sweep-workcount.test.js`.
 This checks seven parent geometry stream digests and exact angular call counts.
