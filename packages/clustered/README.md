@@ -444,6 +444,17 @@ bindings of a shadow-enabled effect; the default second argument is false.
 
 `dispose()`/`destroy()` releases resources and receiver hooks. Device restoration recreates buffers and reuploads the light list. The package stays separate from core, stage and PBR assets.
 
+## Contact shadows
+
+`ContactLights` (`@margoengine/clustered/contact`) grounds small details under point and spot lights: each lit
+fragment marches a short ray toward each light through the previous frame's scene depth, and a hit removes `strength`
+of that light (default 0.8; `setStrengths` sets it per light index, 0 turns a light off). Options: `distance` (0.3),
+`thickness` (0.1), `steps` (12), `bias` (0.01) and `depth`, the scene's single-sample depth texture or a callback for
+it; omitted, it shares the scene-depth capture water and HTML panels use, which SSAO and depth of field refuse (pass
+their stack's `depthTexture` then). It works with or without shadow maps and adds binding 145. It reads one frame late
+(a moving caster's contact trails it by a frame), only what is on screen casts, and receivers added with
+`receiveShadow: false` skip it.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

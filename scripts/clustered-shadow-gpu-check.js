@@ -405,6 +405,54 @@ try {
     );
     await capture('all-kinds');
   }
+  {
+    // Contact shadows (ContactLights): a 0.1-high pebble on the floor and a low point light to its +x side, no shadow
+    // maps. Floor points just past the pebble on the far side march through it (factor 0 at strength 1); points on the
+    // light's side, beside it and far away keep the light exactly. Radiance with strength 1 over strength 0.
+    await call('camera', [0, 8, 8]);
+    const lamp = { position: [1.5, 0.4, 0], range: 10, intensity: 3 },
+      shaded = [
+        [-0.3, 0, 0, 0, 1, 0],
+        [-0.25, 0, 0.1, 0, 1, 0],
+        [-0.28, 0, -0.1, 0, 1, 0],
+      ],
+      open = [
+        [0.3, 0, 0, 0, 1, 0],
+        [-1.5, 0, 0, 0, 1, 0],
+        [-0.3, 0, 1, 0, 1, 0],
+        [0, 0.1, 0, 0, 1, 0],
+      ],
+      sum = (rgb) => rgb[0] + rgb[1] + rgb[2];
+    await call('scene', {
+      meshes: ['floor', 'pebble'],
+      local: false,
+      points: [lamp],
+      contact: { distance: 0.6, thickness: 0.2, steps: 24, strength: 1 },
+    });
+    const rendered = await call('render', 2),
+      compiled = await call('compile'),
+      on = await call('probe', [...shaded, ...open]);
+    await capture('contact');
+    await call('contactStrengths', [0]);
+    await call('render', 1);
+    const off = await call('probe', [...shaded, ...open]),
+      ratios = on.map((rgb, i) => sum(rgb) / sum(off[i]));
+    check(
+      'contact shadows compile into the core and probe shaders',
+      !compiled.core.length && !compiled.probe.length && rendered.shader.includes('clusterContact('),
+      compiled,
+    );
+    check(
+      'contact: floor points behind a 0.1-high pebble lose the light (strength 1)',
+      ratios.slice(0, shaded.length).every((r) => r === 0) && off.slice(0, shaded.length).every((rgb) => sum(rgb) > 0),
+      { ratios },
+    );
+    check(
+      'contact: points on the light side, beside, far away and on top keep it exactly',
+      ratios.slice(shaded.length).every((r) => r === 1),
+      { ratios },
+    );
+  }
   check('no page errors', pageErrors.length === 0, { pageErrors });
   const fixtureErrors = await page.evaluate(() => window.clusteredShadowFixture.errors);
   check('no GPU validation or engine errors', fixtureErrors.length === 0, { fixtureErrors });

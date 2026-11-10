@@ -41,6 +41,8 @@ export class Clustered implements EnginePlugin {
     set stochastic(hook: ClusteredStochastic | undefined);
     get layers(): ClusteredLightTerm | undefined;
     set layers(hook: ClusteredLightTerm | undefined);
+    get contact(): ClusteredLightTerm | undefined;
+    set contact(hook: ClusteredLightTerm | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
@@ -125,6 +127,10 @@ export interface ClusteredSamplingHooks {
     stochastic?: {
         declarations(group: number): string;
         lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
+    };
+    contact?: {
+        declarations(group: number): string;
+        readonly term: string;
     };
 }
 
@@ -234,5 +240,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     readonly shapeShadow?: string;
 }, area?: {
     declarations(group: number, shadow?: string): string;
-}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic }?: ClusteredSamplingHooks): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic, contact }?: ClusteredSamplingHooks): string;
 ```

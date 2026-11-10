@@ -214,8 +214,9 @@ export class Clustered implements EnginePlugin {
   private shapesHook?: ClusteredShapes;
   private stochasticHook?: ClusteredStochastic;
   private layersHook?: ClusteredLightTerm;
+  private contactHook?: ClusteredLightTerm;
   private listValue: readonly (PointLight | SpotLight)[] = Object.freeze([]);
-  /** This frame's binding parts: own entries, then the shadow, area, directional, IES, projector, shapes, stochastic and layers hooks' (or undefined). */
+  /** This frame's binding parts: own entries, then the shadow, area, directional, IES, projector, shapes, stochastic, layers and contact hooks' (or undefined). */
   private readonly parts: (GPUBindGroupEntry[] | undefined)[] = [];
   /** Joined bindings without (0) and with (1) shadows: the parts they were joined from, then the result last. */
   private readonly joined: ((GPUBindGroupEntry[] | undefined)[] | undefined)[] = [];
@@ -291,6 +292,14 @@ export class Clustered implements EnginePlugin {
   }
   set layers(hook: ClusteredLightTerm | undefined) {
     this.layersHook = hook;
+    this.reset();
+  }
+  /** Contact shadows of the point and spot lights (`@margoengine/clustered/contact`); left out with the shadows (see `add`). */
+  get contact(): ClusteredLightTerm | undefined {
+    return this.contactHook;
+  }
+  set contact(hook: ClusteredLightTerm | undefined) {
+    this.contactHook = hook;
     this.reset();
   }
   /** The point and spot lights last given to `setLights`, in order (a frozen copy of the list; the light objects are the caller's). */
@@ -500,6 +509,7 @@ export class Clustered implements EnginePlugin {
     parts[6] = this.shapesHook?.bindings();
     parts[7] = shadows && (this.shadowHook || this.localShadows) ? this.stochasticHook?.bindings() : undefined;
     parts[8] = this.layersHook?.bindings();
+    parts[9] = shadows ? this.contactHook?.bindings() : undefined;
     const count = parts.length;
     let any = false;
     for (let i = 1; i < count; i++) any ||= !!parts[i];
@@ -535,6 +545,7 @@ export class Clustered implements EnginePlugin {
       ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay, receive, {
           ...more,
           stochastic: this.stochasticHook,
+          contact: this.contactHook,
         })
       : clusteredSampling(group, undefined, this.areaHook, false, this.decay, false, more);
   }
@@ -543,7 +554,8 @@ export class Clustered implements EnginePlugin {
    * meshes with `receiveShadow` false skip local-light shadows while the engine has one.
    */
   shader(source: string, group = 0, shadows = true): string {
-    const receive = shadows && !!(this.localShadows || this.shadowHook) && unshadowedCore(this.engine, source),
+    const receive =
+        shadows && !!(this.localShadows || this.shadowHook || this.contactHook) && unshadowedCore(this.engine, source),
       key = `${shadows ? group : -1 - group}${receive}`;
     let cache = this.shaders.get(key);
     const cached = cache?.get(source);

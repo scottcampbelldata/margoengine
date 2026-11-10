@@ -11,6 +11,7 @@ import { AreaShapes } from '../packages/clustered/dist/area-shapes.js';
 import { ShadowAtlas } from '../packages/clustered/dist/shadow-atlas.js';
 import { CubeProjectorLights } from '../packages/clustered/dist/cube-projector.js';
 import { StochasticLights } from '../packages/clustered/dist/stochastic.js';
+import { ContactLights } from '../packages/clustered/dist/contact.js';
 import { Terrain } from '../packages/terrain/dist/index.js';
 
 declare const GPUBufferUsage: {
@@ -38,6 +39,8 @@ type Config = {
   meshes: string[];
   /** Clipmap terrain over x, z in -4..4: flat at y 0 with a ridge 2 high over |x| < 0.5, a LocalShadows caster. */
   terrain?: boolean;
+  /** ContactLights options (besides `lights`): contact shadows on the point lights, from the shared scene depth. */
+  contact?: Record<string, unknown>;
 };
 const canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, {
@@ -65,9 +68,11 @@ mesh('block', [1, 0.5, 1], [0, 1.25, 0]); // y 1 to 1.5
 mesh('bar', [1, 0.05, 6], [0, 1.5, 0]); // a long bar, x -0.5 to 0.5, centred at y = 1.5
 mesh('ceiling', [8, 0.1, 8], [0, 6.05, 0]); // bottom at y = 6
 mesh('topBar', [1, 0.05, 6], [0, 4.5, 0]);
+mesh('pebble', [0.4, 0.1, 0.4], [0, 0.05, 0]); // lying on the floor: x and z -0.2 to 0.2, y 0 to 0.1
 let lights: Clustered | undefined, local: LocalShadows | undefined, suns: DirectionalLights | undefined;
 let areas: AreaLights | undefined,
   terrain: Terrain | undefined,
+  contact: ContactLights | undefined,
   shader = '';
 let shapes: AreaShapes | undefined;
 let cookies: CubeProjectorLights | undefined;
@@ -101,7 +106,8 @@ engine.frameGraph.add({
   },
 });
 function scene(config: Config) {
-  for (const plugin of [stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
+  for (const plugin of [contact, stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
+  contact = undefined;
   stochastic = undefined;
   cookies = undefined;
   shapes = undefined;
@@ -136,6 +142,7 @@ function scene(config: Config) {
     if (config.projectors) cookies.setProjectors(config.projectors as never);
   }
   if (config.stochastic) stochastic = StochasticLights.attach(engine, { lights, quad: false, temporal: false });
+  if (config.contact) contact = ContactLights.attach(engine, { lights, ...config.contact });
 }
 async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   device.pushErrorScope('validation');
@@ -152,7 +159,7 @@ async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
 }
 const kinds: Record<number, GPUBindGroupLayoutEntry> = {};
 for (const binding of [4, 14, 151, 155]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
-for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150, 152])
+for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 145, 150, 152])
   kinds[binding] = { binding, visibility: 0, buffer: { type: 'read-only-storage' } };
 for (const binding of [15, 29])
   kinds[binding] = { binding, visibility: 0, texture: { sampleType: 'depth', viewDimension: '2d-array' } };
@@ -182,6 +189,10 @@ async function messages(code: string): Promise<string[]> {
       for (let i = 0; i < frames; i++) engine.render();
       return { stats: local ? { ...local.stats } : undefined, shader };
     });
+  },
+  /** ContactLights.setStrengths of the current scene. */
+  contactStrengths(values: (number | null)[]) {
+    contact!.setStrengths(values);
   },
   /** Moves the camera (camera-fitted cascades follow it). */
   camera(position: [number, number, number], target: [number, number, number] = [0, 0, 0]) {
@@ -265,7 +276,7 @@ async function messages(code: string): Promise<string[]> {
     cookies!.setCubes(entries as never);
   },
   dispose() {
-    for (const plugin of [stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
+    for (const plugin of [contact, stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
     engine.dispose();
   },
 };

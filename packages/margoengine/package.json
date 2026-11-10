@@ -647,6 +647,10 @@
       "types": "./dist/clustered/layers.d.ts",
       "import": "./dist/clustered/layers.js"
     },
+    "./clustered/contact": {
+      "types": "./dist/clustered/contact.d.ts",
+      "import": "./dist/clustered/contact.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"

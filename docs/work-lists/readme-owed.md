@@ -1215,3 +1215,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 176 job 3): document generated sciviz/fits, /mrc and /ometiff aliases and additive decoders/tiff API; examples deferred.
 
 - @margoengine/biomes (list 3 batch 63 job 2): document /view `water.flow` (true or { discharge, substeps }) with `rivers`, and /rivers `riverSources`; examples deferred.
+
+| @margoengine/clustered | contact: copy-paste example of `ContactLights.attach(engine, {lights})`, `setStrengths`, and `depth: () => stack.depthTexture` beside SSAO | batch-53 job 1 |
+| margoengine | Generated clustered/contact alias | batch-53 job 1 |

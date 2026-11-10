@@ -108,6 +108,10 @@
     "./layers": {
       "types": "./dist/layers.d.ts",
       "import": "./dist/layers.js"
+    },
+    "./contact": {
+      "types": "./dist/contact.d.ts",
+      "import": "./dist/contact.js"
     }
   },
   "files": [

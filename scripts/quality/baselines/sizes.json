@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14554488,
+  "total": 14560646,
   "history": [
     {
       "date": "2026-10-24",
@@ -7781,6 +7781,12 @@
       "commit": "644750be2",
       "reason": "list 3 batch 63 job 2: biomes/view water.flow attaches water/rivers",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "be46a6ad5",
+      "reason": "clustered/contact: new entry, contact shadows per local light, batch 53 job 1",
+      "grew": 1
     }
   ],
   "items": {
@@ -7930,6 +7936,7 @@
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 3962,
     "@margoengine/clustered/budget": 723,
+    "@margoengine/clustered/contact": 6158,
     "@margoengine/clustered/cube-projector": 4716,
     "@margoengine/clustered/directional": 2535,
     "@margoengine/clustered/flicker": 845,

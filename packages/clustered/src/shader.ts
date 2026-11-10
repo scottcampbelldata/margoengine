@@ -71,6 +71,11 @@ export interface ClusteredSamplingHooks {
     declarations(group: number): string;
     lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
   };
+  /**
+   * A per-light shadow factor like `terms` (`Clustered.contact`), also in the loop's `n` and `pixel`; skipped, as the
+   * shadows are, on a core mesh with `receiveShadow` false.
+   */
+  contact?: { declarations(group: number): string; readonly term: string };
 }
 // BRDF: GGX D and separable Smith-GGX G (Walter et al. 2007 eq. 33-34), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
 // (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
@@ -95,7 +100,7 @@ export function clusteredSampling(
   integratedShadows = false,
   decay = false,
   receive = false,
-  { directional, terms = [], shapes, stochastic }: ClusteredSamplingHooks = {},
+  { directional, terms = [], shapes, stochastic, contact }: ClusteredSamplingHooks = {},
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
@@ -107,7 +112,7 @@ export function clusteredSampling(
     visibility =
       (hook ? term('clusterShadow(light,position,n)') : '') +
       (shadows ? term('clusterShadowVisibility(light,position,n)') : ''),
-    head = `${terms.length || sampled ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
+    head = `${terms.length || sampled || contact ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=${ggxD};
@@ -116,7 +121,7 @@ export function clusteredSampling(
     ${decay ? decayTerms : legacyTerms}`,
     start =
       '\n  let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;',
-    radiance = `${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}`;
+    radiance = `${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${contact ? term(contact.term) : ''}`;
   const code =
     declarations(group) +
     (hook ? hook.declarations(group) : '') +
@@ -125,6 +130,7 @@ export function clusteredSampling(
     terms.map((t) => t.declarations(group)).join('') +
     (shapes ? shapes.declarations(group, hook?.shapeShadow ? term(hook.shapeShadow) : undefined) : '') +
     (sampled ? sampled.declarations(group) : '') +
+    (contact ? contact.declarations(group) : '') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}

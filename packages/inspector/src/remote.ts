@@ -170,7 +170,8 @@ export function relayTransport(options: RelayTransportOptions): RemoteTransport 
             body: data,
             signal: lifetime.signal,
           });
-          if (!response.ok) throw new Error(`Relay refused a message (${response.status}); check the url and token`);
+          if (!response.ok)
+            throw margoError('failed', `Relay refused a message (${response.status}); check the url and token`);
         } catch (error) {
           fail(error);
         }
@@ -183,7 +184,7 @@ export function relayTransport(options: RelayTransportOptions): RemoteTransport 
         try {
           const response = await fetch(`${base}/events`, { headers, signal });
           if (!response.ok || !response.body)
-            throw new Error(`Relay refused the stream (${response.status}); check the url and token`);
+            throw margoError('failed', `Relay refused the stream (${response.status}); check the url and token`);
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let rest = '';
           for (;;) {
@@ -193,7 +194,7 @@ export function relayTransport(options: RelayTransportOptions): RemoteTransport 
             rest = lines.pop()!;
             for (const line of lines) if (line) handler(line);
           }
-          if (!signal.aborted) throw new Error('Relay closed the stream; restart the relay and reconnect');
+          if (!signal.aborted) throw margoError('failed', 'Relay closed the stream; restart the relay and reconnect');
         } catch (error) {
           if (!signal.aborted) fail(error);
         }
@@ -331,7 +332,7 @@ export class RemoteTarget implements EnginePlugin, Disposable {
     let reply: Reply;
     try {
       if (this.options.token !== undefined && m.token !== this.options.token)
-        throw new Error('Wrong or missing token; pass the token the target page was given');
+        throw margoError('state', 'Wrong or missing token; pass the token the target page was given');
       reply = { [tag]: version, id: m.id, ok: true, result: await this.handle(m.op, m.args ?? {}) };
     } catch (error) {
       reply = { [tag]: version, id: m.id, ok: false, error: (error as Error)?.message ?? String(error) };

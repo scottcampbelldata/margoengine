@@ -4,6 +4,7 @@ import { Clustered, clusteredSampling } from '../dist/index.js';
 import { LocalShadows } from '../dist/shadows.js';
 import { MAX_STOCHASTIC_SAMPLES, StochasticLights } from '../dist/stochastic.js';
 import { CubeProjectorLights } from '../dist/cube-projector.js';
+import { ContactLights } from '../dist/contact.js';
 import { estimate, exact, rng } from './stochastic-reference.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -53,6 +54,31 @@ test('cube cookies and stochastic shadows compose with distinct shader and resou
   } finally {
     stochastic.dispose();
     cookies.dispose();
+    lights.dispose();
+  }
+});
+test('contact shadows and stochastic shadows compose: both hooks bind, and sampled lights keep the contact factor', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [1, 1, 1], shadows: { resolution: 64 } }),
+    stochastic = StochasticLights.attach(h.engine, { lights, quad: false }),
+    contact = ContactLights.attach(h.engine, { lights, depth: () => undefined });
+  lights.setLights([{ position: [0, 2, 0], range: 6, castShadow: true }]);
+  try {
+    h.frame();
+    assert.equal(lights.stochastic, stochastic);
+    assert.equal(lights.contact, contact);
+    const entries = lights.bindings().map((entry) => entry.binding);
+    assert.equal(new Set(entries).size, entries.length, 'each composed resource needs its own binding');
+    assert.ok(entries.includes(145), 'the contact binding joins after the stochastic one');
+    for (const binding of stochastic.bindings()) assert.ok(entries.includes(binding.binding));
+    const declarations = lights.pbr(0).declarations;
+    assert.match(declarations, /clusterStochastic:ClusterStochastic/);
+    assert.match(declarations, /@binding\(145\) var<storage,read> clusterContactData/);
+    assert.ok(declarations.includes('*clusterContact(index,light,l,position,n,pixel)'), 'the radiance carries the contact factor');
+    assert.ok(!lights.bindings(false).some((b) => b.binding === 145), 'receiveShadow false: no contact binding');
+  } finally {
+    contact.dispose();
+    stochastic.dispose();
     lights.dispose();
   }
 });

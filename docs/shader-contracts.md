@@ -57,7 +57,7 @@ Core-mesh effects reserve group 0 binding 18 for TAA's jittered camera and 19 fo
 `LODFade` (`@margoengine/lod/fade`) takes group 0 binding 95 and inter-stage location 14 on core meshes, and binding 97
 in the lit shader's group on models.
 In the lit shader's group (0 for core meshes, 2 for gltf-pro), clustered's directional lights use 141, IES profiles 142
-and projector images 143 (storage buffers, no textures), and environment's HemisphereLight 144 (a uniform). gltf-pro's
+and projector images 143, contact shadows 145 (storage buffers, no textures), and environment's HemisphereLight 144 (a uniform). gltf-pro's
 `sky` lighting hook replaces its built-in sky gradient (`mix(vec3f(0.35,0.3,0.25),vec3f(1),...)` times `f.radiance.w`)
 wherever a shader writes it; `packages/shared/pbr-hooks.js` finds it by that text, so it must stay byte for byte.
 Terrain color patches share one mesh-ID varying and one per-pixel block; inside it `i.color`, `i.material` and `n` are

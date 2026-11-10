@@ -56,6 +56,8 @@ class Clustered implements EnginePlugin {
     set stochastic(hook: ClusteredStochastic | undefined);
     get layers(): ClusteredLightTerm | undefined;
     set layers(hook: ClusteredLightTerm | undefined);
+    get contact(): ClusteredLightTerm | undefined;
+    set contact(hook: ClusteredLightTerm | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
