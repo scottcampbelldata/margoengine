@@ -2621,3 +2621,7 @@ Build packages and run node --test --test-timeout=120000 packages/tween/test/pro
 ### Mixed/nested timeline samples (batch 215 job 3)
 
 Build packages; run node --test --test-timeout=120000 packages/tween/test/full-timeline.test.js. Entry bytes use bundleBytes on packages/tween/dist/full-timeline.js and gzipSync. Tests use analytic deltas and values without real-time assertions.
+
+### Tween control reproduction (batch 215 job 4)
+
+Build packages, then node --test --test-timeout=120000 packages/tween/test/control.test.js. All clocks are caller-driven. Measure packages/tween/dist/control.js with bundleBytes and gzipSync.

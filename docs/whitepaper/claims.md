@@ -3098,3 +3098,7 @@ Optional tween/props supplies to, from, fromTo, relative arithmetic and property
 ### Hierarchical mixed tween timelines (batch 215 job 3)
 
 Optional tween/timeline supplies mixed scalar/array/path/custom clips and nested independent speed/repeat/yoyo clocks, covering the requested GSAP/anime nesting row. packages/tween/test/full-timeline.test.js proves overlapping start capture, merged callback order and sample values, repeat overshoot equivalence, cycles/parent ownership, reverse seeks, exact aborts, replay promises and error propagation. Entry 3184 B gzip; no speed result claimed.
+
+### Target/key tween control (batch 215 job 4)
+
+Optional tween/control supplies target/key kills and overwrite, per-operation pause/play/speed and a world-wide time scale, meeting the requested control row. packages/tween/test/control.test.js verifies atomic replacement, delayed/paused registration, remaining-key independence, exact cancellation and grouped callbacks. New entry 3714 B gzip; no core/stage change or performance claim.

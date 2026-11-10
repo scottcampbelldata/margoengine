@@ -53,6 +53,10 @@
     "./timeline": {
       "types": "./dist/full-timeline.d.ts",
       "import": "./dist/full-timeline.js"
+    },
+    "./control": {
+      "types": "./dist/control.d.ts",
+      "import": "./dist/control.js"
     }
   },
   "files": [

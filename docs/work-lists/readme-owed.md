@@ -84,3 +84,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: tween/props alias (batch 215 job 2).
 - @margoengine/tween: optional Timeline mixed clips, nesting/local speed, labels, replay promises, seek vs playback callbacks and cancellation (batch 215 job 3).
 - margoengine: tween/timeline alias (batch 215 job 3).
+- @margoengine/tween: TweenControl world, key vs target overwrite, partial cancellation promises, pause and global/local speed (batch 215 job 4).
+- margoengine: tween/control alias (batch 215 job 4).

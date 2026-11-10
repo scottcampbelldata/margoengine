@@ -3782,3 +3782,7 @@ New tween/props entry: 3223 B gzip from 0 B. Numeric writable object/vector prop
 ### Full tween timeline (batch 215 job 3)
 
 New tween/timeline entry: 3184 B gzip from 0 B. A separate Timeline class holds scalar, array, custom, path and nested timelines. Local speeds are finite > 0 (default 1), repeats integers >= 0 or Infinity, yoyo false. Attached children have one owning parent; their clocks are sampled by that parent. Calls/completions run on playback crossings and never on seek. Nested durations include repeats and divide by child speed. Infinite children make a parent endless; an endless zero-duration repeat rejects. Cancellation freezes the tree, rejects observed finished promises, and preserves signal.reason. Callback errors propagate and reject the owner. Core/stage unchanged.
+
+### Tween control world (batch 215 job 4)
+
+Optional tween/control: 3714 B gzip (previously 0 B). TweenControl is an explicit world, with global timeScale 1 by default and no module-global state. Local speed defaults to 1; either speed may be zero to hold even instantaneous work. overwrite defaults to auto (matching keys, including delayed/paused work), all kills every target key, false coexists. Partial kills preserve surviving channels and their original clock. Whole removal rejects the group's promise; repeats/completions notify once per group. New requests validate before overwrite.
