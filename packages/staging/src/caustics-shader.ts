@@ -17,7 +17,7 @@ fn deposit(pixel:vec2i,value:f32){
  let side=u32(state.size.w);if(id.x>=side*side){return;}
  let uv=(vec2f(f32(id.x%side),f32(id.x/side))+.5)/f32(side)-.5;
  let aperture=state.center.xyz+vec3f(uv.x*state.size.x,state.center.w,uv.y*state.size.y);
- var origin=aperture;var direction=-normalize(state.light.xyz);var flux=abs(direction.y)/f32(side*side);
+ var origin=aperture;var direction=-state.light.xyz;var flux=abs(direction.y)/f32(side*side);
  if(state.light.w>0.0){
   origin=state.light.xyz;direction=normalize(aperture-origin);
   let delta=aperture-origin;flux=abs(direction.y)*state.misc.x/dot(delta,delta)/f32(side*side);

@@ -2,6 +2,7 @@ import { trackSpecLayer } from './spec-hooks.js';
 // Optional volume lighting. References and derivations: docs/clean-room.md, batch 173 job 3.
 import { invertMatrix } from '@margoengine/math/mat4';
 import { rangeError, fault } from '../../shared/errors.js';
+import { unitLight } from '../../shared/unit-light.js';
 import type { Figure } from './figure.js';
 import type { VolumeLayer } from './volume.js';
 import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
@@ -276,13 +277,10 @@ export class CinematicVolume implements Drawable {
         : [0, 0, 0, 0],
       64,
     );
-    v.set(
-      [
-        ...(o.lightDirection ?? [0.4, 0.6, 1]),
-        o.shadows ? Math.max(1, Math.round((o.shadows.steps ?? 32) * (this.#renderer.samplingScale ?? 1))) : 0,
-      ],
-      68,
-    );
+    unitLight(v, 68, [
+      ...(o.lightDirection ?? [0.4, 0.6, 1]),
+      o.shadows ? Math.max(1, Math.round((o.shadows.steps ?? 32) * (this.#renderer.samplingScale ?? 1))) : 0,
+    ]);
     v.set([0, pt ? (pt.anisotropy ?? 0) : 0, pt ? (pt.bounces ?? 8) : 0, pt ? (pt.albedo ?? 0.9) : 0], 72);
     v.set([...(o.ambient ?? [0.3, 0.3, 0.3]), 0], 76);
     v.set([...(o.light ?? [0.7, 0.7, 0.7]), 0], 80);

@@ -83,7 +83,7 @@ fn ambientVisibility(p: vec3f) -> f32 {
 }
 fn shadow(p: vec3f) -> f32 {
   if (u.light.w<0.5) { return 1.0; }
-  cost.y+=1u; return transmittance(p,normalize(u.light.xyz),1e20,u32(u.light.w));
+  cost.y+=1u; return transmittance(p,u.light.xyz,1e20,u32(u.light.w));
 }
 fn phase(cosine: f32) -> f32 {
   let g=u.transport.y;
@@ -129,7 +129,7 @@ fn trace(origin: vec3f, direction: vec3f) -> vec4f {
     }
     if (!collision) { if (bounce>0u) { radiance+=throughput*u.ambient.rgb; } break; }
     cost.w+=1u; p+=bd*distance; alpha=1.0; throughput*=c.rgb*u.transport.w;
-    radiance+=throughput*u.direct.rgb*phase(dot(d,normalize(u.light.xyz)))*shadow(p);
+    radiance+=throughput*u.direct.rgb*phase(dot(d,u.light.xyz))*shadow(p);
     d=scatter(d);
     // Russian roulette preserves energy and bounds low-throughput paths.
     if (bounce>=2u) {

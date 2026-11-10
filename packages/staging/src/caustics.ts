@@ -4,6 +4,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Pa
 import type { GPUMeshBVH } from '@margoengine/bvh/gpu';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { applyView } from '../../shared/view-rect.js';
+import { unitLight } from '../../shared/unit-light.js';
 import { causticPhotons, causticFloor } from './caustics-shader.js';
 declare const GPUBufferUsage: {STORAGE:number;UNIFORM:number;COPY_DST:number;COPY_SRC:number;MAP_READ:number};
 declare const GPUMapMode: {READ:number};
@@ -164,7 +165,7 @@ export class ProductCaustics implements EnginePlugin {
     const s=this.settings(),o=this.options;
     if(Math.fround(Math.fround(s.p[1])+Math.fround(s.height))<=r.maxY)throw rangeError('Emission plane intersects the product; increase height above every source vertex','arguments');
     if(s.resolution!==r.mapSide)throw rangeError('Caustic resolution is fixed per geometry preparation; use setGeometry after changing it','arguments');
-    const v=this.values;v.set(c.camera.matrix);v.set([...s.p,s.height],16);v.set([...s.size,s.resolution,s.side],20);v.set([...(o.lightPosition??s.d),o.lightPosition?1:0],24);v.set([s.ior,s.exit,o.backside===false?0:1,o.maxEvents??8],28);
+    const v=this.values;v.set(c.camera.matrix);v.set([...s.p,s.height],16);v.set([...s.size,s.resolution,s.side],20);if(o.lightPosition)v.set([...o.lightPosition,1],24);else unitLight(v,24,[...s.d,0]);v.set([s.ior,s.exit,o.backside===false?0:1,o.maxEvents??8],28);
     v.set([...(o.color??[1,1,1]).map(x=>x*(o.intensity??1)),0],32);v.set([Math.max(...s.size)**2/4,s.radius,Math.max(...s.size)*1e-5,0],36);
     const key=Array.from(v.subarray(16,32)).join('|');if(key!==this.key){this.count=0;this.key=key;}
     c.device.queue.writeBuffer(r.uniform,0,v);
