@@ -1,6 +1,9 @@
 import { PBRModel, closeImages, type PreparedGeometry } from '@margoengine/gltf-pro/model';
 import { MargoError } from '@margoengine/math/errors';
 
+/** The quaternion each node copy passes to setQuaternion (which reads it and keeps nothing). */
+const rotation = [0, 0, 0, 1];
+
 /**
  * A second, independent copy of a glTF-pro model, with its own nodes (so its own
  * skeleton) that an `Animation` from this package can play apart from the source (`Animation.attach(clone)`). The
@@ -34,9 +37,23 @@ export async function cloneModel(model: PBRModel): Promise<PBRModel> {
     const t = engine.store.transforms,
       copy = (from: (typeof model.nodes)[number], to: (typeof model.nodes)[number]) => {
         const a = from.id;
-        to.setPosition([t.x[a], t.y[a], t.z[a]])
-          .setScale([t.sx[a], t.sy[a], t.sz[a]])
-          .setQuaternion([t.qx[a], t.qy[a], t.qz[a], t.qw[a]]);
+        // Through the transform refs and one quaternion scratch: no arrays per node, the same store writes as the
+        // setters. A value the setters refuse (written into the store directly) still gets their own error.
+        const x = t.x[a],
+          y = t.y[a],
+          z = t.z[a],
+          sx = t.sx[a],
+          sy = t.sy[a],
+          sz = t.sz[a];
+        if (Number.isFinite(x + y + z)) to.position.set(x, y, z);
+        else to.setPosition([x, y, z]);
+        if (Number.isFinite(sx + sy + sz) && sx !== 0 && sy !== 0 && sz !== 0) to.scale.set(sx, sy, sz);
+        else to.setScale([sx, sy, sz]);
+        rotation[0] = t.qx[a];
+        rotation[1] = t.qy[a];
+        rotation[2] = t.qz[a];
+        rotation[3] = t.qw[a];
+        to.setQuaternion(rotation);
         to.visible = from.visible;
       };
     copy(model.root, clone.root);

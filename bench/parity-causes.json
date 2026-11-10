@@ -129,7 +129,7 @@
     ]
   },
   "12.7": {
-    "cause": "two ticks per copy became one (perf-history entry 59): 16.8 -> 14.3 ms against three's 8.1, busy machine. The last tick went on 2026-11-06 (a copy takes its source's static batches); that time is not measured yet. Before that: every cloneModel copy repacked its vertices (now shared per asset), core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children), and every copy uploaded its own vertex and index buffers, re-baked its static parts and made a view and sampler per map slot (now counted per asset, reused and cached). Still slower (CPU profile): installBatches runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 of 17.6 ms), then per-copy uniforms and bind groups and core node creation; three clones on the CPU only",
+    "cause": "two ticks per copy became one (perf-history entry 59): 16.8 -> 14.3 ms against three's 8.1, busy machine. The last tick went on 2026-11-06 (a copy takes its source's static batches); that time is not measured yet. Before that: every cloneModel copy repacked its vertices (now shared per asset), core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children), and every copy uploaded its own vertex and index buffers, re-baked its static parts and made a view and sampler per map slot (now counted per asset, reused and cached). Still slower (CPU profile): installBatches runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 of 17.6 ms), then per-copy uniforms and bind groups and core node creation; three clones on the CPU only Batch 161 job 4 (counted in a Node test, RobotExpressive: 74 nodes, 19 primitives on 14 nodes): each copy passed 225 fresh arrays to the node setters (a position, a scale and a quaternion per node and the root), and the gltf-pro constructor filtered all 19 primitives once per primitive node (14 passes). The copy now writes through the transform refs and one quaternion scratch (1 array a copy, 0 setPosition and setScale calls) and the constructor groups primitives by node in one pass (0 filter passes), with the same transform, Euler, visibility, parent, weight and vertex sharing as the parent's copy (packages/animation/tests/clone-work.test.js). What stays per copy (75 core nodes, a uniform slot and bind groups per primitive, node disposal by destroy) is an accepted difference in work: a copy is drawable at once, three's clone builds its GPU state at the first render (docs/limits.md); the like-for-like row 'clone + first draw' is pending. Timing pending the quiet rerun",
     "knownBug": "clonemodel-slower-than-threes-clone",
     "fixes": [
       {
@@ -146,6 +146,11 @@
         "commit": "641246d3",
         "tradeoff": "a model rewrites a geometry buffer in place only while no other copy holds it; the first edit of a shared one uploads a new buffer",
         "rerun": "npm run bench -- parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      },
+      {
+        "commit": "perf(gltf-pro,animation): cloneModel copies nodes without arrays, primitives grouped in one pass",
+        "tradeoff": "none; a store value the setters refuse still gets their own error",
+        "rerun": "node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail"
       }
     ]
   },

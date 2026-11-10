@@ -3388,3 +3388,23 @@ The [volume comparison](../sciviz-rivals.md) adds --runs=1 without clocks, full 
 ## Batch 182 sciviz rival harness (2026-11-10)
 
 `npm run sciviz:compare` covers volume, isosurface, scatter, line, heatmap, streamlines, graph and tiles against VTK.js 38.0.5, Plotly.js 4.2.0, deck.gl 9.4.1, ECharts-GL 2.1.0, regl-scatterplot 1.16.0 and Cosmograph 2.5.1, installed outside the repository. The smoke records image differences, repeat equality and public API counts only ([sciviz-vs-rivals](sciviz-vs-rivals.md)). No elapsed-time result; timing pending the quiet rerun.
+
+### Batch 161 job 4: cloneModel copies nodes without arrays (row 12.7)
+
+- Cause, counted in a Node test on RobotExpressive (74 nodes, 19 primitives on 14 nodes, the `p-skeleton-clone` copy):
+  each copy passed 225 fresh arrays to the node setters (a position, a scale and a quaternion per node and the root;
+  core `setScale` also scans its argument with a closure), and the gltf-pro `PBRModel` constructor, which every copy
+  runs, filtered all 19 primitives once per primitive node (14 passes, 266 element visits).
+- Fix: `cloneModel` writes positions and scales through `node.position.set` and `node.scale.set` and quaternions from
+  one scratch array through `setQuaternion` (the same store writes and Euler lanes); a store value the setters refuse
+  still goes through them and throws their error. The constructor groups primitives by node in one pass, nodes in
+  first-primitive order and primitives in model order, as before.
+- Work counts, failing on the parent: setter arrays per copy 1 (parent 225), `setPosition` and `setScale` calls beyond
+  the constructor's 0 (parent 75 each), filter passes over the primitives 0 (parent 14)
+  (`packages/animation/tests/clone-work.test.js`). Identical output: every copied node's transform lanes, Euler lanes,
+  visibility and parent equal a copy made the parent's way, bit for bit; weights equal and packed vertices shared; each
+  node's mesh source lists the same primitives in the same order.
+- Accepted difference in work: a copy still creates its 75 core nodes, a uniform slot and bind groups per primitive,
+  and `destroy` disposes them, because a copy is drawable at once; three's clone makes JavaScript objects only and builds
+  GPU state at the first render (`docs/limits.md`). The like-for-like row "clone + first draw" is pending.
+- Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).

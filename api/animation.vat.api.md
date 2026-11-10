@@ -261,5 +261,6 @@ interface Track {
     interpolation: Interpolation;
     sample: Float32Array;
     rotation?: number[];
+    cursor: number;
 }
 ```

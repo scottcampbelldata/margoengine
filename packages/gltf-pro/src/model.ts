@@ -2318,9 +2318,15 @@ export class PBRModel implements EnginePlugin {
         throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });
-      for (const node of new Set(this.primitives.map((p) => p.node))) {
-        const model = this,
-          primitives = this.primitives.filter((p) => p.node === node);
+      // The primitives of each node, in one pass: nodes in first-primitive order, primitives in model order.
+      const byNode = new Map<PBRPrimitive['node'], PBRPrimitive[]>();
+      for (const p of this.primitives) {
+        const list = byNode.get(p.node);
+        if (list) list.push(p);
+        else byNode.set(p.node, [p]);
+      }
+      for (const [node, primitives] of byNode) {
+        const model = this;
         const source: MeshSource = {
           model,
           node,

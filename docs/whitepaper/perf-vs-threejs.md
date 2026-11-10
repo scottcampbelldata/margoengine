@@ -468,3 +468,12 @@ copy's bones (2 before), the same bytes; perf-history "Batch 161 job 3". Timing 
 ## Batch 182 scientific volume scope
 
 [VTK.js controls](../sciviz-rivals.md) retain the historical loss and document its sampling/lighting mismatch. Work-count proof removes two matrix allocations per VolumeLayer.prepare with identical uniform bytes. This is a VTK.js row, not a three.js comparison. Timing pending the quiet rerun; no new speed result.
+
+## cloneModel without per-node arrays (batch 161 job 4)
+
+Row 12.7 (`p-skeleton-clone`) stays slower until the quiet rerun. Each RobotExpressive copy passed 225 fresh arrays to
+the node setters and the gltf-pro constructor filtered all primitives once per primitive node (14 passes); a copy now
+uses one scratch array and groups primitives in one pass (0 filter passes), with the same node bits, structure and
+sharing (`packages/animation/tests/clone-work.test.js`); perf-history "Batch 161 job 4". The GPU state each copy builds
+up front (uniform slot and bind groups) is an accepted difference: three builds it at the first render. Like-for-like
+row "clone + first draw": timing pending the quiet rerun (not yet built).

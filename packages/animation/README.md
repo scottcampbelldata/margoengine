@@ -93,6 +93,8 @@ Animation.attach(copy, { skeleton: hero }); // moves with hero, whatever moves h
 animation.play(0);
 ```
 
+A copy is ready to draw when `cloneModel` resolves: it makes its own nodes, uniforms and bind groups up front (three's clone defers that to the first render) and writes the source's node transforms straight into the transform store, with no arrays per node.
+
 ## Skeletons and skins from raw data
 
 `Skeleton` and `Skin` rig a mesh from plain arrays, for editors that author bones and weights themselves (no glTF

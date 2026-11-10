@@ -2405,6 +2405,9 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   creates objects only.
 - **Plan:** rerun the row in the quiet pass. Whatever is left is `destroy`, `setup` and node creation: make those
   cheaper, or publish the rest as an accepted difference if it is work three does not do.
+- **Batch 161 job 4:** a copy no longer passes 225 arrays to the node setters and the constructor no longer filters
+  the primitives per node (`packages/animation/tests/clone-work.test.js`). The GPU state a copy builds up front is
+  published as an accepted difference (`docs/limits.md`, "Work per `cloneModel` copy"). Timing pending the quiet rerun.
 
 ### GPU picking waits for one readback per pick
 
