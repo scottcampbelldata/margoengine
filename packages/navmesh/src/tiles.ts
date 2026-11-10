@@ -351,8 +351,17 @@ export class TiledNavMesh implements NavSurface {
       obstacles = [...this.obstacles.values()].filter(
         (box) => box.max[0] >= x0 && box.min[0] <= x1 && box.max[2] >= z0 && box.min[2] <= z1,
       ),
-      built = solve(points, triangles, { ...this.config, obstacles }, grid);
+      built = this.buildTile(points, triangles, { ...this.config, obstacles }, grid);
     return typeof built === 'string' ? null : built;
+  }
+  /** Optional build backends override this tile-local solve; the default is the TypeScript pipeline. */
+  protected buildTile(
+    points: Float32Array,
+    triangles: Uint32Array,
+    config: Required<NavigationOptions>,
+    grid: Grid,
+  ): Built | string {
+    return solve(points, triangles, config, grid);
   }
   /** The voxel grid of a tile: its cells and the margin around them. */
   protected gridOf(tile: { x: number; z: number }): Grid {

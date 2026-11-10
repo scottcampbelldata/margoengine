@@ -1922,6 +1922,10 @@
       "types": "./dist/navmesh/queries.d.ts",
       "import": "./dist/navmesh/queries.js"
     },
+    "./navmesh/wasm": {
+      "types": "./dist/navmesh/wasm.d.ts",
+      "import": "./dist/navmesh/wasm.js"
+    },
     "./net": {
       "types": "./dist/net.d.ts",
       "import": "./dist/net.js"

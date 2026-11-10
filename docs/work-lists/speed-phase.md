@@ -379,3 +379,5 @@ Batch133 still owes whole-corpus per-file cold/warm decode minima, compile/
 instantiate/startup timings and resolution of every retained warm loss against
 the prebuilt. Non-timed RSS and cold work counts do not substitute for those
 targets. Both default prebuilts and removal job5 wait for passing speed phase.
+
+Batch 252 job 4: quiet-machine end-to-end navmesh build and tiled build worker startup/transfer/codec/raster/polygonization timings against the TypeScript builders. All polygons must remain byte-identical. Current evidence is deterministic: equal cell/intersection work and three vector plus three scalar interpolation operations instead of nine scalar operations per intersection. No wall-clock A/B ran in the build phase.

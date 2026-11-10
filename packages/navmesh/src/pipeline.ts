@@ -534,8 +534,9 @@ export function solve(
   triangles: Uint32Array,
   config: Required<NavigationOptions>,
   grid: Grid,
+  rasterize: typeof voxelise = voxelise,
 ): Built | string {
-  const { spans, walkableTriangles, maxRise } = voxelise(points, triangles, config, grid);
+  const { spans, walkableTriangles, maxRise } = rasterize(points, triangles, config, grid);
   if (!walkableTriangles.length) return 'no triangle is flatter than walkableSlopeAngle';
   const surface =
     config.detailSampleDist > 0
@@ -554,12 +555,12 @@ export function solve(
 }
 
 /** Step 1 of the pipeline: the solid spans of `grid`. */
-function voxelise(
+export function voxelise(
   points: Float32Array,
   triangles: Uint32Array,
   config: Required<NavigationOptions>,
   grid: Grid,
-): { spans: Spans; walkableTriangles: number[]; maxRise: number } {
+): { spans: Spans; walkableTriangles: number[]; maxRise: number; intersections: number; cells: number } {
   const { width, depth, ox, oy, oz, cx, cz, floor } = grid,
     cs = config.cs,
     ch = config.ch,
@@ -571,7 +572,9 @@ function voxelise(
     cosSlope = Math.cos((config.walkableSlopeAngle * Math.PI) / 180),
     walkableTriangles: number[] = [],
     buffers = [0, 1, 2, 3].map(() => new Float64Array(3 * 12));
-  let maxRise = 0;
+  let maxRise = 0,
+    intersections = 0,
+    cells = 0;
   const clip = (from: Float64Array, n: number, to: Float64Array, axis: number, bound: number, sign: number) => {
     let m = 0;
     for (let i = 0; i < n; i++) {
@@ -585,6 +588,7 @@ function voxelise(
         m++;
       }
       if (di >= 0 !== dj >= 0) {
+        intersections++;
         const t = di / (di - dj);
         for (let k = 0; k < 3; k++) to[3 * m + k] = from[3 * i + k] + t * (from[3 * j + k] - from[3 * i + k]);
         m++;
@@ -642,6 +646,7 @@ function voxelise(
       const rows = clip(slab, clip(corners, 3, slab, 2, oz + (cz + z) * cs, 1), strip, 2, oz + (cz + z + 1) * cs, -1);
       if (!rows) continue;
       for (let x = cx0; x <= cx1; x++) {
+        cells++;
         const m = clip(slab, clip(strip, rows, slab, 0, ox + (cx + x) * cs, 1), piece, 0, ox + (cx + x + 1) * cs, -1);
         if (!m) continue;
         let low = Infinity,
@@ -661,7 +666,7 @@ function voxelise(
       }
     }
   }
-  return { spans, walkableTriangles, maxRise };
+  return { spans, walkableTriangles, maxRise, intersections, cells };
 }
 
 /** Steps 2 to 7 of the pipeline on solid spans; a string says why nothing is walkable. */

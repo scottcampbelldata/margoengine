@@ -65,6 +65,10 @@
     "./queries": {
       "types": "./dist/queries.d.ts",
       "import": "./dist/queries.js"
+    },
+    "./wasm": {
+      "types": "./dist/wasm.d.ts",
+      "import": "./dist/wasm.js"
     }
   },
   "files": [
@@ -92,7 +96,7 @@
     "@margoengine/math": "^1.0.0"
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js navmesh",
+    "build": "node ../../scripts/build-optional.js navmesh && node scripts/copy-raster.mjs",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
   }

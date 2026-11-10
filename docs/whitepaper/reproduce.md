@@ -2600,3 +2600,6 @@ CPU proof: node --test --test-timeout=120000 packages/sprites/tests/rigging.test
 Rendered proof: node scripts/gpu-lock.mjs run --owner=rigging-proof --gpu="Skeletal attachment and IK pixel readback" --max=3 --wait-max=60 -- node packages/sprites/tests/rigging-check.mjs (append --compat for WebGL2).
 No speed measurement is asserted. Rigging fixtures are synthetic overlapping atlas
 regions and bone chains with known targets, not externally sourced demo data.
+
+
+Batch 252 job 4: build with npm run build:packages, then run node --test --test-timeout=120000 packages/navmesh/test/wasm.test.js and cargo test --locked --manifest-path packages/navmesh/native/raster/Cargo.toml. Rebuild the kernel with node packages/navmesh/scripts/build-raster.mjs; its source/binary hashes must match before distribution. The work-count test bundles only Margo's own reference pipeline, compares its counters to the real worker, and compares checked encoded polygons byte for byte. No rival source or external model is used.

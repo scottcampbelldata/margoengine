@@ -70,3 +70,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/behavior | text: parseTreeText/printTreeText syntax, utilities, JSON attributes, comments, external subtree registry, diagnostics and bounds | batch-251 job 4 |
 | margoengine | Generated behavior/text alias | batch-251 job 4 |
 | @margoengine/sprites | skeletal IK controls, bone lengths, slot attachments, addSkeleton, draw-order/attachment keys and Bezier curves | batch-245 job 2 |
+
+| @margoengine/navmesh | wasm worker builders, returned work counts, separate asset hosting, abort/deadline, SIMD requirement and tiled runtime rebuild behavior | batch-252 job 4 |
+| margoengine | Generated navmesh/wasm alias | batch-252 job 4 |

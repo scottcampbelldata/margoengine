@@ -5495,3 +5495,8 @@ use bounded coordinate descent and report their residual. Bezier time is inverte
 before evaluating the channel value. Slot order is independent of bone order.
 CPU evidence: rigging.test.js, including skin conversion regressions. GPU evidence:
 rigging-check.mjs plus the existing skeletal-check.mjs, on both backends.
+
+
+## Batch 252 navmesh worker evidence (section 5 supplement)
+
+The optional navmesh/wasm entry loads one feature-local Rust SIMD raster asset and an owned CPU worker. Exact output evidence is in packages/navmesh/test/wasm.test.js and the crate's tests: byte-identical ordinary/tiled polygon files, equal reference clipping counts, cancellation/error/timeout teardown and source/artifact hash enforcement. The SIMD work proof keeps coverage, triangle order, span merging, classification and polygonization unchanged. Native rasterization uses fixed stack clip buffers, not allocations per cell. Evidence still owed: quiet-machine end-to-end speed measurements and browser/CSP hosting matrix. No core/stage or GPU backend change.

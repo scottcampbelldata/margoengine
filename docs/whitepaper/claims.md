@@ -3068,3 +3068,8 @@ targets, mixing and backwards timeline seeks. Skin-data regressions reject
 non-finite weights and fractional indices, preserve bone 65536 and normalize
 large finite weights without float32 overflow. Proof: rigging.test.js and the
 rendered overlapping-slot/IK fixture rigging-check.mjs. No speed claim.
+
+
+## Batch 252 job 4: CPU worker SIMD build
+
+packages/navmesh/test/wasm.test.js runs real worker threads behind the browser Worker messaging contract. Whole meshes and all tiled state bytes equal the TypeScript builders for floors, ramps, obstacles, area tags and irregular geometry; retained tiled geometry still rebuilds identically. The reference clipper and kernel produce identical candidate/intersection counts. Per intersection, scalar XYZ interpolation requires nine sub/mul/add instructions; SIMD XY plus scalar Z requires three vector and three scalar arithmetic instructions with unchanged lane order. This proves reduced arithmetic instruction work, not a wall-clock speedup. Startup, invalid indices/options, loading errors, abort and hard-timeout termination are covered; native crate tests cover clipping and span merging. Browser bundling emits a standalone classic worker and separate Wasm asset; rendering is not involved.

@@ -283,6 +283,7 @@ class TiledNavMesh implements NavSurface {
     get pendingTiles(): number;
     update(maxTiles?: number): number;
     protected solveTile(tile: Tile): Built | null;
+    protected buildTile(points: Float32Array, triangles: Uint32Array, config: Required<NavigationOptions>, grid: Grid): Built | string;
     protected gridOf(tile: {
         x: number;
         z: number;
