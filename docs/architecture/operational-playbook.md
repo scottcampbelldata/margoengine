@@ -6737,3 +6737,6 @@ Figure.updateData serializes native line/scatter replacements, preserves the pub
 ### 5. List 3 batch 66 underwater evidence
 
 water/underwater is an HDR PostStack stage plus an order-1 surface pass that reuses SurfaceCapture (view-ray hit, camera-centred field, camera probe) on the submitted Water or FFTOcean geometry, so it reads what was drawn, never a second simulation. Real-GPU proof on Metal WebGPU and the compatibility layer compares recorded HDR before and after the stage (packages/water/test/underwater.browser.mjs). Missing evidence: cost at 1080p, multi-view correctness, the underside surface term.
+
+
+Review 3 T1 evidence: optional GLSL transition lowering now preserves the source language scalar result for aggregate equality. The WGSL type checker rejected all three original vector/matrix/nested-structure fixtures before the fix; they now join the existing native GLSL pixel oracle grid. Core, stage and rendering backend code are unchanged. Evidence: 28 focused and 56 affected CPU tests pass; both GPU routes compare 26 GLSL fixtures and 19,968 pixels to native GLSL with the original one-byte bar, plus the unchanged preset/live/mask/viewport/restoration grids.

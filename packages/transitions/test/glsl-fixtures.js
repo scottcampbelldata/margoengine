@@ -1,5 +1,17 @@
 // These shaders are original compiler fixtures, not copied transitions.
 export const glslFixtures = [
+  {
+    name: 'aggregate equality vectors',
+    source: 'int calls=0;vec2 readValue(vec2 v){calls++;return v;}vec4 transition(vec2 uv){vec2 a=floor(uv*4.0);vec2 b=vec2(1.0);if(readValue(a)==readValue(b)&&calls==2){return getFromColor(uv);}if(a!=b&&calls==2){return getToColor(uv);}return vec4(1.0,0.0,0.0,1.0);}',
+  },
+  {
+    name: 'aggregate equality matrices',
+    source: 'vec4 transition(vec2 uv){mat2 a=mat2(1.0);mat2 b=mat2(1.0);b[0][1]=floor(uv.x*2.0);if(a==b){return getFromColor(uv);}if(a!=b){return getToColor(uv);}return vec4(1.0,0.0,0.0,1.0);}',
+  },
+  {
+    name: 'aggregate equality nested structs',
+    source: 'struct Inner{vec2 point;bool enabled;};struct Outer{Inner inner;mat2 frame;};vec4 transition(vec2 uv){Outer a=Outer(Inner(vec2(1.0),true),mat2(1.0));Outer b=a;b.inner.point=floor(uv*2.0);b.frame[0][1]=floor(uv.x*2.0);if(a==b){return getFromColor(uv);}if(a!=b){return getToColor(uv);}return vec4(1.0,0.0,0.0,1.0);}',
+  },
   { name: 'fade', source: 'vec4 transition(vec2 uv){return mix(getFromColor(uv),getToColor(uv),progress);}' },
   {
     name: 'macros',

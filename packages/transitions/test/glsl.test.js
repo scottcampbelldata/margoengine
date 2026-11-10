@@ -18,6 +18,15 @@ for (const fixture of glslFixtures)
     assert.ok(module.entryPoints.some((p) => p.stage === 'fragment'));
     assert.equal(code, translateGLSLTransition(fixture.source, { uniforms: fixture.uniforms }));
   });
+test('equality rejects types excluded by GLSL ES 1.00', () => {
+  for (const source of [
+    'vec4 transition(vec2 uv){float a[2];float b[2];if(a==b){return vec4(1.0);}return vec4(0.0);}',
+    'struct S{float a[2];};vec4 transition(vec2 uv){S a;S b;if(a!=b){return vec4(1.0);}return vec4(0.0);}',
+    'vec4 transition(vec2 uv){if(from==to){return vec4(1.0);}return vec4(0.0);}',
+    'vec4 transition(vec2 uv){if(uv==1.0){return vec4(1.0);}return vec4(0.0);}',
+  ]) assert.throws(() => translateGLSLTransition(source), (e) => e.code === 'failed');
+});
+
 test('invalid GLSL and parameters reject without GPU access; translation has no host execution', async () => {
   for (const source of ['', null, 0, 'x'.repeat(65537)])
     assert.throws(() => translateGLSLTransition(source), TypeError);

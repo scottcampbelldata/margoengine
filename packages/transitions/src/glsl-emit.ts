@@ -50,6 +50,7 @@ export class GLSLEmitter {
   private functions: FunctionDeclaration[];
   private names = new Map<FunctionDeclaration, string>();
   private helpers = new Set<string>();
+  private equalityNames = new Map<string, string>();
   constructor(
     private program: Program,
     private uniforms: Readonly<Record<string, GLSLUniformValue>>,
@@ -63,6 +64,27 @@ export class GLSLEmitter {
   }
   private temp() {
     return `temporary_${this.serial++}`;
+  }
+  private equality(type: string): string {
+    const known = this.equalityNames.get(type);
+    if (known) return known;
+    const name = `aggregate_equal_${this.serial++}`;
+    this.equalityNames.set(type, name);
+    const component = (t: string, a: string, b: string): string => {
+      if (['float', 'int', 'uint', 'bool'].includes(t)) return `(${a}==${b})`;
+      return `${this.equality(t)}(${a},${b})`;
+    };
+    let condition: string;
+    if (/^[ibu]?vec[234]$/.test(type)) condition = 'all(a==b)';
+    else if (/^mat[234]$/.test(type))
+      condition = Array.from({ length: Number(type.at(-1)) }, (_, i) => `all(a[${i}]==b[${i}])`).join('&&');
+    else {
+      const fields = this.program.structs.get(type);
+      if (!fields) this.fail('GLSL ES 1.00 equality excludes arrays and samplers');
+      condition = fields.map((f) => component(f.type, `a.${identifier(f.name)}`, `b.${identifier(f.name)}`)).join('&&');
+    }
+    this.helpers.add(`fn ${name}(a:${wgsl(type)},b:${wgsl(type)})->bool{return ${condition};}`);
+    return name;
   }
   private find(name: string) {
     for (let i = this.scopes.length - 1; i >= 0; i--) {
@@ -215,6 +237,13 @@ export class GLSLEmitter {
         ]);
       }
       if (op === '^^') return value(`(${a.code}!=${b.code})`, 'bool', [...a.before, ...b.before]);
+      if (op === '==' || op === '!=') {
+        if (a.type !== b.type) this.fail('Equality operands must have matching types');
+        const code = ['float', 'int', 'uint', 'bool'].includes(a.type)
+          ? `(${a.code}==${b.code})`
+          : `${this.equality(a.type)}(${a.code},${b.code})`;
+        return value(op === '!=' ? `!(${code})` : code, 'bool', [...a.before, ...b.before]);
+      }
       if (op === '*' && (a.type.startsWith('mat') || b.type.startsWith('mat')))
         return value(
           `(${a.code}*${b.code})`,

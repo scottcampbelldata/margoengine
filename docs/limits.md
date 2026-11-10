@@ -6126,3 +6126,6 @@ water/bodies WaterBodies takes 1 to 64 bodies: closed outlines (3 to 4096 points
 ### List 3 batch 66 job 5: underwater view
 
 Underwater options: absorption and scattering three channels 0..100 /m; anisotropy -0.99..0.99; shafts 0..10; steps integer 1..128; shaftDistance 0.1..10000 m; maxDistance 0.1..100000 m; shaftExtent 1..10000 m; resolution power of two 16..1024 (copied); waterline 0..64 px; refractiveIndex 1..2. The waterline is one probe plane under the camera per frame; the surface seen from below keeps Water's own shading; several views per frame share one uniform. Focusing is clamped to 0.1..10. Owned GPU memory: three rgba32float plus depth32float targets (viewport, resolution squared, 1x1).
+
+
+Review 3 T1: transitions/glsl preserves scalar equality and inequality results for vectors, matrices and nested structures. Typed comparison helpers are shared per translated type and evaluate operands once. GLSL ES 1.00 still excludes array and sampler comparisons, including containing structures. Existing source, token and nesting limits and native pixel comparison bars stay unchanged.
