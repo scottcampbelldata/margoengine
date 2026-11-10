@@ -77,3 +77,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document /controls/presentation alias.
 | @margoengine/behavior | triggers: sphere/box contact semantics, TriggerSystem update events, shared-board per-agent keys, namespaces, mutation/deletion/disable and disposal | batch-251 job 5 |
 | margoengine | Generated behavior/triggers alias | batch-251 job 5 |
+
+- @margoengine/tween: awaitable AsyncTween tasks and AsyncTimeline, AbortSignal cancellation, replay and caller-owned clocks (batch 215 job 1).
+- margoengine: optional tween/async re-export and the same await/cancel lifecycle (batch 215 job 1).

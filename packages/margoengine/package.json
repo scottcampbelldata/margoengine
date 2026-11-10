@@ -3230,6 +3230,10 @@
       "types": "./dist/tween/custom-ease.d.ts",
       "import": "./dist/tween/custom-ease.js"
     },
+    "./tween/async": {
+      "types": "./dist/tween/async.d.ts",
+      "import": "./dist/tween/async.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

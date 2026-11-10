@@ -201,6 +201,7 @@ export class Tween {
             track.cycle = cycle;
             track.repeated?.();
           }
+          if (!track.active) continue;
           const phase = done ? 1 : (local - cycle * track.duration) / track.duration;
           t = track.yoyo && cycle % 2 === 1 ? 1 - phase : phase;
         }
@@ -218,7 +219,7 @@ export class Tween {
                   ? track.from + span * eased
                   : track.from * (1 - eased) + track.to * eased;
         }
-        if (done) {
+        if (done && track.active) {
           track.active = false;
           track.complete?.();
         }

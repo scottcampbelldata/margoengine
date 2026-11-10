@@ -5542,3 +5542,15 @@ edge and corner contacts, extreme finite coordinates, mutation-safe region
 snapshots, contact lifecycle, transfer/disposal and atomic validation. A separate
 namespace-collision regression fails before tuple key encoding and passes after.
 No physics solver, downloaded asset demo, GPU work or timing claim is added.
+## Batch 215: tween promises and cancellation (2026-11-10)
+
+Research compared before implementation, without companion code:
+- Tian Zhao and Yonglun Li, *A Concurrency Model for JavaScript with Cooperative Cancellation* (SLE 2021), https://boyang.cs.uwm.edu/publication/sle2021.pdf . Cancellation must terminate future writes; a promise alone does not do that.
+- Daan Leijen, *Structured Asynchrony with Algebraic Effects* (2017), https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/asynceffects-msr-tr-2017-21.pdf . Compared scoped lifecycle ownership and cleanup against detached callbacks.
+- Brian Birtles et al., *Web Animations* (W3C, 2023), https://www.w3.org/TR/web-animations-1/ . Completion and cancellation are separate outcomes; settled promises do not resolve to their thenable animation.
+- WHATWG contributors, *DOM Standard*, AbortSignal (living standard, accessed 2026-11-10), https://dom.spec.whatwg.org/#abortsignal . Preserve the exact reason and remove abort listeners at settlement.
+- GSAP authors, *Timeline.then()* (accessed 2026-11-10), https://gsap.com/docs/v3/GSAP/Timeline/then()/ ; Motion authors, *animate* (accessed 2026-11-10), https://motion.dev/docs/animate . Compared public completion/control behaviour only, no source.
+
+Combined design: optional owners with explicit caller clocks, per-operation completion and cancellation, listener cleanup on every terminal path, group snapshots and replay promises. Tests cover scalar/array/path/custom, repeats, callbacks, pause, replay, exact abort reasons, replacement, invalid input and disposal. These establish the requested completion/AbortSignal row; no claim about all unrelated GSAP/Motion functionality. No external model/data asset is used: examples animate numeric values.
+
+Async cancellation regression (batch 215): cancellation during onRepeat now prevents the same track from writing again or completing. AsyncTimeline gates remaining callbacks and completion after cancellation. The Web Animations cancellation model and the cooperative-cancellation paper above motivate stopping future effects, not just rejecting a promise. Regression: packages/tween/test/async.test.js.

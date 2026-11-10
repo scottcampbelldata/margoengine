@@ -4125,3 +4125,8 @@ subtrees can match parseTreeText's ordinary-tree overload. Add a broad overload
 returning SubtreeDocument so that variable cannot advertise unresolved references
 as an ordinary TreeDocument. Explicit registry literals already use the correct
 overload; runtime parsing and reference validation are unaffected.
+### Batch 215 async lifecycle coverage
+
+No open defect identified in the new completion/AbortSignal entry. Deterministic lifecycle coverage is in packages/tween/test/async.test.js; existing root APIs remain available.
+
+Batch 215 dependency gate blocker: node packages/cutscene/tests/vfx-browser.mjs --compat fails frame 40 replay equality (played particle hash 3932506386, sought 397093820, both picture 396217175 and live 110). Native passes; the failure is in compatibility VFX replay/readback state, outside tween easings; exact differing particle words still need diagnosis in that owning lane.

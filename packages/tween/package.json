@@ -41,6 +41,10 @@
     "./custom-ease": {
       "types": "./dist/custom-ease.d.ts",
       "import": "./dist/custom-ease.js"
+    },
+    "./async": {
+      "types": "./dist/async.d.ts",
+      "import": "./dist/async.js"
     }
   },
   "files": [

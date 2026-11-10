@@ -3771,3 +3771,6 @@ board use different namespaces. Agent ids define identity across updates;
 transferring its blackboard clears the old board's membership. No GPU code or
 proven Wasm gain for the default-size contact checks. Core + stage remains
 23,950 B gzip, below the unchanged 25,000 B limit.
+### Tween async entry (batch 215)
+
+Optional tween/async: 3431 B min+gzip (new entry, previously 0 B). Core and stage source unchanged. Tween root is 5513 B gzip after adding cancellation checks inside repeat/update callbacks. Each operation owns a driver and a promise allocated on creation. No automatic clock; cancelled values remain where last written. Group waits snapshot active work; retain a task to await its removed result. Timeline replay creates a new promise. Rejections must be observed by callers.

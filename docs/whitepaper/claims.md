@@ -3087,3 +3087,6 @@ packages/behavior/tests/triggers.test.js cover published geometric predicates,
 finite extreme coordinates, lifecycle, atomic input validation and namespace
 collision regression. This covers the documented web-reference contact row and
 adds transition memory; no continuous-motion or production-scale speed claim.
+### Tween completion and cancellation (batch 215)
+
+The optional tween/async entry offers awaitable scalar, array, path and custom operations and timelines; AbortSignal cancels future writes and preserves its reason. Evidence: packages/tween/test/async.test.js, including replacement, repeat/yoyo, pause/replay, disposal and propagated errors. Public behaviour comparison: GSAP Timeline.then and Motion animate completion controls, linked in clean-room.md. New entry 3431 B gzip; no core/stage source change.
