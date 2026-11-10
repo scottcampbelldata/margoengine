@@ -15,6 +15,7 @@ import { importMap } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
 import { declarePackageCore } from './core-requirements.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
+import { clearStamp, packageStamps, writeStamp } from './package-stamps.mjs';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -106,6 +107,9 @@ for (const dir of JSON.parse(await readFile('package.json', 'utf8')).workspaces.
   dir.startsWith('packages/'),
 ))
   manifests.set(dir.slice('packages/'.length), JSON.parse(await readFile(`${dir}/package.json`, 'utf8')));
+// What each package is built from, read before any build starts (scripts/package-stamps.mjs). A package's stamp is
+// cleared before its build and written after it succeeds, so the API report can tell a stale dist from a current one.
+const stamps = packageStamps(process.cwd(), manifests);
 async function buildPackage(name) {
   const manifest = manifests.get(name);
   if (manifest.scripts?.build) {
@@ -216,8 +220,10 @@ await buildInDependencyOrder(
   jobs,
   // Under verify's recorder each package's reads form one job, so its build has its own content key, side by side too.
   (name) => recordJob(`package:${name}`, async () => {
+    clearStamp(process.cwd(), name);
     await buildPackage(name);
     await declarePackageCore(resolve(`packages/${name}`));
+    writeStamp(process.cwd(), name, stamps.get(name));
   }),
 );
 if (only) process.exit(0);

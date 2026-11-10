@@ -4,7 +4,7 @@
 // .api.md. `npm run api:check` (default) fails with a diff when a report changed; `npm run api:update` rewrites them and
 // docs/api-surface.md. `--package=<name>` and optional `--entry=<subpath>` limit checking and updates to one package
 // or entry; the program still loads every package's declarations, because another package's `declare module` changes
-// this package's symbols, so a scoped report is the same text the full run writes. Needs `npm run build:packages`. Uses TypeScript 7's checker through its
+// this package's symbols, so a scoped report is the same text the full run writes. Needs `npm run build:packages` (packages whose dist no longer matches their sources are rebuilt first). Uses TypeScript 7's checker through its
 // `typescript/unstable/async` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
 // Not the sync API: on Windows its client gives a new tsgo a fixed ~5 s to open a named pipe and throws "SyncRpcChannel:
 // timed out connecting to named pipe" on a loaded machine; the async client talks over stdio and waits for the process
@@ -26,6 +26,8 @@ import { join, resolve } from 'node:path';
 import { isUmbrellaAlias } from './umbrella.mjs';
 import { mergeScopedApiSurface, packageMatchesApiReportScope, parseApiReportArguments } from './api-report-scope.mjs';
 import { createGlobalReports } from './api-report-globals.mjs';
+import { stalePackages } from './package-stamps.mjs';
+import { execFileSync } from 'node:child_process';
 
 // The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
 // name (C:\Users\\..., what os.tmpdir() gives) matched no package and every cross-package import line
@@ -36,6 +38,19 @@ const apiDir = join(root, 'api');
 const slash = (p) => p.replaceAll('\\', '/');
 const key = (p) => slash(p).toLowerCase(); // the checker reports lower-cased paths on Windows
 const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+// Every package's declarations load below, scoped or not. After a rebase the dist of a package changed upstream still
+// holds its old build: a new entry had no .d.ts and a changed one its old declarations, so the report failed on packages
+// nobody touched until build:packages ran again. Rebuild just the packages whose dist does not match their sources
+// (scripts/package-stamps.mjs); a current build is left alone.
+const stale = stalePackages(root);
+if (stale.length) {
+  console.error(`API report: rebuilding ${stale.length} package(s) whose dist does not match their sources: ${stale.join(', ')}`);
+  execFileSync(process.execPath, ['scripts/build-modern.js', '--precompiled', `--only=${stale.join(',')}`], {
+    cwd: root,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+}
 
 // Packages and their entries, in directory order.
 const packages = [];
