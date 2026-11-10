@@ -416,6 +416,9 @@ try {
 }
 </script>`;
 
+/** CommonJS React entries reached by documented bindings must be prebundled before serving native ESM. */
+export const readmeReactDependencies = ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client', 'react-dom/test-utils'];
+
 async function startPages(samples, examples) {
   const programs = new Map(examples.map((example) => [`/${example.id}/example.tsx`, example]));
   const server = await createServer({
@@ -427,7 +430,7 @@ async function startPages(samples, examples) {
     // React ships CommonJS. A raw /@fs import cannot provide its named exports to a browser.
     optimizeDeps: {
       noDiscovery: true,
-      include: ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client'],
+      include: readmeReactDependencies,
     },
     oxc: { jsx: { runtime: 'automatic' } },
     plugins: [

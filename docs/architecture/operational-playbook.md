@@ -7191,3 +7191,17 @@ Sciviz notebook/share no longer import or depend on the compatibility device. Ap
 
 ### Sections 4.1 and 5: J6 product viewer and implicit footprints
 The ROOT integration footprint includes the product viewer's public optional entries and React owner. The existing exact backend/restoration assertions pass on native, ANGLE D3D11 and ANGLE Vulkan. Pass-local raw centre copies isolated the first scene HDR difference, and an oblique textureSample regression isolated the GLSL emitter's software implicit LOD estimate. Hardware implicit sampling repairs that package without changing core/stage, explicit mip weights, probes or tolerances. Zero tracked allocations and DOM ownership remain required. Full-image/HDR-bit equality and other hardware remain unproven. Reproduce with scripts/integration-product-trace.mjs; methods, standards and raw proof: docs/integration-product.md.
+
+
+### README phase React browser loading (2026-11-10)
+
+The README runner prebundles react-dom/test-utils as well as React and React DOM because the public
+React test entry retains its React 18 act fallback. With dependency discovery disabled, serving that
+CommonJS entry raw rejects its named act import before the example starts. The root regression
+`tests/run-readme-examples.test.js` inventories React imports across built public entries and requires
+preprocessing coverage; `npm run check:readme-run -- --packages=react` exercises the actual browser import.
+This changes test hosting only, with no engine import or runtime bytes added.
+Sources: Evan You and Vite contributors, *Dependency Pre-Bundling* and *Dep Optimization Options*
+(living documentation, accessed 2026-11-10), https://vite.dev/guide/dep-pre-bundling and
+https://vite.dev/config/dep-optimization-options; React team, *react-dom/test-utils Deprecation Warnings*
+(living documentation, accessed 2026-11-10), https://react.dev/warnings/react-dom-test-utils.

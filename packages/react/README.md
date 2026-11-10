@@ -13,20 +13,9 @@ hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` c
 `/shadows`; the full list is in [SCENE.md](SCENE.md)). Optional parts load only when a component needs them, so an
 unused feature costs nothing.
 
-Installed alone (plus the packages your subpaths name, such as `@margoengine/controls` for `OrbitControls`), it builds
-with Vite, webpack, Turbopack (Next.js), Rollup and esbuild and keeps the build to what you import. The cube page with orbit controls requests 94,251 B gzip at load
-and 101,202 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 66% of that; Margo's part
-(core, stage, bindings) is 25,949 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page).
-
-
-**What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
-controls, physics, XR and Next.js notes, the rule for React state against the frame loop, and a troubleshooting list.
-For a textured, shadowed scene with click-to-select, follow the [React first scene guide](../../docs/guides/react-first-scene.md).
-
-Contents: [Install](#install), [First scene](#first-scene), [Components](#components), [Models and environment](#models-and-environment),
-[Batching, views, lights and voxels](#batching-views-lights-and-voxels), [Hooks](#hooks), [Controls](#controls),
-[Physics](#physics), [XR](#xr), [Next.js](#nextjs), [State vs the frame loop](#state-vs-the-frame-loop),
-[Build warnings](#build-warnings), [Testing and size](#testing-and-size), [Troubleshooting](#troubleshooting).
+Start with the scene below, then add optional controls, models and materials as needed. Each binding lives
+at the subpath named for its package; [SCENE.md](SCENE.md) lists the optional peers. For a textured,
+shadowed scene with click-to-select, follow the [React first scene guide](../../docs/guides/react-first-scene.md).
 
 ## Install
 
@@ -51,9 +40,9 @@ npm pkg set type=module
 npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugin-react typescript @types/react @types/react-dom
 ```
 
-On the machine that wrote this page, packing took about a minute and the install 8 seconds. Add an `index.html` with
+Add an `index.html` with
 `<div id="root"></div>` and `<script type="module" src="/src/main.tsx"></script>`, put the first scene below in
-`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`.
+`src/main.tsx`, and run `npm exec -- vite`.
 
 **Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
 `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
@@ -69,10 +58,8 @@ without the optional peers; options typed by a peer you have not installed are `
 A box lit by the default sun, with a click handler:
 
 ```tsx
-import { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from 'margoengine/react';
-import { Model } from 'margoengine/react/gltf-pro';
 
 export function App() {
   return (
@@ -82,9 +69,6 @@ export function App() {
           <BoxGeometry args={[1, 1, 1]} />
           <PbrMaterial color="#84d6bd" />
         </Mesh>
-        <Suspense fallback={null}>
-          <Model src="/model.glb" />
-        </Suspense>
       </Stage>
     </Canvas>
   );
@@ -93,7 +77,8 @@ export function App() {
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scene with only the box.
+This first scene needs no model or texture files. For a reader moving from another renderer, `Mesh`,
+`BoxGeometry`, `PbrMaterial` and the stage camera fill the familiar roles; Canvas owns the renderer and cleanup.
 
 ## Components
 
@@ -230,9 +215,10 @@ export function Crates() {
 | `map` | none | PNG or JPEG: a URL or the bytes. A new value rebuilds the shape. |
 | `color` | `'#ffffff'` with a map | Multiplies the map. |
 
-A textured shape needs WebGPU and draws in the Canvas default scene: inside `<Scene name>` it sends a `MargoError` (code
-`unsupported`) to `onError`. Other formats (KTX2, WebP) and other maps (normal, roughness) belong in a glTF `Model`.
-Pointer events on it have the drawn child mesh as `target` and the component's mesh as `currentTarget`.
+For maps in a named `Scene`, wrap its meshes in `TextureProvider` from `/textures`, as below.
+That path uses native materials on WebGPU and the WebGL2 compatibility device. Without that provider the
+legacy convenience-shape path uses `@margoengine/gltf/textured`, requires WebGPU and the default Scene,
+and accepts PNG/JPEG base colour only. Pointer `target` is the drawn child mesh and `currentTarget` the component mesh.
 
 ### Pointer events and picking
 
@@ -382,7 +368,7 @@ import { Model } from 'margoengine/react/gltf-pro';
 export default function App() {
   return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} style={{ height: 400 }}>
     <Shadows />
-    <Suspense fallback={<span>Loading scene…</span>}>
+    <Suspense fallback={<span>Loading sceneâ€¦</span>}>
       <Model src="/model.glb" position={[0, 0, 0]} materials={{ Upper: { baseColor: [0.52, 0.84, 0.74] } }} castShadow receiveShadow />
       <Environment src="/studio.hdr" exposure={1} background />
     </Suspense>
@@ -825,17 +811,8 @@ and `npm run test:modules:packages` check the package types and imports. `npm ru
 in a real WebGPU browser. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards
 `(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
 
-What the numbers mean, by scope. None of them is "the size of your app":
-
-- **Core and stage together:** 23,626 B gzip (`npm run measure:size`, the entry measurement; the build fails at 25,000 B).
-  It does not include React, this package or any optional package.
-- **A Vite React page with the cube and orbit controls:** 102,335 B gzip of JavaScript, 70% of it React and React DOM
-  (measured, table in limits.md). `PbrMaterial` is core's material and pulls in no other package. A textured `<Model>`
-  adds 1,750 B to the entry and fetches glTF support (56,074 B gzip) when it mounts.
-- **A React page with PBR models loaded, in an independent study:** about 563 KB decoded, 193 KB gzip, including React and
-  the shared scene infrastructure. A Next.js page is about 194 KB gzip.
-
-The measured breakdown of a React build, package by package, is in [docs/limits.md](../../docs/limits.md#react-page).
+Measured entry sizes and page breakdowns, with their scope and reproduction commands, are recorded in
+[docs/limits.md](../../docs/limits.md#react-page). Use `npm run measure:size` for the current build's entry sizes.
 
 ## Troubleshooting
 
@@ -1101,3 +1078,387 @@ the native materials instancing API. Named Scenes and RenderViews preserve scene
 A shared geometry can merge with other same-geometry meshes in the same scene; the total draw count is still one.
 
 Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.
+
+
+## Frame priorities and adaptive resolution
+
+`useFrame(callback, priority = 0)` calls `(engine, deltaSeconds)` in ascending finite numeric priority,
+with registration order breaking ties. Negative priorities order updates without taking over drawing.
+Any positive subscriber takes over drawing for that Canvas: call `engine.render()` from it.
+Unmounting the last positive subscriber restores automatic drawing, including demand-mode `invalidate()`.
+During an XR frame a manual full-scene draw uses the current eye views. Do not start another animation loop.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@margoengine/react';
+import { PerformanceMonitor, AdaptiveDpr, usePerformanceMonitor } from '@margoengine/react/performance';
+
+function Draw() {
+  const { factor } = usePerformanceMonitor();
+  useFrame(engine => engine.render(), 1);
+  const size = 0.5 + factor * 0.5;
+  return <Mesh scale={[size, size, size]}><BoxGeometry /><PbrMaterial /></Mesh>;
+}
+export function AdaptiveScene() {
+  return <Canvas style={{ height: 400 }}>
+    <PerformanceMonitor><AdaptiveDpr /><Draw /></PerformanceMonitor>
+  </Canvas>;
+}
+```
+
+The monitor averages measured elapsed milliseconds, rather than instantaneous reciprocal FPS. Its
+`refreshrate` is the highest observed window average, not a hardware display query. Hidden pages clear
+incomplete windows. Demand mode skips idle intervals unless `sample` supplies measured durations; XR
+frames still sample. `sample(engine, delta)` returns milliseconds or `null` to skip. It defaults to elapsed
+frame time. This is a quality controller, not a benchmark or a GPU timestamp query.
+
+| Monitor option | Default |
+| --- | --- |
+| `ms` | `250` milliseconds per averaging window |
+| `iterations` | `10` windows per decision |
+| `threshold` | `0.75` fraction of windows outside the deadband |
+| `factor` | `1`, bounded to `[0, 1]` |
+| `step` | `0.1` |
+| `bounds(rate)` | `[50, 57]`, or `[50, 90]` when the observed rate exceeds 90 |
+| `flipflops` | `Infinity` direction reversals before stable fallback |
+| `fallbackFactor` | `0` |
+| `onIncline`, `onDecline`, `onChange`, `onFallback` | No callback; each receives the current snapshot |
+
+`usePerformanceMonitor(callbacks = {})` reads `fps`, `refreshrate`, `factor`, `frames`, `averages`,
+`flips` and `fallback`, and can subscribe descendant callbacks. Outside React, `new PerformanceController(options)`
+uses the same defaults: call `sample(milliseconds)`, read `state`, and release `subscribe`/`observe` subscriptions.
+`clear()` drops incomplete measurements, `reset()` also resets quality and fallback, and `dispose()` or `using`
+ends its lifetime.
+
+`AdaptiveDpr` defaults to `min=0.5`, `max=1`, `pixelated=false` (linear presentation filtering).
+It maps quality into that fraction of native Canvas resolution, lowers resolution on decline and restores it
+on incline. It creates a monitor if none encloses it. Targets and picking dimensions belong to each Canvas;
+CSS size stays fixed, demand mode still draws only when invalidated, and XR uses its eye targets. Unmounting
+releases owned targets and restores presentation. Supply `0 < min <= max <= 1`.
+
+## Texture and media ownership
+
+Install the optional `@margoengine/materials` peer for `/textures`. `useTexture(input, options = {})`
+accepts a URL, array of URLs or named record and returns the same shape of `Texture` values. It suspends;
+wrap callers in `Suspense`. Loads share the Canvas asset cache and are released when Canvas is disposed.
+`useKTX2` takes the same inputs and texture options plus `decoder` (default an owned, lazily loaded
+`@margoengine/decoders` KTX2Decoder). A supplied decoder is caller owned.
+
+```tsx
+import { Suspense } from 'react';
+import { Canvas, Scene, Mesh, BoxGeometry, PbrMaterial, RenderView } from '@margoengine/react';
+import { TextureProvider, useTexture } from '@margoengine/react/textures';
+
+function PaintedBox() {
+  const map = useTexture('/textures/crate.png');
+  return <Mesh><BoxGeometry /><PbrMaterial map={map} /></Mesh>;
+}
+export function TexturedScene() {
+  return <Canvas style={{ height: 400 }}>
+    <Scene name="paint"><TextureProvider><Suspense fallback={null}>
+      <PaintedBox />
+    </Suspense></TextureProvider></Scene>
+    <RenderView scene="paint" />
+  </Canvas>;
+}
+```
+
+Provide `public/textures/crate.png`. `TextureProvider` enables the root `PbrMaterial` map props without
+making the root entry import a material package. `MappedPbrMaterial` enables the same path directly.
+Supported root slots are `map`, `normalMap`, `roughnessMap`, `emissiveMap` and `metalRoughnessMap`
+(default none); mapped colour defaults to white. Roughness reads green independently of metalness.
+`TextureMaterial` accepts native material options or `material` (default none, creating a native Material).
+A supplied native material is cloned, so every native material class can be bound without taking ownership
+of the caller's material or its textures. `geometry` defaults to the enclosing geometry's retained UV data;
+provide it explicitly for custom core geometry without UVs. `roughnessMap` and `transmissionOptions`
+default to absent. `onError` defaults to Canvas error reporting. Use one material owner per Mesh.
+Named Scenes retain their own queues and cleanup on both WebGPU and the compatibility device.
+
+Texture options default to slot-selected colour space (sRGB for colour slots), clamp wrapping in S/T,
+linear min/mag filtering, anisotropy 1, 2D sampling, and flipped external-image Y.
+Mipmaps default on for ordinary images, off for video/data; GPU and compressed sources retain their levels.
+See [native texture options](../materials/README.md) for raw/GPU/compressed source conventions.
+`useVideoTexture(urlOrStream, options = {})` adds `start=true`, `muted=true`, `loop=true`,
+`playsInline=true`, `crossOrigin='anonymous'`, `unsuspend='loadedmetadata'` and no `onVideoFrame` callback.
+The video is shared, pauses after its last playing consumer leaves, and its source is released with Canvas.
+Caller-owned MediaStream tracks remain caller owned. Browser codec and autoplay rules still apply.
+
+Cached model mounts keep independent retained-pixel copies; editing one mount's pixels does not mutate another.
+Caller-owned inputs still need their own disposal. Texture hooks and providers do not create a global cache.
+
+## Keyboard, scroll and product controls
+
+`/controls-extra` exports `KeyboardControls`, `useKeyboardControls`, `ScrollControls`, `useScroll`,
+`Scroll` and `PresentationControls`. Install `@margoengine/controls` and its optional `@margoengine/tween`
+peer for scroll/presentation; keyboard alone needs neither.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { KeyboardControls, useKeyboardControls, ScrollControls, Scroll, PresentationControls } from '@margoengine/react/controls-extra';
+
+const keys = [{ name: 'forward', keys: ['KeyW', 'ArrowUp'] }];
+function Product() {
+  const forward = useKeyboardControls(state => state.forward);
+  return <PresentationControls snap>
+    <Mesh><BoxGeometry /><PbrMaterial color={forward ? '#ff8800' : '#84d6bd'} /></Mesh>
+  </PresentationControls>;
+}
+export function ScrollScene() {
+  return <KeyboardControls map={keys}><Canvas style={{ height: 400 }}>
+    <ScrollControls pages={2}>
+      <Scroll><Product /></Scroll>
+      <Scroll html><p>Scroll to move through the scene. Hold W to change colour.</p></Scroll>
+    </ScrollControls>
+  </Canvas></KeyboardControls>;
+}
+```
+
+Keyboard entries require `name` and `keys` (matching key or code); `up=true` clears on release,
+`up=false` latches until focus loss. `domElement` defaults to window, `onChange` to absent.
+The selector hook rerenders on changes; the no-argument hook returns `[subscribe, get]` for frame-loop reads.
+`subscribe(selector, listener)` returns an unsubscribe function. Blur, hidden pages and unmount clear held keys.
+
+| Scroll option | Default |
+| --- | --- |
+| `pages`, `distance` | `1`, `1` |
+| `horizontal`, `infinite`, `prepend` | `false`, `false`, `false` |
+| `damping`, `maxSpeed`, `eps` | `0.2` seconds, `Infinity`, `0.00001` |
+| `enabled` | `true` |
+| `style`, `onError` | No override; errors go to Canvas |
+
+`ScrollControls` owns the DOM scroller and disposes it and its controller on unmount. `useScroll()` exposes
+live `offset`, absolute `delta`, `el`, `fill`, `pages`, `horizontal`, and `range`, `curve`, `visible` helpers
+(their optional margin defaults to 0). `Scroll` defaults to mesh translation (`html=false`); `html=true`
+creates an owned DOM portal, with no style override by default. Helpers require the enclosing ScrollControls.
+
+Presentation defaults are `enabled=true`, `cursor=true`, no rotation override, canvas event element
+(`domElement` overrides native `element`), `polar=[-PI/2, PI/2]`, `azimuth=[-Infinity, Infinity]`,
+`speed=1`, `snap=false`, `zoom=1`, `global=false`, and spring stiffness 170, damping 26, precision 0.000001.
+No `onError` callback is installed by default. It rotates its child group, updates in the Canvas loop,
+restores the cursor and removes controls/listeners on unmount.
+
+## Render textures and HUDs
+
+`/portals` exports `RenderTexture` and `Hud`. RenderTexture requires the optional materials peer and
+an engine with a WebGPU device, native or compatibility. The legacy WebGL2 renderer without a compatibility
+device cannot create these targets. HUDs and render textures own isolated Scenes and cameras; children see
+their local camera through hooks. A supplied `camera` is borrowed; otherwise `cameraOptions` defaults to
+core Camera defaults. Existing explicit main views are retained.
+
+```tsx
+import { useState } from 'react';
+import type { Texture } from '@margoengine/materials';
+import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
+import { TextureMaterial } from '@margoengine/react/textures';
+import { RenderTexture, Hud } from '@margoengine/react/portals';
+
+export function Monitor() {
+  const [map, setMap] = useState<Texture | null>(null);
+  return <Canvas style={{ height: 400 }}>
+    <RenderTexture width={256} height={256} onTexture={setMap}>
+      <Mesh><BoxGeometry /></Mesh>
+    </RenderTexture>
+    <Mesh><BoxGeometry /><TextureMaterial map={map} /></Mesh>
+    <Hud><Mesh position={[1, 0, 0]}><BoxGeometry /></Mesh></Hud>
+  </Canvas>;
+}
+```
+
+RenderTexture width/height default to Canvas drawing-buffer dimensions, in physical texels; explicit values
+must be positive integers within device limits. `background` defaults to black and `renderPriority=-1`
+(must be negative), drawing targets before the main view. `onTexture` defaults to absent and receives the
+new texture on creation, resize and device restoration, then null on cleanup. The ref exposes `texture`,
+`target`, `scene` and `camera`; do not dispose these borrowed handles. `onError` defaults to Canvas reporting.
+Hud defaults to `renderPriority=1` (must be positive), drawing after the main view with fresh depth and
+without clearing its colour. React 18/19 StrictMode replay creates fresh owners and releases old targets,
+views and Scenes; refs and callbacks refer to the current owner.
+
+## Stars, sparkles, trails, edges and decals
+
+`/effects-extra` loads native points, lines or geometry only when the corresponding component mounts.
+Install `@margoengine/points` for fields, `@margoengine/lines` for trails/edges and
+`@margoengine/geometry` plus `@margoengine/materials` for mapped decals.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { Stars, Sparkles, Trail, Edges, Decal } from '@margoengine/react/effects-extra';
+
+export function Effects() {
+  return <Canvas style={{ height: 400 }}>
+    <Stars count={100} seed={2} />
+    <Sparkles count={20} scale={3} />
+    <Trail><Mesh><BoxGeometry /><PbrMaterial />
+      <Edges threshold={15} />
+      <Decal position={[0, 0, 0.5]} scale={0.5} color="#ff8800" />
+    </Mesh></Trail>
+  </Canvas>;
+}
+```
+
+| Field option | Stars default | Sparkles default |
+| --- | --- | --- |
+| `count`, `seed` | `5000`, `1` | `100`, `1` |
+| `radius`, `depth`, `saturation` | `100`, `50`, `0` | Not exposed |
+| Size | `factor=4` | `size=6` |
+| `speed` | `1` | `1` |
+| `fade` | Pulsing fade when omitted | Not exposed |
+| `scale`, `noise` | Not exposed | `1`, `1` (scalar or xyz) |
+| `opacity`, `color` | Derived star colours | `1`, white |
+
+Sparkles size/speed/opacity accept one value or a Float32Array with count entries; colour accepts RGB triples
+with count*3 entries, and noise accepts xyz or count*3 values. Equal seeds and inputs reproduce the field.
+Fields accept at most 1,000,000 points; invalid sizes, arrays or nonfinite inputs reject. Replacing props
+rebuilds the field. Both refs expose the native PointCloud and release it on unmount. `onError` is absent
+by default for all effects, with Canvas error reporting retained.
+
+Trail follows its first mesh child, or an explicit native `target`; `target={null}` selects manual
+`ref.current.moveTo(x, y, z)` sampling. Its defaults are offset `[0,0,0]`, lifetime 1 second,
+maxLength Infinity, maxPoints 256, minDistance 0.05, fade 1, white head, matching tail, tailWidth 1,
+and no fixed normal (camera-facing). Inherited line styling and defaults are in the
+[native lines guide](../lines/README.md). Unmount disposes the trail and its plugin.
+Edges uses its enclosing mesh unless `mesh` is explicit, threshold 15 degrees and automatic welding tolerance;
+it accepts the same native line styling. Replacing geometry refreshes extracted edges.
+
+Decal projects in the target mesh's local coordinates, inheriting its parent transform. It defaults to
+the enclosing mesh, retained source geometry, position/rotation `[0,0,0]`, scale 1, offset `min(scaleX, scaleY) / 1000` and `backfaces=false`. Supply `geometry` for an explicit UV-bearing source;
+`mesh` selects an explicit target. Root PBR map props and material children use TextureProvider internally.
+React 18/19 StrictMode replay reattaches to the current mesh and releases the old material owner.
+
+## Component tests and offscreen scenes
+
+`/test` requires a browser DOM or a caller-installed jsdom, and optional `@margoengine/headless`.
+It installs no DOM globals itself. Mount children directly, without Canvas; by default it owns a GPU-free
+null stage. This browser example needs no GPU:
+
+```tsx
+import { createElement } from 'react';
+import { Mesh, BoxGeometry } from '@margoengine/react';
+import { createTestRenderer } from '@margoengine/react/test';
+
+const renderer = await createTestRenderer(createElement(Mesh, null, createElement(BoxGeometry)));
+try {
+  const [mesh] = renderer.findAll();
+  await renderer.advanceFrames(2, 1 / 60);
+  await renderer.fireEvent(mesh, 'pointerdown');
+  await renderer.fireEvent(mesh, 'pointerup');
+  await renderer.update(null);
+} finally {
+  await renderer.unmount();
+}
+```
+
+For Node install jsdom, set `globalThis.window` and `globalThis.document` from a JSDOM instance,
+and set `globalThis.IS_REACT_ACT_ENVIRONMENT=true` before mounting. Close that DOM afterwards.
+`container` defaults to a new body div; `stage` defaults to an owned null stage. A supplied stage is
+borrowed and survives unmount. Null-stage width/height default to 1, camera to core defaults,
+capacity to 1024 (growing automatically), `signal` to absent and `onError` to core reporting. `findAll(predicate = () => true)` visits live meshes across Scenes;
+`advanceFrames(count=1, delta=1/60)` advances hooks/ticks; `fireEvent(target, type, init={})` injects a live
+mesh hit or null miss through normal bubbling/capture semantics. It does not test GPU picking pixels.
+`update` commits and flushes effects; `unmount` or `await using` releases owned resources.
+
+`/offscreen` keeps React and DOM overlays on the page. Only the required absolute `scene` URL's
+`createScene(context)` executes in the worker or page. Install `@margoengine/worker`; use the shared
+scene contract in its [README](../worker/README.md), returning a disposable scene owner and calling
+`context.attach(engine)`. JSX children are page overlays, never transferred into the worker.
+Defaults: `mode='auto'`, `backend='auto'`, width 300, height 150, timeout 30000 milliseconds,
+label 'Margo scene', canvas display block and CSS width/height 100%. `data`, `signal`, `worker`,
+`className` and callbacks default to absent; `transfer` defaults to no transfers. `style` overrides
+canvas CSS, `onCreated` receives the AutoScene owner, and startup failures show a DOM alert and call
+`onError` when supplied. Auto probes before transfer and falls back to the page when unsupported;
+runtime scene failures are reported without replay. Changing startup props creates a fresh canvas;
+unmount aborts and disposes the scene and its owned worker. Keep URL/data/transfer identities stable.
+
+For a minimal offscreen setup, save these two files together and render `WorkerScene` in your page.
+The scene module also runs on the page when auto selects fallback. `mode="page"` is useful when debugging.
+
+```tsx
+// worker-view.tsx
+import { OffscreenCanvas } from '@margoengine/react/offscreen';
+const scene = new URL('./shared-scene.ts', import.meta.url);
+export function WorkerScene() {
+  return <OffscreenCanvas scene={scene} style={{ width: 400, height: 300 }} />;
+}
+```
+
+```ts
+// shared-scene.ts
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import type { SceneContext } from '@margoengine/worker/auto';
+export async function createScene(context: SceneContext) {
+  context.signal.throwIfAborted();
+  const engine = await Engine.create(context.canvas);
+  if (context.signal.aborted) { engine.dispose(); context.signal.throwIfAborted(); }
+  context.attach(engine);
+  engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#84d6bd' }));
+  engine.start();
+  return { dispose() { engine.dispose(); } };
+}
+```
+
+## Named-scene grids and integration
+
+`Grid` from `/lines` works inside `Scene` with a matching RenderView. Defaults: size 10, divisions 10,
+centerColor '#8f8f8f', color '#5e5e5e', position `[0,0,0]`, no onError override. Prop replacement rebuilds
+its owned plugin; unmount detaches it from that Scene.
+
+```tsx
+import { Canvas, Scene, RenderView } from '@margoengine/react';
+import { Grid } from '@margoengine/react/lines';
+
+export function GridScene() {
+  return <Canvas style={{ height: 400 }}>
+    <Scene name="grid"><Grid size={20} divisions={20} /></Scene>
+    <RenderView scene="grid" />
+  </Canvas>;
+}
+```
+
+Works with the [product viewer composition](../../docs/integration-product.md): public optional entries,
+React Canvas mounting, device restoration and teardown are exercised together. The linked record gives
+its exact reproduction command and measured scope.
+
+## Contributor test setup
+
+Run browser scripts from the repository root, for example
+`node packages/react/scripts/test-bindings-browser.mjs`; workspace commands that need the root change
+there explicitly. Packed-consumer checks need React, React DOM, jsdom, Testing Library and the declared
+package peers installed. Contributor source-inventory tests in a copied consumer use
+`MARGOENGINE_TEST_REPOSITORY` pointing to the actual checkout. Temporary subpath consumer files are
+disposable generated test inputs, excluded from source inventories.
+
+The build emits core version requirements and declarations with runtime attachment guards. Incompatible
+core attachment rejects with a linked version error; rebuild/install matching release packages rather
+than bypassing the guard. Material lifecycle proofs observe current plugin identities, including names
+reused after StrictMode replay. Performance browser proofs wait for the requested factor, target dimensions
+and pipeline readiness instead of assuming a fixed number of frames. The commands and assertions live in
+`packages/react/tests` and `packages/react/scripts`.
+
+For UI images, GameUi supplies the UiRoot; use `useUi()` from `@margoengine/ui/react` in a child and
+add an imperative `Image` from `@margoengine/ui/image` to that UI in an effect. Remove the widget in the
+effect cleanup. The pixel ImageTexture can be shared; it is separate from a 3D material Texture and has
+no new React binding. See the [UI image guide](../ui/README.md) for fit, source rectangle, slice and tint defaults.
+
+
+```tsx
+import { useEffect } from 'react';
+import { Canvas } from '@margoengine/react';
+import { GameUi } from '@margoengine/react/ui';
+import { useUi } from '@margoengine/ui/react';
+import { Image, ImageTexture } from '@margoengine/ui/image';
+
+const pixels = new ImageTexture(1, 1, new Uint8Array([132, 214, 189, 255]));
+function Badge() {
+  const ui = useUi();
+  useEffect(() => {
+    const badge = new Image({ texture: pixels, width: 64, height: 64 });
+    ui.add(badge);
+    return () => { ui.remove(badge); badge.dispose(); };
+  }, [ui]);
+  return null;
+}
+export function ImageScene() {
+  return <Canvas style={{ height: 400 }}><GameUi><Badge /></GameUi></Canvas>;
+}
+```
+
+This image uses the full source, contain fit, no slice, borderScale 1 and opaque white tint by default.
+ImageTexture holds copied CPU pixels; the UiRenderer owns atlas residency and releases it with the UI.

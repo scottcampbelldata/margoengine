@@ -4,7 +4,7 @@
 |---|---|---|
 | @margoengine/lightmap | All existing quad, mesh and progressive GPU examples: explicit GPU options typing preserves the direction tuple; `npm run check:readmes` and `npm run check:readme-run -- --packages=lightmap`. Other feature examples listed below remain owed. | DONE (lightmap-readme-fix) |
 
-- @margoengine/react (lane A known-bugs sweep): document that subpath test consumers are disposable generated files, excluded from source inventories.
+- @margoengine/react (lane A known-bugs sweep): document that subpath test consumers are disposable generated files, excluded from source inventories. DONE (react-readme-phase).
 
 - @margoengine/sciviz (review L2): document incremental circular spreading, neighbour-presence density, clipped edges and unchanged numerical bins.
 
@@ -15,7 +15,7 @@
 - @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase.
 - @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase.
 - @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase.
-- @margoengine/react: performance proof waits for target factor/dimensions and pipeline readiness; review test guidance in the README phase.
+- @margoengine/react: performance proof waits for target factor/dimensions and pipeline readiness; review test guidance in the README phase. DONE (react-readme-phase).
 
 - @margoengine/sciviz (batch 179 job 4): document /provenance opt-in factories, metadata schema and integrity checks, automatic PNG/SVG metadata, PDF info export, successful-call trace replay, history bounds and explicit application codecs/registries.
 - margoengine (batch 179 job 4): document generated sciviz/provenance alias.
@@ -33,8 +33,8 @@
 - @margoengine/materials and @margoengine/gltf-pro (fixes K2 job 1): document automatic per-surface native display glass snapshots, linear addition, capture cost and HDR behavior; examples deferred.
 - @margoengine/oit (fixes K2 job 1): test fixtures account for native glass capture; no OIT runtime API or README example changes.
 
-- @margoengine/react (fixes K2 job 2): document packed-consumer test dependencies and the repository-root override for contributor-script tests; README examples remain deferred.
-- @margoengine/react (K2 packed follow-up): cover portal/decal ownership across React 18 and 19 StrictMode replay; examples deferred.
+- @margoengine/react (fixes K2 job 2): document packed-consumer test dependencies and the repository-root override for contributor-script tests; README examples remain deferred. DONE (react-readme-phase).
+- @margoengine/react (K2 packed follow-up): cover portal/decal ownership across React 18 and 19 StrictMode replay; examples deferred. DONE (react-readme-phase).
 
 - @margoengine/creative (K2 job 3): the meadow test audit now follows the active device classes on native and compatibility; no feature or README example changes.
 
@@ -177,7 +177,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/ui | ui/image: ImageTexture loading and snapshots, Image fit/source/slice/tint options, atlas residency and disposal by ownership. | batch-258 job 2 |
 | margoengine | ui/image umbrella alias and image widget setup. | batch-258 job 2 |
 
-| @margoengine/react | Review UI image usage from the React canvas during the README phase; no public React API change. | batch-258 job 2 |
+| @margoengine/react | Review UI image usage from the React canvas during the README phase; no public React API change. | batch-258 job 2  DONE (react-readme-phase) |
 
 | @margoengine/navmesh | build/tiles borderSize now pads grids, rounds up, combines with automatic clearance and counts toward the padded cell budget; remove former no-effect statement | batch-252 job 6 |
 | @margoengine/input | lock: request/release, raw negotiation, legacy raw null, activation, timeouts/AbortSignal, x/y and control publication | batch-253 job 3 |
@@ -187,7 +187,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/save: document optional scene-state stable bindings, light/shadow capture and transactional restoration.
 | @margoengine/inspector | Scene primitives and lights, delete/duplicate/reparent, tree dragging, retained history handles and disposal. | Batch 262 job 3 |
 | margoengine | Optional inspector/edit import and undoable scene editing. | Batch 262 job 3 |
-| @margoengine/react | Material lifecycle proof observes current plugin identities, including StrictMode name reuse. | Batch 262 job 3 |
+| @margoengine/react | Material lifecycle proof observes current plugin identities, including StrictMode name reuse. | Batch 262 job 3  DONE (react-readme-phase) |
 
 - @margoengine/audio/binaural: BinauralAudio first/second/third order AmbiX, inherited Audio transport, field rotation, HRTF graph costs and browser-dependent localization.
 - @margoengine/worker (batch 257 job 1): document /rpc typed RpcClient, exposeRpc handlers/context, rpcTransfer and RpcPool; defaults, ownership, queue limits, cancellation, deadlines and failure/disposal examples.
@@ -276,7 +276,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/points | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/text | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/usdz | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
-| @margoengine/react | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/react | Core version guard build declarations, attachment rejection and linked version errors. | version-guard  DONE (react-readme-phase) |
 | @margoengine/shader | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/viewcube | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/stage | Core version guard at stage attachment boundaries and matching core imports. | version-guard |
@@ -373,7 +373,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/inspector | tools: CameraTools placement, camera registration/loaded discovery, screenshot, recording start/stop, model/scene GLB and glTF, lazy dependencies and disposal | batch-263 job 3 |
 | margoengine | Generated inspector/tools alias | batch-263 job 3 |
 - @margoengine/animation: document registered-scene disposal, terminal controller lifetime and asynchronous geometry-cache scene/signal ownership.
-- @margoengine/react: document browser script repository-root invocation.
+- @margoengine/react: document browser script repository-root invocation. DONE (react-readme-phase).
 
 - @margoengine/math (batch 220 job 2): document /curve scalar/keyed APIs, four modes and string constants, tension and boundary policies, copied/normalized keys, channel editing, reusable packed interpolants, sampling, limits and a tuning-table example.
 - margoengine (batch 220 job 2): document generated math/curve alias and regenerated bridges to the already-built exporters/optimize-extra and exporters/splats entries.
@@ -431,7 +431,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/selection: document xray XRaySelection styling, default cosine pulse, manual time/play, multiview advancement, ownership and disposal (batch 199 job 2).
 
 
-| @margoengine/react | useFrame numeric priorities, positive takeover, demand restoration and XR manual draws | batch 265 job 4 |
+| @margoengine/react | useFrame numeric priorities, positive takeover, demand restoration and XR manual draws | batch 265 job 4  DONE (react-readme-phase) |
 | @margoengine/xr | onFrame returning false and frame-local renderFrame for both eyes | batch 265 job 4 |
 | margoengine | React frame priorities through the umbrella alias | batch 265 job 4 |
 
@@ -447,12 +447,12 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-pathtracer: shared affine mesh instances, BLAS cache statistics, SAH and degenerate-face handling, vertex normals and UV textures.
 - margoengine: generated controls/globe export ordering refreshed while landing voxel-pathtracer BLAS dependencies.
 - @margoengine/headless: deferred README-only node-check.mjs bundled in test:gpu; ffmpeg is absent from PATH. Rendering correctness in browser-check.mjs passed during the BLAS dependent gate.
-- @margoengine/react: browser binding and instance checks now launch from the repository root; README runtime work stays deferred.
+- @margoengine/react: browser binding and instance checks now launch from the repository root; README runtime work stays deferred. DONE (react-readme-phase).
 - @margoengine/sciviz: document /contour CPU/GPU multi-level isosurfaces and isolines, contourOperator, pulling cell assumptions, precision bound, cancellation and NASA demo.
 - margoengine: document generated sciviz/contour alias with the owning sciviz contour entry.
 
 
-| @margoengine/react | performance: PerformanceMonitor defaults, measured samples, callbacks/hook/controller, AdaptiveDpr decline/restoration, per-Canvas targets, picking, demand/XR and lifecycle limits | batch 265 job 5 |
+| @margoengine/react | performance: PerformanceMonitor defaults, measured samples, callbacks/hook/controller, AdaptiveDpr decline/restoration, per-Canvas targets, picking, demand/XR and lifecycle limits | batch 265 job 5  DONE (react-readme-phase) |
 | margoengine | react/performance optional alias | batch 265 job 5 |
 - @margoengine/geometry (batch 219 job 1): nurbs-edit insertion/elevation for curves and both surface axes, UV trimming with holes/islands, defaults and numerical/resolution limits; generated margoengine/geometry/nurbs-edit alias.
 - margoengine (batch 219 job 1): generated geometry/nurbs-edit alias and current umbrella alias completeness; examples remain deferred.
@@ -550,7 +550,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document geometry/hull and mesh-edit/hull aliases and restored mesh-edit/repair manifest alias in the README phase (batch 224 job 4).
 
 
-| @margoengine/react | Texture hooks, TextureProvider for root map props, TextureMaterial for every native material, Scene ownership, media lifetime and both backends | batch 265 job 3 |
+| @margoengine/react | Texture hooks, TextureProvider for root map props, TextureMaterial for every native material, Scene ownership, media lifetime and both backends | batch 265 job 3  DONE (react-readme-phase) |
 | @margoengine/materials | Material queues are per Scene, including named Scene disposal | batch 265 job 3 |
 | @margoengine/gltf-pro | Model disposal removes its owning Scene plugin | batch 265 job 3 |
 | margoengine | New react/textures alias and separate decoder-bearing import | batch 265 job 3 |
@@ -614,7 +614,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/culling: document /sort FrontToBack, InstanceSorter, SortedInstances, stable equal-depth keys, registration/removal, toggles, opaque-only input and buffer flags (batch 223 job 3).
 - margoengine: document the generated culling/sort alias (batch 223 job 3).
-- @margoengine/react: controls-extra KeyboardControls/useKeyboardControls, ScrollControls/useScroll/Scroll (mesh and HTML), PresentationControls, optional controls peer and cleanup.
+- @margoengine/react: controls-extra KeyboardControls/useKeyboardControls, ScrollControls/useScroll/Scroll (mesh and HTML), PresentationControls, optional controls peer and cleanup. DONE (react-readme-phase).
 - margoengine: react/controls-extra umbrella alias and native SpringOptions naming.
 - @margoengine/controls: PresentationControls accepts geometry-free product roots and picks their live nested descendants.
 - @margoengine/fbx (batch 205 job 3): document legacyFBX opt-in 6.x ASCII/binary, legacy Takes/skin/morph/material semantics, worker composition and supported interpolation/budgets.
@@ -634,7 +634,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 261 job 3): document labels/cluster alias.
 
 | @margoengine/clustered | shapes: ShapeLights (sphere, disc, tube), setLights validation, MAX_SHAPE_LIGHTS, radianceFromPower and shapeLightArea, Clustered.shapes hook, no shadows | batch-52 job 3 |
-- @margoengine/react and margoengine: portals RenderTexture output/ref/onTexture, isolated Hud cameras, view ordering, physical target sizes and compatibility-device requirement.
+- @margoengine/react DONE (react-readme-phase); margoengine still owed: portals RenderTexture output/ref/onTexture, isolated Hud cameras, view ordering, physical target sizes and compatibility-device requirement.
 
 
 - @margoengine/lines (batch 227 job 2): document /texture image pixels/loading/cancellation, UV units, alpha, mipmaps, stroke composition and restoration; examples deferred.
@@ -691,7 +691,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - cinematic: document ortho camera height, existing rigStage follow, framing/group stages, projection output, size blends, zones and mixed-mode endpoints (batch 216 job 2).
 - margoengine: document cinematic/ortho alias (batch 216 job 2).
-- @margoengine/react and margoengine: effects-extra Stars/Sparkles attributes and seed, native Trail options and explicit target=null manual mode, Edges threshold, Decal projector/material maps and parent-space coordinates.
+- @margoengine/react DONE (react-readme-phase); margoengine still owed: effects-extra Stars/Sparkles attributes and seed, native Trail options and explicit target=null manual mode, Edges threshold, Decal projector/material maps and parent-space coordinates.
 
 - @margoengine/mixer (batch 212 stereo): document Bus.insert ownership and createStereo/createBusStereo, normalized width, automation, post-send placement and disposal.
 
@@ -808,7 +808,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | clustered/stochastic alias | batch-52 job 8 |
 
 
-- @margoengine/react (batch 266 job 3): document /test createTestRenderer, DOM/jsdom setup, null-stage ownership, frame/query/pointer helpers, and /offscreen main-thread React plus shared-scene URL, worker/page fallback, startup props and cleanup; examples deferred.
+- @margoengine/react (batch 266 job 3): document /test createTestRenderer, DOM/jsdom setup, null-stage ownership, frame/query/pointer helpers, and /offscreen main-thread React plus shared-scene URL, worker/page fallback, startup props and cleanup; examples deferred. DONE (react-readme-phase).
 - margoengine (batch 266 job 3): document generated react/test and react/offscreen aliases; examples deferred.
 
 - @margoengine/kinematics-constraints (batch 214 job 1): document /chain, CCD/FABRIK settings, failure ownership, query protocol, static-only guarantee and createLimbAvoidance.
@@ -1372,7 +1372,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/dof (lane G known-bugs sweep): document the measured half-float minimum, coded LDR setup/restore refusal and lower-tier option-coverage limits.
 - @margoengine/webgl2-compat (lane G known-bugs sweep): list DOF's half-float minimum and the registered standalone DOF tier comparison.
 - @margoengine/decoders (lane G known-bugs sweep): document /draco-native generic attributes through 255 components, bounded scratch, and the separate historical/prebuilt parity gaps.
-- @margoengine/react (lane G known-bugs sweep): document Grid inside Scene with RenderView, prop replacement and cleanup.
+- @margoengine/react (lane G known-bugs sweep): document Grid inside Scene with RenderView, prop replacement and cleanup. DONE (react-readme-phase).
 
 - Integration J2 tooling: document the generated C2 Works with matrix and composition runner after all adapters land; README examples and Works with generation wait for the README phase.
 
@@ -1417,7 +1417,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf-pro: Node PNG/JPEG image decoding, retained GLTFPixelImage ownership, byte uploads, mipmaps and restoration.
 - @margoengine/materials: Node pixel-backed extension maps.
 - @margoengine/rigging: MToon maps from retained Node pixels.
-- @margoengine/react: independent retained-pixel copies for cached model mounts.
+- @margoengine/react: independent retained-pixel copies for cached model mounts. DONE (react-readme-phase).
 - Python notebook test harness: document event-driven server readiness and bounded camera/selection output polling in the README phase.
 
 - Integration C2 harness: document 24 adapters, 34 rows, all 276 pairs, numeric depth/state/XR probes, package row selection and Windows tracer ANGLE Vulkan routing during the README phase.
@@ -1507,6 +1507,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/viewcube: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
 
-- @margoengine/react: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+- @margoengine/react: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase. DONE (react-readme-phase).
 
 - @margoengine/webgl2-compat: document hardware implicit sampler footprints and the J6 product composition proof in docs/integration-product.md during the README phase.

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exampleIds, readmeEntries } from '../scripts/support/readme-types.mjs';
 import {
+  readmeReactDependencies,
   askedElements,
   eachPage,
   goneLine,
@@ -455,4 +456,16 @@ assert.ok(result.pass);`;
   });
   assert.equal(result.result, 'pass', result.reason);
   assert.deepEqual(readFileSync(wrong), Buffer.from(bytes), 'the external reference fixture is never changed');
+});
+
+
+test('browser preprocessing covers CommonJS React imports reached by every public React entry', () => {
+  const folder = new URL('../packages/react/dist/', import.meta.url);
+  const dependencies = new Set();
+  for (const name of readdirSync(folder).filter(name => name.endsWith('.js'))) {
+    const source = readFileSync(new URL(name, folder), 'utf8');
+    for (const [, dependency] of source.matchAll(/from\s*['"](react(?:-dom)?(?:\/[^'"]+)?)['"]/g)) dependencies.add(dependency);
+  }
+  assert.ok(dependencies.has('react-dom/test-utils'), 'the public test entry needs the React 18 act fallback');
+  for (const dependency of dependencies) assert.ok(readmeReactDependencies.includes(dependency), `${dependency} must be converted before native browser import`);
 });
