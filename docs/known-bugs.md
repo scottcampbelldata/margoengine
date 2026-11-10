@@ -92,6 +92,16 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores k.
   `fragmentUnormRound` and `scatterUnormRound` pass, and so does the baker comparison.
 
+### Fixed 2026-11-10: weather machine stopped its schedule on a refused call and dropped time after 256 steps
+
+- **What:** `WeatherMachine.transitionTo` and `set` (`packages/weather/src/machine.ts`) cleared a running schedule or
+  random walk before checking the target, seconds and ease, so a refused call still stopped it. `update` processed at
+  most 256 blends and holds per 5 s piece and silently dropped the rest of the time: 300 steps of 1 ms in one
+  `update(5)` arrived short. Found in Scott's native Rust engine, which ported this machine.
+- **Fix:** both check first, then stop and start; a piece runs every blend and hold that ends inside it, and throws
+  only if zero-length steps make no progress past a bound set by the schedule length. Regression:
+  `packages/weather/tests/weather.test.js` (both tests fail on the old machine).
+
 ### Fixed 2026-11-10: a MASK texel with alpha equal to alphaCutoff was cut where vertex alpha was 1
 
 - **What:** glTF 2.0 keeps a MASK texel whose alpha is greater than or equal to `alphaCutoff`. With base colour alpha

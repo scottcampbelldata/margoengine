@@ -212,17 +212,27 @@ export class WeatherMachine implements Disposable {
    */
   transitionTo(target: WeatherTarget, { seconds = 30, ease = 'smoothstep' }: TransitionOptions = {}): this {
     this.alive();
+    // Checked before anything stops: a rejected call leaves a running schedule or walk going.
+    const to = this.checked(target, seconds, ease);
     this.steps = this.walk = undefined;
-    this.begin(target, seconds, ease);
+    this.begin(target, seconds, ease, to);
     return this;
   }
 
-  private begin(target: WeatherTarget, seconds: number, ease: BlendEase): void {
+  private checked(target: WeatherTarget, seconds: number, ease: BlendEase): WeatherState {
     number(seconds, 'Transition seconds', 0, 86400);
     if (ease !== 'linear' && ease !== 'smoothstep')
       throw new TypeError(`Transition ease must be "linear" or "smoothstep"; got ${String(ease)}`);
-    const to = resolveState(target, this.current),
-      preset = typeof target === 'string' ? target : undefined;
+    return resolveState(target, this.current);
+  }
+
+  private begin(
+    target: WeatherTarget,
+    seconds: number,
+    ease: BlendEase,
+    to = this.checked(target, seconds, ease),
+  ): void {
+    const preset = typeof target === 'string' ? target : undefined;
     const event: WeatherEvent = { type: 'start', target: Object.freeze({ ...to }), preset };
     this.transition = { from: { ...this.current }, to, seconds, ease, elapsed: 0, preset };
     this.emit(event);
@@ -245,9 +255,10 @@ export class WeatherMachine implements Disposable {
   /** Jumps to `target` at once, ending any transition, schedule or random walk. */
   set(target: WeatherTarget): this {
     this.alive();
+    const next = resolveState(target, this.current);
     this.steps = this.walk = undefined;
     this.transition = undefined;
-    this.current = resolveState(target, this.current);
+    this.current = next;
     this.syncWind();
     return this;
   }
@@ -364,8 +375,11 @@ export class WeatherMachine implements Disposable {
   private step(dt: number): void {
     this.clock += dt;
     let remaining = dt;
-    // Several short blends or holds can end inside one step; process them in order.
-    for (let guard = 0; guard < 256; guard++) {
+    // Several short blends or holds can end inside one step; process them all, in order, until the step's time is
+    // used. Only zero-length blends and holds pass without time, and a schedule or walk has time in every lap (checked
+    // when it starts), so a run of them is bounded; past the bound something is wrong and it throws.
+    for (let idle = 0; ; ) {
+      const before = remaining;
       const t = this.transition,
         holder = this.steps ?? this.walk;
       if (t) {
@@ -387,6 +401,9 @@ export class WeatherMachine implements Disposable {
         holder.total = -1;
         this.advanceSchedule();
       } else break;
+      idle = remaining === before ? idle + 1 : 0;
+      if (idle > 2 * (this.steps?.list.length ?? 0) + 64)
+        throw new RangeError('Weather schedule made no progress in time; give its steps a hold or seconds above 0');
     }
     this.ground(dt);
     this.syncWind();

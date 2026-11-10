@@ -231,6 +231,38 @@ test('schedule and transitions are validated before anything changes', () => {
   assert.deepEqual(machine.state, { ...WEATHER_PRESETS.clear });
 });
 
+test('a refused transitionTo or set leaves a running schedule going', () => {
+  for (const refuse of [
+    (m) => m.transitionTo('nope'),
+    (m) => m.transitionTo('rain', { seconds: -1 }),
+    (m) => m.transitionTo('rain', { ease: 'bounce' }),
+    (m) => m.set('nope'),
+  ]) {
+    const machine = new WeatherMachine('clear'),
+      arrived = [];
+    machine.on((e) => e.type === 'arrive' && arrived.push(e.preset));
+    machine.schedule([
+      { to: 'rain', seconds: 1, hold: 1 },
+      { to: 'snow', seconds: 1, hold: 1 },
+    ]);
+    machine.update(0.5);
+    assert.throws(() => refuse(machine));
+    machine.update(10);
+    assert.deepEqual(arrived, ['rain', 'snow'], String(refuse));
+  }
+});
+
+test('many short steps inside one update all arrive: no elapsed time is dropped', () => {
+  const machine = new WeatherMachine('clear'),
+    arrived = [],
+    list = Array.from({ length: 300 }, (_, i) => ({ to: i % 2 ? 'rain' : 'fog', seconds: 0.001, hold: 0 }));
+  machine.on((e) => e.type === 'arrive' && arrived.push(e.preset));
+  machine.schedule([...list, { to: 'snow', seconds: 1, hold: 0 }]);
+  machine.update(5);
+  assert.equal(arrived.length, 301);
+  assert.deepEqual(machine.state, { ...WEATHER_PRESETS.snow });
+});
+
 test('a listener cannot change the weather it is called from', () => {
   const machine = new WeatherMachine('clear');
   machine.on(() => machine.transitionTo('rain'));

@@ -38,7 +38,7 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 - `transitionTo(target, {seconds = 30, ease = 'smoothstep'})` blends to a preset or a partial state. Starting another one mid-blend continues from the current weather, so nothing jumps. `set(target)` jumps.
 - `schedule([{to, seconds, hold}], {loop})` runs steps in order. `randomWalk(from, {chain, hold, blend, seed})` wanders by a weighted chain (`TEMPERATE` by default; a made-up mild climate), the same way for the same seed.
 - `on(listener)` gets `start` and `arrive` events once each per transition. A listener that changes the weather throws `MargoError` `'state'`.
-- `update(delta)` moves everything; a long delta (a hidden tab) is applied in pieces of at most 5 s so the ground and the schedule behave as if time had passed normally. `state` is a fresh copy each read.
+- `update(delta)` moves everything; a long delta (a hidden tab) is applied in pieces of at most 5 s so the ground and the schedule behave as if time had passed normally. Every blend and hold that ends inside a piece is processed, however many there are, so no time is lost. A call refused for a bad target, seconds or ease (`transitionTo`, `set`) throws before it stops a running schedule or walk. `state` is a fresh copy each read.
 - `wetness` rises under rain and hail (about 20 s) and dries (about 90 s); `snowCover` builds under snow (about 2 minutes) and melts (about 5 minutes). The time constants match the sky's own `Weather`.
 - `using` and `dispose()` end it; use afterwards throws `MargoError` `'disposed'`.
 
