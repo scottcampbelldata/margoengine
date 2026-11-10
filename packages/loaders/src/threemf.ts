@@ -65,14 +65,26 @@ interface Model {
 /** A parsed model part, as an extension of the 3MF reader sees it. */
 export type ThreeMFModel = Model;
 
+/** Package-part access for optional 3MF extensions that reference additional model streams. */
+export interface ThreeMFReadContext {
+  models: ReadonlyMap<string, ThreeMFModel>;
+  loadModelPart(path: string): Promise<ThreeMFModel>;
+}
+
 /** What the materials entry adds to the 3MF reader: more elements, and one call per written triangle corner. */
 export interface ThreeMFExtension {
+  /** Observe any element; returning true consumes it before the core-format reader (for 2D slice vertices). */
+  element?(model: ThreeMFModel, name: string, attributes: Record<string, string>): boolean | void;
+  /** One built object with its composed row-vector affine transform and output unit scale. */
+  instance?(model: ThreeMFModel, object: ObjectData, transform: Float64Array, scale: number, depth: number): void;
+  /** True only when a built native primitive provides geometry despite an empty triangle fallback. */
+  hasGeometry?(): boolean;
   /** An element the reader does not know, with its attributes. */
   open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
   /** The end of any element. */
   close?(model: ThreeMFModel, name: string): void;
   /** Every model part is parsed; `read` returns a package part's bytes. */
-  ready?(read: (path: string) => Promise<Uint8Array>): Promise<void>;
+  ready?(read: (path: string) => Promise<Uint8Array>, context: ThreeMFReadContext): Promise<void>;
   /** Extra text for a triangle's group key: triangles with different keys get different groups. */
   bucket(model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number): string;
   /** Corner `corner` of `triangle` has just been written as the next vertex. */
@@ -146,6 +158,7 @@ function parseModel(
     xml,
     {
       open(name, a) {
+        if (extension?.element?.(model, name, a)) return;
         switch (name) {
           case 'model':
             if (sawModel) throw new LoaderError(F, 'syntax', 'nested <model>');
@@ -355,7 +368,7 @@ export async function read3MF(
     ];
     for (const path of paths) if (path && !models.has(normalizePath(path))) pending.push(await load(path));
   }
-  await extension?.ready?.(read);
+  await extension?.ready?.(read, { models, loadModelPart: load });
   throwIfAborted(options.signal, F);
 
   const scale = options.units === 'file' ? 1 : THREEMF_UNITS[root.unit];
@@ -484,6 +497,7 @@ export async function read3MF(
     if (o.mesh && o.components.length)
       throw new LoaderError(F, 'syntax', `object ${id.slice(0, 32)} has both a mesh and components`);
     visiting.add(o);
+    extension?.instance?.(owner, o, m, scale, depth);
     if (o.mesh) emitMesh(owner, o, o.mesh, m);
     for (const component of o.components)
       emit(owner, component.objectId, component.path, compose(component.transform, m), depth + 1);
@@ -494,7 +508,8 @@ export async function read3MF(
     if (o.type === 'other') continue;
     emit(root, item.objectId, item.path, item.transform, 0);
   }
-  if (!indices.length) throw new LoaderError(F, 'syntax', 'the build contains no triangles');
+  if (!indices.length && !extension?.hasGeometry?.())
+    throw new LoaderError(F, 'syntax', 'the build contains no triangles');
   const result: ThreeMFResult = {
     kind: 'mesh',
     positions: positions.result(),

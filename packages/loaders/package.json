@@ -170,6 +170,10 @@
     "./geo": {
       "types": "./dist/geo.d.ts",
       "import": "./dist/geo.js"
+    },
+    "./threemf-lattice": {
+      "types": "./dist/threemf-lattice.d.ts",
+      "import": "./dist/threemf-lattice.js"
     }
   },
   "files": [

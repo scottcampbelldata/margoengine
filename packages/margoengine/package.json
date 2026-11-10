@@ -4357,6 +4357,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./loaders/threemf-lattice": {
+      "types": "./dist/loaders/threemf-lattice.d.ts",
+      "import": "./dist/loaders/threemf-lattice.js"
     }
   },
   "dependencies": {

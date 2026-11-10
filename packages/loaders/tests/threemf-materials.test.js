@@ -55,7 +55,8 @@ const VERTICES =
 const model = (resources, triangles, object = '') =>
   `<model unit="millimeter"><resources>${resources}<object id="9" type="model" ${object}><mesh>${VERTICES}<triangles>${triangles}</triangles></mesh></object></resources><build><item objectid="9"/></build></model>`;
 const pack = (xml, extra = {}) => zip({ '3D/3dmodel.model': xml, ...extra });
-const TEXTURE = '<texture2d id="1" path="/3D/Texture/a.png" contenttype="image/png" tilestyleu="clamp" filter="nearest"/>';
+const TEXTURE =
+  '<texture2d id="1" path="/3D/Texture/a.png" contenttype="image/png" tilestyleu="clamp" filter="nearest"/>';
 const COORDS =
   '<texture2dgroup id="2" texid="1"><tex2coord u="0" v="0"/><tex2coord u="1" v="0"/><tex2coord u="1" v="1"/><tex2coord u="0" v="1"/></texture2dgroup>';
 const near = (actual, expected) => {
@@ -98,7 +99,9 @@ test('two corners of one vertex keep different coordinates across a seam', async
 
 test('an object pid gives every plain triangle its texture coordinate', async () => {
   const result = await parse3MFMaterials(
-    pack(model(TEXTURE + COORDS, '<triangle v1="0" v2="1" v3="2"/>', 'pid="2" pindex="3"'), { '3D/Texture/a.png': PNG }),
+    pack(model(TEXTURE + COORDS, '<triangle v1="0" v2="1" v3="2"/>', 'pid="2" pindex="3"'), {
+      '3D/Texture/a.png': PNG,
+    }),
   );
   near(result.uvs, [0, 0, 0, 0, 0, 0]);
   assert.equal(result.groups[0].texture, 0);
@@ -117,7 +120,10 @@ test('textured and plain triangles fall into separate groups, and a mirror keeps
   const [i0, i1, i2] = result.indices;
   const uvOf = (i) => [result.uvs[i * 2], result.uvs[i * 2 + 1]];
   const xOf = (i) => result.positions[i * 3];
-  assert.deepEqual([xOf(i0), xOf(i1), xOf(i2)].map((x) => Math.round(x * 1000) + 0), [0, -1, -1]);
+  assert.deepEqual(
+    [xOf(i0), xOf(i1), xOf(i2)].map((x) => Math.round(x * 1000) + 0),
+    [0, -1, -1],
+  );
   near(uvOf(i0), [0, 1]);
   near(uvOf(i1), [1, 0]);
   near(uvOf(i2), [1, 1]);
@@ -156,7 +162,7 @@ test('composite materials mix their base colours by weight', async () => {
       ),
     ),
   );
-  near(result.groups[0].color, [0.75, 0, 0.25, 1]);
+  near(result.groups[0].color, [0.8808250210902997, 0, 0.5370987304831942, 1]);
 });
 
 test('multiproperties carry a texture and a colour, mixed by alpha over the layer below', async () => {
@@ -172,7 +178,8 @@ test('multiproperties carry a texture and a colour, mixed by alpha over the laye
   near(result.uvs, [1, 1, 1, 1, 1, 1]);
   assert.equal(result.groups[0].texture, 0);
   const a = 0x80 / 255;
-  near(result.colors.subarray(0, 3), [1 - a, 0, a]);
+  const srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+  near(result.colors.subarray(0, 3), [srgb(1 - a), 0, srgb(a)]);
 });
 
 test('a texture in a production part is found by that part', async () => {
@@ -201,7 +208,12 @@ test('bad references and values are named errors', async () => {
   await refuses(parse3MFMaterials(pack(model('<texture2d path="a"/>', triangle))), 'syntax');
   await refuses(parse3MFMaterials(pack(model('<texture2dgroup id="2"/>', triangle))), 'syntax');
   await refuses(
-    parse3MFMaterials(pack(model(`${TEXTURE}<texture2dgroup id="2" texid="1"><tex2coord u="x" v="0"/></texture2dgroup>`, triangle), image)),
+    parse3MFMaterials(
+      pack(
+        model(`${TEXTURE}<texture2dgroup id="2" texid="1"><tex2coord u="x" v="0"/></texture2dgroup>`, triangle),
+        image,
+      ),
+    ),
     'syntax',
   );
   await refuses(
@@ -213,13 +225,20 @@ test('bad references and values are named errors', async () => {
   const composite = (body) =>
     `<basematerials id="4"><base name="a" displaycolor="#FF0000"/></basematerials><compositematerials id="5" matid="4" matindices="0 1">${body}</compositematerials>`;
   await refuses(parse3MFMaterials(pack(model(composite('<composite values="1 1"/>'), triangle))), 'range');
-  await refuses(parse3MFMaterials(pack(model('<compositematerials id="5" matid="8" matindices="0"/>', triangle))), 'syntax');
-  const zero = '<basematerials id="4"><base name="a" displaycolor="#FF0000"/></basematerials><compositematerials id="5" matid="4" matindices="0"><composite values="0"/></compositematerials>';
-  await refuses(parse3MFMaterials(pack(model(zero, triangle))), 'range');
+  await refuses(
+    parse3MFMaterials(pack(model('<compositematerials id="5" matid="8" matindices="0"/>', triangle))),
+    'syntax',
+  );
+  const negative =
+    '<basematerials id="4"><base name="a" displaycolor="#FF0000"/></basematerials><compositematerials id="5" matid="4" matindices="0"><composite values="-1"/></compositematerials>';
+  await refuses(parse3MFMaterials(pack(model(negative, triangle))), 'range');
   await refuses(
     parse3MFMaterials(
       pack(
-        model(`${TEXTURE}${COORDS}<multiproperties id="7" pids="2"><multi pindices="0"/></multiproperties>`, '<triangle v1="0" v2="1" v3="2" pid="7" p1="3"/>'),
+        model(
+          `${TEXTURE}${COORDS}<multiproperties id="7" pids="2"><multi pindices="0"/></multiproperties>`,
+          '<triangle v1="0" v2="1" v3="2" pid="7" p1="3"/>',
+        ),
         image,
       ),
     ),

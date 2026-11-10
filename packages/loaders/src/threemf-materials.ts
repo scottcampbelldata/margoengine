@@ -2,6 +2,7 @@
 import { LoaderError, type LoadedGroup } from './types.js';
 import type { BinaryInput } from './util.js';
 import { floats } from './util.js';
+import { SRGBToLinear, LinearToSRGB } from '@margoengine/math/color';
 import {
   cornerProperty,
   read3MF,
@@ -49,6 +50,7 @@ interface TextureGroup {
 interface Multi {
   pids: string[];
   rows: number[][];
+  blends: string[];
 }
 interface Composite {
   base: Color[];
@@ -96,16 +98,27 @@ function required(value: string | undefined, element: string, attribute: string)
  * console.log(image.width, uvs?.length);
  * ```
  */
-export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFMaterials> {
+export function parse3MFMaterials(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFMaterials> {
+  return read3MFMaterials(input, options);
+}
+
+/** Shared materials reader with optional additional format hooks, used by the lattice/slice entry. */
+export async function read3MFMaterials(
+  input: BinaryInput,
+  options: ThreeMFOptions,
+  extra?: ThreeMFExtension,
+): Promise<ThreeMFMaterials> {
   const stores = new Map<ThreeMFModel, Store>(),
     textures: ThreeMFTexture[] = [],
     uvs = floats(),
-    colors = floats();
+    colors = floats(),
+    opacity = floats();
   let group: TextureGroup | undefined,
     multi: Multi | undefined,
     composite: Composite | undefined,
     textured = false,
-    varied = false;
+    varied = false,
+    translucent = false;
   const store = (model: ThreeMFModel): Store => {
     let found = stores.get(model);
     if (!found) stores.set(model, (found = { textures: new Map(), groups: new Map(), multis: new Map() }));
@@ -132,7 +145,8 @@ export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOpti
     const layers = layered ? undefined : multis.get(id);
     if (layers) {
       const row = layers.rows[index];
-      if (!row) throw new LoaderError(F, 'range', `property index ${index} is outside multiproperties ${id.slice(0, 32)}`);
+      if (!row)
+        throw new LoaderError(F, 'range', `property index ${index} is outside multiproperties ${id.slice(0, 32)}`);
       const out: ReturnType<typeof sample> = {};
       layers.pids.forEach((pid, layer) => {
         const { color, ...image } = sample(model, pid, row[layer] ?? 0, true);
@@ -140,9 +154,17 @@ export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOpti
         if (color) {
           const under = out.color,
             a = color[3];
-          out.color = under
-            ? [0, 1, 2, 3].map((c) => color[c] * a + under[c] * (1 - a)) as Color
-            : color;
+          if (under) {
+            const multiply = layers.blends[layer - 1] === 'multiply';
+            out.color = [0, 1, 2].map((c) =>
+              LinearToSRGB(
+                multiply
+                  ? SRGBToLinear(color[c]) * SRGBToLinear(under[c])
+                  : SRGBToLinear(color[c]) * a + SRGBToLinear(under[c]) * (1 - a),
+              ),
+            ) as Color;
+            out.color[3] = multiply ? a * under[3] : a + under[3] * (1 - a);
+          } else out.color = [...color];
         }
       });
       return out;
@@ -191,7 +213,11 @@ export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOpti
         }
         case 'multiproperties': {
           const id = required(a.id, name, 'id');
-          multi = { pids: required(a.pids, name, 'pids').trim().split(/\s+/), rows: [] };
+          const pids = required(a.pids, name, 'pids').trim().split(/\s+/),
+            blends = a.blendmethods?.trim().split(/\s+/) ?? [];
+          if (blends.length >= pids.length || blends.some((b) => b !== 'mix' && b !== 'multiply'))
+            throw new LoaderError(F, 'range', 'blendmethods must contain mix/multiply for at most layers minus one');
+          multi = { pids, rows: [], blends };
           store(model).multis.set(id, multi);
           model.propertyIds.push(id);
           break;
@@ -217,12 +243,19 @@ export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOpti
           indices.forEach((index, i) => {
             const weight = values[i] ?? 0,
               color = base[index];
+            if (weight < 0) throw new LoaderError(F, 'range', 'composite weights must be nonnegative');
             if (!color) throw new LoaderError(F, 'range', `matindices entry ${index} is outside its material group`);
             total += weight;
-            for (let c = 0; c < 4; c++) mixed[c] += color[c] * weight;
+            for (let c = 0; c < 4; c++) mixed[c] += (c < 3 ? SRGBToLinear(color[c]) : color[c]) * weight;
           });
-          if (!(total > 0)) throw new LoaderError(F, 'range', 'a composite has no weight');
-          composite.colors.push(mixed.map((value) => value / total) as Color);
+          if (total === 0) {
+            for (const index of indices)
+              for (let c = 0; c < 4; c++) mixed[c] += c < 3 ? SRGBToLinear(base[index][c]) : base[index][c];
+            total = indices.length;
+          }
+          composite.colors.push(
+            mixed.map((value, c) => (c < 3 ? LinearToSRGB(value / total) : value / total)) as Color,
+          );
           break;
         }
       }
@@ -245,9 +278,12 @@ export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOpti
       uvs.push(v ?? 0);
       const [r, g, b] = color ?? [1, 1, 1];
       colors.push3(r, g, b);
+      const alpha = color?.[3] ?? 1;
+      opacity.push(alpha);
+      if (alpha !== 1) translucent = true;
       if (!varied) {
         const first = at(model, model, object, mesh, t, 0).color;
-        varied = color !== first || store(model).multis.size > 0 && color !== undefined;
+        varied = color !== first || (store(model).multis.size > 0 && color !== undefined);
       }
     },
     group(target: ThreeMFMaterialGroup, model, object, mesh, t) {
@@ -255,10 +291,41 @@ export async function parse3MFMaterials(input: BinaryInput, options: ThreeMFOpti
       if (texture !== undefined) target.texture = texture;
     },
   };
-  const result = (await read3MF(input, options, extension)) as ThreeMFMaterials;
+  const hooks: ThreeMFExtension = extra
+    ? {
+        element: extra.element,
+        instance: extra.instance,
+        hasGeometry: extra.hasGeometry,
+        open(model, name, a) {
+          extension.open?.(model, name, a);
+          extra.open?.(model, name, a);
+        },
+        close(model, name) {
+          extension.close?.(model, name);
+          extra.close?.(model, name);
+        },
+        async ready(read, context) {
+          await extra.ready?.(read, context);
+          await extension.ready?.(read, context);
+        },
+        bucket(model, object, mesh, t) {
+          return extension.bucket(model, object, mesh, t) + '|' + extra.bucket(model, object, mesh, t);
+        },
+        corner(model, object, mesh, t, k) {
+          extension.corner(model, object, mesh, t, k);
+          extra.corner(model, object, mesh, t, k);
+        },
+        group(group, model, object, mesh, t) {
+          extension.group(group, model, object, mesh, t);
+          extra.group(group, model, object, mesh, t);
+        },
+      }
+    : extension;
+  const result = (await read3MF(input, options, hooks)) as ThreeMFMaterials;
   result.textures = textures;
   if (textured) result.uvs = uvs.result();
   if (varied) result.colors = colors.result();
   else delete result.colors;
+  if (translucent) result.attributes = { ...result.attributes, opacity: opacity.result() };
   return result;
 }

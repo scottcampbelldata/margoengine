@@ -3179,3 +3179,6 @@ Scenery moon: build packages, then run
 Repeat the GPU command with `--compat` after `moon-gpu.mjs` for full WebGL2.
 The fixture checks 1x/4x MSAA, real map variation, synthetic north/east landmarks,
 full/quarter/new phases, earthshine, deterministic frames and mesh occlusion.
+
+### Batch 202 native 3MF
+Build loaders and run the threemf-lattice and threemf-materials Node tests with --test-timeout=120000, followed by the affected package/dependent suite. `threemf-native-fixture.js` defines original XML data; the test verifies the committed lattice-slices.3mf browser ZIP against writeZip(nativeFixtureXML()). Shared-lock loader browser checks exercise the new entry, native resources and existing createMeshes fallback on native WebGPU and --compat. Material expectations use explicit standard color-transfer equations and unchanged tolerances. No speed measurement is claimed.

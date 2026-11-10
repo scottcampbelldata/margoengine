@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13094106,
+  "total": 13108147,
   "history": [
     {
       "date": "2026-10-24",
@@ -6579,6 +6579,12 @@
       "commit": "81738add5",
       "reason": "batch232-new-optional-textured-moon",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-202",
+      "reason": "Optional loader entries loaders:threemf-lattice, loaders:threemf-materials, selection:highlight preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
+      "grew": 6
     }
   ],
   "items": {
@@ -7036,7 +7042,7 @@
     "@margoengine/loaders/svg": 11621,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
-    "@margoengine/loaders/threemf-materials": 7917,
+    "@margoengine/loaders/threemf-materials": 8338,
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vdb": 6406,
     "@margoengine/loaders/vrml": 5087,
@@ -7780,6 +7786,10 @@
     "@margoengine/road/structures": 3908,
     "@margoengine/labels/gpu": 6034,
     "margoengine/labels/gpu": 6034,
-    "@margoengine/scenery/moon": 4231
+    "@margoengine/scenery/moon": 4231,
+    "@margoengine/loaders/threemf-lattice": 12644,
+    "margoengine/loaders/threemf-lattice": 326,
+    "margoengine/loaders/threemf-materials": 328,
+    "margoengine/selection/highlight": 322
   }
 }

@@ -3712,3 +3712,6 @@ complementary-phase earthshine. No core/stage change. CPU:
 with NASA's public-use CGI Moon Kit map and synthetic orientation landmarks.
 Limits: visual Lambert model, zero libration, no terrain/eclipses/extinction;
 no measured astronomical photometric accuracy is claimed.
+
+### 3MF native resource fidelity and material equations (batch 202)
+`packages/loaders/tests/threemf-lattice.test.js` proves native beam/cap/radius/ball/set data, exact source doubles and affine instances, empty triangle fallback, inline/external slices, void layers, contour closure, OPC part access, component precedence, clipping references and bounded reference expansion. Independent expected material values prove uniform zero composites, row defaults/ignored extras, linear mix/multiply and alpha. Existing materials tests keep their tolerances and now assert normative transfer-function values. The browser fixture parses native resources and renders the file's composite/multi-property triangle preview on both backends. This claims native resource decoding and preview material correctness; source meshes, analytic construction parameters and manufacturing geometry remain distinct representations.

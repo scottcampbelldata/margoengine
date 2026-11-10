@@ -4505,3 +4505,4 @@ Batch 232 moon: no open defect found in the new lunar layer. CPU regression cove
 texture replacement/restoration/disposal, malformed inputs and aborted fetch;
 `packages/scenery/test/moon-gpu.mjs` proves phase, earthshine, map orientation and
 depth masking. The visual approximations are listed in docs/limits.md.
+`loaders/geo` (batch 202 fix-phase follow-up): a pre-aborted signal reaches `buildGeo` only after binary decoding in `parseShapefile` and `parseMVT`. Repro: call either parser with `signal: AbortSignal.abort()` and truncated bytes (empty SHP or MVT byte 128); both report code truncated before aborted. Cause: the binary entry functions lack the initial throwIfAborted check already present in the text path. Decoding/cancellation quality gap under lane rules 21/22; add entry checks and a regression in the fix phase.

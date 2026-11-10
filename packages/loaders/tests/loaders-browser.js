@@ -6,6 +6,7 @@ import { parsePLY } from '@margoengine/loaders/ply';
 import { parseOFF } from '@margoengine/loaders/off';
 import { parseVTKLegacy } from '@margoengine/loaders/vtk-legacy';
 import { parseGeoJSON } from '@margoengine/loaders/geo';
+import { parse3MFLattice } from '@margoengine/loaders/threemf-lattice';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -92,6 +93,15 @@ window.runLoaderTests = async () => {
   engine.render();
   geoScene.dispose();
   checks.push('Geospatial polygon holes and feature groups render through createMeshes');
+  const native = await load('/tests/fixtures/lattice-slices.3mf', parse3MFLattice, { maxBytes: 1 << 20 });
+  assert(
+    native.objects[0].lattice.activeBeams.length === 1 && native.sliceInstances[0].stack.layers.length === 2,
+    'native beam and slice resources survive browser decoding',
+  );
+  const nativeScene = createMeshes(engine, native);
+  engine.render();
+  nativeScene.dispose();
+  checks.push('Native 3MF beam/slice data and composite/multi material fallback render together');
   const result = await load('/tests/fixtures/face_colors.3mf', parse3MF, { maxBytes: 1 << 20 });
   assert(result.groups.length === 5, `expected 5 color groups, got ${result.groups.length}`);
   checks.push('load() + parse3MF in the browser (DecompressionStream deflate-raw)');

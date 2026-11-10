@@ -23,9 +23,23 @@ export interface ThreeMFTexture {
 
 export function parse3MFMaterials(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFMaterials>;
 
+export function read3MFMaterials(input: BinaryInput, options: ThreeMFOptions, extra?: ThreeMFExtension): Promise<ThreeMFMaterials>;
+
 // Not exported from this entry, but used by the exports above:
 
 type BinaryInput = ArrayBuffer | ArrayBufferView;
+
+type Color = [number, number, number, number];
+
+class Growable<T extends Float32Array | Uint32Array> {
+    array: T;
+    length: number;
+    constructor(make: (size: number) => T, capacity?: number);
+    reserve(extra: number): void;
+    push(value: number): void;
+    push3(a: number, b: number, c: number): void;
+    result(): T;
+}
 
 interface LoadedGeometry {
     kind: 'mesh' | 'points';
@@ -47,15 +61,68 @@ interface LoadedGroup {
     properties?: Record<string, number | number[]>;
 }
 
+interface MeshData {
+    vertices: Growable<Float32Array>;
+    triangles: Growable<Uint32Array>;
+    pid: Growable<Uint32Array>;
+    p: Growable<Uint32Array>;
+}
+
+interface Model {
+    unit: string;
+    objects: Map<string, ObjectData>;
+    properties: Map<string, Color[]>;
+    propertyIds: string[];
+    items: {
+        objectId: string;
+        path?: string;
+        transform: Float64Array;
+    }[];
+    metadata: Record<string, string>;
+}
+
+interface ObjectData {
+    id: string;
+    name?: string;
+    type: string;
+    pid?: string;
+    pindex?: number;
+    mesh?: MeshData;
+    components: {
+        objectId: string;
+        path?: string;
+        transform: Float64Array;
+    }[];
+}
+
 interface ParseLimits {
     maxVertices?: number;
     maxTriangles?: number;
 }
 
+interface ThreeMFExtension {
+    element?(model: ThreeMFModel, name: string, attributes: Record<string, string>): boolean | void;
+    instance?(model: ThreeMFModel, object: ObjectData, transform: Float64Array, scale: number, depth: number): void;
+    hasGeometry?(): boolean;
+    open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
+    close?(model: ThreeMFModel, name: string): void;
+    ready?(read: (path: string) => Promise<Uint8Array>, context: ThreeMFReadContext): Promise<void>;
+    bucket(model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number): string;
+    corner(model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number, corner: number): void;
+    group(group: LoadedGroup, model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number): void;
+}
+
+type ThreeMFModel = Model;
+
 interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
     signal?: AbortSignal;
+}
+
+interface ThreeMFReadContext {
+    models: ReadonlyMap<string, ThreeMFModel>;
+    loadModelPart(path: string): Promise<ThreeMFModel>;
 }
 
 interface ThreeMFResult extends LoadedGeometry {
