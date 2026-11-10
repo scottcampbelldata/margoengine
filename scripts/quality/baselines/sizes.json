@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12677366,
+  "total": 12693625,
   "history": [
     {
       "date": "2026-10-24",
@@ -6274,6 +6274,12 @@
       "commit": "7623f09ce",
       "reason": "Batch 249 parallel: new optional shared-world worker scheduler 0 -> 4938 B gzip, separate worker 0 -> 494 B. Buffer hazards, guarded lifetime and reentrant disposal stay together; worker remains an on-demand asset. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-199-job-1",
+      "reason": "selection root 21061 -> 21308 B gzip; hit-details absent -> 15002 B, ceilings 21142 -> 21948 and new 15453. Shared replay hooks retain one-pass current-pose visibility and one staging map; splitting the same picker would duplicate its ownership and decoding. Core + stage unchanged at 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -6995,7 +7001,7 @@
     "@margoengine/sciviz/tubes": 2789,
     "@margoengine/sciviz/vtk": 6201,
     "@margoengine/sciviz/webgl2": 4667,
-    "@margoengine/selection": 21142,
+    "@margoengine/selection": 21948,
     "@margoengine/selection/spatial": 2313,
     "@margoengine/shader": 19028,
     "@margoengine/shader/compute-texture": 4761,
@@ -7415,6 +7421,7 @@
     "@margoengine/tiles/features": 9837,
     "@margoengine/procedural/textures-pbr": 5202,
     "@margoengine/ecs dist/workers/parallel.js": 750,
-    "@margoengine/ecs/parallel": 5194
+    "@margoengine/ecs/parallel": 5194,
+    "@margoengine/selection/hit-details": 15453
   }
 }

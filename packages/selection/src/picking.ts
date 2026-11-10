@@ -34,6 +34,7 @@ import {
   type PickProxy,
 } from './models.js';
 import { retire } from '../../shared/frame-resources.js';
+import type { PickSurface } from './surface.js';
 import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number; VERTEX: number; INDEX: number };
@@ -97,6 +98,9 @@ interface PickTile {
   height: number;
   candidates: Map<Mesh, PickingSource[]> | undefined;
   instances: number[][];
+  matrix?: Float32Array;
+  eye?: readonly number[];
+  origin?: number[];
 }
 /** A `pickMany` call waiting for its turn in `engine.pick`; `outside` lists points beyond the chosen view. */
 interface PickBatch {
@@ -140,6 +144,12 @@ export interface PickingOverlay {
 }
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
+  /** World surface normal when using the optional hit-details picker. */
+  normal?: readonly [number, number, number];
+  /** Distance from the active camera in world units when using hit-details. */
+  distance?: number;
+  /** Perspective-correct UV0 when using hit-details; core geometry has no UVs and returns [0, 0]. */
+  uv?: readonly [number, number];
   mesh: Mesh;
   model?: ModelLike;
   primitive?: ModelPrimitiveLike;
@@ -243,6 +253,8 @@ function intersects(matrix: Float32Array, model: Float32Array, b: ArrayLike<numb
 /** Optional mesh picking: forward-pass IDs, with a current-pose 3x3 pass for registered GPU sources. */
 export class Picking implements EnginePlugin {
   readonly name = 'picking';
+  /** Optional entry supplies extra attachments; ordinary picks retain the ID-only path. */
+  protected surface?: PickSurface;
   private engine?: Engine;
   private device?: GPUDevice;
   private disposed = false;
@@ -328,9 +340,10 @@ export class Picking implements EnginePlugin {
     this.engine = engine;
     this.device = engine.gpu;
     this.primitives.setup(engine);
+    this.surface?.setup(this.device);
     this.uniform = this.device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     // Three 12-byte rows use WebGPU's 256-byte copy pitch; padding is never resolved as IDs.
-    this.read = this.device.createBuffer({ size: 768, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    this.read = this.device.createBuffer({ size: this.surface ? 2304 : 768, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     this.micro = this.device.createTexture({
       size: [3, 3],
       format: 'r32uint',
@@ -369,15 +382,15 @@ export class Picking implements EnginePlugin {
     if (!pipeline) {
       if (this.pipelines.size >= 64)
         throw new RangeError('Too many picking shader variants; reduce distinct materials and formats to 64 or fewer.');
-      const module = c.device.createShaderModule({ code });
+      const module = c.device.createShaderModule({ code: !mrt && this.surface ? this.surface.shader(code, 'core') : code });
       pipeline = c.device.createRenderPipeline({
         ...c.descriptor,
         layout: 'auto',
-        vertex: { ...c.descriptor.vertex, module },
+        vertex: { ...c.descriptor.vertex, module, ...(!mrt && this.surface ? { buffers: this.surface.buffers(c.descriptor.vertex.buffers as GPUVertexBufferLayout[], 'core') } : {}) },
         fragment: {
           module,
           entryPoint: 'fragment',
-          targets: mrt ? [{ format: c.format }, { format: 'r32uint' }] : [{ format: 'r32uint' }],
+          targets: mrt ? [{ format: c.format }, { format: 'r32uint' }] : [{ format: 'r32uint' }, ...(this.surface?.targets ?? [])],
         },
         depthStencil: mrt
           ? c.descriptor.depthStencil
@@ -451,6 +464,7 @@ export class Picking implements EnginePlugin {
     const e = this.engine!;
     // shortcut: mutable clipping uniforms have no revision, use the micro pass while a `section` plugin is attached.
     if (
+      this.surface ||
       this.primitives.hasSources ||
       this.overlays.some(Boolean) ||
       !this.captured ||
@@ -600,14 +614,17 @@ export class Picking implements EnginePlugin {
       origin = [1 + x0 - px, 1 + y0 - py];
     }
     encoder.copyTextureToBuffer({ texture, origin }, { buffer: read, offset, bytesPerRow: 256 }, [width, height]);
+    this.surface?.copy(encoder, read, offset, origin, [width, height]);
+    const camera = view?.camera ?? e.camera;
     if (!batchEncoder) device.queue.submit([encoder.finish()]);
-    return { at: offset / 4, cx: px - x0, cy: py - y0, width, height, candidates, instances: this.instanceHits };
+    return { at: offset / 4, cx: px - x0, cy: py - y0, width, height, candidates, instances: this.instanceHits, ...(this.surface ? { matrix: this.frame.slice(0, 16), eye: [...camera.position], origin } : {}) };
   }
   /** The hit of one mapped tile: the center's ID, else the nearest neighbor's, resolved and checked against the scene. */
   private decode(scene: PickScene, data: Uint32Array, tile: PickTile, view: PickView | undefined): PickHit | null {
     const e = this.engine!,
       { device, live, meshes, models, starts, total, list, capacity } = scene,
       { at, cx, cy, width, height, candidates } = tile;
+    let hx = cx, hy = cy;
     let id = data[at + cy * 64 + cx];
     if (!id)
       for (const [dx, dy] of [
@@ -623,6 +640,7 @@ export class Picking implements EnginePlugin {
         const nx = cx + dx,
           ny = cy + dy;
         if (nx >= 0 && ny >= 0 && nx < width && ny < height && data[at + ny * 64 + nx]) {
+          hx = nx; hy = ny;
           id = data[at + ny * 64 + nx];
           break;
         }
@@ -678,6 +696,8 @@ export class Picking implements EnginePlugin {
           Object.assign(hit, { model, primitive: model.primitives[primitiveIndex], primitiveIndex });
       }
     }
+    if (this.surface && tile.matrix && tile.eye && tile.origin && !hit.approximate && !hit.line && !hit.cloud && !hit.splats)
+      this.surface.decode(hit, data, at, hx, hy, tile.matrix, tile.eye, tile.origin);
     return hit;
   }
   private async resolve(x: number, y: number, view?: PickView): Promise<PickHit | null> {
@@ -728,7 +748,7 @@ export class Picking implements EnginePlugin {
       layers = view?.layers ?? layerRegistry()?.cameras.get(view?.camera ?? e.camera),
       // One tile per point, for this call only: it outlives no device.
       read = device.createBuffer({
-        size: batch.points.length * tileBytes,
+        size: batch.points.length * (this.surface ? 2304 : tileBytes),
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
       }),
       tiles: (PickTile | null)[] = [];
@@ -739,7 +759,7 @@ export class Picking implements EnginePlugin {
         encoder = captured ? device.createCommandEncoder() : undefined;
       batch.points.forEach(([x, y], i) => {
         const onCanvas = x >= 0 && y >= 0 && x < cssWidth && y < cssHeight,
-          tile = onCanvas ? this.submit(scene, x, y, view, read, i * tileBytes, captured, encoder) : null;
+          tile = onCanvas ? this.submit(scene, x, y, view, read, i * (this.surface ? 2304 : tileBytes), captured, encoder) : null;
         tiles.push(tile);
         if (onCanvas && !tile) batch.outside.push(i);
       });
@@ -843,7 +863,7 @@ export class Picking implements EnginePlugin {
         values[values.length - 1] = mesh.id;
       }
     const pass = encoder.beginRenderPass({
-      colorAttachments: [{ view: c.color, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [{ view: c.color, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }, ...(this.surface?.views.map(view => ({view, clearValue: {r:0,g:0,b:0,a:0}, loadOp: 'clear' as const, storeOp:'store' as const})) ?? [])],
       depthStencilAttachment: { view: c.depth, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' },
     });
     pass.setPipeline(pipeline);
@@ -909,7 +929,7 @@ export class Picking implements EnginePlugin {
         format: 'depth32float',
         depthWriteEnabled: true,
         depthCompare: 'greater-equal',
-      });
+      }, undefined, this.surface);
       draws.draw(device, pass, this.modelPipeline, matrix);
     }
     pass.end();
@@ -917,6 +937,7 @@ export class Picking implements EnginePlugin {
       ? undefined
       : this.primitives.draw(c, matrix, {
           format: 'r32uint',
+          surface: this.surface,
           depthFormat: 'depth32float',
           filter: (node, _primitive, source, index) => {
             const owner = models.indexOf(source as unknown as ModelLike),
@@ -949,6 +970,7 @@ export class Picking implements EnginePlugin {
     if (this.engine && attachedPickers.get(this.engine) === this) attachedPickers.delete(this.engine);
     if (!this.device) return;
     this.primitives.release();
+    this.surface?.dispose();
     for (const resource of [this.ids, this.micro, this.depth, this.uniform, this.read, this.instances])
       retire(this.device!, resource);
     this.ids = this.micro = this.depth = undefined;

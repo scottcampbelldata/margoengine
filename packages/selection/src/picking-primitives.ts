@@ -1,3 +1,4 @@
+import type { PickSurface } from './surface.js';
 import type { Engine, Mesh, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh as MeshHandle } from '@margoengine/core';
@@ -51,6 +52,7 @@ export interface PickingSource {
   prepareDeformation?(context: { backend: 'webgpu'; device: GPUDevice; encoder: GPUCommandEncoder }): void;
 }
 interface DrawOptions {
+  surface?: PickSurface;
   format: GPUTextureFormat;
   depthFormat: GPUTextureFormat;
   sampleCount?: number;
@@ -379,7 +381,7 @@ export class PickingPrimitives {
     }
     for (const record of draws.splice(primitives.length)) retire(this.device!, record.uniform);
     const pass = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }, ...(options.surface?.views.map(view => ({view, loadOp:'load' as const, storeOp:'store' as const})) ?? [])],
       depthStencilAttachment: {
         view: c.depth,
         depthLoadOp: 'load',
@@ -419,6 +421,7 @@ export class PickingPrimitives {
         options.sampleCount ?? 1,
         options.depthCompare ?? 'greater-equal',
         mask,
+        !!options.surface,
         opacity,
         solid,
         displacement?.key ?? displaced,
@@ -435,15 +438,16 @@ export class PickingPrimitives {
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
       if (clipped) code = clippedDepth(code, 3, 'materialClip');
+      if (options.surface) code = options.surface.shader(code, 'primitive');
       const module = this.device!.createShaderModule({ code });
       pipeline = this.device!.createRenderPipeline({
         layout: 'auto',
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: casterBuffers(80, displaced),
+          buffers: options.surface ? options.surface.buffers(casterBuffers(80, displaced), 'primitive') : casterBuffers(80, displaced),
         },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }] },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }, ...(options.surface?.targets ?? [])] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
         multisample: { count: options.sampleCount ?? 1 },
         depthStencil: {

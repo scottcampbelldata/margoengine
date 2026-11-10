@@ -48,6 +48,9 @@ interface ModelPrimitiveLike {
 }
 
 interface PickHit {
+    normal?: readonly [number, number, number];
+    distance?: number;
+    uv?: readonly [number, number];
     mesh: Mesh;
     model?: ModelLike;
     primitive?: ModelPrimitiveLike;
@@ -63,6 +66,17 @@ interface PickHit {
     splat?: number;
 }
 
+interface PickSurface {
+    readonly targets: GPUColorTargetState[];
+    readonly views: GPUTextureView[];
+    setup(device: GPUDevice): void;
+    shader(code: string, kind: 'core' | 'model' | 'primitive'): string;
+    buffers(buffers: GPUVertexBufferLayout[], kind: 'core' | 'model' | 'primitive'): GPUVertexBufferLayout[];
+    copy(encoder: GPUCommandEncoder, buffer: GPUBuffer, offset: number, origin: number[], size: number[]): void;
+    decode(hit: PickHit, data: Uint32Array, offset: number, x: number, y: number, matrix: Float32Array, eye: readonly number[], origin: number[]): void;
+    dispose(): void;
+}
+
 type PickView = RenderView & {
     pixels: true;
 };
@@ -72,6 +86,7 @@ class Picking implements EnginePlugin {
         capture?: boolean;
     };
     readonly name = "picking";
+    protected surface?: PickSurface;
     constructor(options?: {
         capture?: boolean;
     });

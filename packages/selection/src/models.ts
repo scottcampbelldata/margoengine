@@ -1,3 +1,4 @@
+import type { PickSurface } from './surface.js';
 import type { Engine, FrameGraph } from '@margoengine/core/extension';
 import { instanceMatrix } from '../../shared/instances.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -78,16 +79,17 @@ export function modelPipeline(
   format: GPUTextureFormat,
   depthStencil: GPUDepthStencilState,
   multisample?: GPUMultisampleState,
+  surface?: PickSurface,
 ): GPURenderPipeline {
-  const module = device.createShaderModule({ code });
+  const module = device.createShaderModule({ code: surface ? surface.shader(code, 'model') : code });
   return device.createRenderPipeline({
     layout: 'auto',
     vertex: {
       module,
       entryPoint: 'vertex',
-      buffers: [{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }],
+      buffers: surface ? surface.buffers([{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }], 'model') : [{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }],
     },
-    fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
+    fragment: { module, entryPoint: 'fragment', targets: [{ format }, ...(surface?.targets ?? [])] },
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil,
     multisample,
