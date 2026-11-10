@@ -4610,3 +4610,5 @@ Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage;
 The camera rig is built with direct CPU trace and GPU overlay regressions. No open defect identified in this job's scope; other known defects remain in their existing entries.
 
 Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing unregistered headless/rigging/splats/worker browser files before selecting pixel. Repro: node scripts/gpu-package-tests.mjs --no-build --only=pixel. Cause: global registration audit precedes selection. Pixel package GPU scripts run directly on both backends for this batch.
+
+- Batch 236: origin/main 42c1cbdac already contains conflict markers in known-bugs.md and whitepaper/reproduce.md; reproduce with rg for conflict markers. Cause: committed shared-doc merge text. Outside weather scope, deferred under rule 21.

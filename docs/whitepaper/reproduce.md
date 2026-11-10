@@ -3310,3 +3310,6 @@ After build:packages, run `node packages/scatter/test/occlusion.browser.mjs` and
 >>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 Batch 244 camera rig: build packages, run `node --test --test-timeout=60000 packages/pixel/tests/follow.test.js`, then `node scripts/gpu-lock.mjs run --owner=pixel-follow --max=2 --wait-max=60 -- node packages/pixel/tests/follow-check.mjs` and the same command with `--compat` after the script path. Original analytic fixtures need no downloaded data.
+
+## Imported weather (batch 236 job 1)
+After build: `node --test --test-timeout=60000 packages/weather/tests/gltf.test.js`. GPU: `node scripts/gpu-lock.mjs run --owner=weather-proof --wait-max=60 --max=2 -- node packages/weather/tests/parity-browser.mjs gltf`, then the same with `--compat`. Fixture is original procedural test geometry, not an imported third-party demo. The gate requires wetness, puddles, animated rings and snow to change pixels; zero weather and disposal must match the baseline exactly.

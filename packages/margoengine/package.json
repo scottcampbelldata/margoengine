@@ -4366,6 +4366,10 @@
       "types": "./dist/weather/data.d.ts",
       "import": "./dist/weather/data.js"
     },
+    "./weather/gltf": {
+      "types": "./dist/weather/gltf.d.ts",
+      "import": "./dist/weather/gltf.js"
+    },
     "./webgl2-compat": {
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"

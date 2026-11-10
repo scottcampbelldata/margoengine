@@ -668,3 +668,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/pixel (batch 244 job 1): document /follow, PixelFollow manual/attach, target/getter, per-axis lerp/dead-zone/offset/world units, bounds/undersized worlds, seeded shake, flash/fade/reset, overlay RGBA, timing, defaults and disposal.
 - margoengine (batch 244 job 1): document generated pixel/follow forwarding entry.
+- @margoengine/weather (batch 236 job 1): document /gltf GLTFWeather attach/add/removal, shared puddle/snow options, texture/extension composition, backend support, shader and vertex-density limits; examples deferred.
+- margoengine (batch 236 job 1): document weather/gltf forwarding entry; examples deferred.

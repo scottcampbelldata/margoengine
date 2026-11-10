@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Imported weather correctness</title></head><body><canvas style="width:256px;height:192px"></canvas>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/model-entry.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {GLTFWeather} from '/packages/weather/dist/gltf.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,6,8],target:[0,0,0]}});
+engine.stop();const errors=[];engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+// A clean-room glTF fixture: broad green floor and red wall share the imported PBR path.
+const pos=new Float32Array([-6,0,-6,6,0,-6,6,0,6,-6,0,6,-3,0,-3,3,0,-3,3,5,-3,-3,5,-3]);
+const normals=new Float32Array([0,1,0,0,1,0,0,1,0,0,1,0,0,0,1,0,0,1,0,0,1,0,0,1]);
+const ix=new Uint16Array([0,2,1,0,3,2,4,5,6,4,6,7]);
+const buffer=new Uint8Array(pos.byteLength+normals.byteLength+ix.byteLength);buffer.set(new Uint8Array(pos.buffer));buffer.set(new Uint8Array(normals.buffer),pos.byteLength);buffer.set(new Uint8Array(ix.buffer),pos.byteLength+normals.byteLength);
+const doc={asset:{version:'2.0'},buffers:[{byteLength:buffer.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:pos.byteLength},{buffer:0,byteOffset:pos.byteLength,byteLength:normals.byteLength},{buffer:0,byteOffset:pos.byteLength+normals.byteLength,byteLength:ix.byteLength}],accessors:[{bufferView:0,componentType:5126,count:8,type:'VEC3',min:[-6,0,-6],max:[6,5,6]},{bufferView:1,componentType:5126,count:8,type:'VEC3'},{bufferView:2,componentType:5123,count:6,type:'SCALAR'},{bufferView:2,byteOffset:12,componentType:5123,count:6,type:'SCALAR'}],materials:[{pbrMetallicRoughness:{baseColorFactor:[0.05,0.6,0.05,1],metallicFactor:0,roughnessFactor:0.9}},{pbrMetallicRoughness:{baseColorFactor:[0.6,0.05,0.05,1],metallicFactor:0,roughnessFactor:0.9}}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0},{attributes:{POSITION:0,NORMAL:1},indices:3,material:1}]}],nodes:[{mesh:0}],scenes:[{nodes:[0]}],scene:0};
+const model=parseGLTF(engine,doc,[buffer]);
+const d=engine.gpu;
+async function shot(){engine.render({delta:0});await d.queue.onSubmittedWorkDone();const texture=post.sceneTexture;
+const code='@group(0) @binding(0) var t:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> o:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) i:vec3u){let s=textureDimensions(t);if(any(i.xy>=s)){return;}o[i.y*s.x+i.x]=textureLoad(t,vec2i(i.xy),0);}';
+const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code}),entryPoint:'main'}}),size=texture.width*texture.height*16;
+const out=d.createBuffer({size,usage:128|4}),st=d.createBuffer({size,usage:8|1});const e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:out}}]}));pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();e.copyBufferToBuffer(out,0,st,0,size);d.queue.submit([e.finish()]);await st.mapAsync(1);const a=new Float32Array(st.getMappedRange()).slice();st.unmap();out.destroy();st.destroy();return a;}
+const difference=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>1e-4)n++;return n;};
+window.run=async()=>{d.pushErrorScope('validation');const dry=await shot();const effect=GLTFWeather.attach(engine,{puddles:{wetness:0,coverage:0},snow:{cover:0,depth:0}});effect.add(model);const unchanged=difference(dry,await shot());effect.options.puddles.wetness=1;const wet=await shot();effect.options.puddles.coverage=0.7;const puddles=await shot();effect.options.puddles.rain=1;engine.render({delta:0.3});const rings=await shot();effect.options.snow.cover=1;const snow=await shot();effect.dispose();const restored=difference(dry,await shot());const validation=(await d.popErrorScope())?.message??null;return {unchanged,wet:difference(dry,wet),puddles:difference(wet,puddles),rings:difference(puddles,rings),snow:difference(rings,snow),restored,validation,errors};};
+window.ready=true;
+</script></body></html>

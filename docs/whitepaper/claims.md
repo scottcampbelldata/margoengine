@@ -3858,3 +3858,6 @@ OccludedScatter removes camera-hidden instances from colour indirect draws witho
 
 ### Batch 244 job 1: whole-pixel camera rig
 `pixel/follow` implements the requested follower, lerp, dead zone, world bounds, shake, flash and fade row. `packages/pixel/tests/follow.test.js` proves hand-computed traces, fractional accumulation, refresh-rate equality, unit conversion, bounds, shake determinism and effect composition; `follow-check.mjs` reads every viewport pixel for colored flash/fade, layer masks, separate views and disposal on native WebGPU and full WebGL2. This claims behavior parity with the public Phaser camera manual, not image similarity to proprietary game footage. No core/stage changes or timing claim.
+
+## Imported-model weather (batch 236 job 1)
+The optional weather/gltf entry applies the same wetness, standing-water, rain-ring, snow-cover and grain functions as weather/puddles and weather/snow to imported gltf-pro surfaces. Proof: packages/weather/tests/gltf.test.js and packages/weather/tests/gltf-check.html, exercised by parity-browser.mjs on WebGPU and WebGL2 compatibility. No speed claim. Depth is vertex-dependent; arbitrary replacement shaders are rejected.

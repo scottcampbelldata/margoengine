@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13390510,
+  "total": 13395713,
   "history": [
     {
       "date": "2026-10-24",
@@ -6864,6 +6864,12 @@
       "commit": "78c0082ce",
       "reason": "batch-244-follow-new-optional-entry-0-to-3605B-gzip-camera-and-overlay-no-core-stage-growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "78c0082ce",
+      "reason": "batch236: add optional weather/gltf entry with shared wetness puddle and snow shaders; no root imports",
+      "grew": 1
     }
   ],
   "items": {
@@ -8111,6 +8117,7 @@
     "@margoengine/text/fit": 10636,
     "@margoengine/culling/depth": 6320,
     "@margoengine/scatter/occlusion": 1433,
-    "@margoengine/pixel/follow": 3861
+    "@margoengine/pixel/follow": 3861,
+    "@margoengine/weather/gltf": 5203
   }
 }
