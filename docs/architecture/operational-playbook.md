@@ -2300,6 +2300,15 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### 5. Stage GPU inventory registration (2026-11-10)
+
+Stage declares `test:gpu:viewer-extras`, so the global browser inventory and selected GPU plans agree. The leaf exercises native WebGPU and WebGL2 compatibility, exact viewer pixels, animation, variants, picking, hotspots and element lifecycle. `tests/modern-extension-suite.test.js` now checks every package `test/gpu/*-check.mjs` against that package's declared GPU scripts; the added assertion fails on the unregistered stage leaf before the fix. Existing check:merge inventory coverage remains active. No rendering code or public API changes.
+
+The Batch 242 cameras panorama/stereo, splats lod-sog and weather parity drivers already have declared scripts on current main. After the stage registration, the original voxel-net filtered plan and the explicit driver selection both succeed; no additional package changes are needed.
+
+Clean-room research: Gregg Rothermel and Mary Jean Harrold, *Analyzing Regression Test Selection Techniques* (1996), https://digitalcommons.unl.edu/csearticles/13/ ; and the same authors, *Empirical Studies of a Safe Regression Test Selection Technique* (1998), https://digitalcommons.unl.edu/csearticles/11/ . The first frames selection completeness; the second evaluates safe subsets against full-suite execution. Applied here as a complete declaration inventory plus the affected package's GPU tests, with dependent CPU tests. No companion source read or copied; no timing claim.
+
+
 Batch 180 job 2 vector geography: optional geo-vector owns float64 geographic preparation and float32 retained vertex buffers, with no core/stage/backend changes. Angular subdivision preserves the owning triangulator's holes before WGS84 projection; inverse-model eye tests discard rear fragments and hide rear DOM labels. Screen-space points/lines retain drawing-buffer pixel sizes. CPU area, identity, ellipsoid, bins and real-data tests plus native/compatibility all-projection tests prove joins, arcs/bins, horizon, labels, visibility and exact pixels after resource rebuild and engine device reboot. Near-plane ribbons remain documented polish; no timing proof claimed. Mercator northing uses a cancellation-free equivalent with exact-zero/sign regressions.
 
 Batch 201 audio: the optional glTF reader uses caller-owned AudioListener and audio package source classes, with one shared decode per clip and independent source instances. Audio-only model nodes participate in engine transforms without geometry. CPU tests cover scene selection, weighted triggers, timeline offsets/seeks, cancellation, budgets and cleanup; native/compatibility frame tests verify poses and a real offline Web Audio energy oracle. build-modern keeps the audio peer external, preserving class identity and avoiding duplicate runtimes. Core/stage and rendering algorithms are unchanged.

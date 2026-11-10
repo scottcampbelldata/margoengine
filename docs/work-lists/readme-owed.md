@@ -1,5 +1,7 @@
 # README work owed
 
+- @margoengine/stage (GPU inventory repair): document the declared test:gpu:viewer-extras command and its WebGPU/WebGL2 viewer regression coverage during the README phase.
+
 - @margoengine/sciviz (review 3 dependency gate): retain the package browser-root bootstrap for fallback and table test commands; examples deferred.
 
 - @margoengine/splats (review 3): cover progressive cancellation during pending async iteration and between buffered batches, including producer cleanup ownership; examples deferred.

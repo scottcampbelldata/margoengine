@@ -1,6 +1,5 @@
 # Known bugs and unverified features
 
-- Batch 234 outside-scope finding at 2ed6fd460: `node --test tests/modern-extension-suite.test.js` fails three inventory assertions because tracked `packages/stage/test/gpu/viewer-extras-check.mjs` is not named by stage's GPU scripts or the planner. Cause: missing stage test registration, not water. Rule 21 leaves the stage-owner repair for the fix phase; all water leaves are registered and pass both backends.
 Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
 
@@ -4725,7 +4724,6 @@ Batch 222 job 3 outline fixture repair: a cold compatibility compute import can 
 Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The extra physical-composition compatibility run reproduces the already recorded 16 texture units limit when all material maps, shadows, clustered storage and IBL are composed. The new spec/gloss fixture uses neither this worst-case composition nor additional sampler bindings; the existing source fixture is unchanged and its owning compatibility follow-up remains under rule 21.
 
 
-- Batch 242 inventory: node scripts/gpu-package-tests.mjs --only=voxel-net --list fails before filtering because cameras panorama/stereo, splats lod-sog and weather parity browser drivers are not registered in the plan at this main revision; package script discovery and browser-driver inventory disagree. Outside voxel-net; voxel-net has no GPU scripts or rendering.
 
 - Voxel-net /rooms: reconnecting with a consumed room URL gets 1008, because its single-use admission nonce is removed when the player joins. The parked player retains capacity until the server resume timeout; obtain a new lobby reservation after it expires. Follow-up is resume-aware room authorization and separate account identity from seat identity.
 
@@ -4967,7 +4965,6 @@ Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative del
 
 - Existing atmosphere exact-capture defect after main merge: run SPEC_DEMOS=atmosphere SPEC_BACKENDS=webgl2 with packages/sciviz/tests/spec-demos-browser.mjs under the GPU lock. In batch174/j4-land-gpu.log, three blue-channel bytes differ by 1 (offsets 1360474, 1360478, 1365274); sameSourceDiff is also 3 for the unchanged source figure, and camera/limits match. The failure originates in repeated atmosphere compatibility drawing, rather than date/log window restoration; the particular nondeterministic draw operation is not isolated. Record for fix phase under rule 21; exact assertion is unchanged.
 Batch 178 job 4: no open correctness defect in the requested colour/legend contract. Surface NaN heights still form holes because they have no geometric position; diagnostic CVD simulation makes no universal distinguishability promise. The PDF equal-stop gap and finite-first volume MIP state are covered by regression tests in the same job.
-Review 2 integration, stage viewer extras: `node scripts/gpu-package-tests.mjs --no-build --select=water/test:gpu` stops before selection because packages/stage/test/gpu/viewer-extras-check.mjs is not referenced by a declared stage GPU script after 431d257dd. Cause: the global browser inventory validates all packages before filtering. Owning stage lane follow-up; water declared scripts are run directly under the shared GPU lock for this review.
 
 Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with MARGO_COMPAT=1 and no --compat argument writes compatibility hardware/results under a webgpu suffix (now test-results/water-query-webgpu.json after the separate tracked-record correction). Cause: its output suffix reads argv instead of actual browser hardware.compat. Numerical assertions pass; output labeling is a build-phase tooling follow-up.
 

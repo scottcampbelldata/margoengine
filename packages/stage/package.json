@@ -30,7 +30,8 @@
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:features": "cd ../.. && node scripts/stage-features-gpu-check.js",
     "test:gpu:gltf": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-gltf --wait-max=60 --max=5 --gpu=stage-gltf-shadow-pixel-comparison -- node packages/stage/test/gpu/gltf-check.mjs",
-    "test:gpu:lights": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-lights --wait-max=60 --max=4 --gpu=stage-lights-pixel-comparison -- node packages/stage/test/gpu/lights-check.mjs"
+    "test:gpu:lights": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-lights --wait-max=60 --max=4 --gpu=stage-lights-pixel-comparison -- node packages/stage/test/gpu/lights-check.mjs",
+    "test:gpu:viewer-extras": "cd ../.. && node packages/stage/test/gpu/viewer-extras-check.mjs"
   },
   "sideEffects": false,
   "exports": {

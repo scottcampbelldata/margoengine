@@ -4,9 +4,10 @@
 // at the limit and names the suite.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import {
   LOOSE_CHECKS,
+  isGpuScript,
   NOT_IN_CHECKS,
   plan,
   ROOT,
@@ -99,6 +100,22 @@ test('the plan runs every GPU check file, and each one left out says why', () =>
   for (const [file, reason] of Object.entries(LOOSE_CHECKS)) {
     assert.ok(existsSync(new URL(`../${file}`, import.meta.url)), `${file} is gone; remove it from LOOSE_CHECKS`);
     assert.ok(reason.length > 20, `${file} needs a stated reason`);
+  }
+});
+
+test('every package test/gpu/*-check.mjs file is referenced by its own GPU scripts', () => {
+  const packages = new URL('../packages/', import.meta.url);
+  for (const dir of readdirSync(packages)) {
+    const manifest = new URL(`${dir}/package.json`, packages);
+    const gpu = new URL(`${dir}/test/gpu/`, packages);
+    if (!existsSync(manifest) || !existsSync(gpu)) continue;
+    const commands = Object.entries(JSON.parse(readFileSync(manifest, 'utf8')).scripts ?? {})
+      .filter(([name]) => isGpuScript(name))
+      .map(([, command]) => command);
+    const files = readdirSync(gpu)
+      .filter((file) => file.endsWith('-check.mjs'))
+      .map((file) => `packages/${dir}/test/gpu/${file}`);
+    assert.deepEqual(unrunCheckFiles(files, commands, [], {}), [], `${dir}: unregistered GPU checks`);
   }
 });
 
