@@ -2079,6 +2079,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | P39 | Vignette | shader/src/effects.ts | Margo-own: Margo's own parameterisation; defaults do not match any engine I know |
 | P40 | RGB shift default amount | shader/src/effects.ts | Margo-own: 0.002, about 4 px of fringe at 1920 wide; rewritten 2026-10-24 |
 | P41 | Sobel; sepia | shader/src/effects.ts | Sobel; W3C Filter Effects L1 sepia() |
+| P50 | Halftone and dot-screen dot radius: a centred disc covering share v of its cell, sqrt(v / pi) up to pi / 4, above it the inverse of the cell-clipped area pi r^2 - 4 (r^2 acos(1 / 2r) - sqrt(r^2 - 1/4) / 2) as a least-squares quartic in sqrt(1 - v), within 6.5e-4 of the area | shader/src/effects.ts | Margo-own: circle-segment area (rederived); the fit is ours (2026-11-10). Replaced radius sqrt(v / 2) cells, whose area was 1.57 v |
 | P45 | Subgroup check: zeros compare by value | shader/test/subgroups-check.mjs | W3C WGSL 15.7 (an implementation may ignore the sign of a zero) and 17.12.1.1 (the lowest active lane's exclusive add is T(0)); Metal returns -0 there |
 
 ### shadows

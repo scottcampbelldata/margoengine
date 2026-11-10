@@ -265,6 +265,30 @@ try {
       const image = await show(name + (options.greyscale ? '-grey' : ''), 'gradient', name, options);
       differs(`${name}${options.greyscale ? ' greyscale' : ''} compiles and changes the image`, image, gradient);
     }
+    // A screen keeps a flat tone on average: each dot covers its channel's share of the cell, also above pi / 4, where
+    // the cell's sides cut the dot. The edge scene's halves are 0.2 (51) and 0.6 (153); 16 px stay clear of the step.
+    // dotScreen runs at 12 px cells: its 1 px edge ramp loses its outer half where a dot meets its cell's side, about
+    // 0.13 px^2 per pixel of edge (5 levels at the default 6 px with 0.8 ink), half that at 12 px.
+    const mean = (image, x0, x1) => {
+      const sum = [0, 0, 0];
+      for (let y = 0; y < H; y++) for (let x = x0; x < x1; x++) image.at(x, y).forEach((v, c) => (sum[c] += v));
+      return sum.map((v) => +(v / ((x1 - x0) * H)).toFixed(1));
+    };
+    for (const [name, options] of [
+      ['halftone', {}],
+      ['halftone', { greyscale: true }],
+      ['dotScreen', { size: 12 }],
+    ]) {
+      const label = name + (options.greyscale ? '-grey' : ''),
+        image = await show(label + '-tone', 'edge', name, options),
+        tones = [mean(image, 0, 144), mean(image, 176, W)],
+        near = tones.every((tone, k) => tone.every((v) => Math.abs(v - [51, 153][k]) < 5));
+      check(
+        `${label}: flat 0.2 and 0.6 keep their tone on average (within 5 of 51 and 153)`,
+        near ? 'kept' : tones,
+        'kept',
+      );
+    }
     const off = await show('effects-off', 'gradient');
     same('removing the PostStack restores the input frame', off, gradient);
   }

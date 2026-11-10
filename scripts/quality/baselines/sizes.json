@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14663392,
+  "total": 14663658,
   "history": [
     {
       "date": "2026-10-24",
@@ -8057,6 +8057,12 @@
       "commit": "34c8b8a6f",
       "reason": "batch 132 math audit: math fixes change entry sizes",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "89e3eb37d",
+      "reason": "batch 132 shader audit",
+      "grew": 1
     }
   ],
   "items": {
@@ -9009,7 +9015,7 @@
     "@margoengine/shader/deform": 5535,
     "@margoengine/shader/editor": 24745,
     "@margoengine/shader/editor-pass": 34097,
-    "@margoengine/shader/effects": 8497,
+    "@margoengine/shader/effects": 8763,
     "@margoengine/shader/graph": 14462,
     "@margoengine/shader/lighting": 10314,
     "@margoengine/shader/noise": 5772,

@@ -82,13 +82,27 @@ try {
   await shows('storageVertex', [0, 1, 0]);
   await shows('storageStruct', [0, 0, 0.5]);
   await shows('storageCompute', [0, 1, 0]);
-  const written = await scene('storageWrite'),
-    png = await image(),
-    red = at(png, png.width / 2, png.height / 2);
-  await clear();
-  assert.deepEqual(written.written, [0, 7, 0, 0]);
-  assert.ok(red[0] > 250, `storageWrite drew ${red}`);
-  console.log('ok storageWrite');
+  if (hardware.compat) {
+    // WebGL2 render shaders cannot write buffers: the compatibility layer refuses the fragment-stage write with its
+    // coded error (and help link) instead of drawing.
+    const refused = await page.evaluate(() => window.check.run('storageWrite'));
+    await clear();
+    assert.ok(
+      refused.errors.length > 0 &&
+        refused.errors.every((e) => /cannot write buffers.*errors#compatibility-layer/.test(e)),
+      `storageWrite under compat: ${JSON.stringify(refused.errors)}`,
+    );
+    pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/cannot write buffers/.test(e)));
+    console.log('ok storageWrite (compat refuses it with its coded error)');
+  } else {
+    const written = await scene('storageWrite'),
+      png = await image(),
+      red = at(png, png.width / 2, png.height / 2);
+    await clear();
+    assert.deepEqual(written.written, [0, 7, 0, 0]);
+    assert.ok(red[0] > 250, `storageWrite drew ${red}`);
+    console.log('ok storageWrite');
+  }
   await shows('extraGroups', [0.5, 0.25, 0]);
   await shows('extraGroupWithUniforms', [0.5, 0, 0.5]);
 

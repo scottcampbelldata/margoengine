@@ -12,6 +12,7 @@ import {
   resolution,
   screenCoordinate,
   screenUV,
+  select,
   smoothstep,
   sqrt,
   uniform,
@@ -64,10 +65,23 @@ const turn = (p: Node<'vec2f'>, c: Node<'f32'>, s: Node<'f32'>): Node<'vec2f'> =
   vec2(c.mul(p.x).sub(s.mul(p.y)), s.mul(p.x).add(c.mul(p.y)));
 
 /**
+ * Radius, in cell widths, of a centred disc covering share `v` (0..1) of its square cell. Up to pi / 4 it is
+ * sqrt(v / pi). Above, the area is pi r^2 less four segments r^2 acos(1 / 2r) - sqrt(r^2 - 1 / 4) / 2, inverted by a
+ * least-squares quartic in w = sqrt(1 - v) (the uncovered corners shrink as (sqrt(2) / 2 - r)^2), within 6.5e-4 of
+ * the area; it reaches sqrt(2) / 2, the whole cell, at v = 1.
+ */
+const dotRadius = (v: Node<'f32'>): Node<'f32'> => {
+  const w = sqrt(v.oneMinus()),
+    clipped = w.mul(w.mul(w.mul(w.mul(0.6786358).sub(0.4090116)).add(0.1827032)).sub(0.5127241)).add(0.7074851);
+  return select(v.greaterThan(Math.PI / 4), clipped.min(Math.SQRT1_2), sqrt(v.div(Math.PI)));
+};
+
+/**
  * One rotated dot screen: a grid of `size`-pixel square cells turned by `angle` about the pixel origin. `value` gets
- * the cell centre in screen pixels and returns the 0..1 amount of ink for the pixel's cell; the dot's area follows it
- * (radius `sqrt(v) * size / sqrt(2)`, so 1 covers the cell). Returns this pixel's ink coverage, antialiased with a
- * 1 px linear ramp at the dot edge.
+ * the cell centre in screen pixels and returns the 0..1 amount of ink for the pixel's cell; the dot covers that share
+ * of its cell, as a printed screen does, so a flat tone keeps its value on average. Up to pi / 4 the dot fits the cell
+ * (radius `sqrt(v / pi) * size`); above it the cell's sides cut it, and {@link dotRadius} inverts that clipped area.
+ * Returns this pixel's ink coverage, antialiased with a 1 px linear ramp at the dot edge.
  */
 function screen(size: F32, angle: Node<'f32'>, value: (centre: Node<'vec2f'>) => Node<'f32'>): Node<'f32'> {
   const c = angle.cos(),
@@ -75,7 +89,7 @@ function screen(size: F32, angle: Node<'f32'>, value: (centre: Node<'vec2f'>) =>
     // Into grid space (rotate by -angle), find the cell, and its centre back in screen pixels.
     q = turn(screenCoordinate, c, s.negate()),
     centre = q.div(size).floor().add(0.5).mul(size),
-    radius = sqrt(value(turn(centre, c, s)).saturate()).mul(size.mul(Math.SQRT1_2)),
+    radius = dotRadius(value(turn(centre, c, s)).saturate()).mul(size),
     edge = radius.sub(q.distance(centre)).add(0.5).saturate();
   // Dots under half a pixel in radius fade with their size instead of flickering in and out.
   return edge.mul(radius.mul(2).saturate());

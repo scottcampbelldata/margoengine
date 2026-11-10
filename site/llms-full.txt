@@ -9416,6 +9416,9 @@ The ten optional packages in [the public format viewer](integration-engineering.
 
 Sciviz notebook/share library entries use the installed backend when prepareBackend is omitted. The shipped Python AFM and standalone runtime inject fallback setup; webgpu bypasses it. Cancellation and offline controls do not certify every notebook host or GPU. See sciviz-host-backends.md.
 
+## J6 product integration
+The eleven optional product-viewer packages, including PostStack, compose with React ownership, exact RGBA8 restoration and shared cross-backend probes on RTX A6000 native WebGPU, ANGLE D3D11 and ANGLE Vulkan. Four draws and zero tracked teardown allocations are checked. webgl2-compat preserves hardware implicit footprint selection; explicit mip interpolation remains separate. Intermediate HDR bits and whole images are not promised equal. See [product methods and stored-bit proof](integration-product.md). No backend-specific probes or speed claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -14860,6 +14863,9 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 - Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
   duplicated; decoded.ts uses `max-age=3153600000`, past the 2^31 cap of RFC 9111 1.2.2; Vary name records are never
   evicted; 27 throws carry no help link.
+
+### Fixed: J6 product implicit-sampler footprint
+The red 121 versus 120 product probe came from webgl2-compat replacing implicit textureSample footprint selection with a Euclidean derivative LOD estimate. The first resolved scene HDR red was binary16 0x3329 on native and 0x3321 on both ANGLE backends. Keeping hardware implicit sampling repairs the owning emitter; explicit mip interpolation stays unchanged. The glsl.test.js regression fails before repair; the oblique implicitFootprint GPU case changes from native 0x3e99f89a versus old compatibility 0x3ed98258 to 0x3e99f89a on all three paths. Product's existing exact cross-backend and restoration probes now pass, with zero tracked allocations after disposal. Intermediate HDR bit equality is not claimed. Reproduction and raw centre copies: docs/integration-product.md.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

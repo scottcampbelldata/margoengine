@@ -942,7 +942,10 @@ look.uniforms.darkness.value = 0.9;                   // live
 
 The same GPU check feeds known images through them: Sobel gives exactly 4 x the luma step beside a step and 0 elsewhere,
 pixelate copies each block's centre pixel exactly, and posterize, sepia, vignette, RGB shift and chromatic aberration
-match their formulas within 0.6 of 255; halftone and dot screen compile and draw.
+match their formulas within 0.6 of 255; halftone (8 px cells) and dot screen (12 px cells) keep flat 0.2 and 0.6 tones
+within 5 of 255 on average, since each dot covers its value's share of the cell. Their 1 px edge ramp adds about
+pi / 12 px^2 per dot and loses its outer half where a dot meets its cell's side, so small cells drift by a few levels
+(about 5 of 255 for dot screen's default 6 px at 80% ink).
 
 ## Limits
 
