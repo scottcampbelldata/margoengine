@@ -51,6 +51,25 @@ test('inclusive cell threshold, all/any point threshold, inversion, compaction a
   assert.equal((await thresholdGrid({...cube,pointData:[NaN,...cube.pointData.slice(1)]},[0,1])).types.length,0);
   const inverted=await thresholdGrid(image,[6,8],{association:'cell',invert:true});assert.deepEqual([...inverted.sourceCells],[0]);
 });
+test('threshold selects multi-component tuples by component, magnitude, all or any, with one-sided ranges',async()=>{
+  // Two cells of a 3x2x1 image; cell vectors (3,4) |5| and (1,-1) |sqrt 2|; point vectors x = i, y = -i.
+  const image={dims:[3,2,1],bounds:[0,2,0,1,0,0],cellArrays:{v:[3,4,1,-1]},pointArrays:{p:Array.from({length:12},(_,i)=>i%2?-(i>>1):i>>1)}};
+  const ids=async(range,options)=>[...(await thresholdGrid(image,range,{association:'cell',array:'v',...options})).sourceCells];
+  assert.deepEqual(await ids([4.9,5.1]),[0]);
+  assert.deepEqual(await ids([Math.SQRT2-1e-12,Math.SQRT2+1e-12],{component:'magnitude'}),[1]);
+  assert.deepEqual(await ids([2,Infinity],{component:0}),[0]);
+  assert.deepEqual(await ids([-Infinity,0],{component:1}),[1]);
+  assert.deepEqual(await ids([0,10],{component:'all'}),[0]);
+  assert.deepEqual(await ids([-1,-1],{component:'any'}),[1]);
+  assert.deepEqual(await ids([-Infinity,Infinity],{component:'all'}),[0,1]);
+  // Point association: point i holds (i, -i); cell 0 uses points 0,1,4,3 and cell 1 points 1,2,5,4.
+  const points=async(range,options)=>[...(await thresholdGrid(image,range,{array:'p',...options})).sourceCells];
+  assert.deepEqual(await points([0,4],{component:0}),[0]);
+  assert.deepEqual(await points([-Infinity,-5],{component:1,mode:'any'}),[1]);
+  assert.deepEqual(await points([0,4*Math.SQRT2+1e-9]),[0]);
+  for(const component of [2,-1,0.5,'max'])await assert.rejects(ids([0,1],{component}),/component/);
+  for(const range of [[NaN,1],[Infinity,Infinity],[-Infinity,-Infinity],[2,1]])await assert.rejects(ids(range),/ordered range/);
+});
 test('structured subsets honor indices, strides, descending bounds and full tuple arrays',async()=>{
   const d=[5,4,3],image={dims:d,bounds:[4,0,0,6,-1,1],pointData:Array.from({length:60},(_,i)=>i),cellData:Array.from({length:24},(_,i)=>i),pointArrays:{vec:Array.from({length:180},(_,i)=>i)}};
   const s=await extractSubset(image,{ranges:[[1,4],[0,3],[0,2]],strides:[2,2,2]});assert.deepEqual(s.dims,[2,2,2]);assert.deepEqual(s.bounds,[3,1,0,4,-1,1]);assert.deepEqual([...s.pointData],[1,3,11,13,41,43,51,53]);assert.deepEqual([...s.cellData],[1]);assert.equal(s.pointArrays.vec.length,24);

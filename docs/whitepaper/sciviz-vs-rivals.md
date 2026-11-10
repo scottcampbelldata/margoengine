@@ -40,7 +40,7 @@ current on that date.
 | Formats | NRRD, NIfTI, DICOM, Zarr, VTK legacy and XML, NetCDF classic, HDF5, CGNS, Xdmf, Exodus, OpenFOAM, EnSight, FITS, MRC, OME-TIFF, Arrow, Parquet, CSV (`tests/nrrd.test.js`, `tests/formats.test.js`, `tests/climate-formats.test.js`, `tests/hdf5.test.js`, `tests/engineering.test.js`, `tests/astronomy.test.js`, `tests/table.test.js`); Zarr Blosc 1 and Zstandard chunks from real zarr-python and zarr_implementations stores (`tests/formats-spec.test.js`) | ParaView Glance lists its readers through ITK and VTK.js | ParaView and VisIt read hundreds of formats |
 | Scale | point budget option, exact binary64 aggregation, additive point octree (README "Figures", `tests/aggregate.test.js`, `tests/pointcloud.test.js`) | deck.gl performance guide, regl-scatterplot and Cosmograph document million-scale rendering | Datashader-style aggregation |
 | Interaction | hover, pick, box and lasso, linked selection across figures, cross-filter, annotations, measurement (README "Picking, tooltips and selection", `tests/pick.test.js`, `tests/link.test.js`, `tests/annotate.test.js`) | Bokeh linked brushing; Vega-Lite union and intersect selections | Linked views and rulers |
-| Analysis filters | contour, clip, probe, calculator, gradient, glyph in a re-executing pipeline (`tests/datasets.test.js`, `tests/contour.test.js`, `tests/clip.test.js`, `tests/probe.test.js`, `tests/calc.test.js`, `tests/glyph.test.js`). Threshold, plot over line, integrate, resample, warp and connectivity: not found | Vega-Lite table transforms; VTK.js has few grid filters | ParaView: all of these |
+| Analysis filters | contour, clip, probe, calculator, gradient, glyph in a re-executing pipeline (`tests/datasets.test.js`, `tests/contour.test.js`, `tests/clip.test.js`, `tests/probe.test.js`, `tests/calc.test.js`, `tests/glyph.test.js`); threshold by point or cell, component, magnitude, all or any and one-sided ranges (`tests/clip.test.js`), plot over a polyline with arc-length samples and masks, exact length, area and volume integrals of fields, resample to a dataset or image, warp by vector or scalar (`tests/probe.test.js`, `tests/glyph.test.js`). Connectivity: not found | Vega-Lite table transforms; VTK.js has few grid filters | ParaView: all of these |
 | Multi-view | linked cameras, comparative grids, orthogonal slice views (`tests/views.test.js`) | Vega-Lite concatenation with shared scales | Slicer and ParaView linked views |
 | Publication | PNG with physical size, SVG, vector 3D, PDF, TeX labels, video (`tests/export-media.test.js`, `tests/export-vector.test.js`, `tests/pdf.test.js`, `tests/math.test.js`; video in `tests/export-media-browser.mjs`) | Plotly static export (3D rasterized), Bokeh SVG and PNG export | Vector and raster export |
 | Accessibility | ARIA summaries, keyboard data navigation, sonification (`tests/a11y.test.js`) | ECharts ARIA descriptions and decals; Vega-Lite ARIA on SVG | Little |
@@ -137,8 +137,7 @@ included.
 
 ## Not found in Margo today
 
-MinIP, multi-component and general multi-volume compositing, the threshold, plot-over-line, integrate, resample,
-warp and connectivity filters. These are listed in docs/known-bugs.md
+MinIP, multi-component and general multi-volume compositing, and the connectivity filter. These are listed in docs/known-bugs.md
 under "Sciviz comparison gaps".
 
 ## Reproduce

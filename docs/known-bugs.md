@@ -2160,8 +2160,9 @@ Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
 
 - **No MinIP volume mode.** VTK.js documents minimum intensity projection; sciviz volumes offer composite and MIP.
 - **No multi-component or general multi-volume compositing.** Label maps fuse over one scalar volume only.
-- **Missing grid filters:** threshold, plot over line, integrate, resample, warp and connectivity are not in the
-  batch 172 pipeline.
+- **Missing grid filter:** connectivity region extraction is not in the batch 172 pipeline. (Threshold, plot over
+  line, integrate, resample and warp were already built in `/clip`, `/probe` and `/glyph`; the batch 182 search missed
+  them.)
 - **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
 - **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
   for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.

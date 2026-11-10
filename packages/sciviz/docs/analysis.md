@@ -92,7 +92,21 @@ retained, `invert:false`, `crinkle:false`. Crinkle keeps whole cells. Spheres ar
 vertex-sampled implicit fields and can miss a sphere wholly inside a coarse cell;
 boxes apply six exact halfspaces. `isoVolume` cuts an inclusive scalar interval.
 `thresholdGrid` keeps whole cells (`association:'point'`, `mode:'all'`; cell/any and
-inversion are explicit). All tuples and `sourceCells` survive. `extractSubset` uses
+inversion are explicit). An infinite end gives a one-sided threshold (`[-Infinity, t]`
+is below t, `[t, Infinity]` above it); NaN is never a bound. Multi-component arrays
+test `component`: an index, `'magnitude'` (the default when wider than one), or
+`'all'`/`'any'` components inside the range. All tuples and `sourceCells` survive.
+
+```ts
+import { thresholdGrid } from '@margoengine/sciviz/clip';
+
+// Two cells; cell velocity (3, 4) has length 5, (1, -1) has length 1.414.
+const image = { dims: [3, 2, 1] as [number, number, number], bounds: [0, 2, 0, 1, 0, 0] as [number, number, number, number, number, number],
+  cellArrays: { velocity: [3, 4, 1, -1] } };
+const fast = await thresholdGrid(image, [2, Infinity], { association: 'cell', array: 'velocity' });
+const leftward = await thresholdGrid(image, [-Infinity, 0], { association: 'cell', array: 'velocity', component: 1 });
+console.log([...fast.sourceCells!], [...leftward.sourceCells!]); // [0] [1]
+``` `extractSubset` uses
 inclusive logical ranges and positive strides, default full extent/unit strides;
 strided cell tuples come from the lower source cell, not an average. `imageGrid`
 materializes regular/curvilinear images with at least two active dimensions.

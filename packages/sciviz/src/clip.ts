@@ -42,6 +42,12 @@ export interface ThresholdOptions {
   readonly array?: string;
   readonly mode?: 'all' | 'any';
   readonly invert?: boolean;
+  /**
+   * Which tuple entry of a multi-component array is tested: a component index, `'magnitude'` (Euclidean length,
+   * the default for arrays wider than one), or `'all'`/`'any'` components inside the range. One-component arrays
+   * test their value.
+   */
+  readonly component?: number | 'magnitude' | 'all' | 'any';
   readonly signal?: AbortSignal;
 }
 /** Inclusive sample indices, positive strides. Default full extent and unit strides. */
@@ -127,18 +133,36 @@ function scalar(grid: AnalysisGrid, point: boolean, array?: string): ArrayLike<n
 /** Retain complete cells by point or cell scalar range, compacting all arrays and preserving provenance. */
 export async function thresholdGrid(input: AnalysisGrid | AnalysisImage, range: readonly [number, number], options: ThresholdOptions = {}): Promise<AnalysisGrid> {
   options.signal?.throwIfAborted(); const grid = asGrid(input); validate(grid);
-  if (range.length !== 2 || !range.every(Number.isFinite) || range[0] > range[1] ||
+  // One-sided thresholds (ParaView's "below lower" and "above upper") pass an infinite bound; NaN is never a bound.
+  if (range.length !== 2 || range.some(Number.isNaN) || range[0] > range[1] || range[0] === Infinity || range[1] === -Infinity ||
     (options.association !== undefined && !['point', 'cell'].includes(options.association)) ||
     (options.mode !== undefined && !['all', 'any'].includes(options.mode)))
-    throw rangeError('Threshold needs a finite ordered range, point/cell association and all/any point mode', 'sciviz');
-  const point = (options.association ?? 'point') === 'point', data = scalar(grid, point, options.array), selected: number[] = [];
-  const inside = (v: number) => Number.isFinite(v) && v >= range[0] && v <= range[1];
+    throw rangeError('Threshold needs an ordered range (infinite ends allowed), point/cell association and all/any point mode', 'sciviz');
+  const point = (options.association ?? 'point') === 'point', selected: number[] = [];
+  const count = point ? grid.points.length / 3 : grid.types.length;
+  const data = options.array === undefined ? (point ? grid.pointData : grid.cellData) : (point ? grid.pointArrays : grid.cellArrays)?.[options.array];
+  const width = data && count ? data.length / count : 1, component = options.component ?? (width > 1 ? 'magnitude' : 0);
+  if (!data || !Number.isInteger(width) || width < 1 || (count === 0 && data.length !== 0))
+    throw rangeError('Select an array with complete tuples per associated point or cell', 'sciviz');
+  if (typeof component === 'number' ? !Number.isInteger(component) || component < 0 || component >= width : !['magnitude', 'all', 'any'].includes(component))
+    throw rangeError(`Threshold component must be an index below ${width}, 'magnitude', 'all' or 'any'`, 'sciviz');
+  const ok = (v: number) => Number.isFinite(v) && v >= range[0] && v <= range[1];
+  const inside = (id: number): boolean => {
+    if (typeof component === 'number') return ok(data[id * width + component]);
+    if (component === 'magnitude') {
+      let sum = 0;
+      for (let k = 0; k < width; k++) sum += data[id * width + k] ** 2;
+      return ok(Math.sqrt(sum));
+    }
+    for (let k = 0; k < width; k++) if (ok(data[id * width + k]) === (component === 'any')) return component === 'any';
+    return component === 'all';
+  };
   for (let c = 0; c < grid.types.length; c++) {
     if (c % 2048 === 0) { await pause(); options.signal?.throwIfAborted(); }
-    let keep = inside(data[c]);
+    let keep = !point && inside(c);
     if (point) {
       const ids = Array.from({ length: grid.offsets[c] - (c ? grid.offsets[c - 1] : 0) }, (_, k) => grid.connectivity[(c ? grid.offsets[c - 1] : 0) + k]);
-      keep = options.mode === 'any' ? ids.some(id => inside(data[id])) : ids.every(id => inside(data[id]));
+      keep = options.mode === 'any' ? ids.some(inside) : ids.every(inside);
     }
     if (keep !== (options.invert ?? false)) selected.push(c);
   }
