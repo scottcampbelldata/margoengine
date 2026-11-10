@@ -19,23 +19,34 @@ export interface Plane {
   normal: V3;
 }
 
-/** A validated glass medium: IOR, and Beer attenuation as linear RGB left per `1 / inverseDistance` world units. */
+/**
+ * A validated glass medium: IOR, dispersion (20 / Abbe number, 0 for none), and Beer attenuation as linear RGB left
+ * per `1 / inverseDistance` world units.
+ */
 export interface Medium {
   ior: number;
+  dispersion: number;
   color: readonly number[];
   inverseDistance: number;
 }
 
 /** A glass volume's medium, validated by the transmission material's rules (IOR at least 1, color 0 to 1). */
 export function mediumOf(
-  value: Pick<TransmissionOptions, 'ior'> & Pick<VolumeOptions, 'attenuationColor' | 'attenuationDistance'>,
+  value: Pick<TransmissionOptions, 'ior' | 'dispersion'> &
+    Pick<VolumeOptions, 'attenuationColor' | 'attenuationDistance'>,
 ): Medium {
   const checked = validateTransmission({
     factor: 1,
     ior: value.ior,
+    dispersion: value.dispersion,
     volume: { attenuationColor: value.attenuationColor, attenuationDistance: value.attenuationDistance },
   });
-  return { ior: checked.ior, color: [...checked.color], inverseDistance: checked.inverseDistance };
+  return {
+    ior: checked.ior,
+    dispersion: checked.dispersion,
+    color: [...checked.color],
+    inverseDistance: checked.inverseDistance,
+  };
 }
 
 /**

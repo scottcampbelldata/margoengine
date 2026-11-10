@@ -166,8 +166,20 @@ room's baked lightmap where they hit it (`albedo * irradiance / pi`) and the amb
 rectangle lights through ideal smooth convex glass (Snell refraction, Fresnel reflection, total internal reflection,
 Beer absorption, nested volumes) and deposits them at the first receiver they reach after touching glass. It returns
 the native atlas with physical irradiance in its lightmap, the irradiance and hit counts per pixel, and `diagnostics`
-that account for every emitted watt (deposited, escaped, absorbed, truncated, unrefracted, blocked). Receivers are
-opaque; there is no diffuse bounce, rough glass or dispersion.
+that account for every emitted watt (deposited, escaped, absorbed, truncated, unrefracted, blocked, masked). Receivers
+are opaque.
+
+Rough glass, dispersion and bounce light after glass are options of the same call:
+
+- a volume's `roughness` (0 to 1) bends each photon about a GGX microfacet normal sampled from the visible normals
+  (Heitz 2018), and Smith masking of the way out goes to `diagnostics.masked`, so very rough glass passes less light;
+- a volume's `dispersion` (20 / Abbe number, as on the transmission material) gives each photon a stratified wavelength
+  from 380 to 780 nm, a Cauchy index fitted to `ior` and the Abbe number, and the linear sRGB of that wavelength, so a
+  prism splits white light into a rainbow while a flat spectrum still adds up to the light's colour;
+- `bounces` (0 to 4) lets a receiver send light that came through glass on, diffusely and times its quad albedo
+  (`diagnostics.reflected` and `bounced`).
+
+`smithG1`, `sampleVisibleNormal`, `cauchy` and `wavelengthRgb` are exported for checks and custom tracers.
 
 ## Denoising: `@margoengine/lightmap/denoise`
 

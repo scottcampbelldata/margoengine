@@ -3445,6 +3445,15 @@ approximate under a normal map (exact for one light plus ambient). Ambient light
 the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
 quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
 
+## Lightmap rough glass, dispersion and bounce caustics (batch 54)
+
+`bakeRefractedLightmap` (`@margoengine/lightmap/refracted`) rough glass is single-scattering: light the microsurface would
+scatter again is dropped into `diagnostics.masked` (about 9% of a normal beam through a 1-unit slab at roughness 0.5,
+53% at roughness 0.9), so very rough glass is too dark. Roughness is isotropic and per volume. Dispersion uses Cauchy's
+two-term fit (no Sellmeier), wavelengths 380 to 780 nm with out-of-gamut colours clipped, and the event Fresnel at one
+wavelength per photon. Bounces (at most 4) are diffuse and use the quad's albedo only (no `surface` callback, no
+textures); receivers stay opaque.
+
 ## Lightmap irradiance probes (batch 54)
 
 `bakeLightProbes` (`@margoengine/lightmap/probes`) bakes on the CPU, at most 64 probes per axis (262,144) and 67,108,864

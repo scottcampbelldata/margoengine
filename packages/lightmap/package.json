@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/lightmap",
   "version": "1.0.0",
-  "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global) caustics (./refracted) and an edge-avoiding a-trous denoiser (./denoise).",
+  "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global), caustics through rough and dispersive glass with bounces (./refracted) and an edge-avoiding a-trous denoiser (./denoise).",
   "keywords": [
     "margoengine",
     "webgpu",

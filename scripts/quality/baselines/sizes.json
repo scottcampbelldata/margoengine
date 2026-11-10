@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13366313,
+  "total": 13367482,
   "history": [
     {
       "date": "2026-10-24",
@@ -6840,6 +6840,12 @@
       "commit": "8528ee948",
       "reason": "batch 54 job 5: path-traced bounces in @margoengine/lightmap/global",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "829d1245f",
+      "reason": "lightmap/refracted: rough glass, dispersion and bounces (batch 54 job 8)",
+      "grew": 1
     }
   ],
   "items": {
@@ -7283,7 +7289,7 @@
     "@margoengine/lightmap/imported": 1535,
     "@margoengine/lightmap/mesh": 3272,
     "@margoengine/lightmap/probes": 3273,
-    "@margoengine/lightmap/refracted": 7846,
+    "@margoengine/lightmap/refracted": 9015,
     "@margoengine/lines": 20524,
     "@margoengine/lines/batch": 6519,
     "@margoengine/lines/debug": 9836,

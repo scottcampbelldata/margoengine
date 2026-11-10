@@ -10,17 +10,20 @@ import { MutableVec2, MutableVec3, RectAreaLight } from "@margoengine/math";
 
 export interface RefractedDiagnostics {
     emitted: V3;
+    reflected: V3;
     deposited: V3;
     escaped: V3;
     absorbed: V3;
     truncated: V3;
     unrefracted: V3;
     blocked: V3;
+    masked: V3;
     photons: number;
     rays: number;
     reflections: number;
     refractions: number;
     totalInternalReflections: number;
+    bounced: number;
 }
 
 export type RefractedEmitter = (BakeLight & {
@@ -36,9 +39,10 @@ export type RefractedEmitter = (BakeLight & {
     type: 'area';
 });
 
-export interface RefractedGlassVolume extends Pick<TransmissionOptions, 'ior'>, Pick<VolumeOptions, 'attenuationColor' | 'attenuationDistance'> {
+export interface RefractedGlassVolume extends Pick<TransmissionOptions, 'ior' | 'dispersion'>, Pick<VolumeOptions, 'attenuationColor' | 'attenuationDistance'> {
     positions: Float32Array;
     indices: Uint32Array;
+    roughness?: number;
 }
 
 export interface RefractedLightmap {
@@ -54,10 +58,19 @@ export interface RefractedLightmapOptions extends Pick<LightmapOptions, 'texelsP
     photons?: number;
     maxEvents?: number;
     includeDirect?: boolean;
+    bounces?: number;
     onProgress?: (done: number, total: number) => void;
 }
 
 export function bakeRefractedLightmap(quads: LightmapQuads, options: RefractedLightmapOptions): Promise<RefractedLightmap>;
+
+export function cauchy(ior: number, abbe: number): (nanometres: number) => number;
+
+export function sampleVisibleNormal(view: V3, normal: V3, alpha: number, u1: number, u2: number): V3;
+
+export function smithG1(cosine: number, alpha: number): number;
+
+export function wavelengthRgb(nm: number): V3;
 
 // Not exported from this entry, but used by the exports above:
 

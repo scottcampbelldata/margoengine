@@ -5,6 +5,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | Package | What its README must cover | Added by |
 |---|---|---|
 | @margoengine/lightmap | global: bounceMode 'path' with bounces up to 8 and a furnace example | batch-54 job 5 |
+| @margoengine/lightmap | refracted: rough glass, dispersion and bounces (roughness, dispersion, bounces, diagnostics.masked and reflected) | batch 54 job 8 |
 | @margoengine/lightmap | probes: bakeLightProbes over a baked room and probeIrradiance | batch 54 job 7 |
 | @margoengine/lightmap | denoise: denoiseLightmap, denoiseMeshLightmap, denoiseTexels with options and defaults | batch-54 job 4 |
 | margoengine | Generated lightmap/denoise alias | batch-54 job 4 |

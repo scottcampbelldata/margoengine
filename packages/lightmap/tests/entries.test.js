@@ -40,7 +40,9 @@ test('each entry loads only its own passes', async () => {
       !directional.includes('packAtlas') &&
       !directional.includes('bakeGlobalLightmap'),
   );
-  assert.ok(probes.includes('bakeLightProbes') && !probes.includes('packAtlas') && !probes.includes('bakeDirectionalLightmap'));
+  assert.ok(
+    probes.includes('bakeLightProbes') && !probes.includes('packAtlas') && !probes.includes('bakeDirectionalLightmap'),
+  );
   assert.ok(global.includes('bakeGlobalLightmap') && !global.includes('bakeRefractedLightmap'));
   assert.ok(denoise.includes('denoiseTexels') && !/bake\w*Lightmap\(|packAtlas|raycastFirst|MeshBVH/.test(denoise));
   assert.ok(refracted.includes('bakeRefractedLightmap') && !refracted.includes('bakeGlobalLightmap'));

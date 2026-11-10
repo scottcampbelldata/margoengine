@@ -1,6 +1,7 @@
 // @margoengine/lightmap/refracted: caustics. Photons from finite lights refract and reflect through ideal convex glass
 // (Snell, Fresnel, total internal reflection, Beer absorption, nested media) and land in the native atlas.
-// Optics after PBRT 4e 9.3 (https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission).
+// Optics after PBRT 4e 9.3 (https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission); rough
+// glass, dispersion and the receiver bounce are in rough.ts and below.
 import type { BakeLight } from '@margoengine/bvh/bake';
 import { MeshBVH } from '@margoengine/bvh/tree';
 import type { RectAreaLight } from '@margoengine/math';
@@ -13,6 +14,9 @@ import { finiteVector } from '@margoengine/math/validate';
 import { bake, checkpoint, fillGutters, inRange, quadIndices, unit } from './bake.js';
 import type { Lightmap, LightmapOptions, LightmapQuads } from './index.js';
 import { beer, clip, convexPlanes, fresnel, type Medium, mediumOf, type Plane, rectOf } from './optics.js';
+import { cauchy, sampleVisibleNormal, smithG1, visible, wavelengthRgb } from './rough.js';
+
+export { cauchy, sampleVisibleNormal, smithG1, wavelengthRgb } from './rough.js';
 
 /**
  * A closed convex glass boundary as indexed triangles, outward wound with exactly shared edges. Volumes must be
@@ -20,10 +24,16 @@ import { beer, clip, convexPlanes, fresnel, type Medium, mediumOf, type Plane, r
  * innermost medium absorbs. `ior` and attenuation mean what they mean on the transmission material.
  */
 export interface RefractedGlassVolume
-  extends Pick<TransmissionOptions, 'ior'>,
+  extends Pick<TransmissionOptions, 'ior' | 'dispersion'>,
     Pick<VolumeOptions, 'attenuationColor' | 'attenuationDistance'> {
   positions: Float32Array;
   indices: Uint32Array;
+  /**
+   * Surface roughness, 0 (ideal, default) to 1; GGX alpha is its square. Each boundary event samples a visible
+   * microfacet normal for Fresnel and Snell, and Smith masking of the outgoing direction removes the share that would
+   * scatter again on the microsurface (`diagnostics.masked`).
+   */
+  roughness?: number;
 }
 
 /**
@@ -63,13 +73,23 @@ export interface RefractedLightmapOptions
   maxEvents?: number;
   /** Also deposit light that reaches a receiver without touching glass. Default false (caustics only). */
   includeDirect?: boolean;
+  /**
+   * Diffuse bounces after glass, 0 to 4. Default 0. A photon that touched glass deposits where it lands, then
+   * continues cosine-weighted from that receiver with its power times the quad's albedo (`diagnostics.reflected`).
+   */
+  bounces?: number;
   /** Called with photons done and photons in all, every 256 photons. */
   onProgress?: (done: number, total: number) => void;
 }
 
-/** Where the emitted power went (RGB watts; the six terminal terms add up to `emitted`), and work counts. */
+/**
+ * Where the emitted power went (RGB watts; the seven terminal terms add up to `emitted` plus `reflected`), and work
+ * counts.
+ */
 export interface RefractedDiagnostics {
   emitted: V3;
+  /** Sent on again by receivers after a deposit (`bounces`); a source term, not a terminal one. */
+  reflected: V3;
   /** Landed on a receiver after at least one glass event. */
   deposited: V3;
   /** Left the scene. */
@@ -82,12 +102,16 @@ export interface RefractedDiagnostics {
   unrefracted: V3;
   /** Hit a receiver's back face, which is opaque. */
   blocked: V3;
+  /** Lost to Smith masking at rough glass (light the microsurface would scatter again). */
+  masked: V3;
   photons: number;
   /** Receiver ray casts and glass boundary tests the photons made. */
   rays: number;
   reflections: number;
   refractions: number;
   totalInternalReflections: number;
+  /** Diffuse bounces off receivers. */
+  bounced: number;
 }
 
 /** What {@link bakeRefractedLightmap} returns. */
@@ -102,6 +126,10 @@ export interface RefractedLightmap {
 }
 
 interface Volume extends Medium {
+  /** GGX alpha; 0 for ideal glass. */
+  alpha: number;
+  /** The index at a wavelength in nm, when the volume disperses. */
+  dispersive?: (nanometres: number) => number;
   planes: Plane[];
   vertices: V3[];
   edges: V3[];
@@ -153,9 +181,13 @@ function volumesOf(input: readonly RefractedGlassVolume[]) {
       triangles = Array.from({ length: value.indices.length / 3 }, (_, t) =>
         [0, 1, 2].map((k) => corner(value.indices[t * 3 + k])),
       ),
-      vertices = [...new Map(triangles.flat().map((p) => [`${p}`, p])).values()];
+      vertices = [...new Map(triangles.flat().map((p) => [`${p}`, p])).values()],
+      roughness = inRange(value.roughness ?? 0, 0, 1, `${label} glass roughness`, false),
+      medium = mediumOf(value);
     return {
-      ...mediumOf(value),
+      ...medium,
+      alpha: roughness * roughness,
+      ...(medium.dispersion > 0 ? { dispersive: cauchy(medium.ior, 20 / medium.dispersion) } : {}),
       planes: convexPlanes(triangles, `${label} glass volume`),
       vertices,
       edges: triangles.flatMap(([a, b, c]) => [sub(b, a), sub(c, b), sub(a, c)]),
@@ -292,11 +324,24 @@ function radicalInverse(value: number) {
   return n / 4294967296;
 }
 
+/** A unit direction cosine-weighted about the unit `normal`, from two uniform numbers (Malley's method). */
+function cosineAbout(normal: V3, u1: number, u2: number): V3 {
+  const t = normalize(Math.abs(normal[0]) < 0.9 ? cross(normal, [1, 0, 0]) : cross(normal, [0, 1, 0])),
+    b = cross(normal, t),
+    r = Math.sqrt(u1),
+    phi = 2 * Math.PI * u2,
+    z = Math.sqrt(Math.max(0, 1 - u1));
+  return normalize(add(add(scale(t, r * Math.cos(phi)), scale(b, r * Math.sin(phi))), scale(normal, z)));
+}
+
 /**
- * Bakes caustics: photons from `emitters` refract and reflect through ideal smooth convex glass (Fresnel picks
- * reflection or transmission, total internal reflection, Beer absorption on each bent path, nested media use their
- * neighbours' IORs) and deposit their flux at the first diffuse front face they reach after touching glass. Receivers
- * are opaque and their albedo does not weight the result; there is no diffuse bounce, rough glass or dispersion.
+ * Bakes caustics: photons from `emitters` refract and reflect through convex glass (Fresnel picks reflection or
+ * transmission, total internal reflection, Beer absorption on each bent path, nested media use their neighbours'
+ * IORs) and deposit their flux at the first diffuse front face they reach after touching glass. A volume's
+ * `roughness` makes it rough glass (GGX visible normals with Smith masking); its `dispersion` (20 / Abbe number) gives
+ * each photon a stratified wavelength from 380 to 780 nm, a Cauchy index there and the linear sRGB of that
+ * wavelength, normalized per emitter so the packets add up to its power. With `bounces`, receivers reflect the
+ * deposited light on, diffusely and weighted by their albedo.
  * The returned atlas holds physical irradiance (W per square world unit) in its lightmap, with photon noise and
  * texel-sized box filtering; `diagnostics` accounts for every watt. Inputs are copied before the first await.
  */
@@ -308,13 +353,16 @@ export async function bakeRefractedLightmap(
     includeDirect = !!options.includeDirect,
     photons = inRange(options.photons ?? 65536, 1, 1048576, `${label} photons`),
     maxEvents = inRange(options.maxEvents ?? 8, 1, 32, `${label} maxEvents`),
+    bounces = inRange(options.bounces ?? 0, 0, 4, `${label} bounces`),
     { volumes, parents } = volumesOf(options.glassVolumes),
     sources = sourcesOf(options.emitters, volumes);
   if (photons < sources.length) throw new RangeError(`${label} needs at least one photon per emitter`);
   const positions = quads?.positions?.slice(),
+    albedo = quads?.albedo?.slice(),
+    spectral = volumes.some((v) => v.dispersive),
     atlas = await bake(quads, { ...options, onProgress: undefined }, ({ pixels }) => ({
       unlit: true,
-      rays: photons * (maxEvents + 1) * (volumes.length + 1),
+      rays: photons * (maxEvents + 1) * (bounces + 1) * (volumes.length + 1),
       // Irradiance (Float64 RGB) and hit counts per atlas pixel.
       bytes: pixels * 28,
     })),
@@ -328,11 +376,14 @@ export async function bakeRefractedLightmap(
       truncated: [0, 0, 0],
       unrefracted: [0, 0, 0],
       blocked: [0, 0, 0],
+      masked: [0, 0, 0],
+      reflected: [0, 0, 0],
       photons,
       rays: 0,
       reflections: 0,
       refractions: 0,
       totalInternalReflections: 0,
+      bounced: 0,
     },
     put = (to: V3, power: V3) => {
       for (let c = 0; c < 3; c++) to[c] += power[c];
@@ -348,7 +399,16 @@ export async function bakeRefractedLightmap(
   for (let s = 0; s < sources.length; s++) {
     const n = Math.floor(photons / sources.length) + (s < photons % sources.length ? 1 : 0),
       packet = scale(sources[s].power, 1 / n),
-      shift = random();
+      shift = random(),
+      // Stratified wavelengths (a rotated golden-ratio sequence) and their RGB, normalized over this emitter's photons.
+      tint = spectral ? random() : 0,
+      wavelength = (i: number) => visible[0] + (visible[1] - visible[0]) * ((tint + i * 0.6180339887498949) % 1),
+      sum: V3 = [0, 0, 0];
+    if (spectral) {
+      for (let i = 0; i < n; i++) put(sum, wavelengthRgb(wavelength(i)));
+      if (sources[s].power.some((p, c) => p > 0 && !(sum[c] > 0)))
+        throw new RangeError(`${label} dispersion needs more photons per emitter to cover the spectrum`);
+    }
     for (let i = 0; i < n; i++) {
       // Hammersley strata over the source with a seeded jitter and rotation.
       let [origin, direction] = sources[s].emit((i + random()) / n, (radicalInverse(i) + shift) % 1, random),
@@ -356,9 +416,21 @@ export async function bakeRefractedLightmap(
         inside = -1,
         lastVolume = -1,
         lastPlane = -1,
-        events = 0;
+        events = 0,
+        bounce = 0,
+        // The quad a bounce left from, which a ray off its plane cannot meet first.
+        skipQuad = -1;
+      const nm = spectral ? wavelength(i) : 0;
+      if (spectral) {
+        const rgb = wavelengthRgb(nm);
+        power = [0, 1, 2].map((c) => (sum[c] > 0 ? (sources[s].power[c] * rgb[c]) / sum[c] : 0)) as V3;
+      }
+      const iorOf = (v: number) => (v < 0 ? 1 : (volumes[v].dispersive?.(nm) ?? volumes[v].ior));
       while (true) {
-        const receiver = opaque.raycastFirst({ origin, direction }, { side: 'double' });
+        const receiver = opaque.raycastFirst(
+          { origin, direction },
+          skipQuad < 0 ? { side: 'double' } : { side: 'double', includeFace: (f) => f >> 1 !== skipQuad },
+        );
         let distance = receiver?.distance ?? Infinity,
           volume = -1,
           plane = -1;
@@ -395,6 +467,7 @@ export async function bakeRefractedLightmap(
           }
           put(events ? diagnostics.deposited : diagnostics.unrefracted, power);
           if (!events && !includeDirect) break;
+          const quad = receiver.faceIndex >> 1;
           // The hit's barycentrics give the chart position: the quad's triangles are (0, 1, 2) and (0, 2, 3).
           const chart = atlas.charts[receiver.faceIndex >> 1],
             [, b1, b2] = receiver.barycoord,
@@ -404,33 +477,59 @@ export async function bakeRefractedLightmap(
             pixel = (chart.y + Math.max(0, y)) * atlas.width + chart.x + Math.max(0, x);
           for (let c = 0; c < 3; c++) irradiance[pixel * 3 + c] += power[c];
           hits[pixel]++;
-          break;
+          if (!events || bounce === bounces) break;
+          // Diffuse bounce: the receiver sends albedo times the deposit on, cosine-weighted about its front.
+          power = [0, 1, 2].map((c) => power[c] * (albedo ? albedo[quad * 4 + c] : 1)) as V3;
+          if (power.every((x) => x === 0)) break;
+          put(diagnostics.reflected, power);
+          bounce++;
+          diagnostics.bounced++;
+          origin = [...receiver.point];
+          direction = cosineAbout(receiver.faceNormal, random(), random());
+          skipQuad = quad;
+          lastVolume = lastPlane = -1;
+          continue;
         }
         if (events === maxEvents) {
           put(diagnostics.truncated, power);
           break;
         }
         const entering = inside !== volume,
-          from = inside < 0 ? 1 : volumes[inside].ior,
+          from = iorOf(inside),
           outer = parents[volume],
-          to = entering ? volumes[volume].ior : outer < 0 ? 1 : volumes[outer].ior,
-          normal = scale(volumes[volume].planes[plane].normal, entering ? 1 : -1),
+          to = iorOf(entering ? volume : outer),
+          // The macro normal on the photon's side; a rough boundary bends about a sampled microfacet normal instead.
+          macro = scale(volumes[volume].planes[plane].normal, entering ? 1 : -1),
+          alpha = volumes[volume].alpha,
+          normal = alpha > 0 ? sampleVisibleNormal(scale(direction, -1), macro, alpha, random(), random()) : macro,
           cosine = Math.max(0, Math.min(1, -dot(direction, normal))),
           reflectance = fresnel(cosine, from, to);
         origin = add(origin, scale(direction, distance));
         lastVolume = volume;
         lastPlane = plane;
+        skipQuad = -1;
         events++;
-        if (reflectance >= 1 || random() < reflectance) {
+        const reflect = reflectance >= 1 || random() < reflectance;
+        if (reflect) {
           direction = normalize(add(direction, scale(normal, 2 * cosine)));
           diagnostics.reflections++;
           if (reflectance >= 1) diagnostics.totalInternalReflections++;
-        } else {
-          if (from !== to) {
-            const ratio = from / to,
-              ct = Math.sqrt(Math.max(0, 1 - ratio * ratio * (1 - cosine * cosine)));
-            direction = normalize(add(scale(direction, ratio), scale(normal, ratio * cosine - ct)));
+        } else if (from !== to) {
+          const ratio = from / to,
+            ct = Math.sqrt(Math.max(0, 1 - ratio * ratio * (1 - cosine * cosine)));
+          direction = normalize(add(scale(direction, ratio), scale(normal, ratio * cosine - ct)));
+        }
+        if (alpha > 0) {
+          // Smith masking of the way out, against the macro surface on the side the photon leaves by.
+          const out = dot(direction, macro) * (reflect ? 1 : -1),
+            kept = smithG1(out, alpha);
+          for (let c = 0; c < 3; c++) {
+            diagnostics.masked[c] += power[c] * (1 - kept);
+            power[c] *= kept;
           }
+          if (!(kept > 0)) break;
+        }
+        if (!reflect) {
           inside = entering ? volume : outer;
           diagnostics.refractions++;
         }

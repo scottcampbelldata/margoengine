@@ -4,6 +4,10 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 
 | Job | Package | What is left |
 | --- | --- | --- |
+| 54.8 | lightmap | refracted: multiple-scattering rough glass (Heitz et al. 2016) instead of dropping masked light; anisotropic roughness; Walter et al. 2007 still to read |
+| 54.8 | lightmap | refracted: Sellmeier dispersion and spectral Beer absorption; hero-wavelength sampling to cut colour noise |
+| 54.8 | lightmap | refracted: bounces use quad albedo only (no `surface` callback or textures) and are diffuse only; glossy receivers |
+| 54.8 | lightmap | refracted: no picture yet of a rainbow or rough caustic from a real scene; GPU photon path |
 | 54.6 | lightmap | directional lightmaps: a WGSL apply path (decode the direction and directional maps, evaluate with the mapped and vertex normals) belongs with the draw-time apply entry (54.3); only the CPU reference `directionalIrradiance` exists |
 | 54.6 | lightmap | directional lightmaps: an SH (L1) or H-basis option per texel for several strong lights; Habel and Wimmer 2010 (H-basis) still to read |
 | 54.6 | lightmap | directional lightmaps: directional ambient (bent normal from the AO rays) and bounce light with a direction; quads (`bakeLightmap`) have no directional mode |
