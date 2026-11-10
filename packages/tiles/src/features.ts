@@ -593,7 +593,8 @@ export class TileFeatures implements EnginePlugin, Disposable {
     this.clear();
     this.entries.clear();
     this.disposed = true;
-    this.engine.removePlugin(this.name);
+    // The scene this controller was attached to, not whichever scene is active now.
+    this.engine.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

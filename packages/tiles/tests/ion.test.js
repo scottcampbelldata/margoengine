@@ -7,7 +7,8 @@ import { b3dm, boxGLB, settle } from './generator.js';
 
 const encoder = new TextEncoder(),
   json = (value) => encoder.encode(JSON.stringify(value));
-const asset = (name) => new Uint8Array(readFileSync(new URL(`../../../examples/assets/khronos/${name}`, import.meta.url)));
+const asset = (name) =>
+  new Uint8Array(readFileSync(new URL(`../../../examples/assets/khronos/${name}`, import.meta.url)));
 /** The JSON chunk of a GLB, read here without the entry. */
 function gltfOf(glb) {
   const length = new DataView(glb.buffer, glb.byteOffset, glb.byteLength).getUint32(12, true);
@@ -68,12 +69,17 @@ test('ion: the endpoint is asked with a bearer header, and only the asset host g
               url: 'https://assets.ion.test/96188/tileset.json?v=1',
               accessToken: 'asset-token',
               attributions: [
-                { html: '<span>Data &copy; <a href="https://example.test">Example &amp; Co</a></span>', collapsible: false },
+                {
+                  html: '<span>Data &copy; <a href="https://example.test">Example &amp; Co</a></span>',
+                  collapsible: false,
+                },
                 { html: 'Imagery', collapsible: true },
               ],
             }),
           )
-        : new Response(JSON.stringify({ code: 'InvalidCredentials', message: 'Invalid access token' }), { status: 401 });
+        : new Response(JSON.stringify({ code: 'InvalidCredentials', message: 'Invalid access token' }), {
+            status: 401,
+          });
     },
     'https://assets.ion.test/96188/tileset.json': (_url, headers) =>
       headers.Authorization === 'Bearer asset-token'
@@ -112,13 +118,22 @@ test('ion: an expired asset token is renewed once for every request that saw it,
     valid = 'asset-1';
   const { fetch, requests } = server({
     'https://api.cesium.com/v1/assets/7/endpoint': () =>
-      new Response(JSON.stringify({ type: '3DTILES', url: 'https://assets.ion.test/7/tileset.json', accessToken: `asset-${++issued}` })),
+      new Response(
+        JSON.stringify({
+          type: '3DTILES',
+          url: 'https://assets.ion.test/7/tileset.json',
+          accessToken: `asset-${++issued}`,
+        }),
+      ),
     'https://assets.ion.test/7/tileset.json': (_url, h) =>
-      h.Authorization === `Bearer ${valid}` ? new Response(json(tilesetJSON(['a.glb', 'b.glb', 'c.glb']))) : new Response('', { status: 401 }),
+      h.Authorization === `Bearer ${valid}`
+        ? new Response(json(tilesetJSON(['a.glb', 'b.glb', 'c.glb'])))
+        : new Response('', { status: 401 }),
     ...Object.fromEntries(
       ['a', 'b', 'c', 'd'].map((n) => [
         `https://assets.ion.test/7/${n}.glb`,
-        (_url, h) => (h.Authorization === `Bearer ${valid}` ? new Response(boxGLB()) : new Response('', { status: 401 })),
+        (_url, h) =>
+          h.Authorization === `Bearer ${valid}` ? new Response(boxGLB()) : new Response('', { status: 401 }),
       ]),
     ),
   });
@@ -132,12 +147,17 @@ test('ion: an expired asset token is renewed once for every request that saw it,
   // Three requests in flight when the token expires: one renewal serves all three.
   valid = 'asset-3';
   const answers = await Promise.all(['a', 'b', 'c'].map((n) => ion.fetch(`https://assets.ion.test/7/${n}.glb`)));
-  assert.deepEqual(answers.map((r) => r.status), [200, 200, 200]);
+  assert.deepEqual(
+    answers.map((r) => r.status),
+    [200, 200, 200],
+  );
   assert.equal(issued, 3);
   // A token ion will not renew: the request fails as the server answered, and the tile reports it.
   valid = 'none';
   const errors = [];
-  const again = await Tileset.load(ion.url, { fetch: async (u, i) => (u.endsWith('tileset.json') ? new Response(json(tilesetJSON(['d.glb']))) : ion.fetch(u, i)) });
+  const again = await Tileset.load(ion.url, {
+    fetch: async (u, i) => (u.endsWith('tileset.json') ? new Response(json(tilesetJSON(['d.glb']))) : ion.fetch(u, i)),
+  });
   again.on('error', ({ error }) => errors.push(error));
   await loadAll(again);
   assert.equal(errors.length, 1);
@@ -154,9 +174,18 @@ test('ion: a refused token, a missing asset and an external asset fail with code
     'https://api.cesium.com/v1/assets/3/endpoint': () =>
       new Response(JSON.stringify({ type: 'IMAGERY', externalType: 'BING', options: { key: 'k' } })),
   });
-  await assert.rejects(ionAsset(1, { accessToken: 't', fetch }), (e) => e.code === 'failed' && /401 \(Invalid access token\); check the access token/.test(e.message));
-  await assert.rejects(ionAsset(2, { accessToken: 't', fetch }), (e) => e.code === 'failed' && /404; check the asset ID/.test(e.message));
-  await assert.rejects(ionAsset(3, { accessToken: 't', fetch }), (e) => e.code === 'unsupported' && /external BING/.test(e.message));
+  await assert.rejects(
+    ionAsset(1, { accessToken: 't', fetch }),
+    (e) => e.code === 'failed' && /401 \(Invalid access token\); check the access token/.test(e.message),
+  );
+  await assert.rejects(
+    ionAsset(2, { accessToken: 't', fetch }),
+    (e) => e.code === 'failed' && /404; check the asset ID/.test(e.message),
+  );
+  await assert.rejects(
+    ionAsset(3, { accessToken: 't', fetch }),
+    (e) => e.code === 'unsupported' && /external BING/.test(e.message),
+  );
   await assert.rejects(ionAsset(1.5, { accessToken: 't', fetch }), RangeError);
   await assert.rejects(ionAsset(1, { fetch }), TypeError);
 });
@@ -184,7 +213,10 @@ test('hostedTileset: a key goes on every request to the host, and the session a 
   for (const r of requests) assert.equal(new URL(r.url).searchParams.get('key'), 'K', r.url);
   for (const r of leaves) assert.equal(new URL(r.url).searchParams.get('session'), 'S1', r.url);
   assert.equal(new URL(requests[0].url).searchParams.get('session'), null);
-  assert.deepEqual(hosted.credits.map((c) => c.text), ['Service']);
+  assert.deepEqual(
+    hosted.credits.map((c) => c.text),
+    ['Service'],
+  );
   // Headers instead of a query; another host is not signed.
   const seen = [];
   const signed = hostedTileset('https://a.test/t.json', {
@@ -201,7 +233,7 @@ test('hostedTileset: a key goes on every request to the host, and the session a 
   tileset.dispose();
 });
 
-test('credits, real files: the drawn tiles\' glTF copyright, most frequent first, after the service\'s own', async () => {
+test("credits, real files: the drawn tiles' glTF copyright, most frequent first, after the service's own", async () => {
   // Khronos's real Fox and AlphaBlendModeTest GLBs (examples/assets/khronos), each with its own asset.copyright.
   const fox = asset('Fox/Fox.glb'),
     blend = asset('AlphaBlendModeTest/AlphaBlendModeTest.glb'),
@@ -214,7 +246,8 @@ test('credits, real files: the drawn tiles\' glTF copyright, most frequent first
       return rebuildGLB(gltf, glb);
     })();
   const files = {
-    'https://t.test/tileset.json': () => new Response(json(tilesetJSON(['fox.glb', 'fox.b3dm', 'blend.glb', 'both.glb', 'plain.glb']))),
+    'https://t.test/tileset.json': () =>
+      new Response(json(tilesetJSON(['fox.glb', 'fox.b3dm', 'blend.glb', 'both.glb', 'plain.glb']))),
     'https://t.test/fox.glb': () => new Response(fox),
     'https://t.test/fox.b3dm': () => new Response(b3dm(fox)),
     'https://t.test/blend.glb': () => new Response(blend),
@@ -239,7 +272,10 @@ test('credits, real files: the drawn tiles\' glTF copyright, most frequent first
   assert.equal(credits.text(' | ', true).split(' | ').length, 3, 'required leaves out the collapsible');
   // Fewer tiles drawn: their credits go.
   assert.equal(credits.update(frame.selected.filter((t) => t.contentUrls[0]?.endsWith('blend.glb'))), true);
-  assert.deepEqual(credits.list.map((c) => c.text), ['Service', copyrightOf(blend)]);
+  assert.deepEqual(
+    credits.list.map((c) => c.text),
+    ['Service', copyrightOf(blend)],
+  );
   tileset.dispose();
 });
 
@@ -248,17 +284,27 @@ test('credits: HTML output escapes tile text, text output strips tags, and follo
     gltf = gltfOf(glb);
   gltf.asset.copyright = '<img src=x onerror=alert(1)> & Co';
   const evil = rebuildGLB(gltf, glb);
-  assert.deepEqual(contentCopyright({ type: 'glb', gltf: evil, byteLength: evil.byteLength }), ['<img src=x onerror=alert(1)> & Co']);
-  assert.deepEqual(contentCopyright({ type: 'glb', gltf: new Uint8Array([1, 2, 3]), byteLength: 3 }), []);
-  assert.deepEqual(contentCopyright({ type: 'cmpt', tiles: [{ type: 'glb', gltf: evil, byteLength: 1 }, { type: 'pnts' }], byteLength: 1 }), [
+  assert.deepEqual(contentCopyright({ type: 'glb', gltf: evil, byteLength: evil.byteLength }), [
     '<img src=x onerror=alert(1)> & Co',
   ]);
+  assert.deepEqual(contentCopyright({ type: 'glb', gltf: new Uint8Array([1, 2, 3]), byteLength: 3 }), []);
+  assert.deepEqual(
+    contentCopyright({
+      type: 'cmpt',
+      tiles: [{ type: 'glb', gltf: evil, byteLength: 1 }, { type: 'pnts' }],
+      byteLength: 1,
+    }),
+    ['<img src=x onerror=alert(1)> & Co'],
+  );
   assert.equal(htmlText('<p>A&nbsp;&amp;&#66;&#x43; <br/>D</p>'), 'A &BC D');
   const tile = { contents: [{ type: 'glb', gltf: evil, byteLength: 1 }] };
   const listeners = new Set(),
     source = { last: { selected: [] }, onUpdate: (l) => (listeners.add(l), () => listeners.delete(l)) },
     element = { textContent: null };
-  const credits = TileCredits.follow(source, { credits: [{ text: 'ion', html: '<a href="https://ion.test">ion</a>', collapsible: false, count: 0 }], element });
+  const credits = TileCredits.follow(source, {
+    credits: [{ text: 'ion', html: '<a href="https://ion.test">ion</a>', collapsible: false, count: 0 }],
+    element,
+  });
   assert.equal(element.textContent, 'ion');
   source.last = { selected: [tile] };
   for (const l of listeners) l();
@@ -269,9 +315,9 @@ test('credits: HTML output escapes tile text, text output strips tags, and follo
   {
     using again = TileCredits.follow(source);
     assert.equal(listeners.size, 1);
-    assert.equal(again.text(), "<img src=x onerror=alert(1)> & Co");
+    assert.equal(again.text(), '<img src=x onerror=alert(1)> & Co');
   }
-  assert.equal(listeners.size, 0, "using stops following");
+  assert.equal(listeners.size, 0, 'using stops following');
 });
 
 test('credits: TilesRenderer.onUpdate runs after each selection update with last current', async () => {
@@ -283,6 +329,7 @@ test('credits: TilesRenderer.onUpdate runs after each selection update with last
       p.setup?.(this);
     },
     hasPlugin: () => false,
+    sceneOf: () => undefined,
     removePlugin() {},
   };
   const tiles = await TilesRenderer.load(engine, 'https://r.test/tileset.json', { fetch, frame: 'local' });

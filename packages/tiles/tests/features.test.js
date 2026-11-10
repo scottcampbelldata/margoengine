@@ -48,6 +48,7 @@ function fixture(change = () => {}) {
     use(plugin) {
       plugin.setup(this);
     },
+    sceneOf: () => undefined,
     removePlugin() {},
     gpu: null,
   };
@@ -424,7 +425,7 @@ test('feature ID texture transforms pick and highlight the texel gltf-pro draws 
   features.dispose();
 });
 test('FLOAT feature ID attributes (EXT_mesh_features, legacy b3dm _BATCHID) decode as IDs, not raw bits (review 5)', () => {
-  const features = new TileFeatures({ use() {}, removePlugin() {} });
+  const features = new TileFeatures({ use() {}, sceneOf: () => undefined, removePlugin() {} });
   const ids = new Float32Array([0, 1, 2, 3]);
   const asset = {
     maxBytes: 1 << 20,
@@ -469,7 +470,7 @@ test('percent-encoded binary data: URI feature images decode to their exact byte
   ]);
   const uri = 'data:image/png,' + [...png].map((b) => '%' + b.toString(16).padStart(2, '0')).join('');
   const model = { asset: { doc: { textures: [{ source: 0 }], images: [{ uri }] } } };
-  const features = new TileFeatures({ use() {}, removePlugin() {} });
+  const features = new TileFeatures({ use() {}, sceneOf: () => undefined, removePlugin() {} });
   await features.prepareImage({ model, context: {} }, { texture: { index: 0 } });
   assert.equal(features.images.get(model).get(0).data[0], 7);
 });

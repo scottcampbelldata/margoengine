@@ -65,6 +65,7 @@ async function oneTile(budget, loadModel) {
         p.setup?.(this);
       },
       hasPlugin: () => false,
+      sceneOf: () => undefined,
       removePlugin() {},
     };
   const renderer = await TilesRenderer.load(engine, memory.url, {

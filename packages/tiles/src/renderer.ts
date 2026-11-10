@@ -181,6 +181,8 @@ export class TilesRenderer implements EnginePlugin {
   enabled = true;
   disposed = false;
   private engine?: EngineKernel;
+  // The points plugin made for point-cloud tiles, removed with this renderer.
+  private pointsHost?: EnginePlugin;
   private readonly origin?: TilesOrigin;
   private readonly loadModel: NonNullable<TilesRendererOptions['loadModel']>;
   private readonly pointBudget: number;
@@ -510,7 +512,12 @@ export class TilesRenderer implements EnginePlugin {
     engine: EngineKernel,
   ): Promise<{ host: PointsHost; PointCloud: new (options: object) => object }> {
     const points = await import('@margoengine/points');
-    const host = points.PointsPlugin.attach(engine, { name: `${this.name}-points`, pointBudget: this.pointBudget });
+    // In this renderer's own scene: after the import's await the active scene is the default one.
+    const host = new points.PointsPlugin({ name: `${this.name}-points`, pointBudget: this.pointBudget }),
+      scene = engine.sceneOf(this);
+    if (scene) scene.use(host);
+    else engine.use(host);
+    this.pointsHost = host;
     return {
       host: host as unknown as PointsHost,
       PointCloud: points.PointCloud as unknown as new (options: object) => object,
@@ -523,8 +530,11 @@ export class TilesRenderer implements EnginePlugin {
     this.tileset.dispose();
     const engine = this.engine;
     if (!engine) return;
-    if (engine.hasPlugin(`${this.name}-points`)) engine.removePlugin(`${this.name}-points`);
-    if (engine.hasPlugin(this.name)) engine.removePlugin(this.name);
+    // The scenes these plugins were attached to, not whichever scene is active now.
+    const host = this.pointsHost;
+    this.pointsHost = undefined;
+    if (host) engine.sceneOf(host)?.removePlugin(host.name);
+    engine.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
   }
   [Symbol.dispose](): void {

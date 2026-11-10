@@ -62,6 +62,9 @@ function fakeEngine() {
       plugin.setup?.(this);
       return this;
     },
+    sceneOf(plugin) {
+      return this.plugins.get(plugin.name) === plugin ? this : undefined;
+    },
     hasPlugin(name) {
       return this.plugins.has(name);
     },

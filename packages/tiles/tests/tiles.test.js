@@ -568,6 +568,9 @@ test('TilesRenderer: ENU frame puts the tileset at the world origin, y up; conte
       plugin.setup(this);
       return this;
     },
+    sceneOf(plugin) {
+      return this.plugins.get(plugin.name) === plugin ? this : undefined;
+    },
     hasPlugin(name) {
       return this.plugins.has(name);
     },

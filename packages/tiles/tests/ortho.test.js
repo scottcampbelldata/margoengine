@@ -24,7 +24,24 @@ function orthographic(height, aspect = 16 / 9, near = 1, far = 10_000) {
 /** A perspective view-projection (clip w = -z). */
 function perspective(fov = 60, aspect = 16 / 9, near = 1, far = 10_000) {
   const f = 1 / Math.tan((fov * Math.PI) / 360);
-  return Float32Array.from([f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, far / (near - far), -1, 0, 0, (near * far) / (near - far), 0]);
+  return Float32Array.from([
+    f / aspect,
+    0,
+    0,
+    0,
+    0,
+    f,
+    0,
+    0,
+    0,
+    0,
+    far / (near - far),
+    -1,
+    0,
+    0,
+    (near * far) / (near - far),
+    0,
+  ]);
 }
 
 async function renderer(matrix, frame) {
@@ -41,13 +58,15 @@ async function renderer(matrix, frame) {
         p.setup?.(this);
       },
       hasPlugin: () => false,
+      sceneOf: () => undefined,
       removePlugin() {},
     };
   return TilesRenderer.load(engine, memory.url, { fetch: memory.fetch, frame: frame ?? 'local' });
 }
 
 test('ortho: orthographicHeight reads the view height of an orthographic matrix, and none from a perspective one', () => {
-  for (const h of [10, 250, 8000]) assert.ok(Math.abs(TilesRenderer.orthographicHeight(orthographic(h)) - h) < 1e-4 * h, `${h}`);
+  for (const h of [10, 250, 8000])
+    assert.ok(Math.abs(TilesRenderer.orthographicHeight(orthographic(h)) - h) < 1e-4 * h, `${h}`);
   assert.equal(TilesRenderer.orthographicHeight(perspective()), undefined);
   // Core's matrix holds zeros until the first frame; an engine without one is read as perspective.
   assert.equal(TilesRenderer.orthographicHeight(new Float32Array(16)), undefined);
