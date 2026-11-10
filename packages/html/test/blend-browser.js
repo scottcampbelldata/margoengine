@@ -1,4 +1,4 @@
-import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Engine, Camera, PbrMaterial, box } from '@margoengine/core';
 import { HTMLBlend } from '@margoengine/html/blend';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -45,6 +45,58 @@ export async function blendScenario(backend) {
   object.visible=false;await render();assert(sample([.5,0,0])[3]===255,'Hidden panel kept punching a hole');
   object.visible=true;object.setPose([.5,0,0]);panel.style.width='300px';await render();
   assert(sample([1.6,0,0])[3]===0,'Moved/resized panel aperture did not follow');
+  const customCamera=new Camera({position:[.6,0,6],target:[.6,0,0],near:.1,far:100});
+  customCamera.update(canvas.width*.5/canvas.height,backend==='webgpu');
+  const viewMeasurements=[];
+  object.setPose([0,0,0]);panel.style.width='160px';
+  for(const view of [
+    {viewport:[.5,0,.5,1]},
+    {viewport:[canvas.width*.25,canvas.height*.25,canvas.width*.5,canvas.height*.5],pixels:true},
+    {viewport:[.5,0,.5,1],camera:customCamera},
+  ]) {
+    blend.view=view;
+    object.visible=false;
+    await render();
+    const baseline=context.getImageData(0,0,snapshot.width,snapshot.height).data;
+    object.visible=true;
+    await render();
+    const bounds=panel.getBoundingClientRect(),canvasBounds=canvas.getBoundingClientRect(),
+      cx=bounds.left+bounds.width/2,cy=bounds.top+bounds.height/2,
+      px=Math.floor((cx-canvasBounds.left)*canvas.width/canvasBounds.width),
+      py=Math.floor((cy-canvasBounds.top)*canvas.height/canvasBounds.height),
+      rgba=[...context.getImageData(px,py,1,1).data];
+    assert(rgba.every(value=>value===0),`${backend} explicit view aperture missed its DOM center: ${px},${py}: ${rgba}`);
+    const outsideX=Math.floor(view.pixels?view.viewport[0]:view.viewport[0]*canvas.width)-4,
+      outsideY=Math.floor(canvas.height*.5),
+      panelOutsideX=Math.floor((bounds.left-canvasBounds.left)*canvas.width/canvasBounds.width)-4;
+    assert(baseline[(outsideY*canvas.width+outsideX)*4+3]===255,'View control pixel must lie on the opaque scene');
+    assert(baseline[(py*canvas.width+panelOutsideX)*4+3]===255,'Panel control pixel must lie on the opaque scene');
+    assert(context.getImageData(outsideX,outsideY,1,1).data[3]===255,
+      `${backend} explicit view cleared outside its rectangle`);
+    assert(context.getImageData(panelOutsideX,py,1,1).data[3]===255,
+      `${backend} explicit view aperture extended beyond its DOM panel`);
+    assert(document.elementFromPoint(cx,cy)===panel,`${backend} explicit view lost live DOM input`);
+    viewMeasurements.push({viewport:view.viewport,pixels:!!view.pixels,customCamera:!!view.camera,center:[px,py],rgba});
+  }
+  if(backend==='webgl2') {
+    const gl=canvas.getContext('webgl2'),viewport=gl.getParameter(gl.VIEWPORT),scissor=gl.getParameter(gl.SCISSOR_BOX),
+      enabled=gl.isEnabled(gl.SCISSOR_TEST);
+    try {
+      for(const on of [false,true]) {
+        gl.viewport(1,2,3,4);gl.scissor(5,6,7,8);
+        on?gl.enable(gl.SCISSOR_TEST):gl.disable(gl.SCISSOR_TEST);
+        blend.drawGL({backend:'webgl2',gl,width:canvas.width,height:canvas.height,camera:engine.camera});
+        assert([...gl.getParameter(gl.VIEWPORT)].join()==='1,2,3,4','Blend leaked its GL viewport');
+        assert([...gl.getParameter(gl.SCISSOR_BOX)].join()==='5,6,7,8','Blend leaked its GL scissor rectangle');
+        assert(gl.isEnabled(gl.SCISSOR_TEST)===on,'Blend leaked its GL scissor enable state');
+      }
+    } finally {
+      gl.viewport(...viewport);gl.scissor(...scissor);
+      enabled?gl.enable(gl.SCISSOR_TEST):gl.disable(gl.SCISSOR_TEST);
+    }
+  }
+  blend.view=null;
+  object.setPose([.5,0,0]);panel.style.width='300px';
   object.remove();await render();assert(sample([.5,0,0])[3]===255,'Removed panel kept punching');
   blend.dispose();
   assert(canvas.style.cssText===original,'Disposal did not restore canvas styles');
@@ -52,5 +104,5 @@ export async function blendScenario(backend) {
   assert(errors.length===0,errors.join('; '));
   if(backend==='webgl2')assert(canvas.getContext('webgl2').getError()===0,'Blend left a GL error');
   engine.dispose();
-  return {checks:[`${backend}: CSS3D aperture preserves foreground pixels, follows movement/size/visibility, receives live input and restores ownership`],measurements:{clear,covered,outside}};
+  return {checks:[`${backend}: CSS3D aperture preserves foreground pixels, follows movement/size/visibility and explicit views, receives live input and restores ownership/state`],measurements:{clear,covered,outside,views:viewMeasurements}};
 }

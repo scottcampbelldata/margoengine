@@ -1605,7 +1605,7 @@ membership may prevent the requested loudness, and the after report exposes the 
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
 Loudness entry: 2,106 B gzip, budget 2,362 B.
-Mixer root entry: 7,121 B gzip, budget 7,340 B. Core plus stage remains 23,837 B gzip.
+Mixer root entry: 7,121 B gzip, budget 7,340 B. At the original loudness landing, core plus stage measured 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)
@@ -3969,6 +3969,23 @@ previous classifier on failed setup, and leaves no change/abort subscriptions
 after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
+
+## HTMLBlend explicit views (2026-11-10)
+The aperture and live DOM use the same inherited LabelView camera and rectangle.
+Normalized rectangles scale with the active target; drawing-buffer-pixel views
+scale from the canvas into that target. An explicit view without a camera uses
+the engine camera, matching LabelRenderer. Mask scissors cover that rectangle
+and clip to the target. Preview restores its previous viewport/scissor state;
+its viewport coordinates follow OpenGL ES integer pixel conversion. Existing
+rectangular-mask, scene-depth and DOM pointer-routing limits remain unchanged.
+Regressions: packages/html/test/blend.test.js and blend-browser.js, including
+native WebGPU, full WebGL2 compatibility and alpha-enabled preview.
+Installed html/blend grows from 3,111 to 3,442 B min+gzip; its ceiling changes
+from 3,303 to 3,698 B under the optional-package size rule. The additional 331 B
+keep camera, viewport conversion, clipping and backend state restoration in the
+same aperture owner. Splitting them would duplicate mask/DOM lifecycle or require
+callers to coordinate backend state. The parent and current builds were emitted
+with identical settings; the isolated current result matches the canonical build.
 
 ## Mixer insert ownership after disposal (2026-11-10)
 A retained disposed Bus no longer holds its former optional stages through the

@@ -1385,6 +1385,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mcp: document direct/stdio rejection of duplicate active tool IDs and preserved cancellation ownership; completed-ID handling is unchanged.
 
+- @margoengine/html: document HTMLBlend inherited view camera/rectangle alignment, pixel-to-target scaling and preview viewport/scissor restoration/integer coordinates; refresh html/blend from 3,111 to 3,442 B gzip, ceiling 3,698 B.
 - @margoengine/mixer: document released insert ownership when a disposed bus is retained; refresh root size from 7,115 to 7,121 B gzip within the unchanged ceiling.
 - @margoengine/audio: document direct listener disposal detaching its owning scene, same-name replacement and isolated/idempotent cleanup without creating a lazy context.
 - @margoengine/sciviz: document default legend visibility after named-layer removal and reappearance, retaining native hidden semantics and spacing. DONE (sciviz-readme-phase)

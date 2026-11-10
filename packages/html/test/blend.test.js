@@ -4,6 +4,49 @@ import { JSDOM } from 'jsdom';
 import { HTMLBlend } from '../dist/blend.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
+for (const scenario of [
+  { name: 'normalized viewport with the engine camera', viewport: [0.5, 0, 0.5, 1], rect: [64, 0, 64, 96] },
+  { name: 'pixel viewport with its own camera', viewport: [16, 24, 64, 48], pixels: true, camera: true, rect: [16, 24, 64, 48] },
+  { name: 'fractional pixel edges', viewport: [1 / 256, 1 / 64, 0.5, 0.5], rect: [0.5, 1.5, 64, 48] },
+  { name: 'pixel viewport on a scaled render target', viewport: [16, 24, 64, 48], pixels: true, scaled: true, rect: [8, 12, 32, 24] },
+]) test(`HTMLBlend aligns its explicit ${scenario.name} with the DOM projection`, () => {
+  const h = optionalGPU(), dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  const canvas = dom.window.document.querySelector('canvas');
+  h.engine.canvas = canvas;
+  let configuration = { device: h.engine.gpu, format: 'rgba8unorm', alphaMode: 'opaque' };
+  canvas.getContext = () => ({ getConfiguration: () => configuration, configure: value => { configuration = value; } });
+  const matrix = new Float32Array(h.engine.camera.matrix);
+  matrix[12] = -0.25;
+  const view = { viewport: scenario.viewport, pixels: scenario.pixels,
+    ...(scenario.camera ? { camera: { ...h.engine.camera, matrix } } : {}) };
+  const expectedMatrix = scenario.camera ? matrix : h.engine.camera.matrix;
+  const contextMatrix = new Float32Array(h.engine.camera.matrix);
+  contextMatrix[12] = 0.25;
+  h.context.camera = { ...h.engine.camera, matrix: contextMatrix };
+  h.context.view = { id: 99, index: 0, viewport: [1, 1, 126, 94], scissor: [1, 1, 1, 1] };
+  if (scenario.scaled) { h.context.width = 64; h.context.height = 48; }
+  const viewports = [], scissors = [], begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = descriptor => ({ ...begin(descriptor),
+    setViewport: (...args) => viewports.push(args), setScissorRect: (...args) => scissors.push(args) });
+  const blend = HTMLBlend.attach(h.engine, { view });
+  try {
+    const element = dom.window.document.createElement('button');
+    Object.defineProperties(element, { offsetWidth: { get: () => 200 }, offsetHeight: { get: () => 100 } });
+    const object = blend.add3D(element, { position: [0, 0, 0.5] });
+    h.frame();
+    assert.equal(object.onScreen, true);
+    assert.deepEqual(viewports, [[...scenario.rect, 0, 1]]);
+    const [x, y, width, height] = scenario.rect;
+    assert.deepEqual(scissors, [[Math.floor(x), Math.floor(y), Math.ceil(x + width) - Math.floor(x), Math.ceil(y + height) - Math.floor(y)]]);
+    const uniform = h.bufferWrites.findLast(write => write.bytes === 144).buffer;
+    assert.deepEqual([...new Float32Array(uniform.data, 0, 16)], [...expectedMatrix]);
+  } finally {
+    blend.dispose();
+    h.cleanup();
+    dom.window.close();
+  }
+});
+
 test('HTMLBlend punches zero RGBA with scene depth, shares canvas ownership and restores styles and alpha', () => {
   const h=optionalGPU(),dom=new JSDOM('<body><canvas width="128" height="96" style="position:absolute;z-index:8;pointer-events:auto"></canvas></body>');
   const canvas=dom.window.document.querySelector('canvas');

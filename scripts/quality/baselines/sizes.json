@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14664397,
+  "total": 14664792,
   "history": [
     {
       "date": "2026-10-24",
@@ -8069,6 +8069,12 @@
       "commit": "c7455bcfd",
       "reason": "batch 132 input audit",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "9cb969edd",
+      "reason": "HTMLBlend explicit camera/viewport/scissor correction: measured parent 3111 to current 3442 B gzip; ceiling 3303 to 3698 B. Keep coherent mask/DOM ownership and backend state; a split would duplicate lifecycle or require callers to coordinate drawing state. Scott optional-package size rule, 2026-11-10.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8498,7 +8504,7 @@
     "@margoengine/headless/tiles": 2466,
     "@margoengine/headless/video": 7872,
     "@margoengine/html": 7487,
-    "@margoengine/html/blend": 3303,
+    "@margoengine/html/blend": 3698,
     "@margoengine/html/inline": 2744,
     "@margoengine/html/texture": 4779,
     "@margoengine/html/texture-gl": 6494,

@@ -4558,7 +4558,7 @@ cannot release a replacement handle. Regression:
 packages/audio/tests/voice-manager.test.js; all three new lifecycle regressions
 fail without their corresponding repairs. Valid transport, ranking and waveform
 checks retain their existing assertions.
-- Batch 260 HTMLBlend inherited custom view: with `HTMLBlend.attach(engine, {view: {viewport: [0.5, 0, 0.5, 1]}})`, the DOM projects into that rectangle while the aperture uses the active render context's camera/viewport. Cause: mask draw consumes PassContext rather than LabelRenderer.view. Ordinary full-canvas blending passes on all three backends; synchronize explicit view/scissor/camera in the fix phase.
+Fixed 2026-11-10: batch 260 HTMLBlend inherited custom view. Apertures now use the same explicit camera and view rectangle as the DOM, converting normalized or drawing-buffer-pixel coordinates into the current target's pixels. Both drawing paths set the matching scissor; preview restores its prior scissor rectangle and enable state. Four CPU regressions fail on the parent and cover engine-camera fallback, a custom camera, fractional edges and a scaled target. blend-browser.js checks live DOM centers, intact opaque control pixels outside both view and panel, input and GL state on native WebGPU, full compatibility and preview. Existing foreground, visibility, resize, removal and disposal assertions remain intact.
 
 
 Fixed immediately after batch 171 landing: a88cfd4fe contained unresolved boundaries in docs/api-surface.md after a native helper failed but its PowerShell caller continued. Authoritative api:update regenerates the summary; generated-metadata-conflicts.test.js fails on that published artifact and passes on the repair. No engine or atmosphere runtime source changed.

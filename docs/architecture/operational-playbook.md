@@ -749,6 +749,20 @@ mutex, and a live claimant is allowed to finish without interference.
 
 Research guiding the remaining queue and phase work, read before implementation:
 
+HTMLBlend now derives explicit aperture camera/viewport/scissor state from its
+inherited DOM view, including canvas-pixel views drawn into scaled targets.
+Four CPU command/uniform regressions distinguish it from the active pass's
+camera and scissor. The live browser test covers normalized, pixel and custom
+camera views on native WebGPU, full compatibility and preview; it verifies
+transparent DOM centers, opaque unmasked controls, input and preview state
+restoration. Existing foreground/depth and panel lifecycle assertions remain.
+The mask shader, depth convention and core are unchanged; preview coordinates
+retain OpenGL ES integer pixel conversion.
+The html/blend installed entry measures 3,111 to 3,442 B gzip, with its ceiling
+raised from 3,303 to 3,698 B under Scott's optional-entry rule. The generated
+ratchet history records why camera/clipping and backend restoration stay in
+one owner; all unrelated limits are retained.
+
 The sciviz CPU picker now ranks ties using the public normalized projectPoint
 depth (near=0/far=1), preserving reversed WebGPU clip depth in rendering. A real
 perspective-camera regression checks both point orders independently of the

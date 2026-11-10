@@ -22,19 +22,20 @@ export function htmlProgram(gl: WebGL2RenderingContext, vertex: string, fragment
 /** Preserve every draw state changed by either HTML pass, including texture unit zero's sampler. */
 export function htmlGLState(gl: WebGL2RenderingContext): () => void {
   const program = gl.getParameter(gl.CURRENT_PROGRAM), vao = gl.getParameter(gl.VERTEX_ARRAY_BINDING),
-    viewport = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_WRITEMASK),
+    viewport = gl.getParameter(gl.VIEWPORT), scissor = gl.getParameter(gl.SCISSOR_BOX), color = gl.getParameter(gl.COLOR_WRITEMASK),
     depth = gl.getParameter(gl.DEPTH_WRITEMASK), compare = gl.getParameter(gl.DEPTH_FUNC),
     srcRGB = gl.getParameter(gl.BLEND_SRC_RGB), dstRGB = gl.getParameter(gl.BLEND_DST_RGB),
     srcAlpha = gl.getParameter(gl.BLEND_SRC_ALPHA), dstAlpha = gl.getParameter(gl.BLEND_DST_ALPHA),
     eqRGB = gl.getParameter(gl.BLEND_EQUATION_RGB), eqAlpha = gl.getParameter(gl.BLEND_EQUATION_ALPHA),
     active = gl.getParameter(gl.ACTIVE_TEXTURE),
-    enabled = [gl.BLEND, gl.CULL_FACE, gl.DEPTH_TEST].map((flag) => [flag, gl.isEnabled(flag)] as const);
+    enabled = [gl.BLEND, gl.CULL_FACE, gl.DEPTH_TEST, gl.SCISSOR_TEST].map((flag) => [flag, gl.isEnabled(flag)] as const);
   gl.activeTexture(gl.TEXTURE0);
   const texture = gl.getParameter(gl.TEXTURE_BINDING_2D), sampler = gl.getParameter(gl.SAMPLER_BINDING);
   return () => {
     gl.useProgram(program);
     gl.bindVertexArray(vao);
     gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    gl.scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
     gl.colorMask(color[0], color[1], color[2], color[3]);
     gl.depthMask(depth);
     gl.depthFunc(compare);

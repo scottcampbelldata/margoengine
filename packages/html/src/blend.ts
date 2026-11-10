@@ -32,6 +32,7 @@ export class HTMLBlend extends LabelRenderer {
   private readonly masks = new Map<CSS3DObject,Mask>();
   private readonly pipelines = new Map<string,GPURenderPipeline>();
   private readonly values = new Float32Array(36);
+  private readonly viewport: [number,number,number,number] = [0,0,0,0];
   private readonly descriptor = overlayDepthPass();
   private glState?: {gl:WebGL2RenderingContext;program:WebGLProgram;vao:WebGLVertexArrayObject};
   private disposed = false;
@@ -105,16 +106,26 @@ export class HTMLBlend extends LabelRenderer {
     }
     return pipeline;
   }
+  private explicitViewport(c:PassContext):readonly number[]|undefined {
+    const view=this.view;
+    if(!view) return undefined;
+    const [x,y,width,height]=view.viewport??[0,0,1,1],canvas=this.runtime!.canvas,
+      sx=view.pixels?c.width/canvas.width:c.width,sy=view.pixels?c.height/canvas.height:c.height;
+    this.viewport[0]=x*sx;this.viewport[1]=y*sy;
+    this.viewport[2]=width*sx;this.viewport[3]=height*sy;
+    return this.viewport;
+  }
   private drawGPU(c:GPUContext):void {
     if(!this.masks.size) return;
-    const pipeline=this.pipeline(c);
+    const pipeline=this.pipeline(c),viewport=this.explicitViewport(c),
+      camera=this.view?(this.view.camera??this.runtime!.camera):c.camera;
     let pass:GPURenderPassEncoder|undefined;
     for(const [object,mask] of this.masks) {
       if(!object.onScreen) continue;
       mask.uniform??=c.device.createBuffer({size:144,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
       if(mask.pipeline!==pipeline) {mask.group=undefined;mask.pipeline=pipeline;}
       mask.group??=c.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:mask.uniform}}]});
-      this.values.set(c.camera.matrix);
+      this.values.set(camera.matrix);
       this.values.set(object.matrix,16);
       this.values[32]=object.element.offsetWidth*object.pixelScale;
       this.values[33]=object.element.offsetHeight*object.pixelScale;
@@ -123,7 +134,12 @@ export class HTMLBlend extends LabelRenderer {
         this.descriptor.colorAttachments[0].view=c.color;
         this.descriptor.depthStencilAttachment.view=c.depth;
         pass=c.encoder.beginRenderPass(this.descriptor);
-        applyView(pass,c);
+        if(viewport) {
+          const [x,y,width,height]=viewport,left=Math.max(0,Math.floor(x)),top=Math.max(0,Math.floor(y)),
+            right=Math.min(c.width,Math.ceil(x+width)),bottom=Math.min(c.height,Math.ceil(y+height));
+          pass.setViewport(x,y,width,height,0,1);
+          pass.setScissorRect(left,top,Math.max(0,right-left),Math.max(0,bottom-top));
+        } else applyView(pass,c);
         pass.setPipeline(pipeline);
       }
       pass.setBindGroup(0,mask.group);
@@ -138,8 +154,15 @@ export class HTMLBlend extends LabelRenderer {
     this.glState??={gl,program:htmlProgram(gl,vertex,fragment),vao:gl.createVertexArray()!};
     const {program,vao}=this.glState,restore=htmlGLState(gl);
     try {
-      const [x,y,w,h]=c.view?.viewport??[0,0,c.width,c.height];
+      const explicit=this.explicitViewport(c),[x,y,w,h]=explicit??c.view?.viewport??[0,0,c.width,c.height],
+        camera=this.view?(this.view.camera??this.runtime!.camera):c.camera;
       gl.viewport(x,c.height-y-h,w,h);
+      if(explicit) {
+        const left=Math.max(0,Math.floor(x)),top=Math.max(0,Math.floor(y)),
+          right=Math.min(c.width,Math.ceil(x+w)),bottom=Math.min(c.height,Math.ceil(y+h));
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(left,c.height-bottom,Math.max(0,right-left),Math.max(0,bottom-top));
+      }
       gl.useProgram(program);
       gl.bindVertexArray(vao);
       gl.disable(gl.BLEND);
@@ -148,7 +171,7 @@ export class HTMLBlend extends LabelRenderer {
       gl.depthFunc(gl.LESS);
       gl.depthMask(true);
       gl.colorMask(true,true,true,true);
-      gl.uniformMatrix4fv(gl.getUniformLocation(program,'camera'),false,c.camera.matrix);
+      gl.uniformMatrix4fv(gl.getUniformLocation(program,'camera'),false,camera.matrix);
       for(const object of this.masks.keys()) if(object.onScreen) {
         gl.uniformMatrix4fv(gl.getUniformLocation(program,'model'),false,new Float32Array(object.matrix));
         gl.uniform2f(gl.getUniformLocation(program,'size'),object.element.offsetWidth*object.pixelScale,object.element.offsetHeight*object.pixelScale);
