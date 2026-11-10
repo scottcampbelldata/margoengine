@@ -3734,3 +3734,11 @@ splats/progressive yields complete PLY/splat/SPZ records before EOF. Tests prese
 
 Batch 238 compatibility regression: unchanged whole straight-alpha ImageBitmaps avoid Canvas2D quantization. Exact SOG WebP writer/browser-GPU checks now retain every channel on 61x23, 64x64 and 7x5 images, including low and zero alpha, on native WebGPU and compatibility. Proof: bitmap-straight.test.js and the existing data webp assertions in splats/test/gpu/check.mjs.
 Batch 172 /calc claim: safe scalar/vector point/cell expression grammar and the requested unstructured derived-array filters, with CPU and compute-GPU outputs bounded per value on shared f32 inputs. Proof: packages/sciviz/tests/calc.test.js and calc-browser.mjs, including original NASA data and independent affine gradients. Connectivity discovery is CPU topology, not GPU graph traversal; geometric coefficient preparation and quality extrema are CPU-owned. No execution-speed claim.
+
+
+Batch 223 instance ordering: /sort orders kept opaque records by camera-forward
+center depth, stably for equal keys, without per-instance CPU work or readbacks.
+Direct GPU records and argument words match the CPU reference for empty, odd,
+padded and multi-workgroup capacities with a transformed model node. Pixel
+comparison covers all four drawing routes and runtime disable. This establishes
+ordering and image behaviour, not a measured frame-time or fragment-work gain.

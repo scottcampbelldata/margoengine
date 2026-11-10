@@ -3204,3 +3204,11 @@ After build:packages, run node --test --test-timeout=60000 packages/splats/test/
 
 Compatibility upload regression: node --test --test-timeout=120000 packages/webgl2-compat/test/bitmap-straight.test.js packages/webgl2-compat/test/external-image.test.js, plus the unchanged exact WebP channel assertions in the two splats GPU runs above. No timing bar.
 Batch 172 calculator correctness: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/calc.test.js. With a shared GPU lock run node packages/sciviz/tests/calc-browser.mjs (native and compatibility in one command). Demo: /examples/sciviz-calc.html. All expression groups, transfers, centres, connectivity, elevation, quality and least-squares gradients use analytic cases and original NASA FUN3D data. No benchmark or timing assertion.
+
+
+Batch 223 sorting: build packages, then hold a shared GPU slot for
+`node packages/culling/test/gpu/sort-check.mjs` and again with `--compat`.
+Direct readbacks verify all record fields, stable order, source ranges and
+argument words; every route also compares sorted and original canvas pixels.
+CPU contracts run in `packages/culling/test/sort.test.js`. No wall-clock A/B,
+benchmark or timing-only assertion runs during the build phase.

@@ -552,3 +552,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: document /calc grammar, derived operation contracts, bounds, pipeline adapter and NASA calculator demo; README examples deferred during build phase.
 
 - margoengine: document the sciviz/calc optional alias after build phase.
+
+
+- @margoengine/culling: document /sort FrontToBack, InstanceSorter, SortedInstances, stable equal-depth keys, registration/removal, toggles, opaque-only input and buffer flags (batch 223 job 3).
+- margoengine: document the generated culling/sort alias (batch 223 job 3).

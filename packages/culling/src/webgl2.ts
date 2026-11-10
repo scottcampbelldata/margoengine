@@ -98,7 +98,7 @@ export class WebGL2Culling implements EnginePlugin {
           count: 0,
           packed: new Float32Array(capacity * 24),
           instances: device.createBuffer({ size: capacity * 96, usage: 32 | 8 }),
-          args: device.createBuffer({ size: 20, usage: 256 | 8 }),
+          args: device.createBuffer({ size: 20, usage: 256 | 128 | 4 | 8 }),
         };
         this.slots.set(g, s);
       }

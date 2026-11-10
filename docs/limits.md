@@ -4881,3 +4881,37 @@ Optional splats/progressive reads standard vertex-only ASCII/little-endian Gauss
 Batch 238 measured entry sizes: splats/progressive 0 B before (absent), 30,891 B min+gzip after including the renderer and lazy SPZ decoder. The parser/upload entry keeps one shared cloud owner; splitting it would force separate attachment plumbing and would not reduce the renderer needed for progressive drawing. Core plus stage remains 24,209 B gzip, below 25,000. webgl2-compat/device is 106,239 B after direct unchanged-bitmap upload, within its existing 108,058 B ceiling. Whole untransformed straight-alpha ImageBitmaps retain RGB at low/zero alpha; transformed copies still use the existing Canvas2D path.
 Batch 172 calculator: /calc is optional; core/stage remain unchanged at 24209 B gzip. Up to 1000000 points/cells, 64 input tuple components, 4096 expression characters, 512 parsed expressions and nesting 64. Float32 snapshots/coefficients; per-value absolute parity bounds exclude quantisation and discretisation. Rank cutoff 1e-12; centers are vertex means; connectivity is shared-point topology; quality definitions and GPU/CPU ownership are in docs/sciviz-analysis.md. No speed claim.
 Batch 172 /calc entry: new 0 to 6722 B min+gzip (ceiling 6978 B); parser, derived operators and conditioning bounds remain together to avoid public import fragmentation. Core/stage unchanged at 24209 B.
+
+
+### Optional front-to-back instance ordering
+
+`@margoengine/culling/sort` exports FrontToBack for kept core batches (including
+DynamicInstances) and registered model instances, SortedInstances for the static
+CulledInstances draw path, and InstanceSorter for 96-byte GPU lists. Sorting is
+optional; enabled and sortEnabled default true on the respective optional
+classes and can change at runtime. Core and model sorting executes after culling
+and before drawing, independent of registration order. Model tint/transmission
+lists and alphaMode BLEND primitives retain their existing order. Plain model
+primitives keep their original draws; deformed models retain their bypass.
+Each range orders by its transformed local center along the current view
+forward direction, with original row indices breaking equal-depth ties. It
+supports perspective and orthographic views, reflection and node transforms.
+Ordering is per batch, as with specialised batched renderers, rather than across
+materials or geometries. Counts, picking/caster buffers and every record field
+stay unchanged. Opaque surfaces that overlap at equal surface depth but have
+different center depths can resolve in the new order, the usual draw-order
+consequence of sorting. Transparent geometry must never be passed to the raw
+sorter. Importing ordinary cullers does not load ordering code.
+InstanceSorter accepts capacity 0 through 4,194,304 within device storage limits;
+its key network rounds to a power of two. O(n log-squared n) key comparisons and
+one gather are encoded; no per-instance CPU work or GPU readback occurs. Each
+view and stage owns distinct parameter storage. Input instance buffers require
+STORAGE; supplied argument buffers require STORAGE and COPY_SRC. Software
+occlusion arguments now expose those flags too. No speed claim is made.
+
+Removed sort owners release all their view resources with InstanceSorter.forget;
+FrontToBack also collects owners absent from the preceding frame and releases
+registered model resources on removal. Cleanup happens before a later frame,
+after the prior frame's command submission; existing view uploads stay distinct.
+
+Batch 223 job 3 minified gzip: /sort is new, 0 to 14060 B. /webgl2 stays 3028 B while exposing storage/copy access to its argument buffer. /bounds stays 19447 B. The sort entry shares one network implementation across drawing routes and reuses the existing static culler; a split would duplicate resource state and complicate import/use. Core plus stage remains 24,209 B. firstInstance prefixes are included in capacity; their indirect word and draw offset are preserved, along with every other indirect word.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13172743,
+  "total": 13187207,
   "history": [
     {
       "date": "2026-10-24",
@@ -6624,6 +6624,12 @@
       "date": "2026-11-10",
       "commit": "batch-172-job5",
       "reason": "New optional sciviz/calc: 0 to 6722 B, ceiling 6978 B; typed grammar, complete derived operations and GPU bounds share one entry. Splitting would add import complexity without reducing bytes when these operations are used together. Core/stage unchanged 24209 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-223-job-3",
+      "reason": "Stable optional per-instance depth ordering: {\"@margoengine/culling\":{\"before\":13962,\"after\":13962},\"@margoengine/culling/dynamic\":{\"before\":7452,\"after\":7452},\"@margoengine/culling/parts\":{\"before\":14181,\"after\":14181},\"@margoengine/culling/models\":{\"before\":9540,\"after\":9540},\"@margoengine/culling/shadows\":{\"before\":20302,\"after\":20302},\"@margoengine/culling/lod\":{\"before\":3878,\"after\":3878},\"@margoengine/culling/meshlets\":{\"before\":17117,\"after\":17117},\"@margoengine/culling/webgl2\":{\"before\":3028,\"after\":3028},\"@margoengine/culling/bounds\":{\"before\":19447,\"after\":19447},\"@margoengine/culling/sort\":{\"before\":0,\"after\":14060}}. Sort entry shares the existing static culler and uses one stable key network for all routes. Splitting would duplicate sorting state. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7843,6 +7849,7 @@
     "margoengine/selection/highlight": 322,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/sciviz/calc": 6978
+    "@margoengine/sciviz/calc": 6978,
+    "@margoengine/culling/sort": 14464
   }
 }

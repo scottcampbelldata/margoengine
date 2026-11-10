@@ -790,6 +790,10 @@
       "types": "./dist/culling/bounds.d.ts",
       "import": "./dist/culling/bounds.js"
     },
+    "./culling/sort": {
+      "types": "./dist/culling/sort.d.ts",
+      "import": "./dist/culling/sort.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

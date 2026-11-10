@@ -6120,3 +6120,22 @@ Optional tree compilation provides leaf clips and weights to the existing Animat
 Distance policy is CPU/DOM layout code. LabelRenderer honors a layout-adjusted final scale while preserving its existing distanceScale output. The browser gate checks real scaled geometry and opacity over native WebGPU and WebGL2 scenes. No core, stage, backend pipeline or GPU shader change.
 ### Section 5 evidence: batch 172 calculator
 Optional /calc adds bounded grammar-generated WGSL and sparse numeric reductions without core/stage changes. Topology, rank-revealing geometric basis and least-squares coefficients stay CPU-side; expression/reduction output is read from the GPU with finally-owned resources. calc.test.js supplies independent affine/transfer/quality oracles; calc-browser.mjs compares all derived operations and NASA data on both backends with explicit per-value forward-error bounds. Quantisation and reconstruction error are separate from execution parity; see docs/sciviz-analysis.md.
+
+
+
+### Section 5 evidence: batch 223 ordering
+
+The optional /sort entry encodes a stable GPU key network and full-row gather
+after visibility compaction. The key is camera-forward depth of the transformed
+local center. Padding keys sort last; original indices break equal depths. GPU
+readbacks compare all 24 floats and all five argument words to independent CPU
+expectations for capacities 0, 1, 3, 17, 65 and 257, including count below capacity,
+nonzero record/argument offsets and a sheared node transform. Pixel checks cover
+core meshes, static parts, models and moving instances, camera movement and the
+runtime disable switch on both native and compatibility backends. Queue writes
+use separate stage offsets and view resources. Source lists remain available to
+picking/shadows. Only package-owned code changed; no core/stage hooks were added.
+
+Sorting lifecycle CPU tests also pin per-owner release across all views and a
+fresh allocation if the same owner is later encoded again. The GPU fixtures
+exercise enable/disable transitions while cullers continue to update their lists.

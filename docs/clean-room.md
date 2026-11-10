@@ -6817,3 +6817,22 @@ Batch 238 landing blocker: compared Thomas Porter and Tom Duff, Compositing Digi
 ### Batch 172 calculator and derived arrays (2026-11-10)
 Research compared Pratt's bounded top-down parsing, projection-based least-squares reconstruction and algebraic element metrics. Sources: Vaughan R. Pratt, *Top Down Operator Precedence* (1973), https://tdop.github.io/ ; Dimitri J. Mavriplis, *Revisiting the Least-squares Procedure for Gradient Reconstruction on Unstructured Meshes*, NASA/CR-2003-212683 (2003), https://www.cs.odu.edu/~mln/ltrs-pdfs/NASA-2003-cr212683.pdf ; Alexandros Syrakos, Oliver Oxtoby, Eugene de Villiers, Stylianos Varchanis, Yannis Dimakopoulos and John Tsamopoulos, *A unification of least-squares and Green-Gauss gradients under a common projection-based gradient reconstruction framework* (2021), https://arxiv.org/abs/2111.02182 ; Patrick M. Knupp, *Algebraic Mesh Quality Metrics* (2001), https://doi.org/10.1137/S1064827500371499 . No companion implementation was used. The independent implementation combines a typed grammar, geometric rank basis, least-squares weights and original-element corner metrics. It does not claim to implement every metric in Knupp's family.
 Rival behavior comparison: Kitware's Calculator documentation describes point/cell tuple expressions, coordinates, scalar/vector inputs and attached output arrays (https://kitware.github.io/vtk-js/api/Filters_General_Calculator.html, introduction and formula-simple contract only). Margo supplies these through a grammar, not arbitrary callbacks, plus the other requested derived filters. Analytic affine-field, transfer, component and element oracles are checked independently of a rival implementation. No rival source was used. NASA data bytes and licence are unchanged from the earlier contour demo.
+
+
+## Batch 223: stable ordering after compaction
+
+Kenneth E. Batcher, *Sorting Networks and Their Applications*, AFIPS 1968,
+https://doi.org/10.1145/1468075.1468121 , gives the deterministic compare-exchange
+schedule used by the optional /sort entry. Peter Kipfer and Rudiger Westermann,
+*Improved GPU Sorting*, GPU Gems 2, 2005,
+https://developer.nvidia.com/gpugems/gpugems2/part-vi-simulation-and-numerical-algorithms/chapter-46-improved-gpu-sorting ,
+compares GPU sorting networks and describes their use for view-depth ordering.
+We combine that schedule with the opaque front-to-back visibility rationale of
+Greene, Kass and Miller (1993), cited above. Each live key includes its original
+row index, making equal depths stable. Invalid padded lanes sort last. The
+network sorts only keys, then gathers entire original 96-byte rows. Each stage
+has its own 256-byte uniform slot; each view has separate keys, parameters and
+outputs, so queue writes cannot replace another stage's or view's data before
+submission. All original indices, material/tint/UV fields and count words stay.
+No rival or paper companion code was consulted. The new tests use the existing
+licensed Cesium Box sample and independent CPU ordering of direct GPU readbacks.
