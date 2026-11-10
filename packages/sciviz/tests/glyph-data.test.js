@@ -5,8 +5,8 @@ import { createHash } from 'node:crypto';
 import { readDisplacement } from '../../../examples/sciviz-glyph-data.ts';
 import { warpByVector } from '../dist/glyph.js';
 test('original pinned SEACAS displacement file retains all nodes, cells and displacement components', async () => {
-  const bytes = new Uint8Array(readFileSync('examples/assets/sciviz/glyph/displacement.e')),
-    source = JSON.parse(readFileSync('examples/assets/sciviz/glyph/source.json'));
+  const bytes = new Uint8Array(readFileSync(new URL('../../../examples/assets/sciviz/glyph/displacement.e', import.meta.url))),
+    source = JSON.parse(readFileSync(new URL('../../../examples/assets/sciviz/glyph/source.json', import.meta.url)));
   assert.equal(createHash('sha256').update(bytes).digest('hex'), source.sha256);
   const g = await readDisplacement(bytes);
   assert.equal(g.points.length / 3, 2185);
