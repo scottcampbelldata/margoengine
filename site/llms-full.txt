@@ -15488,6 +15488,19 @@ as unsupported by the light loader.
   /packages/sky/test/browser-check.html under the compat shim, run `check.run('meadow','full')`, then
   `(await import('/packages/sky/test/configs.js')).configs.meadow.features.push('night')`, `check.run('meadow','narrow')`
   and `check.compare('full','narrow')` (0 differing); without the push, 2 differing in frame 1.
+  Emitted GLSL checked (lane L, 2026-11-10, M6, Chrome 156, MARGO_COMPAT=1): webgl2-compat's fragment shader for
+  [bruneton, clouds, lighting] and for the same list plus `night` is the same text for every shared function, cloud path
+  included, apart from the counters in local names (`lr_84` against `lr_110`, `qlookup_s15` against `qlookup_s16`): no
+  inlining, precision qualifier, uniform block layout or temporary differs. The night text adds only `stylizedNight`,
+  `hash21`, `nightPcg` and the uniform branch in `nightSky`. `packages/sky/test/compat-night-glsl.test.js` pins this.
+  Swapping the narrow program's GLSL just before `shaderSource`, with the browser's own text otherwise unchanged
+  (`packages/sky/test/compat-night-probe.mjs`, differing scene pixels per frame): narrow as emitted [0,2,0]; the night
+  text [0,0,0]; the night text with the branch that calls `stylizedNight` removed, its functions kept [0,2,0]; the night
+  text with `stylizedNight`'s body replaced by `return vec3(footprint)` [0,2,0]; narrow with a dead
+  `if(...>0.5){return vec3(0.0);}` [0,2,0]. So the live cloud arithmetic rounds one way only when the program also calls
+  the full `stylizedNight` body from a branch the frame never takes: ANGLE's or Apple's Metal compiler, not Margo's text.
+  Left red: making two different programs round alike would mean steering that compiler with dead code. No tolerance
+  changed.
 
 ## Batch 132 audit: viewcube (fixed)
 
