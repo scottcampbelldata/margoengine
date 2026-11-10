@@ -113,3 +113,6 @@ A static file may hold its textures as KTX 2.0 files with Basis Universal data i
 
 ## Object actions and hierarchy
 With object_animation=True, the existing flag-1 animation data also holds object TRS channels. Nodes keep parent links and local transforms, including non-mesh and hidden ancestors; roots list only unparented nodes. No new binary layout. Static hierarchy without actions uses flag 0. Each active/NLA-referenced action is sampled at each integer frame; every object owner gets complete TRS tracks, sharing one-key constant timelines where possible. Signed scale is retained and continuous quaternion signs are used. Local matrices include evaluated constraints and parent inverses. The objects entry aliases the existing anim loader and converter; Animation.attach drives the resulting nodes.
+
+## Lightmap metadata
+Node extras.margo.lightmap = {texture, scale, texCoord:1, radiometry:"irradiance"} references an ordinary texture/embedded PNG. RGB is linear physical diffuse irradiance divided by scale, alpha is coverage. UV1 occupies PBR vertex floats 14 and 15, with top-left origin, separate from UV0. No container revision or root runtime bytes. Cycles colour-free diffuse E/pi is multiplied by pi at export, so the consumer applies albedo * (1-metalness) / pi once. Plain loading leaves metadata as data; the lightmap entry installs it explicitly.

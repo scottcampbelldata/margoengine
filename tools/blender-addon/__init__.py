@@ -47,10 +47,15 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         description="Keep parent links and sample object actions, including empty pivots and constrained transforms; load with the anim or objects entry",
         default=False,
     )
+    lightmap_size: bpy.props.IntProperty(
+        name="Lightmap size",
+        description="Cycles direct and indirect diffuse illumination on a second UV map; 0 disables baking",
+        default=0, min=0, max=4096,
+    )
 
     def execute(self, context):
         try:
-            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation)
+            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation, lightmap_size=self.lightmap_size)
         except (ValueError, OSError, OverflowError, RuntimeError) as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}

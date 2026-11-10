@@ -470,3 +470,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-pathtracer (batch 243 job 2): document emissive-triangle NEE/MIS and MeshTraceScene.spotLights, candela units, cone/range defaults, Type C IES parsing, external tilt ownership and PBR texture/alpha sampling; examples deferred by rule 20.
 
 - margoengine (batch 243 job 2 dependent gate): generated audio/sprites and xr/hands aliases now match current package exports; README work remains deferred by rule 20.
+
+- @margoengine/blender (batch 207 job 2): document lightmap_size (0 off, 16..4096), UV1 generation/preservation, Cycles diffuse passes, HDR scale, scene restoration and lightmap decoder/loaders.
+- @margoengine/lightmap (batch 207 job 2): document imported readLightmap/applyLightmap, physical irradiance, UV1, plugin lifetime/device restore, replace-lighting semantics and material-extension ownership.
+- margoengine (batch 207 job 2): document blender/lightmap and lightmap/imported aliases.

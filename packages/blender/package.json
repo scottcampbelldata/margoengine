@@ -58,18 +58,24 @@
     "./objects": {
       "types": "./dist/objects.d.ts",
       "import": "./dist/objects.js"
+    },
+    "./lightmap": {
+      "types": "./dist/lightmap.d.ts",
+      "import": "./dist/lightmap.js"
     }
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:browser:objects": "node tests/objects-browser.mjs"
+    "test:browser:objects": "node tests/objects-browser.mjs",
+    "test:browser:lightmap": "node tests/lightmap-browser.mjs"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
-    "@margoengine/exporters": "^1.0.0"
+    "@margoengine/exporters": "^1.0.0",
+    "@margoengine/lightmap": "^1.0.0"
   },
   "publishConfig": {
     "access": "public"
@@ -79,6 +85,9 @@
       "optional": true
     },
     "@margoengine/exporters": {
+      "optional": true
+    },
+    "@margoengine/lightmap": {
       "optional": true
     }
   }

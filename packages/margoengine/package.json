@@ -386,6 +386,10 @@
       "types": "./dist/blender/objects.d.ts",
       "import": "./dist/blender/objects.js"
     },
+    "./blender/lightmap": {
+      "types": "./dist/blender/lightmap.d.ts",
+      "import": "./dist/blender/lightmap.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"
@@ -1645,6 +1649,10 @@
     "./lightmap/directional": {
       "types": "./dist/lightmap/directional.d.ts",
       "import": "./dist/lightmap/directional.js"
+    },
+    "./lightmap/imported": {
+      "types": "./dist/lightmap/imported.d.ts",
+      "import": "./dist/lightmap/imported.js"
     },
     "./lines": {
       "types": "./dist/lines.d.ts",

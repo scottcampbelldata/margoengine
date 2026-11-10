@@ -167,6 +167,7 @@ async function buildPackage(name) {
           '@margoengine/gltf-pro/interactivity',
           '@margoengine/selection',
           '@margoengine/gltf-pro/instancing',
+          '@margoengine/lightmap/imported',
           '@margoengine/loaders',
           '@margoengine/lines',
           '@margoengine/decoders',

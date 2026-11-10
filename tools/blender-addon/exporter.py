@@ -17,7 +17,15 @@ class NeedsBake(ValueError):
     """A node graph the direct Principled subset cannot carry; baking turns it into images."""
 
 
-def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False):
+def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False, lightmap_size=0):
+    if lightmap_size:
+        from .lightmaps import lightmaps
+        with lightmaps(context, lightmap_size) as records:
+            return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, records)
+    return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation)
+
+
+def _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, lightmap_records=None):
     """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
     (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
     bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead.
@@ -334,6 +342,11 @@ def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=Fals
                 values[:, 11] = signs
                 values[:, 12:14] = uv.reshape(-1, 2)
                 values[:, 13] = 1 - values[:, 13]
+            if len(mesh.uv_layers) > 1:
+                uv1 = np.empty(len(mesh.loops) * 2, dtype=np.float32)
+                mesh.uv_layers[1].data.foreach_get("uv", uv1)
+                values[:, 14:16] = uv1.reshape(-1, 2)
+                values[:, 15] = 1 - values[:, 15]
         if not np.isfinite(values).all():
             raise ValueError(f"Object '{obj.name}': invalid vertex")
         triangle_loops = triangle_loops.reshape(-1, 3)
@@ -396,6 +409,12 @@ def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=Fals
             nodes.append(node)
             if bone is None and not instance:
                 self.objects[obj.as_pointer()] = (obj, node)
+            if bone is None and lightmap_records and obj.as_pointer() in lightmap_records:
+                lighting = lightmap_records[obj.as_pointer()]
+                maximum = max(1.0, float(lighting[..., :3].max()))
+                encoded = lighting.copy()
+                encoded[..., :3] /= maximum
+                node["extras"]["margo"]["lightmap"] = {"texture": baked_texture(encoded, False), "scale": maximum, "texCoord": 1, "radiometry": "irradiance"}
             return node
 
     def properties(obj):
