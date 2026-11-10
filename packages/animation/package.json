@@ -30,7 +30,8 @@
     "test:gpu:dqs": "cd ../.. && node scripts/animation-dqs-tests.js",
     "test:gpu:instanced-skin": "cd ../.. && node scripts/animation-instanced-skin-tests.js",
     "test:gpu:geometry-cache": "cd ../.. && node scripts/animation-geometry-cache-tests.js",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu:mixer": "cd ../.. && node packages/animation/tests/mixer-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -85,6 +86,10 @@
     "./point-cache": {
       "types": "./dist/point-cache.d.ts",
       "import": "./dist/point-cache.js"
+    },
+    "./mixer": {
+      "types": "./dist/mixer.d.ts",
+      "import": "./dist/mixer.js"
     }
   },
   "files": [

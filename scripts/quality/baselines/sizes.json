@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12696137,
+  "total": 12700552,
   "history": [
     {
       "date": "2026-10-24",
@@ -6286,6 +6286,12 @@
       "commit": "batch-259",
       "reason": "UI curved surfaces: absent to 1436 B; world ceiling 9277 to 9836 B, world-gl ceiling 7556 to 7816 B. Procedural tessellation shares panel textures, XR routing and GPU lifetime; splitting would duplicate those owners. Core plus stage 24209 B unchanged. The inherited world renderer reaches the shared text owner, as world already does; curved does not duplicate it.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch210-mixer",
+      "reason": "New animation/mixer: 0 -> 4158 B min+gzip, ceiling 4414 B; generated umbrella alias shares it. Synchronous action clocks, envelopes and shared binding ownership form one cohesive optional API; splitting adds lifecycle coordination without quality gain. Core/stage unchanged. The synchronous PBRModel constructor and borrowed Animation/Skeleton identity reuse the existing animation root/model runtime; its transitive model dependency is intentional. Lazy loading would turn synchronous clipAction/model construction into an async API, or require a second copy of playback/deformation ownership.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7430,6 +7436,8 @@
     "@margoengine/ecs/parallel": 5194,
     "@margoengine/selection/hit-details": 15453,
     "@margoengine/ui/curved": 1692,
-    "leak @margoengine/ui/curved -> @margoengine/text": 1
+    "leak @margoengine/ui/curved -> @margoengine/text": 1,
+    "@margoengine/animation/mixer": 4414,
+    "leak @margoengine/animation/mixer -> @margoengine/gltf-pro/model": 1
   }
 }

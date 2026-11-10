@@ -356,3 +356,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/cache: replace stale Node-only prefetch/throttle and RangeCache browser/service worker limitations with batch-208 browser evidence; document worker flush lifetime and offline range behavior.
 - @margoengine/ui (batch 259 job 1): document /curved CurvedPanel arc dimensions, ray mapping, segment limits, layoutPanels arrangements and /world-gl renderer setup in the README phase.
 - margoengine (batch 259 job 1): document ui/curved alias in the README phase.
+
+- @margoengine/animation: document /mixer construction, clipAction weights/rates, fades, warped crossfade, loops, additive delta conventions, ownership and disposal (batch 210 job 1).
+- margoengine: document animation/mixer alias and regenerated exporters/splats alias (batch 210 job 1).

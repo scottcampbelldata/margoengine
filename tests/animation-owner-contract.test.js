@@ -10,5 +10,5 @@ test('every explicit Animation plugin disposes by registered identity', () => {
     assert.deepEqual(result.problems, [], name);
     count += result.checked;
   }
-  assert.equal(count, 8);
+  assert.equal(count, 9);
 });
