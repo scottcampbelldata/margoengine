@@ -13,7 +13,7 @@
 - @margoengine/sciviz (review M1): document automatic GPU picking synchronization of in-place position and rectangle edits. DONE (sciviz-readme-phase)
 
 - @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase. DONE (sciviz-readme-phase)
-- @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase.
+- @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase. DONE (voxel-readme-phase)
 - @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase.
 - @margoengine/react: performance proof waits for target factor/dimensions and pipeline readiness; review test guidance in the README phase. DONE (react-readme-phase).
 
@@ -825,7 +825,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-edit and margoengine (batch 241 job 2): document /select NDC conversion, cell-centre boundary rules, lasso parity, select-through/visibleOnly, model placement, normalized RGBA similarity, sparse indexes and budgets; README examples deferred.
 
 - @margoengine/text (batch 248 job 5): replace old CFF2/variation/shaping exclusion; document variations, axes, withVariations, shapedRuns em normalization/UTF-16 clusters/line order, FontLike providers, parser limits and dependency-free frozen oracle tests. No README examples written in build phase.
-- @margoengine/voxel (batch 240 job 1): document /models definition, 24 orientations, face UVs/textures, renderer ordering and optional materials peer, exact queries/physics and lighting coverage; runnable examples owed in the README phase.
+- @margoengine/voxel (batch 240 job 1): document /models definition, 24 orientations, face UVs/textures, renderer ordering and optional materials peer, exact queries/physics and lighting coverage; runnable examples owed in the README phase. DONE (voxel-readme-phase)
 - margoengine (batch 240 job 1): document the voxel/models umbrella entry alongside the optional package in the README phase.
 - `@margoengine/rigging` (batch 213 job 5): document pose-tracking body/hand solvers, Tasks/Holistic frames, coordinate/mirror/aspect conventions, confidence/calibration/smoothing/loss, native VRM binding/cancellation/disposal and root-motion limits; runnable README examples wait for README phase.
 - `margoengine` (batch 213 job 5): document the generated rigging/pose-tracking alias in README phase.
@@ -858,7 +858,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/exporters: document jpeg-read sharing the decoder implementation with unchanged API.
 - margoengine: expose the generated decoders/jpeg optional facade in the decoder index.
 
-- @margoengine/voxel (batch 240 job 2): document /objects, core/glTF graph sources, cell-centre origin, quarter turns, shared ownership, retained handles and streaming; runnable README examples owed in the README phase.
+- @margoengine/voxel (batch 240 job 2): document /objects, core/glTF graph sources, cell-centre origin, quarter turns, shared ownership, retained handles and streaming; runnable README examples owed in the README phase. DONE (voxel-readme-phase)
 
 - @margoengine/voxel-net: document /replay VoxelRecorder, recordVoxelFile/readVoxelRecording, recipient selection, forward tick stepping, cancellable play, file bounds/ownership and server.onSend observation.
 
@@ -951,7 +951,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/creative and margoengine (batch 271 job 4): document /paint-aniso AnisotropicPainterly defaults, LDR ordering, tensor/elliptical sector controls, smooth radial support, 32 B/pixel intermediate budget, exact bypass/alpha, views and both GPU backends; examples deferred.
 
-- @margoengine/voxel (batch 240 job 3): document /wind per-block definitions, direction/clock controls, rooting, liquid seams, bounds, mesher/shadow integration and ownership; runnable README examples owed in the README phase.
+- @margoengine/voxel (batch 240 job 3): document /wind per-block definitions, direction/clock controls, rooting, liquid seams, bounds, mesher/shadow integration and ownership; runnable README examples owed in the README phase. DONE (voxel-readme-phase)
 
 - margoengine (batch 240 job 2): document the voxel/objects alias in the README phase.
 - margoengine (batch 240 job 3): document the voxel/wind alias in the README phase.
@@ -1158,7 +1158,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/usdz: document the API conventions lifecycle repair, attachment ownership and disposal.
 
-- @margoengine/voxel: document the API conventions lifecycle repair, attachment ownership and disposal.
+- @margoengine/voxel: document the API conventions lifecycle repair, attachment ownership and disposal. DONE (voxel-readme-phase)
 
 - @margoengine/weather: document the API conventions lifecycle repair, attachment ownership and disposal.
 

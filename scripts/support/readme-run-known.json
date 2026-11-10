@@ -21,10 +21,5 @@
   "rigging/readme-vrm-avatars-margoengine-rigging-009c8e": "sample: RangeError: This VRM is invalid; fix it: humanoid bone leftUpperLeg is required; humanoid bone leftLowerLeg is required; humanoid bone leftFoot is required; hum",
   "usdz/readme-composition-fbebfe": "sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404",
   "voxel-edit/readme-voxel-files-657e4f": "sample: RangeError: QB file holds 1634476140 matrices, over 4096; split the file",
-  "voxel/readme-bevels-and-baked-light-render-e03f31": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
-  "voxel/readme-codecs-and-chunk-stores-codec-st-7e6699": "sample: InvalidStateError: Failed to execute 'send' on 'WebSocket': Still in CONNECTING state.",
-  "voxel/readme-lighting-effects-day-and-night-w-9389c7": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
-  "voxel/readme-magicavoxel-vox-files-margoengin-91a7da": "sample: TypeError: Bytes are not a .vox file (no \"VOX \" header and MAIN chunk); pass a MagicaVoxel .vox file",
-  "voxel/readme-rendering-margoengine-voxel-rend-1a55a2": "sample: RangeError: BlockTextures size 195 is not a power of two from 1 to 4,096; pass 16, 32 or 64",
   "xr/readme-ar-hit-testing-f7eedf": "example: MargoError: Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session."
 }

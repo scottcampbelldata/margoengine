@@ -3,8 +3,109 @@
 Import `margoengine/voxel` from the `margoengine` package, or `@margoengine/voxel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Voxel worlds for block-building games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
-light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;
-meshing, rendering, light, queries, streaming and `.vox` files follow as subpath entries (plan: [DESIGN.md](DESIGN.md)).
+light byte per cell, and a chunked world with dirty tracking and change events.
+Meshing, rendering, light, queries, streaming and `.vox` files are optional subpath entries
+(design: [DESIGN.md](DESIGN.md)).
+
+## Custom blocks, placed objects and wind
+
+These are independent optional entries. `/models` defines a union of 1..64 boxes
+inside [0,1]^3, with strictly positive extent, and precomputes 24 right-handed cube
+orientations. `modelState(id,orientation)` defaults to identity 0; orientation is
+0..23. Each box has six UV rectangles and texture layers in +x,-x,+y,-y,+z,-z order.
+UV defaults are [0,0,1,1] and layers default to the block's textures; flipped UVs are
+allowed. Exact box-union query/collision and covered-face lighting metadata follow
+the orientation. These are cell-local boxes, not arbitrary triangle collision.
+
+`VoxelModelRenderer.create(engine,world,options,signal)` lazily loads the optional
+materials renderer. Install the matching `@margoengine/materials` peer from the
+private build when using model drawing. Call update after lighting, before rendering.
+It streams changed chunks without consuming the main renderer's light-dirty queue.
+The default material uses block colour/PBR factors; a per-type/texture override is
+caller-owned. Disposal removes model meshes/subscriptions, preserving caller textures
+and materials. Cancellation retains its exact reason.
+
+`/objects` places a core mesh or glTF `{root,meshes}` graph around each cell centre.
+`objectState(id,turns)` rotates 0..3 positive Y quarter turns, default 0. Definitions
+snapshot transforms and share Geometry/material identity. A source can be moved,
+hidden or disposed after definition; keep borrowed geometry/material resources alive
+until placements are removed. Default solid:false and opacity:0 are storage/light
+properties, not a generated triangle collider. Object geometry can extend beyond a
+cell/chunk and uses core's existing per-mesh culling/instancing. `update()` reconciles
+streamed chunks; unchanged cells keep handles. `at(x,y,z)` returns current core handles,
+root first, or empty before update/unloaded. Disposal removes placements/subscriptions,
+not source resources.
+
+```ts
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
+import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
+import { VoxelLighting } from '@margoengine/voxel/light';
+import { defineBlockModel, modelState, VoxelModelRenderer } from '@margoengine/voxel/models';
+import { VoxelObjects, objectState } from '@margoengine/voxel/objects';
+import { defineWindBlock, VoxelWind } from '@margoengine/voxel/wind';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const blocks = new BlockTypes();
+const world = new VoxelWorld({ blocks });
+const panel = defineBlockModel(blocks, 'panel', { color: '#dd714b', boxes: [
+  { min: [0,0,0.4], max: [1,1,0.6] },
+] });
+const grass = defineWindBlock(blocks, 'grass', { shape: 'cross', layer: 'cutout', solid: false });
+const textures = new BlockTextures({ images: [
+  { width: 1, height: 1, data: new Uint8Array([90,180,70,255]) },
+] });
+const lighting = VoxelLighting.attach(world);
+const renderer = VoxelRenderer.attach(engine, { world, textures, workers: 1 });
+const wind = new VoxelWind(renderer, { direction: [1,0], time: 0 });
+const models = await VoxelModelRenderer.create(engine, world);
+const objects = VoxelObjects.attach(engine, world);
+const geometry = box(0.5,0.5,0.5);
+const source = engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({ color: '#49a6cf' }));
+const item = objects.define('item', source);
+source.dispose();
+world.setBlock(0,0,0, modelState(panel,4));
+world.setBlock(1,0,0, objectState(item,1));
+world.setBlock(2,0,0, grass);
+const off = engine.onFrame(() => { lighting.update(); models.update(); objects.update(); });
+wind.time = undefined; // Return to the renderer clock after deterministic setup.
+engine.start();
+window.addEventListener('pagehide', () => {
+  off(); wind.dispose(); objects.dispose(); models.dispose(); renderer.dispose();
+  lighting.dispose(); textures.dispose(); engine.dispose();
+}, { once: true });
+```
+
+`/wind` stores per-block motion prepared by `defineWindBlock`. Non-liquids default
+to foliage (amplitude 0.12 blocks), liquids to liquid motion (0.04); speed defaults
+to 1.6 rad/s, frequency 1.3 rad/block, rooted true for crosses and false otherwise.
+Amplitude is 0..0.5; speed/frequency 0..100. Rooted foliage stays fixed at its cell
+floor. Animated faces keep unit quads so shared liquid edges meet; liquid side/bottom
+constraints differ from free foliage bending. This is display motion, not fluid or
+collision simulation. Direction is XZ, default [1,0]; length below one scales motion,
+zero stops it and longer vectors normalize. Explicit time is seconds within +/-1e6;
+undefined restores the renderer clock. `sampleVoxelWind` gives the deterministic CPU
+offset used by tools/seam checks. Bounds padding covers maximum displacement, and
+beauty, capture and shadow shaders share motion. The optional feature composes with
+the mesher rather than adding work to static worlds. Dispose wind before its renderer;
+renderer disposal also releases attached wind. Block metadata/fine tessellation remain.
+
+## Attachment ownership and contributor checks
+
+Disposable attachments support `dispose()` and `Symbol.dispose`; repeated disposal
+is safe. VoxelLighting has one owner per world: dispose it before attaching another.
+The renderer owns workers it creates and its GPU buffers, but not caller textures or
+an injected mesher. Dispose caller-owned resources after their consumers. VoxelLod
+also supports `using`; end its lifetime before releasing shared textures/render hosts.
+These ownership rules do not dispose the world/block registry.
+
+From the repository root, run `npm run test --workspace @margoengine/voxel` and
+`npm run check:readme-run -- --packages=voxel`. The model browser proof waits for
+pipeline readiness and submitted work before reading pixels; a frame count alone
+does not establish readiness. The focused browser commands are
+`node packages/voxel/tests/models-browser-check.mjs`,
+`node packages/voxel/tests/objects-browser-check.mjs` and
+`node packages/voxel/tests/wind-browser-check.mjs`, under the repository GPU lock.
 
 ```ts
 import { BlockTypes, VoxelWorld, VoxelChunk, blockState, blockId, blockData } from 'margoengine/voxel';
@@ -181,14 +282,15 @@ const cz = 0;
 const blocks = new BlockTypes();
 const world = new VoxelWorld({ blocks }), otherWorld = new VoxelWorld({ blocks });
 const chunk = new VoxelChunk(blocks.define('stone'));
-const socket = new WebSocket('wss://game.example/world');
+const outgoing: Uint8Array[] = [];
+const send = (message: Uint8Array) => { outgoing.push(message); }; // An inspectable local transport.
 const bytes = await encodeChunk(chunk); // deflate-raw by default; {light: false}, {compress: false}
 world.addChunk(cx, cy, cz, await decodeChunk(bytes));
 
 const edits: number[] = [];
 world.onChange((x, y, z, state) => edits.push(x, y, z, state));
 const changes = encodeBlockChanges(edits); // sorted, last state per cell, typically 2-4 bytes per change
-socket.send(changes);
+send(changes);
 applyBlockChanges(otherWorld, changes); // all or nothing, through setBlocks (dirty marking, change events)
 
 const codec = new EntityCodec({ position: 'position', rotation: 'rotation', health: 'u8', anim: 'u16' });
@@ -196,18 +298,22 @@ const hero = { position: [0, 64, 0] as [number, number, number], rotation: [0, 0
 const players = new Map([[1, hero]]);
 const acked = new Map(), received = new Map();
 const message = codec.encode(players, acked); // Maps of u32 id -> entity; only what changed since `acked`
-socket.send(message);
+send(message);
 const state = codec.decode(message, received); // `received`: the receiver's copy of `acked`
 // A server sending one tick to many receivers quantizes each entity once; encode writes the same bytes from it.
 const ready = new Map([...players].map(([id, p]) => [id, codec.prepare(p, id)]));
-const clients = [{ socket, lastSent: new Map() }];
-for (const client of clients) client.socket.send(codec.encode(ready, client.lastSent));
+const clients = [{ send, lastSent: new Map() }];
+for (const client of clients) client.send(codec.encode(ready, client.lastSent));
 
 const store = new IndexedDBChunkStore('world-1'); // or new MemoryChunkStore()
 store.put(cx, cy, cz, chunk); // copies the chunk now; puts in one task share one transaction
 const saved = await store.get(cx, cy, cz); // a VoxelChunk or undefined; sees uncommitted puts
 await store.flush(); // e.g. on visibilitychange: everything committed, or the first failure
 ```
+
+The example collects transport bytes locally. In a networked application, pass them
+to a connected transport only after its open/ready promise resolves; the codec does
+not create or manage a WebSocket connection.
 
 - **Chunks.** u8 version (1), u8 flags (1 light, 2 dense light, 4 deflated), then (deflate-raw when flagged) a
   varint palette length and states, u8 index bits and the `PackedChunk` words as little-endian u32, and the light:
@@ -350,7 +456,13 @@ import { parseVox, writeVox, pasteVoxModel, readVoxRenderDictionaries } from 'ma
 const blocks = new BlockTypes();
 const stone = blocks.define('stone');
 const world = new VoxelWorld({ blocks });
-const scene = parseVox(new Uint8Array(await (await fetch('castle.vox')).arrayBuffer()));
+// Build a complete two-voxel sample; replace these bytes with a fetched .vox file in an importer.
+const palette = new Uint8Array(256 * 4);
+palette.set([220,100,40,255], 4);
+const scene = parseVox(writeVox({ version: 150,
+  models: [{ size: [2,1,1], voxels: new Uint8Array([0,0,0,1, 1,0,0,1]) }],
+  palette, materials: [{ id: 1, rough: 0.5 }], nodes: [], layers: [],
+}));
 scene.models[0].size; // [x, y, z], MagicaVoxel z up; voxels: Uint8Array of x, y, z, palette index
 scene.palette; // 256 RGBA8 colours, palette index i at 4 * i
 scene.nodes; // transform / group / shape nodes; transform frames have rotation (3 x 3), translation, frame
@@ -358,10 +470,11 @@ scene.materials[0].rough; // MATL: type, weight, rough, spec, ior, att, flux, pl
 
 pasteVoxModel(world, scene, [0, 64, 0]); // every visible shape; colours become 'vox:rrggbb' block types
 const mapping = new Array<number>(256).fill(stone);
-pasteVoxModel(world, scene.models[2], [10, 64, 0], mapping); // one model: mapping[paletteIndex] = block state
+pasteVoxModel(world, scene.models[0], [10, 64, 0], mapping); // one model: mapping[paletteIndex] = block state
 
-const node = scene.nodes[2];
-if (node.type === 'transform') node.frames[0].translation = [0, 0, 8];
+for (const node of scene.nodes) {
+  if (node.type === 'transform') node.frames[0].translation = [0, 0, 8];
+}
 const bytes = writeVox(scene); // the same bytes as the file, except what you changed
 
 const render = readVoxRenderDictionaries(scene); // rOBJ / rCAM decoded; scene.chunks untouched
@@ -684,7 +797,9 @@ const blocks = new BlockTypes();
 const stone = blocks.define('stone');
 const world = new VoxelWorld({ blocks });
 
-const textures = await BlockTextures.load(['stone.png', 'dirt.png', 'grass-top.png', 'grass-side.png']); // layers 0-3
+const textures = new BlockTextures({ images: [
+  [140,140,140,255], [120,80,50,255], [70,170,60,255], [90,130,55,255],
+].map(rgba => ({ width: 1, height: 1, data: new Uint8Array(rgba) })) }); // layers 0-3
 // or BlockTextures.fromAtlas(image, { size: 16 }), or new BlockTextures({ images: [canvas, bitmap, ...] })
 const lighting = VoxelLighting.attach(world); // the renderer shades with the chunks' light bytes
 const voxels = VoxelRenderer.attach(engine, { world, textures });
@@ -778,7 +893,8 @@ const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const world = new VoxelWorld({ blocks: new BlockTypes() });
-const voxels = VoxelRenderer.attach(engine, { world, textures: await BlockTextures.load(['stone.png']) });
+const textures = new BlockTextures({ images: [{ width: 1, height: 1, data: new Uint8Array([140,140,140,255]) }] });
+const voxels = VoxelRenderer.attach(engine, { world, textures });
 const sky = Sky.attach(engine);
 const environment = EnvironmentLighting.attach(engine, await Environment.attach(engine, await loadEnvironmentImage('/studio.hdr')));
 const shadows = Shadows.attach(engine, { distance: 96, cascades: 2 });
@@ -848,7 +964,8 @@ import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 const world = new VoxelWorld({ blocks: new BlockTypes() });
-const voxels = VoxelRenderer.attach(engine, { world, textures: await BlockTextures.load(['stone.png']) });
+const textures = new BlockTextures({ images: [{ width: 1, height: 1, data: new Uint8Array([140,140,140,255]) }] });
+const voxels = VoxelRenderer.attach(engine, { world, textures });
 const positions = new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, 4, 0, 0, 4]);
 const atlas = await bakeLightmap(
   { positions, albedo: new Float32Array([0.8, 0.8, 0.8, 1]) },
