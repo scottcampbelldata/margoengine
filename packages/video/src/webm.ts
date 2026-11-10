@@ -132,7 +132,7 @@ export function readWebM(bytes: Uint8Array): Movie {
     codec = `av01.${profile}.${String(level).padStart(2, '0')}${tier}.${String(depth).padStart(2, '0')}`;
   } else return unsupported();
   const records: { sample: Sample; ns: number; duration: number; visible: boolean }[] = [];
-  const block = (e: Element, clock: number, key?: boolean, duration = 0): void => {
+  const block = (e: Element, clock: number, key?: boolean, duration?: number): void => {
     const trackNumber = vint(e.start, e.end);
     if (trackNumber.unknown || trackNumber.next + 3 > e.end) invalid();
     if (trackNumber.value !== id) return;
@@ -174,7 +174,8 @@ export function readWebM(bytes: Uint8Array): Movie {
       }
     }
     sizes.push(e.end - p - sizes.reduce((a, b) => a + b, 0));
-    const step = defaultDuration || (duration ? (duration * scale * timeScale) / count : 0);
+    // An explicit BlockDuration (whole block, all laced frames) overrides the track's DefaultDuration (RFC 9559).
+    const step = duration ? (duration * scale * timeScale) / count : defaultDuration;
     if (count > 1 && !step) unsupported();
     for (let i = 0; i < count; i++) {
       const size = sizes[i]!,
@@ -183,7 +184,7 @@ export function readWebM(bytes: Uint8Array): Movie {
       records.push({
         sample: { offset: p, size, pts: 0, duration: 0, key: key ?? !!(flags & 128) },
         ns,
-        duration: step || duration * scale * timeScale,
+        duration: step,
         visible: !(flags & 8),
       });
       p += size;
@@ -197,7 +198,7 @@ export function readWebM(bytes: Uint8Array): Movie {
       else if (e.id === 0xa0) {
         const group = kids(e);
         if (group.some((e) => e.id === 0xa4)) unsupported();
-        block(one(group, 0xa1), clock, !group.some((e) => e.id === 0xfb), value(group, 0x9b, 0));
+        block(one(group, 0xa1), clock, !group.some((e) => e.id === 0xfb), value(group, 0x9b, 0) || undefined);
       }
     }
   }

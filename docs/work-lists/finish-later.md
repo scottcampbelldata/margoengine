@@ -92,3 +92,4 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 132 | geometry | Finish the batch 132 audit: convex (Barber 1996), triangulate (Eberly 2002), nurbs, sweep, extrude, tessellate, decal, flow, tangent-split (Mikkelsen 2008), sample, polyhedra, parametric, path, shapes; read Shewchuk 1997 in full; add a WebGL2-compat GPU check |
 | 132.5 | compute | SVD non-convergence on many exactly repeated columns (docs/known-bugs.md, batch 132 audit): negligible-column rule not built |
 | 132.2 | compute | Philox word order rests on the Random123 kat_vectors data, not the paper; Chan, Golub and LeVeque 1983, Bluestein 1970, Govindaraju SC08, Satish IPDPS 2009, Bell and Garland SC09 and the nn papers not re-read |
+| R5 | video | Run demux-real.test.js, demux-check and playback-check on the Mac once engine-bench has video/flower.webm (node scripts/reference-rendering/fetch-skip-assets.mjs; not fetched by lane D) |

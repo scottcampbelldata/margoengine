@@ -36,6 +36,24 @@ test('fragmented MP4 preserves B-frame ordering, trex defaults, zero-duration ed
     using plain = await openDemuxedVideo(mp4Fixture());
     assert.equal(plain.frameCount, 5);
   }));
+test('a zero-length fragmented edit with a media time shifts the duration as well as the frame times', () =>
+  mocks(async () => {
+    // ffmpeg-style fragmented MP4: elst segment_duration 0, media_time 100 ticks (a B-frame shift). Frames at media
+    // 100..400 play at 0..0.3 and the last lasts 0.1 s, so the movie is 0.4 s; the edit was ignored and gave 0.5.
+    using video = await openDemuxedVideo(fragmentFixture({ edit: 100 }));
+    assert.deepEqual(
+      Array.from({ length: video.frameCount }, (_, i) => video.timestamp(i)),
+      [0, 0.1, 0.2, 0.3],
+    );
+    assert.equal(video.duration, 0.4);
+  }));
+test('a WebM BlockDuration overrides the track DefaultDuration (RFC 9559)', () =>
+  mocks(async () => {
+    // DefaultDuration is 100 ms; the last BlockGroup says 40 ms, so the clip ends at 0.24 s, not 0.3 s.
+    using video = await openDemuxedVideo(webmFixture({ blockGroup: true, lastDuration: 40 }));
+    assert.equal(video.frameCount, 3);
+    assert.equal(video.duration, 0.24);
+  }));
 test('WebM parses every lace mode, block groups and unknown-length cluster/segment boundaries', () =>
   mocks(async () => {
     for (const lacing of [0, 1, 2, 3])

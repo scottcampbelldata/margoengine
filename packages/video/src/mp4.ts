@@ -253,6 +253,13 @@ export function readMP4(bytes: Uint8Array, fragments?: (input: FragmentInput) =>
         if (length) duration = lead + length / movieScale;
       }
     }
+    // A zero-length (fragmented) edit still moves media time mediaStart to movie time lead: the movie ends where the
+    // last sample ends after that shift.
+    if (mediaLength === undefined) {
+      let end = 0;
+      for (const s of samples) end = Math.max(end, s.pts + s.duration);
+      duration = lead + Math.max(0, end - mediaStart) / scale;
+    }
   }
   const us = (value: number): number => {
     const rounded = Math.round(value * 1000000);

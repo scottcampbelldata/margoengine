@@ -35,7 +35,8 @@ export function fragmentFixture({
     box(
       'trak',
       full('tkhd', u32(0), u32(0), u32(1)),
-      ...(edit ? [box('edts', full('elst', u32(1), u32(0), u32(0), u32(65536)))] : []),
+      // A number is the edit's media time in track ticks (an encoder's B-frame shift); true means 0.
+      ...(edit !== false ? [box('edts', full('elst', u32(1), u32(0), u32(edit === true ? 0 : edit), u32(65536)))] : []),
       box(
         'mdia',
         full('mdhd', u32(0), u32(0), u32(scale), u32(0)),
@@ -109,6 +110,7 @@ export function webmFixture({
   blockGroup = false,
   codec = 'V_VP8',
   malformed = false,
+  lastDuration,
 } = {}) {
   const header = elem(0x1a45dfa3, elem(0x4282, text('webm'))),
     info = elem(0x1549a966, uint(0x2ad7b1, 1000000)),
@@ -144,7 +146,9 @@ export function webmFixture({
     ...(lacing
       ? [blockGroup ? elem(0xa0, elem(0xa1, block(0, [10, 11, 12]))) : elem(0xa3, block(0, [10, 11, 12]))]
       : [0, 100, 200].map((t, i) =>
-          blockGroup ? elem(0xa0, elem(0xa1, block(t, [10 + i]))) : elem(0xa3, block(t, [10 + i])),
+          blockGroup
+            ? elem(0xa0, elem(0xa1, block(t, [10 + i])), ...(i === 2 && lastDuration ? [uint(0x9b, lastDuration)] : []))
+            : elem(0xa3, block(t, [10 + i])),
         )),
   );
   const cluster = unknown ? cat(id(0x1f43b675), new Uint8Array([255]), content) : elem(0x1f43b675, content),

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14654680,
+  "total": 14654942,
   "history": [
     {
       "date": "2026-10-24",
@@ -8009,6 +8009,12 @@
       "commit": "749ddfd7e",
       "reason": "R5 mixer analyser fixes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "466c979cc",
+      "reason": "R5 video demux fixes",
+      "grew": 1
     }
   ],
   "items": {
@@ -9194,7 +9200,7 @@
     "@margoengine/video": 2467,
     "@margoengine/video/360": 1881,
     "@margoengine/video/alpha": 2154,
-    "@margoengine/video/codecs": 3593,
+    "@margoengine/video/codecs": 3855,
     "@margoengine/video/demux": 6445,
     "@margoengine/video/dome": 2026,
     "@margoengine/video/material": 1407,

@@ -6808,6 +6808,13 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Point octree load concurrency (2026-11-10)
+OctreeCloud maxConcurrentLoads must be a positive safe integer. Omitted or
+undefined keeps the default four. Wrong types throw TypeError; zero, negative,
+fractional, non-finite and unsafe integer values throw RangeError before material
+creation. The existing point budget, sampling and rendering limits are unchanged.
+Regression: packages/points/tests/octree.test.js includes real child-load counts.
+
 ## Behavior tree text (batch 251)
 
 `parseTreeText` infers `TreeDocument` only when its options exclude subtree
@@ -14404,7 +14411,7 @@ No open correctness defect in the documented TeX subset or figure-SVG PDF contra
 
 Batch 175 job 2 source-data defect: USGS IA_FullState/ept-data/0-0-0-0.laz first GPS time is -4.799510766208031e194 (implausible). Repro: parseLAS of the archived original, point 0. Cause: identical bits in the uncompressed seed record of the producer file; independent laspy 2.7.0/lazrs 0.8.2 agrees on every decoded record. Preserve original values; use intensity/classification/elevation for this demo, not GPS-time analysis.
 
-Pre-existing points/octree validation gap (batch 175 job 2): constructing OctreeCloud with maxConcurrentLoads: 0 then select(view) schedules no loads and reports loading 0; ready-style callers can mistake that for completion. Cause: constructor validates point and cache budgets but omits the concurrency option. Valid positive-concurrency pointcloud paths pass; track this input-validation repair for the fix phase under lane rule 21.
+Fixed 2026-11-10: points/octree concurrency validation (batch 175 job 2). OctreeCloud now rejects maxConcurrentLoads unless it is a positive safe integer, before allocating its material. Undefined keeps the existing default of four; wrong types throw TypeError and invalid numeric values throw RangeError with a help link. Regression: packages/points/tests/octree.test.js fails on the unchecked parent at zero and verifies actual scheduling of one, four and eight child loads. Selection, sampling, point budgets and rendering work are unchanged.
 Batch 177 job 4: no open correctness defect in the checked chart presentation paths. A pre-existing sciviz test:browser:fallback manifest command bypassed browser-root and failed its package-root regression; it now follows the same adapter as the other package browser commands. Legend interaction is layered above inset canvases, preventing an inset from intercepting its clicks. Native hidden traces are excluded from picks, selection and SVG, as checked by the new browser regression.
 
 
