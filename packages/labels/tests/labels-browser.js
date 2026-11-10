@@ -2,6 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
 import { Callouts } from '@margoengine/labels/callouts';
+import { DistanceLabels } from '@margoengine/labels/distance';
 import { projectPoint } from '@margoengine/math/mat4';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 
@@ -264,6 +265,30 @@ async function scenario(backend) {
   checks.push(
     `${backend}: a callout line runs from the projected point to the nearest point of the label box within 1 px`,
   );
+
+  const distance = new DistanceLabels();
+  // Keep this exact width assertion at an integral screen location. Fractional
+  // bounding-box subtraction otherwise introduces float32 cancellation in Chromium.
+  note.setPosition(engine.camera.target);
+  engine.render();
+  const distanceWidth = note.element.getBoundingClientRect().width;
+  assert(distanceWidth === note.element.offsetWidth, 'distance fixture must start at an integral pixel');
+  labels.layout = distance;
+  distance.set(note, {
+    opacity: { near: 0, far: 10000, nearValue: 0.5, farValue: 0.5 },
+    scale: { near: 0, far: 10000, nearValue: 2, farValue: 2 },
+  });
+  engine.render();
+  assert(note.scale === 2 && getComputedStyle(note.element).opacity === '0.5', 'distance opacity or scale missing');
+  assert(note.element.getBoundingClientRect().width === distanceWidth * 2, 'distance scale did not reach DOM geometry');
+  distance.set(note, { near: note.distance + 1 });
+  engine.render();
+  assert(!note.onScreen && getComputedStyle(note.element).display === 'none', 'near distance limit did not hide');
+  distance.set(note, { far: 10000 });
+  engine.render();
+  assert(note.onScreen, 'distance label did not recover');
+  distance.dispose();
+  checks.push(`${backend}: distance layout scales real DOM geometry, fades, hides and recovers`);
 
   // Dispose cleans the DOM.
   const elements = [label.element, farLabel.element, nearLabel.element, panel, tilted, note.element, callouts.svg];

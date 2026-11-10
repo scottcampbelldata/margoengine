@@ -1650,6 +1650,10 @@
       "types": "./dist/labels/gpu.d.ts",
       "import": "./dist/labels/gpu.js"
     },
+    "./labels/distance": {
+      "types": "./dist/labels/distance.d.ts",
+      "import": "./dist/labels/distance.js"
+    },
     "./lighting2d": {
       "types": "./dist/lighting2d.d.ts",
       "import": "./dist/lighting2d.js"

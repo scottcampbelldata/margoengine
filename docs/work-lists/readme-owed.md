@@ -541,3 +541,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/tilemap | plane: PlaneTileMap transforms, world units, active core/view camera, depth writes/testing, cutouts, transparent order, finite-map repeat, runtime edits and disposal | batch-246 job 3 |
 | margoengine | Generated tilemap/plane alias | batch-246 job 3 |
+
+- @margoengine/labels (batch 261 job 2): document DistanceLabels per-label policies, clamped opacity/scale, inclusive ranges, composition, original-opacity restoration and evaluateLabelDistance for GPU consumers.
+- margoengine (batch 261 job 2): document labels/distance alias.

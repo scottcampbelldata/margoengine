@@ -3725,3 +3725,6 @@ Nested, normalized direct, Cartesian gradient-band and polar directional trees p
 
 ### Batch 246 job 3: perspective tile planes
 The optional plane entry places a complete tile map on an affine 3D plane and shares scene depth. CPU proofs check matrix composition, invalid transforms, owned inputs and depth-state controls. Real GPU proofs compare every pixel against independent analytic ray-plane intersections for a tilted perspective map, moved camera, opaque core-mesh occlusion, cutout plane occlusion and separate view cameras. Both native WebGPU and WebGL2 compatibility are checked. Sources: packages/tilemap/test/plane.test.js and plane-check.mjs. No speed claim or picking claim.
+
+### Batch 261 distance policy correctness
+Independent near/far opacity and scale curves clamp, show conditions include endpoints, and distance scaling precedes collision layout. Unit tests assert exact endpoint/midpoint behavior, style restoration and still-frame zero writes. Native WebGPU/WebGL2 browser tests assert doubled DOM width, half opacity, near hiding and recovery. No timing claim.

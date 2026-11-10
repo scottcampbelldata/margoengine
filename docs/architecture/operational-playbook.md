@@ -6110,3 +6110,7 @@ Batch 213 job 2: MToon uses a synchronous per-model material adapter in optional
 ### Section 5 evidence: rich animator trees (batch 211 job 2)
 
 Optional tree compilation provides leaf clips and weights to the existing Animator pose sampler; it adds no renderer, palette or pass. Gradient-band CPU evidence covers cardinal samples, Cartesian midpoint, polar walk/run separation, 2D parameter sweeps and rotational/scale invariance. The real Fox GPU fixture evaluates a nested direct/directional tree inside a state layer on both backends. No timing result.
+
+
+### 5. Batch 261 distance label layout
+Distance policy is CPU/DOM layout code. LabelRenderer honors a layout-adjusted final scale while preserving its existing distanceScale output. The browser gate checks real scaled geometry and opacity over native WebGPU and WebGL2 scenes. No core, stage, backend pipeline or GPU shader change.

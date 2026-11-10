@@ -574,7 +574,7 @@ export class LabelRenderer implements EnginePlugin {
         y = Math.round((label.screen.y + label.screenOffset[1]) * 100) / 100,
         ax = anchor[0],
         ay = anchor[1],
-        scaled = label.distanceScale !== null ? 1 : 0,
+        scaled = label.distanceScale !== null || label.scale !== 1 ? 1 : 0,
         factor = scaled ? label.scale : 0;
       label.placedAnchor[0] = ax;
       label.placedAnchor[1] = ay;

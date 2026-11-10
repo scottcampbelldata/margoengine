@@ -3195,3 +3195,6 @@ After build: node --test packages/animator/test/blend-trees.test.js. Run the ani
 
 ### Batch 246 job 3
 After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/plane.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tilemap-plane-proof --gpu=perspective-depth-pixel-readback --max=1 --wait-max=60 -- node packages/tilemap/test/plane-check.mjs`, then append `--compat`. Artifacts: test-results/tilemap-plane.json and tilemap-plane-compat.json. All 4096 pixels per scene are compared exactly; source transforms keep projected boundaries off sample centres so the independent oracle does not depend on rasterizer edge tie-breaking.
+
+### Batch 261 distance labels
+After build: node --test --test-timeout=120000 packages/labels/tests/*.test.js. The changed DOM-layout path is rendered by node scripts/gpu-lock.mjs run --owner=labels-distance --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only. The optional GPU label shader is unchanged; job 1 retains its separate full GPU test page.

@@ -46,6 +46,10 @@
     "./gpu": {
       "types": "./dist/gpu.d.ts",
       "import": "./dist/gpu.js"
+    },
+    "./distance": {
+      "types": "./dist/distance.d.ts",
+      "import": "./dist/distance.js"
     }
   },
   "files": [

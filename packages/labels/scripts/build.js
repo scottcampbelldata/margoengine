@@ -24,6 +24,7 @@ await build({
         declutter: resolve(root, 'src/declutter.ts'),
         callouts: resolve(root, 'src/callouts.ts'),
         gpu: resolve(root, 'src/gpu.ts'),
+        distance: resolve(root, 'src/distance.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',

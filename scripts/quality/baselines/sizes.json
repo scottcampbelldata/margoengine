@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13131427,
+  "total": 13133947,
   "history": [
     {
       "date": "2026-10-24",
@@ -6607,6 +6607,12 @@
       "commit": "batch-246-job-3",
       "reason": "New optional tilemap/plane: 0 to 7485 B min+gzip, ceiling 7741 B. Reuses ordered quads, image ownership and texture runs with one affine core-camera transform and shared reversed-Z depth. A separate reduced renderer would duplicate its lifecycle and lose object/image parity.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-261-job2",
+      "reason": "New optional distance layout 0 B (absent) -> 1004 B gzip; separate curves and show conditions with composition/disposal. Root labels now 5592 B within its existing ceiling; core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7822,6 +7828,8 @@
     "margoengine/loaders/threemf-materials": 328,
     "margoengine/selection/highlight": 322,
     "@margoengine/animator/blend-trees": 1841,
-    "@margoengine/tilemap/plane": 7741
+    "@margoengine/tilemap/plane": 7741,
+    "@margoengine/labels/distance": 1260,
+    "margoengine/labels/distance": 1260
   }
 }
