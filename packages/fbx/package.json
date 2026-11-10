@@ -57,6 +57,10 @@
     "./textures": {
       "types": "./dist/textures.d.ts",
       "import": "./dist/textures.js"
+    },
+    "./large": {
+      "types": "./dist/large.d.ts",
+      "import": "./dist/large.js"
     }
   },
   "files": [

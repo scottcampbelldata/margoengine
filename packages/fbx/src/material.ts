@@ -5,12 +5,13 @@ import { findChild, id, property, objectName, type FBXNode } from './document.js
 import { children, type SceneContext } from './scene.js';
 import type { MaterialRead } from './extension.js';
 
-const limit = 64 * 1024 * 1024;
+
 export async function attachMaterials(
   ctx: SceneContext,
   resourcePath: string,
   options: { fetch?: typeof fetch; allowedURLs?: readonly string[] } = {},
 ): Promise<void> {
+  const limit = ctx.budget.limits.textureBytes;
   const textures = new Map<bigint, Promise<TextureData | undefined>>(),
     materials = new Map<string, Promise<MaterialData>>();
   let bytes = 0;

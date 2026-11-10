@@ -3135,3 +3135,8 @@ After npm run build:packages run node --test --test-timeout=120000 packages/geom
 
 Build packages, then run `node --experimental-test-module-mocks --test --test-timeout=120000 packages/react/tests/textures.test.js packages/materials/tests/shared-pass.test.js`. For pixel comparisons run `node scripts/gpu-lock.mjs run --owner=react-textures --wait-max=60 --max=6 -- node packages/react/scripts/test-textures-browser.mjs`, then the same command with `--compat` appended. The test compares unmodified native and React material output for each supported native shading class and named/default Scenes, plus image, KTX2 and video fixtures, with exact pixels.
 Batch 206 shapes: node --test --test-timeout=120000 packages/usdz/tests/shapes.test.js after building. Regenerate: python packages/usdz/tests/oracle/shapes-truth.py packages/usdz/tests/fixtures/shapes.usda packages/usdz/tests/fixtures/shapes-openusd.json with OpenUSD 26.11. The USD browser suite renders all five types normally and with --compat through the shared GPU lock.
+### Large FBX correctness (batch 205)
+
+After building, run `node --test --test-timeout=240000 packages/fbx/test/large.test.js`.
+The test generates its own independent standard-layout input. For GPU/worker proof run the
+package test:gpu command, then with `--compat`, through the shared GPU lock. No speed suite runs.

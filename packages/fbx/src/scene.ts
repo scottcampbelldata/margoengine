@@ -1,3 +1,4 @@
+import { defaultLimits, importLimits, type FBXImportLimits } from './limits.js';
 import type { ExportNode, GeometryData } from '@margoengine/exporters';
 import {
   array,
@@ -27,10 +28,10 @@ export class SceneBudget {
   private steps = 0;
   private samples = 0;
   private morphBytes = 0;
-  constructor(private readonly signal?: AbortSignal) {}
+  constructor(private readonly signal?: AbortSignal, readonly limits: Readonly<FBXImportLimits> = defaultLimits) {}
   reserve(bytes: number): void {
     this.signal?.throwIfAborted();
-    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 128 * 1024 * 1024 - this.bytes)
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.sceneBytes - this.bytes)
       throw new RangeError(
         'FBX scene allocation budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
@@ -38,7 +39,7 @@ export class SceneBudget {
   }
   work(steps = 1): void {
     this.signal?.throwIfAborted();
-    if (!Number.isSafeInteger(steps) || steps < 0 || steps > 128_000_000 - this.steps)
+    if (!Number.isSafeInteger(steps) || steps < 0 || steps > this.limits.sceneWork - this.steps)
       throw new RangeError(
         'FBX scene work budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
@@ -54,7 +55,7 @@ export class SceneBudget {
     this.samples += steps;
   }
   morph(bytes: number): void {
-    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 64 * 1024 * 1024 - this.morphBytes)
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.morphBytes - this.morphBytes)
       throw new RangeError(
         'FBX morph byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
@@ -104,7 +105,7 @@ export function context(
   extensions: readonly ExtensionHooks[] = [],
   layers = false,
 ): SceneContext {
-  const budget = new SceneBudget(signal);
+  const budget = new SceneBudget(signal, importLimits(extensions));
   budget.work(document.connections.length + document.roots.length);
   budget.reserve(document.connections.length * 64 + 512);
   const incoming = new Map<bigint, FBXConnection[]>(),
@@ -263,7 +264,7 @@ function preflight(ctx: SceneContext, source: FBXNode): void {
     ctx.layers ? source.children.filter((child) => child.name === name).length : findChild(source, name) ? 1 : 0;
   const positions = array(source, 'Vertices'),
     indices = array(source, 'PolygonVertexIndex');
-  if (positions.length > 3_000_000 || indices.length > 3_000_000)
+  if (positions.length > ctx.budget.limits.vertices * 3 || indices.length > ctx.budget.limits.corners)
     throw new RangeError(
       'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );
@@ -283,14 +284,14 @@ function preflight(ctx: SceneContext, source: FBXNode): void {
     }
   }
   if (polygon) throw new RangeError('FBX polygon is missing its terminator; re-export the file, it looks damaged');
-  if (triangles > 3_000_000)
+  if (triangles > ctx.budget.limits.corners)
     throw new RangeError(
       'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );
   const uv = Math.min(count('LayerElementUV'), 4) * 2,
     tangent = findChild(source, 'LayerElementTangent') ? 4 : 0,
     color = Math.min(count('LayerElementColor'), 2) * 4;
-  const vertices = Math.min(indices.length, 1_000_000),
+  const vertices = Math.min(indices.length, ctx.budget.limits.vertices),
     width = 7 + uv + tangent + color;
   // Numeric JS builders and vertex-key maps coexist with the final typed arrays.
   ctx.budget.reserve(positions.length * 8 + indices.length * 32 + triangles * 12 + vertices * (128 + width * 12));
@@ -378,11 +379,11 @@ export function buildScene(ctx: SceneContext): void {
       let base = cache.get(source);
       if (!base) {
         preflight(ctx, source);
-        base = buildGeometry(source, ctx.layers);
+        base = buildGeometry(source, ctx.layers, ctx.budget.limits);
         if ((instances.get(source) ?? 0) > 1) cache.set(source, base);
       }
       vertices += base.vertexCount;
-      if (vertices > 1_000_000)
+      if (vertices > ctx.budget.limits.vertices)
         throw new RangeError(
           'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
         );

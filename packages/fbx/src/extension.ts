@@ -1,3 +1,4 @@
+import type { FBXImportLimits } from './limits.js';
 import type { MaterialData, TextureData } from '@margoengine/exporters';
 import type { Curve, LayerRead, StackTracks } from './animation.js';
 import type { MeshBinding } from './scene.js';
@@ -11,6 +12,8 @@ import type { SceneContext } from './scene.js';
 export interface FBXExtension {
   /** The entry's name, which is how a worker finds its own copy. */
   readonly name: string;
+  /** Optional per-import resource caps from the large entry. Default ordinary import caps. */
+  readonly limits?: Readonly<Partial<FBXImportLimits>>;
 }
 
 /** One material as the base reader left it, for an entry to finish. */

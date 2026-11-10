@@ -1,3 +1,4 @@
+import { defaultLimits, type FBXImportLimits } from './limits.js';
 import { margoError } from '../../shared/errors.js';
 import { parseBinary, binaryMagic } from './binary.js';
 import { parseASCII } from './ascii.js';
@@ -21,13 +22,6 @@ export interface FBXDocument {
   version: number;
 }
 
-const INPUT_BYTES = 64 * 1024 * 1024;
-const DECODED_BYTES = 128 * 1024 * 1024;
-const ARRAY_BYTES = 64 * 1024 * 1024;
-const MAX_NODES = 100_000;
-const MAX_PROPERTIES = 2_000_000;
-const MAX_WORK = 128_000_000;
-
 export function invalid(detail: string): never {
   throw margoError('failed', `Invalid FBX: ${detail}; re-export the file from your 3D tool`);
 }
@@ -39,21 +33,24 @@ export class ParseBudget {
   private nodes = 0;
   private properties = 0;
   private steps = 0;
-  constructor(readonly signal?: AbortSignal) {
+  constructor(
+    readonly signal?: AbortSignal,
+    readonly limits: Readonly<FBXImportLimits> = defaultLimits,
+  ) {
     this.check();
   }
   check(): void {
     this.signal?.throwIfAborted();
   }
   reserve(bytes: number): void {
-    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > DECODED_BYTES - this.bytes)
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.decodedBytes - this.bytes)
       throw new RangeError(
         'FBX decoded byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
     this.bytes += bytes;
   }
   array(bytes: number): void {
-    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > ARRAY_BYTES - this.arrays)
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.arrayBytes - this.arrays)
       throw new RangeError(
         'FBX decoded array byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
@@ -62,14 +59,14 @@ export class ParseBudget {
   }
   node(depth: number): void {
     this.check();
-    if (depth > 64 || ++this.nodes > MAX_NODES)
+    if (depth > 64 || ++this.nodes > this.limits.nodes)
       throw new RangeError(
         'FBX node budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
     this.reserve(64);
   }
   property(count = 1): void {
-    if (!Number.isSafeInteger(count) || count < 0 || count > MAX_PROPERTIES - this.properties)
+    if (!Number.isSafeInteger(count) || count < 0 || count > this.limits.properties - this.properties)
       throw new RangeError(
         'FBX property budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
@@ -79,7 +76,7 @@ export class ParseBudget {
   }
   work(count = 1): void {
     this.check();
-    if (!Number.isSafeInteger(count) || count < 0 || count > MAX_WORK - this.steps)
+    if (!Number.isSafeInteger(count) || count < 0 || count > this.limits.parseWork - this.steps)
       throw new RangeError(
         'FBX work budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
@@ -87,15 +84,19 @@ export class ParseBudget {
   }
 }
 
-export async function parseDocument(input: ArrayBuffer | ArrayBufferView, signal?: AbortSignal): Promise<FBXDocument> {
-  const budget = new ParseBudget(signal);
+export async function parseDocument(
+  input: ArrayBuffer | ArrayBufferView,
+  signal?: AbortSignal,
+  limits: Readonly<FBXImportLimits> = defaultLimits,
+): Promise<FBXDocument> {
+  const budget = new ParseBudget(signal, limits);
   const bytes =
     input instanceof ArrayBuffer
       ? new Uint8Array(input)
       : ArrayBuffer.isView(input)
         ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
         : invalid('expected bytes');
-  if (bytes.byteLength < 32 || bytes.byteLength > INPUT_BYTES)
+  if (bytes.byteLength < 32 || bytes.byteLength > limits.inputBytes)
     throw new RangeError(
       'FBX input budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );

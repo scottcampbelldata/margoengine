@@ -1,10 +1,8 @@
+import { defaultLimits, type FBXImportLimits } from './limits.js';
 import type { GeometryData } from '@margoengine/exporters';
 import { array, findChild, type FBXNode } from './document.js';
 
-const MAX_VERTICES = 1_000_000,
-  MAX_CORNERS = 3_000_000,
-  MAX_POLYGON = 4096,
-  MAX_WORK = 40_000_000;
+const MAX_POLYGON = 4096;
 const budget = (): never => {
   throw new RangeError(
     'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
@@ -105,7 +103,9 @@ function triangulate(
   const samePlace = (a: number, b: number): boolean => {
     const p = controlPoints[a] * 3,
       q = controlPoints[b] * 3;
-    return positions[p] === positions[q] && positions[p + 1] === positions[q + 1] && positions[p + 2] === positions[q + 2];
+    return (
+      positions[p] === positions[q] && positions[p + 1] === positions[q + 1] && positions[p + 2] === positions[q + 2]
+    );
   };
   const corners = given.filter((corner, i) => !samePlace(corner, given[(i + given.length - 1) % given.length])),
     n = corners.length;
@@ -246,12 +246,16 @@ const UV_KEYS = ['uvs', 'uvs1', 'uvs2', 'uvs3'] as const,
   COLOR_KEYS = ['colors', 'colors1'] as const;
 
 /** Converts the first normal and tangent layer, and the first UV and color layer, or as many as glTF here holds with `all`. */
-export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
+export function buildGeometry(
+  node: FBXNode,
+  all = false,
+  limits: Readonly<FBXImportLimits> = defaultLimits,
+): BuiltGeometry {
   const positions = array(node, 'Vertices'),
     polygonIndices = array(node, 'PolygonVertexIndex'),
     count = positions.length / 3;
   if (!positions.length || positions.length % 3) throw new RangeError('FBX vertices need xyz per control point');
-  if (count > MAX_VERTICES || polygonIndices.length > MAX_CORNERS) budget();
+  if (count > limits.vertices || polygonIndices.length > limits.corners) budget();
   for (let i = 0; i < positions.length; i++) finite(positions[i], 'positions');
   const normal = layer(node, 'LayerElementNormal', 'Normals', 'NormalsIndex', 3);
   const uvs = layerList(node, 'LayerElementUV', 'UV', 'UVIndex', 2, all ? UV_KEYS.length : 1),
@@ -279,7 +283,7 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
     polygonCount = 0,
     work = 0;
   const charge = (amount = 1) => {
-    if ((work += amount) > MAX_WORK) budget();
+    if ((work += amount) > limits.geometryWork) budget();
   };
   for (let i = 0; i < polygonIndices.length; i++) {
     const index = polygonIndices[i];
@@ -290,7 +294,7 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
     if (polygon.length > MAX_POLYGON) budget();
     if (index < 0) {
       const tri = triangulate(polygon, cp, positions, charge);
-      if (triangles.length + tri.length > MAX_CORNERS) budget();
+      if (triangles.length + tri.length > limits.corners) budget();
       // Avoid argument-spread limits on large but valid polygons.
       for (const corner of tri) triangles.push(corner);
       polygon = [];
@@ -327,8 +331,9 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
     triangles[kept++] = triangles[i + 2];
   }
   triangles.length = kept;
-  if (!kept) throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
-  const builders = new Map<number, Builder>();
+  if (!kept)
+    throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
+  const builders = new Map<number, Builder[]>();
   let vertexCount = 0;
   for (let at = 0; at < triangles.length; at++) {
     const corner = triangles[at],
@@ -342,8 +347,11 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
       // The FBX SDK uses -1 for an unassigned polygon, even when the node has other materials.
       materialIndex = materials[index] === -1 ? -1 : integer(materials[index], 65536, 'material index');
     }
-    let builder = builders.get(materialIndex);
-    if (!builder) {
+    const chunks = builders.get(materialIndex) ?? [];
+    let builder = chunks[chunks.length - 1];
+    // glTF's PBR storage binding holds at most one million 80-byte vertices. Start only at
+    // triangle boundaries and retain every corner, layer and control-point mapping.
+    if (!builder || (at % 3 === 0 && builder.controlPoints.length > 999_997)) {
       builder = {
         positions: [],
         normals: [],
@@ -354,7 +362,8 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
         controlPoints: [],
         vertices: new Map(),
       };
-      builders.set(materialIndex, builder);
+      chunks.push(builder);
+      builders.set(materialIndex, chunks);
     }
     const ni = normal ? layerIndex(normal, control, corner, poly) : -1,
       // Index -1 is a corner the UV set leaves out: it sits at the origin, as in the tool that wrote it.
@@ -368,7 +377,7 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
       builder.indices.push(vertex);
       continue;
     }
-    if (++vertexCount > MAX_VERTICES) budget();
+    if (++vertexCount > limits.vertices) budget();
     vertex = builder.controlPoints.length;
     builder.vertices.set(key, vertex);
     builder.controlPoints.push(control);
@@ -427,7 +436,8 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
       // Tools write a zero tangent, or the normal, where a face's UVs give no direction. No texture has a direction to
       // follow there either, so any unit vector across the normal serves: the axis least like it, made perpendicular.
       if (tlength < 1e-6) {
-        const axis = Math.abs(nx) <= Math.abs(ny) && Math.abs(nx) <= Math.abs(nz) ? 0 : Math.abs(ny) <= Math.abs(nz) ? 1 : 2;
+        const axis =
+          Math.abs(nx) <= Math.abs(ny) && Math.abs(nx) <= Math.abs(nz) ? 0 : Math.abs(ny) <= Math.abs(nz) ? 1 : 2;
         tx = (axis === 0 ? 1 : 0) - nx * (axis === 0 ? nx : axis === 1 ? ny : nz);
         ty = (axis === 1 ? 1 : 0) - ny * (axis === 0 ? nx : axis === 1 ? ny : nz);
         tz = (axis === 2 ? 1 : 0) - nz * (axis === 0 ? nx : axis === 1 ? ny : nz);
@@ -449,17 +459,18 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
   }
   const primitives: BuiltGeometry['primitives'] = [],
     controlPoints: Uint32Array[] = [];
-  for (const [materialIndex, builder] of builders) {
-    const geometry: GeometryData = {
-      positions: Float32Array.from(builder.positions),
-      normals: Float32Array.from(builder.normals),
-      indices: Uint32Array.from(builder.indices),
-    };
-    uvs.forEach((_, set) => (geometry[UV_KEYS[set]] = Float32Array.from(builder.uvs[set])));
-    if (tangent) geometry.tangents = Float32Array.from(builder.tangents);
-    colors.forEach((_, set) => (geometry[COLOR_KEYS[set]] = Float32Array.from(builder.colors[set])));
-    primitives.push({ materialIndex, geometry });
-    controlPoints.push(Uint32Array.from(builder.controlPoints));
-  }
+  for (const [materialIndex, chunks] of builders)
+    for (const builder of chunks) {
+      const geometry: GeometryData = {
+        positions: Float32Array.from(builder.positions),
+        normals: Float32Array.from(builder.normals),
+        indices: Uint32Array.from(builder.indices),
+      };
+      uvs.forEach((_, set) => (geometry[UV_KEYS[set]] = Float32Array.from(builder.uvs[set])));
+      if (tangent) geometry.tangents = Float32Array.from(builder.tangents);
+      colors.forEach((_, set) => (geometry[COLOR_KEYS[set]] = Float32Array.from(builder.colors[set])));
+      primitives.push({ materialIndex, geometry });
+      controlPoints.push(Uint32Array.from(builder.controlPoints));
+    }
   return { primitives, controlPoints, vertexCount, uvNames: uvs.map((uv) => uv.name) };
 }

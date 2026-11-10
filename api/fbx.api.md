@@ -8,6 +8,7 @@ import { PBRModel } from "@margoengine/gltf-pro";
 
 export interface FBXExtension {
     readonly name: string;
+    readonly limits?: Readonly<Partial<FBXImportLimits>>;
 }
 
 export interface FBXOptions {
@@ -24,4 +25,24 @@ export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath,
 export function loadFBX(engine: EngineKernel, url: string | URL, options?: FBXOptions): Promise<PBRModel>;
 
 export function parseFBX(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, options?: FBXOptions): Promise<PBRModel>;
+
+// Not exported from this entry, but used by the exports above:
+
+interface FBXImportLimits {
+    inputBytes: number;
+    decodedBytes: number;
+    arrayBytes: number;
+    nodes: number;
+    properties: number;
+    parseWork: number;
+    sceneBytes: number;
+    sceneWork: number;
+    morphBytes: number;
+    vertices: number;
+    corners: number;
+    geometryWork: number;
+    textureBytes: number;
+    texturePixels: number;
+    outputBytes: number;
+}
 ```

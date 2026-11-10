@@ -3655,3 +3655,14 @@ The optional mesh hull retains original double positions, including a unit cube 
 
 The optional React textures entry uses native image, KTX2 and video Texture values on native Material classes. Normal, roughness and emissive map inputs preserve Scene ownership and core remains unchanged. Evidence: packages/react/tests/textures.test.js, packages/materials/tests/shared-pass.test.js and packages/react/scripts/test-textures-browser.mjs. Reproduction and exact supported inputs are in docs/limits.md and reproduce.md; this is a functionality claim, not a speed result.
 Batch 206 implicit shapes: optional USD Cube, Sphere, Cylinder, Capsule and Cone conversion preserves dimensions, cardinal axes, hierarchy and materials. Proof: shapes.test.js against 22 OpenUSD 26.11 extent results, normal/winding checks and modern-usdz-tests.js actual rendering. Curved geometry is tessellated; no speed or exact analytic-surface claim.
+### Configurable large FBX imports (batch 205)
+
+The large entry imports a 200 MiB valid ASCII file and a separate binary mesh with 2,500,002
+distinct expanded vertices. `packages/fbx/test/large.test.js` proves the first has identical GLB
+output to its unpadded source, and the second retains every position and index. The 200 MiB case
+uses a long legal comment to isolate the input-byte cap, not a claim about a 200 MiB mesh workload.
+Each configurable parse/scene/geometry/output cap is independently exercised at a rejecting value.
+GPU tests also prove custom vertex caps survive worker serialization and successful loads render
+through both backends. These are correctness claims without wall-clock or memory-usage claims.
+
+The large binary mesh is also attached as a real PBRModel on a CPU-only engine and through the actual parser worker. Both retain the configured 512 MiB byte cap, with decoded GLB buffers above 64 MiB; no GPU upload is mocked into the rendering proof. The separate browser proof uses the real GPU.

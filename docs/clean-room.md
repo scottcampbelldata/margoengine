@@ -6677,3 +6677,18 @@ Pixar/OpenUSD contributors, UsdGeom Cube, Sphere, Cylinder, Cone and Capsule sch
 implicitShapes() from @margoengine/usdz/shapes adds a prepare hook before the optional package's mesh walk. Default resolution is 32 radial and 16 latitude segments (8 per capsule hemisphere). radialSegments is 4..256 divisible by four; latitudeSegments is even, 2..128. USD defaults: cube size 2; sphere radius 1; cylinder/cone radius 1, height 2; capsule radius 0.5 and spine 1; axial shapes point along Z unless authored otherwise. Positions and normals rotate together; proper rotations preserve winding. Mesh walking retains materials, display colors, orientation, hierarchy and instancer prototype reuse. Allocation checks use maxTriangles/maxVertices before tessellating. Geometry is sampled at the first authored time, like the static reader. Workers reconstruct this extension by name/options.
 
 OpenUSD 26.11 public API authored fixtures/shapes.usda and computed 22 schema extents across types, default/authored dimensions and all cardinal axes. tests/oracle/shapes-truth.py regenerates them; no external repository asset was added. CPU checks compare extents within 1e-6, unit normals, outward winding, UV presence, prototype sharing and invalid-input limits. Browser checks render all five shape types on both backends.
+## Batch 205: configurable large FBX imports (2026-11-10)
+
+Compared Alexander Gessler/Blender Foundation, *FBX binary file format specification* (2013),
+https://code.blender.org/2013/08/fbx-binary-file-format-specification/ (format description only),
+Autodesk, *Changing FBX Explorer Preferences* (2013),
+https://download.autodesk.com/us/fbx/2013/FBXconverter/files/GUID-09BDEF62-AF81-481D-8331-C59F71578D76.htm ,
+and Autodesk, *FbxMesh Class Reference* (2020),
+https://help.autodesk.com/cloudhelp/2020/ENU/FBX-API-Reference/cpp_ref/class_fbx_mesh.html .
+The format separates file offsets, stored arrays, decoded data and expanded polygon vertices.
+Explorer separately limits loaded data, rather than truncating the geometry. Combine these ideas:
+retain every cumulative safety check, make its cap per import, and preserve full output. No parser
+algorithm, triangulation or evaluator was replaced, no rival source or companion code was read,
+and no speed claim is made. Existing geometry code does the same deterministic work.
+
+The downstream PBR per-primitive bound is retained. FBX partitions large materials at whole-triangle boundaries instead of raising the GPU storage-binding bound: W3C GPU for the Web Working Group, *WebGPU* (2026 living specification), https://www.w3.org/TR/webgpu/#dom-supported-limits-maxstoragebufferbindingsize . Existing public GLTFAsset/PBRModel and prepareGLTF APIs receive the configured byte/node caps; no missing glTF API or core change was needed.

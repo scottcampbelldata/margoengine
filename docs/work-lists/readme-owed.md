@@ -499,3 +499,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/shader | sceneColor shares the owning Scene capture; keep recorder fixtures aligned with Engine frameGraph and sceneOf | batch 265 job 3 |
 - @margoengine/usdz and margoengine: implicitShapes() optional /shapes entry, schema defaults, axes, radialSegments/latitudeSegments, budgets, worker and instancer combination.
+- @margoengine/fbx (batch 205 large): document largeFBX, all per-import defaults, conservative allocation accounting and worker caps; examples deferred.
+- margoengine (batch 205 large): document generated fbx/large alias; examples deferred.

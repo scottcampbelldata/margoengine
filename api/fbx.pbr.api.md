@@ -14,5 +14,24 @@ export function specularToMetal(diffuse: readonly number[], specular: readonly n
 
 interface FBXExtension {
     readonly name: string;
+    readonly limits?: Readonly<Partial<FBXImportLimits>>;
+}
+
+interface FBXImportLimits {
+    inputBytes: number;
+    decodedBytes: number;
+    arrayBytes: number;
+    nodes: number;
+    properties: number;
+    parseWork: number;
+    sceneBytes: number;
+    sceneWork: number;
+    morphBytes: number;
+    vertices: number;
+    corners: number;
+    geometryWork: number;
+    textureBytes: number;
+    texturePixels: number;
+    outputBytes: number;
 }
 ```

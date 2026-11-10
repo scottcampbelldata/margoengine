@@ -54,7 +54,7 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
   if (!clusters.length || clusters.length > 65535)
     throw new RangeError('Invalid FBX skin cluster count; re-export the file, it looks damaged');
   const cpCount = array(mesh.source, 'Vertices').length / 3;
-  if (!Number.isSafeInteger(cpCount) || cpCount < 1 || cpCount > 1_000_000)
+  if (!Number.isSafeInteger(cpCount) || cpCount < 1 || cpCount > ctx.budget.limits.vertices)
     throw new RangeError(
       'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );

@@ -71,7 +71,7 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
           normals = normalNode ? array(shape, 'Normals') : undefined;
         if (positions.length !== indices.length * 3 || (normals && normals.length !== positions.length))
           throw new RangeError('FBX morph delta count mismatch; re-export the file, it looks damaged');
-        if (!Number.isSafeInteger(cpCount) || cpCount < 1 || cpCount > 1_000_000)
+        if (!Number.isSafeInteger(cpCount) || cpCount < 1 || cpCount > ctx.budget.limits.vertices)
           throw new RangeError(
             'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
           );

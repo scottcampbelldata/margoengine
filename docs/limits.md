@@ -4719,3 +4719,40 @@ The optional React textures entry supports URL, array and record images and KTX2
 
 Texture entry bytes measured with bare peers external: @margoengine/react/textures 0 -> 4684 B gzip, ceiling 4940 B. The recorded draft was 4067 B. Final geometry is 5402 B (draft 4806 B), materials 6705 B (draft 6114 B), JSX runtime 2731 B and development JSX runtime 2736 B. React root grows from landed job 5 at 10259 B to 10570 B. Final ceilings for root, geometry and materials are 10888, 5658 and 6961 B. The added bytes preserve per-Canvas loader lifetime, separate green roughness without losing borrowed blue metalness, UV geometry and Scene-owned native materials. Splitting mapped material ownership again would duplicate mesh and resource cleanup; decoder assets remain isolated from the umbrella root. Core + stage remains 24209 B. Native transmission capture and material installations are isolated and disposed by Scene.
 Batch 206 implicit shapes: first-pose Cube/Sphere/Cylinder/Capsule/Cone tessellation. Resolution defaults 32 radial, 16 latitude; limits 256 radial and 128 latitude, with maxTriangles/maxVertices enforced before allocation and by the complete mesh walk. Surface curves are polygonal approximations with analytic normals and UVs. /shapes 0 -> 1201 B min+gzip; worker measured 118236 B (prior ceiling 117288 B). Optional worker ceiling rises only if needed to retain the geometry and parse lifecycle together. Core/stage unchanged, 24209 B combined gzip.
+### FBX large entry (batch 205)
+
+`@margoengine/fbx/large` exports `largeFBX(overrides)` and `FBXImportLimits`. Pass the returned
+immutable extension in `extensions` to convertFBX, parseFBX, loadFBX or their worker forms. One
+limit configuration per import; unknown names and nonpositive/noninteger/unsafe values reject.
+Ordinary imports keep every existing default. All figures below are caps, never reservations.
+
+| Field | Ordinary | largeFBX default |
+| --- | ---: | ---: |
+| inputBytes | 64 MiB | 512 MiB |
+| decodedBytes | 128 MiB | 2 GiB |
+| arrayBytes | 64 MiB | 512 MiB |
+| nodes | 100,000 | 1,000,000 |
+| properties | 2,000,000 | 16,000,000 |
+| parseWork | 128,000,000 | 2,000,000,000 |
+| sceneBytes | 128 MiB | 2 GiB |
+| sceneWork | 128,000,000 | 2,000,000,000 |
+| morphBytes | 64 MiB | 512 MiB |
+| vertices | 1,000,000 | 8,000,000 |
+| corners | 3,000,000 | 24,000,000 |
+| geometryWork | 40,000,000 | 320,000,000 |
+| textureBytes | 64 MiB | 64 MiB |
+| texturePixels | 16,000,000 | 16,000,000 |
+| outputBytes | 128 MiB | 512 MiB |
+
+MiB = 1,048,576 bytes; GiB = 1,073,741,824 bytes. `vertices` bounds control points,
+expanded vertices and the cumulative scene vertices (including instances); `corners` bounds
+polygon corners and triangulated indices. Allocation/work accounting remains conservative,
+so dense seams/instances may need higher caps. Raising a cap cannot create available memory.
+The 4,096-corner polygon, hierarchy depth, animation/key/sample limits and GLB uint32 format
+limits are unchanged. Imported meshes are never decimated or truncated to meet these caps.
+
+Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker is 98,112 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage stays 16,769 B.
+
+The large configuration also reaches GLTFAsset attachment and worker prepareGLTF: the converted GLB uses outputBytes and nodes as its downstream caps. Ordinary attachment retains the pre-existing 64 MiB glTF cap. The 2,500,002-vertex test produces a buffer above 64 MiB and attaches both directly and from prepared worker output.
+
+Large material partitions are emitted as additional child mesh nodes at triangle boundaries, with at most 1,000,000 vertices per primitive, matching the existing PBR storage-binding safety cap. Every triangle and layer is retained; control-point maps still drive skin and morph remapping. Shared vertices on a chunk boundary may be duplicated and count against the configured vertex cap. This adds draw calls rather than reducing geometry. The 2,500,002-vertex independent-triangle fixture emits three full primitives and retains every position/index.

@@ -1,3 +1,4 @@
+import { importLimits } from './limits.js';
 import type { EngineKernel } from '@margoengine/core';
 import type { PBRModel } from '@margoengine/gltf-pro/model';
 import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/worker';
@@ -27,6 +28,7 @@ export async function parseFBXInWorker(
       allowedURLs: options.allowedURLs,
       extensions: options.extensions?.map((extension) => extension.name),
       layers: options.layers,
+      limits: options.extensions?.some((extension) => extension.limits) ? importLimits(options.extensions) : undefined,
     },
     options.signal,
   );
@@ -49,6 +51,7 @@ export async function loadFBXInWorker(
       allowedURLs: options.allowedURLs,
       extensions: options.extensions?.map((extension) => extension.name),
       layers: options.layers,
+      limits: options.extensions?.some((extension) => extension.limits) ? importLimits(options.extensions) : undefined,
     },
     options.signal,
   );

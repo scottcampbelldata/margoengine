@@ -1246,6 +1246,10 @@
       "types": "./dist/fbx/textures.d.ts",
       "import": "./dist/fbx/textures.js"
     },
+    "./fbx/large": {
+      "types": "./dist/fbx/large.d.ts",
+      "import": "./dist/fbx/large.js"
+    },
     "./fsm": {
       "types": "./dist/fsm.d.ts",
       "import": "./dist/fsm.js"

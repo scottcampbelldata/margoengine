@@ -1,3 +1,4 @@
+import { importLimits } from './limits.js';
 import { exportGLB } from '@margoengine/exporters/gltf';
 import { parseDocument } from './document.js';
 import { context, buildScene } from './scene.js';
@@ -18,7 +19,7 @@ export async function convert(
     layers?: boolean;
   } = {},
 ): Promise<ArrayBuffer> {
-  const document = await parseDocument(input, signal),
+  const document = await parseDocument(input, signal, importLimits(options.extensions)),
     ctx = context(document, signal, options.extensions as readonly ExtensionHooks[] | undefined, options.layers);
   buildScene(ctx);
   const morphs: MorphBinding[] = [];
@@ -33,7 +34,7 @@ export async function convert(
   const animations = buildAnimations(ctx, morphs),
     bytes = exportGLB({ nodes: ctx.roots, animations }, { generator: 'Margo Engine fbx' });
   signal?.throwIfAborted();
-  if (bytes.byteLength > 128 * 1024 * 1024)
+  if (bytes.byteLength > ctx.budget.limits.outputBytes)
     throw new RangeError(
       'FBX conversion budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13034207,
+  "total": 13035002,
   "history": [
     {
       "date": "2026-10-24",
@@ -6515,6 +6515,12 @@
       "commit": "batch-206-shapes",
       "reason": "USD shapes optional entry 0 -> 1201 B; worker 117288 B ceiling -> 118236 B measured; schema adapter reuses Margo geometry, a separate worker would duplicate parsing and transfer lifecycle",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "94f328aed",
+      "reason": "batch205-per-import-resource-caps-and-large-file-entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -7721,6 +7727,7 @@
     "@margoengine/mesh-edit/hull": 12352,
     "@margoengine/geometry/hull": 2327,
     "@margoengine/react/textures": 4940,
-    "@margoengine/usdz/shapes": 1457
+    "@margoengine/usdz/shapes": 1457,
+    "@margoengine/fbx/large": 795
   }
 }
