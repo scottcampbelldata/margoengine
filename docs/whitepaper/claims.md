@@ -3347,6 +3347,11 @@ The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPi
 - Batch 220 job 1: math/compat supplies all 17 requested porting methods on seven familiar classes, with original per-type bundles unchanged. Proof: packages/math/test/methods.test.js and existing math.test.js small-import assertions. Six Euler orders, native/separate camera round trips on both depth conventions, ray/segment constraints, closed triangle/plane contacts, degenerate inputs and explicit color spaces are covered. This is mathematical correctness evidence, not a timing claim.
 # Batch 204 optional optimization
 
+Exporters `/sparse` writes sparse accessors and interleaved vertex streams while
+retaining every decoded value and accessor index/type/bound. The regression suite
+checks morph byte reduction, matrix padding, integer normalization and all three
+sparse index widths. [Sources and limits](../exporter-accessor-layout.md).
+
 Exporters `/splats` writes ratified KHR Gaussian splat GLBs and raw .splat files
 from SplatData. Full SH, covariance, linear color and opacity round-trip through
 the independent gltf-pro reader; the existing raw codec is reused. Real-capture

@@ -94,7 +94,12 @@ window.runExporterTests = async () => {
   assert(report.coveredPixels > 500, `scene renders (${report.coveredPixels} covered pixels)`);
   checks.push(`Original hierarchy renders on ${engine.backend} (${report.coveredPixels} covered pixels)`);
 
-  const glb = exportGLB(engine, { generator: 'Margo Engine exporters browser test' });
+  const { layoutGLB } = await import('@margoengine/exporters/sparse');
+  const denseGLB = exportGLB(engine, { generator: 'Margo Engine exporters browser test' });
+  const layout = layoutGLB(denseGLB, { sparse: false });
+  assert(layout.stats.interleaved > 0, 'exported scene must exercise interleaved vertex streams');
+  const glb = layout.glb;
+  checks.push('Interleaved accessor output is used for the pixel and independent loader round-trip');
   const gltf = exportGLTF(engine);
   const flat = exportGLB(engine, { flatten: true });
   report.glb = Array.from(glb);

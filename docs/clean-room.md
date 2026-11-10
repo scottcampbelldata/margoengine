@@ -6068,6 +6068,9 @@ Research compared Ken Shoemake, Animating Rotation with Quaternion Curves (1985)
 Public contracts checked against three.js contributors, Matrix4, Vector3, Ray, Plane, Box3 and Color documentation (2026), https://threejs.org/docs/pages/Matrix4.html, https://threejs.org/docs/pages/Vector3.html, https://threejs.org/docs/pages/Ray.html, https://threejs.org/docs/pages/Plane.html, https://threejs.org/docs/pages/Box3.html and https://threejs.org/docs/pages/Color.html. The new math/compat entry exports familiar subclasses with every one of the 17 requested methods, preserving original per-type imports and their existing small-bundle tests. Tests compare analytic coordinates, all six independent Euler products, both depth conventions, nearest-point candidates, coplanar/contact/degenerate intersections and color-space round trips. HSL interpolation follows direct component hue interpolation, as the porting contract specifies, rather than CSS's optional shortest path. Tests use analytic fixtures, no demo or data asset and no speed claim.
 # Batch 204: exporter optimization passes
 
+Sparse accessor and interleaved buffer research and evidence:
+[accessor layout record](exporter-accessor-layout.md).
+
 Gaussian export sources and clean-room comparison:
 [Gaussian cloud export](exporter-splats.md).
 

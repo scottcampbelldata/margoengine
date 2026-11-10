@@ -4217,6 +4217,13 @@ Batch 220 job 1: import Matrix4, Vector3, Quaternion, Ray, Plane, Box3 and Color
 Batch 220 job 1 size: math/compat 0 to 9929 B min+gzip, ceiling 10227 B. The entry includes seven interoperable opt-in classes and avoids weakening the original Vector3 1600 B test; splitting would require multiple porting imports. Original math root and seven per-type measurements are unchanged. Core + stage remains 24209 B, below 25000 B.
 # Batch 204 optional exporter optimization
 
+Optional exporters `/sparse`: 20,845 B gzip, ceiling 21,471 B (new entry includes
+the existing writer/reader for direct scene export). Sparse defaults to all
+zero-heavy accessors, with morph-only and disabled settings. Interleaving defaults
+on, with four-byte offsets and strides capped at 252 B; matrices stay separate.
+Compression-owned data and existing sparse tables are retained. No speed or
+unconditional file-shrink claim. [Exact contract](exporter-accessor-layout.md).
+
 Optional exporters `/splats`: 2,800 B gzip, ceiling 3,056 B, with a lazily loaded
 splats data-codec peer. GLB retains degree 0..3 SH in linear Rec.709; raw .splat
 uses 32-byte records and its standard color/rotation byte quantization with no

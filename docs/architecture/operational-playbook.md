@@ -5708,6 +5708,12 @@ The receipt docs/whitepaper/results/batch-273-firefox-matrix.json retains the or
 Batch 220 job 1, section 5 evidence: math/compat adds CPU-side camera transforms and geometric queries without touching core, stage, shader maths or backends. Analytic tests cover native combined matrices and separate camera matrices under both depth ranges. Existing per-type size tests stay intact because the subclasses occupy an optional entry. No GPU execution or speed claim is introduced.
 # Batch 204 evidence supplement (section 5)
 
+Sparse/interleaved export keeps matrix-column padding, normalized integer
+components and vertex offsets in their original types. Streams are four-byte
+aligned and split at 252 bytes. CPU tests compare every decoded accessor value,
+including negative zero; existing own-package GPU checks exercise both backends.
+There is no kernel, core, backend or runtime shader change. [Evidence](../exporter-accessor-layout.md).
+
 Gaussian GLB export uses the splats package's existing covariance decomposition;
 the new optional exporter serializes the ratified kernel attributes, with
 linear SH retained exactly and a linear point fallback. Independent CPU loader

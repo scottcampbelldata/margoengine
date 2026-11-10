@@ -212,6 +212,10 @@
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
+    },
+    "./sparse": {
+      "types": "./dist/sparse.d.ts",
+      "import": "./dist/sparse.js"
     }
   },
   "files": [
