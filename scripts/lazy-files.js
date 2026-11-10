@@ -14,14 +14,6 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
-    package: '@margoengine/sciviz',
-    file: 'packages/sciviz/dist/workers/readers.js',
-    label: 'workers/readers.js',
-    kind: 'Scientific reader session worker',
-    measure: 'file',
-    when: 'readInWorker(), only from sciviz/workers; one owned worker per reader session, terminated on cancellation or disposal',
-  },
-  {
     package: '@margoengine/compute',
     file: 'packages/compute/dist/onnx-kernel.wasm',
     label: 'onnx-kernel.wasm',
@@ -92,6 +84,14 @@ export const LAZY_FILES = [
     kind: 'Rust SIMD marching cubes',
     measure: 'file',
     when: '`marchingCubes()`, only from the optional /fallback entry; no device or global installation',
+  },
+  {
+    package: '@margoengine/sciviz',
+    file: 'packages/sciviz/dist/workers/readers.js',
+    label: 'workers/readers.js',
+    kind: 'Scientific reader session worker',
+    measure: 'file',
+    when: 'readInWorker(), only from sciviz/workers; one owned worker per reader session, terminated on cancellation or disposal',
   },
   {
     package: '@margoengine/voxel-pathtracer',

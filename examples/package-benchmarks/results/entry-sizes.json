@@ -14964,6 +14964,11 @@
       "gzip": 9384,
       "brotli": 8103
     },
+    "packages/sciviz/dist/workers/readers.js": {
+      "raw": 116841,
+      "gzip": 41409,
+      "brotli": 36255
+    },
     "packages/voxel-pathtracer/dist/mesh.wasm": {
       "raw": 53582,
       "gzip": 21349,
