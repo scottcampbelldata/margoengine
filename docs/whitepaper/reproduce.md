@@ -3056,3 +3056,8 @@ Build packages, then node --test --test-timeout=120000 packages/blender/tests/ob
 After build:packages, run node --test --test-timeout=120000 packages/headless/tests/tiles.test.js. Run node scripts/gpu-lock.mjs run --owner=tiles-proof --gpu=tiles-render-and-readback --wait-max=1200 --max=240 -- node packages/headless/tests/tiles-gpu.mjs for exact single/tiled comparison, four samples and streamed output past the real texture limit. No benchmark or README runner is involved.
 ### UI localization (batch 259)
 After building, run `node --test --test-timeout=60000 packages/ui/tests/i18n.test.js`; run `node scripts/gpu-lock.mjs run --owner=ui-i18n --max=3 --wait-max=60 -- node packages/ui/tests/i18n-browser.mjs` natively and with --compat. Data: Wikidata Q111 labels (CC0), https://www.wikidata.org/wiki/Q111 . Tests verify fallback, plural selection, parameter refresh, direction metadata, automatic relayout and aborted bindings.
+
+
+
+### Batch 243 mesh PBR channels
+Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtracer/tests/mesh-pbr.test.js. GPU correctness uses node scripts/gpu-lock.mjs run --owner=codex-batch243 --wait-max=60 --max=5 -- node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs. The latter tests native and WebGL2/Vulkan, compares maps with independent equivalent scalar/vertex scenes and snapshots the existing licensed Khronos Box before disposing its loaded model. Results: test-results/voxel-pathtracer-mesh-pbr.json. README work remains deferred in docs/work-lists/readme-owed.md.

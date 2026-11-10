@@ -419,3 +419,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document headless/tiles as the one-install alias of @margoengine/headless/tiles.
 - @margoengine/ui (batch 259 job 3): document /i18n Localization tables, fallback/plurals/parameters, live bindings, relayout and text-direction switching in the README phase.
 - margoengine (batch 259 job 3): document ui/i18n alias in the README phase.
+
+
+- @margoengine/voxel-pathtracer: mesh-pbr factory, material channels and samplers, independent mesh material ids, loaded glTF snapshot ownership and compressed-image callback.
+- margoengine: optional voxel-pathtracer/mesh-pbr re-export and typed loaded-glTF interop.

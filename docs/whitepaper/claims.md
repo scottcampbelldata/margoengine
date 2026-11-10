@@ -3569,3 +3569,8 @@ The optional /tiles entry renders and reads bounded tiles while output can excee
 The same tile proof also passes on the full WebGL2 compatibility layer: exact pixels, four-sample coverage, 8,193-pixel width and no validation errors. The small WebGL2 preview remains unsupported.
 ### Live UI localization (batch 259)
 Locale tables resolve parent/fallback keys, plural messages and parameters, update widget text and accessibility strings, and invalidate layout/shaping while switching Ui text direction. Evidence: i18n.test.js and i18n-browser.mjs (English/Arabic/Spanish Mars labels, automatic width changes and rendered Arabic glyphs).
+
+
+
+### Batch 243 mesh PBR channel contract
+The optional mesh-pbr entry applies the specified glTF channel encodings, UV sets/transforms, normal frames, cutout and explicit mesh placements in one existing path tracer. It retains independent mesh material ids and snapshots loaded-model inputs across asynchronous image conversion. Proof: nine package CPU tests execute the specialized WGSL and compare independent sRGB, roughness/metallic, emission, coverage, wrapping, UV and normal values; loaded glTF snapshot mutation, cancellation and ownership are covered. Native WebGPU and WebGL2/Vulkan pass all six pixel/loaded-model cases each, with maximum equivalent-scene error 4.76837158203125e-6 below the unchanged 1e-5 bound, zero cutout/normal-map difference and no GPU or shader errors. Evidence: whitepaper/results/batch243-mesh-pbr-20261109.json. No speed number is claimed.

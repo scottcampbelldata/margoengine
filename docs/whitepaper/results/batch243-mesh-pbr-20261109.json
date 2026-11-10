@@ -1,0 +1,114 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "rows": [
+        {
+          "name": "base texture equals independently decoded linear factors",
+          "maximumError": 5.960464477539063e-8,
+          "finite": true
+        },
+        {
+          "name": "roughness green and metallic blue equal scalar factors",
+          "maximumError": 0.000003814697265625,
+          "finite": true
+        },
+        {
+          "name": "emissive texture equals independent radiance factors",
+          "maximumError": 5.960464477539062e-7,
+          "finite": true
+        },
+        {
+          "name": "alpha cutout equals empty geometry",
+          "maximumError": 0,
+          "finite": true
+        },
+        {
+          "name": "normal texture equals independent vertex normals",
+          "maximumError": 0,
+          "finite": true
+        },
+        {
+          "name": "licensed Khronos metadata Box snapshot survives model disposal",
+          "finite": true,
+          "triangles": 12,
+          "drawn": true
+        }
+      ],
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "rows": [
+        {
+          "name": "base texture equals independently decoded linear factors",
+          "maximumError": 5.960464477539063e-8,
+          "finite": true
+        },
+        {
+          "name": "roughness green and metallic blue equal scalar factors",
+          "maximumError": 0.00000476837158203125,
+          "finite": true
+        },
+        {
+          "name": "emissive texture equals independent radiance factors",
+          "maximumError": 0.0000019073486328125,
+          "finite": true
+        },
+        {
+          "name": "alpha cutout equals empty geometry",
+          "maximumError": 0,
+          "finite": true
+        },
+        {
+          "name": "normal texture equals independent vertex normals",
+          "maximumError": 0,
+          "finite": true
+        },
+        {
+          "name": "licensed Khronos metadata Box snapshot survives model disposal",
+          "finite": true,
+          "triangles": 12,
+          "drawn": true
+        }
+      ],
+      "errors": [],
+      "messages": []
+    }
+  }
+]

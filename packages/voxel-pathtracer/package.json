@@ -58,6 +58,10 @@
     "./spectral": {
       "types": "./dist/spectral.d.ts",
       "import": "./dist/spectral.js"
+    },
+    "./mesh-pbr": {
+      "types": "./dist/mesh-pbr.d.ts",
+      "import": "./dist/mesh-pbr.js"
     }
   },
   "files": [
@@ -100,7 +104,8 @@
     "test:gpu:parity-gamma": "cd ../.. && node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs",
     "test:gpu:history-taps": "cd ../.. && node packages/voxel-pathtracer/tests/history-taps-browser.mjs",
     "test:gpu:mesh-attributes": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-attributes-browser.mjs",
-    "test:gpu:mesh-instances": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs"
+    "test:gpu:mesh-instances": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs",
+    "test:gpu:mesh-pbr": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -120,7 +125,8 @@
       "test:gpu:parity-gamma": 6,
       "test:gpu:history-taps": 6,
       "test:gpu:mesh-attributes": 4,
-      "test:gpu:mesh-instances": 7
+      "test:gpu:mesh-instances": 7,
+      "test:gpu:mesh-pbr": 5
     }
   },
   "peerDependenciesMeta": {

@@ -4010,6 +4010,10 @@
       "types": "./dist/voxel-pathtracer/spectral.d.ts",
       "import": "./dist/voxel-pathtracer/spectral.js"
     },
+    "./voxel-pathtracer/mesh-pbr": {
+      "types": "./dist/voxel-pathtracer/mesh-pbr.d.ts",
+      "import": "./dist/voxel-pathtracer/mesh-pbr.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"
