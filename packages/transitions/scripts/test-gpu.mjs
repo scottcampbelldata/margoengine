@@ -8,9 +8,11 @@ try {
     const { transitionChecks } = await import('/packages/transitions/test/gpu-browser.js');
     const { liveChecks } = await import('/packages/transitions/test/live-browser.js');
     const { viewportChecks } = await import('/packages/transitions/test/viewport-browser.js');
+    const { glslChecks } = await import('/packages/transitions/test/glsl-browser.js');
     const { presetChecks } = await import('/packages/transitions/test/presets-browser.js');
     const { fullLiveChecks } = await import('/packages/transitions/test/full-live-browser.js');
     return {
+      ...(await glslChecks()),
       ...(await presetChecks()),
       ...(await fullLiveChecks()),
       ...(await transitionChecks()),

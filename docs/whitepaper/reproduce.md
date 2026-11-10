@@ -3345,3 +3345,8 @@ Job 0 conflict-marker reproduction: `node --test --test-timeout=120000 tests/hyg
 Batch 248 job 3: `node --test --test-timeout=120000 packages/text/tests/msdf.test.js`; run the existing text browser suite under the shared GPU lock, once natively and once with --compat. The center of the RGB interpolation diagnostic must be white, while both exterior probes stay dark. No performance benchmark.
 ## Batch 212 job 3: modulation and colour
 Build packages; node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js tests/umbrella.test.js. Run the shared GPU-locked mixer/scripts/test-browser.js as in job 1. Its JSON-effects check renders every algorithm and all native oversampling choices on both backends.
+
+
+### Batch 218 job 3
+
+Use the transitions CPU and locked GPU commands recorded above. glsl-browser.js runs 23 original fixtures over three progress values on 16 by 16 gradients: 17664 pixel comparisons per backend against a separate native GLSL compiler. The same fixtures also compile and render via both frozen and live factory APIs. No downloaded shader library is part of this test or package.

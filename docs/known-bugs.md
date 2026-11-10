@@ -4639,3 +4639,14 @@ No known open defect in the completed panorama entry; cancellation observes the 
 Job 0 extra planner check on main 6081587c2: tests/check-merge-affected.test.js and tests/gpu-browser-registration.test.js fail before running because packages/weather/tests/parity-browser.mjs has no executable registration in the GPU plan. Cause: the new weather glTF browser driver was added without a test:gpu/test:browser script; owning weather lane follow-up under rule 21. Hygiene regression and affected tooling checks pass independently.
 Batch 248 job 3: prebuilt RGB field reduction was the cause of rounded MSDF corners; fixed by sampling RGB before median, covered by interpolation and GPU regression tests.
 Batch 212 fx: full-wet mixing now preserves processed signed zero, covered by the quantisation regression; no open defect found in tested equations or rendered chains.
+
+
+### Batch 218 job 3
+
+The requested GLSL transition signature importer is built with original semantic fixtures and native GLSL pixel comparison. Parser/typed lowering tests cover macros, overloaded helpers, uniform shapes, matrices, structs, arrays, swizzle writes, loops, out/inout and branch side effects. The native oracle embeds user uniform declarations before its sampling helpers so sampler aliases remain in GLSL lexical scope. Near-boundary float sampling differences are documented in Limits rather than hidden by a larger pixel tolerance.
+
+The importer also has regression fixtures for struct members named like vector swizzles and indexed output addresses evaluated once. Struct type resolution now precedes swizzle decomposition; copy-out reuses the address evaluated before the call.
+
+Native reference defect found during GLSL import testing: on the recorded NVIDIA ANGLE WebGL2 backend, an out argument points[j++].x increments j again during copy-back. Repro is indexed-output-once in glsl-fixtures.js: native direct form yields j=2 while GLSL ES 1.00 section 6.1.1 requires a call-time l-value reused at return. Margo evaluates the address once. That fixture uses an independently written native oracle with the address explicitly stored before the call, preserving the specified semantics; the translated input retains its indexed side effect. No input is special-cased in the importer.
+
+GLSL importer fix-phase syntax edge cases (batch 218, rule 22): uniform float weights[2+2]; followed by a transition rejects at parsing even though the length is a constant expression. Cause: GLSLParser.array currently admits only literal or named lengths. Helpers with unnamed parameters also reject because parameter parsing requires an identifier. Canonical numeric/named array lengths and named helper parameters work and are tested. Expand these source forms and their negative/property-based corpus in the fix phase; the transition import API and all requested modes are built.

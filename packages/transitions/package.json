@@ -41,6 +41,10 @@
     "./presets": {
       "types": "./dist/presets.d.ts",
       "import": "./dist/presets.js"
+    },
+    "./glsl": {
+      "types": "./dist/glsl.d.ts",
+      "import": "./dist/glsl.js"
     }
   },
   "files": [

@@ -710,3 +710,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mixer (batch 212 fx): document JSON FXSpec variants, defaults, createFX/createFXChain/createBusFX, automation, ownership, wet endpoints, delay interpolation, sample/bit reduction and native oversampling.
 
 - margoengine (batch 212 fx): document the generated mixer/fx alias.
+
+
+- @margoengine/transitions (batch 218 job 3): document /glsl, translation/frozen/live factories, GLSL ES 1.00 signature, uniform defaults/shapes, UV convention, parser limits, diagnostics, cancellation and trusted shader execution; examples deferred.
+- margoengine (batch 218 job 3): document transitions/glsl forwarding entry; examples deferred.

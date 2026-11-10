@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13446738,
+  "total": 13462928,
   "history": [
     {
       "date": "2026-10-24",
@@ -6948,6 +6948,12 @@
       "commit": "batch212-fx",
       "reason": "Optional fx; @margoengine/mixer/fx: ceiling 0 to 3936, measured 3680. Keep one shared routing lifetime and K-weighting design rather than duplicate state. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "538708aa5",
+      "reason": "Batch 218 GLSL importer new entry 0 to 15718 B gzip. Keep clean-room parser preprocessing typed lowering diagnostics and validated factories together instead of splitting compiler phases. Core plus stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8207,6 +8213,7 @@
     "@margoengine/cameras/panorama": 2742,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/usdz/preview-surface": 5006,
-    "@margoengine/mixer/fx": 3936
+    "@margoengine/mixer/fx": 3936,
+    "@margoengine/transitions/glsl": 16190
   }
 }

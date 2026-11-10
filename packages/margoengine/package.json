@@ -3878,6 +3878,10 @@
       "types": "./dist/transitions/presets.d.ts",
       "import": "./dist/transitions/presets.js"
     },
+    "./transitions/glsl": {
+      "types": "./dist/transitions/glsl.d.ts",
+      "import": "./dist/transitions/glsl.js"
+    },
     "./tween": {
       "types": "./dist/tween.d.ts",
       "import": "./dist/tween.js"

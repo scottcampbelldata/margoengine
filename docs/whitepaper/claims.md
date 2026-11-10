@@ -3891,3 +3891,8 @@ Job 0 hygiene claim: retained conflict markers in tracked text fail hygiene in e
 Prebuilt MSDF rendering now applies the Chlumsky/Sloup/Simecek median after RGB filtering, preserving the independent channel crossings used for sharp corners. Proof: packages/text/tests/msdf.test.js checks noncommuting median/interpolation, RGBA upload/restore, raw PNG alpha and cancellation; the text browser suite distinguishes a true RGB field from its scalar reduction on both backends. This claims MSDF consumption, not MSDF generation or improved quality of a single-channel input.
 ## Batch 212 job 3: modulation and colour
 Optional fx implements all requested modulation/colour classes plus auto-pan and custom curves as JSON chains. Proof: fx.test.js checks exact tremolo, fractional impulse/feedback, independent RBJ convolution, bit/sample reduction, dry identity, quantum independence and transactional ownership/abort. browser.js checks each effect class, rational distortion at none/2x/4x oversampling and authored identity shaping on both backends. These are functional equations, not perceptual or performance claims.
+
+
+### Batch 218 job 3: user GLSL transition functions
+
+GLSL ES 1.00 transition(vec2) functions can be translated to WGSL and used through the frozen or live custom pipeline, including supplied additional uniforms. Evidence: original glsl-fixtures.js semantic cases, glsl.test.js typed-WGSL validation and failure/cancellation checks, and glsl-browser.js native GLSL versus translated WGSL gradient comparisons. This does not claim bit-identical arbitrary float arithmetic or shader execution sandboxing.
