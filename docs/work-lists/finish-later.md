@@ -92,6 +92,7 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 132.2 | taa | Read Malvar and Sullivan, YCoCg-R (JVT-I014r3, 2003) in full (the Microsoft link served HTML on the Mac); measure the 0.01 depth rejection and the thin-feature lock threshold; help links on the RangeError throws |
 | 132.2 | bvh | Read Moller and Trumbore 1997 (no extractable text on the Mac) and Ericson 2005 section 5.1.5; prove or bound the GPU traversal box test against Woop et al. section 4 (only the far distance is widened, by 4e-7); time the watertight CPU fallback on a quiet machine |
 | 132.2 | lighting2d | Read Sannikov 2023 (radiance cascades preprint), Fernando 2005 and Segal et al. 1992 in full; a WebGL2 compat path for the browser check (none exists); measure the 32-sample surface gather |
+| 132.2 | pixel | Read Bayer 1973; audit the xbr3 and xbr4 contour rule of batch 244 once its README section lands; measure the CRT and follow-camera constants |
 | R5 | video | Run demux-real.test.js, demux-check and playback-check on the Mac once engine-bench has video/flower.webm (node scripts/reference-rendering/fetch-skip-assets.mjs; not fetched by lane D) |
 | R5 | selection | Deeper correctness read of highlight.ts (glow/fill) and spatial.ts (XR mesh pointers); only skimmed in R5 lane E |
 | R5 | viewcube | Correctness read of compass.ts (compass ring, context menu) and fit.ts (fit bounds through transitions); R5 lane E checked up.ts and ran the sweep only |
