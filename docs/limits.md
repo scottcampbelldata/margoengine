@@ -6057,3 +6057,5 @@ Rebased state integration preserves open streamed selection universes and their 
 The rebased monitor export was missing its generated margoengine source alias. Regenerating the umbrella added that alias; the existing generated-file, declaration and same-binding tests now pass. This is an additive integration repair in the consuming umbrella package.
 
 Rebased sciviz/parcoords grows from its recorded 8860 B to 9276 B min+gzip; ceiling 9126 to 9555 B. The entry includes the shared SelectionStore and now retains portable brush/history state. Splitting state ownership out would add coordination or change linked row identity; keep the complete optional API. This adds no core or stage bytes.
+
+Review 3 M1: Transmission and TransmissionLayers detach by registered plugin identity from their owning scene. The layer wrapper owns both background and capture passes; its unregistered inner Transmission releases resources without removing an unrelated same-name plugin. Repeated direct disposal and scene-initiated removal remain safe. Regression uses the real Engine, a secondary scene and same-name default-scene plugins. No public API change.

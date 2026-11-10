@@ -326,7 +326,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     for (const release of [...this.models.values()]) release();
     this.release();
     this.pipelines = undefined;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

@@ -196,7 +196,7 @@ fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {var o:MargoTransparent
     for (const { release } of [...this.layers.values()]) release();
     for (const release of [...this.glass.values()]) release();
     this.transmission.dispose();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

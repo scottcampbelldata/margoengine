@@ -8,7 +8,7 @@ function fixture() {
     calls = [],
     passes = [];
   const gpu = mockGPU().device;
-  const engine = { gpu, removePlugin: (name) => removed.push(name) };
+  const engine = { gpu, sceneOf: () => undefined, removePlugin: (name) => removed.push(name) };
   const weighted = { order: 2.95, add: (model) => model.setTransparency({ targets: [{}, {}] }) };
   const owner = new TransmissionLayers({ weighted });
   owner.setup(engine);

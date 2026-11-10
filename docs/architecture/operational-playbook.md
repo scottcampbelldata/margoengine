@@ -6710,3 +6710,5 @@ Review 4 glTF sampler evidence: preserve authored min/mag modes without mipmaps 
 
 ### 5. Batch 179 state reconstruction evidence
 The optional sciviz/spec entry records per-instance recipes, never mutates a shared prototype, and restores existing GPU implementations through lazy optional imports. It adds no core/stage feature. spec.test.js covers storage, hashes, bounds, rejection, cancellation and custom state; spec-browser.mjs and spec-demos-browser.mjs compare reconstruction on WebGPU and the WebGL2 compatibility layer. Exact-size capture is used for byte equality because MSAA transparent blending is not self-bit-stable. GPU assertions keep exact tolerances. Pipeline code and custom codecs come only from the caller's registry; format text cannot import executable code.
+
+Review 3 M1 evidence: materials transmission passes now remove registrations through engine.sceneOf(plugin). Both standalone and nested layer captures are covered by real-Engine secondary-scene CPU regressions, including frame-pass removal and unrelated same-name default-scene plugins. GPU shader and capture algorithms are unchanged.

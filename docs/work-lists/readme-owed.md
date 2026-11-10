@@ -1149,3 +1149,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: document /spec factories, async state saves, schema, hashes and URL arrays, /link brush/history JSON, timeline snapshots, pipeline registry, custom codecs and exact-size round trips (batch 179).
 - margoengine: document the sciviz/spec optional alias after the build phase (batch 179).
 - margoengine: retain the generated sciviz/monitor alias alongside sciviz/spec; both are optional subpaths (batch 179 integration repair).
+
+- @margoengine/materials (review 3 M1): document Transmission and TransmissionLayers disposal in their owning scene, including nested captures.
+
+- @margoengine/sciviz (review 3 material gate): use the common package browser launcher for the engineering reader route in the README phase.

@@ -1,7 +1,6 @@
 # Known bugs and unverified features
 
 
-Review 3 (f6246e14f): materials/transmission-layers.ts dispose() calls engine.removePlugin(name) without its owning scene. Repro: attach a TransmissionLayers to engine.createScene('other'), return to the default scene and call effect.dispose(); engine.sceneOf(effect) still equals the other scene and its plugin/pass registration remains. Cause: removePlugin defaults to the active scene. Confirmed with a real Engine/TransformStore and the recording GPU; follow-up regression should assert the secondary scene releases the plugin and passes. Review continues in private/handoffs/codex-review-3-handoff.md.
 
 Batch 186 job 1: disk/sphere shadows use the existing centre-map PCSS approximation and guard band (limits.md); no exact extended-emitter visibility claim. Native WebGPU and full WebGL2 production-shader visibility checks pass.
 
