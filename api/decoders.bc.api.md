@@ -11,6 +11,12 @@ export interface BCImage {
 
 export function decodeBC(format: string, blocks: Uint8Array, width: number, height: number): BCImage;
 
+export function decodeBCFloat(format: string, blocks: Uint8Array, width: number, height: number): {
+    width: number;
+    height: number;
+    data: Float32Array;
+};
+
 export const halfToFloat: (h: number) => number;
 
 export const linearToByte: (v: number) => number;

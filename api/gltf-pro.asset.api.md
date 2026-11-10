@@ -110,9 +110,16 @@ interface GLTFCompressedImage {
         width: number;
         height: number;
     }[];
+    upload?(device: GPUDevice, srgb: boolean): GPUTexture;
+    gpuFormat?(device: GPUDevice, srgb: boolean): GPUTextureFormat;
 }
 
 interface GLTFDecoderHooks {
+    dds?: {
+        decode(data: Uint8Array, options?: {
+            signal?: AbortSignal;
+        }): GLTFCompressedImage;
+    };
     draco?: {
         decode(data: Uint8Array, options: GLTFDracoDecodeOptions): Promise<GLTFDracoGeometry>;
     };
@@ -172,6 +179,7 @@ interface GLTFExtensions {
   EXT_meshopt_compression?: GLTFMeshopt;
   KHR_meshopt_compression?: GLTFMeshopt;
   KHR_texture_basisu?: { source: number };
+  MSFT_texture_dds?: { source: number };
   EXT_texture_webp?: { source: number };
   EXT_texture_avif?: { source: number };
   KHR_texture_transform?: GLTFTextureTransform;

@@ -2231,6 +2231,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 201 DDS: per-device native BC or CPU RGBA/linear RGBA16F fallback, retained mip bytes and device-restoration upload are covered by CPU tests and native/fallback GPU pixel comparisons on WebGPU and compatibility. Signed/HDR fallback is owned by decoders/bc; DDS container parsing remains decoders/dds. Float32 filtering needs the enabled device feature. No core/stage change or speed claim.
+
 Batch 189: sky/compat-clouds shares the existing cloud, precipitation and weather-effects implementations on native WebGPU and the full WebGL2 layer. Pixel checks exercise ground/inside/above volume traversal, scene depth, drift, rain/snow/sleet, lightning reset, roof cover, splashes and wet/dry lens at both MSAA counts. No core/stage or backend code changes, new demo assets or timing claims. Full-layer support is distinct from the intentionally unsupported small preview. Existing workgroup sky-light reduction may use the compatibility CPU tier; no new performance evidence is claimed.
 
 Batch 188: environment/prefiltered preserves source/specular cube mips, SH and BRDF LUT in lossless KTX2; load and device restore upload only. CPU allocation recording proves zero filtering/BRDF pipelines; exact GPU texture/buffer round trips and device replacement pass on native WebGPU and full WebGL2 compatibility using the real CC0 Venice Sunset radiance photo. Tests: packages/environment/tests/prefiltered.test.js and prefiltered-browser.js. No speed assertion or arbitrary-KTX2 claim.

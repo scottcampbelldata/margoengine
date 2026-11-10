@@ -25,6 +25,8 @@ const physical = [
  * WGSL. `materials: false` is kept as no shader. The same goes for `splats`, added when the file holds Gaussian splats.
  */
 export async function withMaterials(doc: GLTFDocument, decoders: GLTFDecoderHooks = {}): Promise<GLTFDecoderHooks> {
+  if (decoders.dds === undefined && doc.textures?.some((t) => t?.extensions?.MSFT_texture_dds !== undefined))
+    decoders = { ...decoders, dds: (await import('./dds.js')).ddsTextures };
   if (decoders.splats === undefined && hasSplats(doc))
     decoders = { ...decoders, splats: (await import('./splats.js')).gaussianSplats };
   else if (decoders.splats === false) decoders = { ...decoders, splats: undefined };

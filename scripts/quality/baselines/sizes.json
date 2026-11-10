@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14004523,
+  "total": 14047836,
   "history": [
     {
       "date": "2026-10-24",
@@ -7418,6 +7418,12 @@
       "commit": "batch-195",
       "reason": "New optional adaptive event task: 0 to 967 B gzip, 1223 B ceiling; coalescing, cancellation and async serialization stay together. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "af8577615",
+      "reason": "Batch 201 DDS source substitution, retained mips and native or HDR/signed-preserving fallback; decoders adds decodeBCFloat. No optional quality loss or artificial splits; core and stage unchanged. Before/after in docs/limits.md.",
+      "grew": 6
     }
   ],
   "items": {
@@ -7788,8 +7794,8 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7210,
-    "@margoengine/gltf-pro": 71602,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 28845,
+    "@margoengine/gltf-pro": 78462,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 35732,
     "@margoengine/gltf-pro dist/workers/progressive.js": 16170,
     "@margoengine/gltf-pro/asset": 5754,
     "@margoengine/gltf-pro/coordinates": 755,
@@ -7801,12 +7807,12 @@
     "@margoengine/gltf-pro/metadata": 2432,
     "@margoengine/gltf-pro/model": 57606,
     "@margoengine/gltf-pro/physics": 8977,
-    "@margoengine/gltf-pro/prepare": 24874,
-    "@margoengine/gltf-pro/progressive": 78509,
+    "@margoengine/gltf-pro/prepare": 31610,
+    "@margoengine/gltf-pro/progressive": 87387,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/spec-gloss": 9712,
     "@margoengine/gltf-pro/splats": 2100,
-    "@margoengine/gltf-pro/worker": 72074,
+    "@margoengine/gltf-pro/worker": 78950,
     "@margoengine/gltf/auto": 14750,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
@@ -8764,6 +8770,7 @@
     "@margoengine/quality/demand": 1184,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/post/stylize": 7202,
-    "@margoengine/quality/events": 1223
+    "@margoengine/quality/events": 1223,
+    "@margoengine/gltf-pro/dds": 7076
   }
 }

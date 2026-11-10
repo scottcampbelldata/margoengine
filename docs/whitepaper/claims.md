@@ -4124,3 +4124,6 @@ Batch 191 job 5: post/stylize combines bounded shock-wave refraction, scrolling 
 
 ### Batch 195 job 3: adaptive hover events
 quality/events provides finite motion throttling and Infinity suppression matching the public AdaptiveEvents disabled-raycaster contract. Queued requests coalesce to their latest arguments, flush at rest and serialize async handlers. Proof: packages/quality/test/events.test.js and events-browser.mjs; the browser fixture coalesces 200 queued requests into one real hit on both backends and proves one active pick at a time. No latency, battery or throughput claim.
+
+### Batch 201 job 2: DDS glTF images
+The optional DDS entry implements MSFT_texture_dds source substitution and preserves authored mip chains. It delegates container parsing to decoders/dds, selects formats per device, and keeps HDR/signed BC fallback values through decodeBCFloat. CPU tests: packages/gltf-pro/tests/dds.test.js and packages/decoders/tests/bc-float.test.js. GPU native/fallback oracle: packages/gltf-pro/scripts/test-dds-browser.mjs on both backends. This is format/loading correctness evidence, with no speed claim. See clean-room.md for primary sources and limits.md for device constraints.

@@ -4842,3 +4842,5 @@ Fixed batch 270 registration manifest merge: a text-only conflict resolver conca
 Batch 186 gate finding: gpu-package-tests.mjs --select=clustered/test:gpu fails during its global plan because packages/water/package.json places npm run build midway through test:gpu. Run the selected clustered scripts directly; water ownership must move that build to the start in the fix phase.
 
 quality/events (batch 195 job 3): no open defect found in motion policy, queued-input coalescing, asynchronous pick serialization, rejection or cancellation tests. Explicit notification of programmatic movement and no stationary-pointer polling are documented contracts in limits.md.
+
+Batch 201 job 2: DDS source loading, retained mip uploads and signed/HDR fallback are built. No new DDS defect identified. The separately assigned batch-273 composed compatibility sampler overflow remains the next owning fix and is not waived.

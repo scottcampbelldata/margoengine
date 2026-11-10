@@ -3577,3 +3577,6 @@ Batch 191 job 5: node --test --test-timeout=120000 packages/post/test/stylize.te
 
 ### Batch 195 job 3
 Build packages, run node --test --test-timeout=120000 packages/quality/test/events.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch195 --max=3 --wait-max=60 -- node packages/quality/test/events-browser.mjs. The fixture uses original box geometry, a control-like change event and real engine.pick on native WebGPU then full WebGL2 compatibility. The 200-to-1 assertion counts work and has no timing budget.
+
+### Batch 201 job 2
+After build:packages, run `node --test --test-timeout=120000 packages/gltf-pro/tests/dds.test.js packages/decoders/tests/bc-float.test.js`. Under the shared GPU lock run `node packages/gltf-pro/scripts/test-dds-browser.mjs`, then the same script with `--compat`. The fixture compares native and forced software BC paths and records maximum channel error in test-results/batch201-dds[-compat].json; it also asserts a visible red mip-chain material and no GPU validation errors.

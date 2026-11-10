@@ -62,7 +62,8 @@ export interface GLTFImageOptions {
 }
 /** Async codecs stay on the owning thread; meshopt is synchronous and can be packed in a parser worker. */
 export const asyncGeometry = (doc: GLTFDocument): boolean =>
-  !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) || hasSplats(doc);
+  !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) ||
+  hasSplats(doc);
 export const asyncCompression = (doc: GLTFDocument): boolean =>
   asyncGeometry(doc) ||
   !!doc.textures?.some((texture) => texture?.extensions?.KHR_texture_basisu) ||
@@ -82,6 +83,9 @@ export interface GLTFCompressedImage {
   height: number;
   format: GPUTextureFormat;
   mipmaps: readonly { data: Uint8Array; width: number; height: number }[];
+  /** Optional format-specific uploader, retaining all mip bytes for restoration and other devices. */
+  upload?(device: GPUDevice, srgb: boolean): GPUTexture;
+  gpuFormat?(device: GPUDevice, srgb: boolean): GPUTextureFormat;
 }
 /** A decoded glTF image slot; undefined when a KTX2 image was skipped because no ktx2 decoder was passed. */
 
@@ -93,6 +97,8 @@ export interface GLTFTextureOpener {
 }
 /** Optional decoders. Structurally matches @margoengine/decoders (DracoDecoder, MeshoptDecoder, KTX2Decoder) without importing it. */
 export interface GLTFDecoderHooks {
+  /** MSFT_texture_dds reader from @margoengine/gltf-pro/dds. */
+  dds?: { decode(data: Uint8Array, options?: { signal?: AbortSignal }): GLTFCompressedImage };
   draco?: {
     decode(data: Uint8Array, options: GLTFDracoDecodeOptions): Promise<GLTFDracoGeometry>;
   };
@@ -222,6 +228,7 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   EXT_meshopt_compression: 'meshopt',
   KHR_meshopt_compression: 'meshopt',
   KHR_texture_basisu: 'ktx2',
+  MSFT_texture_dds: 'dds',
   KHR_materials_iridescence: 'materials',
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
@@ -362,8 +369,8 @@ const meshoptExtension = 'EXT_meshopt_compression',
   dracoExtension = 'KHR_draco_mesh_compression',
   basisuExtension = 'KHR_texture_basisu';
 /** Basis Universal replaces the ordinary PNG/JPEG source, including optional fallbacks. */
-export function textureSource(def: GLTFTexture): number {
-  const extension = def.extensions?.[basisuExtension];
+export function textureSource(def: GLTFTexture, dds = false): number {
+  const extension = def.extensions?.[basisuExtension] ?? (dds ? def.extensions?.MSFT_texture_dds : undefined);
   if (extension !== undefined && (!extension || typeof extension !== 'object' || Array.isArray(extension)))
     throw new TypeError(
       'Invalid glTF KHR_texture_basisu; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
@@ -737,14 +744,21 @@ function ktxSources(doc: GLTFDocument): Set<number> {
   for (let i = 0; i < (doc.images?.length ?? 0); i++) if (doc.images![i]?.mimeType === 'image/ktx2') sources.add(i);
   return sources;
 }
-export function unusedBasisuFallbacks(doc: GLTFDocument): Set<number> {
+export function unusedBasisuFallbacks(doc: GLTFDocument, dds = false): Set<number> {
   const fallbacks = new Set<number>(),
     selected = new Set<number>();
   for (const texture of doc.textures ?? []) {
-    if (texture?.extensions?.[basisuExtension] !== undefined) {
-      selected.add(textureSource(texture));
+    if (
+      texture?.extensions?.[basisuExtension] !== undefined ||
+      (dds && texture?.extensions?.MSFT_texture_dds !== undefined)
+    ) {
+      selected.add(textureSource(texture, dds));
       if (Number.isSafeInteger(texture.source) && texture.source! >= 0) fallbacks.add(texture.source!);
-    } else if (Number.isSafeInteger(texture?.source) && texture.source! >= 0) selected.add(texture.source!);
+    } else {
+      if (Number.isSafeInteger(texture?.source) && texture.source! >= 0) selected.add(texture.source!);
+      if (!dds && texture?.extensions?.MSFT_texture_dds)
+        fallbacks.add(integer(texture.extensions.MSFT_texture_dds.source, 'DDS image'));
+    }
   }
   for (const source of selected) fallbacks.delete(source);
   return fallbacks;
@@ -874,10 +888,33 @@ export async function decodeKTX2Images(
 ): Promise<GLTFImage[]> {
   options.signal?.throwIfAborted();
   const sources = ktxSources(asset.doc);
-  if (!sources.size) return images as GLTFImage[];
+  const ddsSources = new Set<number>();
+  if (asset.hooks.dds)
+    for (const t of asset.doc.textures ?? [])
+      if (!t.extensions?.KHR_texture_basisu && t.extensions?.MSFT_texture_dds !== undefined)
+        ddsSources.add(textureSource(t, true));
+  if (!sources.size && !ddsSources.size) return images as GLTFImage[];
   const decoded = images.slice(),
     decoder = ktxDecoder(asset, options);
   try {
+    for (const source of ddsSources) {
+      options.signal?.throwIfAborted();
+      if (decoded[source]) continue;
+      const def = entry(asset.doc.images, source, 'DDS image');
+      if (
+        (def.mimeType !== undefined && def.mimeType !== 'image/vnd-ms.dds') ||
+        (def.bufferView !== undefined && def.mimeType !== 'image/vnd-ms.dds')
+      )
+        throw new TypeError('MSFT_texture_dds requires image/vnd-ms.dds');
+      const data =
+        def.bufferView !== undefined
+          ? asset.view(def.bufferView)
+          : typeof def.uri === 'string' && def.uri.startsWith('data:')
+            ? embedded(def.uri, asset.maxBytes)
+            : undefined;
+      if (!data) throw margoError('state', 'External DDS images require loadGLTF');
+      decoded[source] = asset.hooks.dds!.decode(data, options);
+    }
     for (const source of sources) {
       if (decoded[source]) {
         if (!('ktx2' in decoded[source])) throw new TypeError('KHR_texture_basisu requires decoded KTX2 images');
@@ -942,7 +979,7 @@ export async function loadAsset(
   const config: AssetOptions = 'aborted' in options ? { signal: options as AbortSignal } : (options as AssetOptions);
   const {
     signal,
-    decoders = {},
+    decoders: givenDecoders = {},
     buffers: provided = [],
     fetch: get = globalThis.fetch,
     maxDownloadBytes,
@@ -1003,13 +1040,14 @@ export async function loadAsset(
       buffers[i] = b;
     } else buffers[i] = await fetchBytes(resolve(def.uri));
   }
-  const asset = new GLTFAsset(doc, buffers, binary, await withMaterials(doc, decoders), limit, maxNodes);
+  const asset = new GLTFAsset(doc, buffers, binary, await withMaterials(doc, givenDecoders), limit, maxNodes);
+  const decoders = asset.hooks;
   asset.baseURL = base?.href;
   if (optimize) asset.reorder = await triangleOrder();
   if (deferCompression && asyncCompression(doc))
     return { asset, images, deferred: true, baseURL: base?.href, downloadedBytes: total };
   const sources = ktxSources(doc),
-    fallbacks = unusedBasisuFallbacks(doc),
+    fallbacks = unusedBasisuFallbacks(doc, !!decoders.dds),
     decoder = ktxDecoder(asset, { ...imageOptions, ktx2: imageOptions.ktx2 ?? decoders.ktx2, signal });
   let decodedImages = 0;
   await asset.decode(signal);
@@ -1058,7 +1096,21 @@ export async function loadAsset(
           throw new TypeError(
             'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
           );
-        if (sources.has(index)) {
+        const ddsImage =
+          decoders.dds &&
+          doc.textures?.some(
+            (t) => !t.extensions?.KHR_texture_basisu && t.extensions?.MSFT_texture_dds?.source === index,
+          );
+        if (ddsImage) {
+          if (
+            (def.mimeType !== undefined && def.mimeType !== 'image/vnd-ms.dds') ||
+            (def.bufferView !== undefined && def.mimeType !== 'image/vnd-ms.dds')
+          )
+            throw new TypeError('MSFT_texture_dds requires image/vnd-ms.dds');
+          while (running.length) await settle();
+          running.push([index, Promise.resolve(decoders.dds!.decode(data, { signal }))]);
+          await settle();
+        } else if (sources.has(index)) {
           // The KTX2 decoder transcodes one image at a time.
           while (running.length) await settle();
           running.push([index, decoder.decode(data)]);

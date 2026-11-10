@@ -4897,6 +4897,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./gltf-pro/dds": {
+      "types": "./dist/gltf-pro/dds.d.ts",
+      "import": "./dist/gltf-pro/dds.js"
     }
   },
   "dependencies": {

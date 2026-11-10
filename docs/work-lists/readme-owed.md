@@ -958,3 +958,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/quality and margoengine (batch 195 job 3): document /events adaptiveEvents run/regress/setMoving/flush, finite and Infinity policies, defaults, coalesced promises, async nonoverlap, direct clicks, source events and owner AbortSignal; examples deferred.
+
+- @margoengine/gltf-pro (batch 201 job 2): document automatic MSFT_texture_dds loading, ddsTextures/decodeDDSImage, mip retention, native and HDR/signed fallback, and 2D/float32 feature limits.
+- @margoengine/decoders (batch 201 job 2): document decodeBCFloat and its signed/HDR-preserving RGBA output alongside decodeBC.

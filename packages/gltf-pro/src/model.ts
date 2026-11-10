@@ -1629,6 +1629,7 @@ function uploadCompressedImage(
   image: Exclude<GLTFImage, ImageBitmap | undefined | import('./asset.js').KTX2Image | GLTFStreamedImage>,
   srgb: boolean,
 ): GPUTexture {
+  if (image.upload) return image.upload(device, srgb);
   const formats: Record<string, TranscodedKTX2Result['target']> = {
     'rgba8unorm': 'rgba8',
     'bc7-rgba-unorm': 'bc7',
@@ -2802,7 +2803,7 @@ export class PBRModel implements EnginePlugin {
         def = map ? entry(this.asset.doc.textures, map.index, 'texture') : null;
       // KHR_texture_basisu, EXT_texture_webp and EXT_texture_avif sources win when decoded; otherwise the fallback source.
       const source = def
-          ? ((['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'] as const)
+          ? ((['KHR_texture_basisu', 'MSFT_texture_dds', 'EXT_texture_webp', 'EXT_texture_avif'] as const)
               .map((k) => def.extensions?.[k]?.source)
               .find((s) => s !== undefined && this.images[s]) ?? integer(def.source, 'image'))
           : -1,
@@ -2821,7 +2822,8 @@ export class PBRModel implements EnginePlugin {
       if (streamed) (r.streamed ??= []).push(streamed);
       const compressed = image && 'ktx2' in image ? image.ktx2 : image && 'mipmaps' in image ? image : undefined,
         format = compressed
-          ? ((compressed.format.replace(/-srgb$/, '') + (srgbMaps.includes(i) ? '-srgb' : '')) as GPUTextureFormat)
+          ? ('gpuFormat' in compressed && compressed.gpuFormat?.(device, srgbMaps.includes(i))) ||
+            ((compressed.format.replace(/-srgb$/, '') + (srgbMaps.includes(i) ? '-srgb' : '')) as GPUTextureFormat)
           : !image && normalMaps.includes(i)
             ? 'rgba16float'
             : srgbMaps.includes(i)

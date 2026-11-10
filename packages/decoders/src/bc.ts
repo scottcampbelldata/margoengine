@@ -13,7 +13,7 @@ export interface BCImage {
   data: Uint8Array;
 }
 
-type Block = (src: Uint8Array, at: number, out: Uint8Array) => void;
+type Block = (src: Uint8Array, at: number, out: Uint8Array | Float32Array) => void;
 
 /** A signed value of -127..127 as an unsigned byte, -1 at 0 and 1 at 255. */
 export const signedByte = (v: number): number => Math.round(((Math.max(v, -127) + 127) / 254) * 255);
@@ -22,7 +22,7 @@ const r5 = (v: number): number => (v << 3) | (v >> 2);
 const r6 = (v: number): number => (v << 2) | (v >> 4);
 
 /** The colour half of BC1, BC2 and BC3: two 565 endpoints and 2-bit indices. */
-function colorBlock(src: Uint8Array, at: number, out: Uint8Array, punchThrough: boolean): void {
+function colorBlock(src: Uint8Array, at: number, out: Uint8Array | Float32Array, punchThrough: boolean): void {
   const c0 = src[at] | (src[at + 1] << 8),
     c1 = src[at + 2] | (src[at + 3] << 8),
     p = [r5(c0 >> 11), r6((c0 >> 5) & 63), r5(c0 & 31), 255, r5(c1 >> 11), r6((c1 >> 5) & 63), r5(c1 & 31), 255];
@@ -50,7 +50,13 @@ function colorBlock(src: Uint8Array, at: number, out: Uint8Array, punchThrough: 
 }
 
 /** The 8-value ramp of a BC3 alpha, BC4 or BC5 half block, into `channel` of `out`. */
-function rampBlock(src: Uint8Array, at: number, out: Uint8Array, channel: number, signed: boolean): void {
+function rampBlock(
+  src: Uint8Array,
+  at: number,
+  out: Uint8Array | Float32Array,
+  channel: number,
+  signed: boolean,
+): void {
   const low = (v: number): number => (signed ? Math.max((v << 24) >> 24, -127) : v),
     a = low(src[at]),
     b = low(src[at + 1]),
@@ -68,7 +74,7 @@ function rampBlock(src: Uint8Array, at: number, out: Uint8Array, channel: number
       byte = at + 2 + (bit >> 3),
       index = ((src[byte] | (src[byte + 1] << 8)) >> (bit & 7)) & 7,
       v = ramp[index];
-    out[i * 4 + channel] = signed ? signedByte(v) : Math.round(v);
+    out[i * 4 + channel] = out instanceof Float32Array ? v / max : signed ? signedByte(v) : Math.round(v);
   }
 }
 
@@ -89,8 +95,8 @@ const single =
   (src, at, out) => {
     rampBlock(src, at, out, 0, signed);
     for (let i = 0; i < 16; i++) {
-      out[i * 4 + 1] = out[i * 4 + 2] = signed ? 128 : 0;
-      out[i * 4 + 3] = 255;
+      out[i * 4 + 1] = out[i * 4 + 2] = out instanceof Float32Array ? 0 : signed ? 128 : 0;
+      out[i * 4 + 3] = out instanceof Float32Array ? 1 : 255;
     }
   };
 
@@ -100,8 +106,8 @@ const double =
     rampBlock(src, at, out, 0, signed);
     rampBlock(src, at + 8, out, 1, signed);
     for (let i = 0; i < 16; i++) {
-      out[i * 4 + 2] = signed ? 128 : 0;
-      out[i * 4 + 3] = 255;
+      out[i * 4 + 2] = out instanceof Float32Array ? 0 : signed ? 128 : 0;
+      out[i * 4 + 3] = out instanceof Float32Array ? 1 : 255;
     }
   };
 
@@ -144,8 +150,18 @@ const bc7: Block = (src, at, out) => {
     out.fill(0);
     return;
   }
-  const [subsets, partitionBits, rotationBits, selectBits, colorBits, alphaBits, endpointP, sharedP, indexBits, index2Bits] =
-    BC7_MODES[mode];
+  const [
+    subsets,
+    partitionBits,
+    rotationBits,
+    selectBits,
+    colorBits,
+    alphaBits,
+    endpointP,
+    sharedP,
+    indexBits,
+    index2Bits,
+  ] = BC7_MODES[mode];
   let position = mode + 1;
   const take = (n: number): number => {
     const v = bits(src, at, position, n);
@@ -176,9 +192,7 @@ const bc7: Block = (src, at, out) => {
       raw[e * 4 + c] = widen(hasP ? (raw[e * 4 + c] << 1) | pBits[e] : raw[e * 4 + c], n);
     }
   const subsetOf = (i: number): number =>
-      subsets === 1
-        ? 0
-        : (subsets === 2 ? PARTITIONS_2 : PARTITIONS_3).charCodeAt(partition * 16 + i) - 48,
+      subsets === 1 ? 0 : (subsets === 2 ? PARTITIONS_2 : PARTITIONS_3).charCodeAt(partition * 16 + i) - 48,
     anchor = (i: number): boolean =>
       i === 0 ||
       (subsets === 2 && i === ANCHOR_2[partition]) ||
@@ -307,7 +321,7 @@ const bc6h =
       mode = low < 2 ? low : bits(src, at, 0, 5),
       info = BC6H_MODES[mode];
     if (!info) {
-      for (let i = 0; i < 16; i++) out.set([0, 0, 0, 255], i * 4);
+      for (let i = 0; i < 16; i++) out.set([0, 0, 0, out instanceof Float32Array ? 1 : 255], i * 4);
       return;
     }
     const [deltas, width, ...deltaBits] = info,
@@ -346,9 +360,9 @@ const bc6h =
           b = e[subset * 6 + 3 + c],
           v = ((64 - w) * a + w * b + 32) >> 6,
           h = signed ? (v < 0 ? ((-v * 31) >> 5) | 0x8000 : (v * 31) >> 5) : (v * 31) >> 6;
-        out[i * 4 + c] = linearToByte(halfToFloat(h));
+        out[i * 4 + c] = out instanceof Float32Array ? halfToFloat(h) : linearToByte(halfToFloat(h));
       }
-      out[i * 4 + 3] = 255;
+      out[i * 4 + 3] = out instanceof Float32Array ? 1 : 255;
     }
   };
 
@@ -385,9 +399,46 @@ export function decodeBC(format: string, blocks: Uint8Array, width: number, heig
     across = (width + 3) >> 2,
     down = (height + 3) >> 2;
   if (blocks.length < across * down * size)
-    throw decodeFailed(`${format}: ${blocks.length} bytes hold too few blocks for ${width}x${height}; pass the whole level`);
+    throw decodeFailed(
+      `${format}: ${blocks.length} bytes hold too few blocks for ${width}x${height}; pass the whole level`,
+    );
   const data = new Uint8Array(width * height * 4),
     texels = new Uint8Array(64);
+  for (let by = 0; by < down; by++)
+    for (let bx = 0; bx < across; bx++) {
+      decode(blocks, (by * across + bx) * size, texels);
+      for (let y = 0; y < 4 && by * 4 + y < height; y++) {
+        const columns = Math.min(4, width - bx * 4);
+        data.set(texels.subarray(y * 16, y * 16 + columns * 4), ((by * 4 + y) * width + bx * 4) * 4);
+      }
+    }
+  return { width, height, data };
+}
+
+/** Decode BC4/BC5/BC6H to floating-point RGBA, preserving signed channels and HDR radiance. Other BC formats return normalized RGBA. */
+export function decodeBCFloat(
+  format: string,
+  blocks: Uint8Array,
+  width: number,
+  height: number,
+): {
+  width: number;
+  height: number;
+  data: Float32Array;
+} {
+  if (!/^bc[456]/.test(format)) {
+    const image = decodeBC(format, blocks, width, height);
+    return { width, height, data: Float32Array.from(image.data, (v) => v / 255) };
+  }
+  const entry = BLOCKS[format];
+  if (!entry) throw new TypeError('Unknown BC float format ' + format + '; pass a BC4, BC5 or BC6H WebGPU format');
+  const [decode, size] = entry,
+    across = Math.ceil(width / 4),
+    down = Math.ceil(height / 4);
+  if (blocks.length < across * down * size)
+    throw decodeFailed('BC float image has too few blocks; pass the complete mip level');
+  const data = new Float32Array(width * height * 4),
+    texels = new Float32Array(64);
   for (let by = 0; by < down; by++)
     for (let bx = 0; bx < across; bx++) {
       decode(blocks, (by * across + bx) * size, texels);

@@ -239,6 +239,7 @@ interface GLTFExtensions {
   EXT_meshopt_compression?: GLTFMeshopt;
   KHR_meshopt_compression?: GLTFMeshopt;
   KHR_texture_basisu?: { source: number };
+  MSFT_texture_dds?: { source: number };
   EXT_texture_webp?: { source: number };
   EXT_texture_avif?: { source: number };
   KHR_texture_transform?: GLTFTextureTransform;
