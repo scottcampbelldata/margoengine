@@ -661,7 +661,8 @@ export class OctreeCloud implements EnginePlugin {
     this.loaded.clear();
     const engine = this.engine;
     this.engine = undefined;
-    if (engine?.hasPlugin(this.name)) engine.removePlugin(this.name);
+    // The scene this cloud was attached to, not whichever scene is active now.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();
