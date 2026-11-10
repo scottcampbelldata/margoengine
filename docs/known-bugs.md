@@ -64,6 +64,23 @@ Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
 1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
 WebCodecs section 9.4 (2026); sources in clean-room.md.
 
+### Fixed 2026-11-10: a shadowed frame allocated 1,688 B against its 512 B budget
+
+- **What:** `tests/frame-alloc.test.js` failed on main from local CI run 2026-11-10 13:00 on (bd92fa67b): eight
+  moving casters with four cascades added 1,688 B per frame on the CPU (budget 512 B) and 1,680 B at Maglev (budget
+  620 B), Node 26.12.0, V8 14.6.
+- **Cause:** 3d7dd74c9 (`feat(stage): load full glTF through optional PBR path`) let static PBR meshes tighten the
+  cascades, and for that called `meshTriangles` in `Shadows.range()` once per caster and in `worldSphere()` twice per
+  caster each frame. For a core mesh `meshTriangles` builds a new `{ kind: 'core', geometry }` object on every call:
+  33 objects a frame in the probe scene. Building shadows at 3d7dd74c9 and its parent alone gives 1,840 B against
+  520 B per frame (Maglev 1,976 B against 656 B).
+- **Fix:** `range()`, `worldSphere()` and the coloured-shadow pass read a core mesh directly (`mesh.geometry` set
+  means `meshTriangles` would answer `core`) and call `meshTriangles` only for a mesh without core geometry, as
+  `casters()` already did. The static-primitive test that `range()` runs for PBR casters is one function made once
+  instead of a closure per caster per frame. Same decisions, same cascades: the frame is back to 520 B (shadows add
+  368 B) and 656 B at Maglev (shadows add 360 B), the parent's numbers.
+- **Regression:** `tests/frame-alloc.test.js` (failed before, passes after).
+
 ### Fixed 2026-11-10: terrain overlays check read its canvas after the browser presented it
 
 - **What:** `packages/terrain/test/overlays.browser.mjs` (native WebGPU, "overlays visible on the actual terrain")

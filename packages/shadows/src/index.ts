@@ -16,7 +16,7 @@ import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
-import { geometrySurface, meshTriangles } from '../../shared/mesh-source.js';
+import { geometrySurface, meshTriangles, type MeshSource } from '../../shared/mesh-source.js';
 import { sectionState } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
@@ -293,6 +293,9 @@ const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
 @vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
+/** A primitive whose bounds hold still: range() made once, not a closure per caster per frame. */
+const staticPrimitive = (p: MeshSource['primitives'][number]): boolean =>
+  !p.deformed && !('instances' in p && p.instances) && !p.material.displacement && !p.material.shading;
 const validTint = (tint: unknown): tint is readonly number[] =>
   Array.isArray(tint) && tint.length === 3 && tint.every((v) => v >= 0 && v <= 1);
 /** A shader cache key: filter, bind group and anisotropy as one number (bit 1 is left for the receive patch). */
@@ -905,17 +908,15 @@ export class Shadows implements EnginePlugin {
       const source = this.sources[i].source;
       // A node with no geometry and no model behind it (a glTF group) draws nothing, so it changes no bounds.
       if (!('id' in source)) core = false;
-      else {
+      else if (!source.geometry) {
+        // A core mesh is read directly: meshTriangles builds an object on every call, and this runs every frame.
         const triangles = meshTriangles(source);
         core =
           !triangles ||
-          triangles.kind === 'core' ||
-          (!triangles.source.skinned &&
+          (triangles.kind === 'pbr' &&
+            !triangles.source.skinned &&
             !triangles.source.morphed &&
-            triangles.source.primitives.every(
-              (p) =>
-                !p.deformed && !('instances' in p && p.instances) && !p.material.displacement && !p.material.shading,
-            ));
+            triangles.source.primitives.every(staticPrimitive));
       }
     }
     if (!core) return fit;
@@ -951,7 +952,9 @@ export class Shadows implements EnginePlugin {
       w = this.sphere,
       o = id * 16,
       b = id * 4,
-      triangles = meshTriangles(this.engine!.meshes.get(id)),
+      mesh = this.engine!.meshes.get(id),
+      // A core mesh reads core's bounds directly: meshTriangles builds an object on every call (twice a caster a frame).
+      triangles = mesh?.geometry ? undefined : meshTriangles(mesh),
       bounds = triangles?.kind === 'pbr' ? triangles.source.bounds : undefined;
     const x = bounds ? (bounds[0] + bounds[3]) / 2 : s[b],
       y = bounds ? (bounds[1] + bounds[4]) / 2 : s[b + 1],
@@ -1152,7 +1155,8 @@ export class Shadows implements EnginePlugin {
           }
       } else if (r.cast) {
         const source = r.source,
-          triangles = 'id' in source ? meshTriangles(source) : undefined,
+          // A core mesh owns its tints: meshTriangles builds an object on every call, and this runs every frame.
+          triangles = 'id' in source && !source.geometry ? meshTriangles(source) : undefined,
           owner = (triangles?.kind === 'pbr' ? triangles.source : source) as ShadowSource,
           tinted = owner.tintPrimitives;
         if (tinted)
