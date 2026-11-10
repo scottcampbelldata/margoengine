@@ -49,6 +49,10 @@
     "./kinds": {
       "types": "./dist/kinds.d.ts",
       "import": "./dist/kinds.js"
+    },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "import": "./dist/query.js"
     }
   },
   "files": [

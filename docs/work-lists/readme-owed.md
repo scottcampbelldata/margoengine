@@ -244,3 +244,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/webgl2-compat | Native signed-byte SNORM compute storage, exact conversion, masked mip/layer uploads and regression command. | snorm-storage |
 | margoengine | Generated xr/performance alias for the existing XR performance API. | snorm-storage landing repair |
+
+- @margoengine/splines (batch 225 query): analytic bounds/extrema, plane equation and ray units, isolated/overlap results, precision, maxWork and all cubic kinds; margoengine/splines/query mirrors the entry.

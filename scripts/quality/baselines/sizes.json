@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12481046,
+  "total": 12485444,
   "history": [
     {
       "date": "2026-10-24",
@@ -6031,6 +6031,18 @@
       "commit": "snorm-storage",
       "reason": "Native signed-byte SNORM compute publication: lazy compute/readback 31547 to 31756 B gzip (+209 B); ceiling 31741 to 31756 B (+15 B). Shared base 74710 to 74711 B. The existing lazy runtime owns masked upload and texture-view synchronization; splitting a 36-line repair adds an async fetch and exposes internal ownership. Core/stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-225",
+      "reason": "New optional splines/query: absent -> 3614 B gzip; exact cubic geometry and tested public operations justify the optional bytes. Root, core and stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-225",
+      "reason": "Water root ceiling 20185 -> 20817 B for measured 20210 B gzip after the already-landed core version guard. Keeping version-skew prevention is worth the optional bytes; splitting cannot avoid the required engine identity check. No water or core source changes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6988,7 +7000,7 @@
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,
-    "@margoengine/water": 20289,
+    "@margoengine/water": 20817,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/query": 4719,
     "@margoengine/weather": 5230,
@@ -7132,6 +7144,7 @@
     "@margoengine/sprites/blend": 8464,
     "@margoengine/inspector/animation": 3147,
     "leak @margoengine/inspector/animation -> @margoengine/lines": 1,
-    "@margoengine/wfc/tileset": 2142
+    "@margoengine/wfc/tileset": 2142,
+    "@margoengine/splines/query": 3870
   }
 }

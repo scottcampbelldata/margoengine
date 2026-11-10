@@ -3042,6 +3042,10 @@
       "types": "./dist/splines/kinds.d.ts",
       "import": "./dist/splines/kinds.js"
     },
+    "./splines/query": {
+      "types": "./dist/splines/query.d.ts",
+      "import": "./dist/splines/query.js"
+    },
     "./sprites": {
       "types": "./dist/sprites.d.ts",
       "import": "./dist/sprites.js"
