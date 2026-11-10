@@ -233,3 +233,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/worker (batch 257 job 4): document Firefox WebGL2 worker evidence, browser-matrix and strict browser selection, default-profile WebGPU gaps and the distinction between Windows WebKit fallback and unproved native Safari.
 | @margoengine/inspector | animation: AnimationPanel.attach, per-clip set/state, play/pause/scrub/weights, skeleton, ownership and disposal | batch-263 job 1 |
 | margoengine | Generated inspector/animation alias | batch-263 job 1 |
+
+- @margoengine/wfc: document /tileset buildTileset/parseTilesetXML, six symmetry classes, orientation actions, subset selection, frequency weights, XML vocabulary and source-index assembly integration (batch 237 job 2).
+- margoengine: document generated wfc/tileset alias (batch 237 job 2).
+>>>>>>> aed1728ea (feat(wfc): expand symmetry classes and parse tileset XML)

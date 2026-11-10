@@ -2810,3 +2810,7 @@ See results/batch234-caustics-landing.json for all outcomes and runner correctio
 
 Batch 257 job 4 branch-only reproduction: install browsers with node node_modules/playwright/cli.js install firefox webkit (optionally set PLAYWRIGHT_BROWSERS_PATH to a folder inside this worktree). Run node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-matrix.mjs --browser=firefox, then the same with --browser=webkit. Run the original strict suite with browser-check.mjs --browser=<name> to expose missing WebGPU/worker capabilities without weakening assertions. Windows WebKit receipts are supplementary; a native Safari run on Apple hardware remains owed.
 - Batch 263 animation: build packages, run `node --test --test-timeout=30000 packages/inspector/test/animation.test.js`, then run `node packages/inspector/test/animation-browser.mjs` and the same command with `--compat` under a shared GPU lock. The real CC0 Fox test checks clip changes, weighted transforms, a populated skeleton path and disposed-model cleanup.
+
+## Batch 237 tilesets
+Run node --test --test-timeout=60000 packages/wfc/test/tileset.test.js after building packages. The wfc test:gpu script runs the existing solver browser suite and assemble-browser.mjs, which also parses XML, expands F symmetry and solves on both native WebGPU and WebGL2 compatibility routes. Use the shared GPU lock as for batch 237 assembly.
+>>>>>>> aed1728ea (feat(wfc): expand symmetry classes and parse tileset XML)

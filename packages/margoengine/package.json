@@ -3922,6 +3922,10 @@
       "types": "./dist/wfc/assemble.d.ts",
       "import": "./dist/wfc/assemble.js"
     },
+    "./wfc/tileset": {
+      "types": "./dist/wfc/tileset.d.ts",
+      "import": "./dist/wfc/tileset.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"

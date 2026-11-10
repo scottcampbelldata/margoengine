@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12463577,
+  "total": 12465719,
   "history": [
     {
       "date": "2026-10-24",
@@ -6007,6 +6007,12 @@
       "commit": "batch-263",
       "reason": "New optional inspector/animation: absent to 2891 B gzip; playback and shared Lines skeleton helpers stay together. Core plus stage 23950 B unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-237",
+      "reason": "New optional wfc/tileset 0 -> 1886 B min+gzip, plus 256 B headroom; D4 expansion and DOM-free XML stay together as a small configuration entry.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7105,6 +7111,7 @@
     "@margoengine/xr/performance": 1582,
     "@margoengine/stats/panels": 10192,
     "@margoengine/inspector/animation": 3147,
-    "leak @margoengine/inspector/animation -> @margoengine/lines": 1
+    "leak @margoengine/inspector/animation -> @margoengine/lines": 1,
+    "@margoengine/wfc/tileset": 2142
   }
 }

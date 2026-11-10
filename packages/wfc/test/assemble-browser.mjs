@@ -31,10 +31,22 @@ try {
     const { Engine, box } = await import('/packages/core/dist/index.js');
     const { assembleWFC } = await import('/packages/wfc/dist/assemble.js');
     const { buildSocketTiles } = await import('/packages/wfc/dist/sockets.js');
+    const { buildTileset, parseTilesetXML } = await import('/packages/wfc/dist/tileset.js');
+    const { ConstrainedWFC } = await import('/packages/wfc/dist/constraints.js');
     const { install, uninstall } = await import('/packages/webgl2-compat/dist/index.js');
     const out = [];
     for (const route of ['webgpu', 'webgl2-compat']) {
       if (route === 'webgl2-compat') await install({ force: true });
+      const definitions = parseTilesetXML(
+        '<set><tiles><tile name="tile" symmetry="F"/></tiles><neighbors>' +
+          Array.from({ length: 8 }, (_, a) =>
+            Array.from({ length: 8 }, (_, b) => `<neighbor left="tile ${a}" right="tile ${b}"/>`).join(''),
+          ).join('') +
+          '</neighbors></set>',
+      );
+      const expanded = buildTileset(definitions);
+      const solved = new ConstrainedWFC([2, 1, 2], expanded).solve({ seed: 1 });
+      if (expanded.length !== 8 || solved.length !== 4) throw new Error('XML symmetry solve failed');
       const canvas = document.createElement('canvas');
       canvas.width = 128;
       canvas.height = 128;

@@ -49,6 +49,10 @@
     "./assemble": {
       "types": "./dist/assemble.d.ts",
       "import": "./dist/assemble.js"
+    },
+    "./tileset": {
+      "types": "./dist/tileset.d.ts",
+      "import": "./dist/tileset.js"
     }
   },
   "files": [

@@ -3308,3 +3308,7 @@ The packed and single-output bundled cases distinguish runtime identities even a
 
 Batch 257 job 4 is DONE under Scott's 95% rule, with native Safari proof owed in private/handoffs/finish-later.md. Local Firefox 157.0 WebGL2 worker rendering and Windows Playwright WebKit 27.2 page fallback are proved by browser-matrix.mjs, with identical centre RGBA [213,26,1,255]. This does not claim Firefox WebGPU or native Safari support. Test receipts: test-results/worker-matrix-firefox.json and worker-matrix-webkit.json.
 - Inspector animation panel, batch 263: optional per-model and per-clip playback, scrub, loop, speed, normalized pose weights and a skeleton for every skin. Evidence: packages/inspector/test/animation.test.js and animation-browser.mjs (real CC0 Fox), on native WebGPU and the WebGL2 compatibility device. These are correctness claims, with no speed claim. Primary-view SVG helpers also work with the preview backend.
+
+## Batch 237: tileset classes
+All six Gumin symmetry classes, oriented neighbor references and tileset XML are implemented in wfc/tileset. Tests assert cardinalities, exact oriented adjacency, reciprocal closure, reflection transforms, subsets, encoded names, invalid XML and a real ConstrainedWFC solve. Browser checks solve XML-derived variants beside WebGPU and WebGL2 compatibility rendering. No rival source was used and no timing result is claimed.
+>>>>>>> aed1728ea (feat(wfc): expand symmetry classes and parse tileset XML)
