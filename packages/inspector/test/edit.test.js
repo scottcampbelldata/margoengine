@@ -199,3 +199,31 @@ test('invalid history finalizers reject before abandoning redo or releasing reso
   history.clear();
   assert.deepEqual(released, ['existing']);
 });
+
+test('an editor attached while the inspector parent is detached survives until the inspector is removed', async (t) => {
+  const dom = new JSDOM('<body><canvas width="800" height="600"></canvas></body>'),
+    doc = dom.window.document;
+  const engine = new Engine(
+    doc.querySelector('canvas'),
+    await TransformStore.create(64),
+    { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
+    { position: [0, 5, 10], target: [0, 0, 0] },
+    null,
+  );
+  t.after(() => {
+    engine.dispose();
+    dom.window.close();
+  });
+  const panel = doc.createElement('div');
+  const inspector = Inspector.attach(engine, { parent: panel, pick: false });
+  const editor = SceneEditor.attach(engine, inspector);
+  const mesh = editor.createPrimitive();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  doc.body.append(panel);
+  editor.refresh();
+  assert.ok(editor.createPrimitive('sphere', mesh));
+  assert.equal(editor.element.isConnected, true);
+  inspector.element.remove();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.throws(() => editor.createPrimitive(), /disposed/);
+});

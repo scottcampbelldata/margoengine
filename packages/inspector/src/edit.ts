@@ -87,6 +87,9 @@ export class SceneEditor {
   private ambientActive = false;
   private dragging?: Mesh;
   private disposed = false;
+  private wasConnected = false;
+  /** The inspector's parent at attach time; leaving it is a removal even while that parent is detached. */
+  private readonly host: ParentNode | null;
   private readonly stopHistory: () => void;
   private readonly abort = () => this.dispose();
 
@@ -167,6 +170,7 @@ export class SceneEditor {
     this.tree.addEventListener('dragend', this.dragEnd);
     if (options.keyboard !== false) this.tree.addEventListener('keydown', this.keyDown);
     this.stopHistory = inspector.history.onChange(() => this.refresh());
+    this.host = inspector.element.parentNode;
     const Observer = doc.defaultView?.MutationObserver;
     if (Observer) {
       this.observer = new Observer(() => this.refresh());
@@ -542,10 +546,13 @@ export class SceneEditor {
   /** Marks regenerated tree rows draggable. Called automatically on tree changes. */
   refresh(): void {
     if (this.disposed) return;
-    if (!this.inspector.element.isConnected) {
+    // Only a removal tears the editor down: an inspector built in a detached parent may be attached later.
+    const element = this.inspector.element;
+    if (element.parentNode !== this.host || (this.wasConnected && !element.isConnected)) {
       this.dispose();
       return;
     }
+    this.wasConnected ||= element.isConnected;
     for (const row of this.tree.querySelectorAll<HTMLElement>('[data-entity]')) row.draggable = true;
   }
   /** Removes editor UI/input and its owned lights. Scene meshes and shared undo history remain usable. */
