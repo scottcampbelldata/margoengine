@@ -312,3 +312,11 @@ Method and rival harness: [batch-170-cache.md](batch-170-cache.md). No rival tim
 | blender | Like for like: vertex bytes at 80 B per vertex, 130,560 vertices | 10,444,800 B | 10,444,800 B if glTF stored the same six attributes (4,177,920 B as written, 32 B) | same size for the same layout |
 
 Method and harness: [batch-170-blender.md](batch-170-blender.md). No rival timing was run.
+
+## Batch 170 vfx: work counts, 2026-11-10
+
+| Package | Work | Margo | Rival | Status |
+| --- | --- | --- | --- | --- |
+| vfx | Steady frame, 100,000 live particles: bytes sent to the GPU | 224 B in 1 write | three.quarks 0.17.1: 4,800,000 B of instance attributes | no loss; timing pending the quiet rerun |
+
+Method and rival harness: [batch-170-vfx.md](batch-170-vfx.md). No rival timing was run.

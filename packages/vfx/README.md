@@ -23,7 +23,7 @@ engine.start();
 around `position` (default zero). `intensity` multiplies RGB for HDR emission,
 0..16 (default 1). Billboards draw at frame-graph order 6, after water and scatter.
 
-One million particles use 64 MB for state plus 4 MB for the draw list, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware.
+One million particles use 64 MB for state plus 4 MB for the draw list, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. A steady frame of 100,000 particles sends the GPU 224 bytes in one write ([counted](../../docs/whitepaper/batch-170-vfx.md)). GPU performance still depends on capacity, fill rate and hardware.
 
 This is Margo's one particle system; `GPUParticles` in `@margoengine/creative/particles` is a leaf-field preset
 over it. Six optional features patch the shaders only when set, so effects without them compile the same WGSL

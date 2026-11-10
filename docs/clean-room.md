@@ -1,5 +1,10 @@
 # Clean room
 
+### Batch 170 vfx work counts (2026-11-10)
+
+Read the W3C *WebGPU* `writeBuffer` and compute pass sections. [Title, link and counts](whitepaper/batch-170-vfx.md).
+three.quarks ran only as a black box outside this repository. No external implementation was read.
+
 ### Batch 170 Blender export size (2026-11-10)
 
 Read the Khronos *glTF 2.0 Specification* buffer, buffer view and accessor sections. [Title, link and sizes](whitepaper/batch-170-blender.md).

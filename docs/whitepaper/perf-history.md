@@ -1,5 +1,11 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 vfx: no loss on per-frame uploads (2026-11-10)
+
+100,000 live particles: Margo sends one 224-byte uniform block per steady frame (24 GPU commands), three.quarks 0.17.1
+marks 4,800,000 bytes of instance attributes for upload. Nothing to fix; a guard test now holds the count. Frame time
+pending the quiet rerun. [Counts and method](batch-170-vfx.md).
+
 ## Batch 170 blender: `.margo` is larger than Blender's glTF (2026-11-10, accepted difference)
 
 A 256 by 128 UV sphere shared by 10 objects exports to 11,227,568 B as `.margo` (2,910,714 B gzipped) and 4,959,600 B

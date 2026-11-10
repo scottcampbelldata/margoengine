@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 vfx: a steady frame of 100,000 live particles sends 224 bytes to the GPU in one write; three.quarks 0.17.1
+  marks 4,800,000 bytes of instance attributes for upload. Work evidence only, no speed claim.
+  [Scope, rival count and reproduction](batch-170-vfx.md).
+
 - Batch 170 blender: one test scene exports to an 11,227,568 B `.margo` (2,910,714 B gzipped) against Blender's glTF
   at 4,959,600 B (1,160,872 B). Accepted difference: 80-byte GPU-ready vertices against 32 bytes, so loading copies no
   vertex data. Size evidence only, no speed claim. [Scene, cause and reproduction](batch-170-blender.md).
