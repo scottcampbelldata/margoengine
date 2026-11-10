@@ -4,9 +4,10 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
+import { Line, LineOptions } from "@margoengine/lines";
 import { ColorInput } from "@margoengine/math";
 
-export function Grid({ size, divisions, centerColor, color, position, onError }: GridProps): null;
+export function Grid(_arg0: GridProps): null;
 
 export interface GridProps {
     size?: number;
@@ -14,6 +15,15 @@ export interface GridProps {
     centerColor?: ColorInput;
     color?: ColorInput;
     position?: Vec3;
+    onError?: (error: unknown) => void;
+}
+
+export const Line: import("react").ForwardRefExoticComponent<LineProps & import("react").RefAttributes<NativeLine>>;
+
+export interface LineProps extends Omit<LineOptions, 'positions'> {
+    points: ArrayLike<number> | readonly Vec3[];
+    lineWidth?: number;
+    segments?: boolean;
     onError?: (error: unknown) => void;
 }
 ```

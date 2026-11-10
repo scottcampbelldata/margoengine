@@ -2382,3 +2382,12 @@ preparation holds the GPU. The native feature-level fixture is deliberately
 not the WebGL2 layer. No test assertion or image bound changes.
 Do not invoke the unrelated tracer compilation or teardown investigations.
 [Receipt](results/batch-273-native-baselines.json).
+
+## Batch 265 native React binding proof
+
+After building packages, run node --experimental-test-module-mocks --test packages/react/tests/package-bindings.test.js
+and npm run modern:test:react. For actual rendering, run node scripts/gpu-lock.mjs run --owner=codex-batch265 --max=4
+--wait-max=60 -- node packages/react/scripts/test-bindings-browser.mjs, then the same command with --compat appended.
+Reports and paired PNGs are written to test-results/react-bindings*.json and test-results/react-binding-*.png.
+The source page is packages/react/tests/bindings-browser.html. Real-capture licence/source is in
+packages/splats/test/fixtures/NOTICE.md. Run npm run check:readme-run -- --packages=react for all copy-paste examples.

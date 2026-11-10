@@ -2338,6 +2338,30 @@
       "types": "./dist/react/jsx-dev-runtime.d.ts",
       "import": "./dist/react/jsx-dev-runtime.js"
     },
+    "./react/points": {
+      "types": "./dist/react/points.d.ts",
+      "import": "./dist/react/points.js"
+    },
+    "./react/lod": {
+      "types": "./dist/react/lod.d.ts",
+      "import": "./dist/react/lod.js"
+    },
+    "./react/selection": {
+      "types": "./dist/react/selection.d.ts",
+      "import": "./dist/react/selection.js"
+    },
+    "./react/splats": {
+      "types": "./dist/react/splats.d.ts",
+      "import": "./dist/react/splats.js"
+    },
+    "./react/viewcube": {
+      "types": "./dist/react/viewcube.d.ts",
+      "import": "./dist/react/viewcube.js"
+    },
+    "./react/cameras": {
+      "types": "./dist/react/cameras.d.ts",
+      "import": "./dist/react/cameras.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

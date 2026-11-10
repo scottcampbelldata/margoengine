@@ -30,7 +30,8 @@
     "test:after-scene:browser": "node scripts/test-after-scene-browser.js",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:browser:extras": "node scripts/test-extras-browser.js",
-    "test:browser:tags": "node scripts/test-tags-browser.js"
+    "test:browser:tags": "node scripts/test-tags-browser.js",
+    "test:browser:bindings": "node scripts/test-bindings-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -158,6 +159,36 @@
       "types": "./dist/jsx-dev-runtime.d.ts",
       "react-server": "./dist/rsc/jsx-dev-runtime.js",
       "import": "./dist/jsx-dev-runtime.js"
+    },
+    "./points": {
+      "types": "./dist/points.d.ts",
+      "react-server": "./dist/rsc/points.js",
+      "import": "./dist/points.js"
+    },
+    "./lod": {
+      "types": "./dist/lod.d.ts",
+      "react-server": "./dist/rsc/lod.js",
+      "import": "./dist/lod.js"
+    },
+    "./selection": {
+      "types": "./dist/selection.d.ts",
+      "react-server": "./dist/rsc/selection.js",
+      "import": "./dist/selection.js"
+    },
+    "./splats": {
+      "types": "./dist/splats.d.ts",
+      "react-server": "./dist/rsc/splats.js",
+      "import": "./dist/splats.js"
+    },
+    "./viewcube": {
+      "types": "./dist/viewcube.d.ts",
+      "react-server": "./dist/rsc/viewcube.js",
+      "import": "./dist/viewcube.js"
+    },
+    "./cameras": {
+      "types": "./dist/cameras.d.ts",
+      "react-server": "./dist/rsc/cameras.js",
+      "import": "./dist/cameras.js"
     }
   },
   "files": [
@@ -201,7 +232,11 @@
     "@margoengine/ui": "^1.0.0",
     "@margoengine/audio": "^1.0.0",
     "@margoengine/sprites": "^1.0.0",
-    "@margoengine/sciviz": "^1.0.0"
+    "@margoengine/sciviz": "^1.0.0",
+    "@margoengine/points": "^1.0.0",
+    "@margoengine/lod": "^1.0.0",
+    "@margoengine/splats": "^1.0.0",
+    "@margoengine/viewcube": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -292,6 +327,18 @@
       "optional": true
     },
     "@margoengine/sciviz": {
+      "optional": true
+    },
+    "@margoengine/points": {
+      "optional": true
+    },
+    "@margoengine/lod": {
+      "optional": true
+    },
+    "@margoengine/splats": {
+      "optional": true
+    },
+    "@margoengine/viewcube": {
       "optional": true
     }
   }

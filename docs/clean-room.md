@@ -4821,3 +4821,34 @@ No foreign implementation or companion source was opened or copied.
 
 Only diagnostic observation is added. Passing controls do not prove that any
 historical shutdown hang has been repaired; the known-bug entry remains open.
+
+## Batch 265: React native package bindings
+
+Research first, 2026-11-09. No rival implementation or paper companion code was read. The wrappers combine React's
+commit/cleanup ownership with the existing native package renderers, rather than recreating rendering algorithms.
+
+- React team, *useEffect* and *forwardRef* (React 19 reference, 2026), https://react.dev/reference/react/useEffect and
+  https://react.dev/reference/react/forwardRef: stable dependency arity, cleanup symmetry and committed imperative refs.
+- Nicolas P. Rougier, *Shader-Based Antialiased, Dashed, Stroked Polylines* (2013),
+  https://jcgt.org/published/0002/02/08/paper.pdf: native line coverage, width, cap and dash options must survive the binding.
+- David Luebke and Carl Erikson, *View-Dependent Simplification of Arbitrary Polygonal Environments* (1997),
+  https://luebke.us/ (author publications): view-dependent selection and hysteresis motivate delegating distance
+  selection to LODSystem instead of approximating it in React state.
+- Guodong Rong and Tiow-Seng Tan, *Jump Flooding in GPU with Applications to Voronoi Diagram and Distance Transform*
+  (2006), https://www.comp.nus.edu.sg/~tants/jfa.html: preserve the native outline's distance field and width.
+- Bernhard Kerbl, Georgios Kopanas, Thomas Leimkuehler and George Drettakis, *3D Gaussian Splatting for Real-Time Radiance
+  Field Rendering* (2023), https://arxiv.org/abs/2308.04079: preserve anisotropic covariance, opacity and GPU depth sorting.
+- Azam Khan, Igor Mordatch, George Fitzmaurice, Justin Matejka and Gordon Kurtenbach, *ViewCube: a 3D orientation indicator
+  and controller* (2008), https://doi.org/10.1145/1342250.1342253: preserve face/corner navigation, home and smooth transitions.
+
+Public API comparison only: https://drei.docs.pmnd.rs/shapes/line,
+https://drei.docs.pmnd.rs/performances/detailed, https://drei.docs.pmnd.rs/performances/points,
+https://drei.docs.pmnd.rs/abstractions/splat, https://drei.docs.pmnd.rs/gizmos/gizmo-helper and
+https://drei.docs.pmnd.rs/cameras/perspective-camera. Requested rows map to native Margo functionality. Camera defaults
+configure the stable engine camera, unlike Fiber's identity replacement. No claim of Fiber API identity is made.
+Native-versus-wrapper pixel comparisons exercise real Niantic sample positions/covariances, source/licence in
+packages/splats/test/fixtures/NOTICE.md. This is binding fidelity evidence, not an independent rival-renderer pixel match.
+
+Camera ownership also follows the documented native attach/dispose contract in packages/cameras/README.md: the
+orthographic projection is attached to the actual default camera, preserving its dynamic up and fixedOrthographic
+getters and same-frame projection reads. A copied callback or a frame-lagged proxy does not preserve that contract.

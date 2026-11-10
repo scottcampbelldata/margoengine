@@ -911,3 +911,110 @@ normal props, refs and event behavior.
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+## Native package bindings
+
+Import each binding from its own optional subpath. Install the native peer named in the table. These wrappers use
+native package objects, including their validation, device recovery and disposal. Refs become null on unmount;
+imports resolving after unmount create nothing. Line, Points, Outline and Splat attach to the enclosing Scene.
+
+| Entry | Component | Native peer | Defaults and updates |
+| --- | --- | --- | --- |
+| /lines | Line | @margoengine/lines | Connected strip, width 1 CSS px, white, solid; points accepts flat xyz or triples. lineWidth aliases width; segments draws pairs. All native LineOptions apply. Changed data/style rebuilds; ref supports native frame updates. |
+| /points | Points | @margoengine/points | Native PointCloudOptions, including positions, colours, sizes, material, matrix and block size. Changed options rebuild; ref supports native dirty channels. |
+| /selection | Outline | @margoengine/selection (installed with React) | Parent Mesh selected unless selection is given; refs resolved every frame. Width 3 px, orange, JFA, no xray. Native options apply; selection=[] clears. |
+| /lod | Detailed | @margoengine/lod | One distance per child (first ignored); 1-8 children, increasing world-unit distances, hysteresis 0.1. Each child is a group and can contain nested meshes/models. Transform props default to identity. |
+| /splats | Splat | @margoengine/splats | data is SplatData, or src is a .splat URL loaded through Suspense, cache, progress and AbortSignal. antialias=false; changing data/src rebuilds, antialias updates live. |
+| /viewcube | GizmoHelper | @margoengine/viewcube | Native ViewCubeOptions: top-right, 80 CSS px, 0.4 s transitions, drag=true; optional roll, home, themes and projection toggle. Changed options recreate the widget. |
+| /cameras | PerspectiveCamera, OrthographicCamera | @margoengine/cameras for orthographic | makeDefault=false. Perspective: position [0,2,5], target [0,0,0], up [0,1,0], fov 60 degrees, near 0.1, far 1000. Orthographic: native ProjectionOptions, resize-aware height, zoom 1. |
+
+A default camera configures the engine's stable camera handle, so controls and useCamera see it too. Nested defaults
+restore the latest underlying camera on unmount, even if an underlying mount disappears first. A non-default camera
+has its own ref for RenderView. The engine handle's identity stays stable; this differs from Fiber's camera-store
+replacement. Orthographic projections load lazily. Native attachment failures go to onError and the Canvas. A Suspense URL load
+throws failures to the nearest React error boundary, as useLoader does.
+
+The small component examples below go inside Canvas (the camera examples also work with RenderView). For the complete
+runnable real-capture comparison, run the repository Vite server and open
+/packages/react/tests/bindings-browser.html; its paired canvases compare the wrappers with the native package APIs.
+The capture is the Niantic MIT sample excerpt documented in ../splats/test/fixtures/NOTICE.md, not generated art.
+
+### Line binding
+
+```tsx
+import { Line } from '@margoengine/react/lines';
+export function Route() {
+  return <Line points={[[0,0,0],[1,1,0],[2,0,0]]} color="#60c0ff" lineWidth={3} dashed dashSize={0.2} />;
+}
+```
+
+### Points binding
+
+```tsx
+import { Points } from '@margoengine/react/points';
+const positions = new Float32Array([0,0,0, 1,0,0, 0,1,0]);
+export function Markers() {
+  return <Points positions={positions} material={{size: 8, color: '#60c0ff'}} />;
+}
+```
+
+### Outline binding
+
+```tsx
+import { Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { Outline } from '@margoengine/react/selection';
+export function Selected() {
+  return <Mesh><BoxGeometry/><PbrMaterial color="#ff3030"/><Outline color={[0,1,0]} width={4}/></Mesh>;
+}
+```
+
+### Detailed binding
+
+```tsx
+import { Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { Detailed } from '@margoengine/react/lod';
+export function Levels() {
+  return <Detailed distances={[0,10]}>
+    <Mesh><BoxGeometry/><PbrMaterial color="#ff3030"/></Mesh>
+    <Mesh><BoxGeometry/><PbrMaterial color="#30ff30"/></Mesh>
+  </Detailed>;
+}
+```
+
+### Splat binding
+
+The URL here is the repository's real capture fixture; in your app, serve a .splat capture at your chosen URL.
+
+```tsx
+import { Suspense } from 'react';
+import { Splat } from '@margoengine/react/splats';
+export function Capture() {
+  return <Suspense fallback={null}><Splat src="/packages/splats/test/fixtures/raccoon-v2.splat" antialias/></Suspense>;
+}
+```
+
+### View cube binding
+
+```tsx
+import { GizmoHelper } from '@margoengine/react/viewcube';
+export function Orientation() {
+  return <GizmoHelper corner="bottom-right" roll home theme="auto" />;
+}
+```
+
+### Camera bindings
+
+```tsx
+import { OrthographicCamera, PerspectiveCamera } from '@margoengine/react/cameras';
+export function Cameras({plan = false}: {plan?: boolean}) {
+  return plan ? <OrthographicCamera makeDefault height={12} position={[0,10,0]} target={[0,0,0]} up={[0,0,-1]}/>
+    : <PerspectiveCamera makeDefault position={[0,2,5]}/>;
+}
+```
+
+Native WebGPU requirements remain: line/point/splat/outline rendering needs WebGPU or the WebGL2 compatibility device,
+not the preview fallback. Detailed mesh switching, camera projection and the DOM view cube also work on preview.
+Splat clouds sort independently, and the native LOD limit is eight children. These bindings do not change those limits.
+
+
+Optional binding entry gzip sizes (bare peers external): lines 1,502 B, points 1,204 B, lod 2,764 B, selection 1,156 B, splats 1,858 B, viewcube 1,032 B, cameras 1,821 B. Native peers load separately. Line and Points follow the enclosing Mesh unless an explicit matrix (or Line mesh) is supplied; SplatData uses world-space positions.

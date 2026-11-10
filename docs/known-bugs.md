@@ -4011,3 +4011,13 @@ Historical predictor3 is absent from integer.rs's supported-method set. The
 record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
 UV bytes and intact canaries; native returns code5. The old-format reconstruction
 rule remains to be established by further crafted public-API observations.
+
+### Batch 265 native React binding scope
+
+Fixed while building: copying an orthographic projection callback onto the default camera lost its native control
+metadata and read a stale camera pose. The binding now transfers the native projection to the leased engine camera,
+restoring its property descriptors and prior owner on cleanup. Regression: packages/react/tests/package-bindings.test.js
+checks same-frame dolly, vertical views, fixedOrthographic, nested defaults and option/default changes.
+Instances, texture hooks, frame priorities and adaptive performance remain separate batch jobs.
+
+Open outside job 1: render Grid inside Scene name="hud" and draw only that scene with RenderView; the grid is missing there because packages/react/src/lines.tsx Grid attaches with engine.use instead of the enclosing world.use. Recorded under lane-efficiency rule 6; the new Line binding uses its owning Scene.

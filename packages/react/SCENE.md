@@ -336,3 +336,9 @@ crossfades on WebGPU. Unit tests cover StrictMode, Suspense,
 optional imports, source ownership, parent transforms, post limits and mocked
 XR sessions. Packaging tests exercise strict public subpath consumers and prove
 the base bundle's static dependency graph excludes optional scene subpaths.
+
+## Optional native bindings
+
+Line: /lines; Points: /points; Outline: /selection; Detailed: /lod; Splat: /splats;
+GizmoHelper: /viewcube; PerspectiveCamera and OrthographicCamera: /cameras.
+See README Native package bindings for peers, defaults, executable examples and the real-capture comparison.

@@ -1,0 +1,216 @@
+{
+  "batch": 265,
+  "job": 1,
+  "scope": "Native package binding fidelity and lifetime; not an independent rival pixel match",
+  "asset": {
+    "notice": "packages/splats/test/fixtures/NOTICE.md",
+    "file": "packages/splats/test/fixtures/raccoon-v2.splat",
+    "count": 8385,
+    "license": "MIT"
+  },
+  "native": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "rows": [
+      {
+        "mode": "lines",
+        "changed": 34,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "points",
+        "changed": 88,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "splats",
+        "changed": 36,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "parent",
+        "changed": 179,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "cameras",
+        "changed": 4096,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "lod",
+        "changed": 256,
+        "different": 256,
+        "green": 256
+      },
+      {
+        "mode": "outline",
+        "changed": 3768,
+        "different": 3768,
+        "green": 1272
+      },
+      {
+        "mode": "viewcube",
+        "changed": 8900,
+        "different": 8900,
+        "green": 0
+      },
+      {
+        "mode": "url",
+        "changed": 462,
+        "different": 854,
+        "green": 0
+      }
+    ]
+  },
+  "compat": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "rows": [
+      {
+        "mode": "lines",
+        "changed": 34,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "points",
+        "changed": 88,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "splats",
+        "changed": 36,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "parent",
+        "changed": 179,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "cameras",
+        "changed": 4096,
+        "different": 0,
+        "green": 0
+      },
+      {
+        "mode": "lod",
+        "changed": 256,
+        "different": 256,
+        "green": 256
+      },
+      {
+        "mode": "outline",
+        "changed": 3768,
+        "different": 3768,
+        "green": 1272
+      },
+      {
+        "mode": "viewcube",
+        "changed": 8900,
+        "different": 8900,
+        "green": 0
+      },
+      {
+        "mode": "url",
+        "changed": 462,
+        "different": 854,
+        "green": 0
+      }
+    ]
+  },
+  "entrySizes": [
+    {
+      "entry": "@margoengine/react/lines",
+      "bytes": 1502,
+      "previousCeiling": 999,
+      "ceiling": 1758,
+      "before": 764
+    },
+    {
+      "entry": "@margoengine/react/points",
+      "bytes": 1204,
+      "previousCeiling": 0,
+      "ceiling": 1460
+    },
+    {
+      "entry": "@margoengine/react/lod",
+      "bytes": 2764,
+      "previousCeiling": 0,
+      "ceiling": 3020
+    },
+    {
+      "entry": "@margoengine/react/selection",
+      "bytes": 1156,
+      "previousCeiling": 0,
+      "ceiling": 1412
+    },
+    {
+      "entry": "@margoengine/react/splats",
+      "bytes": 1858,
+      "previousCeiling": 0,
+      "ceiling": 2114
+    },
+    {
+      "entry": "@margoengine/react/viewcube",
+      "bytes": 1032,
+      "previousCeiling": 0,
+      "ceiling": 1288
+    },
+    {
+      "entry": "@margoengine/react/cameras",
+      "bytes": 1821,
+      "previousCeiling": 0,
+      "ceiling": 2077
+    }
+  ],
+  "coreStageGzip": 23950,
+  "checks": {
+    "reactUnitTests": 224,
+    "readmeExamples": 34,
+    "regressionFile": "packages/react/tests/package-bindings.test.js"
+  },
+  "reproduce": "docs/whitepaper/reproduce.md#batch-265-native-react-binding-proof"
+}

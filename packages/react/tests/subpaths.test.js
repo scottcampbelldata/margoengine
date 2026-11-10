@@ -52,7 +52,13 @@ const expected = {
   './environment': ['AmbientLight', 'Environment', 'Fog', 'HemisphereLight'],
   './html': ['Html'],
   './helpers': ['Billboard', 'Bounds', 'Float', 'useBounds'],
-  './lines': ['Grid'],
+  './lines': ['Grid', 'Line'],
+  './points': ['Points'],
+  './lod': ['Detailed'],
+  './selection': ['Outline'],
+  './splats': ['Splat'],
+  './viewcube': ['GizmoHelper'],
+  './cameras': ['OrthographicCamera', 'PerspectiveCamera'],
   './devtools': ['DevTools'],
   './shadows': ['ContactShadows', 'Shadows'],
   './sky': ['Sky'],
@@ -129,6 +135,10 @@ const optionalPeers = [
   '@margoengine/animator',
   '@margoengine/voxel',
   '@margoengine/cameras',
+  '@margoengine/points',
+  '@margoengine/lod',
+  '@margoengine/splats',
+  '@margoengine/viewcube',
 ];
 async function temporary(run) {
   const directory = await mkdtemp(join(testsRoot, '.subpaths-'));

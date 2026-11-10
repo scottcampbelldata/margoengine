@@ -3332,3 +3332,29 @@ Compatibility entry gzip sizes stay root 105186, device 105232, XR 105035,
 tiers 104920 bytes; core plus stage stays 23950 bytes, below 25000.
 Remaining defects and coverage limits are retained in known-bugs and
 `work-lists/batch-273-compat-triage.md`; full suite closure requires every leaf.
+
+## React native package bindings (batch 265)
+
+Line, Points, Outline, Detailed, Splat, GizmoHelper and perspective/orthographic cameras are independent optional React
+entries. Native limits remain (LOD: 8 levels; splats sort per cloud; outline: 1-32 px). WebGPU or the compatibility device
+is needed for GPU package draws; preview supports camera/viewcube and mesh LOD. Default cameras retain the engine camera
+handle identity. No new core or stage code, Rust loop or speed claim. Entry byte measurements are recorded with the
+batch 265 claim after validation. Fixtures: Niantic MIT raccoon excerpt, packages/splats/test/fixtures/NOTICE.md.
+
+
+Batch 265 measured minified gzip entry bytes (bare peer imports external):
+
+| Entry | Before | After | Ceiling |
+| --- | ---: | ---: | ---: |
+| @margoengine/react/lines | 764 | 1502 | 1758 |
+| @margoengine/react/points | 0 | 1204 | 1460 |
+| @margoengine/react/lod | 0 | 2764 | 3020 |
+| @margoengine/react/selection | 0 | 1156 | 1412 |
+| @margoengine/react/splats | 0 | 1858 | 2114 |
+| @margoengine/react/viewcube | 0 | 1032 | 1288 |
+| @margoengine/react/cameras | 0 | 1821 | 2077 |
+
+Before 0 means a new entry. The parent Line/Grid entry was rebundled from its TypeScript source through Oxc (764 B);
+its previous recorded ceiling was 999 B. Its new line binding adds an independent native object and lifecycle owner.
+Each optional binding has a lazy import and resource cleanup, with its own entry budget.
+removing functionality. Core + stage stays 23,950 B gzip, below 25,000 B; no core/stage source changed.

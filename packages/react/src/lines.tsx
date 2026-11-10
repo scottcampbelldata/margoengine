@@ -1,7 +1,60 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import type { ColorInput, Vec3 } from '@margoengine/math';
-import { report, useScene } from './internal.js';
+import type { Line as NativeLine, LineOptions } from '@margoengine/lines';
+import { report, useCreated, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { attachBinding, detachBinding } from './package-binding.js';
+
+/** A polyline's vertices, either flat xyz or triples. Other options are the native line material and transform. */
+export interface LineProps extends Omit<LineOptions, 'positions'> {
+  points: ArrayLike<number> | readonly Vec3[];
+  /** Alias for width, in CSS pixels (or world units with worldUnits). Default 1. */
+  lineWidth?: number;
+  /** Draw independent pairs instead of a connected strip. Default false. */
+  segments?: boolean;
+  onError?: (error: unknown) => void;
+}
+/** A native, antialiased line. The ref exposes setPositions/setMatrix/material for frame-loop updates. */
+export const Line = forwardRef<NativeLine, LineProps>(function Line(
+  { points, lineWidth, segments = false, onError, ...options },
+  ref,
+) {
+  const scene = useScene(),
+    latest = useRef(options);
+  const { mesh, material, matrix, ...style } = options;
+  latest.current = options;
+  useCreated(
+    scene,
+    {
+      load: () => optionalPeer('@margoengine/lines', () => import('@margoengine/lines')),
+      create: (api) => {
+        const positions =
+          typeof points[0] === 'number' ? (points as ArrayLike<number>) : (points as readonly Vec3[]).flat();
+        const line = new api.Line({
+          ...latest.current,
+          mesh: latest.current.mesh === undefined && !matrix ? scene.registry?.current : latest.current.mesh,
+          positions,
+          width: lineWidth ?? latest.current.width,
+          mode: segments ? 'segments' : latest.current.mode,
+        });
+        const plugin = new api.Lines({ name: `react-line:${++serial}` });
+        plugin.add(line);
+        attachBinding(scene, plugin);
+        owners.set(line, () => detachBinding(scene, plugin));
+        return line;
+      },
+      dispose: (line) => {
+        owners.get(line)?.();
+        line.dispose();
+      },
+      ref,
+      onError,
+    },
+    [scene.world, scene.registry, points, lineWidth, segments, mesh, material, matrix, JSON.stringify(style)],
+  );
+  return null;
+});
+const owners = new WeakMap<NativeLine, () => void>();
 
 /** Props of `<Grid>`; every prop is optional. */
 export interface GridProps {

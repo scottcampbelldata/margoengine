@@ -5261,3 +5261,11 @@ the trace value/error and scheduling tests validate diagnostics only.
 The final rebuilt control under concurrent verify load recorded closed pipes
 before the browser's delayed exit; process/stdio close took 7,974 ms and complete
 cleanup 9,691 ms. These are diagnostic phase observations, not benchmark results.
+
+### 5. Batch 265 optional React package bindings
+
+Native line, point, selection, LOD, splat, viewcube and camera APIs now have independent React entries. No core/stage
+change or new GPU maths. The binding gate compares paired native/React pixels on the existing real capture excerpt and
+checks LOD selection, outline pixels, viewcube navigation and lifetime cleanup on WebGPU and the compatibility device.
+StrictMode unit coverage checks per-Scene plugin ownership and nested camera restoration. Independent rival pixel
+comparisons are not supplied; the public behavioural contract comparison is recorded in clean-room.md.

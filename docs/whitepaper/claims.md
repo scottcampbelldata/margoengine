@@ -2808,3 +2808,15 @@ scenes retain all draw/bake work and image bounds. This closes official suite
 is not claimed while tracer compilation remains with its dedicated owner.
 Runtime, exports and size are unchanged. No speed claim is made.
 [Receipt](results/batch-273-native-baselines.json).
+
+## Batch 265: optional React package bindings
+
+Claim: Line, Points, Outline, Detailed, Splat, GizmoHelper and camera components are optional entries over native APIs;
+root imports do not evaluate their peers. Proof: packages/react/tests/package-bindings.test.js, subpaths.test.js and
+packages/react/scripts/test-bindings-browser.mjs. The browser comparison uses the real MIT Niantic capture excerpt;
+limits and the stable-camera identity difference are explicit in the React README. No speed or rival pixel-match claim.
+
+
+Measured optional entry gzip bytes: lines 1502, points 1204, lod 2764, selection 1156, splats 1858, viewcube 1032, cameras 1821. Core + stage: 23,950 B. These are bundle byte counts, not speed measurements.
+
+Recorded proof: [batch-265-bindings.json](results/batch-265-bindings.json). Both backends match native line, point, parented line/point, splat and orthographic-camera pixels exactly. The distant LOD contributes 256 green pixels; the outline contributes 1,272 green pixels. The native projection stays on the actual leased camera, preserving same-frame controls and metadata.
