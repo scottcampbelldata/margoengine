@@ -19,7 +19,13 @@ for (const fallback of [false, true]) {
       canvas.style.cssText = 'width:192px;height:144px';
       document.body.append(canvas);
       const fig = installFigureStats(
-        await (fallback ? createFallbackFigure : Figure.create)(canvas, { axes: false, controls: false }),
+        fallback
+          ? await createFallbackFigure(canvas, {
+              axes: false,
+              controls: false,
+              compat: await import('/packages/webgl2-compat/dist/index.js'),
+            })
+          : await Figure.create(canvas, { axes: false, controls: false }),
       );
       fig.engine.stop();
       const check = (condition, message) => {

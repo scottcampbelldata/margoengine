@@ -10,6 +10,13 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 import { Line } from "@margoengine/lines";
 import { PointCloud } from "@margoengine/points";
 
+export interface CompatLayer {
+    install(options: {
+        force: true;
+        signal?: AbortSignal;
+    }): Promise<unknown>;
+}
+
 export interface CpuIsosurface {
     readonly vertices: Float32Array;
     readonly triangles: number;
@@ -21,7 +28,11 @@ export interface CpuIsosurfaceOptions {
     readonly signal?: AbortSignal;
 }
 
-export function createFallbackFigure(canvas: HTMLCanvasElement, options?: CreateFigureOptions): Promise<Figure>;
+export interface FallbackFigureOptions extends CreateFigureOptions {
+    readonly compat: CompatLayer;
+}
+
+export function createFallbackFigure(canvas: HTMLCanvasElement, options: FallbackFigureOptions): Promise<Figure>;
 
 export function marchingCubes(data: ArrayLike<number>, level: number, options: CpuIsosurfaceOptions): Promise<CpuIsosurface>;
 

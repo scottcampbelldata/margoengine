@@ -283,12 +283,18 @@ export interface CustomLayer {
 /** Any layer a figure holds. */
 export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer | CustomLayer;
 
-const layerVisible = (layer: Layer): boolean =>
-  'cloud' in layer
-    ? layer.cloud.visible
-    : 'line' in layer
-      ? layer.line.visible
-      : !('visible' in layer) || layer.visible !== false;
+// Set by a selection binding (sciviz/link) on the source it hides while it draws that layer's marks itself.
+const LINKED_DRAW: unique symbol = Symbol.for('@margoengine/sciviz/linked-draw') as never;
+
+const layerVisible = (layer: Layer): boolean => {
+  const source = ('cloud' in layer ? layer.cloud : 'line' in layer ? layer.line : layer) as {
+    visible?: boolean;
+    [LINKED_DRAW]?: { readonly visible: boolean };
+  };
+  // A bound layer is still shown (by its binding), so picks, selections and exports keep it.
+  const shown = source[LINKED_DRAW] ?? source;
+  return shown.visible !== false;
+};
 
 const read = async (data: DataSource | undefined): Promise<ArrayLike<number> | undefined> =>
   data === undefined ? undefined : isGpuArray(data) ? await data.read() : data;

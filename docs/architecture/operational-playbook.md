@@ -2274,8 +2274,8 @@ Batch 180 job 2 vector geography: optional geo-vector owns float64 geographic pr
 Batch 201 audio: the optional glTF reader uses caller-owned AudioListener and audio package source classes, with one shared decode per clip and independent source instances. Audio-only model nodes participate in engine transforms without geometry. CPU tests cover scene selection, weighted triggers, timeline offsets/seeks, cancellation, budgets and cleanup; native/compatibility frame tests verify poses and a real offline Web Audio energy oracle. build-modern keeps the audio peer external, preserving class identity and avoiding duplicate runtimes. Core/stage and rendering algorithms are unchanged.
 
 Batch 188 EXR codec evidence: twenty independent native-oracle photographic files decode bit exact in Node and both browser backends, then reach GPU SH, GGX prefilter and rendered HDR backgrounds. A production Vite render checks copied worker, ESM glue and Wasm assets. The standard prebuilt decoder stays entirely optional and off the engine thread; size/byte bounds, corruption, cancellation, hard worker timeout and disposal are covered. Codec implementations are the pinned standard OpenEXR binary; no speed or independent deep-image proof is claimed.
-Batch 181 job 1 evidence: sciviz/fallback createFallbackFigure selects the full shared
-WebGL2 compatibility renderer, not the native preview subset. CPU marching cubes stages
+Batch 181 job 1 evidence: sciviz/fallback createFallbackFigure installs the caller-supplied full shared
+WebGL2 compatibility renderer (`compat` option; sciviz does not import it), not the native preview subset. CPU marching cubes stages
 vertices then uploads/publishes them atomically; the same case table and vertex format
 serve native WebGPU. fallback-browser.mjs checks seven pixel comparisons on real head
 samples/charts, actual device replacement, cancellation and the head/stars/wind demo

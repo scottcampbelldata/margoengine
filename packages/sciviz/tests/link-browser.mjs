@@ -120,6 +120,12 @@ for (const compat of [false, true]) {
         demo.selection.rowIds.length === 2 && demo.selection.has(0) && demo.selection.has(4),
         'multiple layers publish a single merged selection',
       );
+      // A binding hides its source and draws the marks itself; box and lasso selection must still reach the layer.
+      const region = fig.select({ rect: [0, 0, canvas.clientWidth, canvas.clientHeight] });
+      check(
+        region.points.some((p) => p.layer === first) && region.points.some((p) => p.layer === second),
+        'bound layers stay selectable',
+      );
       a.dispose();
       b.dispose();
       fig.dispose();

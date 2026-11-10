@@ -326,8 +326,11 @@ all other feature kernels. GPU transport itself uses no Wasm and reads back only
 
 ## CPU isosurface extraction
 
-The optional `@margoengine/sciviz/fallback` entry currently provides `marchingCubes`, the CPU extraction part of
-the WebGL2 work. Extraction is separate from drawing and requests no device. The new `webgl2` entry below
+The optional `@margoengine/sciviz/fallback` entry provides `marchingCubes`, the CPU extraction part of
+the WebGL2 work, and `createFallbackFigure(canvas, { compat, ...figureOptions })`, which creates a complete figure on
+the shared WebGL2 compatibility layer. Sciviz never imports or depends on that layer: pass it as
+`compat: await import('@margoengine/webgl2-compat')`, and the call installs it page-wide with `force: true`. Without
+`compat` the call rejects with a TypeError naming that option. Extraction is separate from drawing and requests no device. The new `webgl2` entry below
 attaches the first native drawing paths; the complete WebGL2 job is still in progress.
 
 ```ts

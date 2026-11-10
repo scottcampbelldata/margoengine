@@ -40,6 +40,7 @@ for (const compat of [false, true]) {
         ['small scale',sample((x,y,z)=>[1e-20*x,2e-20*y,-3e-20*z])],
         ['subnormal high inverse spacing',sample(x=>[0.01*x,0,0],[2,1,1],[0,1e-38,0,0,0,0])],
         ['subnormal',sample((x,y)=>[1e-40*x,-1e-40*y,0])],
+        ['subnormal rotation',sample((x,y)=>[-1e-40*y,1e-40*x,0])],
       ];
       const masked=sample((x,y,z)=>[x,y,z]);masked.u[17]=NaN;masked.mask=masked.u.map((_,i)=>i===35?0:1);cases.push(['masked',masked]);
       const rotation=[[-2/3,2/3,1/3],[2/3,1/3,2/3],[1/3,2/3,-2/3]];

@@ -25,7 +25,12 @@ for (const fallback of [false, true]) {
       const canvas = document.createElement('canvas');
       canvas.width = 192; canvas.height = 144; canvas.style.cssText = 'width:192px;height:144px';
       document.body.append(canvas);
-      const make = fallback ? createFallbackFigure : Figure.create;
+      const compat = await import('/packages/webgl2-compat/dist/index.js');
+      let missing;
+      try { await createFallbackFigure(canvas, { axes: false }); } catch (e) { missing = e; }
+      if (!(missing instanceof TypeError) || !/compat: await import\('@margoengine\/webgl2-compat'\)/.test(missing.message))
+        throw Error(`missing compat layer must name the fix: ${missing}`);
+      const make = fallback ? (c, o) => createFallbackFigure(c, { ...o, compat }) : Figure.create;
       let f = await make(canvas, { axes: false, controls: false, aspect: [1, 1, 1] });
       f.engine.stop();
       const errors = [];

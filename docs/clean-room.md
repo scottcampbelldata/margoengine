@@ -7630,7 +7630,7 @@ supplies the shared renderer's target contract. Compared retaining a second nati
 renderer with reusing Margo's complete compatibility layer. The latter keeps every existing layer,
 axes and bricked page table on one shader path, as parity/group-10 recommends.
 
-The optional sciviz/fallback createFallbackFigure explicitly installs that full WebGL2 layer and
+The optional sciviz/fallback createFallbackFigure installs the full WebGL2 layer that the caller passes as `compat` and
 creates an ordinary Figure, with a per-renderer CPU marching-cubes hook. Existing Margo Wasm,
 cases and GPU vertex layout are reused; no new numerical algorithm or speed claim. CPU results
 are staged, checked for cancellation, then published atomically into a drawing buffer. Failed

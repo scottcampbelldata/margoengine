@@ -1,4 +1,6 @@
 import type { Figure, ScatterLayer, LineLayer, PointSelection } from './figure.js';
+// Shared with figure.ts through the global registry, so this optional entry does not pull in the figure module.
+const LINKED_DRAW: unique symbol = Symbol.for('@margoengine/sciviz/linked-draw') as never;
 import type { RectsLayer } from './rects.js';
 import type { SelectionStore, RowKey, SelectionOperation } from './link.js';
 import { frameWGSL, type Drawable, type GpuContext } from './render.js';
@@ -133,6 +135,7 @@ export class SelectionBinding implements Drawable {
     this.#originalVisible = target.visible;
     this.#rebuild();
     target.visible = false;
+    (target as { [LINKED_DRAW]?: SelectionBinding })[LINKED_DRAW] = this;
     figure.renderer.add(this);
     const stores = views.get(figure) ?? new Map<SelectionStore, Set<SelectionBinding>>();
     const bound = stores.get(store) ?? new Set<SelectionBinding>();
@@ -282,8 +285,12 @@ export class SelectionBinding implements Drawable {
     this.#figure.renderer.remove(this);
     for (const buffer of this.#buffers) buffer.destroy();
     const layer = this.#layer;
-    (layer.kind === 'scatter' ? layer.cloud : layer.kind === 'line' ? layer.line : layer).visible =
-      this.#originalVisible;
+    const target = (layer.kind === 'scatter' ? layer.cloud : layer.kind === 'line' ? layer.line : layer) as {
+      visible: boolean;
+      [LINKED_DRAW]?: SelectionBinding;
+    };
+    if (target[LINKED_DRAW] === this) delete target[LINKED_DRAW];
+    target.visible = this.#originalVisible;
   }
   [Symbol.dispose](): void {
     this.dispose();

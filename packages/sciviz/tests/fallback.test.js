@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { marchingCubes } from '@margoengine/sciviz/fallback';
+import { createFallbackFigure, marchingCubes } from '@margoengine/sciviz/fallback';
 import { caseTriangles, CORNERS, EDGES } from '@margoengine/sciviz/maths';
 import { parseNRRD } from '@margoengine/loaders/nrrd';
 import { build } from 'vite';
@@ -195,4 +195,23 @@ test('a consuming build keeps the feature-local Wasm as a lazy file rather than 
   assert.equal(wasm.length, 1, 'the consuming build emits one separate Wasm file');
   assert.deepEqual(Buffer.from(wasm[0].source), await readFile(new URL('../dist/fallback.wasm', import.meta.url)));
   assert.ok(bundle.includes(wasm[0].fileName), 'the entry references the emitted asset');
+});
+
+test('createFallbackFigure installs only the layer the caller passes, and names the fix when it is missing', async () => {
+  for (const options of [undefined, {}, { compat: {} }])
+    await assert.rejects(createFallbackFigure(null, options), (e) => {
+      assert.ok(e instanceof TypeError);
+      assert.match(e.message, /pass \{ compat: await import\('@margoengine\/webgl2-compat'\) \}/);
+      return true;
+    });
+  const abort = new AbortController();
+  const calls = [];
+  const compat = {
+    async install(options) {
+      calls.push(options);
+      abort.abort('stop after install');
+    },
+  };
+  await assert.rejects(createFallbackFigure(null, { compat, signal: abort.signal }), (e) => e === 'stop after install');
+  assert.deepEqual(calls, [{ force: true, signal: abort.signal }]);
 });

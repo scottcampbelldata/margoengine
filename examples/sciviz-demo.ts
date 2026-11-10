@@ -4,8 +4,11 @@ import { Figure, type CreateFigureOptions } from '@margoengine/sciviz/spec';
 // ?backend=webgl2 demonstrates the complete shared renderer, including CPU isosurfaces.
 export async function createFigure(canvas: HTMLCanvasElement, options: CreateFigureOptions = {}): Promise<Figure> {
   if (new URLSearchParams(location.search).get('backend') === 'webgl2') {
-    const { createFallbackFigure } = await import('@margoengine/sciviz/fallback');
-    return Figure.record(await createFallbackFigure(canvas, options), options);
+    const [{ createFallbackFigure }, compat] = await Promise.all([
+      import('@margoengine/sciviz/fallback'),
+      import('@margoengine/webgl2-compat'),
+    ]);
+    return Figure.record(await createFallbackFigure(canvas, { ...options, compat }), options);
   }
   return Figure.create(canvas, options);
 }

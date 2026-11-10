@@ -1,6 +1,8 @@
 // Largest-pivot scaled Jacobi, derived from orthogonal plane rotations; no external implementation used.
 export const deriveShader = /* wgsl */ `
 struct Params { nx: u32, ny: u32, nz: u32, count: u32, ix: f32, iy: f32, iz: f32, missingBits: u32 }
+// The smallest normal f32 (2^-126).
+const MIN_NORMAL = 1.1754943508222875e-38;
 @group(0) @binding(0) var<storage, read> source: array<f32>;
 @group(0) @binding(1) var<storage, read_write> gradient: array<u32>;
 @group(0) @binding(2) var<storage, read_write> divergence: array<u32>;
@@ -55,9 +57,10 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   curl[3u*i] = bitcast<u32>(cv.x); curl[3u*i+1u] = bitcast<u32>(cv.y); curl[3u*i+2u] = bitcast<u32>(cv.z);
   let cs = max(abs(cv.x), max(abs(cv.y), abs(cv.z)));
   vorticity[i] = 0u;
-  if (cs > 0.0) { vorticity[i] = bitcast<u32>(length(cv/cs) * cs); }
+  // Scale only by a normal f32: Metal flushes subnormals to zero, so a subnormal scale makes 0/0 (2026-11-09).
+  if (cs >= MIN_NORMAL) { vorticity[i] = bitcast<u32>(length(cv/cs) * cs); }
   q[i] = 0u; lambda2[i] = 0u;
-  if (scale == 0.0) { return; }
+  if (!(scale >= MIN_NORMAL)) { return; }
   for (var k = 0u; k < 9u; k++) { g[k] /= scale; }
   var m: array<f32, 9>;
   var norm = 0.0;

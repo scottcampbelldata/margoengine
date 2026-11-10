@@ -5842,8 +5842,9 @@ New optional sciviz/geo-lod, no core or stage edits. Defaults: projection mercat
 Flat Mercator/equirectangular and WGS84 globe use XYZ Mercator source bounds, ending at +/-85.05112878 degrees latitude (polar caps are outside this raster source). View selection uses conservative projected bounding boxes, not terrain occlusion. Heights and skirts are metres; elevation is a pixel-centred bilinear grid. No vertical datum conversion is inferred. geoTerrainStreamSource wraps longitude and clips latitude at a fixed level, resampling to TerrainStream.tileTexels (2..1024); the caller supplies TerrainStream's physical tileSize, origin and colours. quantizedGeoElevation calls tiles/terrain's decoder lazily, rasterises pixel centres, rejects incomplete coverage and does not infer a geographic tiling scheme. Native WebGL2 preview is refused by requireGPU; WebGL2 compatibility uses the same draw path. No wall-clock speed claim.
 
 Geo-lod entry size: new 0 to 7261 B min+gzip, ceiling 7517 B. One optional entry retains a cohesive view/cache/height/render lifecycle. Core plus stage unchanged at 24,209 B.
-Batch 181 job 1, complete WebGL2 route: sciviz/fallback exports createFallbackFigure. Calling
-it explicitly installs the shared compatibility layer for the page, even with native WebGPU.
+Batch 181 job 1, complete WebGL2 route: sciviz/fallback exports createFallbackFigure. The caller passes
+the layer as `compat: await import('@margoengine/webgl2-compat')` (sciviz never imports or depends on it;
+without it the call rejects with a TypeError naming that option), and the call installs it with force for the page, even with native WebGPU.
 Importing it performs no installation or Wasm load. The full tier requires highp fragment
 precision and EXT_color_buffer_float; unsupported hardware rejects with coded unsupported.
 The smaller sciviz/webgl2 preview attacher is unchanged. All normal Figure layers use the full

@@ -1172,3 +1172,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 183 job 3): document the generated stage/viewer-extras alias; examples deferred.
 - @margoengine/sciviz (batch 177 job 5): document /stream append/patch, original data/channels, rollover, cancellation/disposal, async WebSocket/SSE/polling sources, sliding/smooth date windows, Figure.updateData identity and transient allocations, and integration with /format. README examples owed.
 - margoengine (batch 177 job 5): document the optional sciviz/stream alias in README phase.
+
+- @margoengine/sciviz (lane L fix): createFallbackFigure now takes the layer as `compat: await import('@margoengine/webgl2-compat')`; README prose updated, example deferred.

@@ -6,6 +6,10 @@ import { loadNRRD } from '../dist/nrrd.js';
 import { graphLayer } from '../dist/graph.js';
 import { ColumnarTable, readCSV } from '../dist/table.js';
 
+// sciviz never imports the compatibility layer; the caller supplies it.
+const createFallback = async (canvas, options) =>
+  createFallbackFigure(canvas, { ...options, compat: await import('../../webgl2-compat/dist/index.js') });
+
 const asset = (name) => new URL(`/examples/assets/sciviz/${name}`, location.href);
 async function bytes(name, signal) {
   const response = await fetch(asset(name), { signal });
@@ -69,7 +73,7 @@ export async function realDataSweeps({
           let fig;
           try {
             fig = installFigureStats(
-              await (fallback ? createFallbackFigure : Figure.create)(canvas, {
+              await (fallback ? createFallback : Figure.create)(canvas, {
                 mode: kind === 'cells' ? '2d' : '3d',
                 controls: false,
                 axes: false,
