@@ -120,11 +120,24 @@ test('lod imposters take the direct hook of shadows, with the names they rewrite
   assert.ok(source('lod/src/imposter.ts').includes('/*lod:direct*/'));
 });
 
+// The mask's replace call, matched as code rather than layout: biome (lineWidth 120) wraps its arguments onto their own
+// lines, so the one-line text match failed once 0616feffe let the formatter wrap the unchanged call.
+const maskCall = (anchor) =>
+  new RegExp(String.raw`imposterShader\.replace\(\s*'${anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}',`);
+
 test('the lod selection mask rewrites the imposter shader', () => {
   const anchor = 'return Pixel(vec4f(color,coverage),',
     code = source('lod/src/imposter.ts');
   assert.ok(code.includes(`${anchor}clamp(clip.z/clip.w,0.0,1.0));`), 'the shader returns this');
-  assert.ok(code.includes(`imposterShader.replace('${anchor}',`), 'and the mask rewrites it');
+  assert.match(code, maskCall(anchor), 'and the mask rewrites it');
+});
+
+test('the lod selection mask check reads the call however biome wraps it, and only that call', () => {
+  const anchor = 'return Pixel(vec4f(color,coverage),';
+  assert.match(`imposterShader.replace('${anchor}', 'x')`, maskCall(anchor));
+  assert.match(`imposterShader.replace(\n  '${anchor}',\n  'x',\n)`, maskCall(anchor));
+  assert.doesNotMatch(`imposterShader.replace('return Pixel(vec4f(color,1.0),', 'x')`, maskCall(anchor));
+  assert.doesNotMatch(`otherShader.replace('${anchor}', 'x')`, maskCall(anchor));
 });
 
 test('lod fade guards all three surface entries of the gltf-pro shader', () => {
