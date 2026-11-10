@@ -131,7 +131,9 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   depth, stencil, packed and snorm included; occlusion queries, render bundles and
   external textures (each video frame is copied: WebGL2 has no zero-copy video) work. The adapter reports
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
-  flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back.
+  flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back with a texel-fetch
+  draw of its own (exact, one texel a pixel), not `blitFramebuffer` (see `docs/known-bugs.md`, "ANGLE D3D11 flipped
+  blit").
 - **GLSL back end** (`margoengine/webgl2-compat/glsl`): `translateWGSL({ vertex, fragment })` turns a render
   pipeline's WGSL stages into GLSL ES 3.00 and the table the device binds resources by; `translateStage` translates one
   entry point alone. Uniform buffers are read in WGSL's own memory layout (exact for every struct, `@size`, `@align`

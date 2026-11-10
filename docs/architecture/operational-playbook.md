@@ -1,3 +1,14 @@
+### Section 5 evidence: compat canvas present is a draw, not a blit (batch 166 job 2)
+
+The WebGL2 layer's canvas present was a y-flipped `blitFramebuffer` plus a colour-masked clear. Under ANGLE D3D11
+both run on ANGLE's own shaders, and afterwards a later draw that changed no uniform binding sometimes read zero from
+its fragment uniform blocks (every instanced box black). A raw WebGL2 replay of the recorded calls, no Margo code,
+reproduces it on ANGLE D3D11 and not on ANGLE Vulkan; an unflipped blit in the replay removes it. The present is now
+the layer's own exact texel-fetch draw (`Replayer.presentTexture`). Evidence and counts: `docs/known-bugs.md`,
+"ANGLE D3D11 flipped blit"; tests `packages/webgl2-compat/test/canvas-present.test.js` and
+`present-uniforms-browser.mjs`. Missing: which of ANGLE or the NVIDIA driver loses the binding, and other GPUs.
+No core, stage or public API change.
+
 ### Section 5 evidence: WGSL minus lookahead (batch 165)
 
 The compatibility parser now distinguishes expression subtraction/negation from

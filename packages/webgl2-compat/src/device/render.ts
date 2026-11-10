@@ -1031,11 +1031,35 @@ export class Replayer {
     return hasDepth(s.info) || hasStencil(s.info) ? this.framebuffer([], s) : this.framebuffer([s]);
   }
 
-  /** A framebuffer with level 0, layer 0 of a texture as its one colour attachment (the canvas present reads it). */
-  framebufferOf(t: CompatTexture): WebGLFramebuffer {
-    const p = t.primary as TextureStorage;
+  /**
+   * Copies level 0 of canvas texture `t` into the context's drawing buffer, upside down (WebGL's rows run bottom-up),
+   * with alpha 1 when `opaque`: a full-target triangle of the layer's own that fetches one texel a pixel, so the copy
+   * is exact. Not blitFramebuffer and a colour-masked clear: Chrome's ANGLE D3D11 backend makes a flipped blit and a
+   * masked clear with shaders of its own, and after them the fragment-stage uniform blocks of a later draw that
+   * changes no binding sometimes read zero (docs/known-bugs.md, "ANGLE D3D11 flipped blit").
+   */
+  presentTexture(t: CompatTexture, opaque: boolean): void {
+    const gl = this.gl,
+      state = this.device.state,
+      p = t.primary as TextureStorage;
     t.read(p, 0, 1, 0, 1, this.sync);
-    return this.framebuffer([this.sub(p, 0, 0)]);
+    const h = this.helper(
+      'present',
+      'uniform highp sampler2D t;\nuniform ivec4 o;\nout highp vec4 c;\n' +
+        'void main() { c = texelFetch(t, ivec2(int(gl_FragCoord.x), o.y - 1 - int(gl_FragCoord.y)), 0); if (o.x == 1) c.a = 1.0; }',
+    );
+    state.bindDrawFramebuffer(null);
+    this.helperState(h, t.width, t.height);
+    state.unit(0, p.target, p.gl, this.device.loadSampler);
+    const all = `0:${t.mipLevelCount - 1}`;
+    if (p.levels !== all) {
+      state.activeUnit(0);
+      gl.texParameteri(p.target, gl.TEXTURE_BASE_LEVEL, 0);
+      gl.texParameteri(p.target, gl.TEXTURE_MAX_LEVEL, t.mipLevelCount - 1);
+      p.levels = all;
+    }
+    gl.uniform4i(h.offset, opaque ? 1 : 0, t.height, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   /** Full colour and depth write masks and no scissor, for clears and blits. */

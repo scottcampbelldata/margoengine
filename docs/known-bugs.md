@@ -5374,6 +5374,35 @@ Fixed 2026-11-10: Batch 176 inspection. GPU planner registrations and command or
 - Batch 120 path audit: a browser without WebGPU needs an explicit @margoengine/webgl2-compat install, one extra step compared with a bundled WebGL renderer. Cause is the deliberate optional backend boundary; documentation and both kit-backend checks cover it, while reducing the extra setup remains a release UX decision.
 - Batch 120 incidental documentation gate, base b4404cddb: node --test tests/from-threejs-snippets.test.js flags docs/guides/react-test-offscreen.md because it has no ts fence recognized by the snippet harness. All changed kit/import/migration guide snippets pass; the unrelated React guide/harness mismatch is deferred to its owner under rule 21.
 
+### Fixed: ANGLE D3D11 flipped blit left the next draws' fragment uniform blocks reading zero (batch 166 job 2)
+
+- **Symptom:** on the WebGL2 layer under Chrome's default ANGLE D3D11 backend (RTX A6000), the 50,000-box frame of
+  `packages/materials/test/vertex-inputs.html?bench` drew every box black, coverage intact, in about 35 of 100 page
+  loads with batch 166 job 2's vertex fetch cuts, and in about 7 of 100 with origin/main's code once Chrome's program
+  cache was off (`--disable-gpu-program-cache --disable-gpu-shader-disk-cache`, as on a first visit). Native WebGPU and
+  ANGLE Vulkan never did it.
+- **Not Margo's GL state:** a recorder of every WebGL2 call with its payload bytes showed good and black loads issuing
+  the same 389 calls with byte-identical data; they differ only in how many times the layer polled a fence. Redrawing
+  the same draw from the same state after a black frame came out right. A changed fragment shader showed the fragment
+  stage's uniform blocks reading zero while varyings and the vertex stage's reads of the same binding were correct.
+- **Below Margo:** replaying the recorded calls on a bare WebGL2 context, no Margo code loaded
+  (kept outside the repository in lane A's `.lane/`: `b166hunt-gl.js` recorder and replayer, `b166hunt-rr.mjs` with `MODE=record` or `MODE=replay`, recordings `b166hunt/rec-*.json`; program cache off): the job 2 stream drew black
+  in 6 to 7 of 15 replays, origin/main's stream in 5 of 20, and the job 2 stream on ANGLE Vulkan in 0 of 20. Edits of
+  the replayed stream: changing only the present's y-flipped `blitFramebuffer` into an unflipped one gave 0 of 20;
+  binding either uniform range again before each draw gave 0 of 15; leaving out the two programs that were linked but
+  never drawn gave 0 of 15; resolving every link at once, clearing without the scissor, dropping
+  `invalidateFramebuffer` or giving the vertex blocks their own binding points did not help. So after the flipped
+  blit, which ANGLE's D3D11 backend makes with shaders and constant buffers of its own, a later draw that changes no
+  uniform binding sometimes runs with its fragment constant buffers unbound. Whether ANGLE or the NVIDIA D3D11 driver
+  owns the lost binding is not settled; it needs a report to ANGLE with the replay.
+- **Fix in the layer:** the canvas present no longer blits. `Replayer.presentTexture` draws a full-target triangle of
+  the layer's own that fetches one texel a pixel, flipped in the shader, and writes alpha 1 for an opaque canvas
+  instead of a colour-masked clear (also a shader path in ANGLE D3D11). The copy is exact. Regression tests:
+  `packages/webgl2-compat/test/canvas-present.test.js` (no blit, no clear, one helper draw, fails before the fix) and
+  `packages/webgl2-compat/test/present-uniforms-browser.mjs` (12 cold-cache loads of the 50,000-box frame, all lit and
+  identical; before the fix load 7 drew black). After the fix, real page: job 2 0 of 20 with the cache and 0 of 20
+  without it, origin/main's code 0 of 20 without it.
+
 ### Open: ANGLE D3D11 returns two versions of the same MSAA-resolved HDR texture (compat dispersion live reset; sciviz geo-lod restore; likely the atmosphere same-source byte)
 
 Platform defect below the compatibility layer, proven at the WebGL call level (bug hunt, 2026-11-10). No exact workaround exists inside `@margoengine/webgl2-compat`, so the exact assertions stay unchanged and open.

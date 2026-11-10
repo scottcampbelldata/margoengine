@@ -1,7 +1,8 @@
 // GPUCanvasContext of the compatibility layer (W3C WebGPU specification section 21). A device renders into its own
 // offscreen WebGL2 context; the canvas texture is an ordinary texture of that device, and presenting copies it,
 // flipped into WebGL's bottom-up order, to the context's drawing buffer and from there to the page canvas (as an
-// ImageBitmap, or with drawImage where OffscreenCanvas is missing). The copy is exact: same size, no filtering.
+// ImageBitmap, or with drawImage where OffscreenCanvas is missing). The copy is exact: same size, one texel fetch a
+// pixel (Replayer.presentTexture).
 import { CompatDevice } from './device.js';
 import { type CompatTexture, TextureUsage } from './resources.js';
 
@@ -94,24 +95,13 @@ export class CompatCanvasContext {
       c = this.config;
     if (!t || !c || t.destroyed || c.device.destroyed) return;
     const device = c.device,
-      gl = device.gl,
-      s = device.state;
+      gl = device.gl;
     const source = gl.canvas as Canvas;
     if (source.width !== t.width || source.height !== t.height) {
       source.width = t.width;
       source.height = t.height;
     }
-    const read = device.replayer.framebufferOf(t);
-    s.bindReadFramebuffer(read);
-    s.bindDrawFramebuffer(null);
-    s.enable(gl.SCISSOR_TEST, false);
-    s.set('colorMask', '1111', () => gl.colorMask(true, true, true, true));
-    gl.blitFramebuffer(0, 0, t.width, t.height, 0, t.height, t.width, 0, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-    if ((c.alphaMode ?? 'opaque') === 'opaque') {
-      s.set('colorMask', '0001', () => gl.colorMask(false, false, false, true));
-      gl.clearColor(0, 0, 0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-    }
+    device.replayer.presentTexture(t, (c.alphaMode ?? 'opaque') === 'opaque');
     const transferable = typeof (source as OffscreenCanvas).transferToImageBitmap === 'function';
     // A canvas's mode cannot change on reconfiguration. XR devices use page-backed
     // sources; desktop devices use OffscreenCanvas. Either source must reach the
