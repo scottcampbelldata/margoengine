@@ -336,8 +336,9 @@ console.log(half.triangles, half.error, lods.map((level) => level.triangles.afte
   are input values and textures never swim; the trade is a slightly larger error than optimal placement. Border and
   UV-seam vertices slide only along their own border or seam (with the paper's perpendicular constraint planes), and
   corners where seams meet stay. Collapses that would fold a triangle, flip its UVs, pinch the surface (the link
-  condition) or leave a sliver are skipped, so the target is a ceiling. `maxError` is a squared distance in local
-  units. Coplanar triangles of one source face merge back into convex polygons; `faceMap` and `sourceVertices`
+  condition) or leave a sliver are skipped, so the target is a ceiling. `maxError` and the reported `error` are
+  squared distances in local units: each vertex's quadric is divided by the face area summed into it (an
+  area-weighted mean), so the same value means the same at any model scale. Coplanar triangles of one source face merge back into convex polygons; `faceMap` and `sourceVertices`
   give provenance.
 - `meshLODChain(mesh, {ratios = [0.5, 0.25, 0.125]})` simplifies each level from the previous one, so levels nest and
   seams match between them.

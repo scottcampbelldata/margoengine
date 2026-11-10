@@ -10,7 +10,10 @@ export interface SimplifyOptions {
   ratio?: number;
   /** Stop at this many triangles (or fewer only when nothing more can be collapsed). */
   targetTriangles?: number;
-  /** Stop before any collapse whose quadric error (squared distance, local units) exceeds this. Default: no limit. */
+  /**
+   * Stop before any collapse whose quadric error exceeds this: the area-weighted mean squared distance of the moved
+   * vertex from the planes it merges, in squared local units. Default: no limit.
+   */
   maxError?: number;
   /** Input vertex indices that cannot move or disappear. Default none; use for shared cluster boundaries. */
   lockedVertices?: readonly number[];
@@ -27,7 +30,7 @@ export interface SimplifyResult {
   mesh: PolygonMesh;
   /** Input triangle count (faces fanned) and output triangle count. */
   triangles: { before: number; after: number };
-  /** Largest quadric error of any collapse made (squared local units). */
+  /** Largest quadric error of any collapse made (area-weighted mean squared distance, squared local units). */
   error: number;
   /** Conservative maximum displacement in local units, including accumulated collapses (not a quadric cost). */
   maxDeviation: number;
@@ -183,7 +186,10 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
   };
   const featureEdges = (u: number) => [...neighbors(u)].filter((w) => isFeature(u, w));
   // Quadrics: area-weighted face planes, plus heavy perpendicular planes along borders and seams.
-  const Q: Quadric[] = P.map(() => new Float64Array(10));
+  const Q: Quadric[] = P.map(() => new Float64Array(10)),
+    // Summed face areas behind each quadric: dividing by it turns the area-weighted sum (length^4) into a mean squared
+    // distance (length^2), so maxError and error read the same at any model scale.
+    W = new Float64Array(P.length);
   const normalOf = (a: readonly number[], b: readonly number[], c: readonly number[]) => {
     const ux = b[0] - a[0],
       uy = b[1] - a[1],
@@ -204,7 +210,10 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
       ny = n[1] / l,
       nz = n[2] / l,
       d = -(nx * P[a][0] + ny * P[a][1] + nz * P[a][2]);
-    for (const v of [a, b, c]) addPlane(Q[v], nx, ny, nz, d, l / 2);
+    for (const v of [a, b, c]) {
+      addPlane(Q[v], nx, ny, nz, d, l / 2);
+      W[v] += l / 2;
+    }
   });
   const handled = new Set<string>();
   for (let u = 0; u < P.length; u++)
@@ -243,7 +252,9 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
   const consider = (u: number) => {
     for (const v of neighbors(u)) {
       if (!canMove(u, v)) continue;
-      heap.push({ cost: evaluate(Q[u], P[v]) + evaluate(Q[v], P[v]), from: u, to: v, su: stamp[u], sv: stamp[v] });
+      const weight = W[u] + W[v],
+        cost = (evaluate(Q[u], P[v]) + evaluate(Q[v], P[v])) / (weight > 0 ? weight : 1);
+      heap.push({ cost, from: u, to: v, su: stamp[u], sv: stamp[v] });
     }
   };
   for (let u = 0; u < P.length; u++) if (around[u].size) consider(u);
@@ -322,6 +333,7 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
     deviation[v] = Math.max(deviation[v], deviation[u] + Math.hypot(...P[u].map((x, k) => x - P[v][k])));
     maxDeviation = Math.max(maxDeviation, deviation[v]);
     for (let k = 0; k < 10; k++) Q[v][k] += Q[u][k];
+    W[v] += W[u];
     return true;
   };
   while (triangles > target && heap.items.length) {

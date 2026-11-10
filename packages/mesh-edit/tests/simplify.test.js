@@ -152,3 +152,28 @@ test('a collapse never makes a face of corners a hair apart: a sphere whose pole
   assert.ok(chain[1].triangles.after < chain[0].triangles.after);
   assert.ok(chain[0].triangles.after < indices.length / 3);
 });
+
+test('simplify error and maxError are squared distances: scaling the model by 4 scales them by 16', () => {
+  const base = grid(8),
+    faces = base.faces.flatMap((f) =>
+      [1, 2].map((c) => ({
+        id: `${f.id}:${c}`,
+        vertices: [f.vertices[0], f.vertices[c], f.vertices[c + 1]],
+        uv: [f.uv[0], f.uv[c], f.uv[c + 1]],
+      })),
+    ),
+    bumpy = (s) => ({
+      vertices: base.vertices.map(([x, , z]) => [x * s, Math.sin(x) * Math.cos(z) * 0.3 * s, z * s]),
+      faces,
+    });
+  const one = K.simplifyMesh(bumpy(1), { ratio: 0.3, mergeCoplanar: false }),
+    four = K.simplifyMesh(bumpy(4), { ratio: 0.3, mergeCoplanar: false });
+  assert.equal(four.triangles.after, one.triangles.after);
+  assert.ok(one.error > 0);
+  assert.equal(four.error, 16 * one.error, 'the error is a squared distance, not area times squared distance');
+  // A maxError picked as a squared distance means the same at both scales.
+  const limit = one.error / 2,
+    small = K.simplifyMesh(bumpy(1), { ratio: 0, maxError: limit, mergeCoplanar: false }),
+    large = K.simplifyMesh(bumpy(4), { ratio: 0, maxError: 16 * limit, mergeCoplanar: false });
+  assert.equal(large.triangles.after, small.triangles.after);
+});

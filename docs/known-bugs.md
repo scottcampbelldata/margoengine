@@ -5858,3 +5858,7 @@ changed. Repro: `MARGO_GPU_SLOTS=2 node packages/webgl2-compat/test/features-bro
 ## Batch 132 audit: mixer (fixed)
 
 - Fixed: `createEffect` (packages/mixer/src/effects.ts) accepted a filter `q` from -40 to 1000 for every filter type, so an eq band or filter effect took a bandpass, notch, allpass or peaking `q` of 0 or below (alpha = sin(w0) / 2q gives no filter of that kind) and a lowpass or highpass resonance up to 1000 dB, while the reference `biquadCoefficients` refuses all of them. The effect now uses the reference ranges. Regression: the bad-q cases in "effect settings are validated and mapped to node parameters" in packages/mixer/tests/mixer.test.js.
+
+## Batch 132 audit: mesh-edit (fixed)
+
+- Fixed: `simplifyMesh` (packages/mesh-edit/src/simplify.ts) documented `maxError` and `error` as squared distances, but its quadrics are weighted by face area (Garland and Heckbert), so the cost was area times squared distance (length to the fourth): scaling a model by 10 scaled `error` by 10,000, and a `maxError` picked as a squared distance stopped at a different point on every model scale. Each vertex now carries the face area summed into its quadric and the cost is divided by it (an area-weighted mean squared distance). Regression: "simplify error and maxError are squared distances: scaling the model by 4 scales them by 16" in packages/mesh-edit/tests/simplify.test.js.
