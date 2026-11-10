@@ -4211,7 +4211,7 @@ The numerical/consumer limits are in limits.md and the sciviz README; no algorit
 Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.
 
 Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.
-`scripts/gpu-package-tests.mjs --serial` labels shared leases `check:gpu-packages`, so sameLane serializes unrelated worktrees with that owner; repro: queue serial suites in two lanes. Workaround for this lane: wrap the real GPU suite with gpu-lock run --owner=codex-batch197; leave shared scheduler repair for the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 197). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
 Fixed with animation landing: React bindings/instances browser scripts now select repository-root cwd. The package-cwd CPU regression covers every React browser leaf; native/compat GPU checks retain their assertions.
 Batch 251 job 3: the exact plateau-mean fixture exposed naive-sum rounding.
@@ -4237,7 +4237,7 @@ overload; runtime parsing and reference validation are unaffected.
 
 No open defect identified in the new completion/AbortSignal entry. Deterministic lifecycle coverage is in packages/tween/test/async.test.js; existing root APIs remain available.
 
-Batch 215 outside scope: node packages/cutscene/tests/vfx-browser.mjs --compat fails frame 40 replay equality on clean origin/main 01faf2a63 with the same hashes as the tween branch (played particles 3932506386, sought 397093820; both picture 396217175 and live 110). Reproduced once after a clean-main build; log .review/b215-main-cutscene-compat.log. This predates the six tween jobs and belongs to compatibility VFX replay/readback state; exact differing particle words and root cause remain for the owning lane. Dependent GPU coverage runs in local CI under rule 23.
+Fixed 2026-11-10: Batch 215 outside scope. cutscene VFX replay waits for the actual compatibility route before recording (326c67544). Unchanged vfx-browser.mjs --compat passes all seven replay frames including frame 40 particle hash 397093820.
 
 ## Batch 262 tweak panel
 
@@ -4249,9 +4249,9 @@ text, retained vector/colour references, shared folders and abort cleanup.
 
 Resolved on main by 2c1b94730: the GPU queue now observes owner exit before replaying completion evidence.
 
-Outside batch 262: run scripts/gpu-package-tests.mjs in two different worktrees; both request owner check:gpu-packages, and ownerLane maps both to check, so sameLane serializes unrelated lanes. Use a distinct lane owner when running these tests directly; the runner owner needs a tooling fix.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 262). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
-Outside batch 262: node packages/cutscene/tests/vfx-browser.mjs --compat reproduces on clean origin/main 5d6e5facd without any inspector changes: frame 40 sought particle hash 397093820 vs played 3932506386, live 110 and picture 396217175 match. The compatibility VFX reset/replay or readback cause remains unproven. Log: test-results/batch262-resume-baseline-gate-0.log. Dependent GPU coverage belongs to scheduled CI and does not gate inspector landing.
+Fixed 2026-11-10: Outside batch 262. cutscene VFX replay waits for the actual compatibility route before recording (326c67544). Unchanged vfx-browser.mjs --compat passes all seven replay frames including frame 40 particle hash 397093820.
 
 
 ### Fixed in batch 262: inspector disposal in another scene
@@ -4297,7 +4297,7 @@ without the shared exclusion and passes with no notifications.
 
 Outside the batch 262 single-aspect viewer: simultaneous depth and stencil bindings of one resolved MSAA source still share the backend resolved texture object. applyBindings changes that object mode per binding, so the last aspect wins; ordinary non-MSAA views already get separate aliases. Repro for the fix phase: one fragment shader textureLoads both aspects of a 4-sample depth24plus-stencil8 texture in the same draw; allocate synchronized resolved aliases per aspect.
 
-Outside batch 262: scoped API surface merging accepts conflict markers and duplicate package rows from its input (observed on main 8b5e85718, including the 9ed943656 marker). scripts/api-report-scope.mjs validates the first summary/header but never rejects conflict text or duplicate rows, so a scoped merge preserves them. Full api:update regenerates a clean report; fix phase should add strict input validation with a regression.
+Fixed 2026-11-10: Outside batch 262. scoped API merging rejects marked or duplicated input (6cf48539f). tests/api-report-scope.test.js passes all five checks.
 
 ### Batch 254 voice registration callback rollback (fix phase)
 Repro: start a decoded Audio, then manager.add(sound,{gain:()=>NaN}) throws for invalid gain; a second manager.add(sound) raises attached and the original sound remains paused. Cause: registration pauses the sound and inserts ownership before update evaluates the user gain callback, with no rollback on that error. Valid-input voice budgeting/phase tests pass. Per build-phase rules 21/22 this invalid-callback edge waits for the fix phase; restore the prior playback/ownership on failed registration with a regression test.
@@ -4312,7 +4312,7 @@ a second install or a stale build to mutate core's ownership registries silently
 two-install and stale-build regressions now reject before plugin work; same-path matching imports
 pass. [Design, regression and size evidence](core-version-guard.md).
 
-GPU queue owner collision: start gpu-package-tests.mjs in two worktrees; both use owner check:gpu-packages, so gpu-admission.mjs sameLane treats them as one lane and the second can wait for the first entire suite chain despite free slots. Repro: parallel runner in lane-T queued from 02:01:58 UTC behind lane-P; no tests ran. Cause: the generic owner is used as a lane identity in addition to the distinct worktree identity. This guard landing uses the supported gpu-lock run CLI with explicit owner lane-T-version-guard and serial nested suites; repair default runner owners in the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (version guard). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
 Dependent audio GPU validation is incomplete for the version-guard landing: the shared GPU monitor reclaimed lane-T-version-guard at 2026-11-10T02:28:06.439Z after 211623 ms without GPU activity, while audio/scripts/test-browser.js awaited its browser evaluations before writing audio-browser.json. The suite produced no report and did not reach its own 10 min limit. Root cause of the uncompleted audio evaluation is unconfirmed; monitor evidence is in the local GPU idle record and test-results/version-guard-resume/gpu-lane-T.log. No timeout or idle threshold was raised.
 
@@ -4358,8 +4358,8 @@ Batch 267 job 3: no open HTTP transport defect found in the real-network correct
 
 Build-phase follow-up outside batch 267 HTTP: direct stdio/createMcpServer calls with concurrent tools/call messages reusing one id overwrite the running cancellation map, and the first finalizer can delete the second entry. Repro: send two pending calls with id 7, then notifications/cancelled for id 7. Cause: server.ts running.set/delete has no duplicate ownership check. HTTP legacy now rejects duplicate active ids before dispatch; direct/stdin ownership repair is deferred under lane rule 21.
 
-Outside batch 267: node scripts/gpu-package-tests.mjs --no-build planning rejects packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs as browser-driving files absent from registered scripts. Cause: the browser-file registry has no matching commands/helper classification for those two files. MCP leaves are registered; this pre-existing registry issue is deferred to its owners under lane rule 21.
-- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+Fixed 2026-11-10: Outside batch 267. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
+Fixed 2026-11-10: Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8. notice regeneration preserves appended asset credits (a9aecea66). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
 ### Batch 172 pipeline regression coverage
 
@@ -4392,9 +4392,9 @@ error before any assertion ran. It now selects the repository root like the
 adjacent React browser suites. `packages/react/tests/browser-working-directory.test.js`
 reproduces the package invocation with a mocked browser entry and no GPU.
 
-Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-browser.mjs --compat fails frame40 particle bytes (397093820 vs 3932506386), with identical 110 live particles and picture 396217175; lane R batch 215 reproduced it on clean main. The dependent LOD imposter hang is resolved by batch 222: buffer mapping now waits its own nonforcing readback readiness after queued submits, retaining a device fence only for an invalid GPU-only shadow. Delayed scheduler tasks (fresh-timer message fallback) leave the event loop idle for WebGL sync state. The unchanged 16384-pick grid passes with 16362 agreements, every 262 imposter pixel and 1128 full-detail pixel picking correctly, and all original atlas sweep assertions pass (test-results/batch222-imposter-local.log). Cutscene remains with its owning package for the fix phase.
+Fixed 2026-11-10: animation dependent cutscene replay (326c67544). The unchanged compatibility VFX suite passes all seven frames including exact frame 40 particle bytes (397093820). The dependent LOD imposter hang is resolved by batch 222: buffer mapping now waits its own nonforcing readback readiness after queued submits, retaining a device fence only for an invalid GPU-only shadow. Delayed scheduler tasks (fresh-timer message fallback) leave the event loop idle for WebGL sync state. The unchanged 16384-pick grid passes with 16362 agreements, every 262 imposter pixel and 1128 full-detail pixel picking correctly, and all original atlas sweep assertions pass (test-results/batch222-imposter-local.log).
 
-GPU runner registration on clean origin/main b47fdef13: `node scripts/gpu-package-tests.mjs --plan --select=animation/test:gpu` rejects MCP assets-browser/live-browser, WebGL2 Firefox support and worker browser-matrix leaves as unregistered. This animation job changes none of their registrations; owning packages must register or classify those leaves in the fix phase.
+Fixed 2026-11-10: GPU runner registration on clean origin/main b47fdef13. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.
 
@@ -4424,7 +4424,7 @@ ImageBitmap uploads ignored requested unpack flip/alpha settings at the WebGL bo
 Incoming main61b17b70d independently repairs the inspector isolation blocker with its native-context observation, local compiler and regressions. Main also supplies the missing exporters/materials alias. Preserve those owner fixes and the existing isolation/import-equivalence tests; no duplicate implementation lands with this group.
 The final dependent check exposed the incoming exporters/sparse umbrella alias missing as well; regenerate it with the owning script and retain the original full import-equivalence regression. Quality was initially run beside React's source-fixture tests, so its file snapshot caught a temporary consumer.tsx that the test then removed. Run that gate after fixture-producing CPU tests finish; no engine failure, ignored file or tolerance change is claimed.
 Fixed in batch 208: StreamingAssetCache range misses left the background full-file body unread after its new response hook returned, so flush never finished and an offline full-file visit missed. Background fills now explicitly request complete buffered consumption. Regression: packages/cache/test/stream.test.js, background whole-file fill (5 s timeout before repair, exact 100-byte offline response afterward). Caller-facing streaming stays pull-driven.
-- Batch 259 tooling follow-up: `node scripts/gpu-package-tests.mjs --no-build --only=ui/` fails before selection because browser discovery classifies `packages/webgl2-compat/test/support/firefox-bidi.mjs` and `packages/worker/tests/browser-matrix.mjs` as unregistered suites. Cause: global discovery precedes scoped selection. UI GPU suites run directly under the shared GPU lock instead; tooling repair waits for its owner.
+Fixed 2026-11-10: Batch 259 tooling follow-up. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 210 job 1: requested action operations pass mixer.test.js and analytical/real-rig GPU checks. Cache lookup follow-up for the fix phase (under the 5% rule): existingAction on an unknown clip throws instead of returning null, and a fresh optional root can create an unnecessary player because the lookup calls resolve/player; repro new AnimationMixer(skeleton).existingAction("missing"), or existingAction(clip, anotherModel). The umbrella generator also restores the already-exported but missing exporters/splats alias; the existing umbrella consistency test covers that generated-file gap. Optional-root pointer rebinding and reverse-time scheduled starts receive broader fix-phase coverage in private/handoffs/finish-later.md; all requested mixer operations are built.
 
@@ -4432,7 +4432,7 @@ Batch 210 job 1: requested action operations pass mixer.test.js and analytical/r
 Origin/main 43e08376d added exporters/sparse without its umbrella facade. The ordinary umbrella generator needed for mesh-edit/boolean-batch also restores that upstream alias. Regression: tests/umbrella.test.js (manifest, identity and import-map checks). No exporter implementation changes.
 ### Batch 226 tags and lifecycle
 Fixed during integration: synchronous parent/creation notifications could expose attach transforms or clone metadata before initialization. Optional graph/clone now batch notifications until commit; the tags.test.js attach/clone listener and failed-allocation regression fails without that boundary. Failed observer installation restores any already-installed wrappers. No open defect found in the requested row; pre-saved method references and private-store mutation are documented observation limits.
-`check:gpu-packages --no-build --only=sprites --serial` cannot plan on main 59061a16b: packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs drive browsers but have no matching registered package script. The planner checks unrelated unregistered leaves before filtering. Batch 245 runs every sprites GPU leaf directly under the shared GPU lock, both backends; no assertions or scripts are weakened. Planner registration repair waits for its owning lanes.
+Fixed 2026-11-10: Batch 245 GPU planner registrations. GPU planner registrations and command ordering are repaired on main (af4b357e1, d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 - XR AR-extras GPU fixture: node packages/xr/tests/ar-extra.browser.mjs fails on clean origin/main 6ab64e777 as well as batch 265 with missing AR observations. The fixture counts session frames started before its async observation helpers attach; under shared load it reads before those helpers receive a frame. Receipt: test-results/batch265-resume-cleanmain-xr-ar.log. Owning fixture fix waits for the fix phase (rule 21).
 
@@ -4470,13 +4470,13 @@ WebGL2 timeout did not recur on either checkpoint or attribute inputs. Native
 composition was not retried; its readiness failure remains open.
 - Bug 45 PARKED (rule 21): native path-tracing compiler pressure and CPU/GPU camera rounding remain unresolved; native split work retained on bug45-native-split at 333a02a44 for the fix phase.
 - BLAS landing dependent-gate repair: controls/globe had a manually ordered umbrella export and lacked its generator banner; node scripts/umbrella.mjs restores canonical output, covered by tests/umbrella.test.js.
-- Outside batch 243: direct serial scripts/gpu-package-tests.mjs requests use owner check:gpu-packages for every worktree; ownerLane collapses them to check, so unrelated runners block admission. Repro: two direct serial runners on different worktrees. Use the brief-required outer named shared lock for this lane; tooling repair waits for the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 243). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 - BLAS dependent-gate repair: React bindings/instances commands served rooted fixture URLs from the package directory and returned navigation errors. Commands now select the repository root; packages/react/tests/browser-scripts.test.js fails before repair and checks the browser fixture class.
 
-Batch 243 outside scope: the package GPU planner rejects webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs as unregistered browser leaves on main. Cause: planning scans support runners without matching their registered parent script. Changed mesh/React GPU fixtures run directly under this lane's named shared lock; planner repair waits for the fix phase.
+Fixed 2026-11-10: Batch 243 outside scope. Current complete GPU plan passes browser registration and chain validation; original repairs: d7be06653. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 - Batch 172 clean-main atmosphere check (948fc52e5): native passes; WebGL2 fails zero-cloud transparency before reaching restoration (expected hash 1630307923, actual -1597066215), with no page errors. Repro: node packages/sciviz/tests/atmosphere-browser.mjs. Existing retained atmosphere/GPU-flow render state failure is baseline, not calculator-induced; exact root cause remains in the atmosphere/compatibility owner. Preserve all assertions; rules 21/22 defer it.
 
-Batch 265 integration observation: on main baseline 298227511, scripts/gpu-package-tests.mjs rejects its complete plan before selecting React because packages/mcp/tests/live-browser.mjs and packages/worker/tests/browser-matrix.mjs have no registered starter recognized by that planner. Cause: global browser reachability validation runs before --select filtering. React browser leaves are run directly under the same shared GPU lock; planner registration repair belongs to the owning tooling lane.
+Fixed 2026-11-10: Batch 265 integration observation. GPU planner registrations and command ordering are repaired on main (af4b357e1, d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 ### Mesh repair validation boundary (batch 224)
 The repair entry sanitizes invalid soup positions/faces and compacts discarded vertices before calling the strict hole-fill API. The nonfinite-position fixture in packages/mesh-edit/tests/repair.test.js retains the regression; validation is not weakened. Remaining open borders, zero volume and geometric reconstruction limits are explicitly reported and documented in docs/limits.md.
@@ -4485,7 +4485,7 @@ Batch 210 job 2: no open playback defect found by the loop, endpoint, event, pro
 
 
 Batch 207 object actions: generated dependency-graph instances still use export-frame world placement (objects.py keeps these as roots); animating the generating collection/pivot does not yet resample instance transforms. Repro: animate a collection-instancing empty and export with object_animation=True; ordinary mesh/empty object actions and hierarchy are covered.
-Batch 205 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=decoders` fails during plan construction because packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs are not registered in the runner; direct changed-package commands cover this job. Owning runner registration waits for its lane/fix phase.
+Fixed 2026-11-10: Batch 205 gate observation. Current complete GPU plan passes browser registration and chain validation; original repairs: d7be06653. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 Fixed within batch 205: FBX previously selected only the first image hook, so an image converter later in extensions was unreachable. The reader now tries registered converters in order; packages/fbx/test/textures.test.js covers PBR plus textures in either order.
 
@@ -4505,7 +4505,7 @@ Batch 243 job 2 historical compatibility timeout: the earlier renderImage call r
 
 Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked: export real mesh objects for spatially distinct irradiance (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects).
 
-- Batch 246 gate inventory finding: `node scripts/gpu-package-tests.mjs --no-build --only=tilemap` rejects existing unregistered browser drivers headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs before selecting tilemap. Cause: global driver inventory runs before selection; tilemap uses its registered leaf commands directly. Deferred to the owning lanes.
+Fixed 2026-11-10: Batch 246 gate inventory finding. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 ### Fixed: repair alias during batch 224 rebase
 The job 3 shared-manifest conflict resolution took the upstream umbrella manifest, leaving the new repair source facade without its export mapping. Regenerate the umbrella from all package exports after resolving the manifest, before the rebase commit, rather than accepting one side's generated JSON. Job 4 restores the mapping together with the new hull entries. Regression: tests/umbrella.test.js validates manifests, binding identities and import maps; the lane's local merge helper now regenerates before continuing a rebase.
@@ -4543,14 +4543,14 @@ No open correctness defect identified. Regression covers layout scale reaching D
 
 Batch 266 input helpers: alias-release and modifier-change regressions are covered in controls-extra.test.js; no additional known defect found in this job.
 
-Batch 266 gate finding: gpu-package-tests plan rejects unregistered browser support files in headless, webgl2-compat and worker before React selection. Cause: global loose-browser discovery precedes --only filtering. React registered scripts run directly under shared locks for this job; owning lanes retain planner registration work.
+Fixed 2026-11-10: Batch 266 gate finding. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 266 fixed: PresentationControls tested only the root mesh, so local dragging a React group never started. The owning controls entry now tests live descendants, excluding detached or unrelated meshes; controls/tests/presentation.test.js and the local-drag browser fixture cover the cause.
 ### Batch 231 textured scatter
 
 Fixed during construction: general 4x4 conjugation can round an affine last-row 1 off unity for non-dyadic node scales. The attachment restores the mathematically exact affine last row before passing it to PBRInstances; textured.test.js retains a non-dyadic scaled-node regression. No open textured-scatter defect remains.
 
-Build-phase tooling gap: node scripts/gpu-package-tests.mjs --no-build --only=scatter --list refuses before selection because headless/tests/gif-gpu.mjs, headless/tests/tiles-gpu.mjs, webgl2-compat/test/support/firefox-bidi.mjs and worker/tests/browser-matrix.mjs are not registered by that global plan. Cause: global discovery validates unrelated browser files before applying --only. Batch 231 runs every scatter browser script directly on both backends under the shared GPU lock; owning lanes can register the unrelated files.
+Fixed 2026-11-10: Build-phase tooling gap. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 
 ### Batch 229 job 1: imagery evidence
@@ -4629,7 +4629,7 @@ Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage;
 ### Batch 244 job 1
 The camera rig is built with direct CPU trace and GPU overlay regressions. No open defect identified in this job's scope; other known defects remain in their existing entries.
 
-Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing unregistered headless/rigging/splats/worker browser files before selecting pixel. Repro: node scripts/gpu-package-tests.mjs --no-build --only=pixel. Cause: global registration audit precedes selection. Pixel package GPU scripts run directly on both backends for this batch.
+Fixed 2026-11-10: Outside batch 244. Current complete GPU plan passes browser registration and chain validation; original repairs: 326c67544, d7be06653, f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 - Batch 236: origin/main 42c1cbdac already contains conflict markers in known-bugs.md and whitepaper/reproduce.md; reproduce with rg for conflict markers. Cause: committed shared-doc merge text. Outside weather scope, deferred under rule 21.
 Batch 212 analyser: repaired bus insertion deleting internal output taps and shared-document merge markers, both covered by regression tests. No open tested defect.
@@ -4659,7 +4659,7 @@ Batch 244 landing repair: the existing umbrella generated-file regression expose
 ### Batch 196 panorama
 
 No known open defect in the completed panorama entry; cancellation observes the pending map rejection before unmapping, covered by panorama-browser.mjs.
-GPU plan registration: tests/gpu-browser-registration.test.js fails because packages/cameras/test/panorama-browser.mjs, packages/cameras/test/stereo-browser.mjs and packages/splats/test/gpu/lod-sog-check.mjs drive a browser but no package script starts them. Repro: node --test tests/gpu-browser-registration.test.js. Cause: drivers added without a test:gpu or test:browser script; owners cameras and splats, deferred under rule 21. The weather driver is registered as weather test:browser:parity (batch 236 job 2).
+Fixed 2026-11-10: GPU plan registration. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 Batch 248 job 3: prebuilt RGB field reduction was the cause of rounded MSDF corners; fixed by sampling RGB before median, covered by interpolation and GPU regression tests.
 Batch 212 fx: full-wet mixing now preserves processed signed zero, covered by the quantisation regression; no open defect found in tested equations or rendered chains.
 
@@ -4706,7 +4706,7 @@ Build-phase follow-up (batch 212 analyser): queue a meter report, call reset(), 
 ### Batch 214 scope
 Chain avoidance has no known defect from its correctness cases; bounded search and static-only limitations are documented in limits.md.
 
-Batch 214 unrelated GPU planner repro: node scripts/gpu-package-tests.mjs --no-build --select=animator/test:gpu rejects cameras/test/panorama-browser.mjs and weather/tests/parity-browser.mjs because neither has a registered package test script. Changed-package GPU leaves run directly under the lock instead; owners must register these scripts.
+Fixed 2026-11-10: Batch 214 unrelated GPU planner repro. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 238 job 4: no open modifier defect found by independent SH/position/opacity probes, repeated seek, lifecycle and real-image restoration checks. Source centre/opacity changes require explicit setRest, as documented; RGB, SH and covariance remain live inputs.
 
@@ -4746,7 +4746,7 @@ Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The
 Batch 214 job 2: no new defect found in legal-pose rejection; static-only scope and undefined twist at antipodal swing are documented in limits.md.
 
 
-Batch 203 gate discovery: node scripts/gpu-package-tests.mjs --no-build --only=decoders --list fails before selection because cameras panorama/stereo, splats lod-sog-check and weather parity browser scripts lack registrations. Cause: global plan validation runs before package filtering. Changed-package suites were invoked directly under the shared GPU lock; registration repair belongs to the owning build jobs.
+Fixed 2026-11-10: Batch 203 gate discovery. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Batch 240 job 2: object-block tests cover source-disposal independence, invalid graph rejection before defining an id, per-instance culling and streamed removal. No open defect accepted for this job.
 
@@ -4769,7 +4769,7 @@ Batch 270 job 2: no new open defects identified in lifetime dynamics; exact rese
 
 - Batch 193 job 1: no open defect found in HueGrade; its display-linear domain, 64-point cap and HSV luminance difference are documented limits.
 
-- Batch 193 gate finding: the GPU package runner cannot select tonemap because packages/water/package.json has an npm build in the middle of test:gpu. Repro: node scripts/gpu-package-tests.mjs --no-build --only=tonemap. Tonemap scripts run directly under the shared lock; water script correction belongs to its lane.
+Fixed 2026-11-10: Batch 193 gate finding. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 ### Closed: draws into a 3D slice beside a depth attachment (batch 271 job 1)
 On the WebGL2 layer, a render pass whose colour attachment is a slice of a 3D texture and which also attaches depth or stencil kept its clear colour: every draw was dropped. Cause, measured in raw WebGL2 on ANGLE Direct3D 11 (NVIDIA RTX A6000, Chrome): with a DEPTH_COMPONENT32F texture or renderbuffer beside `framebufferTextureLayer` of an RGBA8 3D texture, the framebuffer is complete, `clearBufferfv` lands and `drawArrays` writes nothing, with no GL error; the same draw into a 2D texture, an array layer, or the 3D slice with no depth attachment lands (30 probe rows, 8 failing, all 3D with depth). Fix in `@margoengine/webgl2-compat` (`Replayer.standIn`, `CompatTexture.sliceStandIn`): such a slice is drawn in a 2D stand-in of the same format and level size, loaded from the slice on `loadOp: 'load'` and blitted back on `storeOp: 'store'`. Regression: `volumeSliceDepth` in `packages/webgl2-compat/test/features.html` (native and layer must match, plus exact expected bytes); it failed before the fix (slice 0 red on the layer, green natively) and passes after. `node packages/creative/scripts/test-targets-depth.js --compat` now passes 164 surfaces.
@@ -4797,7 +4797,7 @@ Batch 270 job 4: no new open defects identified in scheduling; the prewarm compa
 ## Batch 185 job 4
 The missing texture-array node is built in shader/texture-array, including restoration through the existing material codec. No open defect was found in layer selection, binding sharing, fallback, colour-space sampling or lifecycle. Limits and backend evidence are recorded in limits.md.
 Batch 184 transmission background list: no open defect in eight native/compat, sorted/weighted, 1x/4x grids including foreground, opaque occlusion and device restore. Existing materials dispersion live-reset compatibility defect is outside the unchanged transmission sampling/uniform paths and remains tracked above.
-Batch 184 gate discovery: gpu-package-tests plan() rejects the existing packages/water test:gpu script because npm run build appears inside its command chain; use the materials manifest directly for this lane. Water command ordering owns the cause and is outside this materials job.
+Fixed 2026-11-10: Batch 184 gate discovery. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 Fixed during batch 184 landing: materials KTX2 BC7/ETC/ASTC copies always uploaded a linear internal format, then requested an sRGB reinterpretation that WebGL2 cannot perform for nonrenderable compressed textures. The materials upload now caches a direct compressed upload per requested colour space on compatibility devices. Regression: materials/test/texture-formats.test.js checks both first-use orders, per-format views, reuse, update and disposal; the original GPU repro is mat-more-gpu-check.js with MARGO_COMPAT=1.
 
@@ -4816,7 +4816,7 @@ Repro: install compatShim in packages/taa/test/upscale-browser.mjs and run the u
 
 Batch 270 job 5: no new open defects identified in preset save/load; typed precision, signed zero, missing resources, pollution keys, exact simulation replay and pixel equality have regression coverage.
 
-- Batch 272 unrelated gate finding: gpu-package-tests plan fails before staging selection when packages/water/package.json test:gpu places npm run build after initial GPU steps; move that build to the script start in the owning lane. Repro: node scripts/gpu-package-tests.mjs --no-build --select=staging/test:gpu. Staging gates are run directly instead.
+Fixed 2026-11-10: Batch 272 unrelated gate finding. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 
 ### Batch 189: cloud/weather fallback support
@@ -4852,7 +4852,7 @@ Fur follow-up integration, outside the completed shell-controls row: combining a
 Fixed while landing batch 195 job 1: main 72642362b retained an old VFX test:gpu line beside its fuller replacement with no separator, so every manifest consumer rejected JSON. Remove the stale duplicate and retain all parity cases. Regression: tests/integration-json.test.js.
 
 Fixed batch 270 registration manifest merge: a text-only conflict resolver concatenated two package JSON property lines without a comma during the rebase onto an upstream dedicated parity script. The package manifest is now reconstructed as valid JSON, retaining the upstream script and placing both --all backend runs there. Existing test:gpu stays the original render suite, so CI does not duplicate parity runs. gpu-registration.test.js now checks all automatically discovered GPU scripts together with the same two-backend assertions. The lane resolver rejects other JSON conflicts for structural resolution, and landing validates changed JSON before a push.
-Batch 186 gate finding: gpu-package-tests.mjs --select=clustered/test:gpu fails during its global plan because packages/water/package.json places npm run build midway through test:gpu. Run the selected clustered scripts directly; water ownership must move that build to the start in the fix phase.
+Fixed 2026-11-10: Batch 186 gate finding. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 quality/events (batch 195 job 3): no open defect found in motion policy, queued-input coalescing, asynchronous pick serialization, rejection or cancellation tests. Explicit notification of programmatic movement and no stationary-pointer polling are documented contracts in limits.md.
 
@@ -4860,7 +4860,7 @@ Batch 201 job 2: DDS source loading, retained mip uploads and signed/HDR fallbac
 
 Batch 177 job 1: the finite-supertriangle design was replaced before landing by convex hull initialization plus Delaunay legalization. Thin-domain coverage and empty-circumcircle tests retain the regression; no open contour2d correctness defect is known. Inline label collision avoidance is a future layout quality improvement documented in limits.md.
 
-Batch 177 out-of-scope gate finding: `node scripts/gpu-package-tests.mjs --list --only=sciviz --no-build` rejects `packages/water/package.json` because `test:gpu` contains `npm run build` after browser commands. Cause: planner validates every package before applying selection. Sciviz's own GPU commands run directly through the shared lock for this job; water script ordering belongs to its owner during the build phase.
+Fixed 2026-11-10: Batch 177 out-of-scope gate finding. GPU planner registrations and command ordering are repaired on main (f235e21f0). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 Batch 184 packaging follow-up: the fur conflict resolution locale-sorted the generated umbrella export keys, violating its canonical package-group and owning-entry order. Upstream regeneration has restored the canonical map; this follow-up adds packages/margoengine/tests/export-order.test.js to catch that conflict-resolution class independently. No export key, target or condition changed. Incoming main f9ff16e06 independently contains invalid packages/vfx/package.json JSON: a missing comma between two test:gpu properties (lines 34-35). That pre-existing parse error blocks the full umbrella generator/build/API/quality recheck; VFX owns the cause and stays outside this materials lane under rules 21/22.
 
 The VFX JSON parse blocker above is resolved upstream by f359f4473; the batch 184 packaging continuation rebases onto that valid manifest before its final checks.
@@ -4880,7 +4880,7 @@ No new open correctness defect in the implemented encoder is known from its curr
 
 ## Batch 178 vector publication
 No known depth-order, clipping, committed-readback or cancellation defect remains in the tested contract. Appearance refinements (lighting, procedural contour/grid ink and non-pixel series styles) are explicit accepted limits in docs/sciviz-vector-export.md and are tracked in the private finish-phase handoff.
-Batch 178 gate discovery finding: node scripts/gpu-package-tests.mjs --no-build --only=sciviz --list fails before filtering because packages/water/package.json test:gpu contains an interior npm run build after three GPU leaves. Cause: global plan validation rejects builds after a GPU step. The lane executes the sciviz GPU leaves directly under shared locks; the water manifest repair belongs to its owner/fix phase.
+Fixed 2026-11-10: Batch 178 gate discovery finding. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 ## Batch 176 job 1
 No unresolved defect found in the implemented dataset contract. Exact curved-cell filtering and adaptive error-controlled tessellation are not claimed; the input is explicitly normalized at a caller-controlled refinement level. Invalid or over-budget topology rejects rather than silently losing cells. The remaining batch format, AMR, tensor and molecule jobs are separate unbuilt jobs, not known bugs in this entry.
 
@@ -4892,7 +4892,7 @@ Build-phase follow-up outside batch 176 job 1: legacy parseVTKXML mislabels mixe
 The lane rebase helper counted only @margoengine rows when rebuilding the shared API summary, omitting margoengine kits from its header. The next full api:update regenerates the header and table from emitted declarations, and api:check requires exact agreement. No public implementation changed; future shared-doc merges include the umbrella row before the normal generated check.
 
 Batch 177 job 2: no open correctness defect after statistical formula, missing-step, constant-axis, input-code and hash regressions. LOESS confidence coverage is an explicitly approximate conditional model, documented in limits.md; simultaneous/prediction intervals are outside this job's mean-band claim. NASA live TAP returned HTTP 503 on both official hosts; the demo's pinned public table snapshot avoids a runtime network dependency and records its date and source.
-- Outside batch 175: gpu-package-tests.mjs --only=sciviz --no-build --list stops in plan() because packages/water test:gpu contains an interior npm run build. Cause: the global plan validates every workspace before filtering. Batch 175 runs the unchanged sciviz GPU leaves directly under the shared lock; water manifest repair belongs to its lane.
+Fixed 2026-11-10: Outside batch 175. Current complete GPU plan passes browser registration and chain validation; original repairs: f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
 ### Batch 195 job 2 discovery: legacy feature-scaler compatibility suite deadline
 
@@ -4906,7 +4906,7 @@ Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject corr
 
 
 Batch 136 replacement proof: the geometric-normal unsigned-residue scoring defect is fixed with circular-distance and complete-payload selection; the sparse high-precision RAW cutoff is expanded within a fixed memory bound. Rust regressions and the 76-row two-decoder corpus pass with no open defect found in this scope.
-- Build-phase follow-up: node scripts/supply-chain.mjs regenerates the table but drops manually appended notices after the generated footer (HEAD had 73 such lines); the renderer has no preserved-tail mechanism. Job 173.5 retains all existing notices; fix generator ownership in the fix phase.
+Fixed 2026-11-10: Build-phase follow-up. notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
 - Fix-phase investigation, existing sciviz glyph capture: glyph-browser.mjs produced too few compatibility pixels once for custom and once for line shapes in the batch 173 gate. Instrumented failures retain image/canvas/stats now; isolated and full diagnostic runs then matched native output exactly (line 151 pixels, custom 3158), and the original assertions with failure diagnostics pass both backends. Root cause remains unisolated, so this is not claimed as a fix or a timing-only miss. Logs stay in lane-X private/batch173/job5/{gpu-glyph-browser.mjs,final-gpu-glyph,glyph-failure-data,glyph-diagnostic}.log. Investigate cold command replay/capture state without retries or lowered pixel bars.
 Batch 186 job 3: no open correctness defect found in cube projection or mixed spot/cube ownership. Filtering is the supplied-image bilinear contract; mipmapped minification and HDR inputs remain documented later quality extensions, not asserted here.
@@ -4920,10 +4920,10 @@ Batch 186 composition follow-up: all three clustered list buffers plus rectangle
 
 Batch 180 job 1: no open defect found in the view/cache/height contract. XYZ source polar coverage, conservative visibility and native-preview refusal are recorded limits; geo-lod.test.js and geo-lod-browser.mjs cover this entry.
 
-GPU runner lane identity (observed during batch 180): simultaneous serial scripts/gpu-package-tests.mjs --no-build --only=<package> from separate worktrees both request owner check:gpu-packages. gpu-lock status showed lane check queued behind another worktree while 2 of 5 slots were free. Cause: the generic owner collapses independent lanes in admission. Use lane-specific outer gpu-lock run --owner=<lane> for direct runs; repair the runner identity in its owning tooling lane during the fix phase.
+Fixed 2026-11-10: GPU package-runner owner collision (batch 180). Unrelated worktrees previously shared the generic check owner and were serialized despite free slots. Both serial and parallel admission now use a stable digest of canonical worktree identity, retaining one slot per worktree and distinct suite labels. Regression: tests/gpu-suite-owner.test.js reproduces the parent runner collision with CPU-only admission and checks independent owners; scheduler policy and GPU assertions are unchanged.
 
 Batch 136 removal landing blocker fixed: supply-chain regeneration previously replaced the whole notices file and discarded appended asset credits. Explicit retained addenda, legacy-boundary migration, unknown-boundary rejection and an idempotence/stale-generated-content regression preserve them. No remaining blocker in this scope.
-- Build-phase follow-up (batch 177 job 3): `node scripts/supply-chain.mjs` drops the manually appended notices after the generated document body; cause: render() emits only its ASSETS records. Repro: generate and diff THIRD-PARTY-NOTICES.md on main. Existing trailing credits preserved in this change; generator repair belongs to the fix phase.
+Fixed 2026-11-10: Build-phase follow-up (batch 177 job 3). notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
 Batch 274 fix-phase API polish: Module.stateDict() and Tensor.read() in compute/nn expose no AbortSignal, so an in-flight large state readback cannot be cancelled by their callers. Repro: start model.stateDict() for a large model; there is no signal option to pass. Cause: the existing wrappers call GpuArray.read() without forwarding ReadOptions; BatchNorm follows that existing signature. Add optional wait/read options through nested modules in the fix phase. NN-extra numerical execution, gradients and saved state are complete.
 ### Fixed: batch 1 umbrella package test discovery
@@ -5016,7 +5016,7 @@ Review 3 SV4 (61928c3a0): bindTransfer checks signal before its initial apply(),
 - Batch 120 incidental gate finding, base 2ed6fd460: node --test tests/check-fixed-waits.test.js flags packages/biomes/tests/water-check.html line 101, a fixed 90-frame loop absent from the baseline. Cause: the biomes test waits for frame count instead of GPU readiness; unrelated to profile installation, deferred to its owning lane under efficiency rule 21.
 Batch 176 job 4: no open defect found in the supported Cartesian cell-centred AMR contract. Format extensions, block-edge reconstruction and explicit sample/index budgets are documented in limits.md; refinements remain on the private finish-later list.
 
-Batch 176 inspection: node scripts/gpu-package-tests.mjs --only=sciviz --no-build --list fails before selection because packages/stage/test/gpu/viewer-extras-check.mjs has no registered browser script. Cause: global discovery validates an unregistered upstream stage test before applying --only. Outside this job; the AMR suite runs directly with the shared GPU lock on both backends.
+Fixed 2026-11-10: Batch 176 inspection. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 - Batch 174 annotation keyboard focus: on a running figure, focus an editable SVG handle and let the next engine frame run; focus returns to the document because Annotations.render replaces every SVG child with innerHTML on each frame. Pointer dragging still uses capture on the stable SVG root. Preserve/reconcile the focused handle across frame paints in the fix phase; current keyboard regression covers stopped figures.
 
 
@@ -5038,10 +5038,10 @@ Platform defect below the compatibility layer, proven at the WebGL call level (b
 - Next step: report to ANGLE/NVIDIA with a self-contained replay of the recorded session (full payloads, not hashes). Until then this stays a release blocker for exact compat captures on Windows D3D11. Never raise the bound for it.
 
 
-Batch 181 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=sciviz --serial` rejects before filtering because packages/stage/test/gpu/viewer-extras-check.mjs has no registered browser script on this base. Cause: global unregistered-browser audit precedes package filtering. Own sciviz scripts run directly, each under the existing shared lock and deadline; stage/check tooling left to its owner.
+Fixed 2026-11-10: Batch 181 gate observation. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 
-- Batch 180 job 5 incidental gate finding (base b4404cddb): node scripts/gpu-package-tests.mjs --no-build --only=sciviz --list rejects packages/stage/test/gpu/viewer-extras-check.mjs because no registered owning GPU script starts it. Cause: global browser-leaf registration validation runs before package selection. Stage registration is outside job 5; sciviz's declared browser leaves are run directly with shared GPU locks and hard limits. Deferred to its owning lane under rule 21.
+Fixed 2026-11-10: Batch 180 job 5 incidental gate finding (base b4404cddb). GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
 - Batch 180 job 5 visual review: add two named heatmaps to a default Figure, then remove the first. Figure.#updateLegend sets element.hidden=true when only one remains, but Legend's inline display:grid overrides the browser's hidden rule, leaving both old legend rows visible. Repro: select several field reductions in examples/sciviz-temporal.html; evidence test-results/sciviz-temporal-webgpu.png. Numerical fields and exported pixels without overlays are correct. Small existing legend presentation gap deferred under rules 21/22; fix the owning legend visibility and add its DOM/browser regression in the fix phase.
 

@@ -702,6 +702,33 @@ mutex, and a live claimant is allowed to finish without interference.
 
 Research guiding the remaining queue and phase work, read before implementation:
 
+GPU package-suite requests now derive their owner prefix from SHA-256 of the
+canonical worktree identity, shared by serial and parallel paths. A suite label
+follows the prefix so labels cannot merge unrelated worktrees into the old
+generic `check` lane. Existing worktree exclusion, FIFO and shared/exclusive
+policy stay intact. `tests/gpu-suite-owner.test.js` executes actual runner
+admission without GPU work: the parent incorrectly shares a lane with another
+worktree's generic owner, while the repair separates them and retains same-tree
+exclusion across labels and subdirectories. This applies the separation between
+resource allocation and job identity in SchedMD's [Generic Resource Scheduling
+documentation (2026)](https://slurm.schedmd.com/gres.html), compared with John M.
+Mellor-Crummey and Michael L. Scott's [Scalable Reader-Writer Synchronization for
+Shared-Memory Multiprocessors
+(1991)](https://www.cs.rochester.edu/u/scott/papers/1991_PPoPP_read_write.pdf).
+The hash uses the Node.js contributors' [Crypto API
+(2026)](https://nodejs.org/api/crypto.html). No external implementation is used.
+The dependent heat-containment fixture also retains strict full-chain command
+and ID equality for all twelve current voxel GPU leaves, including models,
+objects and wind added after its former nine-leaf expectation. No suite command,
+sample count, timeout, ordering assertion or temperature policy was removed.
+Its post chain likewise checks all seventeen leaves, retaining the original
+eleven and adding selective bloom, mask, pixelate, halftone, stylize and curvature.
+The TAA chain also retains every original leaf and requires the velocity-upscaler
+leaf added since its seven-command expectation.
+Toon's full four-command chain includes screen outlines and model hatching as
+well as the original models and hatch checks. Every updated comparison remains
+an exact ordered-array comparison with explicit expected commands.
+
 The 2026-11-10 known-bugs sweep reproduced a stale-capacity FIFO fixture:
 three holders did not fill the new five-slot default, so its queue observation
 could never complete. The CPU-only regression now fills `gpu.slots()` and checks

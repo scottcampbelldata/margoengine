@@ -329,11 +329,14 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'cd ../.. && node packages/voxel/tests/smooth-browser-check.mjs',
       'cd ../.. && node packages/voxel/tests/gi-browser-check.mjs',
       'cd ../.. && node packages/voxel/tests/debris-browser-check.mjs',
+      'cd ../.. && node packages/voxel/tests/models-browser-check.mjs',
+      'cd ../.. && node packages/voxel/tests/objects-browser-check.mjs',
+      'cd ../.. && node packages/voxel/tests/wind-browser-check.mjs',
     ],
   );
   assert.deepEqual(
     chain.map((s) => s.id),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `voxel/test:gpu#${n}`),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => `voxel/test:gpu#${n}`),
   );
   // voxel-edit's browser checks: one step each.
   assert.deepEqual(
@@ -359,6 +362,12 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'anamorphic-browser.mjs',
       'blur-browser.mjs',
       'lens-browser.mjs',
+      'selective-bloom-browser.mjs',
+      'mask-browser.mjs',
+      'pixelate-browser.mjs',
+      'halftone-browser.mjs',
+      'stylize-browser.mjs',
+      'curvature-browser.mjs',
     ],
   );
   // TAA's browser checks, one step each.
@@ -372,6 +381,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'sharpen-browser.mjs',
       'xr-browser.mjs',
       'deform-browser.mjs',
+      'upscale-velocity-browser.mjs',
     ],
   );
   // DOF's browser checks, one step each.
@@ -382,7 +392,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
   // Toon's browser checks, one step each.
   assert.deepEqual(
     splitSteps(byId('toon/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/toon/test/', '')),
-    ['models-check.mjs', 'hatch-check.mjs'],
+    ['models-check.mjs', 'hatch-check.mjs', 'screen-outline.browser.mjs', 'hatch-models.browser.mjs'],
   );
 });
 

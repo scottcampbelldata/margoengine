@@ -30,12 +30,14 @@ import { deferSpeed, reportSpeedPhase, speedEnabled } from './support/speed-phas
 // in test-results/gpu-suites/. Timing tests still run last, alone, under an exclusive hold. The first failure stops the
 // run, names the suite and prints its log; a serial run goes on to the end and reports all failures.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
 import { exitOnHelp } from './support/help.mjs';
 import { acquire, lockDir, slots } from './gpu-lock.mjs';
+import { worktreeIdentity } from './support/gpu-admission.mjs';
 import { keepGoingMode, parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
 import { suiteResources } from './support/suite-resources.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
@@ -45,6 +47,11 @@ import { STEPS } from './modern-extension-suite.mjs';
 import { packageMinutes, runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
+/** Stable admission identity shared by this worktree's serial and parallel suites. */
+export function suiteOwner(worktree = root, label) {
+  const identity = createHash('sha256').update(worktreeIdentity(worktree)).digest('hex');
+  return `gpu-packages-${identity}${label ? `/${label}` : ''}`;
+}
 export const HEAT_EXIT = 75;
 const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
 
@@ -778,7 +785,7 @@ export async function runSideBySide(
     log: (line) => console.error(line),
     take: (mode, step) =>
       acquire({
-        owner: `check:gpu-packages ${step.label}`,
+        owner: suiteOwner(root, step.label),
         mode,
         timing: mode === 'exclusive' ? `GPU timing suite: ${step.label}` : undefined,
         max: holdMinutes(step),
@@ -904,7 +911,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         // heartbeat keeps it, and it is released as soon as the step ends.
         take: (mode, step) =>
           acquire({
-            owner: mode === 'exclusive' ? `check:gpu-packages ${step.label}` : 'check:gpu-packages',
+            owner: suiteOwner(root, mode === 'exclusive' ? step.label : undefined),
             mode,
             timing: mode === 'exclusive' ? `GPU timing suite: ${step.label}` : undefined,
             max: mode === 'exclusive' ? Math.ceil(testLimitMs(step.minutes) / 60_000) + 5 : 60,
