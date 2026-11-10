@@ -5591,3 +5591,26 @@ Final batch 215 entry measurement: tween root is 5529 B gzip after the shared Sp
 ## Batch 253 job 1: vector input (2026-11-10)
 Research compared: W3C Gamepad Working Group, Gamepad (2021), https://www.w3.org/TR/2021/WD-gamepad-20210805/ (linear adjacent x/y axes); Microsoft, Getting Started With XInput, https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput (circular deadzones and continuous magnitude rescaling, description only, no sample code used); Gery Casiez, Daniel Vogel, Ravin Balakrishnan and Andy Cockburn, The Impact of Control-Display Gain on User Performance in Pointing Tasks (2008), https://www.dgp.toronto.edu/~ravin/papers/hci2008_cdgain.pdf (direction and gain are separate). Babylon's public GamepadState documentation, https://doc.babylonjs.com/lite/typedoc/interfaces/GamepadState, exposes raw axis snapshots with application-selected deadzones. Combined design: retain raw axes, perform one continuous radial mapping, clamp the vector to the unit circle and offer explicit normalization. No rival source or files read or used.
 VectorInput subclasses the existing Input, keeping scalar channel rebinding, contexts and tick replay. Tests exercise true radial diagonals below the old per-axis threshold, opposing keys, unit diagonals, analog direction and magnitude, normalization, blur/reset, invalid input and replay. This covers the complete vector-actions row with no renderer dependency. Test inputs are synthetic correctness fixtures, not public demos. No speed claim or new CPU-heavy algorithm.
+
+## Batch 262 job 1: standalone tweak panel
+
+Research compared Yiya Yang, *Motivation, practice and guidelines for undoing*
+(1992), https://doi.org/10.1016/0953-5438(92)90011-4, and Thomas Berlage,
+*A selective undo mechanism for graphical user interfaces based on command objects*
+(1994), https://doi.org/10.1145/196699.196721. Yang motivates predictable
+recovery at user-action boundaries; Berlage distinguishes command inverses and
+selective replay. This panel uses the existing linear EditHistory with explicit
+gesture boundaries and application-supplied button inverses, without claiming
+selective undo. Native form controls follow W3C WAI, *ARIA Authoring Practices
+Guide: Slider Pattern* (living standard, consulted 2026-11-10),
+https://www.w3.org/WAI/ARIA/apg/patterns/slider/.
+
+Public API descriptions only: lil-gui authors, *lil-gui 0.21.0 Guide* (2026),
+https://lil-gui.georgealways.com/; Tweakpane authors, *Bindings and Quick Tour*
+(v4, consulted 2026-11-10), https://tweakpane.github.io/docs/input-bindings/ and
+https://tweakpane.github.io/docs/quick-tour/. Their common binding types informed
+number, boolean, string, colour, point, enum, button and nested folders. Margo
+adds shared linear undo for all edits, with explicit inverses for arbitrary actions.
+No rival implementation or companion source was read, imported or adapted.
+The demo is an original procedural box and authored parameter values; no external
+data asset or third-party media licence is involved.

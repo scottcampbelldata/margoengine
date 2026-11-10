@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12226690,
+  "total": 12230966,
   "history": [
     {
       "date": "2026-10-24",
@@ -5522,6 +5522,12 @@
       "commit": "42a8ba0e6",
       "reason": "batch253-vector-new-optional-entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-262",
+      "reason": "New optional inspector/tweak entry: absent to 4020 B; standalone bindings, explicit gesture undo and native accessible inputs stay together. No core/stage additions.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6565,6 +6571,7 @@
     "@margoengine/tween/control": 3970,
     "@margoengine/tween/scroll-pin": 2361,
     "@margoengine/tween/inertia": 3034,
-    "@margoengine/input/vector": 4551
+    "@margoengine/input/vector": 4551,
+    "@margoengine/inspector/tweak": 4276
   }
 }

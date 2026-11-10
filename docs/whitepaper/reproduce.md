@@ -2634,3 +2634,12 @@ Build packages; run node --test --test-timeout=120000 packages/tween/test/scroll
 
 Build packages; run node --test --test-timeout=120000 packages/tween/test/inertia.test.js. All time is explicitly supplied. Measure packages/tween/dist/inertia.js using bundleBytes and gzipSync, bare imports external. Tests include exact endpoint and two-sample velocity assertions plus analytic exponential samples.
 Batch 253 vector input correctness: build packages/input, then node --test --test-timeout=30000 packages/input/test/vector.test.js. Fixtures cover real Input events, gamepad polls and InputRecorder/InputReplay; no model assets or GPU are involved.
+
+## Batch 262 tweak panel
+
+Run npm run test --workspace @margoengine/inspector, then after build:packages run
+node scripts/gpu-lock.mjs run --owner=inspector-parity --max=3 --wait-max=60 -- node
+packages/inspector/test/parity-browser.mjs (one command line). It drives native
+controls and undo over real WebGPU and WebGL2 preview draws; repeat that command
+with --compat appended for the WebGL2 compatibility layer. README coverage is tracked in docs/work-lists/readme-owed.md. Entry bytes use bundleBytes
+from scripts/measure-size.js and gzipSync, with bare imports external.

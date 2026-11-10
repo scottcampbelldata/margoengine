@@ -4130,3 +4130,17 @@ overload; runtime parsing and reference validation are unaffected.
 No open defect identified in the new completion/AbortSignal entry. Deterministic lifecycle coverage is in packages/tween/test/async.test.js; existing root APIs remain available.
 
 Batch 215 outside scope: node packages/cutscene/tests/vfx-browser.mjs --compat fails frame 40 replay equality on clean origin/main 01faf2a63 with the same hashes as the tween branch (played particles 3932506386, sought 397093820; both picture 396217175 and live 110). Reproduced once after a clean-main build; log .review/b215-main-cutscene-compat.log. This predates the six tween jobs and belongs to compatibility VFX replay/readback state; exact differing particle words and root cause remain for the owning lane. Dependent GPU coverage runs in local CI under rule 23.
+
+## Batch 262 tweak panel
+
+No open defect found in the standalone binding scope. Regression coverage includes
+object-valued enum identity, long gestures, independent undo steps, partial numeric
+text, retained vector/colour references, shared folders and abort cleanup.
+
+### Batch 262 prior gate blocker
+
+Resolved on main by 2c1b94730: the GPU queue now observes owner exit before replaying completion evidence.
+
+Outside batch 262: run scripts/gpu-package-tests.mjs in two different worktrees; both request owner check:gpu-packages, and ownerLane maps both to check, so sameLane serializes unrelated lanes. Use a distinct lane owner when running these tests directly; the runner owner needs a tooling fix.
+
+Outside batch 262: node packages/cutscene/tests/vfx-browser.mjs --compat reproduces on clean origin/main 5d6e5facd without any inspector changes: frame 40 sought particle hash 397093820 vs played 3932506386, live 110 and picture 396217175 match. The compatibility VFX reset/replay or readback cause remains unproven. Log: test-results/batch262-resume-baseline-gate-0.log. Dependent GPU coverage belongs to scheduled CI and does not gate inspector landing.

@@ -3111,3 +3111,16 @@ Optional tween/scroll-pin pins a section during timeline scrubbing and snaps rea
 
 Optional tween/inertia carries numeric properties using measured velocity and stops on an exact point/list/function endpoint or range, meeting the requested GSAP inertia row. packages/tween/test/inertia.test.js proves analytic free decay, identical physical samples under delta partitioning, velocity continuity, hard/bouncy bounds, exact completion, stale samples and lifecycle behaviour. Entry 2778 B gzip; no timing or speed claim.
 Batch 253 vector input claim: named 2D actions preserve analog direction with a continuous radial deadzone, normalized WASD diagonals, rebindable scalar channels, contexts and tick-exact binding replay. Proof: packages/input/test/vector.test.js. Public rival behaviour comparison and research: docs/clean-room.md, Batch 253 job 1. No speed or hardware-coverage claim.
+
+## Batch 262: standalone tweak panel
+
+The optional inspector/tweak entry provides the binding kinds in the batch row:
+numbers with bounds/step, strings, booleans, nested folders, RGB(A), vectors,
+label/value enums and function buttons. Comparison is to the public lil-gui and
+Tweakpane binding descriptions cited in clean-room.md, not full API compatibility.
+Undo groups live input gestures and shares an EditHistory with the inspector; an
+arbitrary function is undoable only with its supplied inverse.
+Proof: packages/inspector/test/tweak.test.js plus native browser input over a
+rendering WebGPU engine and WebGL2 preview engine in parity-browser.mjs, plus
+the same WebGPU path forced through WebGL2 compatibility with --compat.
+No speed result is claimed.

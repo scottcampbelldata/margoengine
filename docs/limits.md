@@ -3796,3 +3796,13 @@ New tween/scroll-pin: 2105 B gzip, previously 0 B. pinTimeline accepts a positiv
 New tween/inertia: 2778 B gzip from 0 B. Caller supplies release velocity or a VelocityTracker; sample/release times are seconds. The tracker defaults to a 0.1 s window and 32 samples, with configurable capacity 2..1024; stale release returns zero. Resistance defaults to 6 per second. Endpoints may be numeric, nearest lists or functions of the predicted end; optional min/max bound the selected endpoint. Hard ranges are default; bounce in [0,1) opts into spring overshoot. Rest thresholds are 0.01 units/s and 0.001 units; after maxDuration (default 10 simulated seconds) the exact end is written. Local speed 1 by default, with pause/play and AbortSignal. No wall clock or frame loop starts automatically. Observe cancellation promises. Core/stage unchanged.
 Batch 253 vector input: optional input/vector provides VectorInput and wasd. Each vector owns scalar channels <name>.x and <name>.y, which contexts, rebinding and recordings use. Positive y is down. Axes sum and clamp individually, then one radial deadzone (default 0.15) rescales magnitude to [0,1]. normalize defaults false; true gives unit magnitude beyond the deadzone. Diagonals always stay in the unit circle. Additional scalar actions share the same Input; gamepad axes have no axial deadzone in VectorInput. No core/stage change or GPU code. Physical-device feel remains hardware-dependent.
 Vector entry: previously absent, 4,295 B min+gzip, ceiling 4551 B. This includes the shared Input implementation when imported alone; splitting the action path would complicate contexts and replay. Core plus stage remains 23,950 B.
+
+## Batch 262: standalone tweak entry
+
+New inspector/tweak: 4,020 B min+gzip, bare imports external (previously absent).
+Its ceiling is measured bytes plus the standard 256 B headroom. It stays optional
+and does not change core or stage. Colour strings use #rrggbb; arrays/objects
+allow RGB(A), alpha is retained, float or byte RGB is explicit. CSS colour syntax
+beyond #rrggbb is not part of this binding contract. Application writes need
+refresh(); arbitrary action buttons need a supplied inverse to be undoable.
+An input gesture commits on change/blur or panel.undo(), and Escape cancels it.

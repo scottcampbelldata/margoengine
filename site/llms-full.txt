@@ -2590,6 +2590,22 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 256 Rust generation: `@margoengine/netcode/generate-rust` exports
+generateRust(schema.json or compiledSchema, { source? }). Output is standalone
+Rust 2021 requiring Rust 1.82 or newer, with no crate dependencies. Each schema
+type becomes Msg<Name>, each field f_<name>, maps BTreeMap<u32, T>, enums u32
+wire indices and optionals Option<Box<T>>. Native methods encode, decode,
+encode_delta, decode_delta and same use the runtime codec's wire contract and
+normalized SCHEMA_HASH. f32 fields use native f32; quantized values use f64.
+Encoding and decoding return margo_wire::Result, validate limits and reject
+trailing bytes, invalid UTF-8, non-finite floats and malformed map/mask data.
+Nesting above 256 codec calls returns an error to bound untrusted recursion.
+This is a generator and native protocol codec, not a new engine Wasm bundle.
+New entry gzip is 9,827 B (previously absent), ceiling 10,122 B. Schema validation,
+complete codec emission and native data conversion stay together; a split would
+force generator consumers to assemble a second template entry without saving
+runtime application bytes. Core and stage remain unchanged.
+
 Batch 256 presence: `@margoengine/netcode/presence` exposes RoomPresence,
 PresenceStore, MemoryPresence, StorePresence, openSqlitePresence and RoomNode.
 Run each node's `run({ signal })` promise and handle its rejection; `close()` or
@@ -6238,6 +6254,148 @@ The earlier 23924 B figures above describe their original feature checkpoints. E
 records both genuinely measured 461e82a93 with dirty=false. No record has been relabeled.
 Acceptance is blocked on shared Chromium process/stdio cleanup after 30 passing root rendering
 assertions, as recorded in known-bugs.md. No new native-WebGL2 volume claim or speed claim.
+### Sprites slice entry (batch 245 job 1)
+`@margoengine/sprites/slice` exports SliceLayer, SliceSprite and sliceParts.
+Fixed source borders shrink proportionally when the target cannot contain them.
+Middle regions stretch by default or repeat with positive tileScaleX/Y (default 1)
+and scrollX/Y (default 0). Source rectangles and borders use integer texels;
+width/height use nonnegative world units. Normal maps and custom shaders need a
+separate SpriteLayer. At most nine visible instances per image share one draw,
+including ordinary sprites and atlas pages. Linear filtering uses premultiplied
+linear-light sampling. There is no CPU pixel loop and no Wasm module. The new
+entry is 8,587 B gzip (previously absent); core + stage remains 23,950 B, source
+unchanged. No optional ceiling is lowered or quality removed to reduce bytes.
+
+
+### Signed safe saves (batch 255 job 4)
+
+The optional save/signed entry exposes signedStorage(storage, key, options), returning the full SafeStorage read/write/delete/keys/check interface. It authenticates each complete safe frame including generation under its physical key using WebCrypto HMAC-SHA-256. Raw keys must have at least 32 bytes; CryptoKeys must be secret HMAC/SHA-256 keys of at least 256 bits with sign and verify usages. Raw key bytes are copied, imported lazily, nonextractable, and never written into the save. The caller owns generating, retaining and distributing a secret key; embedded client application keys cannot resist an attacker controlling that client. Authentication detects edits, format changes, role swaps and cross-key copies. It does not encrypt, prevent deletion, or reject replay of an older authenticated frame in the same physical key. Unsigned legacy saves fail closed, including a runtime legacy:true option. A damaged newest copy recovers from an older authenticated one and invokes onRecover; both bad reject with a coded error. Crypto awaits observe AbortSignal before storage writes. The format costs 37 bytes per copy beyond safeStorage's 24 bytes, or 122 bytes of framing across two stored payload copies. The default provider is globalThis.crypto.subtle; options.subtle supports an explicit provider. Existing safe verify/onRecover options apply. README work is owed in docs/work-lists/readme-owed.md.
+
+Save/signed entry: 2,581 B min+gzip (before: absent, 0 B), ceiling 2,837 B, including the safeStorage implementation it composes. Core plus stage stays 23,950 B. Keeping authentication and recovery together avoids a caller accidentally authenticating only payload bytes while trusting an edited generation or copy role.
+### Batch 197 BoxGizmo
+
+Optional controls/box-gizmo exports BoxGizmo, eight corner scale handles and twelve edge midpoint rotation handles. One live engine mesh with nonempty Geometry is attached at a time; recompute bounds with refreshBounds after vertex edits. Defaults: 12 CSS-pixel handles, uniform scaling, opposite-corner pivot, no scale or rotation snapping. scaleFromCenter selects the centre pivot; uniformScaling=false projects each local scale axis onto the screen. Hidden axes preserve their scale. Positive scale factors clamp to 0.0001, preserving a mirrored mesh's sign. Edge rotation uses local axes around the bounds centre. Parent transforms, including nonuniform scaling, preserve the chosen local pivot; rotating a child under a nonuniform parent follows that parent's affine frame. UI is an overlay, including occluded handles, and nearest-depth handles win screen overlaps. Escape, pointercancel and disconnect restore the original pose; pointerup commits. Mesh or engine disposal removes references, listeners, passes and GPU buffers.
+
+Entry size: controls/box-gizmo 0 to 6586 B min+gzip, ceiling 6842 B; core/stage unchanged.
+
+Batch 252 job 3: NavMeshQuery takes `{seed:0}` for an independent reproducible 32-bit stream. randomPoint samples allowed polygons including disconnected islands, weighted by true 3D surface area. randomPointAroundCircle samples only the connected ground portal neighborhood within a strict XZ radius; off-mesh links are excluded and radius zero returns the projected start. A one-shot seed overrides the stream. The strict disk uses unbiased rejection after bounding-square clipping: maxSamples defaults to 65,536 (valid 1..10,000,000), and a grazing intersection exhausting the bound throws coded failed instead of returning a biased fallback. distanceToWall returns XZ distance, surface hit, wall interval and a unit direction from hit to center; at zero distance it uses the inward wall normal. A search with no wall in range returns the radius, null position/edge and zero normal. All queries respect costs/area filters and read rebuilt tiles live.
+
+Batch 252 job 3 measured entry sizes: @margoengine/navmesh/queries: 4473 B gzip (ceiling 3371 -> 4729 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+Batch 252 job 3 entry delta: queries 3,115 -> 4,473 B gzip, ceiling 3,371 -> 4,729 B. The added optional bytes retain uniform area sampling, strict radius rejection and correct partial-portal wall intervals together with their shared graph helpers.
+## Fuzzy decisions (batch 251)
+
+New behavior/fuzzy measures 2,621 B min+gzip (previously absent), generated umbrella
+alias 61 B external; no existing ceiling raised. Inputs are finite world/domain
+values, and memberships outside a shape's finite domain are zero. Default output
+method centroid, 256 midpoint samples (integer 1..1,000,000), fallback 0 when no
+rule fires. Mean-of-max is the mean of the sampled maxima, not an exact continuous
+integral. Max-average uses weighted set representatives. Continuous and discrete
+singleton sets use separate output variables. Custom sampling ranges must have
+finite min <= max and finite width. Expression depth is limited to 256; cycles
+reject. Rules are one forward Mamdani stage; evaluation has no inter-agent state
+or implicit recurrent feedback. JSON round trips preserve the whole designer
+configuration. No GPU entry or speed claim; default-sized decision evaluation
+has no proven Wasm gain.
+### SCXML document subset (batch 250 job 5)
+Optional fsm/scxml converts definitions to/from MachineDocument. Input supports the W3C SCXML namespace and version 1.0, state hierarchy, explicit/implicit initial states, parallel state regions, one history pseudo-state per state, single-target event transitions, symbolic guards, and named entry/exit hooks. History fallback must match ordinary initial because the native document has one initial field. Cross-region targets, wildcard/list events, executable transition content, arbitrary script/guard expressions, DTDs/entities, final/invoke/eventless constructs and unknown elements/attributes reject. Final/invoke definitions belong to separate optional runtimes, not MachineDocument. Session name/datamodel metadata is accepted but is not saved.
+Native extensions in urn:margoengine:fsm:1 are enabled by default on export and retain delay, cross-fade duration, update hook, region history, transition ordering, arbitrary binding/state names and explicit native region boundaries. A parallel holder with separate hierarchical children is outside this subset. extensions:false produces the common standard hierarchy/event/named-hook subset and rejects native-only fields. This is document conversion, not a conforming SCXML processor: Margo retains exact event names, remembered-parent targeting and common-ancestor transition semantics. The importer never evaluates an expression or invokes a hook. Browser DOMParser is the default; Node must supply options.parser, with no new parser runtime dependency.
+Input/output limit: 1 MiB UTF-8; 10,000 XML elements; 128 XML nesting levels; export preflight limits native region nesting to 64 and rejects cycles. Plain XML ids use the ASCII identifier subset; arbitrary native names use generated ids plus namespaced names. XML 1.0 forbidden characters reject. Shared region definition objects are valid; cycles are not.
+
+Batch 250 job 5: fsm/scxml 0 to 4970 B min+gzip, ceiling 5226 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+## Behavior tree text (batch 251)
+
+New behavior/text: 3,751 B min+gzip, previously absent; umbrella alias 60 B external.
+No existing ceiling raised. Syntax is type(key=JSON,...) with optional brace-delimited
+children and an optional tree wrapper. Utility children use option(score=JSON)
+wrappers, each containing one child. Values are JSON strings, numbers, booleans,
+null or arrays; node validation constrains the actual allowed fields. Whitespace,
+line comments (# or //) and block comments are accepted outside string literals.
+There is one root; maximum source length is 8,388,608 UTF-16 code units, depth 256,
+100,000 syntax nodes including option wrappers. Reference expansion has its own
+existing size/depth bounds. Subtree registrations are supplied externally, without
+globals. The printer retains semantic fields and references; comments, whitespace
+and input key order are not preserved. No MDSL import compatibility or editor.
+
+### 2D skeletal rigging (batch 245 job 2)
+The optional skeletal entry adds bone length (default 0), solveTwoBoneIK and
+solveChainIK. IK defaults: mix 1, positive bend, tolerance 0.001 world units and
+64 sweeps (maximum 1024). Nonuniform first-bone scales use the bounded chain
+solver. Unreachable targets return residual distance and converged false.
+Slots select one named mesh or null; a mesh belongs to one slot. Slot draw order
+is independent of bones, among equal mesh z values. Curves are linear by default,
+stepped or cubic Bezier with x controls in [0,1] and unrestricted finite y.
+Discrete timelines seek back to setup state before their first key. No core or
+stage changes. The entry grows from 5,270 to 7,369 B gzip; its optional ceiling is 7,625 B. Keeping the complete rig API together avoids duplicated transforms and skinning. Core + stage stays 23,950 B.
+
+
+Batch 252 job 4: @margoengine/navmesh/wasm exposes buildNavMeshInWorker and buildTiledNavMeshInWorker, returning {mesh,work}. The build uses a dedicated classic Web Worker and feature-local Rust SIMD rasterizer; polygonization retains the TypeScript reference pipeline. Inputs are copied and never detached. Build controls accept signal, timeout (default 60,000 ms, integer 1..2,147,483,647), and workerURL/wasmURL hosting overrides. Worker support and Wasm SIMD are required; failures are coded, and the worker terminates on success/error/abort/timeout. Whole-mesh input/output limits are the same as ./build; tile limits match ./tiles. A returned tiled mesh retains geometry and supports normal synchronous TypeScript update calls; another off-thread whole-level rebuild uses the worker function again. Work counts report candidates, intersections, f64x2 interpolation pairs, batched raster calls and Wasm memory high-water bytes. They are not elapsed-time speed numbers.
+
+Batch 252 job 4 measured entry sizes: @margoengine/navmesh/wasm: 17289 B gzip (ceiling 0 -> 17808 B); @margoengine/navmesh dist/workers/navmesh-build.js: 17428 B gzip (ceiling 0 -> 17951 B); @margoengine/navmesh/build: 12491 B gzip (ceiling 12727 -> 12727 B); @margoengine/navmesh/tiles: 14911 B gzip (ceiling 15113 -> 15113 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+
+Batch 252 job 4 kernel asset: 30308 raw bytes, 11888 B gzip, separate from entry/worker JavaScript. The 16 m floor fixture clips 2,048 triangle/cell candidates and 4,340 intersections in one batched raster call, with 4,340 f64x2 pairs and 1,179,648 B Wasm memory high-water. The reference performs 39,060 scalar interpolation arithmetic operations; the SIMD path uses 13,020 vector plus 13,020 scalar arithmetic operations. Core plus stage remains 23,950 B gzip.
+### Batch 197 product-page controls
+
+Optional controls/presentation exports PresentationControls, ScrollArea, ScrollControls, PathControls and MotionPathControls (alias). Presentation rotates one live mesh relative to its starting rotation, defaults to product-only picking (global=false), polar [-PI/2,PI/2], unbounded azimuth, speed=1, zoom=1, snap=false. Springs default to stiffness 170, damping 26 and precision 0.000001; bounds project spring state and stop outward velocity. The optional tween peer is required for this entry's spring API; other entries do not load it.
+
+ScrollArea owns a native overlay scroller and HTML content slot. Defaults pages=1, distance=1, horizontal=false, prepend=false. ScrollControls accepts that element or an application scroller, with equivalent page/distance defaults for a wheel-only surface. Defaults damping=0.2 seconds, maxSpeed=Infinity, eps=0.00001, infinite=false. Native scroll uses actual overflow; wheel fallback uses configured viewport pages. Infinite native scroll recentres at the ends without changing continuous progress. Offset is normalized, delta is signed per-update progress; range/curve/visible use normalized intervals. Native keyboard/touch scrolling stays with the browser.
+
+PathControls drives the camera or an explicitly selected engine mesh, optionally from ScrollControls. A curve implements at(t), optionally length/atDistance for arc-length sampling (Margo Spline fits directly). Defaults loop=true, offset=0, damping=0.1 seconds, focusDamping=0.1 seconds, maxSpeed=Infinity, lookAhead=0.001. Focus is a world point or live mesh; otherwise the view follows the path tangent, including the final non-looping endpoint. Zero-length tangents use -Z, vertical views use +Z up. Points must be finite. Mesh positions use the full inverse parent matrix; orientation removes the parent's rotation and does not model shear from a nonuniform scaled/rotated parent. All classes dispose their owned listeners/plugins; ScrollArea removes only owned DOM. Applications dispose controls before removing the scroll area.
+
+Entry size: controls/presentation 0 to 6772 B min+gzip, ceiling 7028 B. Synchronous product picking imports the BVH peer; exact spring behavior uses the optional tween peer, without changing core/stage.
+## Trigger regions (batch 251)
+
+New behavior/triggers: 1,606 B min+gzip (previously absent), umbrella alias 64 B
+external. No existing ceiling raised. Coordinates are three finite world values;
+radii are finite and nonnegative. Boundaries touch, zero-radius points and
+zero-width boxes are allowed. Agent radius defaults to 0, enabled defaults true,
+namespace defaults triggers. Contact tests run once per explicit update, with
+O(agents * regions) work; fast pass-through between updates is not swept.
+Boxes are axis-aligned. Regions are detached on set; move them by calling set
+again. Disabled or removed contacts exit on the next update, disposal exits
+immediately. Duplicate agent ids reject before changing contact state. Events
+follow current-agent and region insertion order, then removed-agent exits.
+Blackboard values under triggerStateKey(id, namespace) hold inside ids and the
+last update's events, with no agent object cycles. Different systems sharing a
+board use different namespaces. Agent ids define identity across updates;
+transferring its blackboard clears the old board's membership. No GPU code or
+proven Wasm gain for the default-size contact checks. Core + stage remains
+23,950 B gzip, below the unchanged 25,000 B limit.
+### Tween async entry (batch 215)
+
+Optional tween/async: 3431 B min+gzip (new entry, previously 0 B). Core and stage source unchanged. Tween root is 5529 B gzip after adding cancellation checks inside repeat/update callbacks. Each operation owns a driver and a promise allocated on creation. No automatic clock; cancelled values remain where last written. Group waits snapshot active work; retain a task to await its removed result. Timeline replay creates a new promise. Rejections must be observed by callers.
+
+### Tween property entry (batch 215 job 2)
+
+New tween/props entry: 3223 B gzip from 0 B. Numeric writable object/vector properties only; destination lists are explicit starts and evenly spaced keys. Frame lists support ordered offsets and segment easing; missing properties hold the preceding key. Relative +=, -=, *= and /= values resolve against preceding endpoints. from/fromTo and explicit keys render their first values immediately. Caller supplies update deltas; local speed defaults to 1. Rejections must be observed. Core/stage unchanged.
+
+### Full tween timeline (batch 215 job 3)
+
+New tween/timeline entry: 3184 B gzip from 0 B. A separate Timeline class holds scalar, array, custom, path and nested timelines. Local speeds are finite > 0 (default 1), repeats integers >= 0 or Infinity, yoyo false. Attached children have one owning parent; their clocks are sampled by that parent. Calls/completions run on playback crossings and never on seek. Nested durations include repeats and divide by child speed. Infinite children make a parent endless; an endless zero-duration repeat rejects. Cancellation freezes the tree, rejects observed finished promises, and preserves signal.reason. Callback errors propagate and reject the owner. Core/stage unchanged.
+
+### Tween control world (batch 215 job 4)
+
+Optional tween/control: 3714 B gzip (previously 0 B). TweenControl is an explicit world, with global timeScale 1 by default and no module-global state. Local speed defaults to 1; either speed may be zero to hold even instantaneous work. overwrite defaults to auto (matching keys, including delayed/paused work), all kills every target key, false coexists. Partial kills preserve surviving channels and their original clock. Whole removal rejects the group's promise; repeats/completions notify once per group. New requests validate before overwrite.
+
+### Scroll pin entry (batch 215 job 5)
+
+New tween/scroll-pin: 2105 B gzip, previously 0 B. pinTimeline accepts a positive finite-duration seekable animation, root or optional timeline. Vertical window/element sources; one viewport distance by default, natural section start, pinSpacing true. Numeric start/distance may be refreshed by functions. Snap is disabled by default; labels (or directional labels), intervals, lists and custom functions select normalized progress. Idle delay 0.2 s, snap duration 0.25 s and scrub 0 s. Root timelines supply a labels map; the optional full timeline supplies labelTimes. Interval stops use constant storage regardless of interval size. No playback callbacks fire on scrubbing. Disposal restores DOM and styles.
+
+### Tween inertia (batch 215 job 6)
+
+New tween/inertia: 2778 B gzip from 0 B. Caller supplies release velocity or a VelocityTracker; sample/release times are seconds. The tracker defaults to a 0.1 s window and 32 samples, with configurable capacity 2..1024; stale release returns zero. Resistance defaults to 6 per second. Endpoints may be numeric, nearest lists or functions of the predicted end; optional min/max bound the selected endpoint. Hard ranges are default; bounce in [0,1) opts into spring overshoot. Rest thresholds are 0.01 units/s and 0.001 units; after maxDuration (default 10 simulated seconds) the exact end is written. Local speed 1 by default, with pause/play and AbortSignal. No wall clock or frame loop starts automatically. Observe cancellation promises. Core/stage unchanged.
+Batch 253 vector input: optional input/vector provides VectorInput and wasd. Each vector owns scalar channels <name>.x and <name>.y, which contexts, rebinding and recordings use. Positive y is down. Axes sum and clamp individually, then one radial deadzone (default 0.15) rescales magnitude to [0,1]. normalize defaults false; true gives unit magnitude beyond the deadzone. Diagonals always stay in the unit circle. Additional scalar actions share the same Input; gamepad axes have no axial deadzone in VectorInput. No core/stage change or GPU code. Physical-device feel remains hardware-dependent.
+Vector entry: previously absent, 4,295 B min+gzip, ceiling 4551 B. This includes the shared Input implementation when imported alone; splitting the action path would complicate contexts and replay. Core plus stage remains 23,950 B.
+
+## Batch 262: standalone tweak entry
+
+New inspector/tweak: 4,020 B min+gzip, bare imports external (previously absent).
+Its ceiling is measured bytes plus the standard 256 B headroom. It stays optional
+and does not change core or stage. Colour strings use #rrggbb; arrays/objects
+allow RGB(A), alpha is retained, float or byte RGB is explicit. CSS colour syntax
+beyond #rrggbb is not part of this binding contract. Application writes need
+refresh(); arbitrary action buttons need a supplied inverse to be undoable.
+An input gesture commits on change/blur or panel.undo(), and Escape cancels it.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -10344,6 +10502,49 @@ the linked sciviz RangeError before any GPU allocation. derive.test.js checks bo
 The numerical/consumer limits are in limits.md and the sciviz README; no algorithm is weakened.
 
 Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.
+
+Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.
+`scripts/gpu-package-tests.mjs --serial` labels shared leases `check:gpu-packages`, so sameLane serializes unrelated worktrees with that owner; repro: queue serial suites in two lanes. Workaround for this lane: wrap the real GPU suite with gpu-lock run --owner=codex-batch197; leave shared scheduler repair for the fix phase.
+
+React test:browser:bindings and test:browser:instances scripts assume repository-root cwd in scripts/browser.js startDevServer, but their package commands run in packages/react and request /packages/react/tests/*.html, producing HTTP 404. Repro: run the package scripts; both scripts pass from the repository root on WebGPU and --compat. Fix phase: correct owning package commands and add a cwd regression.
+Batch 251 job 3: the exact plateau-mean fixture exposed naive-sum rounding.
+Compensated normalized accumulation fixes the cause; the unchanged analytical
+fixture now passes. No open defect found by fuzzy.test.js.
+
+Batch 251 job 4: no open text-format defect found in all-node, reference,
+200 generated round-trip, syntax-location and bounded-input tests (text.test.js).
+
+Batch 251 job 5: memory namespace/id concatenation could collide, for example
+namespace foo with id string:a versus namespace foo:string with id a. Tuple
+encoding fixes the cause; triggers.test.js retains the failing-before regression.
+
+Batch 251 finish-phase test quality: subtrees.test.js uses string keys in its
+shared-memory fixture instead of BlackboardKey objects. The count assertions
+still exercise a shared board, but use a typed key in the fix phase.
+Batch 251 finish-phase typing: a variable typed TreeTextOptions with optional
+subtrees can match parseTreeText's ordinary-tree overload. Add a broad overload
+returning SubtreeDocument so that variable cannot advertise unresolved references
+as an ordinary TreeDocument. Explicit registry literals already use the correct
+overload; runtime parsing and reference validation are unaffected.
+### Batch 215 async lifecycle coverage
+
+No open defect identified in the new completion/AbortSignal entry. Deterministic lifecycle coverage is in packages/tween/test/async.test.js; existing root APIs remain available.
+
+Batch 215 outside scope: node packages/cutscene/tests/vfx-browser.mjs --compat fails frame 40 replay equality on clean origin/main 01faf2a63 with the same hashes as the tween branch (played particles 3932506386, sought 397093820; both picture 396217175 and live 110). Reproduced once after a clean-main build; log .review/b215-main-cutscene-compat.log. This predates the six tween jobs and belongs to compatibility VFX replay/readback state; exact differing particle words and root cause remain for the owning lane. Dependent GPU coverage runs in local CI under rule 23.
+
+## Batch 262 tweak panel
+
+No open defect found in the standalone binding scope. Regression coverage includes
+object-valued enum identity, long gestures, independent undo steps, partial numeric
+text, retained vector/colour references, shared folders and abort cleanup.
+
+### Batch 262 prior gate blocker
+
+Resolved on main by 2c1b94730: the GPU queue now observes owner exit before replaying completion evidence.
+
+Outside batch 262: run scripts/gpu-package-tests.mjs in two different worktrees; both request owner check:gpu-packages, and ownerLane maps both to check, so sameLane serializes unrelated lanes. Use a distinct lane owner when running these tests directly; the runner owner needs a tooling fix.
+
+Outside batch 262: node packages/cutscene/tests/vfx-browser.mjs --compat reproduces on clean origin/main 5d6e5facd without any inspector changes: frame 40 sought particle hash 397093820 vs played 3932506386, live 110 and picture 396217175 match. The compatibility VFX reset/replay or readback cause remains unproven. Log: test-results/batch262-resume-baseline-gate-0.log. Dependent GPU coverage belongs to scheduled CI and does not gate inspector landing.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -5501,3 +5501,12 @@ rigging-check.mjs plus the existing skeletal-check.mjs, on both backends.
 
 The optional navmesh/wasm entry loads one feature-local Rust SIMD raster asset and an owned CPU worker. Exact output evidence is in packages/navmesh/test/wasm.test.js and the crate's tests: byte-identical ordinary/tiled polygon files, equal reference clipping counts, cancellation/error/timeout teardown and source/artifact hash enforcement. The SIMD work proof keeps coverage, triangle order, span merging, classification and polygonization unchanged. Native rasterization uses fixed stack clip buffers, not allocations per cell. Evidence still owed: quiet-machine end-to-end speed measurements and browser/CSP hosting matrix. No core/stage or GPU backend change.
 Batch 215 scroll pin evidence (section 5 supplement): packages/tween/test/scroll-pin-browser.mjs checks actual window/element layout and scroll destinations under native and compatibility browser runs. CPU fixtures use deterministic RAF clocks. Dependency VFX compatibility replay equality remains separately blocked as recorded in docs/known-bugs.md; no rendering-backend change is made by the pin entry.
+
+## Section 5 evidence: batch 262 standalone bindings
+
+Inspector's optional tweak entry has native DOM interaction checks alongside
+rendering WebGPU and WebGL2 preview engines (test/parity-browser.mjs), plus
+a forced --compat run of the same WebGPU path through WebGL2 compatibility. The browser script
+is discoverable as inspector/test:browser for check:gpu-packages. CPU tests
+exercise gesture boundaries, shared undo, enum identity and abort/disposal. No
+core, stage, GPU mathematics or rendering pass is added.

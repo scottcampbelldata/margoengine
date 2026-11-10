@@ -92,3 +92,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: tween/inertia alias (batch 215 job 6).
 | @margoengine/input | vector: VectorInput, wasd, radial processing, generated scalar channels, contexts, rebinding and replay | batch-253 job 1 |
 | margoengine | Generated input/vector alias | batch-253 job 1 |
+| @margoengine/inspector | Standalone tweak bindings, folders, colours, vectors, enums, buttons and gesture undo. | Batch 262 job 1 |
+| margoengine | Optional inspector/tweak import and shared history usage. | Batch 262 job 1 |

@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Inspector optional tools</title>
+<canvas width="400" height="300" style="width:400px;height:300px"></canvas><main></main>
+<script type="module">
+import {Engine, box} from '@margoengine/core';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+import {TweakPanel} from '@margoengine/inspector/tweak';
+window.setup = async (backend) => {
+  window.engine?.dispose(); window.panel?.dispose();
+  const old = document.querySelector('canvas'), canvas = old.cloneNode(); old.replaceWith(canvas);
+  const engine = window.engine = await Engine.create(canvas, {backend, fallback:webglRenderer});
+  const mesh = engine.createMesh().setGeometry(box());
+  const state = window.state = {x:0, tint:'#ff0000', enabled:true, mode:'a', vector:{x:0,y:1,z:2}, clicks:0, run(){this.clicks++;}};
+  const panel = window.panel = new TweakPanel({parent:document.querySelector('main')});
+  panel.add(state,'x',{min:-3,max:3,step:0.1}).onChange((x)=>mesh.setPosition([x,0,0]));
+  panel.addColor(state,'tint'); panel.add(state,'enabled'); panel.add(state,'mode',{options:['a','b']});
+  panel.addFolder('Vector').add(state,'vector'); panel.add(state,'run',{undo:()=>state.clicks--});
+  engine.start();
+  return engine.backend;
+};
+</script>

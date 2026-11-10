@@ -45,6 +45,10 @@
     "./packages": {
       "types": "./dist/packages.d.ts",
       "import": "./dist/packages.js"
+    },
+    "./tweak": {
+      "types": "./dist/tweak.d.ts",
+      "import": "./dist/tweak.js"
     }
   },
   "files": [
@@ -66,6 +70,8 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js inspector",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser": "node test/parity-browser.mjs",
+    "test:browser:compat": "node test/parity-browser.mjs --compat"
   }
 }
