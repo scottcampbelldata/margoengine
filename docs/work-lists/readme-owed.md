@@ -137,17 +137,17 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/behavior | triggers: sphere/box contact semantics, TriggerSystem update events, shared-board per-agent keys, namespaces, mutation/deletion/disable and disposal | batch-251 job 5 |
 | margoengine | Generated behavior/triggers alias | batch-251 job 5 |
 
-- @margoengine/tween: awaitable AsyncTween tasks and AsyncTimeline, AbortSignal cancellation, replay and caller-owned clocks (batch 215 job 1).
+- @margoengine/tween: awaitable AsyncTween tasks and AsyncTimeline, AbortSignal cancellation, replay and caller-owned clocks (batch 215 job 1). DONE (tween-prose-phase; examples tracked separately)
 - margoengine: optional tween/async re-export and the same await/cancel lifecycle (batch 215 job 1).
-- @margoengine/tween: props to/from/fromTo, relative arithmetic, Vector3, keyframe values/offsets, immediate starts, pause/speed and AbortSignal (batch 215 job 2).
+- @margoengine/tween: props to/from/fromTo, relative arithmetic, Vector3, keyframe values/offsets, immediate starts, pause/speed and AbortSignal (batch 215 job 2). DONE (tween-prose-phase; examples tracked separately)
 - margoengine: tween/props alias (batch 215 job 2).
-- @margoengine/tween: optional Timeline mixed clips, nesting/local speed, labels, replay promises, seek vs playback callbacks and cancellation (batch 215 job 3).
+- @margoengine/tween: optional Timeline mixed clips, nesting/local speed, labels, replay promises, seek vs playback callbacks and cancellation (batch 215 job 3). DONE (tween-prose-phase; examples tracked separately)
 - margoengine: tween/timeline alias (batch 215 job 3).
-- @margoengine/tween: TweenControl world, key vs target overwrite, partial cancellation promises, pause and global/local speed (batch 215 job 4).
+- @margoengine/tween: TweenControl world, key vs target overwrite, partial cancellation promises, pause and global/local speed (batch 215 job 4). DONE (tween-prose-phase; examples tracked separately)
 - margoengine: tween/control alias (batch 215 job 4).
-- @margoengine/tween: pinTimeline, window/element sections, full/root label maps, snap modes, input cancellation, responsive refresh and disposal (batch 215 job 5).
+- @margoengine/tween: pinTimeline, window/element sections, full/root label maps, snap modes, input cancellation, responsive refresh and disposal (batch 215 job 5). DONE (tween-prose-phase; examples tracked separately)
 - margoengine: tween/scroll-pin alias (batch 215 job 5).
-- @margoengine/tween: VelocityTracker release timestamps, inertia friction, endpoint/list/function selection, hard vs bouncy ranges, rest thresholds, caller clock and cancellation (batch 215 job 6).
+- @margoengine/tween: VelocityTracker release timestamps, inertia friction, endpoint/list/function selection, hard vs bouncy ranges, rest thresholds, caller clock and cancellation (batch 215 job 6). DONE (tween-prose-phase; examples tracked separately)
 - margoengine: tween/inertia alias (batch 215 job 6).
 | @margoengine/input | vector: VectorInput, wasd, radial processing, generated scalar channels, contexts, rebinding and replay | batch-253 job 1 |
 | margoengine | Generated input/vector alias | batch-253 job 1 |
@@ -1521,3 +1521,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/inspector: optional-entry copy-paste examples and their runtime validation remain owed; round 3 instruction prohibits writing/fixing examples and check:readme-run. Prose coverage is complete.
 
 - @margoengine/stats: geometry, gl and panels copy-paste examples and runtime validation remain owed under the round 3 prohibition on README examples and check:readme-run.
+
+- @margoengine/tween: async, props, timeline, control, scroll-pin and inertia copy-paste examples and runtime validation remain owed under the round 3 prohibition on README examples and check:readme-run.

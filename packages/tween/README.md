@@ -4,6 +4,171 @@ Import `margoengine/tween` from the `margoengine` package, or `@margoengine/twee
 
 Numeric property interpolation and easing; `update` steps the existing tracks in place and creates no per-track objects.
 
+## Choose a clock and entry
+
+The root Tween and Timeline remain the small numeric API. Additional workflows use
+explicit imports from `@margoengine/tween/<entry>` or `margoengine/tween/<entry>`:
+
+| Entry | API | Clock owner |
+|---|---|---|
+| `async` | AsyncTween, AsyncTimeline | Caller calls update in seconds. |
+| `props` | to, from, fromTo, keyframes | Each returned operation has update. |
+| `timeline` | Timeline with arrays, paths, custom clips and nesting | Caller updates the parent. |
+| `control` | TweenControl with target/property ownership | Caller updates the control world. |
+| `scroll-pin` | pinTimeline, scrollSnapPoint | The link owns scroll listeners and requestAnimationFrame. |
+| `inertia` | VelocityTracker, inertia | Caller supplies sample times and update deltas in seconds. |
+
+These imports do not start a clock or install listeners. Only attaching a scroll link
+takes browser input ownership. Do not advance the same operation from both a world or
+parent and an independent frame loop. Handle completion rejections when cancelling,
+replacing or disposing awaitable work; cancellation preserves the last written values.
+
+## Awaitable operations
+
+`AsyncTween` provides the root Tween's to, array, path and custom methods as awaitable
+tasks. A returned TweenTask is also a cancel function; it exposes `finished`,
+`cancel(reason)` and Symbol.dispose. Completion resolves; abort, replacement, clear or
+an update failure rejects. An AbortSignal rejects with its exact reason; explicit
+cancellation defaults to AbortError. A replacement on the same target/property rejects
+the previous task. Invalid input is checked before valid work is replaced.
+
+Call `driver.update(deltaSeconds)` from the application loop. Awaiting a task does not
+advance it. `driver.finished` captures operations active when it is read; tasks added
+later are independent. Callback-created work starts on the next update. Recursive
+update is rejected. `clear()` or disposal cancels all active tasks. Timing options
+match the root Tween: required nonnegative duration, delay 0, linear easing, repeat 0,
+yoyo false and optional completion/repeat callbacks; signal defaults to unset.
+
+`AsyncTimeline` wraps the root scalar Timeline with `finished` and then support,
+signal cancellation and disposal. Its to, label, call, seek, reverse, pause, play and
+update follow the root API. Pause and seek do not settle completion. Replaying a
+settled run creates a fresh finished promise; save or await the promise for that run.
+An already-aborted signal also cancels a replay. Playback callbacks run during update,
+not during seek. Cancelling pauses the timeline and leaves sampled values in place.
+
+## Multiple properties and keyframes
+
+The `props` entry's `to(target, values, options)`, `from(target, values, options)` and
+`fromTo(target, start, end, options)` animate finite numeric writable properties,
+including a Vector3's x/y/z. Destinations may be numbers or relative strings using
++=, -=, *= or /=. Relative scalars resolve against the captured starting value;
+relative entries in a keyframe value list resolve against the preceding value.
+Nonfinite arithmetic, including division by zero, rejects.
+
+`from` and `fromTo` write their starts immediately. An explicit property keyframe list
+also writes its first value immediately, including during a delay; a scalar `to` waits
+for update. Lists need at least two values and distribute offsets evenly.
+`keyframes(target, frames, options)` accepts frames with values, optional offset in
+0..1 and optional per-segment easing. Missing first/last offsets default to 0/1;
+interior omissions distribute between explicit offsets. Offsets must be nondecreasing.
+Omitted properties carry their previous value; values outside the explicit offset
+range hold the corresponding endpoint. Easing defaults to operation easing or linear.
+
+Each result exposes target, keys, duration and finished, plus update, pause, play,
+cancel and Symbol.dispose. Its speed defaults to 1 and accepts finite nonnegative
+values; zero freezes the clock. Advance it with update even when awaiting completion.
+Options include the async timing options and AbortSignal. Cancellation rejects the
+completion promise and leaves current property values intact.
+
+## Mixed clips and nested timelines
+
+`Timeline` from `/timeline` is a separate optional class from the root scalar Timeline.
+It combines to, array, custom and path clips, call callbacks and nested Timeline groups.
+Array interpolation defaults to componentwise; pass an interpolate function for
+quaternions or other representations. Clips require finite nonnegative duration;
+easing defaults to linear. `at` defaults to append and accepts seconds, an existing
+label, or a label with a signed seconds offset. `label` adds a named time and labelTimes
+returns a defensive snapshot.
+
+`add(child, at)` gives a child one parent, rejects cycles and samples the child from
+the parent clock. `remove(child)` detaches it for reuse. The child's speed is applied
+once; parent duration includes the child's repeated span divided by that speed. A
+child's pause does not suspend parent sampling. Default speed is 1 and must be finite
+and positive; repeat defaults to 0 and accepts nonnegative integers or Infinity, while
+yoyo defaults to false. Read duration for one pass, totalDuration for repeated local
+span, time for the playhead and playing for clock state.
+
+Call play then update(deltaSeconds). Pause preserves position; reverse changes
+direction. Seek samples values without call or onComplete notifications. Custom clip
+samplers still run when sampled, so keep their side effects appropriate for seeking.
+Playback crossings dispatch callbacks, including nested ones. Starting values are
+captured when a clip is first sampled. Replay renews finished and the repeat budget.
+Abort or cancel rejects completion and stops the hierarchy, preserving values;
+cancellation propagates between parent and child. Disposal cancels and detaches children.
+
+## A control world for target ownership
+
+Construct `TweenControl` from `/control` to keep a target/key registry without globals.
+`world.to(target, values, options)` returns a ControlledTween and validates all values
+before replacing existing work. `overwrite` defaults to auto, removing matching keys
+of older work on that target. All removes every older target key; false allows
+coexistence, with writes following update order.
+
+`killTweensOf(target, keys?)` removes selected keys or all keys, including paused and
+delayed work, and returns the removed-key count. `getTweensOf(target)` returns active
+operations. A ControlledTween exposes target, remaining keys, finished, pause/play,
+speed, kill and cancel. Partial removal lets remaining keys finish normally; removing
+the last unfinished key cancels and rejects the whole operation. Cancel defaults to
+AbortError, and signal aborts preserve their reason.
+
+Call only `world.update(deltaSeconds)` for registered work. Operation speed and the
+world's timeScale multiply; both default to 1 and allow finite nonnegative values.
+Zero freezes time, including delay. Work created from callbacks starts on the next
+update. Disposal cancels the world's remaining operations without resetting targets.
+
+## Pin a scrolling section and snap
+
+`pinTimeline(timeline, options)` from `/scroll-pin` takes an attached pin element and
+a timeline of positive finite duration. It pauses playback and samples through seek.
+The scroll source defaults to the pin's window and may be a scrolling element. Start
+defaults to the section's natural offset; distance defaults to one source viewport
+height. Both may be functions reread on refresh. Start must be finite and nonnegative;
+distance must be finite and positive.
+pinSpacing defaults to true, reserving the extra scrolling distance in layout.
+
+Snap defaults to disabled. Supply a normalized interval in (0,1], a nonempty list of
+stops in 0..1, a destination function, labels or labelsDirectional. The directional
+mode prefers stops in the direction of travel. The optional Timeline supplies
+labelTimes; for a root Timeline pass a labels Map explicitly. Label times are seconds,
+converted to progress by duration. `scrollSnapPoint(progress, stops, direction)` exposes
+the deterministic stop choice independently.
+
+snapDelay defaults to 0.2 seconds, snapDuration to 0.25, and scrub catch-up to 0;
+all must be finite and nonnegative. Wheel, pointer, touch and keyboard input interrupt
+an active snap. The link exposes progress, snapping, refresh and dispose. Responsive
+resize refreshes layout; call refresh after application changes to ranges or labels.
+onUpdate runs after each sample; timeline playback callbacks do not fire on seek.
+Disposal or signal abort removes listeners, animation frames and spacer and restores
+the pin's original inline style and DOM position. The timeline remains caller-owned
+and paused, without automatically resuming its prior clock.
+
+## Release velocity and inertia
+
+`VelocityTracker` from `/inertia` estimates units per second over recent samples.
+Its defaults are a 0.1-second window and capacity 32 (allowed 2..1024). Call
+sample(value, seconds) with finite values and nondecreasing nonnegative times; an
+equal-time sample replaces the last. reset forgets a previous gesture. velocity uses
+the latest sample time. At release use velocityAt(releaseSeconds), which returns zero
+when the pointer has been idle beyond the window. No wall clock is read internally.
+
+`inertia(target, key, options)` takes either a numeric velocity or a VelocityTracker.
+For a tracker, releaseTime defaults to its latest sample time; supply the actual
+release time to account for an idle pointer. Default resistance is 6 per second,
+with exponential velocity decay and a projected endpoint of start + velocity/resistance.
+Optional end selects an exact endpoint, nearest stop from a list, or the result of a
+function of the projected endpoint. min and max default to unbounded; supplied bounds
+must be finite and ordered. Selected endpoints clamp to them; stop lists must be
+nonempty and entirely within the bounds.
+
+bounce defaults to 0 for hard range bounds and accepts [0,1) for spring motion around
+the endpoint. restSpeed defaults to 0.01 units/second, restDelta to 0.001 units and
+maxDuration to 10 simulated seconds; each must be finite and positive. Reaching rest
+or maxDuration writes the exact endpoint. onUpdate receives value and physical velocity;
+onComplete fires once. The returned operation exposes value, velocity, end, finished,
+update, pause/play, speed and cancel. Speed defaults to 1 and allows finite values >=0.
+Caller update deltas are seconds. Signal abort, cancel and disposal reject unfinished
+work and preserve its current value. Observe finished rejections when interrupting it.
+
 ```ts
 import {Tween, easeInOutCubic} from 'margoengine/tween';
 const object = {opacity: 0};
@@ -242,7 +407,8 @@ Build and unit tests: npm test --workspace @margoengine/tween
 
 ## Speed
 
-10,000 `spring.update(dt)` calls take 0.28 ms in Node on the development PC, with no allocation per call, so a spring per object is fine:
+Use the caller's frame loop to update each spring. Measure performance for your target
+hardware and workload:
 
 ```ts
 import {Spring} from 'margoengine/tween';
