@@ -8,6 +8,42 @@ and colour space, selection linked to a histogram), and [Wind field](../../examp
 [Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
 Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
 
+## Optional workflows
+
+Import only the entry you need. Every `@margoengine/sciviz/<entry>` below also has a
+`margoengine/sciviz/<entry>` forwarding entry; neither the figure root nor core/stage
+loads these features for you. Install matching private-repository builds as described
+in the root installation guide, rather than the unrelated registry package.
+
+- [Analysis and scientific datasets](docs/analysis.md): pipeline, contour, clip, probe,
+  calculator, glyphs, normalized datasets and scientific file readers.
+- [Scientific volumes](docs/volumes.md): transfer functions, categorical fusion,
+  cinematic and quality wrappers, mapped/tetrahedral/AMR volumes and atmosphere.
+- [Charts and linked data](docs/charts.md): selections, tables, queries, statistics,
+  formatting, streaming and publication.
+- [Large data and geography](docs/large-data.md): cloud volumes, point clouds,
+  aggregation, density, graph layout, time series, climate and map layers.
+- [State and application integration](docs/applications.md): portable state,
+  provenance, sharing, notebooks, accessibility, layouts, monitoring and workers.
+
+Works with the [scientific dashboard composition](../../docs/integration-sciviz.md):
+optional entries share a Figure, compute device, selection and publication lifecycle.
+The record gives the exact reproduction command and measured integration scope.
+
+## Contributor checks
+
+From the repository root run `npm run test --workspace @margoengine/sciviz` for CPU
+contracts and `npm run check:readme-run -- --packages=sciviz` for the examples here
+and in the package guides. Browser workspace commands use `scripts/browser-root.mjs`
+to establish the repository root; keep that launcher when invoking fallback, table,
+engineering and pointcloud suites. For example,
+`npm run test:browser:table --workspace @margoengine/sciviz`.
+Each browser suite declares its backend coverage. Full compatibility requires the
+full WebGL2 tier, not merely a WebGL2 context. Readiness checks use cinematic sample
+counts, progressive refinement state and submitted GPU work, rather than sleeps.
+CPU-load sampling starts after setup. Timing results remain deferred during the
+build phase and these correctness checks make no speed claim.
+
 ## Climate and solver files
 
 `@margoengine/sciviz/netcdf` opens CDF-1 classic and CDF-2 64-bit-offset files without eagerly decoding variables.
@@ -58,8 +94,8 @@ response fits `maxBytes`. The default 64 MiB bounds headers, single reads, decod
 remote file's total size. `signal` cancels the file lifetime; per-read `signal` cancels that read. `dispose()` and
 `Symbol.dispose` abort pending/future reads and are idempotent. Nothing loads on import beyond this entry's code.
 
-NetCDF-4/HDF5 is explicitly unsupported here: a reliable reader requires object headers, B-trees, chunk indexes
-and filter semantics, owned by the separate engineering-format job. Convert to classic with the format owner's
+NetCDF-4/HDF5 is explicitly unsupported by `/netcdf`: object headers, B-trees, chunk indexes
+and filter semantics belong to the optional `/hdf5` engineering readers. Convert to classic with the format owner's
 tools. CDF-5, non-UTF-8 text metadata and indeterminate streaming record counts also reject. CF coordinate systems/calendars are retained
 as metadata, not guessed or reprojected. StructuredGrid drawing needs three non-singleton axes; oriented
 ImageData needs resampling before an axis-aligned volume. Other raw VTK cell types remain accessible but must

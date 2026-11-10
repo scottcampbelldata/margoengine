@@ -6,24 +6,24 @@
 
 - @margoengine/react (lane A known-bugs sweep): document that subpath test consumers are disposable generated files, excluded from source inventories. DONE (react-readme-phase).
 
-- @margoengine/sciviz (review L2): document incremental circular spreading, neighbour-presence density, clipped edges and unchanged numerical bins.
+- @margoengine/sciviz (review L2): document incremental circular spreading, neighbour-presence density, clipped edges and unchanged numerical bins. DONE (sciviz-readme-phase)
 
-- @margoengine/sciviz (review M3): document reversible contrast and reduced-motion suspension, retained playback cancellation, and preservation of stopped engines.
+- @margoengine/sciviz (review M3): document reversible contrast and reduced-motion suspension, retained playback cancellation, and preservation of stopped engines. DONE (sciviz-readme-phase)
 
-- @margoengine/sciviz (review M1): document automatic GPU picking synchronization of in-place position and rectangle edits.
+- @margoengine/sciviz (review M1): document automatic GPU picking synchronization of in-place position and rectangle edits. DONE (sciviz-readme-phase)
 
-- @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase.
+- @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase. DONE (sciviz-readme-phase)
 - @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase.
 - @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase.
 - @margoengine/react: performance proof waits for target factor/dimensions and pipeline readiness; review test guidance in the README phase. DONE (react-readme-phase).
 
-- @margoengine/sciviz (batch 179 job 4): document /provenance opt-in factories, metadata schema and integrity checks, automatic PNG/SVG metadata, PDF info export, successful-call trace replay, history bounds and explicit application codecs/registries.
+- @margoengine/sciviz (batch 179 job 4): document /provenance opt-in factories, metadata schema and integrity checks, automatic PNG/SVG metadata, PDF info export, successful-call trace replay, history bounds and explicit application codecs/registries. DONE (sciviz-readme-phase)
 - margoengine (batch 179 job 4): document generated sciviz/provenance alias.
 
 
 - @margoengine/stage (GPU inventory repair): document the declared test:gpu:viewer-extras command and its WebGPU/WebGL2 viewer regression coverage during the README phase.
 
-- @margoengine/sciviz (review 3 dependency gate): retain the package browser-root bootstrap for fallback and table test commands; examples deferred.
+- @margoengine/sciviz (review 3 dependency gate): retain the package browser-root bootstrap for fallback and table test commands; examples deferred. DONE (sciviz-readme-phase)
 
 - @margoengine/splats (review 3): cover progressive cancellation during pending async iteration and between buffered batches, including producer cleanup ownership; examples deferred.
 
@@ -83,7 +83,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated navmesh/queries alias | batch-252 job 1 |
 
 
-| @margoengine/sciviz | Review climate/solver file examples and limits for netcdf/vtk in the README phase; existing examples and 57 runtime checks were completed before deferral. | Batch 171 job 5 |
+| @margoengine/sciviz | Review climate/solver file examples and limits for netcdf/vtk in the README phase; existing examples and 57 runtime checks were completed before deferral. | Batch 171 job 5 DONE (sciviz-readme-phase) |
 | @margoengine/loaders | Review the lazy VTK XML dataset API example in the README phase; the existing example was validated before deferral. | Batch 171 job 5 |
 | margoengine | Cover the sciviz/netcdf and sciviz/vtk aliases in the README phase. | Batch 171 job 5 |
 | @margoengine/behavior | inspect: mount TreeInspector, trace:true, automatic/manual refresh, pause/resume, abort and disposal, idle vs last tick | batch-251 job 2 |
@@ -106,7 +106,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/netcode | presence: RoomNode run/close, remote routed reservations, lease defaults, PresenceStore adapter contract, same-host SQLite and network-store integration | batch-256 job 2 |
 | margoengine | Generated netcode/presence alias | batch-256 job 2 |
 
-| @margoengine/sciviz | Review derived-field CPU/GPU examples and stated numerical bounds in the README phase. | Batch 171 job 4 |
+| @margoengine/sciviz | Review derived-field CPU/GPU examples and stated numerical bounds in the README phase. | Batch 171 job 4 DONE (sciviz-readme-phase) |
 | margoengine | Cover the sciviz/derive alias in the README phase. | Batch 171 job 4 |
 | @margoengine/sprites | SliceLayer/addSlice: fixed borders, stretch/repeat, scrolling, partial tiles, resize, transforms and pages; SpriteInput dx/dy gradients before masking | batch-245 job 1 |
 | margoengine | Document the sprites/slice alias and its optional imports | batch-245 job 1 |
@@ -168,7 +168,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/controls: document /device-orientation, user-gesture permission, secure context, AbortSignal/timeout, relative alignment, screen compensation, yaw offset, recenter, smoothing and disposal.
 - margoengine: document /controls/device-orientation alias.
 
-| @margoengine/sciviz | Document atmosphere globe creation, UTC solar time, metre heights, wind units, scalar/point/cloud layers, disposal and model limits. | Batch 171 job 6 |
+| @margoengine/sciviz | Document atmosphere globe creation, UTC solar time, metre heights, wind units, scalar/point/cloud layers, disposal and model limits. | Batch 171 job 6 DONE (sciviz-readme-phase) |
 | @margoengine/sky | Document the planet entry frame, Hillaire transport bindings, physical limits and disposal. | Batch 171 job 6 |
 | margoengine | Document the sciviz/atmosphere and sky/planet aliases. | Batch 171 job 6 |
 
@@ -366,7 +366,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mcp: cover both HTTP protocol eras, modern per-request metadata, discovery, encoded/custom headers and distinct disconnect cancellation semantics.
 - @margoengine/cache: document cache/stream StreamingAssetCache, pull-driven bodies, consume/cancel before flush, EOF commit, failure behavior, budgets and service worker waitUntil.
 - margoengine: document the generated cache/stream alias and StreamingAssetCache lifecycle in the README phase.
-- @margoengine/sciviz: document optional pipeline registry, lazy demand, dirty/time propagation, AbortSignal, JSON restoration, resource ownership and NASA FUN3D demo after the build phase.
+- @margoengine/sciviz: document optional pipeline registry, lazy demand, dirty/time propagation, AbortSignal, JSON restoration, resource ownership and NASA FUN3D demo after the build phase. DONE (sciviz-readme-phase)
 
 - margoengine: document the optional sciviz/pipeline facade and its equivalence to @margoengine/sciviz/pipeline after the build phase.
 
@@ -448,7 +448,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: generated controls/globe export ordering refreshed while landing voxel-pathtracer BLAS dependencies.
 - @margoengine/headless: deferred README-only node-check.mjs bundled in test:gpu; ffmpeg is absent from PATH. Rendering correctness in browser-check.mjs passed during the BLAS dependent gate.
 - @margoengine/react: browser binding and instance checks now launch from the repository root; README runtime work stays deferred. DONE (react-readme-phase).
-- @margoengine/sciviz: document /contour CPU/GPU multi-level isosurfaces and isolines, contourOperator, pulling cell assumptions, precision bound, cancellation and NASA demo.
+- @margoengine/sciviz: document /contour CPU/GPU multi-level isosurfaces and isolines, contourOperator, pulling cell assumptions, precision bound, cancellation and NASA demo. DONE (sciviz-readme-phase)
 - margoengine: document generated sciviz/contour alias with the owning sciviz contour entry.
 
 
@@ -500,7 +500,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/headless and margoengine: document /null createNullStage, scene/plugin and animation ticks, fixed delta/time, disposal, cancellation, and GPU-only operation refusals.
-- @margoengine/sciviz: document /clip, named tuple arrays, sourceCells, all cut shapes and inversions, crinkle, threshold modes, image/curvilinear subsets, cancellation, sampled implicit limits and TCIA/NASA demos.
+- @margoengine/sciviz: document /clip, named tuple arrays, sourceCells, all cut shapes and inversions, crinkle, threshold modes, image/curvilinear subsets, cancellation, sampled implicit limits and TCIA/NASA demos. DONE (sciviz-readme-phase)
 - margoengine: document the generated sciviz/clip alias with its owning optional entry.
 - @margoengine/usdz: pointInstancers() optional /instancer entry, timeCode/maxNodes, prototype sharing, masks, nesting and worker usage; sampled layers need composition().
 - margoengine: generated usdz/instancer alias; generated selection/hit-details alias restores the export map checked by the existing umbrella test.
@@ -562,7 +562,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/road (batch 233 job 3): GeoJSON/OSM imports, tags/width/lane defaults, source identity, grade-separated network topology, coordinate projection, bounds and runnable render/graph example after build phase.
 - margoengine (batch 233 job 3): road/geojson alias after build phase.
-- @margoengine/sciviz: document /probe locator ownership, barycentric/trilinear cell models, integration dimensions, masks/resampling, profile/chart linkage, pipeline params, precision/conditioning limits and NASA/OpenNeuro demo.
+- @margoengine/sciviz: document /probe locator ownership, barycentric/trilinear cell models, integration dimensions, masks/resampling, profile/chart linkage, pipeline params, precision/conditioning limits and NASA/OpenNeuro demo. DONE (sciviz-readme-phase)
 - margoengine: document generated sciviz/probe alias alongside the owning optional entry.
 
 - @margoengine/culling: document /bounds BoxCulledMeshes, BoxCulledModels and BoxDynamicInstances, inherited methods, padding and compatibility behaviour (batch 223 job 2).
@@ -607,7 +607,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/webgl2-compat: document direct full-image straight-alpha bitmap copies and the existing Canvas2D path for crop, flip and requested premultiplication.
 - margoengine: document the generated /splats/progressive alias alongside the scoped entry.
-- @margoengine/sciviz: document /calc grammar, derived operation contracts, bounds, pipeline adapter and NASA calculator demo; README examples deferred during build phase.
+- @margoengine/sciviz: document /calc grammar, derived operation contracts, bounds, pipeline adapter and NASA calculator demo; README examples deferred during build phase. DONE (sciviz-readme-phase)
 
 - margoengine: document the sciviz/calc optional alias after build phase.
 
@@ -641,7 +641,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 227 job 2): document lines/stroke and lines/texture forwarding entries; examples deferred.
 - @margoengine/scatter: document /surface scatterSurface GeometryData inputs, exact area/paint density, normal alignment, world matrix/offset/scale/yaw defaults, returned arrays, limits, source updates and AbortSignal.
 - margoengine: document the /scatter/surface forwarding entry and its surface placement arrays.
-- @margoengine/sciviz: document /glyph input/selection, defaults, six sources, ownership, warp contracts and NOAA/SEACAS demo; examples deferred during build phase.
+- @margoengine/sciviz: document /glyph input/selection, defaults, six sources, ownership, warp contracts and NOAA/SEACAS demo; examples deferred during build phase. DONE (sciviz-readme-phase)
 
 - margoengine: document sciviz/glyph optional alias after build phase.
 
@@ -784,7 +784,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mixer (batch 212 dynamics): document gate hysteresis/hold/floor, expanderCurve/range, LR4 phase compensation, per-band settings, envelope direction, createBusDynamics ownership and peak safety.
 
 - margoengine (batch 212 dynamics): document generated mixer/dynamics alias.
-- @margoengine/sciviz (batch 173 job 1): document /transfer physical units, rectangle/triangle/Gaussian widgets, modality presets, histogram, editor/binding lifetimes, existing-volume LUT updates, preintegration and its step/density assumptions; examples deferred.
+- @margoengine/sciviz (batch 173 job 1): document /transfer physical units, rectangle/triangle/Gaussian widgets, modality presets, histogram, editor/binding lifetimes, existing-volume LUT updates, preintegration and its step/density assumptions; examples deferred. DONE (sciviz-readme-phase)
 - margoengine (batch 173 job 1): document optional sciviz/transfer alias after build phase.
 
 
@@ -850,7 +850,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/video (batch 269 job 2): document /dome videoDomeMaterial, mono/side-by-side/top-bottom, eye, 180/360 angles, sphere orientation, black rear, half-texel borders, source ownership and compat; point ordinary map/repeat/mips users to materials.Texture. Examples deferred.
 - margoengine (batch 269 job 2): document generated video/dome alias; examples deferred.
 
-- @margoengine/sciviz (batch 173 job 2): document labels entry, fusionVolume registered sources, exact category palettes/outlines and legend, RGB/RGBA scale, component functions/weights, three mixing rules, snapshot/rebuild semantics and texture/step limits; add copy-paste examples in the README phase.
+- @margoengine/sciviz (batch 173 job 2): document labels entry, fusionVolume registered sources, exact category palettes/outlines and legend, RGB/RGBA scale, component functions/weights, three mixing rules, snapshot/rebuild semantics and texture/step limits; add copy-paste examples in the README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 173 job 2): document sciviz/labels alias in the README phase.
 
 
@@ -916,7 +916,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 
-- @margoengine/sciviz (batch 173 job 3): document cinematicVolume, independent default-off lighting modes, HG/radiance/step/sample defaults, camera-rest resets, scene metric, exact cost readback, disposal/source sharing, limits and real EMDB/TCIA demo; examples in README phase.
+- @margoengine/sciviz (batch 173 job 3): document cinematicVolume, independent default-off lighting modes, HG/radiance/step/sample defaults, camera-rest resets, scene metric, exact cost readback, disposal/source sharing, limits and real EMDB/TCIA demo; examples in README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 173 job 3): document optional sciviz/cinematic alias in README phase.
 
 - @margoengine/voxel-net: document /server-runtimes Bun/Deno factories, native listener ownership, AbortSignal/await using, authentication facade, TLS types, shared test:runtimes command and Deno idle input requirement.
@@ -989,7 +989,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 272 job 2): cover staging/accumulate-ambient and regenerated post/pixelate forwarding; examples deferred.
 
 
-- @margoengine/sciviz (batch 173 job 4): document volume-quality defaults, block/opacity bounds, blue-noise provenance, adaptive/isosurface limits, invalidate(), exact scene-depth termination, source sharing, 56 B cinematic depth/count history and saturated-frame cost semantics; replace the old opaque-interior limitation during the README phase.
+- @margoengine/sciviz (batch 173 job 4): document volume-quality defaults, block/opacity bounds, blue-noise provenance, adaptive/isosurface limits, invalidate(), exact scene-depth termination, source sharing, 56 B cinematic depth/count history and saturated-frame cost semantics; replace the old opaque-interior limitation during the README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 173 job 4): document optional sciviz/volume-quality alias in the README phase.
 
 - @margoengine/quality and margoengine (batch 195 job 1): document /demand renderOnDemand, source events, update replacing onFrame, invalidate coalescing/counts, animation holds, loaded, idle clock, restore and disposal defaults; examples deferred.
@@ -1016,7 +1016,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine: document the generated decoders/ktx2-hdr6 alias and retain the environment/prefiltered alias emitted by the umbrella generator.
 
-- @margoengine/sciviz and margoengine/sciviz/contour2d (batch 177 job 1): grid and scattered contours, saddle ties, polygon bands/holes, inline labels, SVG options/defaults, cancellation, climate demo and limits.
+- @margoengine/sciviz and margoengine/sciviz/contour2d (batch 177 job 1): grid and scattered contours, saddle ties, polygon bands/holes, inline labels, SVG options/defaults, cancellation, climate demo and limits. Sciviz DONE (sciviz-readme-phase); forwarding-package documentation remains owed.
 
 
 - @margoengine/environment (batch 188 job 3): document /reflector-pbr, Fresnel/IOR/metalness/baseColor, roughness and world blurDistance, geometric-normal and constant-base limits, capture lifecycle and supported backends.
@@ -1027,7 +1027,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 272 job 3): document staging/caustics forwarding; examples deferred.
 
 - margoengine: retain canonical package-group and entry order when maintaining generated aliases; this repair adds no API.
-- @margoengine/sciviz (batch 174 job 1): document SelectionStore, bindSelection, row/group keys, resolve/empty semantics, modifier operations, events, history, mask ownership, disposal and the real-data linked stars demo in the README phase.
+- @margoengine/sciviz (batch 174 job 1): document SelectionStore, bindSelection, row/group keys, resolve/empty semantics, modifier operations, events, history, mask ownership, disposal and the real-data linked stars demo in the README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 174 job 1): document generated sciviz/link alias in the README phase.
 - @margoengine/vfx (batch 174 landing repair): no API change; retain documentation of the recurring GPU parity command during the README phase.
 
@@ -1040,19 +1040,19 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 
-- @margoengine/sciviz (batch 178 job 1): document /export-vector, scene/layer snapshots, BSP ordering, colour facets, explicit raster fallback, budgets and appearance limits; examples deferred.
+- @margoengine/sciviz (batch 178 job 1): document /export-vector, scene/layer snapshots, BSP ordering, colour facets, explicit raster fallback, budgets and appearance limits; examples deferred. DONE (sciviz-readme-phase)
 - margoengine (batch 178 job 1): document generated sciviz/export-vector and post/curvature aliases; examples deferred.
 
 - @margoengine/staging (batch 272 job 4): document Backdrop/backdropGeometry dimensions, mesh orientation/material/ownership and stagingLights/stagingLighting presets, forwarded environment options/cancellation and limitations; examples deferred.
 - margoengine (batch 272 job 4): document staging/backdrop forwarding; examples deferred.
-- @margoengine/sciviz (batch 176 job 1): document /datasets constructors, normalized DataSet filter contract, composites and common arrays, higher-order refinement, face-stream limits, VTK/PLOT3D readers, options, cancellation and the real NASA example; add runnable examples after the build phase.
+- @margoengine/sciviz (batch 176 job 1): document /datasets constructors, normalized DataSet filter contract, composites and common arrays, higher-order refinement, face-stream limits, VTK/PLOT3D readers, options, cancellation and the real NASA example; add runnable examples after the build phase. DONE (sciviz-readme-phase)
 - @margoengine/loaders (batch 176 job 1): document lazy VTKXMLPiece coordinates and topology metadata, RectilinearGrid support and unnamed coordinate axis order after the build phase.
 - margoengine (batch 176 job 1): document generated sciviz/datasets forwarding after the build phase.
 - @margoengine/cutscene (batch 217 job 3): document scroll RangePlayback/ScrollPlayback, ranges/directions/iteration counts, update ownership, event endpoints, cancellation, scrub defaults, source bounds and disposal; examples deferred.
 - margoengine (batch 217 job 3): document generated cutscene/scroll alias.
 
-- @margoengine/sciviz and margoengine/sciviz/stats (batch 177 job 2): all statistical charts, /maths exports, confidence/robustness assumptions, defaults, missing values and real GHCN/NASA vector demo.
-- @margoengine/sciviz (batch 175 job 1): document /omezarr cloud stores, OME 0.4/0.5, N5/precomputed, stored-level sources, bounds/ranges, codec refusals, Range reads, cancellation and the three recorded scientific crops; examples deferred.
+- @margoengine/sciviz and margoengine/sciviz/stats (batch 177 job 2): all statistical charts, /maths exports, confidence/robustness assumptions, defaults, missing values and real GHCN/NASA vector demo. Sciviz DONE (sciviz-readme-phase); forwarding-package documentation remains owed.
+- @margoengine/sciviz (batch 175 job 1): document /omezarr cloud stores, OME 0.4/0.5, N5/precomputed, stored-level sources, bounds/ranges, codec refusals, Range reads, cancellation and the three recorded scientific crops; examples deferred. DONE (sciviz-readme-phase)
 - margoengine (batch 175 job 1): document generated sciviz/omezarr alias; examples deferred.
 
 - @margoengine/compute (batch 274 job 3): document compute/cpu-wasm creation, AbortSignal, disposal, work counters, supported built-ins, host Math semantics, chunk/memory bounds and the separate lazy SIMD asset; add its example in the README phase.
@@ -1073,7 +1073,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/exporters (batch 136 proof): document the four-setting corpus, prediction-degree and circular-normal candidate selection, bounded RAW alphabet and scoped no-worse ratio/error evidence during the README phase.
-- @margoengine/sciviz: document /curvilinear, structured and spherical node order/units/seams, shared source classifiers, physical referenceStep, index slices/outlines, masking, lifecycle, NOAA demo and accuracy limits.
+- @margoengine/sciviz: document /curvilinear, structured and spherical node order/units/seams, shared source classifiers, physical referenceStep, index slices/outlines, masking, lifecycle, NOAA demo and accuracy limits. DONE (sciviz-readme-phase)
 
 - margoengine: document generated /sciviz/curvilinear alias alongside the optional scientific volume entries.
 - @margoengine/clustered (batch 186 job 3): document CubeProjectorLights, six-face order/orientation, setCubes plus inherited spot setProjectors, quaternion rotation, sRGB/linear/alpha filtering, limits, restoration and copied pixels; examples deferred.
@@ -1082,14 +1082,14 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 
-- @margoengine/sciviz (batch 180 job 1): document geo-lod, selection/cache/fades, terrain stream and quantized height adapters, cancellation, errors, provider attribution and real AWS demo; margoengine generated geo-lod alias.
-- @margoengine/sciviz (batch 181 job 1): document createFallbackFigure from /fallback, page-wide explicit WebGL2 installation, full-tier requirements, same-case CPU isosurfaces, ownership/cancellation/restore and ?backend=webgl2 for the three real-data demos; examples deferred.
+- @margoengine/sciviz (batch 180 job 1): document geo-lod, selection/cache/fades, terrain stream and quantized height adapters, cancellation, errors, provider attribution and real AWS demo; margoengine generated geo-lod alias. DONE (sciviz-readme-phase)
+- @margoengine/sciviz (batch 181 job 1): document createFallbackFigure from /fallback, page-wide explicit WebGL2 installation, full-tier requirements, same-case CPU isosurfaces, ownership/cancellation/restore and ?backend=webgl2 for the three real-data demos; examples deferred. DONE (sciviz-readme-phase)
 
 - @margoengine/ui (review 2): describe Select popup ownership when closing and reopening within one turn, including disposal of the current popup.
 
 - @margoengine/exporters (batch 136 removal): remove obsolete bundled-Draco-encoder instructions and document the owned lazy artifact and external custom encoderPath compatibility during the README phase.
 - Tooling (API lock Day 0): document report coverage, locked/watch rollout and one-shot approved breaks in the README phase; examples deferred.
-- @margoengine/sciviz (batch 177 job 3): document /charts-extra families, own scales/layouts, SVG exports, data conventions, bounds and NOAA/EIA demo; copy-paste examples owed in README phase.
+- @margoengine/sciviz (batch 177 job 3): document /charts-extra families, own scales/layouts, SVG exports, data conventions, bounds and NOAA/EIA demo; copy-paste examples owed in README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 177 job 3): document sciviz/charts-extra optional alias in README phase.
 
 - @margoengine/compute (batch 274 job 4): document /nn-extra, all defaults/layouts, train/eval and nested normalization state, grouped transpose/output size, recurrent run states/lengths/gradients, upsampling modes/coordinates, and table/tape storage. Add examples only in the README phase.
@@ -1104,14 +1104,14 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 
-- @margoengine/sciviz (batch 174 job 2): table readers, physical types/nulls, indexed range/set filters, GPU/CPU aggregates, linked chart binding, TLC demo and format/numerical limits.
+- @margoengine/sciviz (batch 174 job 2): table readers, physical types/nulls, indexed range/set filters, GPU/CPU aggregates, linked chart binding, TLC demo and format/numerical limits. DONE (sciviz-readme-phase)
 - @margoengine/decoders (batch 174 job 2): raw Snappy and bounded lazy columnar block codecs, cancellation and decoded-size limits.
-- @margoengine/sciviz (batch 178 job 2): document /pdf and /math, caller-owned font coverage, metadata/physical sizing, TeX subset, native MathML and shared PNG/SVG/PDF formula overlays, disposal and accepted layout differences; examples deferred.
+- @margoengine/sciviz (batch 178 job 2): document /pdf and /math, caller-owned font coverage, metadata/physical sizing, TeX subset, native MathML and shared PNG/SVG/PDF formula overlays, disposal and accepted layout differences; examples deferred. DONE (sciviz-readme-phase)
 - margoengine (batch 178 job 2): document generated sciviz/math and sciviz/pdf aliases; examples deferred.
 
 - @margoengine/tiles (review 2): document feature decorator cancellation/disposal during preceding decoration and asynchronous feature image decoding.
 
-- @margoengine/sciviz (batch 176 job 2): document /hdf5 lazy lifetime/hyperslabs, /cgns and /xdmf resource and solution selection, /exodus time/results/entity sets, /openfoam mesh/field/patch loading, /ensight parts/times, source formats and explicit limits; runnable examples deferred to the README phase.
+- @margoengine/sciviz (batch 176 job 2): document /hdf5 lazy lifetime/hyperslabs, /cgns and /xdmf resource and solution selection, /exodus time/results/entity sets, /openfoam mesh/field/patch loading, /ensight parts/times, source formats and explicit limits; runnable examples deferred to the README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 176 job 2): document generated sciviz engineering entry forwarding; examples deferred.
 - @margoengine/stage (batch 183 job 1): document the PBR addGLTF path, optional pbr/animation handles, paused clips, deformation, WebGL2 compatibility device, cleanup and bind-pose fitting; replace the basic-loader description in the README phase.
 - @margoengine/shadows (batch 183 job 1): document automatic cascade distance for static PBR meshes and conservative bounds fallback for deformation, custom shading, displacement and instances.
@@ -1129,11 +1129,11 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 
-- @margoengine/sciviz: pointcloud async factory/openPointCloud, source origins, global attribute maps, point/cache budgets, attribute hover, rectangle/lasso and open SelectionStore universes. Browser suites use browser-root from npm workspaces.
+- @margoengine/sciviz: pointcloud async factory/openPointCloud, source origins, global attribute maps, point/cache budgets, attribute hover, rectangle/lasso and open SelectionStore universes. Browser suites use browser-root from npm workspaces. DONE (sciviz-readme-phase)
 - @margoengine/points: OctreeNodeData typed attributes/rowIds, MemoryOctree column preservation and COPC attributes.
 - margoengine: generated sciviz/pointcloud alias and synchronized environment/exr-codecs alias.
 - @margoengine/tilemap (review 4): describe Wang weights as finite nonnegative relative values, zero exclusions and deterministic normalized selection; README examples deferred.
-- @margoengine/sciviz (batch 177 job 4): document /format ChartPolish lifecycle, normalized vs original coordinates, supported existing traces, secondary/broken/inset axes, hover and controller SVG; /categorical bands/jitter/RGB/clustering and limits; Figure axis chrome/mappings/rectangle integration APIs. README examples owed.
+- @margoengine/sciviz (batch 177 job 4): document /format ChartPolish lifecycle, normalized vs original coordinates, supported existing traces, secondary/broken/inset axes, hover and controller SVG; /categorical bands/jitter/RGB/clustering and limits; Figure axis chrome/mappings/rectangle integration APIs. README examples owed. DONE (sciviz-readme-phase)
 - margoengine (batch 177 job 4): document optional sciviz/format and sciviz/categorical aliases in README phase.
 
 
@@ -1164,18 +1164,18 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/worker: document the API conventions lifecycle repair, attachment ownership and disposal.
 
-- @margoengine/sciviz: retain the common browser-root launcher for the engineering and pointcloud fixtures when documenting package test commands.
-- @margoengine/sciviz: document /tetvolume, conforming VTK tetrahedra, opposite-vertex adjacency, point/cell scalars, referenceStep and unit scaling, shared source controls, clipping/depth, immutable masks, lifecycle, accuracy and the declared NASA 2D extension.
+- @margoengine/sciviz: retain the common browser-root launcher for the engineering and pointcloud fixtures when documenting package test commands. DONE (sciviz-readme-phase)
+- @margoengine/sciviz: document /tetvolume, conforming VTK tetrahedra, opposite-vertex adjacency, point/cell scalars, referenceStep and unit scaling, shared source controls, clipping/depth, immutable masks, lifecycle, accuracy and the declared NASA 2D extension. DONE (sciviz-readme-phase)
 - margoengine: document the generated /sciviz/tetvolume alias in the scientific-volume section.
 
-- @margoengine/sciviz (batch 174 job 3): parcoords/matrix creation, shared row keys/scales, reorder/flip/axis and cell brushes, exact pixel density and its CPU/compatibility route, limits, disposal and the 2d CustomLayer declaration.
+- @margoengine/sciviz (batch 174 job 3): parcoords/matrix creation, shared row keys/scales, reorder/flip/axis and cell brushes, exact pixel density and its CPU/compatibility route, limits, disposal and the 2d CustomLayer declaration. DONE (sciviz-readme-phase)
 
 
 
-- @margoengine/sciviz (batch 181 job 2): document /monitor, installFigureStats/fig.stats, live allocation semantics, custom/table adapters, cancellation, versioned JSON sweeps and deferred timings; README examples deferred.
+- @margoengine/sciviz (batch 181 job 2): document /monitor, installFigureStats/fig.stats, live allocation semantics, custom/table adapters, cancellation, versioned JSON sweeps and deferred timings; README examples deferred. DONE (sciviz-readme-phase)
 - @margoengine/points (batch 181 job 2): explain the internal per-cloud inventory used by sciviz/monitor, lazy GPU allocation and release; README examples deferred.
 - @margoengine/lines (batch 181 job 2): explain the internal per-line inventory used by sciviz/monitor, retained capacity and release; README examples deferred.
-- @margoengine/sciviz and margoengine/sciviz/geo-vector: Batch 180 job 2: lazy GeoJSON/TopoJSON/MVT parsing, joins, labels, arcs, projected bins and flat/globe layers, budgets/cancellation and restore. Demo examples/sciviz-geo-vector.html. No README examples written in the build phase.
+- @margoengine/sciviz and margoengine/sciviz/geo-vector: Batch 180 job 2: lazy GeoJSON/TopoJSON/MVT parsing, joins, labels, arcs, projected bins and flat/globe layers, budgets/cancellation and restore. Demo examples/sciviz-geo-vector.html. No README examples written in the build phase. Sciviz DONE (sciviz-readme-phase); forwarding-package documentation remains owed.
 - @margoengine/stage (batch 183 job 2): cover stage/lights definitions, defaults/units, shared ownership, automatic and manual receivers, cancellation, disposal and the native/compatibility device requirement.
 - @margoengine/clustered (batch 183 job 2): document hasReceiver and its false-after-removal/disposal contract.
 - margoengine (batch 183 job 2): document the generated stage/lights alias during the README phase.
@@ -1183,14 +1183,14 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf-pro (review 4): cover independent non-mip min/mag filtering on ordinary and packed physical textures and unchanged native interpolation differences; examples deferred.
 - margoengine (batch 180 integration): cover the generated sciviz/monitor alias with its owning monitor entry in the README phase; no README example work now.
 
-- @margoengine/sciviz: document /spec factories, async state saves, schema, hashes and URL arrays, /link brush/history JSON, timeline snapshots, pipeline registry, custom codecs and exact-size round trips (batch 179).
+- @margoengine/sciviz: document /spec factories, async state saves, schema, hashes and URL arrays, /link brush/history JSON, timeline snapshots, pipeline registry, custom codecs and exact-size round trips (batch 179). DONE (sciviz-readme-phase)
 - margoengine: document the sciviz/spec optional alias after the build phase (batch 179).
 - margoengine: retain the generated sciviz/monitor alias alongside sciviz/spec; both are optional subpaths (batch 179 integration repair).
 
 - @margoengine/materials (review 3 M1): document Transmission and TransmissionLayers disposal in their owning scene, including nested captures.
 
-- @margoengine/sciviz (review 3 material gate): use the common package browser launcher for the engineering reader route in the README phase.
-- @margoengine/sciviz (batch 178 job 3): document /export-media sizing, alpha, tiled ownership, DPI, ZIP/video timeline restoration, provenance and limits; examples deferred.
+- @margoengine/sciviz (review 3 material gate): use the common package browser launcher for the engineering reader route in the README phase. DONE (sciviz-readme-phase)
+- @margoengine/sciviz (batch 178 job 3): document /export-media sizing, alpha, tiled ownership, DPI, ZIP/video timeline restoration, provenance and limits; examples deferred. DONE (sciviz-readme-phase)
 - @margoengine/lines (batch 178 job 3): document /tiles full-image line construction, removable camera state and subpixel capture grid; examples deferred.
 - @margoengine/headless (batch 178 job 3): document video provenance and maxBytes payload budget; examples deferred.
 - margoengine (batch 178 job 3): document generated sciviz/export-media and lines/tiles aliases; examples deferred.
@@ -1205,10 +1205,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/blender: record the four package browser commands and their repository-root serving behavior during the README phase.
 - @margoengine/stage (batch 183 job 3): document viewer-extras controller, explicit margo-viewer registration, attributes/defaults, annotations, animation/variants/picking/poster, WebXR requirements and cancellation/ownership; examples deferred.
 - margoengine (batch 183 job 3): document the generated stage/viewer-extras alias; examples deferred.
-- @margoengine/sciviz (batch 177 job 5): document /stream append/patch, original data/channels, rollover, cancellation/disposal, async WebSocket/SSE/polling sources, sliding/smooth date windows, Figure.updateData identity and transient allocations, and integration with /format. README examples owed.
+- @margoengine/sciviz (batch 177 job 5): document /stream append/patch, original data/channels, rollover, cancellation/disposal, async WebSocket/SSE/polling sources, sliding/smooth date windows, Figure.updateData identity and transient allocations, and integration with /format. README examples owed. DONE (sciviz-readme-phase)
 - margoengine (batch 177 job 5): document the optional sciviz/stream alias in README phase.
 
-- @margoengine/sciviz (lane L fix): createFallbackFigure now takes the layer as `compat: await import('@margoengine/webgl2-compat')`; README prose updated, example deferred.
+- @margoengine/sciviz (lane L fix): createFallbackFigure now takes the layer as `compat: await import('@margoengine/webgl2-compat')`; README prose updated, example deferred. DONE (sciviz-readme-phase)
 
 | @margoengine/environment | exr-tiled: run the `parseTiledEXR` example (levels: all) under check:readme-run; fixture `/texture-mips.exr` still to provide. | Batch 51 job 2 |
 | @margoengine/inspector | shaders: ShaderEditor.attach with a WgslMaterial mesh, recompileShader result and diagnostics, undo | batch-107 job 2 |
@@ -1242,7 +1242,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/water and margoengine (batch 67 job 3): /rain WaterRain with weather (WeatherMachine state.rain), rain, cell, lifetime, strength, splashes into Ripples, setTime, dispose; examples deferred.
 
-- @margoengine/sciviz (batch 176 job 3): document /fits images/cubes/binary cells/WCS and scaling, /mrc cell geometry/complex modes, /ometiff series/ZCT/multifile planes, bounds/cancellation, exact sample types and storage-grid rendering limits; examples deferred.
+- @margoengine/sciviz (batch 176 job 3): document /fits images/cubes/binary cells/WCS and scaling, /mrc cell geometry/complex modes, /ometiff series/ZCT/multifile planes, bounds/cancellation, exact sample types and storage-grid rendering limits; examples deferred. DONE (sciviz-readme-phase)
 - @margoengine/decoders (batch 176 job 3): document openTIFF lazy classic/BigTIFF IFDs, descriptions, quantitative sample storage, predictors/limits/cancellation and unchanged parseTIFF display API; examples deferred.
 - margoengine (batch 176 job 3): document generated sciviz/fits, /mrc and /ometiff aliases and additive decoders/tiff API; examples deferred.
 
@@ -1255,13 +1255,13 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/pixel (review 3 P1): document zero-lerp stationary axes across the full finite nonnegative update delta domain; examples deferred.
 
 - @margoengine/weather (review 2): document direct GLTFWeather/PrecipitationCover disposal in secondary scenes and retained caller models; examples deferred.
-- @margoengine/sciviz (batch 174 job 4): document query predicates/reductions and f64/null policy, keyed extraction, sortable virtualised Spreadsheet/keyboard/AbortSignal, selected time-series snapshots and plot lifecycle, native scaled limits in data units and setLimits space: 'plot' for portable windows.
+- @margoengine/sciviz (batch 174 job 4): document query predicates/reductions and f64/null policy, keyed extraction, sortable virtualised Spreadsheet/keyboard/AbortSignal, selected time-series snapshots and plot lifecycle, native scaled limits in data units and setLimits space: 'plot' for portable windows. DONE (sciviz-readme-phase)
 - margoengine (batch 174 job 4): cover the generated sciviz/query alias and refreshed sciviz/monitor alias.
-- Batch 178 job 4, @margoengine/sciviz (and margoengine/sciviz/colormaps alias): construction names, Tol category domains, Machado diagnostics, colorScale domain/range and bins, exceptional colours, encodingLegend sizes/shapes and export/state parity. README examples deferred during the build phase.
+- Batch 178 job 4, @margoengine/sciviz (and margoengine/sciviz/colormaps alias): construction names, Tol category domains, Machado diagnostics, colorScale domain/range and bins, exceptional colours, encodingLegend sizes/shapes and export/state parity. README examples deferred during the build phase. Sciviz DONE (sciviz-readme-phase); forwarding-package documentation remains owed.
 
 - @margoengine/water (review 2): document live Caustics/Ripples composition across attachment and removal; examples deferred.
 
-- @margoengine/sciviz (review 3 SV2): document pending SSE byte-read cancellation, exact abort reasons and caller-owned iterator cleanup; examples deferred.
+- @margoengine/sciviz (review 3 SV2): document pending SSE byte-read cancellation, exact abort reasons and caller-owned iterator cleanup; examples deferred. DONE (sciviz-readme-phase)
 
 - @margoengine/decoders: batch 203 job 4 AVIF still decoding, browser/Node workers, cancellation and resource limits, precision/color metadata and declared still-image limitations; write examples only after the feature is built.
 
@@ -1271,14 +1271,14 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 
-- @margoengine/sciviz (batch 181 job 3): document /pick-gpu, GpuPicking pick/attachHover/invalidate/disposal, async hover and pickerror, original cell/voxel IDs, CPU-reference differences, shared-device restore, cancellation and real 2MASS/TCIA demo. No README examples written during the build phase.
+- @margoengine/sciviz (batch 181 job 3): document /pick-gpu, GpuPicking pick/attachHover/invalidate/disposal, async hover and pickerror, original cell/voxel IDs, CPU-reference differences, shared-device restore, cancellation and real 2MASS/TCIA demo. No README examples written during the build phase. DONE (sciviz-readme-phase)
 
 - margoengine (batch 181 job 3): document the generated sciviz/pick-gpu alias; README examples deferred.
 
-- @margoengine/sciviz (review 3 SV3): document getClassification snapshot ownership and bindTransfer restoration of previous custom gradient/preintegrated tables on disposal or abort; examples deferred.
+- @margoengine/sciviz (review 3 SV3): document getClassification snapshot ownership and bindTransfer restoration of previous custom gradient/preintegrated tables on disposal or abort; examples deferred. DONE (sciviz-readme-phase)
 - @margoengine/compute (batch 132 audit): runnable example for the new Dense decompositions section (`@margoengine/compute/decomp`).
-- @margoengine/sciviz (batch 180 job 3): document geo-time tracks/keyframes, units, trails/fadeSteps, Timeline, SGP4/TLE/OMM/TEME and satelliteTrack, WMTS time source/raster selection, cache limits, cancellation and retained restore. Build phase: examples owed.
-- @margoengine/sciviz (batch 174 job 5): document annotate records and physical linear units, editable pointer/keyboard handles, ROI membership, first classified voxel/grid cell picking, PNG/SVG publication and native spec annotations restoration, AbortSignal/disposal and classification limits.
+- @margoengine/sciviz (batch 180 job 3): document geo-time tracks/keyframes, units, trails/fadeSteps, Timeline, SGP4/TLE/OMM/TEME and satelliteTrack, WMTS time source/raster selection, cache limits, cancellation and retained restore. Build phase: examples owed. DONE (sciviz-readme-phase)
+- @margoengine/sciviz (batch 174 job 5): document annotate records and physical linear units, editable pointer/keyboard handles, ROI membership, first classified voxel/grid cell picking, PNG/SVG publication and native spec annotations restoration, AbortSignal/disposal and classification limits. DONE (sciviz-readme-phase)
 - margoengine (batch 174 job 5): document generated sciviz/annotate optional alias.
 
 
@@ -1294,40 +1294,40 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine: lead with core/stage alone, domain install profiles, or the full umbrella; preserve legacy kit subpaths.
 
-- @margoengine/sciviz, batch 176 job 4: document /amr block snapshots/masks, AMReX/Enzo/FLASH readers, direct k-d volume, slices, contours and level outlines with defaults and cancellation.
+- @margoengine/sciviz, batch 176 job 4: document /amr block snapshots/masks, AMReX/Enzo/FLASH readers, direct k-d volume, slices, contours and level outlines with defaults and cancellation. DONE (sciviz-readme-phase)
 - margoengine, batch 176 job 4: document the generated /sciviz/amr alias.
 - @margoengine/viz, batch 176 job 4: document the generated /sciviz/amr install-profile alias.
 
 
 
 
-- @margoengine/sciviz (batch 175 job 3): document /aggregate glyph coordinate columns, exact binary64 reductions, missing/category/order semantics, separate shading/spreading, figure refresh/hover/cancellation, resource limits and the honest repeated-observation 100M proof; examples wait for the README phase.
+- @margoengine/sciviz (batch 175 job 3): document /aggregate glyph coordinate columns, exact binary64 reductions, missing/category/order semantics, separate shading/spreading, figure refresh/hover/cancellation, resource limits and the honest repeated-observation 100M proof; examples wait for the README phase. DONE (sciviz-readme-phase)
 
 - margoengine (batch 175 job 3): document the generated optional sciviz/aggregate alias in the README phase.
 - @margoengine/viz (batch 175 job 3): document the generated sciviz/aggregate optional alias after the build phase.
-- @margoengine/sciviz (batch 174 job 6): document LinkedCameras physical range/camera defaults and stopped-engine sync, FigureLayout ownership and factory, ComparativeGrid time/parameter graphs and registry/output disposal, VolumeQuad physical nearest-sample crosshair and isotropic resize, AbortSignal and disposal.
+- @margoengine/sciviz (batch 174 job 6): document LinkedCameras physical range/camera defaults and stopped-engine sync, FigureLayout ownership and factory, ComparativeGrid time/parameter graphs and registry/output disposal, VolumeQuad physical nearest-sample crosshair and isotropic resize, AbortSignal and disposal. DONE (sciviz-readme-phase)
 - margoengine (batch 174 job 6): document generated sciviz/views optional alias.
 - @margoengine/viz (batch 174 job 6): document the generated sciviz/views domain-profile alias.
 
 - create-margo: document web/game/viz/react-kit standalone template installs and prefix changes, keep the one-line create command, and refresh all template README examples in the README phase.
-- @margoengine/sciviz (batch 179 job 2): document /share compressed links and limits, pinned data, runtime bundler and standalone export, exact-origin iframe commands/events, lifecycle/cancellation and camera/time deep links.
+- @margoengine/sciviz (batch 179 job 2): document /share compressed links and limits, pinned data, runtime bundler and standalone export, exact-origin iframe commands/events, lifecycle/cancellation and camera/time deep links. DONE (sciviz-readme-phase)
 - margoengine (batch 179 job 2): document generated sciviz/share alias.
 - @margoengine/viz: document generated sciviz/share forwarding entry after build phase.
-- @margoengine/sciviz (batch 178 job 5): a11y attach/disposal, keyboard focus, native/custom complete table adapters, contrast/motion, explicit sonification, source precision and automated-audit limits.
+- @margoengine/sciviz (batch 178 job 5): a11y attach/disposal, keyboard focus, native/custom complete table adapters, contrast/motion, explicit sonification, source precision and automated-audit limits. DONE (sciviz-readme-phase)
 
 - margoengine and @margoengine/viz (batch 178 job 5): generated sciviz/a11y alias and explicit optional installation.
 
 
-- @margoengine/sciviz (batch 181 job 5): document /progressive controller, defaults, soft frame budget, moving/refined states, per-view target/sample policy, disposal, device restore/GPU source ownership and the real-data demo; README examples deferred.
+- @margoengine/sciviz (batch 181 job 5): document /progressive controller, defaults, soft frame budget, moving/refined states, per-view target/sample policy, disposal, device restore/GPU source ownership and the real-data demo; README examples deferred. DONE (sciviz-readme-phase)
 - margoengine (batch 181 job 5): document the generated sciviz/progressive alias; README examples deferred.
 
 - @margoengine/viz (batch 181 job 5): document the generated sciviz/progressive profile alias; README examples deferred.
 
-- @margoengine/sciviz: /temporal source contract, streaming reductions and missingness, interpolation, physical probe charts, numbered/.series readers and time units; NOAA daily and ERA5 six-hour demo.
+- @margoengine/sciviz: /temporal source contract, streaming reductions and missingness, interpolation, physical probe charts, numbered/.series readers and time units; NOAA daily and ERA5 six-hour demo. DONE (sciviz-readme-phase)
 - margoengine: generated /sciviz/temporal alias and optional source/probe/chart workflow.
 - @margoengine/viz: generated /sciviz/temporal alias and optional temporal analysis workflow.
 
-- @margoengine/sciviz: cover optional /density all-point integer count opacity, Gaussian bandwidth and clipping, direct arrays/scatter replacement, readback, restore and exact table aggregation; use the attributed 2MASS/TLC demo. Batch 181 job 4, examples remain deferred during build phase.
+- @margoengine/sciviz: cover optional /density all-point integer count opacity, Gaussian bandwidth and clipping, direct arrays/scatter replacement, readback, restore and exact table aggregation; use the attributed 2MASS/TLC demo. Batch 181 job 4, examples remain deferred during build phase. DONE (sciviz-readme-phase)
 - margoengine: document the generated sciviz/density alias and its optional loading behaviour after the build phase (batch 181 job 4).
 - @margoengine/viz: document the generated sciviz/density alias after the build phase (batch 181 job 4).
 
@@ -1335,34 +1335,34 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 274 job 5): document the compute/onnx optional alias after its generated umbrella entry lands; examples remain deferred to the README phase.
 
 - @margoengine/game and @margoengine/viz (batch 274 job 5): document generated compute/onnx profile aliases in the README phase.
-- @margoengine/sciviz: document /notebook AFM, named binary spec attachments, camera/selection traits and static export after build phase.
+- @margoengine/sciviz: document /notebook AFM, named binary spec attachments, camera/selection traits and static export after build phase. DONE (sciviz-readme-phase)
 - margoengine and @margoengine/viz: document generated sciviz/notebook forwarding entries after build phase.
 - Python margoengine: document NotebookFigure, local notebook extra, private wheel build, NumPy/Arrow borrowing, refresh and host/static HTML integration after build phase.
 
 - @margoengine/compute (batch 274 job 6): document /quant upload, per-channel affine int8 parameters, broadcast matmul, grouped Conv2d, packed lifetime, bias units, cancellation and float-reference error bounds.
-- @margoengine/sciviz: document mode 101 row padding and truncated padded payload rejection (review H1).
-- @margoengine/sciviz: document caller Accept override preservation and default SSE headers (review L1).
+- @margoengine/sciviz: document mode 101 row padding and truncated padded payload rejection (review H1). DONE (sciviz-readme-phase)
+- @margoengine/sciviz: document caller Accept override preservation and default SSE headers (review L1). DONE (sciviz-readme-phase)
 
 
-- @margoengine/sciviz (batch 175 job 5): graph-gpu layout/reference settings, direct device drawing, widths/colours/arrows, FDEB lifecycle, candidate label refresh, OpenAlex demo and cancellation/device-loss behaviour.
+- @margoengine/sciviz (batch 175 job 5): graph-gpu layout/reference settings, direct device drawing, widths/colours/arrows, FDEB lifecycle, candidate label refresh, OpenAlex demo and cancellation/device-loss behaviour. DONE (sciviz-readme-phase)
 - margoengine (batch 175 job 5): generated sciviz/graph-gpu optional alias.
 - @margoengine/viz (batch 175 job 5): generated sciviz/graph-gpu optional alias.
-- @margoengine/sciviz (batch 180 job 4): document optional /cf and /projections, named plane selections, unit and calendar codecs, all Appendix D vertical formulas, geographic/projected metadata, curvilinear and periodic sampling, masks, conservative averages/coverage, map layers, projection defaults/domains and the real ERA5/CMIP6 demo. No README examples written or checked during build phase.
+- @margoengine/sciviz (batch 180 job 4): document optional /cf and /projections, named plane selections, unit and calendar codecs, all Appendix D vertical formulas, geographic/projected metadata, curvilinear and periodic sampling, masks, conservative averages/coverage, map layers, projection defaults/domains and the real ERA5/CMIP6 demo. No README examples written or checked during build phase. DONE (sciviz-readme-phase)
 - margoengine (batch 180 job 4): document generated sciviz/cf and sciviz/projections forwarding subpaths during the README phase.
 - @margoengine/viz (batch 180 job 4): document CF climate and Snyder projections through the generated sciviz subpaths during the README phase.
-- @margoengine/sciviz: document directed scientific bounds, physical resampling requirements and unsupported grid transforms (review H2).
+- @margoengine/sciviz: document directed scientific bounds, physical resampling requirements and unsupported grid transforms (review H2). DONE (sciviz-readme-phase)
 
 
 - @margoengine/compute (batch 274 ONNX follow-up): document TreeEnsemble variants, SVM kernels/calibration, legacy ML5 compatibility, pairwise score shapes and provider differences in the README phase.
 
-- @margoengine/sciviz (batch 175 job 4): document /series Range/CORS/immutability, async format batches, owned TimeSeries, M4/min-max/LTTB limits, exact original selection events, progressive binding/cancellation and physical-unit FFT/STFT defaults.
+- @margoengine/sciviz (batch 175 job 4): document /series Range/CORS/immutability, async format batches, owned TimeSeries, M4/min-max/LTTB limits, exact original selection events, progressive binding/cancellation and physical-unit FFT/STFT defaults. DONE (sciviz-readme-phase)
 - margoengine (batch 175 job 4): document generated sciviz/series optional alias.
 - @margoengine/viz (batch 175 job 4): document generated sciviz/series optional alias.
-- @margoengine/sciviz (batch 178 job 6): themes, validated style tokens, scoped CSS refresh/disposal, author overrides, journal column/media presets and print/font limits.
+- @margoengine/sciviz (batch 178 job 6): themes, validated style tokens, scoped CSS refresh/disposal, author overrides, journal column/media presets and print/font limits. DONE (sciviz-readme-phase)
 - margoengine and @margoengine/viz (batch 178 job 6): generated sciviz/themes alias.
 # Batch 175 job 6
 
-- @margoengine/sciviz: document /workers readInWorker argument tuples, disposable sessions, lazy proxies, input ownership, progress milestones, custom stores and cancellation.
+- @margoengine/sciviz: document /workers readInWorker argument tuples, disposable sessions, lazy proxies, input ownership, progress milestones, custom stores and cancellation. DONE (sciviz-readme-phase)
 - @margoengine/worker: document /rpc onProgress and RpcContext.progress, transferable progress payloads, observer failures and channel isolation.
 - margoengine: document the generated /sciviz/workers alias after the build phase.
 - @margoengine/viz: document the generated /sciviz/workers alias after the build phase.
@@ -1376,7 +1376,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - Integration J2 tooling: document the generated C2 Works with matrix and composition runner after all adapters land; README examples and Works with generation wait for the README phase.
 
-- @margoengine/sciviz, batch 176 job 5: document /tensor symmetric layouts, CPU/GPU eigensystems and ownership, ellipsoid/superquadric glyphs, FA/direction colour, Euler/FACT tracking, hyperstreamlines and explicitly ordinary linear least-squares DWI fitting with all defaults and precision/coordinate limits.
+- @margoengine/sciviz, batch 176 job 5: document /tensor symmetric layouts, CPU/GPU eigensystems and ownership, ellipsoid/superquadric glyphs, FA/direction colour, Euler/FACT tracking, hyperstreamlines and explicitly ordinary linear least-squares DWI fitting with all defaults and precision/coordinate limits. DONE (sciviz-readme-phase)
 - margoengine and @margoengine/viz, batch 176 job 5: document generated /sciviz/tensor aliases.
 
 - @margoengine/save: document own-data shadow setting restoration, special-key round trips and prototype-preserving rollback in scene-state.
@@ -1387,14 +1387,14 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mixer: document released insert ownership when a disposed bus is retained; refresh root size from 7,115 to 7,121 B gzip within the unchanged ceiling.
 - @margoengine/audio: document direct listener disposal detaching its owning scene, same-name replacement and isolated/idempotent cleanup without creating a lazy context.
-- @margoengine/sciviz: document default legend visibility after named-layer removal and reappearance, retaining native hidden semantics and spacing.
+- @margoengine/sciviz: document default legend visibility after named-layer removal and reappearance, retaining native hidden semantics and spacing. DONE (sciviz-readme-phase)
 - @margoengine/loaders: document that all vector parsers reject pre-aborted signals before input conversion or decoding, preserving LoaderError code aborted.
 - @margoengine/points: document maxConcurrentLoads as a positive safe integer, default four, with constructor TypeError/RangeError validation.
-- @margoengine/sciviz: document normalized CPU picking depth ties and transfer binding initialization abort/error cleanup, including aggregated restoration failures.
+- @margoengine/sciviz: document normalized CPU picking depth ties and transfer binding initialization abort/error cleanup, including aggregated restoration failures. DONE (sciviz-readme-phase)
 
 - @margoengine/behavior: cover parseTreeText inference for ordinary options, explicit registrations and TreeTextOptions variables; use BlackboardKey objects for shared subtree state.
 - @margoengine/loaders (batch 176 job 6): document loaders/mmcif and PDB residue insertion/alternate metadata, first-model/conformer policy and struct_conn limits.
-- @margoengine/sciviz (batch 176 job 6): document molecule representations/defaults, element-radius fallbacks, residue picking and resource lifetime with a runnable example in the README phase.
+- @margoengine/sciviz (batch 176 job 6): document molecule representations/defaults, element-radius fallbacks, residue picking and resource lifetime with a runnable example in the README phase. DONE (sciviz-readme-phase)
 - margoengine (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
 - @margoengine/game (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
 - @margoengine/web (batch 176 job 6): document generated loaders/mmcif and sciviz/molecule aliases where the profile exposes them.
@@ -1449,7 +1449,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/taa: document that reset() and reset(viewId) restart jitter as well as discard history; see docs/taa-reset.md.
 - @margoengine/cache: the two service worker examples are ```js but contain TypeScript (type FetchEvent, as); no sections for ./stream and ./decoded (batch 132 audit).
 
-- @margoengine/sciviz: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+- @margoengine/sciviz: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase. DONE (sciviz-readme-phase)
 
 - @margoengine/points: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
 
@@ -1485,7 +1485,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/exporters: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
-- @margoengine/sciviz: host-owned prepareBackend for notebook/share, native-only bypass, aborts and the bundled AFM/offline defaults.
+- @margoengine/sciviz: host-owned prepareBackend for notebook/share, native-only bypass, aborts and the bundled AFM/offline defaults. DONE (sciviz-readme-phase)
 
 - @margoengine/gltf-pro: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
 
