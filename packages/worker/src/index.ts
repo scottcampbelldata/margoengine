@@ -105,7 +105,16 @@ export class WorkerCanvas {
   private readonly lockChanged = (): void => this.post({ type: 'pointerlock', locked: this.pointerLocked });
   private readonly lockError = (): void => this.post({ type: 'pointerlockerror' });
   private ratio?: MediaQueryList;
-  private readonly send = (): void => this.post({ type: 'size', ...this.size() });
+  /** The size and position the worker holds: the last ones posted, by a size message or an event. */
+  private sent: Record<string, number | undefined>;
+  /** Posts the size only when it differs from what the worker holds, so the observer's first call (fired on observe, with
+   * the size the canvas message already carried) and a pixel ratio change that also resizes cost no message. */
+  private readonly send = (): void => {
+    const size = this.size();
+    if (Object.keys(size).every((key) => Object.is(size[key], this.sent[key]))) return;
+    this.sent = { ...size };
+    this.post({ type: 'size', ...size });
+  };
   private readonly ratioChanged = (): void => {
     this.watchRatio();
     this.send();
@@ -142,6 +151,7 @@ export class WorkerCanvas {
           .finally(() => this.lockRequests.delete(data.id));
       }
     };
+    this.sent = this.size();
     this.resizing = new ResizeObserver(this.send);
     this.resizing.observe(canvas);
     this.watchRatio();
@@ -242,6 +252,9 @@ export class WorkerCanvas {
         source = event as unknown as Record<string, unknown>;
       for (const field of FIELDS) if (field in event) fields[field] = source[field];
       const { left, top } = this.canvas.getBoundingClientRect();
+      // The worker takes the canvas position from each event too.
+      this.sent.left = left;
+      this.sent.top = top;
       this.post({ type: 'event', name: type, fields, left, top });
     };
     const listener =
@@ -334,7 +347,8 @@ export function transferCanvas(
             });
           }
           view = new WorkerCanvas(canvas, worker, port1);
-          worker.postMessage({ [TAG]: 'canvas', canvas: offscreen, port: port2, data, ...view.size() }, [
+          // The size measured as the page end started: the worker holds it from this message on.
+          worker.postMessage({ [TAG]: 'canvas', canvas: offscreen, port: port2, data, ...view['sent'] }, [
             offscreen,
             port2,
             ...transfer,

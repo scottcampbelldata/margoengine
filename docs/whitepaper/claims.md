@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 worker: a transferred canvas followed by 100 Resize Observer calls with no change posts 100 size messages
+  on the parent and none after, with identical worker size and position. Work evidence only, no speed claim.
+  [Scope and reproduction](batch-170-worker.md).
+
 - Batch 170 stats: 1,000 idle timer refreshes write the overlay text 1,000 times on the parent and never after;
   `StatsPanels` drops from 220,000 canvas commands to zero, with identical draws whenever something changed. Work
   evidence only, no speed claim. [Scope, stats.js counts and reproduction](batch-170-stats.md).

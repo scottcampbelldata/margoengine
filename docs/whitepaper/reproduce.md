@@ -1,5 +1,8 @@
 # Reproducing Margo's numbers
 
+- Batch 170 worker: `npm test --workspace @margoengine/worker` runs the size message work count
+  ([batch-170-worker.md](batch-170-worker.md)).
+
 - Batch 170 stats: after `npm run build --workspace @margoengine/stats`,
   `node --test --test-timeout=60000 packages/stats/test/workcount.test.js` checks idle refresh work and identical
   draws. [stats.js black-box count](batch-170-stats.md).

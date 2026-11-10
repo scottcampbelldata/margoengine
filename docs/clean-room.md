@@ -1,5 +1,10 @@
 # Clean room
 
+### Batch 170 worker work counts (2026-11-10)
+
+Read the W3C *Resize Observer* draft and the WHATWG *HTML Living Standard* channel messaging and OffscreenCanvas
+sections. [Titles, links and counts](whitepaper/batch-170-worker.md). No external implementation was read.
+
 ### Batch 170 stats work counts (2026-11-10)
 
 Compared the WHATWG *HTML Living Standard* timers and canvas path API with W3C *Page Visibility Level 2* (2022).

@@ -146,6 +146,47 @@ test('a resize on the page reaches the worker, pixel ratio and light tier includ
   assert.equal(globalThis.margoLow, 1.5);
 });
 
+test('work count: a size the worker already holds costs no message, a new one costs one', async () => {
+  // Batch 170: the observer fires once on observe (Resize Observer spec) with the size the canvas message carried. The
+  // parent posted it again; each unchanged call cost one message. The worker's size is identical either way.
+  const real = MessagePort.prototype.postMessage,
+    sizes = [];
+  MessagePort.prototype.postMessage = function (message, ...rest) {
+    if (message?.type === 'size') sizes.push(message);
+    return real.call(this, message, ...rest);
+  };
+  try {
+    const { canvas, received } = await connect();
+    for (let i = 0; i < 100; i++) ResizeObserver.last.callback();
+    await tick();
+    assert.equal(sizes.length, 0);
+    assert.deepEqual(received.canvas.getBoundingClientRect(), {
+      ...{ left: 10, top: 20, width: 320, height: 200 },
+      ...{ x: 10, y: 20, right: 330, bottom: 220 },
+    });
+    Object.assign(canvas, { clientWidth: 640 });
+    ResizeObserver.last.callback();
+    ResizeObserver.last.callback();
+    await tick();
+    assert.equal(sizes.length, 1);
+    assert.equal(received.canvas.clientWidth, 640);
+    // An event moves the worker's position; a size call back at the old position must still reach it.
+    received.canvas.addEventListener('pointermove', () => {});
+    await tick();
+    canvas.getBoundingClientRect = () => ({ left: 50, top: 20 });
+    canvas.dispatchEvent(new Event('pointermove'));
+    await tick();
+    assert.equal(received.canvas.getBoundingClientRect().left, 50);
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20 });
+    ResizeObserver.last.callback();
+    await tick();
+    assert.equal(sizes.length, 2);
+    assert.equal(received.canvas.getBoundingClientRect().left, 10);
+  } finally {
+    MessagePort.prototype.postMessage = real;
+  }
+});
+
 test('only events the worker listens for cross, with their values', async () => {
   const { canvas, received } = await connect(),
     seen = [];

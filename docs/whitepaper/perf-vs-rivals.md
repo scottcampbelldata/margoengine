@@ -287,3 +287,11 @@ No rival timing was run and no speed ratio is claimed.
 | stats | `Stats` overlay, 10 s at 60 Hz | 7,617 canvas commands | 7,617, same draws | stats.js 0.17.0: 6,090 (bar graph scrolled by image copy) | accepted difference in drawing; timing pending the quiet rerun |
 
 Method and rival harness: [batch-170-stats.md](batch-170-stats.md). No rival timing was run.
+
+## Batch 170 worker: work counts, 2026-11-10
+
+| Package | Work | Before | After | Rival | Status |
+| --- | --- | --- | --- | --- | --- |
+| worker | Start plus 100 unchanged Resize Observer calls | 100 size messages | 0, same worker state | three.js 0.186.1: no library code on this path | `perf(worker)`; frame time pending the quiet rerun |
+
+Method: [batch-170-worker.md](batch-170-worker.md). No rival timing was run.

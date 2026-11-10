@@ -65,6 +65,8 @@ Your own `worker.postMessage` traffic is left alone: the link runs on a `Message
 
 `received.attach(engine)` makes the first frame after a background tab step 0, as on the page, and lets the page dispose the engine.
 
+The page posts a size only when it differs from what the worker holds, so an unchanged resize costs no message; the frame loop runs in the worker and the page does no work per frame.
+
 Because `clientWidth` follows the page and the page's `devicePixelRatio` and `margoLow` are copied to the worker, the engine picks the same drawing-buffer size as on the page, and `engine.pick` takes CSS pixels. With `exactSize` the worker owns `canvas.width` and `canvas.height`.
 
 Input events arrive on `received.canvas`, as plain events with the values of the real ones (`clientX`, `pointerId`, `deltaY`, `key`, ...). The page only forwards a type once something in the worker listens for it. Pointer, mouse, wheel, click, context menu and focus events come from the canvas; key events come from the document, since an unfocused canvas gets none, and they land on `received.canvas`, which is where controls listen when an element has no document. A `style` written in the worker (`touchAction`, `cursor`) is set on the page's canvas.

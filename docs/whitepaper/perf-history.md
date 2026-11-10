@@ -1,5 +1,12 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 worker: no size message the worker already holds (2026-11-10)
+
+The page end of a worker canvas posted the size again on the Resize Observer's first call and on every call with
+nothing new: 100 size messages for a start plus 100 unchanged calls, zero after, with identical worker state. Fix
+commit subject: `perf(worker): post a canvas size only when the worker lacks it`. Timing pending the quiet rerun.
+[Research, counts and the three.js note](batch-170-worker.md).
+
 ## Batch 170 stats: no redraw of an unchanged overlay (2026-11-10)
 
 The 150 ms overlay timers redrew text and graphs with nothing new to show: 8,580 canvas commands in 10 idle
