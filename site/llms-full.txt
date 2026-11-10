@@ -13893,6 +13893,20 @@ Repro: nearestPoint(identity, [0,0,0.1,0,0,0], 100,100,50,50,8) returns index 1;
 
 Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
 
+## Batch 132 audit: compute SVD does not converge on a matrix of many repeated columns
+
+Repro (CPU backend, any host): fill a 512 x 512 matrix row-major from `seed = (seed * 1103515245 + 12345) >>> 0`
+computed in doubles (the product loses its low bits, so the stream cycles and only about 15,600 distinct values fill
+262,144 entries, giving many exactly repeated columns), divided by 2^32 minus 0.5, then `await svd(ctx.array(data,
+{ shape: [512, 512] }))` from `@margoengine/compute/decomp`. It rejects with "Jacobi iteration did not converge" after
+the default 100 sweeps; 256 x 256 from the same stream and random rank-deficient products (rank 1 to 50) converge.
+Cause: one-sided Jacobi orthogonalizes each repeated pair down to columns at rounding level, which keep rotating
+against each other at ever smaller scales into the subnormal range, where rounding is too coarse to reach the
+relative stopping test (Drmac and Veselic, LAPACK Working Note 170, 2007, section 3.2: underflow can stop Jacobi
+converging). Fix to build: treat a column whose norm falls below eps times the largest column norm as numerically
+zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
+relative accuracy the Jacobi method keeps for graded columns.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools

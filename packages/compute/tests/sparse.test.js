@@ -122,3 +122,18 @@ test('bicgstab solves a nonsymmetric convection-diffusion system', async () => {
   controller.abort(new Error('stop'));
   await assert.rejects(() => bicgstab(A, b, { signal: controller.signal }), /stop/);
 });
+
+test('cg and bicgstab keep a solution reached exactly between residual checks', async () => {
+  // On 2 I the first step gives the exact x and a zero residual. The next step used to divide 0 / 0, turning x into NaN,
+  // and the solvers returned the starting guess (zeros) with converged false (batch 132 audit).
+  using gpu = await createCompute({ backend: 'cpu' });
+  using A = diags(gpu, [2], [0], [4, 4]);
+  for (const solve of [cg, bicgstab])
+    for (const preconditioner of ['jacobi', 'none']) {
+      const { x, converged, residual } = await solve(A, gpu.array([2, 4, 6, 8]), { preconditioner });
+      assert.deepEqual(await read(x), [1, 2, 3, 4], `${solve.name} ${preconditioner}`);
+      assert.equal(converged, true, `${solve.name} ${preconditioner}`);
+      assert.equal(residual, 0, `${solve.name} ${preconditioner}`);
+      x.dispose();
+    }
+});

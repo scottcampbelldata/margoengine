@@ -1252,3 +1252,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 181 job 3): document the generated sciviz/pick-gpu alias; README examples deferred.
 
 - @margoengine/sciviz (review 3 SV3): document getClassification snapshot ownership and bindTransfer restoration of previous custom gradient/preintegrated tables on disposal or abort; examples deferred.
+- @margoengine/compute (batch 132 audit): runnable example for the new Dense decompositions section (`@margoengine/compute/decomp`).

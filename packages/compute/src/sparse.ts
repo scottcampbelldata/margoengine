@@ -438,7 +438,7 @@ async function finish(
  */
 export async function cg(A: CsrMatrix, b: Operand, options: SparseSolveOptions = {}): Promise<SparseSolveResult> {
   const s = setup('cg', A, b, options),
-    { inverse, checkEvery, maxIterations } = s,
+    { ctx, inverse, checkEvery, maxIterations } = s,
     signal = options.signal;
   aborted(signal);
   const b2 = await take1(dot(s.b, s.b), signal),
@@ -456,9 +456,11 @@ export async function cg(A: CsrMatrix, b: Operand, options: SparseSolveOptions =
     good = x.add(0).eval();
   if ((await take1(dot(r, r), signal)) > stop)
     while (k < maxIterations) {
+      // A residual that reached exactly zero ends the method (Hestenes and Stiefel; Barrett et al., Templates, 1994,
+      // figure 2.5): alpha and beta are then 0 instead of 0 / 0, so x stays the solution until the next check reads it.
       const ap = A.matvec(p),
         pap = dot(p, ap),
-        alpha = rz.div(pap).eval();
+        alpha = ctx.where(rz.eq(0), 0, rz.div(pap)).eval();
       pap.dispose();
       x = swap(x, x.add(p.mul(alpha)).eval());
       r = swap(r, r.sub(ap.mul(alpha)).eval());
@@ -476,7 +478,7 @@ export async function cg(A: CsrMatrix, b: Operand, options: SparseSolveOptions =
       }
       const zNext = inverse ? r.mul(inverse).eval() : r,
         rzNext = dot(r, zNext),
-        beta = rzNext.div(rz).eval();
+        beta = ctx.where(rzNext.eq(0), 0, rzNext.div(rz)).eval();
       p = swap(p, zNext.add(p.mul(beta)).eval());
       if (inverse) z.dispose();
       z = zNext;
@@ -518,24 +520,27 @@ export async function bicgstab(A: CsrMatrix, b: Operand, options: SparseSolveOpt
     good = x.add(0).eval();
   if ((await take1(dot(r, r), signal)) > stop)
     while (k < maxIterations) {
+      // r exactly zero is convergence, not the rho = 0 breakdown: hold x there (alpha, beta and omega 0, not 0 / 0).
       const rhoNext = dot(rHat, r),
-        beta = rhoNext.div(rho).mul(alpha.div(omega)).eval();
+        solved = dot(r, r).eq(0).eval(),
+        beta = ctx.where(solved, 0, rhoNext.div(rho).mul(alpha.div(omega))).eval();
       p = swap(p, r.add(p.sub(v.mul(omega)).mul(beta)).eval());
       const pHat = precondition(p);
       v = swap(v, A.matvec(pHat));
       const rv = dot(rHat, v);
-      alpha = swap(alpha, rhoNext.div(rv).eval());
+      alpha = swap(alpha, ctx.where(solved, 0, rhoNext.div(rv)).eval());
       rv.dispose();
       const sv = r.sub(v.mul(alpha)).eval(),
         sHat = precondition(sv),
         t = A.matvec(sHat),
         tt = dot(t, t),
         ts = dot(t, sv);
-      omega = swap(omega, ts.div(tt).eval());
+      // s exactly zero (t = A M^-1 s zero) is Templates' early exit after the half step, x + alpha p^: omega 0.
+      omega = swap(omega, ctx.where(tt.eq(0), 0, ts.div(tt)).eval());
       ts.dispose();
       x = swap(x, x.add(pHat.mul(alpha)).add(sHat.mul(omega)).eval());
       r = swap(r, sv.sub(t.mul(omega)).eval());
-      for (const a of [pHat, sv, sHat, t, tt, beta]) a.dispose();
+      for (const a of [pHat, sv, sHat, t, tt, beta, solved]) a.dispose();
       rho = swap(rho, rhoNext);
       k++;
       if (k % checkEvery === 0 || k === maxIterations) {

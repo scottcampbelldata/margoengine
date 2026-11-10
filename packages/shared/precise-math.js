@@ -391,6 +391,8 @@ fn pmAsinTail(a: f32) -> vec2f {
     // (e^r - 1 - r) / r^2 and e^r - 1, |r| <= ln2 / 2.
     // x = k ln2 + r (Cody-Waite; k ln2Hi and x - k ln2Hi are exact): (k, r, rHi, rLo).
     // v 2^k in two steps, so the first stays in the normal range.
+    // pmScale hides its half-scaled value so no compiler folds the two scalings into one 2^k, which overflows at
+    // k = 128 (ANGLE on Metal under fast math gave preciseExp(88.378) = Infinity on the WebGL2 layer, batch 132 audit).
     pmExp: [
       ['pmBits'],
       `fn pmExpm1P(r: f32) -> f32 { return ${horner('r', P.expm1)}; }
@@ -401,7 +403,7 @@ fn pmReduceLn2(x: f32) -> vec4f {
  let lo = -k * PM_LN2_LO;
  return vec4f(k, hi + lo, hi, lo);
 }
-fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h), h); }
+fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(pmHide(ldexp(v, k - h)), h); }
 `,
     ],
     preciseExp: [

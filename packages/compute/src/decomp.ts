@@ -122,7 +122,11 @@ async function decompose(a: Operand, op: number, options: DecompOptions, b?: Ope
     output = lengths.reduce((x, y) => x + y, 0),
     count = size(batch);
   if (rhs > 4096 || m * n * 8 + m * m * 2 + n * n * 2 + n * rhs * 2 > 16_777_216 || count * output > 16_777_216)
-    throw rangeError('decomp exceeds its 16,777,216-element workspace/output limit', 'compute');
+    throw rangeError(
+      'decomp exceeds its 16,777,216-element workspace/output limit (8mn + 2m^2 + 2n^2 + 2n rhs per matrix: square ' +
+        'matrices up to 1182); use smaller blocks or the sparse solvers in @margoengine/compute/sparse',
+      'compute',
+    );
   const [av, bv, kernel] = await Promise.all([
     a.read({ signal: options.signal }),
     b?.read({ signal: options.signal }),

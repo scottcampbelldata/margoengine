@@ -1319,7 +1319,11 @@ export class Adam extends Optimizer {
   }
 }
 
-/** Adam with weight decay applied to the weights directly instead of through the gradient. */
+/**
+ * Adam with weight decay applied to the weights directly instead of through the gradient. Each step multiplies the
+ * weights by `1 - lr * weightDecay` (the PyTorch convention). Loshchilov and Hutter's Algorithm 2 subtracts
+ * eta_t * lambda * theta, which the learning rate does not scale: their lambda is `lr * weightDecay` here.
+ */
 export class AdamW extends Adam {
   constructor(parameters: readonly Tensor[], options: AdamOptions = {}) {
     super(parameters, options, 0.01);

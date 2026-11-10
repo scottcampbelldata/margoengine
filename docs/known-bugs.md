@@ -4977,3 +4977,17 @@ Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with 
 Repro: nearestPoint(identity, [0,0,0.1,0,0,0], 100,100,50,50,8) returns index 1; reversed-Z puts index 0 nearer. Cause: sciviz/src/pick.ts treats projectPoint.depth as reversed, but math/mat4 normalizes it to near=0/far=1. GPU picking uses actual reversed clip depth; strict distance ranking is separately documented. CPU-only tie correction is deferred under build-phase rule 21; it does not block the new ID pass and the existing CPU reference remains unchanged. Regression owed: real perspective camera coincident projected points, plus corrected expected depth convention in the existing CPU fixture.
 
 Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
+
+## Batch 132 audit: compute SVD does not converge on a matrix of many repeated columns
+
+Repro (CPU backend, any host): fill a 512 x 512 matrix row-major from `seed = (seed * 1103515245 + 12345) >>> 0`
+computed in doubles (the product loses its low bits, so the stream cycles and only about 15,600 distinct values fill
+262,144 entries, giving many exactly repeated columns), divided by 2^32 minus 0.5, then `await svd(ctx.array(data,
+{ shape: [512, 512] }))` from `@margoengine/compute/decomp`. It rejects with "Jacobi iteration did not converge" after
+the default 100 sweeps; 256 x 256 from the same stream and random rank-deficient products (rank 1 to 50) converge.
+Cause: one-sided Jacobi orthogonalizes each repeated pair down to columns at rounding level, which keep rotating
+against each other at ever smaller scales into the subnormal range, where rounding is too coarse to reach the
+relative stopping test (Drmac and Veselic, LAPACK Working Note 170, 2007, section 3.2: underflow can stop Jacobi
+converging). Fix to build: treat a column whose norm falls below eps times the largest column norm as numerically
+zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
+relative accuracy the Jacobi method keeps for graded columns.

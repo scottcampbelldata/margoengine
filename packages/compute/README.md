@@ -188,7 +188,10 @@ Each picks the direct or the FFT method by kernel size.
 `@margoengine/compute/random` provides `new Random(gpu, { seed, stream })`, a Philox4x32-10 generator with
 `uniform`, `normal`, `integers`, `bits`, `permutation` and `choice`. Every draw except `normal` is bit-identical on
 every device and on the CPU backend; `normal` uses the precise functions ([Precision](#precision)), so it agrees with
-the CPU backend to a few ulp on every GPU.
+the CPU backend to a few ulp on every GPU. Uniforms carry 24 random bits, so `normal` (Box-Muller) never goes past
+5.77 standard deviations. `integers` maps a 32-bit word by multiply and shift without rejection: some values are more
+likely by at most `(high - low) / 2^32` (Lemire 2019). `permutation` sorts random 32-bit keys; a tie, probability under
+`n (n - 1) / 2^33`, keeps index order.
 
 ```ts
 import { createCompute } from '@margoengine/compute';
@@ -206,6 +209,16 @@ const power = re.square().add(im.square());
 const smooth = convolve(rng.normal(10000), gpu.array([0.25, 0.5, 0.25]), { mode: 'same' });
 console.log(gram.shape, await power.max().item(), smooth.size);
 ```
+
+## Dense decompositions
+
+`@margoengine/compute/decomp` provides `solve`, `inv`, `det`, `cholesky`, `qr`, `svd`, `eigh` and `eigvalsh` on stacks of
+matrices, NumPy style. They run in one lazily loaded SIMD Wasm module in f64 on every backend and return f32 arrays:
+partially pivoted LU, lower Cholesky, Householder QR, one-sided cyclic Jacobi SVD (Demmel and Veselic 1992; it never
+forms A^T A) and two-sided Jacobi for symmetric eigenpairs. Options: `fullMatrices` (default `false`, reduced Q and U)
+and `maxSweeps` (default 100, 1 to 1000; a Jacobi method that has not converged by then rejects). Each matrix must keep
+`8 m n + 2 m^2 + 2 n^2` (plus `2 n k` for a solve with k right-hand sides) at or under 16,777,216 elements, so square
+matrices go up to 1182 (1094 for `solve` with as many columns); larger problems belong to the sparse solvers below.
 
 ## Sparse matrices and solvers
 
@@ -290,7 +303,8 @@ package's own arrays, so a network runs unchanged on WebGPU and on the CPU backe
 - **Activations**, as layers and as `Tensor` methods: `ReLU`, `LeakyReLU`, `GELU` (the tanh form), `SiLU`, `Sigmoid`, `Tanh`,
   `Softmax`. `Tensor` also has `logSoftmax`, `exp`, `log` and `rsqrt`.
 - **Losses:** `crossEntropy(logits, labels)` (it takes logits, not probabilities) and `mseLoss(prediction, target)`.
-- **Optimizers:** `SGD` (`momentum`, `weightDecay`), `Adam` and `AdamW`. Change `opt.lr` between steps to schedule it.
+- **Optimizers:** `SGD` (`momentum`, `weightDecay`), `Adam` and `AdamW`. AdamW scales its decay by the learning rate as
+  PyTorch does (`weights *= 1 - lr * weightDecay`); the paper's lambda is `lr * weightDecay`. Change `opt.lr` between steps to schedule it.
 - **Functions:** `scaledDotProductAttention(q, k, v, { causal })`, `dropout`, `noGrad(work)`.
 
 A `Tensor` holds a GpuArray and how it was made. `tensor(array)` wraps your input, `parameter(array)` makes one to train, and

@@ -179,6 +179,11 @@ fn tall_svd(
     for i in 0..n {
         vectors[i * n + i] = 1.0;
     }
+    // Stop when every pair's cosine |a_p . a_q| / (|a_p| |a_q|) is at most 8 eps. Demmel and Veselic (LAWN 15, 1992,
+    // their one-sided Jacobi algorithm) leave tol to the user, "usually machine precision"; Drmac and Veselic (LAWN
+    // 169, 2007, eq. 2.8) usually take m eps. 8 eps is Margo's choice, measured to converge on uniform random 700 x
+    // 700, 1000 x 300 and 1180 x 40 (the workspace limit); outputs are f32, so the tighter test costs no visible
+    // accuracy.
     let mut converged = n < 2;
     for _ in 0..sweeps {
         let mut changed = false;
@@ -328,6 +333,9 @@ fn eigh(a: &[f64], n: usize, sweeps: usize) -> Result<Vec<f64>, ()> {
     for i in 0..n {
         v[i * n + i] = 1.;
     }
+    // Demmel and Veselic's relative test |a_pq| <= tol sqrt(|a_pp a_qq|) (LAWN 15, their two-sided Jacobi), with tol 4
+    // eps, Margo's choice measured to converge on uniform random symmetric 256 x 256 and 600 x 600. Their analysis is
+    // for positive definite H; the absolute values extend the test to indefinite input.
     let mut converged = n < 2;
     for _ in 0..sweeps {
         let mut changed = false;

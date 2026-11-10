@@ -8067,3 +8067,23 @@ The same gate exposed interaction ownership under linked rendering. Research: Ar
 
 ## Review 3 SV3: transfer binding classification restoration
 Research compared the Memento snapshot pattern from Erich Gamma, Richard Helm, Ralph Johnson and John Vlissides, Design Patterns (1994), bibliographic record https://books.google.com/books/about/Design_patterns.html?id=6oHuKQe3TjQC (book not read), with Ecma International, ECMAScript 2024, TypedArray.prototype.slice, https://tc39.es/ecma262/2024/multipage/indexed-collections.html#sec-%typedarray%.prototype.slice , and Kai Ninomiya, Brandon Jones and Jim Blandy (editors), WebGPU (2026), resource usages, https://www.w3.org/TR/webgpu/#resource-usages . The standards were consulted; no external implementation source was read. A default reset loses prior gradient/preintegrated classification metadata; retaining a GPU handle would couple restoration to destroyed resources. The owning VolumeLayer instead returns a CPU snapshot of table dimensions, bytes and all classification metadata, and bindTransfer restores that snapshot through the existing upload path. Copies isolate both setter inputs and getter outputs. CPU regressions cover gradient/preintegrated tables, disposal, abort, device restoration and repeated cleanup; transfer-browser compares exact pre-binding and restored pixels on both backends.
+## Batch 132 audit: compute sources (2026-11-10)
+
+Read for the audit, papers only, no companion code: J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, *Parallel
+random numbers: as easy as 1, 2, 3* (SC11, 2011), https://www.thesalmons.org/john/random123/papers/random123sc11.pdf
+(S-box, Philox-4x32 multipliers, Weyl key constants, 10 rounds); D. Lemire, *Fast Random Integer Generation in an
+Interval* (ACM TOMACS 29(1), 2019), https://arxiv.org/abs/1805.10941 (multiply-shift bias); J. Demmel and K. Veselic,
+*Jacobi's Method is More Accurate than QR* (LAPACK Working Note 15, 1989/1992), https://www.netlib.org/lapack/lawnspdf/lawn15.pdf
+(one- and two-sided algorithms, relative stopping test); Z. Drmac and K. Veselic, *New Fast and Accurate Jacobi SVD
+Algorithm I and II* (LAPACK Working Notes 169 and 170, 2007), https://www.netlib.org/lapack/lawnspdf/lawn169.pdf and
+https://www.netlib.org/lapack/lawnspdf/lawn170.pdf (tolerance m eps, eq. 2.8; underflow and non-convergence, section
+3.2); R. Barrett et al., *Templates for the Solution of Linear Systems* (SIAM 1994), https://www.netlib.org/linalg/html_templates/
+(preconditioned CG and BiCGSTAB figures, the small-s early exit); I. Loshchilov and F. Hutter, *Decoupled Weight Decay
+Regularization* (ICLR 2019), https://arxiv.org/abs/1711.05101 (Algorithm 2: Adam steps and the decay eta_t lambda theta);
+D. Hendrycks and K. Gimpel, *Gaussian Error Linear Units* (2016), https://arxiv.org/abs/1606.08415 (tanh form, 0.044715).
+Sources `nn.ts` names that this table lacked: Ba, Kiros and Hinton 2016 (layer normalization), Vaswani et al. 2017
+(scaled dot-product attention), Chellapilla, Puri and Simard 2006 (convolution by unfolding), Kingma and Ba 2015
+(Adam), Rumelhart, Hinton and Williams 1986 (back-propagation); not re-read in this audit. Not read: Chan, Golub and
+LeVeque's Stanford report (the link fetched nothing); the Random123 known-answer vectors in `tests/maths.test.js` come
+from that distribution's data file, not the paper, which does not print them or fix the four-word order.
+

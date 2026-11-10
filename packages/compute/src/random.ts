@@ -225,7 +225,10 @@ export class Random {
     return this.#draw(shape, 'i32', 3, 0, 0, low, high - low);
   }
 
-  /** A random permutation of 0..n-1 (u32): the argsort of random keys. */
+  /**
+   * A random permutation of 0..n-1 (u32): the stable argsort of random 32-bit keys. Equal keys keep index order, so it
+   * departs from uniform only when two keys tie, which happens with probability below n (n - 1) / 2^33.
+   */
   permutation(n: number): GpuArray<'u32'> {
     if (!Number.isInteger(n) || n < 0) throw rangeError(`permutation n must be a whole number, got ${n}`, 'compute');
     const keys = this.bits(n),
