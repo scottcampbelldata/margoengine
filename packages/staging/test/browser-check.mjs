@@ -5,6 +5,10 @@
 // shadow height, with contact shadows off (opacity 0) and on, and asserts pixels; then times the contact-shadow
 // passes with timestamp queries. Writes test-results/staging-contact.png and, unless --no-record (test runs), the
 // timings to examples/package-benchmarks/results/staging-contact.json (a checked-in record).
+// Under MARGO_COMPAT=1 the WebGL2 layer offers no 'timestamp-query' (webgl2-compat src/device/render.ts: "Timestamp
+// queries are not offered on WebGL2"; a timestampWrites descriptor is refused as unsupported). The pixel assertions
+// run unchanged; the page's timing then finds no query set and returns null, which is asserted, the timing rows are
+// skipped with a printed note, and no record is written.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -13,8 +17,10 @@ import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { acPower } from '../../../examples/package-benchmarks/parts/power.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
 
-const root = resolve(import.meta.dirname, '../../..');
+const root = resolve(import.meta.dirname, '../../..'),
+  compat = compatRun();
 // Desktops without a battery report AC power (true); only a laptop on battery (false) refuses.
 const power = () => acPower() !== false;
 assert.ok(power(), 'On battery: run real-GPU checks on AC power');
@@ -92,6 +98,11 @@ try {
       }
       for (const isStatic of [false, true]) {
         const row = await page.evaluate(([f, s]) => window.check.timing(f, s), [65, isStatic]);
+        if (compat) {
+          assert.equal(row, null, 'compat: the WebGL2 layer offers no timestamp-query, so the page has no query set');
+          console.log(`compat: no timestamp-query on the WebGL2 layer, timing (static ${isStatic}) skipped`);
+          continue;
+        }
         assert.ok(row, 'timestamp-query unavailable');
         report.timing.push(row);
         console.log(JSON.stringify(row));
@@ -103,7 +114,7 @@ try {
   }
   report.acPowerAfter = power();
   assert.ok(report.acPowerAfter, 'Power dropped to battery during the run; discard it');
-  if (!process.argv.includes('--no-record'))
+  if (!process.argv.includes('--no-record') && !compat)
     writeFileSync(
       resolve(root, 'examples/package-benchmarks/results/staging-contact.json'),
       JSON.stringify(report, null, 1) + '\n',

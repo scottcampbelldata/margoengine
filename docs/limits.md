@@ -6814,3 +6814,24 @@ Accepted difference seen in the same probe and not part of this check: `textureS
 (1.7679) reads 0.4264706 natively and 0.4248279 through the layer, because the layer blends levels with the exact
 float fraction while the Metal sampler snaps it to 8 bits. That is the layer's documented exact-mip design
 (`emit.ts`, `exactMip`).
+
+## Compat branches for GPU-only assertions (lane L, 2026-11-10)
+
+Nine browser checks asserted behaviour that the WebGL2 compatibility layer does not have by design, so they failed
+under `MARGO_COMPAT=1`. Each now has a compat branch in the style of `meshlets-check.mjs` (b9d89881e) and
+`lod-check.mjs` (a1991951f): under compat it still asserts that every picture matches core (or the hand-worked
+answer), asserts the coded refusal or fallback the package documents, and skips only the GPU-only assertion, printing
+a `compat:` note. On WebGPU nothing changed. All nine pass on the M6 Mac mini on WebGPU (Metal) and under
+`MARGO_COMPAT=1` (ANGLE Metal).
+
+| Check | Documented compat behaviour (where) | Asserted under compat | Skipped under compat |
+| --- | --- | --- | --- |
+| culling `bounds-check` | The compat route tests spheres for box bounds and culls against the frustum only (README "Modes", src/compat.ts) | 0 differing pixels vs core every step; box count equals sphere count; the frustum still drops rods | "the plate hides the rods by box" |
+| culling `meshes-occlusion-check` | Frustum and screen size only, the same image with more drawn (README "Occlusion for core meshes") | 0 differing pixels; every instance draws behind the wall; the frustum drops some inside the crowd | the three Hi-Z counts |
+| culling `models-plain-check` | Nothing is culled, every row draws (README "Loaded models and materials meshes") | 0 differing pixels and a lit scene each step; no primitive has cull records | the drop counts |
+| culling `occluders-check` | No Hi-Z, occluders hide nothing (src/compat.ts) | 0 differing pixels; every part draws behind the walls; parts draw over the walls | "the walls hide the parts", "a hidden wall stops occluding" |
+| culling `shadows-cull-check` | Cascade lists are not built, every caster draws (README "Shadows per cascade") | 0 differing pixels for both classes; `readCascades()` gives no lists | per-cascade drop counts |
+| oit `exact-check` | ExactOIT `setup` throws `'unsupported'`, use OIT (README "Exact") | the coded refusal at 1x and 4x; core sorted blending within 2.5 of the hand-worked four layers; weighted OIT draws the layers | every ExactOIT picture assertion |
+| oit `vfx-check` | as above | the coded refusal on each of 40 'exact' builds; every other mode as on WebGPU; the remover check through OIT | the ExactOIT picture comparisons |
+| oit `real-check` | as above | the coded refusal per model; moments and blending take their parts; the particles run through OIT, compared with OIT's own run | "ExactOIT takes its BLEND parts", distances to the exact picture, "moments stay closer to exact" |
+| staging `browser-check` | The layer offers no `timestamp-query` (webgl2-compat src/device/render.ts) | every pixel assertion; the timing call returns null; no record is written | the contact-shadow timing rows |

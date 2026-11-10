@@ -1,12 +1,18 @@
 // Real-GPU check for addEffect: particles, splats, points and sprites blend with glass in true depth order, whichever of
 // them draws first. Takes a GPU slot itself. From the repository root, after building packages:
 // node packages/oit/test/gpu/vfx-check.mjs
+// Under MARGO_COMPAT=1 ExactOIT refuses by design (README "Exact (ExactOIT)": storage buffers in fragment shaders,
+// `setup` throws 'unsupported'; use OIT). Every 'exact' build then asserts that coded refusal instead of drawing, the
+// remover check runs through the documented fallback (OIT), and only the assertions that compare an ExactOIT picture
+// are skipped, with a printed note. Every other mode runs and is asserted as on WebGPU.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
+import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'oit-vfx' });
+const compat = compatRun(),
+  release = await acquire({ owner: 'oit-vfx' });
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/vfx.html', port: 5289 }),
   { page } = context;
 const biggest = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
@@ -17,16 +23,38 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error') pageErrors.push(m.text());
   });
-  await page.waitForFunction(() => window.ready, null, { timeout: 30000 }).catch((error) => {
-    throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
-  });
+  await page
+    .waitForFunction(() => window.ready, null, { timeout: 30000 })
+    .catch((error) => {
+      throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
+    });
   const shot = async () => {
     const url = await page.evaluate(() => window.check.shot()),
       image = await decodePNG(Buffer.from(url.split(',')[1], 'base64')),
       at = (image.height / 2) * image.width * 4 + image.width * 2;
     return [...image.data.subarray(at, at + 3)];
   };
+  let refused = 0;
   const build = async (o) => {
+    if (compat && o.mode === 'exact') {
+      // The documented refusal, coded, before any list buffer exists; the caller skips what compares its picture.
+      const error = await page.evaluate(
+        (options) =>
+          window.check.build(options).then(
+            () => null,
+            (e) => ({ code: e.code, message: e.message }),
+          ),
+        o,
+      );
+      assert.equal(
+        error?.code,
+        'unsupported',
+        `compat: ExactOIT ${JSON.stringify(o)} must refuse, got ${JSON.stringify(error)}`,
+      );
+      assert.match(error.message, /^ExactOIT needs storage buffers in fragment shaders; use OIT on this device/);
+      refused++;
+      return null;
+    }
     await page.evaluate((options) => window.check.build(options), o);
     return shot();
   };
@@ -55,8 +83,10 @@ try {
       report[`${kind} ${samples}x`] = { alone, front, behind };
       assert.ok(a > 0.5, `${samples}x ${kind} shows, coverage ${a}`);
       // Two 8-bit blends, each input read back in 8 bits and colours held in halves in the lists.
-      assert.ok(biggest(front, expectFront) <= 2, `${samples}x ${kind} in front: ${front} against ${expectFront}`);
-      assert.ok(biggest(behind, expectBehind) <= 2, `${samples}x ${kind} behind: ${behind} against ${expectBehind}`);
+      if (!compat) {
+        assert.ok(biggest(front, expectFront) <= 2, `${samples}x ${kind} in front: ${front} against ${expectFront}`);
+        assert.ok(biggest(behind, expectBehind) <= 2, `${samples}x ${kind} behind: ${behind} against ${expectBehind}`);
+      }
       // Their own draws cannot do it: behind the glass the effect still lands on top of it, or the glass on top of it.
       const plain = await build({ samples, kind, z: -0.5, glass: true }),
         planeFirst = await build({ samples, kind, z: 0.5, glass: true });
@@ -66,21 +96,32 @@ try {
         `${samples}x ${kind}: its own draw should miss one of the two orders, ${plain} and ${planeFirst}`,
       );
       // Taken away, or with the effect or pass gone, it draws as before, bit for bit.
-      await build({ samples, kind, mode: 'exact' });
+      await build({ samples, kind, mode: compat ? 'oit' : 'exact' });
       await page.evaluate(() => window.check.remove());
       assert.deepEqual(await shot(), alone, `${samples}x ${kind}: the remover restores its own draw`);
       await build({ samples, kind, mode: 'oit' });
       await page.evaluate(() => window.check.disposePass());
       assert.deepEqual(await shot(), alone, `${samples}x ${kind}: disposing the pass restores its own draw`);
       await build({ samples, kind, z: 0.5, glass: true, mode: 'oit' });
-      assert.equal(await page.evaluate(() => window.check.disposeEffect()), 0, `${kind}: a disposed effect leaves the pass`);
-      assert.deepEqual(await shot(), await build({ samples, glass: true, mode: 'oit' }), `${samples}x ${kind}: only glass is left`);
+      assert.equal(
+        await page.evaluate(() => window.check.disposeEffect()),
+        0,
+        `${kind}: a disposed effect leaves the pass`,
+      );
+      assert.deepEqual(
+        await shot(),
+        await build({ samples, glass: true, mode: 'oit' }),
+        `${samples}x ${kind}: only glass is left`,
+      );
       // Weighted blending and moments are approximations: coverage holds, and the nearer layer counts for more.
       for (const mode of ['oit', 'moments', 'ranged', 'blending']) {
         const near = await build({ samples, kind, z: 0.5, glass: true, mode }),
           far = await build({ samples, kind, z: -0.5, glass: true, mode });
         report[`${kind} ${samples}x ${mode}`] = { near, far };
-        assert.ok(near[0] > far[0] && near[2] < far[2], `${samples}x ${kind} ${mode}: nearer counts for more, ${near}, ${far}`);
+        assert.ok(
+          near[0] > far[0] && near[2] < far[2],
+          `${samples}x ${kind} ${mode}: nearer counts for more, ${near}, ${far}`,
+        );
       }
     }
     // Alone in a pass an effect looks as it does on its own, whatever it brings: one layer, so one blend either way.
@@ -96,6 +137,7 @@ try {
       const own = await build({ samples, ...o });
       for (const mode of ['exact', 'oit', 'moments', 'ranged', 'blending']) {
         const taken = await build({ samples, ...o, mode });
+        if (!taken) continue;
         report[`${JSON.stringify(o)} ${samples}x ${mode}`] = { own, taken };
         // Exact keeps the colour in halves; the others also divide by the weights they summed in halves.
         assert.ok(biggest(own, taken) <= 2, `${samples}x ${JSON.stringify(o)} ${mode}: ${taken} against ${own}`);
@@ -109,19 +151,24 @@ try {
       report[`additive ${kind} ${samples}x`] = { own, added, left };
       assert.ok(biggest(own, wall) > 8, `${samples}x additive ${kind} shows`);
       assert.ok(biggest(own, added) <= 2, `${samples}x additive ${kind} in blending OIT: ${added} against ${own}`);
-      assert.deepEqual(left, own, `${samples}x additive ${kind} stays out of a pass that takes no additive`);
+      if (left) assert.deepEqual(left, own, `${samples}x additive ${kind} stays out of a pass that takes no additive`);
     }
     // The draw order is the data order once the sort is off: it must not matter. Sums of two in halves commute.
     for (const mode of ['exact', 'oit', 'moments']) {
       const one = await build({ samples, kind: 'splats', pair: true, mode }),
         other = await build({ samples, kind: 'splats', pair: true, swapped: true, mode });
       report[`splat order ${samples}x ${mode}`] = { one, other };
-      assert.deepEqual(one, other, `${samples}x ${mode}: the order of the data changes nothing`);
+      if (one || other) assert.deepEqual(one, other, `${samples}x ${mode}: the order of the data changes nothing`);
     }
     const sorted = await build({ samples, kind: 'splats', pair: true }),
       exact = await build({ samples, kind: 'splats', pair: true, mode: 'exact' });
-    assert.ok(biggest(sorted, exact) <= 2, `${samples}x: exact equals the sorted splats, ${exact} against ${sorted}`);
+    if (exact)
+      assert.ok(biggest(sorted, exact) <= 2, `${samples}x: exact equals the sorted splats, ${exact} against ${sorted}`);
   }
+  if (compat)
+    console.log(
+      `compat: ExactOIT refused ${refused} times with the coded 'unsupported'; the ExactOIT picture comparisons skipped`,
+    );
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));
   assert.deepEqual(errors.concat(pageErrors), [], 'no GPU or shader errors');

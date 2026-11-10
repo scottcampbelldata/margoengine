@@ -366,11 +366,24 @@ function uploadRows(
   gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
 }
 
-/** Deletes the shared data textures of bind groups the program dropped (WebGPU bind groups have no destroy()). */
+/**
+ * Deletes the shared data textures of bind groups the program dropped (WebGPU bind groups have no destroy()). The held
+ * value is only a WeakRef to the device and an id into `sharedTextures`: a registry keeps held values strongly, and the
+ * old `{ gl, texture }` reached the device through the context's canvas listeners, so every device that ever made such
+ * a group, its engine and the group itself stayed alive (an engine with VFX on the WebGL2 layer ran the page out of
+ * Wasm memory after about 124 engines; lane L, 2026-11-10).
+ */
+const sharedTextures = new WeakMap<CompatDevice, Map<number, WebGLTexture>>();
+let sharedIds = 0;
 const dropped =
-  typeof FinalizationRegistry === 'function'
-    ? new FinalizationRegistry<{ gl: WebGL2RenderingContext; texture: WebGLTexture }>(({ gl, texture }) => {
-        if (!gl.isContextLost()) gl.deleteTexture(texture);
+  typeof FinalizationRegistry === 'function' && typeof WeakRef === 'function'
+    ? new FinalizationRegistry<{ device: WeakRef<CompatDevice>; id: number }>(({ device, id }) => {
+        const owner = device.deref(),
+          live = owner && sharedTextures.get(owner),
+          texture = live?.get(id);
+        if (!owner || !live || !texture) return;
+        live.delete(id);
+        if (!owner.gl.isContextLost()) owner.gl.deleteTexture(texture);
       })
     : null;
 
@@ -1013,7 +1026,13 @@ export class CompatBindGroup {
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
       this.shared = { texture, shift, rows, versions: new Map() };
-      dropped?.register(this, { gl, texture });
+      if (dropped) {
+        const id = ++sharedIds;
+        let live = sharedTextures.get(this.device);
+        if (!live) sharedTextures.set(this.device, (live = new Map()));
+        live.set(id, texture);
+        dropped.register(this, { device: new WeakRef(this.device), id });
+      }
     }
     const d = this.shared;
     for (const [binding, row] of d.rows) {

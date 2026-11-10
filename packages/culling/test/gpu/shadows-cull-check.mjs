@@ -1,13 +1,18 @@
 // Real-GPU check for @margoengine/culling/shadows: casters culled per cascade against the same scene drawing every caster in
 // every cascade. Frames must match to the byte, and the near cascades must draw fewer casters than there are.
+// Under MARGO_COMPAT=1 the cascade lists are not built on the WebGL2 layer and every cascade draws every caster
+// (README "Shadows per cascade", src/shadows.ts): every frame must still match, readCascades() gives no lists, and the
+// per-cascade drop counts are skipped with a printed note.
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/shadows-cull-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
+import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'culling-shadows' });
+const compat = compatRun(),
+  release = await acquire({ owner: 'culling-shadows' });
 try {
   const context = await openBrowser({ startPath: '/packages/culling/test/gpu/shadows-cull.html', port: 5287 }),
     { page } = context,
@@ -36,11 +41,16 @@ try {
       console.log(`step ${i} ${r.label}: ${parts} and ${rows} differ, parts ${r.parts}, rows ${r.rows} of ${r.count}`);
       assert.equal(parts, 0, `${r.label}: CascadeParts changed the frame`);
       assert.equal(rows, 0, `${r.label}: CascadeInstances changed the frame`);
+      if (compat) {
+        assert.deepEqual([r.parts, r.rows], [[], []], `compat: ${r.label}: no cascade lists on the WebGL2 layer`);
+        continue;
+      }
       assert.equal(r.parts.length, 3, `${r.label}: a list per cascade`);
       assert.ok(r.parts[0] < r.count / 2, `${r.label}: the nearest cascade drops parts (${r.parts[0]})`);
       assert.ok(r.rows[0] < r.count / 2, `${r.label}: the nearest cascade drops rows (${r.rows[0]})`);
       assert.deepEqual(r.parts, r.rows, `${r.label}: both classes keep the same casters`);
     }
+    if (compat) console.log('compat draws every caster in every cascade, the per-cascade drop counts skipped');
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);
     assert.deepEqual(pageErrors, []);
   } finally {

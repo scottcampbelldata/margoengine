@@ -5,9 +5,11 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
+import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'culling-occluders' });
+const compat = compatRun(),
+  release = await acquire({ owner: 'culling-occluders' });
 try {
   const context = await openBrowser({ startPath: '/packages/culling/test/gpu/occluders.html', port: 5285 }),
     { page } = context,
@@ -22,6 +24,7 @@ try {
     await page.evaluate(() => window.check.setup());
     const steps = await page.evaluate(() => window.check.steps),
       drawn = [];
+    let total = 0;
     for (let i = 0; i < steps; i++) {
       const r = await page.evaluate((n) => window.check.step(n), i),
         [a, b] = [await shot('a'), await shot('b')];
@@ -31,10 +34,14 @@ try {
       console.log(`step ${i} ${r.label}: ${differing} differ, ${r.drawn} of ${r.total} drawn`);
       assert.equal(differing, 0, `${r.label}: culled frame differs`);
       drawn.push(r.drawn);
+      total = r.total;
     }
-    assert.ok(drawn[0] < 100, `the walls hide the parts (${drawn[0]} drawn)`);
+    if (compat) {
+      console.log('compat has no Hi-Z, "the walls hide the parts" and "a hidden wall stops occluding" skipped');
+      assert.equal(drawn[0], total, `compat: behind the walls every part draws (${drawn[0]} of ${total})`);
+    } else assert.ok(drawn[0] < 100, `the walls hide the parts (${drawn[0]} drawn)`);
     assert.ok(drawn[2] > 300, `over the walls the parts draw (${drawn[2]} drawn)`);
-    assert.ok(drawn[4] > drawn[3] + 10, `a hidden wall stops occluding (${drawn[4]} against ${drawn[3]})`);
+    if (!compat) assert.ok(drawn[4] > drawn[3] + 10, `a hidden wall stops occluding (${drawn[4]} against ${drawn[3]})`);
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);
     assert.deepEqual(pageErrors, []);
   } finally {

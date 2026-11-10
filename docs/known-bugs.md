@@ -4984,7 +4984,7 @@ The light loader rejected every model without a renderable primitive before scen
 Resolved by Job 0 conflict-marker hygiene guard: shared docs on origin/main 8ee384c7e retain nested merge markers from mixer/cutscene rebases (for example docs/clean-room.md, Batch 216 onward); cause is prior conflict markers retained during append resolution. Repro: search lines starting with seven <, = or > characters in the six shared docs. All content lines from both sides are preserved; hygiene now rejects this class before landing.
 Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage; no open defect identified in this job.
 
-- Batch 231 scope finding: `node packages/culling/test/gpu/meshes-occlusion-check.mjs --compat` fails its native Hi-Z draw-count assertion (1509/1509 behind the wall). Cause: existing CulledMeshes compatibility route intentionally performs frustum-only culling (`src/compat.ts`), separate from the new DepthPyramid API; software `culling/webgl2` is a separate API. New scatter/occlusion performs real Hi-Z on both backends. Deferred legacy parity per build-phase rule 21.
+- Batch 231 scope finding: `node packages/culling/test/gpu/meshes-occlusion-check.mjs --compat` fails its native Hi-Z draw-count assertion (1509/1509 behind the wall). Cause: existing CulledMeshes compatibility route intentionally performs frustum-only culling (`src/compat.ts`), separate from the new DepthPyramid API; software `culling/webgl2` is a separate API. New scatter/occlusion performs real Hi-Z on both backends. Deferred legacy parity per build-phase rule 21. Closed, lane L (2026-11-10): the check has a compat branch (frustum-only counts asserted, occlusion counts skipped with a note); docs/limits.md "Compat branches for GPU-only assertions".
 
 ### Batch 244 job 1
 The camera rig is built with direct CPU trace and GPU overlay regressions. No open defect identified in this job's scope; other known defects remain in their existing entries.
@@ -5741,8 +5741,11 @@ as unsupported by the light loader.
   `MomentOIT`) and `TransparentDepth.dispose` (depth.ts:180) called `engine.removePlugin(this.name)`, which acts on the
   active scene. Input: `engine.createScene('other').use(new OIT()); oit.dispose()`. Wrong output: the pass stayed in
   `other.plugins` and `engine.sceneOf(oit)` still returned `other`. Regression packages/oit/test/audit-132.test.js.
-- Open: packages/oit/test/gpu exact-check, vfx-check and real-check fail under MARGO_COMPAT=1 with the coded refusal
-  "ExactOIT needs storage buffers in fragment shaders" (by design of the WebGL2 layer); they have no compat branch.
+- Closed, lane L (2026-11-10): packages/oit/test/gpu exact-check, vfx-check and real-check failed under MARGO_COMPAT=1
+  with the coded refusal "ExactOIT needs storage buffers in fragment shaders" (by design of the WebGL2 layer). Each now
+  has a compat branch that asserts that refusal and skips only the ExactOIT picture comparisons; docs/limits.md
+  "Compat branches for GPU-only assertions". Adding the branch to vfx-check exposed a real leak in webgl2-compat (next
+  section).
 
 ## Batch 132 audit: voxel-net (fixed)
 
@@ -5890,4 +5893,16 @@ gradients. Repro before the fix: `node packages/webgl2-compat/test/bias-browser.
 differ, keys `linear/oblique-grad/false` and `/true`). Fix: `packages/webgl2-compat/src/glsl/emit.ts` samples
 implicitly when the gradients are the coordinate's own derivatives. Regression: `packages/webgl2-compat/test/glsl.test.js`.
 Details and numbers: docs/limits.md "webgl2-compat footprint check per platform".
+
+## webgl2-compat bind groups kept their device and engine alive (lane L, 2026-11-10, fixed)
+
+Fixed: `CompatBindGroup.storageTexture()` (packages/webgl2-compat/src/device/resources.ts) registered each shared
+storage texture with a module-level `FinalizationRegistry` whose held value was `{ gl, texture }`. A registry holds
+held values strongly, and a WebGL2 context reaches its device (the canvas's context-lost listener), the device its
+engine, and the engine the plugin that owns the bind group, so neither the group nor anything around it was ever
+collected. Repro before the fix: `MARGO_COMPAT=1 node packages/oit/test/gpu/vfx-check.mjs` stopped with "RangeError:
+WebAssembly.instantiate(): Out of memory" when the page created its 124th engine with a VFX effect (a heap snapshot
+showed the path from the registry's WeakCells through `gl` to the disposed engines). Fix: the held value is a
+`WeakRef` to the device and an id into a per-device `WeakMap` of shared textures. Regression:
+packages/webgl2-compat/test/bind-group-release.test.js (fails with the old held value), and vfx-check under compat.
 

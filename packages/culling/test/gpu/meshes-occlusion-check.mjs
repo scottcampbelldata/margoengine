@@ -1,13 +1,19 @@
 // Real-GPU check for CulledMeshes' occlusion: engine A culls, engine B draws everything. Every step's frames must match
 // to the byte, and behind the wall the plugin must draw far fewer instances than there are.
+// Under MARGO_COMPAT=1 the WebGL2 layer's route (src/compat.ts) has no Hi-Z, so occlusion culls against the frustum and
+// screen size only (README "Occlusion for core meshes": the same image with more drawn). Every frame must still match
+// core, a view with the whole crowd in the frustum draws every instance, a view into the crowd still drops some, and
+// the three occlusion counts are skipped with a printed note.
 // Takes a GPU slot itself. Run from the repository root after building packages:
 //   node packages/culling/test/gpu/meshes-occlusion-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
+import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'culling-meshes-occlusion' });
+const compat = compatRun(),
+  release = await acquire({ owner: 'culling-meshes-occlusion' });
 try {
   const context = await openBrowser({ startPath: '/packages/culling/test/gpu/meshes-occlusion.html', port: 5283 }),
     { page } = context,
@@ -22,6 +28,7 @@ try {
     await page.evaluate(() => window.check.setup());
     const steps = await page.evaluate(() => window.check.steps),
       drawn = [];
+    let total = 0;
     for (let i = 0; i < steps; i++) {
       const r = await page.evaluate((n) => window.check.step(n), i),
         [a, b] = [await shot('a'), await shot('b')];
@@ -31,10 +38,17 @@ try {
       console.log(`step ${i} ${r.label}: ${differing} differ, ${r.drawn} of ${r.total} drawn`);
       assert.equal(differing, 0, `${r.label}: culled frame differs from core`);
       drawn.push(r.drawn);
+      total = r.total;
     }
-    assert.ok(drawn[0] < 200, `the wall hides the crowd (${drawn[0]} drawn)`);
-    assert.ok(drawn[2] > drawn[0] + 300, `the crowd draws from the side (${drawn[2]} drawn)`);
-    assert.ok(drawn.at(-1) < 200, `hidden again (${drawn.at(-1)} drawn)`);
+    if (compat) {
+      console.log('compat culls against the frustum only (no Hi-Z), the three occlusion counts skipped');
+      assert.equal(drawn[0], total, `compat: behind the wall every instance draws (${drawn[0]} of ${total})`);
+      assert.ok(Math.min(...drawn) < total / 2, `compat: the frustum still drops instances (${drawn})`);
+    } else {
+      assert.ok(drawn[0] < 200, `the wall hides the crowd (${drawn[0]} drawn)`);
+      assert.ok(drawn[2] > drawn[0] + 300, `the crowd draws from the side (${drawn[2]} drawn)`);
+      assert.ok(drawn.at(-1) < 200, `hidden again (${drawn.at(-1)} drawn)`);
+    }
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);
     assert.deepEqual(pageErrors, []);
   } finally {
