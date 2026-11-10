@@ -1,6 +1,7 @@
 // The page side of a worker canvas: written from the HTML specification (transferControlToOffscreen, MessagePort) and
 // the UI Events and Pointer Events specifications. The worker side is ./canvas.ts; the two share only the message shapes.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import type { WorkerPointerLockOptions } from './canvas.js';
 
 const TAG = 'margo-worker-canvas';
 /** Events a worker can listen for on its canvas. Key events come from the document, the rest from the canvas. */
@@ -99,6 +100,10 @@ export class WorkerCanvas {
   disposed = false;
   private readonly listening = new Map<EventTarget, Map<string, EventListener>>();
   private readonly resizing: ResizeObserver;
+  private readonly closing = new AbortController();
+  private readonly lockRequests = new Map<number, AbortController>();
+  private readonly lockChanged = (): void => this.post({ type: 'pointerlock', locked: this.pointerLocked });
+  private readonly lockError = (): void => this.post({ type: 'pointerlockerror' });
   private ratio?: MediaQueryList;
   private readonly send = (): void => this.post({ type: 'size', ...this.size() });
   private readonly ratioChanged = (): void => {
@@ -119,11 +124,86 @@ export class WorkerCanvas {
       if (data.listen) this.listen(data.listen);
       else if (data.style) this.canvas.style.setProperty(data.style[0], data.style[1]);
       else if (data.closed) this.dispose();
+      else if (data.pointerLock === 'exit') this.exitPointerLock();
+      else if (data.pointerLock === 'cancel') this.lockRequests.get(data.id)?.abort();
+      else if (data.pointerLock === 'request') {
+        const controller = new AbortController();
+        this.lockRequests.set(data.id, controller);
+        void this.requestPointerLock({ ...data.options, signal: controller.signal })
+          .then(
+            () => this.post({ type: 'lock-result', id: data.id }),
+            (error) =>
+              this.post({
+                type: 'lock-result',
+                id: data.id,
+                error: { name: error?.name, message: String(error?.message ?? error), code: error?.code },
+              }),
+          )
+          .finally(() => this.lockRequests.delete(data.id));
+      }
     };
     this.resizing = new ResizeObserver(this.send);
     this.resizing.observe(canvas);
     this.watchRatio();
     canvas.ownerDocument.addEventListener('visibilitychange', this.visibility);
+    canvas.ownerDocument.addEventListener('pointerlockchange', this.lockChanged);
+    canvas.ownerDocument.addEventListener('pointerlockerror', this.lockError);
+    this.lockChanged();
+  }
+  /** True while the page has locked the pointer to this canvas. */
+  get pointerLocked(): boolean {
+    return this.canvas.ownerDocument.pointerLockElement === this.canvas;
+  }
+  /** Requests lock on the page. Call in a trusted user gesture; browser permission/activation rules still apply. */
+  requestPointerLock({
+    signal,
+    timeout = 10_000,
+    unadjustedMovement = false,
+  }: WorkerPointerLockOptions = {}): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.disposed) throw fault('state', 'Worker canvas disposed; transfer a new canvas', 'worker');
+      if (typeof this.canvas.requestPointerLock !== 'function')
+        throw fault('unsupported', 'Pointer lock unavailable in this browser', 'worker');
+      if (!(timeout > 0 && Number.isFinite(timeout)))
+        throw rangeError('Pointer lock timeout must be finite and above zero', 'worker');
+      const lifetime = AbortSignal.any([this.closing.signal, ...(signal ? [signal] : [])]);
+      lifetime.throwIfAborted();
+      if (this.pointerLocked) {
+        resolve();
+        return;
+      }
+      const doc = this.canvas.ownerDocument;
+      const finish = (error?: unknown) => {
+        clearTimeout(timer);
+        doc.removeEventListener('pointerlockchange', change);
+        doc.removeEventListener('pointerlockerror', failed);
+        lifetime.removeEventListener('abort', abort);
+        if (error !== undefined) reject(error);
+        else resolve();
+      };
+      const change = () => {
+        if (this.pointerLocked) finish();
+      };
+      const failed = () =>
+        finish(fault('failed', 'Pointer lock denied; request it from a trusted page gesture', 'worker'));
+      const abort = () => finish(lifetime.reason);
+      const timer = setTimeout(
+        () => finish(fault('timeout', 'Pointer lock deadline exceeded; request from a trusted gesture', 'worker')),
+        timeout,
+      );
+      doc.addEventListener('pointerlockchange', change);
+      doc.addEventListener('pointerlockerror', failed);
+      lifetime.addEventListener('abort', abort, { once: true });
+      try {
+        void this.canvas.requestPointerLock({ unadjustedMovement })?.catch((error) => finish(error));
+      } catch (error) {
+        finish(error);
+      }
+    });
+  }
+  /** Releases this canvas's lock. Leaves another element's lock alone. */
+  exitPointerLock(): void {
+    if (this.pointerLocked) this.canvas.ownerDocument.exitPointerLock();
   }
   /** @internal The size, position and pixel ratio the worker reads as the canvas's. */
   size(): Record<string, number | undefined> {
@@ -164,8 +244,24 @@ export class WorkerCanvas {
       const { left, top } = this.canvas.getBoundingClientRect();
       this.post({ type: 'event', name: type, fields, left, top });
     };
-    types.set(type, forward);
-    target.addEventListener(type, forward, { passive: !PREVENTED.has(type) });
+    const listener =
+      type === 'mousemove'
+        ? (event: Event) => {
+            if (!this.pointerLocked) forward(event);
+          }
+        : forward;
+    types.set(type, listener);
+    target.addEventListener(type, listener, { passive: !PREVENTED.has(type) });
+    if (type === 'mousemove') {
+      const doc = this.canvas.ownerDocument;
+      let documentTypes = this.listening.get(doc);
+      if (!documentTypes) this.listening.set(doc, (documentTypes = new Map()));
+      const lockedMove = (event: Event) => {
+        if (this.pointerLocked) forward(event);
+      };
+      documentTypes.set(type, lockedMove);
+      doc.addEventListener(type, lockedMove);
+    }
   }
   /**
    * Stops forwarding and tells the worker: `received.signal` aborts there, and an engine attached to `received` is disposed.
@@ -173,6 +269,8 @@ export class WorkerCanvas {
    */
   dispose(): void {
     if (this.disposed) return;
+    this.exitPointerLock();
+    this.closing.abort();
     this.post({ type: 'close' });
     this.disposed = true;
     for (const [target, types] of this.listening)
@@ -181,6 +279,8 @@ export class WorkerCanvas {
     this.resizing.disconnect();
     this.ratio?.removeEventListener('change', this.ratioChanged);
     this.canvas.ownerDocument.removeEventListener('visibilitychange', this.visibility);
+    this.canvas.ownerDocument.removeEventListener('pointerlockchange', this.lockChanged);
+    this.canvas.ownerDocument.removeEventListener('pointerlockerror', this.lockError);
     this.port.close();
   }
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

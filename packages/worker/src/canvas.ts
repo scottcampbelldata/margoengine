@@ -23,6 +23,16 @@ export interface ReceiveCanvasOptions {
   timeout?: number;
 }
 
+/** Pointer-lock request on either end of the canvas bridge. Browser user activation is still required. */
+export interface WorkerPointerLockOptions {
+  /** Aborts the wait, not the browser's native permission request. Default none. */
+  signal?: AbortSignal;
+  /** Hard wait deadline in milliseconds, above zero. Default 10000. */
+  timeout?: number;
+  /** Requests raw mouse input; denial is reported rather than retried with adjusted input. Default false. */
+  unadjustedMovement?: boolean;
+}
+
 /**
  * The worker's end of a canvas, from {@link receiveCanvas}. `received.attach(engine)` ties it to the engine: the first
  * frame after the page comes back from a background tab steps 0, as on the page, and `dispose` on the page disposes
@@ -35,6 +45,9 @@ export class ReceivedCanvas {
   private readonly closing = new AbortController();
   private readonly captured = new Set<number>();
   private readonly listened = new Set<string>();
+  private readonly locks = new Map<number, { finish(error?: unknown): void }>();
+  private nextLock = 0;
+  private locked = false;
   private engine?: Engine;
   private resuming = false;
   private rect = { width: 0, height: 0, left: 0, top: 0 };
@@ -78,6 +91,9 @@ export class ReceivedCanvas {
       setPointerCapture: { value: (id: number) => captured.add(id) },
       releasePointerCapture: { value: (id: number) => captured.delete(id) },
       hasPointerCapture: { value: (id: number) => captured.has(id) },
+      requestPointerLock: { value: (options?: WorkerPointerLockOptions) => this.requestPointerLock(options) },
+      exitPointerLock: { value: () => this.exitPointerLock() },
+      pointerLockElement: { get: () => (this.locked ? canvas : null) },
       addEventListener: {
         value: (type: string, ...rest: [EventListener, AddEventListenerOptions?]) => {
           if (!this.listened.has(type)) {
@@ -93,11 +109,61 @@ export class ReceivedCanvas {
       else if (data.type === 'size') this.resize(data);
       else if (data.type === 'hidden') this.setHidden(data.hidden);
       else if (data.type === 'close') this.close();
+      else if (data.type === 'pointerlock') {
+        this.locked = data.locked;
+        canvas.dispatchEvent(new Event('pointerlockchange'));
+      } else if (data.type === 'pointerlockerror') canvas.dispatchEvent(new Event('pointerlockerror'));
+      else if (data.type === 'lock-result')
+        this.locks.get(data.id)?.finish(data.error && Object.assign(new Error(data.error.message), data.error));
     };
   }
   /** Aborts when the page disposes its `WorkerCanvas`, or this is disposed. */
   get signal(): AbortSignal {
     return this.closing.signal;
+  }
+  /** True while this canvas owns the page's pointer lock, updated by native lock-change events. */
+  get pointerLocked(): boolean {
+    return this.locked;
+  }
+  /** Asks the page to request lock. Invoke from forwarded trusted interaction; rejection reports activation/permission failure. */
+  requestPointerLock({
+    signal,
+    timeout = 10_000,
+    unadjustedMovement = false,
+  }: WorkerPointerLockOptions = {}): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const lifetime = AbortSignal.any([this.signal, ...(signal ? [signal] : [])]);
+      lifetime.throwIfAborted();
+      if (!(timeout > 0 && Number.isFinite(timeout)))
+        throw rangeError('Pointer lock timeout must be finite and above zero', 'worker');
+      const id = ++this.nextLock;
+      const finish = (error?: unknown) => {
+        clearTimeout(timer);
+        lifetime.removeEventListener('abort', abort);
+        this.locks.delete(id);
+        if (error !== undefined) reject(error);
+        else resolve();
+      };
+      const abort = () => {
+        this.send({ pointerLock: 'cancel', id });
+        finish(lifetime.reason);
+      };
+      const timer = setTimeout(() => {
+        this.send({ pointerLock: 'cancel', id });
+        finish(fault('timeout', 'Pointer lock response deadline exceeded; check the page connection', 'worker'));
+      }, timeout);
+      this.locks.set(id, { finish });
+      lifetime.addEventListener('abort', abort, { once: true });
+      try {
+        this.send({ pointerLock: 'request', id, options: { timeout, unadjustedMovement } });
+      } catch (error) {
+        finish(error);
+      }
+    });
+  }
+  /** Asks the page to release this canvas's lock. The native change event updates pointerLocked. */
+  exitPointerLock(): void {
+    this.send({ pointerLock: 'exit' });
   }
   private send(message: object): void {
     if (!this.closing.signal.aborted) this.port.postMessage(message);
@@ -146,6 +212,10 @@ export class ReceivedCanvas {
     if (this.closing.signal.aborted) return;
     this.send({ closed: true });
     this.closing.abort();
+    if (this.locked) {
+      this.locked = false;
+      this.canvas.dispatchEvent(new Event('pointerlockchange'));
+    }
     this.engine = undefined;
     this.port.close();
   }

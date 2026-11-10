@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12416004,
+  "total": 12418123,
   "history": [
     {
       "date": "2026-10-24",
@@ -5698,6 +5698,12 @@
       "date": "2026-11-10",
       "commit": "batch-254",
       "reason": "Sprites optional entry 0 -> 1508 B: named shared-buffer intervals plus ordered codec fallback; separate small facilities remain tree-shakable within the entry."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f7bcb68b1",
+      "reason": "Batch 257 worker optional entries: measured gzip {\"@margoengine/worker\":2539,\"@margoengine/worker/canvas\":1793,\"@margoengine/worker/auto\":3920,\"@margoengine/worker dist/workers/scene.js\":2796}; previous ceilings {\"@margoengine/worker\":2128,\"@margoengine/worker/canvas\":1597,\"@margoengine/worker/auto\":3601,\"@margoengine/worker dist/workers/scene.js\":2627}. New orchestration, cancellation and lifecycle behavior remains optional. Splitting would complicate ownership and duplicate the protocol. Core/stage source unchanged.",
+      "grew": 4
     }
   ],
   "items": {
@@ -5731,6 +5737,8 @@
     "@margoengine/audio/music": 1828,
     "@margoengine/audio/occlusion": 1772,
     "@margoengine/audio/pan": 933,
+    "@margoengine/audio/sprites": 1764,
+    "@margoengine/audio/voices": 2373,
     "@margoengine/audio/zones": 1395,
     "@margoengine/behavior": 8897,
     "@margoengine/behavior/context": 1658,
@@ -6041,9 +6049,11 @@
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/video": 7287,
     "@margoengine/html": 7487,
+    "@margoengine/html/blend": 3303,
     "@margoengine/html/texture": 4779,
     "@margoengine/html/texture-gl": 6494,
     "@margoengine/input": 5414,
+    "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
     "@margoengine/input/layout": 1954,
     "@margoengine/input/lock": 1616,
@@ -6061,6 +6071,7 @@
     "@margoengine/inspector/packages": 4990,
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
+    "@margoengine/inspector/textures": 4964,
     "@margoengine/inspector/tweak": 4276,
     "@margoengine/kinematics-constraints": 11751,
     "@margoengine/kinematics-constraints/sdf": 7229,
@@ -6459,6 +6470,7 @@
     "@margoengine/sprites/aseprite": 4595,
     "@margoengine/sprites/atlas": 649,
     "@margoengine/sprites/billboard": 5389,
+    "@margoengine/sprites/pick": 2189,
     "@margoengine/sprites/shader": 1222,
     "@margoengine/sprites/skeletal": 7625,
     "@margoengine/sprites/slice": 8845,
@@ -6480,6 +6492,7 @@
     "@margoengine/stats": 4934,
     "@margoengine/stats/beacon": 1639,
     "@margoengine/stats/compile": 1882,
+    "@margoengine/stats/geometry": 1824,
     "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
@@ -6677,14 +6690,15 @@
     "@margoengine/wfc/overlapping": 2707,
     "@margoengine/wfc/sockets": 932,
     "@margoengine/wfc/worker": 1587,
-    "@margoengine/worker": 2128,
-    "@margoengine/worker dist/workers/scene.js": 2627,
-    "@margoengine/worker/auto": 3601,
-    "@margoengine/worker/canvas": 1597,
+    "@margoengine/worker": 2795,
+    "@margoengine/worker dist/workers/scene.js": 3052,
+    "@margoengine/worker/auto": 4176,
+    "@margoengine/worker/canvas": 2049,
     "@margoengine/worker/rpc": 2408,
     "@margoengine/xr": 8967,
     "@margoengine/xr/ar": 2828,
     "@margoengine/xr/device-check": 2344,
+    "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,
     "@margoengine/xr/layers": 3942,
     "@margoengine/xr/locomotion": 3390,
@@ -6776,14 +6790,6 @@
     "margoengine/game": 996,
     "margoengine/react/instances": 318,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/audio/voices": 2373,
-    "@margoengine/sprites/pick": 2189,
-    "@margoengine/html/blend": 3303,
-    "@margoengine/inspector/textures": 4964,
-    "@margoengine/stats/geometry": 1824,
-    "@margoengine/input/haptics": 1201,
-    "@margoengine/xr/hands": 2546,
-    "@margoengine/audio/sprites": 1764
+    "margoengine/web": 577
   }
 }

@@ -1,6 +1,6 @@
 // The worker of browser-check.js: core, a control package and the stage class on the received canvas, unchanged.
 import { box, Engine, PbrMaterial } from '/packages/core/dist/index.js';
-import { OrbitControls } from '/packages/controls/dist/index.js';
+import { OrbitControls, PointerLockControls } from '/packages/controls/dist/index.js';
 import { Stage } from '/packages/stage/dist/index.js';
 import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
 import { receiveCanvas } from '/packages/worker/dist/canvas.js';
@@ -26,12 +26,16 @@ const received = await receiveCanvas(),
     fallback: webglRenderer,
     camera: { position: [0, 0, 3], target: [0, 0, 0] },
   }),
-  mesh = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#ff2000', roughness: 0.5 })),
+  mesh = engine
+    .createMesh()
+    .setGeometry(box())
+    .setMaterial(new PbrMaterial({ color: '#ff2000', roughness: 0.5 })),
   controls = new OrbitControls(engine.camera, canvas);
 received.attach(engine);
 const stage = new Stage(engine);
 let frames = 0,
-  lastError;
+  lastError,
+  pointer;
 engine.onError = (error) => {
   lastError = String(error);
 };
@@ -42,6 +46,18 @@ engine.onFrame((_, delta) => {
 engine.start();
 
 commands = {
+  pointerSetup() {
+    controls.disconnect();
+    pointer = new PointerLockControls(engine.camera, canvas);
+    canvas.addEventListener('click', () => {
+      void received.requestPointerLock().catch((error) => {
+        lastError = String(error);
+      });
+    });
+  },
+  pointerExit() {
+    received.exitPointerLock();
+  },
   frames: () => frames,
   state: () => ({
     backend: engine.backend,
@@ -51,6 +67,9 @@ commands = {
     ratio: globalThis.devicePixelRatio,
     frames,
     camera: [...engine.camera.position],
+    target: [...engine.camera.target],
+    locked: pointer?.isLocked ?? false,
+    pointerLocked: received.pointerLocked,
     touchAction: canvas.style.touchAction,
     error: lastError,
     hasDocument: typeof document !== 'undefined',

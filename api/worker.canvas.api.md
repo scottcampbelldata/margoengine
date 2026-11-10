@@ -16,8 +16,17 @@ export class ReceivedCanvas {
     [Symbol.dispose]: () => void;
     hidden: boolean;
     get signal(): AbortSignal;
+    get pointerLocked(): boolean;
+    requestPointerLock({ signal, timeout, unadjustedMovement }?: WorkerPointerLockOptions): Promise<void>;
+    exitPointerLock(): void;
     attach(engine: EngineKernel): this;
     dispose(): void;
+}
+
+export interface WorkerPointerLockOptions {
+    signal?: AbortSignal;
+    timeout?: number;
+    unadjustedMovement?: boolean;
 }
 
 export function receiveCanvas({ signal, timeout }?: ReceiveCanvasOptions): Promise<ReceivedCanvas>;

@@ -17,10 +17,21 @@ export class WorkerCanvas {
     readonly worker: CanvasWorker;
     [Symbol.dispose]: () => void;
     disposed: boolean;
+    get pointerLocked(): boolean;
+    requestPointerLock({ signal, timeout, unadjustedMovement }?: WorkerPointerLockOptions): Promise<void>;
+    exitPointerLock(): void;
     dispose(): void;
 }
 
 export function transferCanvas(canvas: HTMLCanvasElement, worker: CanvasWorker, { data, transfer, signal, timeout }?: TransferCanvasOptions): Promise<WorkerCanvas>;
 
 export const workerCanvasSupported: () => boolean;
+
+// Not exported from this entry, but used by the exports above:
+
+interface WorkerPointerLockOptions {
+    signal?: AbortSignal;
+    timeout?: number;
+    unadjustedMovement?: boolean;
+}
 ```

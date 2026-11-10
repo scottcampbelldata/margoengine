@@ -107,6 +107,20 @@ try {
   await page.mouse.wheel(0, 400);
   result.zoomed = await until((s) => Math.abs(distance(s.camera) - distance(orbit)) > 1e-3, 'the wheel to zoom');
   assert.equal(await page.evaluate(() => scrollY), 0, 'the page stayed put');
+  await ask('pointerSetup');
+  await page.locator('#gpu').click();
+  result.pointerLock = await until(
+    (s) => s.locked && s.pointerLocked,
+    'a native page pointer lock observed by worker controls',
+  );
+  const target = result.pointerLock.target;
+  await page.mouse.move(250, 160, { steps: 3 });
+  result.pointerMoved = await until(
+    (s) => s.target.some((v, i) => v !== target[i]),
+    'locked movement deltas to turn worker controls',
+  );
+  await ask('pointerExit');
+  result.pointerUnlocked = await until((s) => !s.locked && !s.pointerLocked, 'worker requested pointer unlock');
 
   if (speedEnabled()) {
     result.pageTicks = await page.evaluate(() => window.check.pageWhileWorkerBlocks(400));

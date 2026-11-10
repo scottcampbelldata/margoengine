@@ -2205,6 +2205,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 257 job 3: native Chromium pointer lock is proved across the canvas bridge with a trusted click, worker PointerLockControls rotation and worker-requested native exit. Six CPU cases cover state, exact deltas, permission/error paths, cancellation and ownership/disposal. This changes input forwarding only; rendering backends and core/stage remain unchanged.
+
 Batch 257 job 2: automatic worker/page selection is proved with one shared scene module and six rendered worker/page/fallback cases across WebGPU and WebGL2. Capability/module preparation precedes irreversible canvas transfer. Worker runtime failures propagate; cleanup is acknowledged over RPC before termination. Native Firefox/Safari evidence is the separate batch job 4.
 
 Batch 253 input evidence: `packages/input/test/input-browser.mjs` acquires native pointer lock from a click, drives a mesh transform through vector and locked mouse action channels, checks rendered pixel movement, then checks return after release. WebGPU and WebGL2 compatibility both pass. The package's `test:browser` registers this rendering proof in the GPU suite; changed-package GPU checks use a shared slot only. Physical XR controllers, hand tracking and raw mouse fidelity still need hardware acceptance; CPU fixtures cover their action/replay contracts and raw capability negotiation. No new rendering algorithm or speed claim.
