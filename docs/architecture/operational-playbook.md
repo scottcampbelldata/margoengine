@@ -7150,3 +7150,6 @@ The worker build postprocessor now removes @vite-ignore only from new URL worker
 ### Sections 4.1 and 5: J6 game integration
 
 The ROOT test:integration:browser gate resolves each test page into its public package footprint. The first scene combines 13 optional packages, tests both backends, destroys the device, joins core recovery, compares four exact probes and five scene draws, then asserts zero tracked allocations and scene/simulation ownership. A resource-ledger CPU regression and a footprint registration test accompany the independent TypeScript project. No core/stage or renderer code changed. See docs/integration-everything.md for standards, reproduction and accounting limits.
+
+### Section 5 evidence: deterministic TAA reset (2026-11-10)
+TAA keeps its Halton sample phase separate from motion frame identity. Explicit and projection resets now restart samples, matching restored views. The exact two-view regression fails without this repair; full product elimination and uniform captures isolated the difference to jitter. No core/stage code or import boundary changed. Sources, reproduction and limits: docs/taa-reset.md.

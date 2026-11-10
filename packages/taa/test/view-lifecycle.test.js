@@ -87,6 +87,33 @@ test('TAA releases the history of a view that was not drawn for a frame', () => 
   }
 });
 
+test('TAA reset restarts the raster sample sequence in every view', () => {
+  const h = rig();
+  const matrix = (id, index = 0) => {
+    const state = h.frame(id, index);
+    return [...new Float32Array(state.binding.resource.buffer.data).slice(0, 16)];
+  };
+  try {
+    const first = matrix('left');
+    matrix('left');
+    const advanced = matrix('left');
+    assert.notDeepEqual(advanced, first, 'the scene must have advanced its Halton phase');
+    matrix('right', 1);
+    matrix('right', 1);
+    h.taa.reset('left');
+    assert.deepEqual(matrix('left'), first, 'named reset starts at the first sample');
+    assert.deepEqual(matrix('right', 1), advanced, 'named reset preserves the other view phase');
+    h.taa.reset();
+    assert.deepEqual(matrix('left'), first, 'global reset restarts the left view');
+    assert.deepEqual(matrix('right', 1), first, 'global reset restarts the right view');
+    h.taa.onDeviceRestored(h.engine);
+    assert.deepEqual(matrix('left'), first, 'restoration and explicit reset use the same projection');
+    assert.deepEqual(matrix('right', 1), first, 'restored views share the initial sample');
+  } finally {
+    h.taa.dispose();
+  }
+});
+
 test('TAA previous and inverse projections use full-texture coordinates for an offset viewport', () => {
   const h = rig();
   try {

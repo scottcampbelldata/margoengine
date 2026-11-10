@@ -294,6 +294,7 @@ export class TAA implements EnginePlugin {
   private originalCamera?: Context['camera'];
   private cameraView?: Context['camera'];
   private frame = 0;
+  private sample = 0;
   private front = 0;
   private valid = false;
   private disposed = false;
@@ -399,13 +400,14 @@ export class TAA implements EnginePlugin {
       this.reset();
     };
   }
-  /** Discards history for every view, or only the named engine view when viewId is supplied. */
+  /** Discards history and restarts jitter for every view, or only the named engine view when viewId is supplied. */
   reset(viewId?: string): void {
     if (viewId !== undefined) {
       this.views.find(viewId)?.reset();
       return;
     }
     this.valid = false;
+    this.sample = 0;
     for (const view of this.views.values()) view.reset();
   }
   private forView(c: Context): TAA {
@@ -481,18 +483,18 @@ export class TAA implements EnginePlugin {
       this.originalCamera = camera;
     }
     try {
-      if (!only) {
-        const [width, height] = viewSize(c);
-        jitterProjection(this.jittered, this.originalCamera!.matrix, this.frame, width, height);
-        c.camera = this.cameraView!;
-        // jitterProjection's NDC offset in uv; the velocity passes see it in both matrices only with history.
-        this.offset[0] = (halton((this.frame % 8) + 1, 2) - 0.5) / c.width;
-        this.offset[1] = (halton((this.frame % 8) + 1, 3) - 0.5) / c.height;
-      }
       const projection = [c.camera.fov, c.camera.near, c.camera.far, ...(viewRect(c) ?? [])].join(':');
       if (projection !== this.projection) {
         this.reset();
         this.projection = projection;
+      }
+      if (!only) {
+        const [width, height] = viewSize(c);
+        jitterProjection(this.jittered, this.originalCamera!.matrix, this.sample, width, height);
+        c.camera = this.cameraView!;
+        // jitterProjection's NDC offset in uv; the velocity passes see it in both matrices only with history.
+        this.offset[0] = (halton(this.sample + 1, 2) - 0.5) / c.width;
+        this.offset[1] = (halton(this.sample + 1, 3) - 0.5) / c.height;
       }
       this.values.set(c.camera.matrix);
       this.values.set(this.valid ? this.previous : c.camera.matrix, 16);
@@ -1168,6 +1170,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       this.lastOffset.set(this.offset);
       this.valid = true;
       this.frame++;
+      this.sample = (this.sample + 1) % 8;
       if (!only) this.captureTarget!.restore(c);
     } catch (error) {
       this.reset();

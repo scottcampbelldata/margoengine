@@ -6496,3 +6496,6 @@ or package source/size change. Evidence and reproduction:
 ## J6 game integration
 
 The game test page composes 13 optional packages on native WebGPU and full WebGL2. Four RGBA probes and five scene draws survive an actual device destruction/replacement unchanged. Teardown leaves zero tracked live device allocations, meshes, plugins, physics bodies and crowd agents. The silent audio source is exercised without an acoustic-quality claim. This is one deterministic scene, not every option or every package pair. Reproduction and instrumentation limits: [everything scenes](integration-everything.md).
+
+### TAA reset phase (2026-11-10)
+TAA reset restarts its eight Halton samples and discards history for the named view or every view. Motion frame identity remains monotonic until device recreation. This proves identical initial sample projections after reset and restoration, not identical shader arithmetic across backends. See [reset evidence](taa-reset.md).
