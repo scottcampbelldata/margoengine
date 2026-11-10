@@ -88,6 +88,7 @@ class Clustered implements EnginePlugin {
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
     setLights(lights: readonly (PointLight | SpotLight)[]): this;
+    hasReceiver(receiver: ClusteredReceiver): boolean;
     add(receiver: ClusteredReceiver, { receiveShadow }?: {
         receiveShadow?: boolean;
     }): () => void;

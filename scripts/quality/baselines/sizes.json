@@ -7636,6 +7636,12 @@
       "commit": "c3f95201b",
       "reason": "Batch 180 job 2: new optional vector geography entry 0 to 25913 B gzip, ceiling 26691 B; coherent retained renderer and bounded geography preparation, topology, joins and bins; core plus stage unchanged 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "3d7dd74c9",
+      "reason": "batch183-stage-lights-new-optional-entry-retains-complete-shared-lifecycle-and-all-four-light-kinds-root-unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -9025,7 +9031,8 @@
     "@margoengine/sciviz/tetvolume": 6578,
     "@margoengine/sciviz/parcoords": 9126,
     "@margoengine/sciviz/monitor": 2714,
-    "@margoengine/sciviz/geo-vector": 26691
+    "@margoengine/sciviz/geo-vector": 26691,
+    "@margoengine/stage/lights": 1957
   },
   "total": 14526260
 }

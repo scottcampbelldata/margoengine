@@ -1137,3 +1137,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/points (batch 181 job 2): explain the internal per-cloud inventory used by sciviz/monitor, lazy GPU allocation and release; README examples deferred.
 - @margoengine/lines (batch 181 job 2): explain the internal per-line inventory used by sciviz/monitor, retained capacity and release; README examples deferred.
 - @margoengine/sciviz and margoengine/sciviz/geo-vector: Batch 180 job 2: lazy GeoJSON/TopoJSON/MVT parsing, joins, labels, arcs, projected bins and flat/globe layers, budgets/cancellation and restore. Demo examples/sciviz-geo-vector.html. No README examples written in the build phase.
+- @margoengine/stage (batch 183 job 2): cover stage/lights definitions, defaults/units, shared ownership, automatic and manual receivers, cancellation, disposal and the native/compatibility device requirement.
+- @margoengine/clustered (batch 183 job 2): document hasReceiver and its false-after-removal/disposal contract.
+- margoengine (batch 183 job 2): document the generated stage/lights alias during the README phase.

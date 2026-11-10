@@ -29,7 +29,8 @@
     "test:gpu": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node packages/stage/test/gpu/scene-check.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:features": "cd ../.. && node scripts/stage-features-gpu-check.js",
-    "test:gpu:gltf": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-gltf --wait-max=60 --max=5 --gpu=stage-gltf-shadow-pixel-comparison -- node packages/stage/test/gpu/gltf-check.mjs"
+    "test:gpu:gltf": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-gltf --wait-max=60 --max=5 --gpu=stage-gltf-shadow-pixel-comparison -- node packages/stage/test/gpu/gltf-check.mjs",
+    "test:gpu:lights": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-lights --wait-max=60 --max=4 --gpu=stage-lights-pixel-comparison -- node packages/stage/test/gpu/lights-check.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -72,6 +73,10 @@
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
+    },
+    "./lights": {
+      "types": "./dist/lights.d.ts",
+      "import": "./dist/lights.js"
     },
     "./scene": {
       "types": "./dist/scene.d.ts",

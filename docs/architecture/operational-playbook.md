@@ -6702,3 +6702,4 @@ reconfiguring the canvas and expiring the old target. The fresh render and copy 
 occur together before mapping the owned readback buffer. capture-order.test.js proves
 the queue/reconfigure/render/copy/map order; the original atmosphere invariance and
 restore assertions pass on both backends. No rendering or alpha work was weakened.
+Batch 183 job 2 evidence (section 5): optional stage/lights delegates GPU maths to Clustered, AreaLights and DirectionalLights. Point-only use imports no area table. Setup is synchronous after the optional imports finish, and failed groups restore earlier contributions. Shared plugin and receiver leases preserve other callers; Clustered.hasReceiver is an additive query over its existing membership map. Correctness evidence is exact native/compatibility frame equality for all four light kinds and their mixture, plus CPU ownership/rollback/disposal tests. Core and stage root bytes remain 24,209 B gzip.

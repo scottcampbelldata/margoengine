@@ -3927,6 +3927,10 @@
       "types": "./dist/stage/physics.d.ts",
       "import": "./dist/stage/physics.js"
     },
+    "./stage/lights": {
+      "types": "./dist/stage/lights.d.ts",
+      "import": "./dist/stage/lights.js"
+    },
     "./stage/scene": {
       "types": "./dist/stage/scene.d.ts",
       "import": "./dist/stage/scene.js"

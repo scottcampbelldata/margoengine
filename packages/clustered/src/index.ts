@@ -430,6 +430,10 @@ export class Clustered implements EnginePlugin {
     this.dirty = true;
     return this;
   }
+  /** Whether this receiver is attached, including receivers owned by another helper. False after removal or disposal. */
+  hasReceiver(receiver: ClusteredReceiver): boolean {
+    return this.receivers.has(receiver);
+  }
   /**
    * Lights `receiver` (a gltf-pro model, materials mesh or terrain; core meshes are lit without it). With
    * `receiveShadow: false` it gets the same lighting without local-light shadows: their maps neither darken it nor
