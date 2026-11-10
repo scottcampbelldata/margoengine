@@ -213,6 +213,10 @@
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
     },
+    "./textures": {
+      "types": "./dist/textures.d.ts",
+      "import": "./dist/textures.js"
+    },
     "./sparse": {
       "types": "./dist/sparse.d.ts",
       "import": "./dist/sparse.js"

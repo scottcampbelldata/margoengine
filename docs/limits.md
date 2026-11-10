@@ -1,5 +1,17 @@
 # Design envelope
 
+Batch 204 job 2: optional exporters/textures is 10015 B gzip (new from 0 B),
+ceiling 10316 B. Resize accepts at most 16384 per side and 16777216 pixels for
+input, output and horizontal intermediate (Float64 RGBA, at most 512 MiB).
+WebP/AVIF/JPEG encoding requires the requested platform canvas encoder;
+unsupported or silently substituted formats reject with a coded error naming
+the missing MIME. Chromium 157 encoded WebP but lacked AVIF encoding in both
+backend checks. PNG works without canvas for RGBA input. Native encode timeout
+is 30 seconds; native quality and low-alpha canvas rounding are platform-defined.
+AVIF byte input currently needs caller-decoded RGBA. AVIF uses the published
+draft glTF extension contract, with optional PNG/JPEG fallback; no ratification
+or portable AVIF encoder claim. Details and defaults: exporter-textures.md.
+
 Batch 256 migration: `@margoengine/netcode/migrate` exports HostMigration and its
 typed options/state. Give each peer the same schema, initial state, frame and
 host (default lowest id), and reliable full-mesh Connection links. It owns and

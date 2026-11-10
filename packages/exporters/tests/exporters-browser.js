@@ -250,6 +250,9 @@ window.runExporterTests = async () => {
     'compressTextures reads a JPEG and encodes in its worker, the transcoder reads the file, and an abort stops it',
   );
 
+  report.textures = await (await import('./textures-browser.js')).textureBrowserChecks();
+  checks.push('Texture resize, native WebP serialization, AVIF capability/error, GLB image fallbacks and DOM toBlob');
+
   if (gpu) report.validationError = (await gpu.popErrorScope())?.message ?? null;
   report.gpuErrors = gpuErrors;
   assert(

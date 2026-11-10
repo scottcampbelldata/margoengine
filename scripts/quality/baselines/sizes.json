@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12753903,
+  "total": 12764219,
   "history": [
     {
       "date": "2026-10-24",
@@ -6322,6 +6322,12 @@
       "commit": "batch-199-job-2",
       "reason": "Optional selection/xray absent -> 12322 B gzip, ceiling 12692 B. It includes the shared Selection masks and model replay rather than duplicating them or adding a second renderer. Core + stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "43e08376d",
+      "reason": "Batch 204 job 2: new optional exporters/textures entry, 0 to 10015 B gzip, ceiling 10316 B. Clean-room linear-light resize plus platform WebP/AVIF serialization and GLB fallback/role management; splitting the single processing entry would complicate callers. No core/stage change.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7477,6 +7483,7 @@
     "@margoengine/loaders/off": 2992,
     "margoengine/loaders/off": 314,
     "@margoengine/sprites/spine": 16920,
-    "@margoengine/selection/xray": 12692
+    "@margoengine/selection/xray": 12692,
+    "@margoengine/exporters/textures": 10316
   }
 }

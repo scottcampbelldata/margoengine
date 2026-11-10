@@ -1,5 +1,17 @@
 # Clean room
 
+## Batch 204 job 2: texture resize and native image encoding
+
+Research and comparisons are recorded in [exporter-textures.md](exporter-textures.md):
+Turkowski (1990), Dodgson (1992), Porter and Duff (1984), ICC sRGB (2015),
+WHATWG Canvas (2026), Khronos WebP (2021) and the Radley/McCurdy/Knyazev AVIF
+draft. Combine scale-aware separable filters, exact box footprint integration,
+linear-light associated-alpha colour filtering, native MIME detection and
+glTF extension/fallback ownership. Only public papers, standards and API
+descriptions informed this clean-room implementation. No foreign encoder or
+companion implementation was read, copied or added. The portable clean-room
+AVIF encoder remains a separate codec follow-up under Scott's decision.
+
 ## Batch 258 job 4: world panels on preview WebGL2
 
 Research compared Kelsey Gilbert (editor), WebGL 2.0 Specification (2026 editor's draft), https://registry.khronos.org/webgl/specs/latest/2.0/ , with Khronos Group, OpenGL ES Shading Language 3.00 specification (2016), https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf . Framebuffers, complete mip chains, sampler bindings, pixel unpack state and matrix/clip conventions define the new backend. No reference implementation was read.
