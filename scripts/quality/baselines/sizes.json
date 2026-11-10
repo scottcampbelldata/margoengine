@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12481031,
+  "total": 12481046,
   "history": [
     {
       "date": "2026-10-24",
@@ -6025,6 +6025,12 @@
       "commit": "batch-237",
       "reason": "New optional wfc/tileset 0 -> 1886 B min+gzip, plus 256 B headroom; D4 expansion and DOM-free XML stay together as a small configuration entry.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "snorm-storage",
+      "reason": "Native signed-byte SNORM compute publication: lazy compute/readback 31547 to 31756 B gzip (+209 B); ceiling 31741 to 31756 B (+15 B). Shared base 74710 to 74711 B. The existing lazy runtime owns masked upload and texture-view synchronization; splitting a 36-line repair adds an async fetch and exposes internal ownership. Core/stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6995,7 +7001,7 @@
     "@margoengine/weather/snow": 3300,
     "@margoengine/webgl2-compat": 107944,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 75875,
-    "@margoengine/webgl2-compat lazy compute runtime and read-back": 31741,
+    "@margoengine/webgl2-compat lazy compute runtime and read-back": 31756,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,

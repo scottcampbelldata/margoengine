@@ -241,3 +241,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated /sprites/blend alias and the missing /xr/performance alias already exported by XR on main | batch-245 job 5 |
 - @margoengine/rigging (batch 213 job 1): VRM 0.x loading, coordinate conversion, metadata retention, expression/spring mapping, migration differences and cancellation.
 - margoengine (batch 213 job 1): rigging/vrm0 optional alias.
+
+| @margoengine/webgl2-compat | Native signed-byte SNORM compute storage, exact conversion, masked mip/layer uploads and regression command. | snorm-storage |
+| margoengine | Generated xr/performance alias for the existing XR performance API. | snorm-storage landing repair |

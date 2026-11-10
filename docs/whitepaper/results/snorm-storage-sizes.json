@@ -1,0 +1,11 @@
+{
+  "parent": "2873b6acb",
+  "method": "Vite optional-package emission with parent runtime source substitution; bundleSplit(index.js, /^(runtime|readback)-/) and gzipSync",
+  "lazyBefore": 31547,
+  "lazyAfter": 31756,
+  "ceilingBefore": 31741,
+  "ceilingAfter": 31756,
+  "baseBefore": 74710,
+  "baseAfter": 74711,
+  "coreStageGzip": 24209
+}

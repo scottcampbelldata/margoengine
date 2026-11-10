@@ -92,7 +92,8 @@
     "test:gpu": "npm run build && cd ../.. && node packages/webgl2-compat/test/adapter-browser.mjs && node packages/webgl2-compat/test/compat-browser-check.mjs && node packages/webgl2-compat/test/features-browser.mjs && node packages/webgl2-compat/test/destroy-frame-browser.mjs && node packages/webgl2-compat/test/compute-browser.mjs && node packages/webgl2-compat/test/routes-browser.mjs && node packages/webgl2-compat/test/xr-browser.mjs && node packages/voxel-pathtracer/tests/browser-check.mjs --compat --report=compat traversal analytic textures shapes transparent determinism capture viewport materialtables && node packages/vfx/test/browser-check.mjs --compat && node packages/scatter/test/lod.browser.mjs --compat && node packages/materials/test/browser-check.mjs --compat && node packages/gltf-pro/scripts/test-shader-review.js --compat && node packages/lod/test/browser-check.mjs --compat && node scripts/modern-postfx-tests.js --compat && node packages/shadows/test/lit-faces-browser.mjs --compat && node packages/voxel/tests/render-browser-check.mjs --compat && node packages/webgl2-compat/test/preview-browser-check.mjs && cd packages/environment && node scripts/test-browser.js --compat && cd ../lines && node scripts/test-browser.js --compat && cd ../points && node scripts/test-browser.js --compat && cd ../text && node scripts/test-browser.js --compat",
     "capabilities": "npm run build && node scripts/capabilities.mjs",
     "prepack": "npm run build",
-    "test:gpu:tiers": "npm run build && cd ../.. && node packages/webgl2-compat/test/tiers-browser.mjs && node packages/webgl2-compat/test/tier-packages-browser.mjs"
+    "test:gpu:tiers": "npm run build && cd ../.. && node packages/webgl2-compat/test/tiers-browser.mjs && node packages/webgl2-compat/test/tier-packages-browser.mjs",
+    "test:gpu:snorm": "cd ../.. && node packages/webgl2-compat/test/snorm-storage-browser.mjs"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"

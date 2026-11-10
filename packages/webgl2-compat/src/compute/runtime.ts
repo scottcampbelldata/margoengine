@@ -13,7 +13,7 @@
 import { fault } from '../../../shared/errors.js';
 import type { BoundGroup, CompatComputePipeline, ComputeBuilt, ComputeRuntime } from '../device/compute.js';
 import type { CompatDevice } from '../device/device.js';
-import { CompatRenderPipeline, type Replayer } from '../device/render.js';
+import { CompatRenderPipeline, type Replayer, writeTexture } from '../device/render.js';
 import {
   type Bound,
   CompatBindGroup,
@@ -550,10 +550,44 @@ class Runtime implements ComputeRuntime {
     };
   }
 
-  /** Draws the texels a CPU kernel stored into a storage texture view (only those: a mask discards the rest). */
+  /** Publishes only the texels a CPU kernel stored into a storage texture view. */
   private upload(r: Replayer, view: CompatTextureView, texture: CPUTexture & { cache: Map<number, CPULevel> }): void {
     const level = texture.cache.get(0);
     if (!level?.written) return;
+    // SNORM textures are sampleable and byte-uploadable, but not framebuffer attachments in WebGL2.
+    // Publish only written spans: re-encoding an untouched -128 byte would change it to -127.
+    if (view.texture.info.name.endsWith('snorm')) {
+      const channels = view.texture.info.channels,
+        { w, h } = level;
+      for (let z = 0; z < level.d; z++)
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; ) {
+            if (!level.written[(z * h + y) * w + x]) {
+              x++;
+              continue;
+            }
+            const start = x;
+            while (x < w && level.written[(z * h + y) * w + x]) x++;
+            const bytes = new Uint8Array((x - start) * channels);
+            for (let i = start; i < x; i++)
+              for (let c = 0; c < channels; c++)
+                bytes[(i - start) * channels + c] =
+                  Math.round(Math.max(-1, Math.min(1, level.data[((z * h + y) * w + i) * 4 + c])) * 127) & 255;
+            writeTexture(
+              this.device,
+              {
+                texture: view.texture,
+                mipLevel: view.baseMipLevel,
+                origin: [start, y, view.texture.dimension === '3d' ? z : view.baseArrayLayer + z],
+              },
+              bytes,
+              {},
+              [x - start, 1, 1],
+            );
+          }
+        }
+      return;
+    }
     const gl = this.gl,
       state = this.device.state,
       t = view.texture,
