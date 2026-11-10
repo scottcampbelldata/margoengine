@@ -15404,6 +15404,12 @@ and a standalone pass over all 1,312 entry `.d.ts` files found every source file
 - Fixed: `applyGLTFLightExtensions` (packages/gltf-pro/src/lights.ts, the aimed-profile cache) keyed fixtures by profile format + profile name + aim. Two EXT_lights_ies profiles with the default name "" and the same LM-63 first line, on nodes aimed alike, shared the first profile: input `LightProfile.ies` (peak 8500 cd) and a second profile peaking at 5250 cd; the second fixture drew at 8500 cd with the first one's beam. Cause: the name is optional and not unique. Fix: the loop is now `placeIESLights`, keyed by the parsed profile object (one per `lights` index) and the aim. Regression: packages/gltf-pro/tests/lights.test.js, "two unnamed profiles of one format aimed alike keep their own candela" (fails with the old key).
 - Open: EXT_lights_image_based says each saved image "must be flipped about its vertical axis". The reader swaps rows (a flip about the horizontal axis), which the README says is how the one real file reads, but the check that picked it (the mean against the first SH coefficient) does not depend on orientation. Repro to settle it: project the decoded cube onto the l = 1 SH basis and compare signs with the file's coefficients 1 to 3, with rows swapped and with columns swapped.
 
+## Batch 132 audit: animation (open, Mac sweep)
+
+Found by lane I's Mac sweep on 2026-11-10 (M6 Mac mini, Metal; forced compatibility with `MARGO_COMPAT=1`, which runs the WebGPU code on the WebGL2 layer). Both checks pass natively. Neither script asks for a compat pass in package.json, so no gate ran them this way before.
+- `MARGO_COMPAT=1 npm run test:gpu:morph` (scripts/animation-morph-gpu-tests.js): every STEP and LINEAR weight reads back wrong, worst error 1 (CUBICSPLINE 0.79); first failure STEP loop, copy 1, at 0.4: expected 1, read 0. `planCompute` puts `morphWeightShader` (packages/animation/src/morph-gpu.ts) on the WebGL2 layer's `scatter` tier (one store into the `weights` buffer at binding 6). Not yet isolated: the suspects are the scatter tier's `num_workgroups` index, `arrayLength(&items)` on a bound sub-range, or the readback of a page buffer bound at an offset.
+- `MARGO_COMPAT=1 npm run test:gpu:uploads` (packages/animation/tests/upload-copies-browser.mjs): "a held pose stays certified as uploaded" fails; the page reports `{"skinned":4,"palettes":2,"copies":0,"mismatched":0,"held":false}`. Cause not yet found.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
