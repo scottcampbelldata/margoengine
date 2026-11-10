@@ -1369,6 +1369,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/xr (lane G known-bugs sweep): document manager disposal in secondary scenes and same-name plugin isolation.
 - @margoengine/gltf-pro (lane G known-bugs sweep): document parsed opticalDepth, legacy attenuation fallback, late world-path exponentiation and remaining native-volume limits.
+- @margoengine/dof (lane G known-bugs sweep): document the measured half-float minimum, coded LDR setup/restore refusal and lower-tier option-coverage limits.
+- @margoengine/webgl2-compat (lane G known-bugs sweep): list DOF's half-float minimum and the registered standalone DOF tier comparison.
 - @margoengine/decoders (lane G known-bugs sweep): document /draco-native generic attributes through 255 components, bounded scratch, and the separate historical/prebuilt parity gaps.
 - @margoengine/react (lane G known-bugs sweep): document Grid inside Scene with RenderView, prop replacement and cleanup.
 
@@ -1481,3 +1483,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/culling: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
 - @margoengine/exporters: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+
+- @margoengine/sciviz: host-owned prepareBackend for notebook/share, native-only bypass, aborts and the bundled AFM/offline defaults.

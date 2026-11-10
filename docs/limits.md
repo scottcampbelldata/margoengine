@@ -3385,6 +3385,19 @@ device 105232, xr 105035, tiers 104920 B; ceilings unchanged. Upstream main's
 unit-light repair changes core/stage to 23950 B, below 25000 B; this lane does
 not edit core/stage. GPU and gate results are retained in the stencil receipt.
 
+### DOF lower-tier requirement
+
+Standalone DOF requires native WebGPU or at least the half-float compatibility
+tier, including after device restoration. The default 64x64 fixture is exact
+between full/half-float; LDR loses 5.322265625 percent of pixels over 2, mean
+2.09423828125, max 6, beyond the unchanged parity rule. Setup refuses LDR before
+allocation; restoration releases old resources before refusal. This is not
+physical lower-tier certification or every-lens/temporal image coverage.
+See [reproduction and research](dof-tier-requirement.md).
+DOF root min+gzip is 9290 -> 9529 B, ceiling 9297 -> 9815; the mandatory
+setup/restore capability diagnostic belongs with every DOF use, so a separate
+entry would split required validation. Core plus stage remains 24209 B.
+
 ### Batch 273 polygon offset clamp checkpoint
 
 The optional compatibility device now loads EXT_polygon_offset_clamp and replays
@@ -6537,3 +6550,5 @@ The eight optional packages in [the scientific dashboard](integration-sciviz.md)
 
 ## J6 public CAD-format integration
 The ten optional packages in [the public format viewer](integration-engineering.md) compose STL/USDZ round trips, authored FBX, mesh editing, selection, orthographic navigation, LOD, frustum culling and GLB export. Four exact probes and five draws survive replacement on both backends; teardown leaves zero tracked live resources and scene ownership. Authored small meshes stand in for production CAD; coverage is limited to those public mesh formats and calls. No large-assembly quality or speed claim.
+
+Sciviz notebook/share library entries use the installed backend when prepareBackend is omitted. The shipped Python AFM and standalone runtime inject fallback setup; webgpu bypasses it. Cancellation and offline controls do not certify every notebook host or GPU. See sciviz-host-backends.md.

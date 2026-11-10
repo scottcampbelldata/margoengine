@@ -3,6 +3,15 @@
 - Batch 179 provenance/trace: packages/sciviz/tests/provenance.test.js proves runnable intermediate mutation/removal history, stable saved resource IDs and noncolliding future IDs, explicit recording limits, metadata hashes/versions, PNG image-chunk identity and CRC/cancellation bounds, safe namespaced SVG JSON, and full Unicode PDF information. packages/sciviz/tests/provenance-browser.mjs exercises PNG/SVG provenance and trace generation on all 24 existing scientific demos, MRI trace execution on both backends, and PDF provenance for MRI, NOAA wind and the surface scene. The record follows PROV-DM concepts but does not claim PROV-O graph conformance or cryptographic authorship. No speed result is claimed.
 
 
+### Standalone DOF precision requirement
+
+DOF refuses the LDR compatibility tier at setup and restore before allocating
+replacement resources. The existing default scene is byte-identical between
+full and half-float, while LDR exceeds the original image rule. Evidence:
+dof/tests/lower-tiers.test.js and the package's registered test:gpu:tiers,
+with unchanged parity assertions. No speed or complete lower-tier option
+certification claim. [Scope and sources](../dof-tier-requirement.md).
+
 ### Native volume range repair
 
 Parsed native glTF volume tint preserves optical depth until world-path scaling,
@@ -4619,3 +4628,6 @@ TAA deterministic reset (2026-11-10): exact named/global reset and replacement-d
 J6 scientific dashboard (2026-11-10): the eight optional packages in docs/integration-sciviz.md pass native/compatibility device-loss and disposal assertions with four exact probes, point/line counters and exact sum 20. Evidence: results/integration-j6-sciviz.json. Reproduce: npm run build:packages, then npm run test:integration:browser -- --scene=sciviz. One authored static scene on RTX A6000; no speed claim.
 
 J6 public CAD-format viewer (2026-11-10): the public calls in docs/integration-engineering.md pass format/value assertions, exact native/compatibility restoration probes and zero tracked disposal. Evidence: results/integration-j6-cad.json. Reproduce: npm run build:packages, then npm run test:integration:browser -- --scene=engineering. Authored small mesh stand-ins on RTX A6000; no private CAD/BIM, large-file or speed claim.
+
+### Notebook/share backend ownership
+Sciviz notebook/share source imports and its manifest have no compatibility-layer dependency. Host adapters supply deferred, abortable setup. Evidence: unchanged webgl2-compat/test/isolation.test.js and sciviz/tests/backend-isolation.test.js; native/compat share and notebook browser controls. No speed or universal host claim. Reproduction and standards: ../sciviz-host-backends.md.

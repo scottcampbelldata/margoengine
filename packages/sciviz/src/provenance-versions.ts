@@ -48,6 +48,5 @@ export const packageVersions: Readonly<Record<string, string>> = {
   "@margoengine/save": "1.0.0",
   "@margoengine/shader": "1.0.0",
   "@margoengine/exporters": "1.0.0",
-  "@margoengine/webgl2-compat": "1.0.0",
   "@margoengine/worker": "1.0.0"
 };

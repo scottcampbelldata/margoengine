@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14659936,
+  "total": 14660454,
   "history": [
     {
       "date": "2026-10-24",
@@ -8045,6 +8045,12 @@
       "commit": "fcc2238f5",
       "reason": "R5 terrain imagery fixes and R5 done",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "ddf282ba2",
+      "reason": "Lane G DOF tier requirement: measured root 9290 -> 9529 B min+gzip, +239 B; ceiling9297 ->9815. Mandatory half-float setup/restore validation prevents lossy LDR HDR capture. Splitting it would separate required validation from every DOF use and add an unnecessary feature entry. Core+stage remains24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8313,7 +8319,7 @@
     "@margoengine/decoders/webp-lossless": 3366,
     "@margoengine/decoders/xz": 4182,
     "@margoengine/decoders/zstd": 5305,
-    "@margoengine/dof": 9297,
+    "@margoengine/dof": 9815,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 3529,
     "@margoengine/ecs": 4815,

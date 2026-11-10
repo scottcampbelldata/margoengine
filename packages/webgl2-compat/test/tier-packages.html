@@ -11,6 +11,7 @@ import { uninstall } from '/packages/webgl2-compat/dist/index.js';
 import { CompatDevice } from '/packages/webgl2-compat/dist/device.js';
 import { PACKAGES as ADAPTER_PACKAGES } from './adapter-browser.js';
 import { Bloom, SSAO, FXAA, PostStack } from '/packages/post/dist/index.js';
+import { DOF } from '/packages/dof/dist/index.js';
 import { waitForPipelines } from '/scripts/support/gpu-ready.js';
 
 const standalone = Effect => engine => {
@@ -21,6 +22,7 @@ const PACKAGES = {
   ...ADAPTER_PACKAGES,
   'post bloom alone': standalone(Bloom),
   'post ssao alone': standalone(SSAO),
+  'dof HDR': standalone(DOF),
   'post LDR FXAA': engine => {
     ADAPTER_PACKAGES['core alone'](engine);
     PostStack.attach(engine, [new FXAA()]);

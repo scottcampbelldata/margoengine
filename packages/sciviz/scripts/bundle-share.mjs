@@ -67,7 +67,7 @@ export async function bundleShareRuntime(options = {}) {
       throw new Error('Standalone runtime contains external assets: ' + assets.map((item) => item.fileName).join(', '));
     return output.find((item) => item.type === 'chunk' && item.isEntry).code;
   }
-  return bundle(resolve(root, 'dist/share.js'), 'iife');
+  return bundle(resolve(root, 'scripts/share-runtime.mjs'), 'iife');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const output = process.argv[2];

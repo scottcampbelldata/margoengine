@@ -17,6 +17,8 @@ export interface NotebookRenderOptions {
   readonly signal?: AbortSignal;
   /** Explicit application codecs, pipeline registry or engine. Nothing is fetched from an executable registry. */
   readonly load?: Omit<FigureLoadOptions, 'buffers' | 'signal'>;
+  /** Host-owned backend setup. Called for auto/webgl2 only; omit to use the installed backend. */
+  readonly prepareBackend?: (options: { force: boolean; signal: AbortSignal }) => Promise<unknown>;
 }
 /** Convert comm byte views to a named lookup without copying their storage or losing offsets. */
 export function notebookBuffers(value: unknown): ReadonlyMap<string, ArrayBufferView> {
@@ -75,7 +77,7 @@ function applySelection(figure: Figure, input: unknown): void {
   figure.setSelection({ region: value.region, points }, { emit: false });
 }
 /** Render a portable spec as an anywidget-compatible view, with binary data and two-way camera/selection state. */
-export async function render({ model, el, signal, load }: NotebookRenderOptions): Promise<() => void> {
+export async function render({ model, el, signal, load, prepareBackend }: NotebookRenderOptions): Promise<() => void> {
   signal?.throwIfAborted();
   let figure: Figure | undefined,
     active: AbortController | undefined,
@@ -132,10 +134,7 @@ export async function render({ model, el, signal, load }: NotebookRenderOptions)
       const backend = model.get('backend') ?? 'auto';
       if (!['auto', 'webgpu', 'webgl2'].includes(String(backend)))
         throw typeError('Notebook backend must be auto, webgpu or webgl2', 'sciviz');
-      if (backend !== 'webgpu') {
-        const { installCompat } = await import('@margoengine/webgl2-compat/device');
-        await installCompat({ force: backend === 'webgl2' });
-      }
+      if (backend !== 'webgpu') await prepareBackend?.({ force: backend === 'webgl2', signal: controller.signal });
       controller.signal.throwIfAborted();
       const next = await Figure.fromJSON(spec, canvas, { ...load, buffers, signal: controller.signal });
       if (disposed || id !== generation) {

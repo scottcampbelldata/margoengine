@@ -23,11 +23,15 @@ export interface NotebookRenderOptions {
     readonly el: HTMLElement;
     readonly signal?: AbortSignal;
     readonly load?: Omit<FigureLoadOptions, 'buffers' | 'signal'>;
+    readonly prepareBackend?: (options: {
+        force: boolean;
+        signal: AbortSignal;
+    }) => Promise<unknown>;
 }
 
 export function notebookBuffers(value: unknown): ReadonlyMap<string, ArrayBufferView>;
 
-export function render({ model, el, signal, load }: NotebookRenderOptions): Promise<() => void>;
+export function render({ model, el, signal, load, prepareBackend }: NotebookRenderOptions): Promise<() => void>;
 
 // Not exported from this entry, but used by the exports above:
 

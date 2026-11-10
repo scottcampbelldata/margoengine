@@ -2620,6 +2620,12 @@ Each is described with its cause and guard in
 - **Cause:** no reference renderer or sample library in the repository.
 - **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.
 
+Lane G's current-main parser/graph control passes all 26 materialx.test.js
+cases. This does not supply a paired MaterialXView image: no installed viewer
+was found in the external comparison tools. The rendering-validation gap and
+required source/licence/reference artifacts remain open; no renderer parity
+is inferred from graph compilation.
+
 ## Mixer batch 111 acceptance
 
 Automatic sidechain has no known open defect in the tested generated-signal paths. Real-speech,
@@ -3552,6 +3558,15 @@ bounded diagnostic, preserving every pixel/sample and accumulation order.
 This remains an engine bug pending attribution, and is not a speed exemption.
 No new watchdog repro was run by the job 4 continuation.
 
+Lane G current-main repro (2026-11-10): MARGO_GPU=amd and GPU_POWER=low-power,
+browser-check.mjs denoise-materials reaches the unchanged 480x300 reference at
+16384 samples on vendor amd / rdna-2, then loses its device. Dawn reports
+DXGI_ERROR_DEVICE_REMOVED (0x887A0005); four shader modules compiled with zero
+errors. This confirms the current failure, not a driver/kernel attribution.
+The failed run was not retried or treated as a timing exemption. Local log:
+test-results/kb-g/gate-62620-0.log. Per-ray termination/access invariants and
+packet submission still require an isolating repair.
+
 ### Fixed: guiding README blocked module initialization (Batch 99)
 
 Repro: run the caustic-guiding README example with the shader disk cache disabled.
@@ -3823,8 +3838,18 @@ mean 8.579345703125 / maximum 108 respectively. Half-float passes (SSAO maximum 
 mean 0.008544921875); LDR-only FXAA is pixel-identical. Their resource-owning
 initializers now refuse LDR before allocation and after releasing old resources
 on restore; tests include SSAO's GTAO subclass in its real PostStack.
+Lane G's standalone DOF control exposes the same missing requirement: LDR has
+5.322265625 percent over 2, mean 2.09423828125 and max 6; full and half-float
+are byte-identical. DOF now checks the existing half-float requirement before
+allocation and after releasing resources on restore. Six CPU cases fail on
+the parent and cover default/temporal setup and replacement lifetimes; the
+package's new tier GPU entry retains the unchanged parity rule and expects
+the coded LDR refusal. See [DOF requirement](dof-tier-requirement.md).
 Other standalone HDR effects and other
 package entries still need their measured requirement checks.
+The DOF landing also repairs sciviz notebook/share dependency ownership: host
+adapters install fallback, and both unchanged isolation assertions pass. See
+[host backends](sciviz-host-backends.md).
 The brief's separate full-tier compatibility failures remain in scope;
 the voxel-pathtracer D3D11 hang has a separate owner and was not investigated here.
 

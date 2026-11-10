@@ -24,7 +24,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, requireCompatTier } from '../../shared/compat.js';
 import type { DOFLens } from './lens.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -71,7 +71,7 @@ export interface DOFOptions {
 /**
  * Depth of field: thin-lens circle of confusion from reversed-Z depth, near and far bokeh gathered separately; reads
  * `dof.options` each frame. `DOF.attach(engine, options)` alone, or inside a `PostStack` to combine it with SSAO,
- * Bloom, Tonemap or FXAA. WebGPU only.
+ * Bloom, Tonemap or FXAA. Requires native WebGPU or at least the half-float WebGL2 compatibility tier.
  * @throws RangeError when an option is out of range or the lens scale overflows float32; TypeError when `enabled` is
  * not a boolean.
  * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
@@ -200,6 +200,7 @@ export class DOF implements EnginePlugin {
         this.disposed ? 'disposed' : 'unsupported',
         'DOF requires WebGPU and a live effect; attach a new DOF to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
+    requireCompatTier(engine.gpu, 'DOF HDR processing', 'half-float');
     if (
       !this.host &&
       (engine.hasPlugin('ssao') ||

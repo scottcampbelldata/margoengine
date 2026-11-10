@@ -55,6 +55,7 @@
     "test": "node --test tests/*.test.js",
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js",
-    "test:gpu": "cd ../.. && node packages/dof/tests/gpu/lens-check.mjs && node packages/dof/tests/gpu/compat-check.mjs"
+    "test:gpu": "cd ../.. && node packages/dof/tests/gpu/lens-check.mjs && node packages/dof/tests/gpu/compat-check.mjs",
+    "test:gpu:tiers": "cd ../.. && node packages/webgl2-compat/test/tier-packages-browser.mjs --only=dof%20HDR"
   }
 }

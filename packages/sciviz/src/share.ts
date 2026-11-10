@@ -300,16 +300,21 @@ export async function exportStandalone(figure: Figure | FigureSpec, options: Sta
     { type: 'text/html;charset=utf-8' },
   );
 }
+/** Load options for an offline viewer with host-owned backend setup. */
+export interface StandaloneLoadOptions extends FigureLoadOptions {
+  /** Called for auto/webgl2 only; omit to use the installed backend. */
+  readonly prepareBackend?: (options: { force: boolean; signal?: AbortSignal }) => Promise<unknown>;
+}
 /** @internal Entrypoint for the bundled offline viewer. Dispatches margo-ready with the restored figure. */
-export async function startStandalone(options: FigureLoadOptions = {}): Promise<Figure> {
+export async function startStandalone(options: StandaloneLoadOptions = {}): Promise<Figure> {
   const { spec, view, parentOrigin, channel, backend } = JSON.parse(
     document.getElementById('margo-state')!.textContent!,
   );
-  if (backend !== 'webgpu') {
-    const { installCompat } = await import('@margoengine/webgl2-compat/device');
-    await installCompat({ force: backend === 'webgl2' });
-  }
-  const figure = await Figure.fromJSON(spec, document.querySelector('canvas')!, options);
+  const { prepareBackend, ...load } = options;
+  load.signal?.throwIfAborted();
+  if (backend !== 'webgpu') await prepareBackend?.({ force: backend === 'webgl2', signal: load.signal });
+  load.signal?.throwIfAborted();
+  const figure = await Figure.fromJSON(spec, document.querySelector('canvas')!, load);
   try {
     if (location.hash.startsWith('#margo=')) {
       const linked = await readShareURL(location.href);

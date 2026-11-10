@@ -7119,6 +7119,18 @@ The optional sciviz/molecule entry owns the sphere/capped-cylinder pipelines, co
 C2-007 Water depth-copy evidence (section 5): inside a 4x scene capture Water copies the capture depth into its surface depth in the surface depth's own format, so a capture in depth32float-stencil8 (TAA, mirroring the canvas) and a depth32float source (DepthTexture) no longer fail WebGPU attachment-state validation and drop the frame. CPU regression in packages/water/test/water.test.js; the TAA + Water pair and the full c2-007 member set read the analytic depth 0.018445 on native WebGPU at 1x and 4x. No core, stage or public API change.
 
 
+## Standalone DOF tier requirement (section 5 evidence, 2026-11-10)
+
+The optional DOF owner now refuses LDR before engine assignment/allocation and
+after releasing resources during restoration. The logical rgba16float scene
+capture loses range/precision on normalized LDR storage: the retained default
+fixture exceeds the unchanged image rule, while half-float is byte-identical
+to full. Six lifecycle/allocation regressions and a package-registered tier
+GPU scene protect the requirement, without changing backend format policy.
+Full lens/Autofocus/temporal checks remain independent; other standalone HDR
+requirements and physical lower-tier breadth remain open. Research and exact
+numbers: [dof-tier-requirement.md](../dof-tier-requirement.md).
+
 ## Native volume range repair (section 5 evidence, 2026-11-10)
 
 The optional gltf-pro native tint retains natural optical depth until its
@@ -7173,3 +7185,6 @@ The integration ROOT footprint now includes sciviz, points, lines, labels, compu
 
 ### Sections 4.1 and 5: J6 public CAD-format viewer
 The ROOT integration footprint now includes public format loading, polygon mesh editing, orthographic cameras/navigation profiles, selection, LOD, frustum culling and exports. STL preserves 20 triangles, USDZ creates two primitives, FBX creates one, one of two culled instances draws, and GLB header/mesh values are checked. Both backends keep four exact probes and five draws through replacement and dispose to zero tracked ownership. Sources, reproduction and boundaries: docs/integration-engineering.md.
+
+### Section 5 evidence: notebook/share backend isolation (2026-11-10)
+Sciviz notebook/share no longer import or depend on the compatibility device. Application adapters inject abortable setup, retaining auto/forced fallback in Python and offline bundles. The two unchanged isolation regressions and host setup/abort/error controls pass within the 1377 changed/dependent CPU tests. Own-package GPU and offline evidence accompany the landing. No core, stage, shader or rendering backend change. Sources, reproduction and device limits: docs/sciviz-host-backends.md.

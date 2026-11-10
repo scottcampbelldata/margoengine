@@ -47,12 +47,12 @@ try {
       assert.equal(result.tier, tier);
       assert.deepEqual(result.errors, [], `${name} ${tier}: errors`);
       assert.equal(result.gl, 0);
-      if (['post bloom and tonemap', 'post bloom alone', 'post ssao alone'].includes(name) && tier === 'ldr') {
+      if (['post bloom and tonemap', 'post bloom alone', 'post ssao alone', 'dof HDR'].includes(name) && tier === 'ldr') {
         assert.equal(result.refusal?.name, 'MargoError');
         assert.equal(result.refusal?.code, 'unsupported');
         assert.match(
           result.refusal.message,
-          /(?:PostStack HDR\/display effects|Bloom HDR processing|SSAO geometry\/HDR processing).*half-float.*ldr.*https:\/\//,
+          /(?:PostStack HDR\/display effects|Bloom HDR processing|SSAO geometry\/HDR processing|DOF HDR processing).*half-float.*ldr.*https:\/\//,
         );
         report.rows.push({ name, tier, refusal: result.refusal });
         save();

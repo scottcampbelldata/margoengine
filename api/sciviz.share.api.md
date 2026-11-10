@@ -56,6 +56,13 @@ export interface SharedFigure {
     readonly view: ShareView;
 }
 
+export interface StandaloneLoadOptions extends FigureLoadOptions {
+    readonly prepareBackend?: (options: {
+        force: boolean;
+        signal?: AbortSignal;
+    }) => Promise<unknown>;
+}
+
 export interface StandaloneOptions extends ShareOptions {
     readonly runtime: string;
     readonly title?: string;
@@ -83,7 +90,7 @@ export function serveEmbed(figure: Figure, options: EmbedOptions): {
     [Symbol.dispose](): void;
 };
 
-export function startStandalone(options?: FigureLoadOptions): Promise<Figure>;
+export function startStandalone(options?: StandaloneLoadOptions): Promise<Figure>;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -376,7 +376,6 @@
     "@margoengine/terrain": "^1.0.0",
     "@margoengine/tiles": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
-    "@margoengine/webgl2-compat": "^1.0.0",
     "@margoengine/worker": "^1.0.0"
   },
   "scripts": {
