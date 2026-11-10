@@ -76,7 +76,7 @@ corrupt node links throw instead of looping.
 - **Float64 queries.** Ray, closest point, sphere, oriented box, triangle/triangle and frustum tests run in float64. A ray Moller-Trumbore rejects is tried again by the watertight test of Woop, Benthin and Wald (JCGT 2013), so a ray through the shared edge of two triangles hits at least one of them (before, about 7% of rays aimed at a random shared edge missed both). Box tests use a tiny relative slack so pruning is always conservative; the tests check that every query returns what a brute-force scan over all triangles returns.
 - **Raycaster.** `setFromCamera` inverts `camera.matrix` and unprojects at the backend's clip depths (WebGPU reversed-Z near 1 and far 0, WebGL -1 and 1); `setFromEngine` takes canvas CSS pixels and refreshes the camera first. `intersectEngine` runs the transform kernel (so edits since the last render count), skips meshes that are hidden or under a hidden parent, applies `layers` and `filter`, rejects by the world bounding sphere, and casts the ray in each mesh's local space against that geometry's BVH from a `WeakMap` cache. World normals use the inverse-transpose. With `side: 'material'` (default) single-sided materials only hit their front side, defined like the renderer does by local winding, so mirrored meshes behave as drawn.
 - **Deformed picking.** `await raycaster.intersectModel(model)` consumes the structural `DeformedPickingSource` interface implemented by gltf-pro's `PBRModel`. It snapshots the current GPU skin/morph output and local-to-world matrices, builds a separate BVH per primitive and refits it for later poses with unchanged topology. Deformations outside bind-pose bounds remain pickable. Hits have the same side rules, world distances, layer masks and filters as ordinary raycasts, without assigning a core `Geometry` or adding runtime gltf-pro imports. Each hit carries `uv` (TEXCOORD_0 interpolated from the posed snapshot) and the snapshot's `primitiveIndex` and `nodeIndex`, which `PBRModel` captures before its readback, so they stay right when snapshots are filtered, primitives share a node or the model changes while the readback is pending. A custom `DeformedPickingSource` whose snapshots leave those two out gets hits without them; posed hits carry no `model` or `primitive` object. Ray settings are captured before readback; removed, hidden or disposed meshes are skipped when it finishes. GPU readback and CPU refitting have an explicit cost, so use this query for pointer events. Ordinary mesh queries stay synchronous.
-- **Worker and SSR safety.** `buildAsync` uses `new Worker(new URL('./bvh.worker.js', import.meta.url), {type: 'module'})`, which Vite, webpack 5 and Next.js emit as an asset (the browser test checks a production Vite build). Results come back in transfer lists. Without `Worker` (Node, SSR) it builds synchronously. Importing the package touches no browser globals and the package has no runtime dependency on core (types only).
+- **Worker and SSR safety.** `buildAsync` uses `new Worker(new URL('./bvh.worker.js', import.meta.url), {type: 'module'})`, which Vite, webpack 5 and Next.js emit as an asset (the browser test checks a production Vite build). Results come back in transfer lists. Without `Worker` (Node, SSR) it builds synchronously. Importing does not create workers or attach engine state. Engine-bound raycasting resolves the verified core runtime for its compatibility checks; use the separate `/tree` entry for engine-free code.
 
 ## Options
 
@@ -100,6 +100,108 @@ corrupt node links throw instead of looping.
 Engine-free code (editors, tools, workers) can import `@margoengine/bvh/tree`: `MeshBVH`, `buildBVH`, the shapecast constants and their types, with no engine core in its module graph or types. The core peer dependency is optional.
 
 Other exports: `buildBVH` (raw `BVHData`), `shapecast` callbacks with `NOT_INTERSECTED`/`INTERSECTED`/`CONTAINED`, `getGeometryBVH`/`setGeometryBVH`/`hasGeometryBVH`, `terminateBVHWorker`, `frustumPlanes` (matrix products and inverses: `@margoengine/math/mat4`). Layer masks: `setRenderLayers` from `@margoengine/cameras/layers`, which raycasts read.
+
+
+## Parallel CPU builds: optional /parallel
+
+Import `buildParallel` from `@margoengine/bvh/parallel` (or
+`margoengine/bvh/parallel`) to distribute one complete BVH build across module
+workers. It returns a Promise<MeshBVH>, with the serial builder's topology and
+original face ids. Ordinary builds keep the index-preserving default: application
+geometry/index buffers are not reordered or transferred by this operation.
+The optional entry creates workers only when called, not on import.
+
+It accepts the same GeometryLike or TriangleSource as MeshBVH.build. Keep source
+positions and topology unchanged until completion; the resulting tree retains its
+source for later queries/refit. Use separate builds for independent mutable sources.
+
+| Option | Default | Accepted values |
+|---|---|---|
+| workers | min(8, hardwareConcurrency - 1), at least 1; missing hardwareConcurrency uses 2 | Integer 1..64; leaf workers, plus one coordinator. |
+| timeoutMs | 120000 | Finite milliseconds >0, at most 2147483647; browser worker startup and execution share the deadline. |
+| signal | unset | AbortSignal; abort rejects with its reason. |
+| maxLeafTriangles | 8 | Integer 1..65536; a target, not a guarantee at the maximum depth. |
+| maxDepth | 40 | Integer 1..64. |
+| bins | 32 | Integer 4..256. |
+| strategy | sah | sah or center; the same choice must be used for serial-byte comparison. |
+
+The coordinator plans the upper tree, assigns independent subtrees and merges
+their packed nodes/index/face ids. It creates at most workers leaf workers, and
+fewer when there are fewer independent subtrees. Normal input arrays are cloned
+to the coordinator. When SharedArrayBuffer is available there, positions are
+copied into shared storage used by the leaf workers; otherwise each leaf worker
+receives a position clone on its first task. Each task also owns its index slice
+and build scratch. Shared memory therefore avoids repeated position clones, not
+all allocations. Source buffers remain attached to the caller in both cases.
+
+Browsers need cross-origin isolation for SharedArrayBuffer; module workers still
+work without it via cloning. Serve both nested assets, parallel.worker.js and
+parallel-leaf.worker.js, from the built package. The coordinator uses
+new URL(..., import.meta.url) for the nested worker too. Production bundlers must
+emit both assets and serve them with a JavaScript MIME type; a page-only dev run
+does not prove production asset wiring. CSP must allow the emitted module workers.
+
+Success, worker failure, abort and deadline all terminate the owned worker tree.
+A deadline rejects with a coded timeout error; worker/message errors use failed
+with a help link. No partial tree is published. With no global Worker (ordinary
+Node/SSR), the function yields one microtask then builds locally. An already-aborted
+signal still rejects, but that synchronous fallback cannot be interrupted mid-build
+and does not enforce the browser worker deadline. It does not start Node worker_threads.
+
+This standalone browser example checks bytes rather than claiming a speedup:
+
+```ts
+import {MeshBVH} from '@margoengine/bvh/tree';
+import {buildParallel} from '@margoengine/bvh/parallel';
+const status = document.body.appendChild(document.createElement('p'));
+const positions = new Float32Array(32 * 9);
+for (let face = 0; face < 32; face++) {
+  const x = face % 8, z = Math.floor(face / 8);
+  positions.set([x, 0, z, x, 0, z + 0.8, x + 0.8, 0, z], face * 9);
+}
+const source = {positions};
+const controller = new AbortController();
+const tree = await buildParallel(source, {workers: 2, maxLeafTriangles: 2, timeoutMs: 120000, signal: controller.signal});
+const serial = MeshBVH.build(source, {maxLeafTriangles: 2});
+const actual = new Uint8Array(tree.toArrayBuffer());
+const expected = new Uint8Array(serial.toArrayBuffer());
+if (actual.length !== expected.length || !actual.every((byte, index) => byte === expected[index])) {
+  throw new Error('Parallel and serial trees differ');
+}
+if (positions.byteLength !== 32 * 9 * 4) throw new Error('Input was transferred');
+status.textContent = 'Parallel tree matches the serial tree byte for byte';
+// Workers have already ended; keep positions alive while using tree.
+status.remove();
+```
+
+For cancellation, observe the returned promise before aborting. This also runs in
+Node and demonstrates rejection without allocating a worker:
+
+```ts
+import {buildParallel} from '@margoengine/bvh/parallel';
+const reason = new Error('Application cancelled the build');
+const source = {positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0])};
+const observed = buildParallel(source, {signal: AbortSignal.abort(reason)})
+  .then(() => false, error => error === reason);
+if (!await observed) throw new Error('Abort reason was not preserved');
+```
+
+The package's `npm run test:browser --workspace @margoengine/bvh` checks a
+production Vite consumer emits both nested assets and verifies parallel builds
+against serial bytes, input ownership and worker cleanup. Those are correctness
+proofs, not a published parallel speed result. Workload and cloning overhead decide
+whether parallel building benefits an application; speed measurement stays deferred.
+
+## Core compatibility at engine boundaries
+
+The package build records its required core version. Engine-bound Raycaster calls
+check the engine's local core registry before reading runtime state. A mismatched
+version or second core module instance rejects with a coded version error and
+https://margoengine.com/errors#version. Resolve engine-bound packages to the same
+verified core build; reinstall or rebuild aligned packages instead of bypassing
+the check. Engine-free tree builds remain available through /tree, with an optional
+core peer and no core runtime in that entry's module graph. No global registration
+or engine attachment happens on import.
 
 ## Baking light and AO into vertex colours
 

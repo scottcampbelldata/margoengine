@@ -267,7 +267,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 | @margoengine/core | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/math | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
-| @margoengine/bvh | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/bvh | Core version guard build declarations, attachment rejection and linked version errors. | version-guard DONE (bvh-readme-phase) |
 | @margoengine/controls | Core version guard build declarations, attachment rejection and linked version errors. | version-guard DONE (controls-readme-phase) |
 | @margoengine/creative | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/decoders | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
@@ -354,7 +354,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - margoengine (batch 225 query/offset): generated splines/query and splines/offset imports and result contracts, with examples deferred until the README phase.
 - `@margoengine/exporters/materials`: document glTF-shaped KHR material payloads, TextureData-backed extension maps and per-primitive named variants, with defaults and UV requirements.
 
-| @margoengine/bvh | buildParallel options/defaults, nested worker assets, shared/cloned memory costs, cancellation/deadline, serial-byte parity and existing index-preserving default. | Batch 221 |
+| @margoengine/bvh | buildParallel options/defaults, nested worker assets, shared/cloned memory costs, cancellation/deadline, serial-byte parity and existing index-preserving default. | Batch 221 DONE (bvh-readme-phase) |
 | margoengine | Generated bvh/parallel alias, reviewed with the owning bvh example in the README phase. | Batch 221 |
 
 - @margoengine/ecs (batch 249 job 4): WorldSerializer snapshots/restores, remote id maps, chosen component semantics, createDelta/applyDelta/undo, limits/cancellation/native API requirements, codecs and World reserve/entities.
