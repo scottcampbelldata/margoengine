@@ -192,6 +192,43 @@ const copyBytes = (source: AllowSharedBufferSource): Uint8Array =>
     ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength).slice()
     : new Uint8Array(source).slice();
 
+/**
+ * The AudioSpecificConfig of an AAC encoder's `description`. The WebCodecs AAC registration says the description is that
+ * config (ISO/IEC 14496-3 1.6.2.1), and Chromium gives it so. WebKit (Safari 27.2, Playwright WebKit 2370) gives a whole
+ * ES_Descriptor instead, and its own AudioDecoder then refuses it. A description starting with ES_DescrTag (3) is walked
+ * per ISO/IEC 14496-1 7.2.6.5 (ES_Descriptor), 7.2.6.6 (DecoderConfigDescriptor) and 8.3.3 (sizes of up to four bytes
+ * of seven bits) to its DecSpecificInfo (tag 5); any other description is the config already.
+ */
+function aacAudioSpecificConfig(description: Uint8Array): Uint8Array {
+  if (description[0] !== 3) return description;
+  const bad = (): never => {
+    throw fault('failed', 'The AAC encoder gave an ES_Descriptor without a DecSpecificInfo', 'headless');
+  };
+  let at = 0;
+  // One descriptor header: its tag must be `tag`; returns the end of its body.
+  const enter = (tag: number): number => {
+    if (description[at++] !== tag) bad();
+    let size = 0;
+    for (let i = 0; i < 4; i++) {
+      const byte = description[at++] ?? bad();
+      size = size * 128 + (byte & 0x7f);
+      if (!(byte & 0x80)) return at + size <= description.length ? at + size : bad();
+    }
+    return bad();
+  };
+  enter(3);
+  const flags = description[at + 2] ?? bad();
+  at += 3; // ES_ID and the flags byte.
+  if (flags & 0x80) at += 2; // dependsOn_ES_ID
+  if (flags & 0x40) at += 1 + (description[at] ?? bad()); // URLlength and URLstring
+  if (flags & 0x20) at += 2; // OCR_ES_Id
+  const config = enter(4);
+  at += 13; // objectTypeIndication, streamType and its flags, bufferSizeDB, maxBitrate, avgBitrate.
+  if (at >= config) bad();
+  const end = enter(5);
+  return end <= config ? description.slice(at, end) : bad();
+}
+
 const SOUND_CODECS = {
     webm: [['opus', 'opus']],
     mp4: [
@@ -260,6 +297,8 @@ async function encoderLeadIn(
   }
   if (failed) throw failure;
   if (!decoderConfig) throw fault('failed', 'The audio encoder gave no decoder configuration', 'headless');
+  if (decoderConfig.description)
+    decoderConfig = { ...decoderConfig, description: aacAudioSpecificConfig(copyBytes(decoderConfig.description)) };
   const decoder = new Decoder({
     output(audio) {
       const plane = new Float32Array(audio.numberOfFrames);
@@ -327,7 +366,9 @@ async function encodeSound(
       chunk.copyTo(data);
       samples.push({ data, timestamp: chunk.timestamp, duration: chunk.duration ?? 0, key: true });
       const decoder = metadata?.decoderConfig;
-      if (decoder?.description) description = copyBytes(decoder.description);
+      if (decoder?.description)
+        description =
+          codec === 'aac' ? aacAudioSpecificConfig(copyBytes(decoder.description)) : copyBytes(decoder.description);
     },
     error(error) {
       failure = error;
@@ -361,6 +402,16 @@ async function encodeSound(
     if (failed) throw failure;
   } finally {
     if (encoder.state !== 'closed') encoder.close();
+  }
+  // The input is contiguous, so its encoded frames are too: each starts where the one before ended, counted in samples.
+  // WebKit stamps the first chunk after each AudioData with that AudioData's time though its frames run on (AAC: 22
+  // frames of 1024 samples, then a jump of 448 samples, every half second), which in a sample table is a gap.
+  if (samples.length && samples.every((sample) => sample.duration > 0)) {
+    let frames = Math.round((samples[0].timestamp * sampleRate) / 1e6);
+    for (const sample of samples) {
+      sample.timestamp = Math.round((frames * 1e6) / sampleRate);
+      frames += Math.round((sample.duration * sampleRate) / 1e6);
+    }
   }
   if (codec === 'aac' && !description) throw fault('failed', 'The encoder gave no AAC description', 'headless');
   // Opus states its own lead-in (the OpusHead pre-skip); AAC has nowhere to, so it is measured.

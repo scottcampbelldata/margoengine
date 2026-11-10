@@ -466,6 +466,15 @@ function soundTrak(sound: SoundTrack, position: number, milliseconds: number): U
           fullBox('stsc', 0, 0, u32(1), u32(1), u32(samples.length), u32(1)),
           fullBox('stsz', 0, 0, u32(0), u32(samples.length), ...samples.map((sample) => u32(sample.data.length))),
           fullBox('co64', 0, 0, u32(1), u64(position)),
+          // ISO/IEC 14496-12 10.1 and 10.1.1.2: every AAC frame needs the one before it to decode right (roll
+          // distance -1). Without this group WebKit's decodeAudioData drops the lead-in twice and the sound plays
+          // 44 ms early; with it, WebKit, Chromium, AudioToolbox and ffmpeg all start it on the edit list's sample.
+          ...(sound.codec === 'aac'
+            ? [
+                fullBox('sgpd', 1, 0, text('roll'), u32(2), u32(1), u16(0xffff)),
+                fullBox('sbgp', 0, 0, text('roll'), u32(1), u32(samples.length), u32(1)),
+              ]
+            : []),
         ),
       ),
     ),

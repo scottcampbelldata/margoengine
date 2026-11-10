@@ -229,13 +229,24 @@ test('MP4 with sound, AAC: a second track whose offset lands on its samples', as
     [view.getUint32(stts.start + 4), view.getUint32(stts.start + 8), view.getUint32(stts.start + 12)],
     [1, 2, 24_000],
   );
+  // Every frame is in one roll group of distance -1, as WebKit needs to cut the lead-in once, not twice.
+  const sgpd = child(bytes, stbl, 'sgpd'),
+    sbgp = child(bytes, stbl, 'sbgp');
+  assert.deepEqual(
+    [...bytes.subarray(sgpd.start, sgpd.end)],
+    [1, 0, 0, 0, 114, 111, 108, 108, 0, 0, 0, 2, 0, 0, 0, 1, 255, 255],
+  );
+  assert.deepEqual(
+    [...bytes.subarray(sbgp.start, sbgp.end)],
+    [0, 0, 0, 0, 114, 111, 108, 108, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1],
+  );
 });
 
 /**
  * An AAC stand-in that, as real AAC encoders do, puts `lead` silent samples before the sound and says nothing of them:
  * chunks of 1024 samples of channel 0 as float bytes, stamped from 0. Its decoder reads the floats back.
  */
-function leadingCodecs(lead) {
+function leadingCodecs(lead, description = Uint8Array.of(0x11, 0x88)) {
   const { binding } = codecs();
   class AudioEncoder {
     state = 'configured';
@@ -269,7 +280,7 @@ function leadingCodecs(lead) {
                   codec: 'mp4a.40.2',
                   sampleRate,
                   numberOfChannels: 1,
-                  description: Uint8Array.of(0x11, 0x88),
+                  description,
                 },
               },
         );
@@ -336,6 +347,196 @@ test('MP4 with AAC: the encoder lead-in is measured and cut by an edit list, so 
       `lead ${lead}`,
     );
   }
+});
+
+// WebKit's AudioEncoder (Safari 27.2, Playwright WebKit 2370 on an Apple M6) gives this whole ES_Descriptor as the
+// description, where WebCodecs and Chromium give the bare AudioSpecificConfig 0x11 0x90; its own AudioDecoder refuses it.
+const WEBKIT_ESDS = Uint8Array.of(
+  3,
+  128,
+  128,
+  128,
+  34,
+  0,
+  0,
+  0,
+  4,
+  128,
+  128,
+  128,
+  20,
+  64,
+  20,
+  0,
+  24,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  5,
+  128,
+  128,
+  128,
+  2,
+  17,
+  144,
+  6,
+  128,
+  128,
+  128,
+  1,
+  2,
+);
+
+test('MP4 with AAC from WebKit: an ES_Descriptor description is cut to its AudioSpecificConfig', async () => {
+  const { binding } = codecs({ description: WEBKIT_ESDS });
+  const { bytes } = await encodeVideo([frame(1)], {
+    format: 'mp4',
+    codec: 'vp09.00.10.08',
+    fps: 2,
+    audio: sound(1),
+    webCodecs: binding,
+  });
+  const at = Buffer.from(bytes).indexOf(Buffer.from([5, 2, 0x11, 0x90]));
+  assert.ok(at > 0, 'DecSpecificInfo holds the two-byte AudioSpecificConfig');
+  assert.equal(Buffer.from(bytes).indexOf(Buffer.from([3, 128, 128, 128, 34])), -1, 'no ES_Descriptor nested in esds');
+  // The same walk takes the optional ES_Descriptor fields: dependsOn_ES_ID, a URL and OCR_ES_Id.
+  const long = Uint8Array.of(
+    3,
+    30,
+    0,
+    1,
+    0xe0,
+    0,
+    2,
+    3,
+    97,
+    98,
+    99,
+    0,
+    4,
+    4,
+    17,
+    64,
+    21,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    5,
+    2,
+    0x12,
+    0x10,
+  );
+  const other = await encodeVideo([frame(1)], {
+    format: 'mp4',
+    codec: 'vp09.00.10.08',
+    fps: 2,
+    audio: sound(1),
+    webCodecs: codecs({ description: long }).binding,
+  });
+  assert.ok(Buffer.from(other.bytes).includes(Buffer.from([5, 2, 0x12, 0x10])));
+  for (const broken of [Uint8Array.of(3, 5, 0, 0, 0, 4, 1), WEBKIT_ESDS.slice(0, 30)])
+    await assert.rejects(
+      encodeVideo([frame(1)], {
+        format: 'mp4',
+        codec: 'vp09.00.10.08',
+        fps: 2,
+        audio: sound(1),
+        webCodecs: codecs({ description: broken }).binding,
+      }),
+      /without a DecSpecificInfo/,
+    );
+});
+
+test('MP4 with AAC from WebKit: the lead-in probe decodes with the AudioSpecificConfig, not the ES_Descriptor', async () => {
+  const binding = leadingCodecs(2112, WEBKIT_ESDS),
+    seen = [];
+  class AudioDecoder extends binding.AudioDecoder {
+    configure(config) {
+      seen.push([...config.description]);
+      if (config.description[0] === 3) throw new Error('InternalAudioDecoderCocoa decoding failed');
+    }
+  }
+  const video = await encodeVideo([frame(1), frame(2)], {
+    format: 'mp4',
+    codec: 'vp09.00.10.08',
+    fps: 2,
+    audio: { channels: [Float32Array.from({ length: 48_000 }, (_, i) => Math.sin(i / 7))], sampleRate: 48_000 },
+    webCodecs: { ...binding, AudioDecoder },
+  });
+  assert.deepEqual(seen, [[0x11, 0x90]]);
+  assert.equal(soundEdit(video.bytes).mediaTime, 2112);
+});
+
+test('MP4 with AAC from WebKit: frames stamped from each AudioData still make one run of 1024 in the time table', async () => {
+  // WebKit's AudioEncoder (Playwright WebKit 2370 on an Apple M6, measured 2026-11-10) emits 1024-sample frames without a
+  // break but stamps the first frame out after each AudioData with that AudioData's time: 0, 21333, ... 469333, then
+  // 500000, a jump of 448 samples every half second. Read as written, the sample table had a 1472 every 23rd frame.
+  const { binding } = codecs({ description: Uint8Array.of(0x11, 0x90) });
+  class AudioEncoder {
+    state = 'configured';
+    static isConfigSupported = async () => ({ supported: true });
+    constructor({ output }) {
+      this.output = output;
+    }
+    configure(config) {
+      this.rate = config.sampleRate;
+      this.held = 2112;
+      this.sent = 0;
+    }
+    emit(timestamp) {
+      const step = Math.round((1024 * 1e6) / this.rate);
+      for (let first = true; this.held >= 1024; this.held -= 1024, first = false) {
+        this.next = first && timestamp !== undefined ? timestamp : this.next + step;
+        this.output(
+          { byteLength: 1, timestamp: this.next, duration: step, copyTo: (out) => (out[0] = 1) },
+          this.sent++ ? undefined : { decoderConfig: { description: Uint8Array.of(0x11, 0x90) } },
+        );
+      }
+    }
+    encode(data) {
+      this.held += data.numberOfFrames;
+      this.emit(data.timestamp);
+    }
+    async flush() {
+      this.held += 1023;
+      this.emit();
+    }
+    close() {
+      this.state = 'closed';
+    }
+  }
+  const { bytes } = await encodeVideo([frame(1), frame(2)], {
+    format: 'mp4',
+    codec: 'vp09.00.10.08',
+    fps: 2,
+    audio: sound(2),
+    webCodecs: { ...binding, AudioEncoder },
+  });
+  const moov = boxes(bytes).find((one) => one.type === 'moov'),
+    trak = boxes(bytes, moov.start, moov.end).filter((one) => one.type === 'trak')[1],
+    stbl = child(bytes, child(bytes, child(bytes, trak, 'mdia'), 'minf'), 'stbl'),
+    stts = child(bytes, stbl, 'stts'),
+    view = new DataView(bytes.buffer, bytes.byteOffset),
+    frames = Math.floor((96_000 + 2112 + 1023) / 1024);
+  assert.deepEqual(
+    [view.getUint32(stts.start + 4), view.getUint32(stts.start + 8), view.getUint32(stts.start + 12)],
+    [1, frames, 1024],
+    'every frame lasts 1024 samples',
+  );
 });
 
 test('MP4 with AAC and no AudioDecoder has no edit list, as before', async () => {

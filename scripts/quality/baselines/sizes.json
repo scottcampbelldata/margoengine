@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14657835,
+  "total": 14658154,
   "history": [
     {
       "date": "2026-10-24",
@@ -8027,6 +8027,12 @@
       "commit": "b586dfe60",
       "reason": "R5 clustered: textured area cells, contact self-shadow",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d1f810a32",
+      "reason": "headless AAC MP4 fixes from WebKit real run (batch 121)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8454,7 +8460,7 @@
     "@margoengine/headless/null": 2977,
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,
-    "@margoengine/headless/video": 7553,
+    "@margoengine/headless/video": 7872,
     "@margoengine/html": 7487,
     "@margoengine/html/blend": 3303,
     "@margoengine/html/inline": 2744,
