@@ -95,7 +95,10 @@ export interface LayoutNode {
   readonly children: readonly LayoutNode[];
   /** False takes the box out of the layout entirely. Default true. */
   readonly visible?: boolean;
-  /** Content size (without padding) of a leaf box wrapped to at most `maxWidth`. */
+  /**
+   * Content size (without padding) of a leaf box wrapped to at most `maxWidth`.
+   * Return the same size for the same width during one arrange call; repeated constraints share one measurement.
+   */
   measure?(maxWidth: number): { width: number; height: number };
   /** Written by {@link arrange}. */
   rect: Rect;
@@ -188,13 +191,25 @@ const floating = (node: LayoutNode): LayoutNode[] =>
 const horizontal = (m: Insets) => m[1] + m[3];
 const vertical = (m: Insets) => m[0] + m[2];
 
+type SizeCache = Map<LayoutNode, Map<number, Size2>>;
+
 interface Size2 {
   width: number;
   height: number;
 }
 
 /** Width of `node` (border box) when `avail` is the most it may take: explicit, or its content plus padding. */
-function contentOf(node: LayoutNode, innerWidth: number): Size2 {
+function contentOf(cache: SizeCache, node: LayoutNode, innerWidth: number): Size2 {
+  let sizes = cache.get(node);
+  const previous = sizes?.get(innerWidth);
+  if (previous) return previous;
+  const content = measureContent(cache, node, innerWidth);
+  if (!sizes) cache.set(node, (sizes = new Map()));
+  sizes.set(innerWidth, content);
+  return content;
+}
+
+function measureContent(cache: SizeCache, node: LayoutNode, innerWidth: number): Size2 {
   const style = node.style,
     flow = flowChildren(node),
     over = floating(node);
@@ -208,7 +223,7 @@ function contentOf(node: LayoutNode, innerWidth: number): Size2 {
       height = 0;
     for (const child of over) {
       const m = edges(child.style.margin),
-        size = sizeOf(child, innerWidth - horizontal(m));
+        size = sizeOf(cache, child, innerWidth - horizontal(m));
       width = Math.max(width, size.width + horizontal(m));
       height = Math.max(height, size.height + vertical(m));
     }
@@ -218,7 +233,7 @@ function contentOf(node: LayoutNode, innerWidth: number): Size2 {
     const cols = style.columns ?? 1,
       sizes = flow.map((c) => {
         const m = edges(c.style.margin),
-          size = sizeOf(c, innerWidth);
+          size = sizeOf(cache, c, innerWidth);
         return { width: size.width + horizontal(m), height: size.height + vertical(m) };
       }),
       cellW = style.cellWidth ?? Math.max(0, ...sizes.map((s) => s.width)),
@@ -228,12 +243,12 @@ function contentOf(node: LayoutNode, innerWidth: number): Size2 {
   }
   const row = isRow(node);
   if (row && style.wrap && Number.isFinite(innerWidth)) {
-    const lines = wrapLines(flexItems(node, flow, innerWidth, Infinity), innerWidth, gx);
+    const lines = wrapLines(flexItems(cache, node, flow, innerWidth, Infinity), innerWidth, gx);
     let width = 0,
       height = 0;
     for (const line of lines) {
       width = Math.max(width, distribute(line, innerWidth, gx, true, false));
-      height += lineHeight(line, Infinity);
+      height += lineHeight(cache, line, Infinity);
     }
     return { width, height: height + gy * (lines.length - 1) };
   }
@@ -241,7 +256,7 @@ function contentOf(node: LayoutNode, innerWidth: number): Size2 {
     cross = 0;
   for (const child of flow) {
     const m = edges(child.style.margin),
-      size = sizeOf(child, innerWidth - (row ? 0 : horizontal(m)));
+      size = sizeOf(cache, child, innerWidth - (row ? 0 : horizontal(m)));
     main += (row ? size.width + horizontal(m) : size.height + vertical(m)) + (row ? gx : gy);
     cross = Math.max(cross, row ? size.height + vertical(m) : size.width + horizontal(m));
   }
@@ -250,13 +265,13 @@ function contentOf(node: LayoutNode, innerWidth: number): Size2 {
 }
 
 /** The border-box size of `node` when at most `availWidth` is available (Infinity when unbounded). */
-function sizeOf(node: LayoutNode, availWidth: number, forcedWidth?: number): Size2 {
+function sizeOf(cache: SizeCache, node: LayoutNode, availWidth: number, forcedWidth?: number): Size2 {
   const s = node.style,
     p = edges(s.padding);
   let width = forcedWidth ?? explicit(s.width, availWidth);
   const fixedWidth = width !== undefined;
   const innerWidth = Math.max(0, (width ?? availWidth) - horizontal(p));
-  const content = contentOf(node, innerWidth);
+  const content = contentOf(cache, node, innerWidth);
   width = clamp(fixedWidth ? width! : content.width + horizontal(p), s.minWidth, s.maxWidth);
   let height = explicit(s.height, Infinity);
   height = clamp(height ?? content.height + vertical(p), s.minHeight, s.maxHeight);
@@ -264,21 +279,21 @@ function sizeOf(node: LayoutNode, availWidth: number, forcedWidth?: number): Siz
 }
 
 /** Height of `node` when laid out `width` wide. */
-function heightAt(node: LayoutNode, width: number): number {
-  return sizeOf(node, width, width).height;
+function heightAt(cache: SizeCache, node: LayoutNode, width: number): number {
+  return sizeOf(cache, node, width, width).height;
 }
 
 /**
  * Lay out the tree below `root` into `box` and write every node's `rect` (absolute UI units, y down). The algorithm
  * is a small flexbox: children of a row or column take their base size, then free space is shared by `grow` and
  * a shortage by `shrink`, then `justify` and `align` place them. A stack anchors its children, and a grid fills cells
- * row by row.
+ * row by row. Measurements are memoized only within this call, so edits are visible on the next call.
  */
 export function arrange(root: LayoutNode, box: Rect): void {
-  place(root, box.x, box.y, box.width, box.height);
+  place(new Map(), root, box.x, box.y, box.width, box.height);
 }
 
-function place(node: LayoutNode, x: number, y: number, width: number, height: number): void {
+function place(cache: SizeCache, node: LayoutNode, x: number, y: number, width: number, height: number): void {
   node.rect = { x, y, width, height };
   const s = node.style,
     p = edges(s.padding),
@@ -291,9 +306,9 @@ function place(node: LayoutNode, x: number, y: number, width: number, height: nu
   node.contentWidth = inner.width;
   node.contentHeight = inner.height;
   const flow = flowChildren(node);
-  if (s.direction === 'grid') placeGrid(node, flow, inner);
-  else if (flow.length) placeFlex(node, flow, inner);
-  for (const child of floating(node)) placeAnchored(node, child, inner, { x, y, width, height });
+  if (s.direction === 'grid') placeGrid(cache, node, flow, inner);
+  else if (flow.length) placeFlex(cache, node, flow, inner);
+  for (const child of floating(node)) placeAnchored(cache, node, child, inner, { x, y, width, height });
   for (const child of node.children) {
     if (child.visible === false) child.rect = { x, y, width: 0, height: 0 };
     const o = child.style.offset;
@@ -308,13 +323,13 @@ export function translate(node: LayoutNode, dx: number, dy: number): void {
   for (const child of node.children) translate(child, dx, dy);
 }
 
-function placeGrid(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
+function placeGrid(cache: SizeCache, node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
   const s = node.style,
     [gx, gy] = gaps(s),
     cols = s.columns ?? 1,
     sizes = flow.map((c) => {
       const m = edges(c.style.margin),
-        size = sizeOf(c, inner.width);
+        size = sizeOf(cache, c, inner.width);
       return { width: size.width + horizontal(m), height: size.height + vertical(m) };
     }),
     cellW = s.cellWidth ?? Math.max(0, ...sizes.map((z) => z.width)),
@@ -329,7 +344,7 @@ function placeGrid(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
       cy = inner.y + Math.floor(i / cols) * (cellH + gy) - scroll;
     const w = cellW - horizontal(m),
       h = cellH - vertical(m);
-    place(child, cx + m[3], cy + m[0], Math.max(0, w), Math.max(0, h));
+    place(cache, child, cx + m[3], cy + m[0], Math.max(0, w), Math.max(0, h));
   });
 }
 
@@ -356,7 +371,7 @@ interface Item {
 const alignOf = (node: LayoutNode): Align => node.style.align ?? (isRow(node) ? 'center' : 'stretch');
 
 /** Flex items of `flow` with their base sizes along `node`'s main axis. */
-function flexItems(node: LayoutNode, flow: LayoutNode[], innerMain: number, innerCross: number): Item[] {
+function flexItems(cache: SizeCache, node: LayoutNode, flow: LayoutNode[], innerMain: number, innerCross: number): Item[] {
   const row = isRow(node),
     parentAlign = alignOf(node);
   return flow.map((child) => {
@@ -369,7 +384,7 @@ function flexItems(node: LayoutNode, flow: LayoutNode[], innerMain: number, inne
     const px = explicit(mainStyle, innerMain);
     if (px !== undefined) base = px;
     else if (mainStyle === 'fill') base = 0;
-    else if (row) base = sizeOf(child, Math.max(0, innerMain - mainMargin)).width;
+    else if (row) base = sizeOf(cache, child, Math.max(0, innerMain - mainMargin)).width;
     else {
       const align = cs.alignSelf && cs.alignSelf !== 'auto' ? cs.alignSelf : parentAlign;
       const cw =
@@ -377,8 +392,8 @@ function flexItems(node: LayoutNode, flow: LayoutNode[], innerMain: number, inne
         (align === 'stretch' || cs.width === 'fill' ? innerCross - crossMargin : undefined);
       base =
         cw === undefined
-          ? sizeOf(child, innerCross - crossMargin).height
-          : heightAt(child, clamp(cw, cs.minWidth, cs.maxWidth));
+          ? sizeOf(cache, child, innerCross - crossMargin).height
+          : heightAt(cache, child, clamp(cw, cs.minWidth, cs.maxWidth));
     }
     return {
       child,
@@ -413,11 +428,11 @@ function wrapLines(items: Item[], innerMain: number, gap: number): Item[][] {
 }
 
 /** Height of a wrapped line: its tallest child at the width it was given, margins included. */
-function lineHeight(line: Item[], innerHeight: number): number {
+function lineHeight(cache: SizeCache, line: Item[], innerHeight: number): number {
   let height = 0;
   for (const it of line) {
     const cs = it.child.style,
-      own = explicit(cs.height, innerHeight) ?? heightAt(it.child, it.size);
+      own = explicit(cs.height, innerHeight) ?? heightAt(cache, it.child, it.size);
     height = Math.max(height, clamp(own, cs.minHeight, cs.maxHeight) + vertical(it.m));
   }
   return height;
@@ -463,24 +478,24 @@ function distribute(items: Item[], innerMain: number, gap: number, row: boolean,
   return items.reduce((sum, it) => sum + it.size, outer);
 }
 
-function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
+function placeFlex(cache: SizeCache, node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
   const s = node.style,
     row = isRow(node),
     [gx, gy] = gaps(s),
     gap = row ? gx : gy,
     innerMain = row ? inner.width : inner.height,
-    items = flexItems(node, flow, innerMain, row ? inner.height : inner.width);
+    items = flexItems(cache, node, flow, innerMain, row ? inner.height : inner.width);
   if (row && s.wrap) {
     // Each line is a row of its own; the lines stack down by the row gap and scroll vertically.
     const lines = wrapLines(items, innerMain, gx),
       used = lines.map((line) => distribute(line, innerMain, gx, true, false)),
-      heights = lines.map((line) => lineHeight(line, inner.height)),
+      heights = lines.map((line) => lineHeight(cache, line, inner.height)),
       total = heights.reduce((sum, h) => sum + h, 0) + gy * (lines.length - 1),
       scroll = scrollOf(node, total, inner.height, 'y');
     node.contentHeight = total;
     let y = inner.y - scroll;
     lines.forEach((line, i) => {
-      placeLine(node, line, { x: inner.x, y, width: inner.width, height: heights[i] }, used[i], 0);
+      placeLine(cache, node, line, { x: inner.x, y, width: inner.width, height: heights[i] }, used[i], 0);
       y += heights[i] + gy;
     });
     return;
@@ -489,11 +504,11 @@ function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
   const scroll = scrollOf(node, used, innerMain, row ? 'x' : 'y');
   if (row) node.contentWidth = used;
   else node.contentHeight = used;
-  placeLine(node, items, inner, used, scroll);
+  placeLine(cache, node, items, inner, used, scroll);
 }
 
 /** Place one line of sized items along `node`'s main axis inside `inner`, by `justify` and `align`. */
-function placeLine(node: LayoutNode, items: Item[], inner: Rect, used: number, scroll: number): void {
+function placeLine(cache: SizeCache, node: LayoutNode, items: Item[], inner: Rect, used: number, scroll: number): void {
   const s = node.style,
     row = isRow(node),
     [gx, gy] = gaps(s),
@@ -538,19 +553,19 @@ function placeLine(node: LayoutNode, items: Item[], inner: Rect, used: number, s
     const fixed = explicit(crossStyle, innerCross);
     if (fixed !== undefined) cross = fixed;
     else if (crossStyle === 'fill' || align === 'stretch') cross = space;
-    else cross = row ? heightAt(it.child, it.size) : sizeOf(it.child, space).width;
-    if (row && fixed === undefined && crossStyle !== 'fill' && align !== 'stretch') cross = heightAt(it.child, it.size);
+    else cross = row ? heightAt(cache, it.child, it.size) : sizeOf(cache, it.child, space).width;
+    if (row && fixed === undefined && crossStyle !== 'fill' && align !== 'stretch') cross = heightAt(cache, it.child, it.size);
     cross = clamp(cross, crossMin, crossMax);
     const crossPos = align === 'center' ? (space - cross) / 2 : align === 'end' ? space - cross : 0;
     const mainStart = (row ? inner.x : inner.y) + cursor + (row ? it.m[3] : it.m[0]),
       crossStart = (row ? inner.y : inner.x) + crossPos + (row ? it.m[0] : it.m[3]);
-    if (row) place(it.child, mainStart, crossStart, it.size, cross);
-    else place(it.child, crossStart, mainStart, cross, it.size);
+    if (row) place(cache, it.child, mainStart, crossStart, it.size, cross);
+    else place(cache, it.child, crossStart, mainStart, cross, it.size);
     cursor += it.size + margins(it) + between;
   }
 }
 
-function placeAnchored(parent: LayoutNode, child: LayoutNode, inner: Rect, outer: Rect): void {
+function placeAnchored(cache: SizeCache, parent: LayoutNode, child: LayoutNode, inner: Rect, outer: Rect): void {
   const cs = child.style,
     m = edges(cs.margin),
     anchor: Anchor = cs.anchor ?? 'stretch',
@@ -560,15 +575,15 @@ function placeAnchored(parent: LayoutNode, child: LayoutNode, inner: Rect, outer
   const stretch = anchor === 'stretch';
   const fillW = cs.width === 'fill' || (stretch && (cs.width === undefined || cs.width === 'auto'));
   const fillH = cs.height === 'fill' || (stretch && (cs.height === undefined || cs.height === 'auto'));
-  let width = fillW ? availW : (explicit(cs.width, box.width) ?? sizeOf(child, availW).width);
+  let width = fillW ? availW : (explicit(cs.width, box.width) ?? sizeOf(cache, child, availW).width);
   width = clamp(width, cs.minWidth, cs.maxWidth);
   let height = fillH ? availH : explicit(cs.height, box.height);
-  height = clamp(height ?? heightAt(child, width), cs.minHeight, cs.maxHeight);
+  height = clamp(height ?? heightAt(cache, child, width), cs.minHeight, cs.maxHeight);
   const left = anchor.includes('left'),
     right = anchor.includes('right'),
     top = anchor.includes('top'),
     bottom = anchor.includes('bottom');
   const px = left ? 0 : right ? availW - width : stretch ? 0 : (availW - width) / 2,
     py = top ? 0 : bottom ? availH - height : stretch ? 0 : (availH - height) / 2;
-  place(child, box.x + m[3] + px, box.y + m[0] + py, width, height);
+  place(cache, child, box.x + m[3] + px, box.y + m[0] + py, width, height);
 }

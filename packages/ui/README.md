@@ -71,6 +71,27 @@ ui.add(settings);
 
 Sizes are UI units. By default one unit is one CSS pixel; see Scaling.
 
+`arrange` shares measurements of the same node and available width within one call. A custom
+`LayoutNode.measure` returns a stable content size for that width during the call. The next call
+measures again, so direct edits to styles, children or content take effect without an invalidation API.
+The cache belongs to that call, including when a measurer starts a separate layout.
+
+```ts
+import { arrange, type LayoutNode } from '@margoengine/ui';
+
+const label: LayoutNode = {
+  style: {}, children: [], rect: { x: 0, y: 0, width: 0, height: 0 },
+  measure: (width) => ({ width: Math.min(80, width), height: 20 }),
+};
+const row: LayoutNode = {
+  style: { direction: 'row', align: 'center' }, children: [label],
+  rect: { x: 0, y: 0, width: 0, height: 0 },
+};
+arrange(row, { x: 0, y: 0, width: 200, height: 100 });
+console.log(label.rect); // { x: 0, y: 40, width: 80, height: 20 }
+```
+
+
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `direction` | `'column'` | `'row'`, `'column'`, `'stack'` (children anchored over each other) or `'grid'` |

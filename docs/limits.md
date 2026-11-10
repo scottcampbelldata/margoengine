@@ -6624,3 +6624,13 @@ SSGI exact one-bounce round trips on RTX A6000 / ANGLE D3D11 can differ by one d
 An already-read response may still finish after its stored copy is evicted or replaced. Its background last-use update cannot recreate missing metadata, overwrite a newer file's size, type or validators, or move last use backwards. A 304 freshness update requires matching stored validators. The same four delayed-response cases run with plain and indexed eviction on the CPU stand-in and real IndexedDB; after a 150-byte-budget eviction only one 100-byte file remains, and replacing that file with an 80-byte response retains the new response's headers. Public API and schema are unchanged. This does not add global request coalescing or change the documented offline fallback.
 
 Batch 162 primitive angular reuse: sphere/cylinder/capsule/torus allocate a temporary Float64 sin/cos table of 16 bytes per angular column including the seam (at most 1,040 bytes per affected p-primitives builder). No cache survives a call. Geometry buffers and groups match the parent byte for byte on the same JavaScript runtime; cross-runtime transcendental bit identity is not promised. Operation counts are not a runtime or competitive speed claim. [Evidence](whitepaper/batch-162-workcounts.md).
+
+### UI layout measurement contract (batch 169, 2026-11-10)
+
+`arrange` retains content sizes by node and available inner width only during one
+call. Custom measurers return stable values for a width during that call. Direct
+edits between calls require no dirty flags. On the nested-row oracle, two different
+width constraints require two callbacks, versus Yoga 3.2.1's one; fully explicit
+grow/shrink fixtures require zero callbacks on either side and yield equal
+rectangles. [Evidence and reproducible scope](whitepaper/batch-169.md). No cross-call
+cache, competitive timing result or full CSS/Yoga conformance is claimed.

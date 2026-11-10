@@ -4688,3 +4688,10 @@ Delayed hit bookkeeping preserves eviction and replacement outcomes. Evidence: a
 ### Batch 162 primitive operation count (2026-11-10)
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
+
+### Batch 169 UI measurement work (2026-11-10)
+
+One `arrange` call on the documented eight-parent row chain invokes the leaf
+measurer twice instead of 24 times, preserving the layout-byte hash across 64 mixed
+trees. Proof: `packages/ui/tests/layout-workcount.test.js`; [reproduction and limits](batch-169.md).
+This is a deterministic callback count, not a speed or full Yoga-conformance claim.

@@ -418,3 +418,10 @@ Selection now removes proven repeated CPU work: horizontal micro misses compute
 all 100 neighborhood copies together. Parent-failing work-count regressions keep
 identical outputs. No new elapsed-time verdict is available; the existing
 `p-gpu-pick` row remains a loss. GPU point-by-point confirmation passes; elapsed timing remains deferred.
+
+## Batch 169 UI work-count diagnosis
+
+UI has no like-for-like three.js flex layout row. Its Yoga comparison and call-scoped
+measurement fix are [recorded with the other rivals](perf-vs-rivals.md#batch-169-ui-work-counts-2026-11-10).
+The nested fixture falls from 24 measurements to 2 with identical layout bytes; fix
+commit: `perf(ui): memoize intrinsic layout per call`. Timing pending the quiet rerun.

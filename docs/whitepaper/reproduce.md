@@ -3963,3 +3963,10 @@ or add timings to the historical ledger.
 ### Batch 162 geometry, math and raycast work counts
 
 [Work-count methods](batch-162-workcounts.md) give the unchanged scenes, deterministic assertions, parent byte checks, trade-offs and sources. Build with npm run build:packages, then run node --test --test-timeout=120000 packages/geometry/tests/primitive-workcount.test.js for primitive columns. Timing pending the quiet rerun; do not enable the deferred speed suite for this evidence.
+
+### Batch 169 UI layout work count
+
+Run `npm run build:packages`, then
+`node --test --test-timeout=120000 packages/ui/tests/layout-workcount.test.js`.
+The [batch record](batch-169.md#reproduce) gives the separate external Yoga 3.2.1
+installation and value-only harness command. Timings await the quiet campaign.

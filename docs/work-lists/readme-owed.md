@@ -1538,3 +1538,5 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/post: review5 Bloom/SSAO and HDR PostStack detachment, coded engine.onError and recreation examples completed in the README phase (2026-11-10); runtime check recorded with the restore repair.
 
 - @margoengine/cache: document safe delayed-hit bookkeeping across eviction/replacement and matching-validator 304 freshness during the README phase.
+
+- @margoengine/ui batch 169 job 1: DONE in the measurement-reuse job; arrange custom-measurer example documents call-scoped stable-width measurements, edits and reentrancy, checked by check:readme-run. Other existing UI debt remains separately listed above.

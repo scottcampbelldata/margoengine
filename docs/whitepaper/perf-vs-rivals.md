@@ -196,3 +196,13 @@ differences give max 125 on all three comparisons, so the full-frame PSNR includ
 edge differences. The independent trace confirms the weighted image loss, not an accuracy-parity claim.
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
+
+## Batch 169 UI: work counts, 2026-11-10
+
+| Package | Work | Before | After | Black-box oracle | Status |
+| --- | --- | --- | --- | --- | --- |
+| ui | 8 nested rows, same content widths 200 and 20 | 24 leaf measures | 2 leaf measures; 64 mixed-tree layout hashes unchanged | Yoga 3.2.1: one measure, same 9 rectangles; explicit grow/shrink: zero measures on both | `perf(ui): memoize intrinsic layout per call`; timing pending the quiet rerun |
+
+Cause, accepted measurement-contract difference, the like-for-like explicit-size rows
+and exact reproduction commands are in [batch-169.md](batch-169.md). No rival timing
+was run and no speed ratio is claimed.
