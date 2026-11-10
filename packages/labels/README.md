@@ -119,7 +119,7 @@ for (const [name, x, priority] of [['Main valve', 0, 2], ['Drain', 0.05, 1], ['G
 // After a frame: declutter.hidden labels had no free position, declutter.moved were moved around their point.
 ```
 
-- **Positions.** `eightPositions` tries above right, above left, below right, below left, right, left, above and below the point, in that order; `fourPositions` the four corners. Without `positions` an overlapping label is hidden.
+- **Positions.** `eightPositions` tries above right, above left, below left, below right, right, above, left and below the point, in that order (the ranking in Figure 1 of Christensen, Marks and Shieber 1995); `fourPositions` the four corners. Without `positions` an overlapping label is hidden.
 - **Sizes.** Each element is measured once (`offsetWidth`, `offsetHeight`) and scaled by its `distanceScale`; call `label.remeasure()` after its text or style changes its size.
 - **Cost.** The overlap test buckets placed boxes in a grid of `cell` pixels (default 64), so each label tests only its neighbours. A still frame writes nothing to the DOM.
 - **Own layouts.** `layout` takes any `{arrange(labels, context)}`: `context.size(label)`, `context.hide(label)` and `context.place(label, anchor)` run before anything is drawn, with `label.screen`, `label.distance` and `label.scale` already set for the update.

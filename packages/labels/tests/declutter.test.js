@@ -91,6 +91,18 @@ test('positions move a label around its point before hiding it, and the moved bo
   for (let i = 0; i < visible.length; i++)
     for (let j = i + 1; j < visible.length; j++) assert.ok(apart(box(visible[i]), box(visible[j]), 0), `${i} ${j}`);
   assert.deepEqual(fourPositions, eightPositions.slice(0, 4));
+  // Christensen, Marks and Shieber 1995, Figure 1: 1 above right, 2 above left, 3 below left, 4 below right, 5 right,
+  // 6 above, 7 left, 8 below (anchors are the element's point placed on the label's point).
+  assert.deepEqual(eightPositions, [
+    [0, 1],
+    [1, 1],
+    [1, 0],
+    [0, 0],
+    [0, 0.5],
+    [0.5, 1],
+    [1, 0.5],
+    [0.5, 0],
+  ]);
 });
 
 test('padding is the free gap: labels more than padding apart both show, closer ones do not', () => {

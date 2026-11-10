@@ -5,17 +5,18 @@ import { rangeError } from '../../shared/errors.js';
 export type Anchor = readonly [number, number];
 
 /**
- * The eight positions around a point, most preferred first: above right, above left, below right, below left, right,
- * left, above, below (each an anchor of the element, so `[0, 1]` puts the element's lower left corner on the point).
+ * The eight positions around a point, most preferred first, in the standard ranking of Christensen, Marks and Shieber
+ * (ACM TOG 1995, Figure 1): above right, above left, below left, below right, right, above, left, below (each an
+ * anchor of the element, so `[0, 1]` puts the element's lower left corner on the point).
  */
 export const eightPositions: readonly Anchor[] = [
   [0, 1],
   [1, 1],
-  [0, 0],
   [1, 0],
+  [0, 0],
   [0, 0.5],
-  [1, 0.5],
   [0.5, 1],
+  [1, 0.5],
   [0.5, 0],
 ];
 /** The four corner positions of {@link eightPositions}. */
