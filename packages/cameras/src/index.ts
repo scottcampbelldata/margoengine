@@ -167,6 +167,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   private camera?: Camera;
   private worldUp: Vec3 = [0, 1, 0];
   private canvas?: { width: number; height: number };
+  /** The engine this projection was attached to as a plugin, so dispose() can detach it from its scene. */
+  private host?: Pick<EngineKernel, 'sceneOf'>;
   private animation?: Fit;
   /** Same as `engine.use(new CameraProjection(...))`; returns the CameraProjection. */
   static attach(engine: EngineKernel, options?: ProjectionOptions): CameraProjection {
@@ -177,9 +179,12 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   constructor(options: ProjectionOptions = {}) {
     Object.assign(this, options);
   }
-  setup(engine: Pick<Engine, 'camera'> & { canvas?: { width: number; height: number } }): void {
+  setup(
+    engine: Pick<Engine, 'camera'> & { canvas?: { width: number; height: number }; sceneOf?: EngineKernel['sceneOf'] },
+  ): void {
     this.attach(engine.camera);
     this.canvas = engine.canvas;
+    if (engine.sceneOf) this.host = engine as Pick<EngineKernel, 'sceneOf'>;
   }
   /**
    * Frames a box given as `[minX, minY, minZ, maxX, maxY, maxZ]` (`model.bounds`). Perspective: core's
@@ -322,14 +327,20 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     Object.defineProperty(camera, 'fixedOrthographic', { configurable: true, get: () => this.fixedOrthographic });
     camera.project = (out, aspect, webgpu) => this.project(camera, out, aspect, webgpu);
   }
+  /** Gives the camera back its own projection and up, and detaches from the engine's scene it was attached to. */
   dispose(): void {
-    const camera = this.camera;
-    if (!camera) return;
-    this.camera = undefined;
-    this.animation = undefined;
-    Object.defineProperty(camera, 'up', { configurable: true, enumerable: true, writable: true, value: this.worldUp });
-    delete (camera as { fixedOrthographic?: boolean }).fixedOrthographic;
-    camera.project = undefined;
+    const camera = this.camera,
+      host = this.host;
+    this.host = undefined;
+    if (camera) {
+      this.camera = undefined;
+      this.animation = undefined;
+      Object.defineProperty(camera, 'up', { configurable: true, enumerable: true, writable: true, value: this.worldUp });
+      delete (camera as { fixedOrthographic?: boolean }).fixedOrthographic;
+      camera.project = undefined;
+    }
+    // engine.removePlugin calls dispose again, which finds nothing left to restore.
+    host?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
