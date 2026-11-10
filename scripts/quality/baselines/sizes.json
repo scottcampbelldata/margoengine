@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13855298,
+  "total": 13856900,
   "history": [
     {
       "date": "2026-10-24",
@@ -7280,6 +7280,12 @@
       "commit": "batch-235-job-3",
       "reason": "Optional planar water: absent to 2404 B gzip. Environment reflector 11209 to 11265 B, refractor 11166 to 11223 B. Capture-only and paired projection metadata belong to their owner; the water entry owns projective Fresnel/SSR sampling and lifecycle. A split would duplicate resource ownership. Core plus stage unchanged 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-270-job4",
+      "reason": "Prewarm and deterministic burst schedules: root 34670 to 35448 B, base 11318 to 11398 B, schedule 0 to 942 B gzip. Per-step queue submissions preserve manual simulation semantics. Keeping scheduling in one optional entry avoids extra ownership APIs; optional ceilings raised under Scott approval. Core plus stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8329,7 +8335,7 @@
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 14210,
     "@margoengine/vfx": 35711,
-    "@margoengine/vfx/base": 11336,
+    "@margoengine/vfx/base": 11740,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/depth-collide": 2262,
     "@margoengine/vfx/emitter": 2656,
@@ -8600,6 +8606,7 @@
     "margoengine/creative/planet-atmosphere": 329,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/vfx/schedule": 1198
   }
 }

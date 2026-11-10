@@ -168,6 +168,7 @@ interface VFXOptions {
     emitter?: VFXEmitter;
     space?: import('./space.js').VFXSpace;
     overLife?: import('./over-life.js').VFXOverLife;
+    schedule?: import('./schedule.js').VFXSchedule;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
@@ -197,6 +198,7 @@ interface VFXRibbons {
 }
 
 interface VFXRuntime {
+    warmup?(run: (delta: number) => void): void;
     emission?(delta: number): number;
     compute?: GPUBindGroupEntry[];
     render?: GPUBindGroupEntry[];

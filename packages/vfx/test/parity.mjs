@@ -44,6 +44,15 @@ try {
       'ok shapes: 4096 births each, volume/shell moments, torus area correction, perimeter shares, grid occupancy, normals and exact reset',
     );
   }
+  if (process.argv.includes('--schedule')) {
+    const r = await page.evaluate(() => window.checkSchedule());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.live > 2);
+    assert.deepEqual(r.warm, r.manual);
+    assert.deepEqual(r.warm, r.replay);
+    console.log('ok schedule: prewarm equals five ordinary steps byte for byte, seeded bursts, exact reset');
+  }
   assert.deepEqual(pageErrors, []);
   console.log('ok space: local/world, rigid rotation, velocity inheritance, eight spaced distance births');
   if (process.argv.includes('--over-life')) {

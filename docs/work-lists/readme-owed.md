@@ -885,3 +885,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/viewcube (batch 198 job 3): document /compass ViewCompass attachment, north/radian defaults, cardinal clicks/drag, keyboard menu actions, fit callback and adapter fallback, visibility/themes, reserved margins, cleanup and pole limitation.
 - margoengine (batch 198 job 3): document viewcube/compass forwarding.
 - @margoengine/water, @margoengine/environment and margoengine (batch 235 job 3): cover water/reflector capture binding, horizontal alignment, environment captureOnly/textureMatrix, source filtering, manual update versus engine.start, fallback/SSR/defaults/limits and borrowed-resource disposal; examples deferred.
+- @margoengine/vfx (batch 270 job 4): document /schedule, prewarm step/tail/submission semantics, time-zero/cycle/probability bursts, seed, immutable attachment settings and reset/restoration; examples deferred.
+- margoengine (batch 270 job 4): document generated vfx/schedule alias; examples deferred.

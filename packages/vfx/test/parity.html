@@ -46,5 +46,11 @@ window.checkShapes=async()=>{
  }
  return {results,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
 };
+window.checkSchedule=async()=>{
+ device.pushErrorScope('validation');const plan={prewarm:0.5,step:0.125,seed:17,bursts:[{time:0,count:3,cycles:4,interval:0.125,probability:0.5},{time:0.5,count:2}]};
+ const e=new VFX({...still,capacity:32,velocity:[1,0,0],schedule:plan});await ready(e);step(e,0.125);const warm=await read(e);e.reset();step(e,0.125);const replay=await read(e);e.dispose();
+ const ref=new VFX({...still,capacity:32,velocity:[1,0,0],schedule:{...plan,prewarm:0}});await ready(ref);for(let i=0;i<5;i++)step(ref,0.125);const manual=await read(ref);ref.dispose();
+ return{warm,replay,manual,live:warm.filter((_,i)=>i<256&&i%8===3&&warm[i]>0).length,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
+};
 window.ready=true;
 </script></body></html>

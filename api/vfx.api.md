@@ -133,6 +133,7 @@ export interface VFXFeatures {
     nodes?: VFXExtension<VFXNodes>;
     space?: VFXExtension<import('./space.js').VFXSpace>;
     overLife?: VFXExtension<import('./over-life.js').VFXOverLife>;
+    schedule?: VFXExtension<import('./schedule.js').VFXSchedule>;
 }
 
 export interface VFXFields {
@@ -224,6 +225,7 @@ export interface VFXOptions {
     emitter?: VFXEmitter;
     space?: import('./space.js').VFXSpace;
     overLife?: import('./over-life.js').VFXOverLife;
+    schedule?: import('./schedule.js').VFXSchedule;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
@@ -257,6 +259,21 @@ export interface VFXRibbons {
     interval?: number;
     width?: number;
     heads?: boolean;
+}
+
+export interface VFXSchedule {
+    prewarm?: number;
+    step?: number;
+    bursts?: readonly VFXScheduledBurst[];
+    seed?: number;
+}
+
+export interface VFXScheduledBurst {
+    time: number;
+    count: number;
+    cycles?: number;
+    interval?: number;
+    probability?: number;
 }
 
 export interface VFXShadows {
@@ -401,6 +418,7 @@ interface VFXExtension<T> {
 }
 
 interface VFXRuntime {
+    warmup?(run: (delta: number) => void): void;
     emission?(delta: number): number;
     compute?: GPUBindGroupEntry[];
     render?: GPUBindGroupEntry[];

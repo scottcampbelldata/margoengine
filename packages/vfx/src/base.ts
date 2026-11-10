@@ -100,6 +100,8 @@ export interface VFXOptions {
   space?: import('./space.js').VFXSpace;
   /** Spin, speed, growth and speed limits over normalized lifetime. Needs `overLife`. */
   overLife?: import('./over-life.js').VFXOverLife;
+  /** Prewarm and timed burst cycles. Needs schedule from the optional /schedule entry. */
+  schedule?: import('./schedule.js').VFXSchedule;
   /** A ribbon behind each particle through its last positions, for smoke and magic trails. Needs `ribbons` from `@margoengine/vfx/ribbons`. */
   ribbons?: VFXRibbons;
   /** Draw each particle as a small lit triangle mesh instead of a billboard. Needs `mesh` from `@margoengine/vfx/mesh`. */
@@ -454,6 +456,8 @@ export interface VFXState {
 
 /** The GPU side of an added feature, made at attach and again after device restoration. */
 export interface VFXRuntime {
+  /** Optional first-frame/reset warmup; each callback submits one ordinary simulation step. */
+  warmup?(run: (delta: number) => void): void;
   /** Additional whole births before the frame budget is packed; called once per simulation step. */
   emission?(delta: number): number;
   /** Entries added to the simulation's bind group. */
@@ -504,6 +508,7 @@ const extensions = [
   'nodes',
   'space',
   'overLife',
+  'schedule',
 ] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
@@ -574,6 +579,7 @@ export interface VFXFeatures {
   nodes?: VFXExtension<VFXNodes>;
   space?: VFXExtension<import('./space.js').VFXSpace>;
   overLife?: VFXExtension<import('./over-life.js').VFXOverLife>;
+  schedule?: VFXExtension<import('./schedule.js').VFXSchedule>;
 }
 let nextId = 0;
 /**
@@ -967,6 +973,15 @@ export class VFX implements EnginePlugin {
     });
   }
   private simulate(c: Context): void {
+    for (const runtime of this.runtimes)
+      runtime.warmup?.((delta) => {
+        const encoder = c.device.createCommandEncoder();
+        this.simulateStep({ ...c, delta, encoder });
+        c.device.queue.submit([encoder.finish()]);
+      });
+    this.simulateStep(c);
+  }
+  private simulateStep(c: Context): void {
     this.validate();
     const o = this.options;
     this.time += c.delta;

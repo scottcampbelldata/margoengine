@@ -4246,6 +4246,10 @@
       "types": "./dist/vfx/shapes.d.ts",
       "import": "./dist/vfx/shapes.js"
     },
+    "./vfx/schedule": {
+      "types": "./dist/vfx/schedule.d.ts",
+      "import": "./dist/vfx/schedule.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

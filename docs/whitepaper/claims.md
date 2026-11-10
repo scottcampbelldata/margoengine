@@ -4064,3 +4064,4 @@ The compass maps cardinal clicks and ordinary turntable drags through the cube f
 ### Batch 235 job 3: calm-water planar reflections (2026-11-10)
 
 Optional water/reflector accepts environment Reflector captures, shows geometry outside the main camera, uses the successful-image projection, preserves existing Fresnel/foam and SSR replacement, and falls back exactly before a capture. Proof: packages/water/test/reflector.browser.mjs checks an independently projected offscreen red marker, fallback pixels, capture metadata/filter lifetime, SSR MRT compilation and restoration on both backends. Environment CPU/GPU mirror checks retain clipping/camera evidence. No speed claim.
+Batch 270 job 4: vfx/schedule supplies prewarm and timed/cycled/probabilistic burst schedules. schedule.test.js checks the event stream, seeding and bounds; parity.mjs --schedule compares prewarm with ordinary submitted steps and reset replay byte for byte on both GPU backends.

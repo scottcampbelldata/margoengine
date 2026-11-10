@@ -22,6 +22,8 @@ import { shadows } from './shadows.js';
 import { nodes } from './nodes.js';
 import { space } from './space.js';
 import { overLife } from './over-life.js';
+import { schedule } from './schedule.js';
+export type { VFXSchedule, VFXScheduledBurst } from './schedule.js';
 export type { VFXOverLife } from './over-life.js';
 export type { VFXSpace } from './space.js';
 export type {
@@ -73,6 +75,7 @@ const features = {
   nodes,
   space,
   overLife,
+  schedule,
 };
 /**
  * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons, mesh, events, lit, depthCollide, stretch, fields, skinned, flipbook, shadows, nodes). Effects that use none of them load

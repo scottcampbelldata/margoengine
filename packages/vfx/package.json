@@ -125,6 +125,10 @@
     "./shapes": {
       "types": "./dist/shapes.d.ts",
       "import": "./dist/shapes.js"
+    },
+    "./schedule": {
+      "types": "./dist/schedule.d.ts",
+      "import": "./dist/schedule.js"
     }
   },
   "files": [

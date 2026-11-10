@@ -4778,3 +4778,4 @@ Batch 194 job 3 reobserved the existing physical-composition compatibility limit
 ### Batch 235 job 3: captured-matrix and water feedback contract
 
 Environment now exposes the matrix of its last successful captured image rather than requiring consumers to read a mutable camera. captureOnly keeps capture active without drawing a second rectangle; water filters its draw from that capture to avoid self-feedback. Regression: environment/tests/mirror.test.js and water/test/reflector.browser.mjs prove snapshot identity, capture-only drawing, independent offscreen-object projection, exact unready fallback, SSR compilation and lifecycle.
+Batch 270 job 4: no new open defects identified in scheduling; the prewarm comparison protects separate per-step uniform writes/submissions and exact reset replay.
