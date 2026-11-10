@@ -1,8 +1,8 @@
 // Real-GPU checks for LightProbes.addCapture (@margoengine/environment/probes): a reflection probe over flat terrain
 // under a sky, with no environment and no core meshes, bakes black without the hook; with the terrain's passes and the
 // sky's replayed into the capture, its downward texels show the green terrain and its upward ones the blue sky. Live
-// capture then runs with the terrain's prepare pass replayed: after the frame, the terrain's own uniform holds the main
-// camera again (the restore), not the probe's.
+// capture then runs with the terrain's prepare pass replayed: after each frame, the terrain's own uniform holds the main
+// camera again (the restore), not the probe's, and its upload count follows terrain's changed-bits rule exactly.
 import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Terrain } from '@margoengine/terrain';
@@ -99,33 +99,66 @@ window.runTests = async () => {
 
   // Live capture replays terrain:prepare with the probe camera; the frame's terrain draw must see the main camera.
   // The ring uniform has no COPY_SRC: watch the queue's uploads to it. The last one before the frame's submit is what
-  // the frame's terrain draw reads.
+  // the frame's terrain draw reads. Terrain writes a ring uniform only when its bits differ from the last upload to that
+  // buffer (26faf9535), so each frame's count follows that rule exactly: the frame prepare uploads the main camera
+  // unless the buffer already holds those bits, then the six probe faces and the restore (the main camera again) always
+  // upload. The first frame keeps the camera the bake left (prepare skipped); the second moves it (prepare uploads).
   const ring = terrain.rings[0].uniform,
     queue = device.queue,
     writeBuffer = queue.writeBuffer,
-    eyes = [];
+    bitsOf = (data) => new Uint32Array(data.buffer, data.byteOffset, data.byteLength >> 2).slice(),
+    sameBits = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]),
+    eyeOf = (bits) => [...new Float32Array(bits.buffer, 0, 19).slice(16, 19)];
+  let held, uploads;
   queue.writeBuffer = function (buffer, offset, data, ...rest) {
-    if (buffer === ring) eyes.push([...new Float32Array(data.buffer, data.byteOffset, 19).slice(16, 19)]);
+    if (buffer === ring) (uploads ?? []).push((held = bitsOf(data)));
     return writeBuffer.call(this, buffer, offset, data, ...rest);
   };
-  probes.setLive({ facesPerFrame: 6 });
-  try {
+  const liveFrame = async (label) => {
+    assert(held, `${label}: the ring uniform was uploaded before the frame`);
+    const before = held;
+    uploads = [];
     engine.render();
+    await queue.onSubmittedWorkDone();
+    const seen = uploads,
+      main = seen.at(-1),
+      prepare = !!main && !sameBits(before, main),
+      eyes = seen.map(eyeOf),
+      eye = eyes.at(-1)?.map((v) => +v.toFixed(4));
+    uploads = undefined;
+    assert(
+      seen.length === (prepare ? 8 : 7),
+      `${label}: ${prepare ? 'frame prepare' : 'frame prepare skipped (the ring holds its bits)'}, six probe faces and the restore: ${seen.length} uploads`,
+    );
+    if (prepare)
+      assert(sameBits(seen[0], main), `${label}: the frame prepare and the restore upload the same main camera`);
+    assert(
+      eyes.slice(prepare ? 1 : 0, -1).every((e) => Math.abs(e[1] - 2) < 1e-4),
+      `${label}: the probe faces upload the probe position: ${JSON.stringify(eyes)}`,
+    );
+    checks.push({ name: label, prepare, uploads: eyes.length, eye });
+    assert(
+      eye.every((v, i) => Math.abs(v - engine.camera.position[i]) < 1e-4),
+      `${label}: terrain uniform holds the main camera after the capture: ${eye}`,
+    );
+    return { prepare, first: eyes[0] };
+  };
+  try {
+    // A bake ends with the restore, so the ring's last upload (what the frame prepare is compared with) is seen here.
+    await probes.bake();
+    assert(terrain.rings[0].uniform === ring, 'the bake keeps the ring buffer');
+    probes.setLive({ facesPerFrame: 6 });
+    await liveFrame('restore after live capture');
+    engine.camera.position = [4, 5, 8];
+    const moved = await liveFrame('restore after live capture, camera moved');
+    assert(moved.prepare, 'a moved camera changes the ring bits, so the frame prepare must upload');
+    assert(
+      moved.first.every((v, i) => Math.abs(v - engine.camera.position[i]) < 1e-4),
+      `the frame prepare uploads the moved main camera: ${moved.first}`,
+    );
   } finally {
     queue.writeBuffer = writeBuffer;
   }
-  await queue.onSubmittedWorkDone();
-  const eye = eyes.at(-1).map((v) => +v.toFixed(4));
-  assert(eyes.length === 8, `frame prepare, six probe faces and the restore: ${eyes.length} uploads`);
-  assert(
-    eyes.slice(1, 7).every((e) => Math.abs(e[1] - 2) < 1e-4),
-    `the probe faces upload the probe position: ${JSON.stringify(eyes)}`,
-  );
-  checks.push({ name: 'restore after live capture', eye });
-  assert(
-    eye.every((v, i) => Math.abs(v - engine.camera.position[i]) < 1e-4),
-    `terrain uniform holds the main camera after the capture: ${eye}`,
-  );
   probes.setLive(null);
   removeTerrain();
   removeSky();
