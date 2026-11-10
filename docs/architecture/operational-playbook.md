@@ -6719,3 +6719,8 @@ Sciviz media captures use existing target views and a copied off-axis camera; no
 
 
 Review 3 L1 evidence (section 5): LOD material and cluster controllers release their scene registrations by identity after local cleanup. The real-Engine regression uses a secondary scene, a real PBR model, a populated cluster and unrelated same-name default-scene plugins; it verifies frame-pass removal and retained input ownership. No selection, projection-error or dithering math changes.
+
+
+Review 2 live Blender arithmetic: Ping-Pong uses an origin-anchored triangular wave with absolute scale. packages/blender/tests/nodes-browser.mjs compares 140 publicly evaluated Blender values on the native and compatibility GPU paths; the independent oracle catches phase reversal and signed-scale errors.
+
+Review 2 Blender GPU gates: all four optional browser drivers now serve repository URLs from a module-relative repository root even when npm starts in packages/blender. The isolated launch regression in packages/blender/tests/browser-working-directory.test.js checks every driver without launching a GPU.

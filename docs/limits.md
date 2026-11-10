@@ -6072,3 +6072,6 @@ Batch 178 job 3 measured gzip: sciviz/export-media 6994 B (ceiling 7250), lines/
 Review 3 L1: direct MSFTMaterialLOD and ClusterLOD disposal unregisters the controller from its actual scene. Cluster frame passes are removed with the registration; source models, hierarchy geometry and anchors remain caller-owned. Repeated direct disposal and scene-initiated disposal are safe, and same-name plugins in another scene survive. No public API change.
 
 Review 3 U1: UpViewCube retains the owned world-space camera-up identity when deriving pole azimuth. Repeated positive or negative quarter rolls at Top/Bottom now compose exactly in Y-up, Z-up and arbitrary world frames. The existing projection-owned continuous compass-spin finish item is separate and remains open. No public API or rotation formula changes.
+
+
+Review 2 Blender live Ping-Pong: period is twice the absolute scale, zero input and zero scale produce zero, and signed inputs reflect across zero. The 140-value evaluated Blender fixture covers input -32..32 and scales 0, 0.5, 1, 2, 8, -1, -2; GPU pixel comparison retains the existing one-byte tolerance.

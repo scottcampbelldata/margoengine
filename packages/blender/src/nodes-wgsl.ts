@@ -8,7 +8,7 @@ export const mathExpressions: Record<string, string> = {
   SMOOTH_MIN: 'bnSmoothMin(a,b,c)', SMOOTH_MAX: '-bnSmoothMin(-a,-b,c)',
   ROUND: 'floor(a+0.5)', FLOOR: 'floor(a)', CEIL: 'ceil(a)', TRUNC: 'trunc(a)', FRACT: 'fract(a)',
   MODULO: 'select(0.0,a-trunc(bnDiv(a,b))*b,b!=0.0)', FLOORED_MODULO: 'select(0.0,a-floor(bnDiv(a,b))*b,b!=0.0)',
-  WRAP: 'bnWrap(a,b,c)', SNAP: 'floor(bnDiv(a,b))*b', PINGPONG: 'abs(b-abs(bnWrap(a,-b,b)))',
+  WRAP: 'bnWrap(a,b,c)', SNAP: 'floor(bnDiv(a,b))*b', PINGPONG: 'bnPingPong(a,b)',
   SINE: 'sin(a)', COSINE: 'cos(a)', TANGENT: 'tan(a)', ARCSINE: 'asin(clamp(a,-1.0,1.0))',
   ARCCOSINE: 'acos(clamp(a,-1.0,1.0))', ARCTANGENT: 'atan(a)', ARCTAN2: 'atan2(a,b)',
   SINH: 'sinh(a)', COSH: 'cosh(a)', TANH: 'tanh(a)', RADIANS: 'radians(a)', DEGREES: 'degrees(a)',
@@ -30,6 +30,7 @@ fn bnPow(a:f32,b:f32)->f32 {if(a<0.0){if(fract(b)!=0.0){return 0.0;}return pow(-
 fn bnLog(a:f32,b:f32)->f32 {if(a<=0.0||b<=0.0||b==1.0){return 0.0;}return log(a)/log(b);}
 fn bnSmoothMin(a:f32,b:f32,k:f32)->f32 {if(k==0.0){return min(a,b);}let h=max(k-abs(a-b),0.0)/k;return min(a,b)-h*h*h*k/6.0;}
 fn bnWrap(a:f32,hi:f32,lo:f32)->f32 {let d=hi-lo;if(d==0.0){return lo;}return a-d*floor((a-lo)/d);}
+fn bnPingPong(a:f32,b:f32)->f32 {let scale=abs(b);return scale-abs(bnWrap(a,2.0*scale,0.0)-scale);}
 fn bnHSV(c:vec3f)->vec3f {
  let hi=max(c.x,max(c.y,c.z));let lo=min(c.x,min(c.y,c.z));let d=hi-lo;var h=0.0;
  if(d>0.0){if(hi==c.x){h=(c.y-c.z)/d;}else if(hi==c.y){h=2.0+(c.z-c.x)/d;}else{h=4.0+(c.x-c.y)/d;}}

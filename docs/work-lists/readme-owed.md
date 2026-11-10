@@ -1164,3 +1164,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/lod (review 3 L1): document direct MSFTMaterialLOD/ClusterLOD disposal removing scene registrations and frame passes while retaining caller-owned inputs.
 
 - @margoengine/viewcube (review 3 U1): document repeated quarter rolls at Top/Bottom for custom world-up frames, including returning to the original orientation.
+
+
+- @margoengine/blender: document origin-anchored live Ping-Pong, signed scale and zero-scale behavior with the /nodes entry.
+- @margoengine/blender: record the four package browser commands and their repository-root serving behavior during the README phase.

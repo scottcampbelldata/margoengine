@@ -3765,3 +3765,6 @@ Build with `npm run build:packages`. CPU: `node --test --test-timeout=120000 pac
 Batch 179 GPU state mutation regression: after GpuArray.write followed by isosurface.update, saving waits for the mutation and snapshots the consumed field again. Both native WebGPU and compatibility exact captures reproduce the updated field with zero differing bytes. Async mutations are included in the figure's pending state set.
 ## Batch 178 job 3: media
 After build:packages, run the shared-slot command in [sciviz-media.md](../sciviz-media.md#evidence-and-reproduction). The NOAA wind page exercises image/video/ZIP controls. The test writes test-results/sciviz-media/report.json, checks bit-exact tiled/full wind pixels on both backends, streams beyond the texture limit, and uses browser video playback/seek as an independent container oracle. CPU tests cover PNG chunks, ZIP loading, lifetime, timeline restoration and metadata; no benchmark or speed assertion is run.
+
+
+Review 2 Blender Ping-Pong: run Blender --background --factory-startup --python packages/blender/tests/pingpong-reference.py to reproduce the public-API oracle. Run the blender/test:browser:nodes GPU package leaf on native WebGPU and MARGO_COMPAT=1. packages/blender/tests/nodes-browser.mjs retains the same one-byte tolerance for every frozen value and also checks all previous graph variants.
