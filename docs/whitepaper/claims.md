@@ -1,5 +1,16 @@
 # Claims and evidence
 
+Verify cache bookkeeping: for 128 existing archives and 12 new package outputs,
+`tests/result-cache.test.js` proves 1,614 versus zero per-archive stats under cap
+and 1,548 versus zero at cap on Windows, with identical retained bytes, zero
+archive-content bytes read by eviction, and unchanged
+per-insertion capacity enforcement. Shared touches, additions, removals and
+timestamp ties/backwards changes are covered. Fresh native metadata comes from
+enumeration, with stat retained for special entries and other platforms.
+This is a deterministic work claim only; no timing
+or rendering claim follows. Details: operational playbook, section 5 evidence
+"verify cache settlement"; research: `docs/clean-room.md`.
+
 GPU lease correction (Bug 45, 2026-11-09): `MARGO_GPU_IDLE_MIN` declares a measured
 compile idle window, default three minutes and capped by the unchanged hard hold.
 The independent heartbeat reads the recorded window. Deterministic regressions

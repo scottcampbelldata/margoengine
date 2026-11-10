@@ -1,5 +1,43 @@
 # Clean room
 
+## Verify cache settlement: repeated metadata work
+
+Research reviewed before implementation, using papers' abstracts and the
+official API description, with no companion implementation source:
+
+- Tanmay Agrawal, Ashay Shirwadkar, Pratik Gaikar and Kushagra Verma,
+  *MetaCache: Efficient Metadata Caching in Linux file system* (2014),
+  https://arxiv.org/abs/1409.8239 . Metadata lookup can dominate workloads with
+  many small files. Persistent metadata caching would need cross-lane coherence.
+- Jingwei Xu, Mingkai Dong, Qiulin Tian, Ziyi Tian, Tong Xin and Haibo Chen,
+  *SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with
+  In-Network Coordination* (2024, revised 2025),
+  https://arxiv.org/abs/2410.08618 . Compared latency hiding and amortized
+  metadata work with preserving synchronous filesystem semantics. This local
+  store needs neither distributed coordination nor deferred capacity checks.
+- Node.js contributors, *File system*, synchronous API and `fs.statSync`
+  documentation (accessed 2026), https://nodejs.org/api/fs.html . Synchronous
+  metadata calls block the event loop; changing them to promises alone would
+  leave the repeated work in place.
+- Microsoft, *DirectoryInfo.EnumerateFileSystemInfos* and *FileInfo.Length*,
+  .NET Framework 4.8.1 API documentation (accessed 2026):
+  https://learn.microsoft.com/en-us/dotnet/api/system.io.directoryinfo.enumeratefilesysteminfos?view=netframework-4.8.1
+  and https://learn.microsoft.com/en-us/dotnet/api/system.io.fileinfo.length?view=netframework-4.8.1 .
+  Enumeration pre-populates timestamps and length, avoiding individual metadata
+  lookups. No implementation source was read or copied.
+
+Own inference and implementation: the observed store was already at its 5 GiB
+cap with about 60,000 archives. Size reuse below cap alone would leave repeated
+timestamp lookups at cap. Instead reuse metadata supplied by each fresh Windows
+directory enumeration via the system .NET runtime. Keep Node's original listing
+order, follow links with stat and preserve the portable stat scan. No metadata
+survives an eviction call; backward clock changes and shared-store touches are
+observed. Keep per-write eviction rather than defer it to the end: later touches
+and recreated keys can otherwise change the result. Deterministic fixtures for
+128 archives and 12 outputs prove 1,614 versus zero per-file stats under cap,
+1,548 versus zero at cap, identical bytes/retention and zero archive-content
+reads by eviction. No elapsed speed result is claimed. All code is original.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

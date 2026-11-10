@@ -1,5 +1,45 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: verify cache settlement
+
+After the build prints sizes and the catalog, verify settles the shadow result
+cache before launching its parallel checks. It merges recorded inputs, hashes
+and packs package outputs, publishes passes and enforces the archive cap. This
+is parent-process work, so an empty child-process list does not imply a hang.
+Verify now names that work before it begins. Previously every newly packed
+package synchronously statted and sorted the entire archive directory.
+
+Windows directory enumeration already returns sizes and timestamps, which
+Node's Dirent omits. `scripts/support/archive-metadata.ps1` reads those fields
+through the system .NET runtime, avoiding a separate native metadata lookup per
+archive. Every insertion still takes a fresh inventory and enforces the same
+cap. Node's listing supplies tie order; links/directories and disappeared
+entries retain the stat path, and other platforms use the original stat scan.
+The helper has a hard 60-second limit and propagates errors. Sorting happens
+only when deletion is necessary; archive writes, compression, keys, poisoning,
+comparisons, retirement and checks are unchanged. No timestamps are memoized.
+
+`tests/result-cache.test.js` compares the former full-stat path with enumeration:
+128 existing archives plus 12 outputs require 1,614 versus zero per-archive
+stats under cap, and 1,548 versus zero at cap, with identical retained names
+and bytes and zero archive-content bytes read by eviction. Both paths perform
+12 Node listings; Windows also performs 12 native metadata enumerations.
+Further fixtures cover shared touches/additions/removals, backwards timestamps,
+per-write eviction, ties and recreated keys. `tests/archive-metadata.test.js`
+matches stat metadata, fractional/pre-epoch times, Unicode paths, directories,
+disappearances and helper failures.
+`tests/verify-cache-progress.test.js` requires the progress line before work.
+These deterministic regressions run in verify, hence check:merge. No elapsed
+speed result is claimed; every inventory still scales with archive count and
+uses a short system helper process on Windows. Sources are in `docs/clean-room.md`.
+
+Validation: the single full verify passes 14,233 tests with zero failures/skips
+and no cache disagreements. The final expanded focused suite passes 42/42.
+Lint and hygiene pass (the initial standalone hygiene required rebuilding stale
+worktree declarations). A read-only inventory of the live shared store reports
+59,914 archives and zero per-file stat calls on the native path. Cache counts
+can change as other lanes write; deterministic fixtures supply the comparison.
+
 ### Batch 133 land-only validation
 
 The optional native decoder retains the default prebuilts and its existing

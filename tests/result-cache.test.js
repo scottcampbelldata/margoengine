@@ -12,6 +12,7 @@ import fs, {
   readFileSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
@@ -20,6 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { classifyCommand } from '../scripts/support/record-reads.mjs';
+import { archiveMetadata } from '../scripts/support/archive-metadata.mjs';
 import {
   buildManifest,
   collectLogs,
@@ -517,6 +519,110 @@ test('the store lives in the per-user folder', () => {
   assert.equal(defaultStoreDir({ LOCALAPPDATA: 'L' }), join('L', 'margoengine', 'result-cache'));
 });
 
+/** The old per-output stat scan is the reference; no wall-clock measurements enter this comparison. */
+function outputBatchFixture(t, { fullScan = false, archives = 128, capBytes = Infinity } = {}) {
+  const base = temp(t),
+    store = new ResultStore(join(base, 'store'), {
+      capBytes,
+      readOutputs: fullScan ? (folder) => archiveMetadata(folder, { platform: 'portable' }) : undefined,
+    }),
+    output = join(base, 'output');
+  mkdirSync(output);
+  writeFileSync(join(output, 'value.txt'), 'identical output bytes');
+  const packed = store.storeOutput('seed', output),
+    bytes = readFileSync(packed);
+  for (let i = 0; i < archives; i++) {
+    const path = join(store.dir, 'dist', `seed-${i}.gz`);
+    writeFileSync(path, bytes);
+    utimesSync(path, 100 + i, 100 + i);
+  }
+  rmSync(packed, { force: true });
+  return { store, output, bytes };
+}
+
+for (const atCap of [false, true]) test(`Windows output enumeration eliminates per-archive stats ${atCap ? 'at' : 'under'} cap with identical bytes`, (t) => {
+  const { statSync: stat, readFileSync: read } = fs,
+    counts = [],
+    retained = [];
+  t.after(() => {
+    fs.statSync = stat;
+    fs.readFileSync = read;
+    syncBuiltinESMExports();
+  });
+  for (const fullScan of [true, false]) {
+    const { store, output, bytes } = outputBatchFixture(t, { fullScan });
+    if (atCap) store.capBytes = bytes.length * 128;
+    let statted = 0,
+      archiveBytesRead = 0;
+    fs.statSync = (path, ...rest) => {
+      if (dirname(String(path)) === join(store.dir, 'dist')) statted++;
+      return stat(path, ...rest);
+    };
+    fs.readFileSync = (path, ...rest) => {
+      const bytes = read(path, ...rest);
+      if (dirname(String(path)) === join(store.dir, 'dist')) archiveBytesRead += bytes.length;
+      return bytes;
+    };
+    syncBuiltinESMExports();
+    for (let i = 0; i < 12; i++) store.storeOutput(`build-${i}`, output);
+    counts.push({ statted, archiveBytesRead });
+    fs.statSync = stat;
+    fs.readFileSync = read;
+    syncBuiltinESMExports();
+    retained.push(readdirSync(join(store.dir, 'dist')).map((name) => [name, read(join(store.dir, 'dist', name))]));
+    assert.equal(store.restoreOutput('build-11', output), true);
+    assert.equal(readFileSync(join(output, 'value.txt'), 'utf8'), 'identical output bytes');
+  }
+  const oldStats = atCap ? 1548 : 1614;
+  assert.deepEqual(counts, [
+    { statted: oldStats, archiveBytesRead: 0 },
+    { statted: process.platform === 'win32' ? 0 : oldStats, archiveBytesRead: 0 },
+  ]);
+  assert.deepEqual(retained[1], retained[0]);
+});
+
+test('native eviction sees other lanes, fresh touch ordering, ties and per-write capacity decisions', (t) => {
+  const results = [];
+  for (const fullScan of [true, false]) {
+    const { store, output, bytes } = outputBatchFixture(t, { fullScan, archives: 4 }),
+      dist = join(store.dir, 'dist'),
+      snapshots = [],
+      snapshot = () => snapshots.push(readdirSync(dist).filter((name) => name.endsWith('.gz')));
+    {
+      store.evict();
+      const other = new ResultStore(store.dir);
+      other.storeOutput('seed-0', output); // Another lane touches what used to be oldest.
+      rmSync(join(dist, 'seed-1.gz')); // Another lane removes an output.
+      writeFileSync(join(dist, 'foreign.gz'), bytes); // Another lane publishes a new key.
+      utimesSync(join(dist, 'foreign.gz'), 102, 102); // Tie with seed-2: listing order still decides.
+      store.capBytes = bytes.length * 4;
+      store.storeOutput('new-0', output);
+      snapshot();
+      store.storeOutput('new-1', output);
+      snapshot();
+      // Returning to an evicted key must recreate it and enforce the cap at this write, too.
+      store.storeOutput('foreign', output);
+      snapshot();
+      results.push({ snapshots, total: store.evict() });
+    }
+    assert.equal(existsSync(join(dist, 'seed-0.gz')), true, 'the other lane refreshed its timestamp');
+    assert.equal(existsSync(join(dist, 'seed-2.gz')), false, 'the old timestamp is evicted');
+  }
+  assert.deepEqual(results[1], results[0]);
+  assert.equal(results[1].snapshots[0].includes('foreign.gz'), false, 'equal timestamps retain listing order');
+});
+
+test('every eviction observes timestamps moved backwards by another lane', (t) => {
+  const { store, bytes } = outputBatchFixture(t, { archives: 2 }),
+    newest = join(store.dir, 'dist', 'seed-1.gz');
+  store.evict();
+  utimesSync(newest, 1, 1);
+  store.capBytes = bytes.length;
+  assert.equal(store.evict(), bytes.length);
+  assert.equal(existsSync(newest), false);
+  assert.equal(existsSync(join(store.dir, 'dist', 'seed-0.gz')), true);
+});
+
 test('building three small packages twice gives the same bytes', { timeout: 120_000 }, (t) => {
   // In a temp tree, because verify runs this file beside steps that read the real dist folders.
   const tree = temp(t),
@@ -680,7 +786,10 @@ test('two processes with one process id keep two logs', (t) => {
 
 test('evict takes a stored output another run removed while it was looking', (t) => {
   const dir = join(temp(t), 'store'),
-    store = new ResultStore(dir, { capBytes: 1 }),
+    store = new ResultStore(dir, {
+      capBytes: 1,
+      readOutputs: (folder) => archiveMetadata(folder, { platform: 'portable' }),
+    }),
     folder = join(temp(t), 'out');
   mkdirSync(folder, { recursive: true });
   writeFileSync(join(folder, 'a.txt'), 'a');

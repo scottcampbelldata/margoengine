@@ -1,5 +1,13 @@
 # Design envelope
 
+Verify's shadow archive store retains its 5 GiB cap and per-write oldest-first
+eviction. Windows reads fresh enumeration metadata through its system .NET
+runtime rather than individually statting every ordinary archive; a helper
+invocation is bounded at 60 seconds. Links/directories and non-Windows platforms
+retain Node stat behavior. Every insertion still inventories the full directory,
+so enumeration/transfer work scales with archive count. No metadata is retained
+between evictions. This changes tooling work, not engine size.
+
 GPU lock idle reclamation defaults to three minutes. `MARGO_GPU_IDLE_MIN` may
 cover a measured shader compile plus margin, capped by the command's existing
 `--max` hard hold limit. It does not extend test deadlines. The lease records the

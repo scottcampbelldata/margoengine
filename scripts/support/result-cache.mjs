@@ -27,6 +27,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { margoError } from '../../packages/shared/errors.js';
 import { packageClosure, packageDependencies } from '../package-order.js';
+import { archiveMetadata } from './archive-metadata.mjs';
 import { isClockInfrastructure, READ_RANK } from './record-reads.mjs';
 
 export const CAP_BYTES = 5 * 1024 ** 3;
@@ -596,9 +597,12 @@ function readEntry(file) {
 }
 
 export class ResultStore {
-  constructor(dir = defaultStoreDir(), { capBytes = CAP_BYTES } = {}) {
+  #readOutputs;
+
+  constructor(dir = defaultStoreDir(), { capBytes = CAP_BYTES, readOutputs = archiveMetadata } = {}) {
     this.dir = dir;
     this.capBytes = capBytes;
+    this.#readOutputs = readOutputs;
     for (const part of ['steps', 'poison', 'dist']) mkdirSync(join(dir, part), { recursive: true });
   }
   #stepDir(step) {
@@ -708,25 +712,19 @@ export class ResultStore {
   /** Removes the oldest stored outputs until the store is under its cap. */
   evict() {
     const folder = join(this.dir, 'dist'),
-      files = readdirSync(folder)
-        .filter((name) => name.endsWith('.gz'))
-        // Worktrees share the store, so another run may have removed a file since the listing: it is no longer stored.
-        .flatMap((name) => {
-          const path = join(folder, name),
-            stat = statSync(path, { throwIfNoEntry: false });
-          return stat ? [{ path, ...pick(stat) }] : [];
-        })
-        .sort((a, b) => a.at - b.at);
+      files = this.#readOutputs(folder);
     let total = files.reduce((sum, { size }) => sum + size, 0);
-    for (const { path, size } of files) {
-      if (total <= this.capBytes) break;
-      if (retire(path)) total -= size;
+    if (total > this.capBytes) {
+      files.sort((a, b) => a.at - b.at);
+      for (const { path, size } of files) {
+        if (total <= this.capBytes) break;
+        if (retire(path)) total -= size;
+      }
     }
     return total;
   }
 }
 
-const pick = (stat) => ({ at: stat.mtimeMs, size: stat.size });
 /** A stored output's bytes, or undefined once another run has evicted it. */
 function readStored(file) {
   try {

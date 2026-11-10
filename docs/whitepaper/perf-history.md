@@ -1,5 +1,14 @@
 # Performance history: losses, causes and fixes
 
+## Verify cache metadata work
+
+The post-build pause repeated a full synchronous archive stat/sort per newly
+packed package. Fresh Windows enumeration metadata reduces 1,614 per-file stats
+to zero under cap and 1,548 to zero at cap for the 128-archive/12-output fixture,
+retaining identical bytes and per-write eviction. Both paths use 12 Node
+listings; Windows adds 12 native enumerations through its system .NET runtime.
+All timestamps remain fresh. This is work-count evidence without timing claims.
+
 ## Batch 134 owned-storage checkpoint, timing deferred
 
 The [current scoped evidence](results/batch-134-owned-zstd-checkpoint.json)

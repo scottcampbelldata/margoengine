@@ -1,5 +1,14 @@
 # Reproducing Margo's numbers
 
+For verify cache metadata counts and progress ordering, run
+`node --experimental-test-module-mocks --test --test-timeout=120000 tests/result-cache.test.js tests/archive-metadata.test.js tests/verify-cache-progress.test.js`.
+The 128-archive/12-output fixture compares stat and native enumeration paths:
+1,614 versus zero per-file stats under cap and 1,548 versus zero at cap on
+Windows, with zero eviction archive-content bytes read and identical retained
+names/bytes. Other platforms retain the stat counts. Additional fixtures cover
+metadata equality, shared changes, timestamp ties/backwards changes, per-write
+capacity decisions, disappearing entries and native helper errors.
+
 For the Bug 45 GPU idle-lease correction, run
 `node --test --test-timeout=60000 tests/gpu-idle-window.test.js tests/gpu-activity.test.js tests/gpu-monitor-edges.test.js tests/gpu-lock.test.js`.
 These CPU fixtures simulate the exact idle intervals and inspect real fake-lock

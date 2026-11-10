@@ -81,8 +81,9 @@ export function cacheKind(command) {
 }
 
 /** Records one finished step and prints what the store would have done with it. */
-function settle(shadow, { command, code, seconds, recordDir }) {
+export function settle(shadow, { command, code, seconds, recordDir }) {
   if (!shadow || !recordDir) return;
+  console.log(`  cache: settling ${command}: recording inputs, packing outputs and enforcing the archive cap`);
   const kind = cacheKind(command),
     rows = shadow.finish(command, recordDir, { kind, code, seconds });
   if (kind !== 'step') {
