@@ -173,6 +173,8 @@ const TOOLS = {
     'by-hand proof against an HTTP/3 server on the outside tool aioquic, which needs Python; run directly',
   'packages/webgl2-compat/test/metal-dropped-draw-repro.mjs':
     'raw WebGL2 repro of the ANGLE Metal dropped draw, not a gate: it prints what the browser does (test:gpu checks the fix in compute-browser.mjs scatterAfterWrite); run directly',
+  'packages/sky/test/compat-night-probe.mjs':
+    'raw repro of the compat meadow difference on ANGLE Metal, not a gate: it prints the differing pixels per GLSL variant (test:gpu checks meadow in browser-check.mjs, test/compat-night-glsl.test.js pins the GLSL); run directly',
   'packages/vfx/test/bench-soft.mjs':
     'benchmark of soft particles with the GPU held exclusively (test:gpu checks the pixels)',
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',
