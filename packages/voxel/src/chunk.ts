@@ -62,6 +62,8 @@ export let uniformState: (chunk: VoxelChunk) => number | undefined;
 export let paletteOf: (chunk: VoxelChunk) => Uint32Array;
 /** The chunk's light: its one byte while every cell has it, else a copy of the 32,768 bytes. */
 export let lightOf: (chunk: VoxelChunk) => number | Uint8Array;
+/** Internal light change counter for optional renderers sharing the world's dirty queue. */
+export let lightVersion: (chunk: VoxelChunk) => number;
 /** Replaces the chunk's light with one byte for every cell or 32,768 bytes (taken, not copied). */
 export let writeLight: (chunk: VoxelChunk, light: number | Uint8Array) => void;
 
@@ -82,8 +84,10 @@ export class VoxelChunk {
   private bits: Bits = 0;
   private words: Uint32Array | null = null;
   private lightByte = 0;
+  private lightRevision = 0;
   private lightCells: Uint8Array | null = null;
   static {
+    lightVersion = (chunk) => chunk.lightRevision;
     reserveCells = (chunk, states, count) => {
       const missing = new Set<number>();
       for (let i = 0; i < count; i++) if (chunk.find(states[i]) < 0) missing.add(states[i]);
@@ -97,6 +101,7 @@ export class VoxelChunk {
     paletteOf = (chunk) => chunk.palette.subarray(0, chunk.size);
     lightOf = (chunk) => (chunk.lightCells ? chunk.lightCells.slice() : chunk.lightByte);
     writeLight = (chunk, light) => {
+      chunk.lightRevision++;
       if (typeof light === 'number') {
         chunk.lightByte = light;
         chunk.lightCells = null;
@@ -178,6 +183,8 @@ export class VoxelChunk {
   setLight(x: number, y: number, z: number, light: number): void {
     if ((x & 31) !== x || (y & 31) !== y || (z & 31) !== z) throw cellError(x, y, z);
     if ((light & 255) !== light) throw integerError('Light byte', light, 255, 'pass sky << 4 | block');
+    if (this.getLight(x, y, z) === light) return;
+    this.lightRevision++;
     if (!this.lightCells) {
       if (light === this.lightByte) return;
       this.lightCells = new Uint8Array(CELLS).fill(this.lightByte);
@@ -190,6 +197,7 @@ export class VoxelChunk {
    */
   fillLight(light: number): void {
     if ((light & 255) !== light) throw integerError('Light byte', light, 255, 'pass sky << 4 | block');
+    if (this.lightCells || this.lightByte !== light) this.lightRevision++;
     this.lightByte = light;
     this.lightCells = null;
   }

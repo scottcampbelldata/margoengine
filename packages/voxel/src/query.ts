@@ -4,6 +4,7 @@
 import type { BoxLike, MutableVec3, Vec3 } from '@margoengine/math';
 import type { BlockType } from './blocks.js';
 import { octants } from './octants.js';
+import { cellBoxes } from './model-data.js';
 import type { VoxelWorld } from './world.js';
 
 /** A hit from {@link raycastVoxels}. */
@@ -110,6 +111,48 @@ const boxes = (type: BlockType, state: number): number =>
 // Where ray o + t d (t from t0 to t1, inside cell c) first enters an octant of `mask`: walks the cell's 2 x 2 x 2 half
 // blocks as the cell walk does. Writes t and the entered axis (-1: it starts inside one) to OCT; false on a miss.
 const OCT = [0, 0];
+function modelHit(
+  type: BlockType,
+  state: number,
+  c: Vec3,
+  o: Vec3,
+  d: Vec3,
+  t0: number,
+  t1: number,
+  entered: number,
+): boolean {
+  let best = Infinity,
+    bestAxis = -1;
+  for (const box of cellBoxes(type, state)) {
+    let near = -Infinity,
+      far = Infinity,
+      axis = -1;
+    for (let a = 0; a < 3; a++) {
+      const lo = c[a] + box.min[a],
+        hi = c[a] + box.max[a];
+      if (!d[a]) {
+        if (o[a] < lo || o[a] >= hi) far = -Infinity;
+        continue;
+      }
+      const n = ((d[a] > 0 ? lo : hi) - o[a]) / d[a],
+        f = ((d[a] > 0 ? hi : lo) - o[a]) / d[a];
+      if (n > near) {
+        near = n;
+        axis = a;
+      }
+      far = Math.min(far, f);
+    }
+    const at = Math.max(near, t0);
+    if (far > at && at <= t1 && at < best) {
+      best = at;
+      bestAxis = near >= t0 ? axis : entered;
+    }
+  }
+  if (best === Infinity) return false;
+  OCT[0] = best;
+  OCT[1] = bestAxis;
+  return true;
+}
 function octantHit(mask: number, c: Vec3, o: Vec3, d: Vec3, t0: number, t1: number, axis: number): boolean {
   const h = [0, 0, 0],
     next = [0, 0, 0];
@@ -200,7 +243,12 @@ export function raycastVoxels(
       let axis: number = stepped & 1 ? 0 : stepped & 2 ? 1 : stepped & 4 ? 2 : -1,
         at = t;
       // A slab or stair is hit where the ray meets its boxes, if it does before leaving the cell.
-      if (
+      if (type?.model && mask) {
+        if (modelHit(type, state, [x, y, z], [ox, oy, oz], [dx, dy, dz], t, Math.min(tx, ty, tz, end), axis)) {
+          at = OCT[0];
+          axis = OCT[1];
+        } else axis = -2;
+      } else if (
         mask !== 255 &&
         mask &&
         octantHit(mask, [x, y, z], [ox, oy, oz], [dx, dy, dz], t, Math.min(tx, ty, tz, end), axis)
@@ -215,7 +263,7 @@ export function raycastVoxels(
           d = [dx, dy, dz];
         if (at === t && t) {
           for (let a = 0; a < 3; a++) if (stepped & (1 << a)) point[a] = d[a] > 0 ? cell[a] : cell[a] + 1;
-        } else if (at !== t && axis >= 0) point[axis] = cell[axis] + 0.5;
+        } else if (at !== t && axis >= 0 && !type?.model) point[axis] = cell[axis] + 0.5;
         if (axis >= 0) normal[axis] = -Math.sign(d[axis]);
         return {
           cell,
@@ -277,19 +325,27 @@ function clip(world: VoxelWorld, b: Float64Array, a: number, m: number): number 
         const state = world.getBlock(cell[0], cell[1], cell[2]),
           type = table[state & 0xffff];
         if (!type?.solid) continue;
+        const custom = type.model ? cellBoxes(type, state) : undefined;
         const mask = boxes(type, state),
           whole = mask === 255;
         // A whole cell is one box; a slab or stair is each filled octant (half a block on every axis).
-        for (let k = 0; k < (whole ? 1 : 8); k++) {
-          if (!whole && !((mask >> k) & 1)) continue;
+        for (let k = 0; k < (custom ? custom.length : whole ? 1 : 8); k++) {
+          if (!custom && !whole && !((mask >> k) & 1)) continue;
           const size = whole ? 1 : 0.5,
-            lo = n + (!whole && k & bit[a] ? 0.5 : 0),
-            hu = i + (!whole && k & bit[u] ? 0.5 : 0),
-            hv = j + (!whole && k & bit[v] ? 0.5 : 0);
-          if (hu >= b[u + 3] - EPS || hu + size <= b[u] + EPS || hv >= b[v + 3] - EPS || hv + size <= b[v] + EPS)
+            box = custom?.[k],
+            lo = n + (box ? box.min[a] : !whole && k & bit[a] ? 0.5 : 0),
+            hi = box ? n + box.max[a] : lo + size,
+            hu = i + (box ? box.min[u] : !whole && k & bit[u] ? 0.5 : 0),
+            hv = j + (box ? box.min[v] : !whole && k & bit[v] ? 0.5 : 0);
+          if (
+            hu >= b[u + 3] - EPS ||
+            (box ? i + box.max[u] : hu + size) <= b[u] + EPS ||
+            hv >= b[v + 3] - EPS ||
+            (box ? j + box.max[v] : hv + size) <= b[v] + EPS
+          )
             continue;
-          const stop = up ? lo - face : lo + size - face;
-          if (up ? lo >= face - EPS && stop <= m + EPS : lo + size <= face + EPS && stop >= m - EPS) {
+          const stop = up ? lo - face : hi - face;
+          if (up ? lo >= face - EPS && stop <= m + EPS : hi <= face + EPS && stop >= m - EPS) {
             blocked = true;
             m = up ? Math.min(m, stop) : Math.max(m, stop);
           }

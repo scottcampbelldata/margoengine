@@ -4270,6 +4270,10 @@
       "types": "./dist/voxel/debris.d.ts",
       "import": "./dist/voxel/debris.js"
     },
+    "./voxel/models": {
+      "types": "./dist/voxel/models.d.ts",
+      "import": "./dist/voxel/models.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

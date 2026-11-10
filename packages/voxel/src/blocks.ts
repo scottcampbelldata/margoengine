@@ -3,6 +3,7 @@ import { parseColor } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
 import { octants, SLAB_DOUBLE, SLAB_TOP, STAIR_CORNER, STAIR_FIXED, WATERLOGGED } from './octants.js';
 import type { VoxelWorld } from './world.js';
+import type { ModelOrientation } from './model-data.js';
 
 /**
  * Render pass of a block type: `'opaque'` (back-face culled, hides its neighbours' faces), `'cutout'` (alpha
@@ -19,7 +20,7 @@ export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
  * {@link connectStairs}). Bit 15 of either waterlogs it ({@link waterlogState}). Slabs and stairs are meshed, lit,
  * shadowed, collided and picked as their half-block boxes ({@link shapeOctants}).
  */
-export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
+export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
 /** Side a stair's full-height back faces: `'+x'`, `'-x'`, `'+z'` or `'-z'`. */
 export type StairFacing = '+x' | '-x' | '+z' | '-z';
 /**
@@ -40,6 +41,8 @@ export type StairCorner =
 
 /** Options of {@link BlockTypes.define}. Every field is optional. */
 export interface BlockTypeOptions {
+  /** Prepared box model; use defineBlockModel from the optional models entry. Default none. */
+  model?: readonly ModelOrientation[];
   /**
    * Texture layer (0-2047) of every face, or one per face in the order +x, -x, +y, -y, +z, -z (`[side, side, top,
    * bottom, side, side]`). Default 0.
@@ -88,6 +91,8 @@ export interface BlockTypeOptions {
 
 /** A defined block type with every option resolved; `color` is linear RGB. Plain, structured-cloneable data. */
 export interface BlockType {
+  /** Prepared orientations for a custom box model, absent on built-in shapes. */
+  readonly model?: readonly ModelOrientation[];
   /** Its id: the low 16 bits of a block state. */
   readonly id: number;
   /** Its unique name. */
@@ -127,7 +132,7 @@ export interface BlockType {
 }
 
 const LAYERS: readonly BlockLayer[] = ['opaque', 'cutout', 'translucent', 'invisible'],
-  SHAPES: readonly BlockShape[] = ['cube', 'cross', 'liquid', 'slab', 'stair'],
+  SHAPES: readonly BlockShape[] = ['cube', 'cross', 'liquid', 'slab', 'stair', 'model'],
   FACINGS: readonly StairFacing[] = ['+x', '-x', '+z', '-z'];
 
 // Argument error for `value` that should be an integer in 0..max: TypeError for a non-number, RangeError otherwise.
@@ -310,6 +315,8 @@ export class BlockTypes {
       layer = choice(o.layer, 'layer', LAYERS),
       shape = choice(o.shape, 'shape', SHAPES),
       animation = o.animation ?? { frames: 1, fps: 0 };
+    if ((shape === 'model') !== !!o.model?.length)
+      throw new TypeError('Model shape needs prepared boxes; use defineBlockModel from @margoengine/voxel/models');
     if (!animation || typeof animation !== 'object') throw new TypeError('Block type animation must be {frames, fps}');
     const frames = animation.frames;
     if (!Number.isInteger(frames) || frames < 1 || frames > 2048)
@@ -330,6 +337,7 @@ export class BlockTypes {
       textures: [...faces] as unknown as BlockType['textures'],
       layer,
       shape,
+      ...(o.model ? { model: o.model } : {}),
       solid: flag(o.solid, 'solid', true),
       liquid: flag(o.liquid, 'liquid', false),
       light: level(o.light, 'light', 0),

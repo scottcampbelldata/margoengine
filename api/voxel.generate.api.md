@@ -38,9 +38,10 @@ export function serveVoxelGenerator(generate: VoxelGenerate): void;
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
+type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
 
 interface BlockType {
+    readonly model?: readonly ModelOrientation[];
     readonly id: number;
     readonly name: string;
     readonly textures: readonly [number, number, number, number, number, number];
@@ -66,6 +67,18 @@ interface BlockType {
     readonly transmission: number;
     readonly scatter: number;
     readonly waterlog: number;
+}
+
+interface ModelBox {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+    readonly uv: readonly (readonly number[])[];
+    readonly textures: readonly number[];
+}
+
+interface ModelOrientation {
+    readonly boxes: readonly ModelBox[];
+    readonly covered: number;
 }
 
 interface PackedChunk {

@@ -140,6 +140,7 @@ export class VoxelColorLight {
         c.blocks.define(t.name, {
           layer: t.layer,
           shape: t.shape,
+          ...(t.model ? { model: t.model } : {}),
           solid: t.solid,
           liquid: t.liquid,
           light: this.#emits(t, channel),

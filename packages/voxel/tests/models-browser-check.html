@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>Voxel custom models correctness</title><canvas width="240" height="180" style="width:240px;height:180px"></canvas>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {BlockTypes,VoxelWorld} from '@margoengine/voxel';
+import {defineBlockModel,VoxelModelRenderer,modelState} from '@margoengine/voxel/models';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0.5,0.5,-3],target:[0.5,0.5,0.5],near:0.1,far:100}});
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const blocks=new BlockTypes(),world=new VoxelWorld({blocks});
+const uv=Array.from({length:6},()=>[0,0,1,1]);
+const id=defineBlockModel(blocks,'panel',{boxes:[{min:[0,0,0.4],max:[1,1,0.6],uv}],color:[1,0,0]});
+world.setBlock(0,0,0,id);world.getChunk(0,0,0).fillLight(240);
+const renderer=await VoxelModelRenderer.create(engine,world);
+const image=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+async function draw(){renderer.update();for(let i=0;i<24;i++){engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r,1));}engine.render({delta:0});return image();}
+const red=a=>{let n=0;for(let i=0;i<a.length;i+=4)if(a[i]>50&&a[i]>a[i+1]*2&&a[i]>a[i+2]*2)n++;return n;};
+window.check={async run(){
+ const before=red(await draw());world.setBlock(0,0,0,modelState(id,4));const rotated=red(await draw());
+ world.removeChunk(0,0,0);const removed=red(await draw());
+ world.setBlock(0,0,0,id);world.getChunk(0,0,0).fillLight(240);const reloaded=red(await draw());
+ renderer.dispose();engine.render({delta:0});const disposed=red(image());
+ engine.dispose();return {before,rotated,removed,reloaded,disposed,errors};
+}};window.ready=true;
+</script>

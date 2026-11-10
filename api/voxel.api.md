@@ -8,9 +8,10 @@ import { ColorInput } from "@margoengine/math";
 
 export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
+export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
 
 export interface BlockType {
+    readonly model?: readonly ModelOrientation[];
     readonly id: number;
     readonly name: string;
     readonly textures: readonly [number, number, number, number, number, number];
@@ -39,6 +40,7 @@ export interface BlockType {
 }
 
 export interface BlockTypeOptions {
+    model?: readonly ModelOrientation[];
     textures?: number | readonly [number, number, number, number, number, number];
     layer?: BlockLayer;
     shape?: BlockShape;
@@ -140,4 +142,18 @@ export const slabState: (id: number, top?: boolean) => number;
 export function stairState(id: number, facing: StairFacing, upsideDown?: boolean, corner?: StairCorner): number;
 
 export function waterlogState(state: number, wet?: boolean): number;
+
+// Not exported from this entry, but used by the exports above:
+
+interface ModelBox {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+    readonly uv: readonly (readonly number[])[];
+    readonly textures: readonly number[];
+}
+
+interface ModelOrientation {
+    readonly boxes: readonly ModelBox[];
+    readonly covered: number;
+}
 ```

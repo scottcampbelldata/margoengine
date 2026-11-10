@@ -3,6 +3,7 @@
 // Only types come from @margoengine/physics: this entry adds no runtime import, so neither it nor the root pulls a solver.
 import type { ColliderOptions, Physics, PhysicsBody, PhysicsCollider } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
+import { meshBlockModels } from './model-mesh.js';
 import { octants } from './octants.js';
 import { paletteOf, type VoxelChunk } from './chunk.js';
 import { chunkKey, VoxelWorld } from './world.js';
@@ -534,7 +535,7 @@ export class VoxelPhysics {
     const table = this.world.blocks.table;
     if (this.solid.length !== table.length) {
       this.part = Uint8Array.from(table, (t) =>
-        t.solid && t.shape === 'slab' ? 1 : t.solid && t.shape === 'stair' ? 2 : 0,
+        t.solid && t.model ? 3 : t.solid && t.shape === 'slab' ? 1 : t.solid && t.shape === 'stair' ? 2 : 0,
       );
       this.solid = Uint8Array.from(table, (t, id) => +(t.solid && !this.part[id]));
     }
@@ -550,7 +551,13 @@ export class VoxelPhysics {
     if ((x | 0) !== x || (z | 0) !== z) return 0;
     const state = this.world.getBlock(x, y, z),
       kind = this.partIds()[state & 0xffff];
-    return kind ? octants(kind === 1 ? 'slab' : 'stair', state >>> 16) : this.solid[state & 0xffff] ? 255 : 0;
+    return kind === 3
+      ? 0
+      : kind
+        ? octants(kind === 1 ? 'slab' : 'stair', state >>> 16)
+        : this.solid[state & 0xffff]
+          ? 255
+          : 0;
   }
   // (Re)builds the triangle mesh of the chunk's solid slabs and stairs: per cell and face direction, the quarters of its
   // face on the cell's side where it fills the octant behind and the neighbour's octant in front is not solid, and of
@@ -573,7 +580,7 @@ export class VoxelPhysics {
           lz = (i >> 5) & 31,
           state = chunk.get(lx, ly, lz),
           kind = parts[state & 0xffff];
-        if (!kind) continue;
+        if (!kind || kind === 3) continue;
         const own = octants(kind === 1 ? 'slab' : 'stair', state >>> 16),
           cell = [x0 + lx, y0 + ly, z0 + lz];
         for (let d = 0; d < 6; d++) {
@@ -613,10 +620,18 @@ export class VoxelPhysics {
       }
     if (entry.parts) this.retire(entry.parts);
     entry.parts = null;
-    if (!positions.length) return;
+    const models = meshBlockModels(this.world, entry.cx, entry.cy, entry.cz, true);
+    if (!positions.length && !models.length) return;
     const quads = positions.length / 12,
-      indices = new Uint32Array(quads * 6);
+      modelIndices: number[] = [],
+      indices = new Uint32Array(quads * 6 + models.reduce((n, m) => n + m.indices.length, 0));
     for (let q = 0; q < quads; q++) indices.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+    for (const surface of models) {
+      const base = positions.length / 3;
+      for (const i of surface.indices) modelIndices.push(i + base);
+      for (const p of surface.positions) positions.push(p);
+    }
+    indices.set(modelIndices, quads * 6);
     entry.parts = this.attach({ shape: 'trimesh', vertices: positions, indices, fixInternalEdges: true }, entry, true);
   }
   // The slab and stair mesh of the chunk holding world cell (x, y, z) rebuilds.
@@ -711,17 +726,17 @@ export class VoxelPhysics {
       return true;
     }
     const collider = triangles
-        ? this.attach(
-            {
-              shape: 'trimesh',
-              vertices: this.vertices.subarray(0, triangles * 6),
-              indices: this.indices.subarray(0, triangles * 3),
-              fixInternalEdges: true,
-            },
-            entry,
-            entry.mode === MESH,
-          )
-        : null;
+      ? this.attach(
+          {
+            shape: 'trimesh',
+            vertices: this.vertices.subarray(0, triangles * 6),
+            indices: this.indices.subarray(0, triangles * 3),
+            fixInternalEdges: true,
+          },
+          entry,
+          entry.mode === MESH,
+        )
+      : null;
     if (piece.collider) this.retire(piece.collider);
     piece.collider = collider;
     piece.dirty = false;

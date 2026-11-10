@@ -119,7 +119,14 @@ const CELLS = 32768,
   PART = 64,
   TAG = 0x8000, // a bucket entry meshed at half-block resolution
   LAYERS: Record<string, number> = { opaque: 0, cutout: 1, translucent: 2, invisible: 3 },
-  SHAPES: Record<string, number> = { cube: 0, cross: CROSS, liquid: LIQUID, slab: SHAPE | PART, stair: SHAPE | PART },
+  SHAPES: Record<string, number> = {
+    cube: 0,
+    cross: CROSS,
+    liquid: LIQUID,
+    slab: SHAPE | PART,
+    stair: SHAPE | PART,
+    model: NO_FACES,
+  },
   // Per face direction (+x, -x, +y, -y, +z, -z): index strides of the normal, u and v axes, and the word 0 shifts of
   // the slice, u and v coordinates (x at 0, y at 5, z at 10).
   NORMAL = [1, 1, SY, SY, SZ, SZ],

@@ -18,6 +18,7 @@ const define = (types: readonly BlockType[]): void => {
     blocks!.define(t.name, {
       layer: t.layer,
       shape: t.shape,
+      ...(t.model ? { model: t.model } : {}),
       solid: t.solid,
       liquid: t.liquid,
       light: t.light,

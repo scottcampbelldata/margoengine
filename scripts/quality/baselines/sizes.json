@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13587586,
+  "total": 13594966,
   "history": [
     {
       "date": "2026-10-24",
@@ -7056,6 +7056,12 @@
       "commit": "ea70841f4",
       "reason": "Batch 248 job 5: text/extrude grows from 10834 to 14894 B gzip for CFF2 FD selection and blend, fvar/avar/HVAR/gvar and positioned shaping runs. The optional ceiling rises from 11160 to 15342 B. Keeping one parser avoids duplicated sfnt state or an asynchronous bridge; core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "bd07d2924",
+      "reason": "Batch 240 exact custom box queries and collision plus optional lazy model renderer; keep features together",
+      "grew": 3
     }
   ],
   "items": {
@@ -8130,6 +8136,7 @@
     "@margoengine/voxel-edit/mesh": 9456,
     "@margoengine/voxel-edit/pick": 7239,
     "@margoengine/voxel-edit/rig": 3044,
+    "@margoengine/voxel-edit/select": 8499,
     "@margoengine/voxel-edit/shaders": 5097,
     "@margoengine/voxel-edit/smooth": 2633,
     "@margoengine/voxel-edit/sparse": 6873,
@@ -8169,8 +8176,9 @@
     "@margoengine/voxel/lightmap": 2762,
     "@margoengine/voxel/lod": 7228,
     "@margoengine/voxel/mesher": 8312,
-    "@margoengine/voxel/physics": 10072,
-    "@margoengine/voxel/query": 3821,
+    "@margoengine/voxel/models": 5552,
+    "@margoengine/voxel/physics": 11412,
+    "@margoengine/voxel/query": 4309,
     "@margoengine/voxel/render": 25048,
     "@margoengine/voxel/smooth": 3339,
     "@margoengine/voxel/stream": 13408,
@@ -8333,7 +8341,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/voxel-edit/select": 8499
+    "margoengine/web": 577
   }
 }

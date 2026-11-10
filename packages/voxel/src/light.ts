@@ -246,7 +246,7 @@ export class VoxelLighting {
   private refresh(): void {
     const table = this.world.blocks.table;
     for (const type of table) {
-      const part = type.shape === 'slab' ? PART : type.shape === 'stair' ? PART | STAIR : 0;
+      const part = type.model ? PART : type.shape === 'slab' ? PART : type.shape === 'stair' ? PART | STAIR : 0;
       this.flags[type.id] = type.opacity | (type.light << 4) | part;
       this.wet[type.id] = type.waterlog ? (table[type.waterlog]?.opacity ?? 0) : 0;
       if (part) this.parts = true;
@@ -259,6 +259,8 @@ export class VoxelLighting {
     const state = s.chunk.get(i & 31, i >> 10, (i >> 5) & 31),
       f = this.flags[state & 0xffff];
     if (!(f & PART)) return f;
+    const model = this.world.blocks.table[state & 0xffff]?.model;
+    if (model) return f | (model[(state >>> 16) % model.length].covered << 10);
     const data = state >>> 16,
       opacity = data & WATERLOGGED ? Math.max(f & 15, this.wet[state & 0xffff]) : f & 15;
     return (f & ~15) | opacity | (COVER[f & STAIR ? stairOctants(data) : slabOctants(data)] << 10);
