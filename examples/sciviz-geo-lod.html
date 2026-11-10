@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>View-driven terrain tiles | Margo Engine</title>
+<style>body{margin:0;background:#111820;color:#e4eaf0;font:16px system-ui}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:28px}section{position:relative;height:650px}canvas{width:100%;height:100%}button,select{font:inherit;margin:8px;padding:8px}small{display:block;font-size:11px;line-height:1.5}a{color:#a5d5ff}</style></head>
+<body><main><h1>Terrain that follows the view</h1><p>Drag to orbit and scroll to zoom. Tiles refine in view, fade in over the coarser map and stay in a bounded cache.</p>
+<label>Projection <select id="projection"><option value="globe">WGS 84 globe</option><option value="mercator">Web Mercator</option><option value="plate">Equirectangular</option></select></label>
+<label><input id="live" type="checkbox"> Stream detailed tiles from AWS (otherwise use the 21 pinned tiles at levels 0 to 2)</label>
+<section><canvas id="map" width="1000" height="650"></canvas></section><p id="status">Loading terrain...</p><small id="credit"></small>
+<small>Data terms: <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>, <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">regional licences and attribution</a>. Heights are metres. Colours show elevation, with ocean blue and land green to white. Grid skirts hide cracks between levels. The Mercator source ends at 85.0511 degrees latitude.</small></main><script type="module" src="./sciviz-geo-lod.ts"></script></body></html>

@@ -6567,3 +6567,10 @@ Curvilinear/spherical integration lives entirely in sciviz/curvilinear, never co
 
 ### Section 5 evidence: batch 186 cube-cookie transport
 One optional storage buffer augments the existing projector light factor, with manual cube bilinear filtering and cross-face edge/corner taps. It changes no core/stage path and needs no per-image texture bindings. Protected projector activity/storage hooks allow cube-only activation and shared spot ownership. Native/full-WebGL2 shader probes and CPU lifecycle/packing tests pass. Filters operate on supplied RGBA8 level-zero images; mipmapped minification, other formats and cross-vendor evidence are not claimed.
+
+
+
+### 5. View-driven raster geography (batch 180 job 1)
+Optional sciviz/geo-lod owns its quadtree, bounded cache, loading signals and retained CPU tile payloads. No core/stage or existing renderer modifications. WGS84 globe/flat meshes share the geographic projection, a metre height grid and downward edge skirts. prepare reads the current camera times figure model with physical viewport size; view selection does not depend on a camera preset. Coarse-first alpha-blended draw order retains fallback through child fades; requests that finish after cancellation cannot enter residency. GPU resources restore from retained pixels and mesh arrays. CPU tests check exact adjacent edge coordinates, quadtree coverage/budget, signals, failures, missing tiles and cache lifecycle; GPU tests use real AWS elevation, camera changes and identical retained-data restore on WebGPU and webgl2-compat. No exclusive GPU use or speed assertion.
+
+Sciviz browser commands launch through scripts/browser-root.mjs so every suite serves repository fixtures when invoked by npm from packages/sciviz. The package CPU regression executes the bootstrap from that directory and checks all browser commands. This corrects the calc/atmosphere 404 gate failure without changing shared browser lifecycle code.

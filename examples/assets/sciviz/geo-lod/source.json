@@ -1,0 +1,198 @@
+{
+  "accessed": "2026-11-10",
+  "dataset": "AWS Terrain Tiles / Mapzen Terrarium",
+  "registry": "https://registry.opendata.aws/terrain-tiles/",
+  "terms": "https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+  "credit": "Mapzen terrain tiles, including SRTM, GMTED2010, ETOPO1 (US public domain) and regional sources under the linked attribution terms; retain the dataset attribution.",
+  "tiles": [
+    {
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "file": "0-0-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/0/0/0.png",
+      "bytes": 106274,
+      "sha256": "0ac97eb7a98aa4e225cad6495523ea1f9851695df0f414e05ad981f652e8c042"
+    },
+    {
+      "z": 1,
+      "x": 0,
+      "y": 0,
+      "file": "1-0-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/0/0.png",
+      "bytes": 100773,
+      "sha256": "4dc6acd89555ef0dbd711d632e55edbbd31589fea21c2039bbdd3b4ad98dd316"
+    },
+    {
+      "z": 1,
+      "x": 1,
+      "y": 0,
+      "file": "1-1-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/1/0.png",
+      "bytes": 97258,
+      "sha256": "120b705b9e33e829c49475e2238471efdc5cc00f08fb2b3f7057b7868ef0e619"
+    },
+    {
+      "z": 1,
+      "x": 0,
+      "y": 1,
+      "file": "1-0-1.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/0/1.png",
+      "bytes": 94598,
+      "sha256": "709d4dc611353c47432a607ec42433c6eb6e3779298e464021a31eaebbc5a254"
+    },
+    {
+      "z": 1,
+      "x": 1,
+      "y": 1,
+      "file": "1-1-1.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/1/1.png",
+      "bytes": 93363,
+      "sha256": "1bbbf0045ef8633042b7a251a35fd51a40ba7bef00acf834087fb8b56928e231"
+    },
+    {
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "file": "2-0-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/0/0.png",
+      "bytes": 80494,
+      "sha256": "fd30cc25bfc59c9dc466685032bcb250b438f23f45a017991eee6e729788c99f"
+    },
+    {
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "file": "2-1-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/1/0.png",
+      "bytes": 92043,
+      "sha256": "940569f27283af21dd5d7e8674dba389af524404cbdf7f42e2cf2d2886b08521"
+    },
+    {
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "file": "2-2-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/2/0.png",
+      "bytes": 76730,
+      "sha256": "e243c4658f5a8f631c0b140650904d7d7b552f4165f906dd40c27a15e0c7e455"
+    },
+    {
+      "z": 2,
+      "x": 3,
+      "y": 0,
+      "file": "2-3-0.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/3/0.png",
+      "bytes": 75158,
+      "sha256": "c51d910af72c105230ac38ab57bae42e16e5497f5b6bb889f07965a782a2ac78"
+    },
+    {
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "file": "2-0-1.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/0/1.png",
+      "bytes": 99785,
+      "sha256": "a1ebf41b05a8057630cfcc50af6b37ca885a3c95b8af4cbc86b0ffe16cd2d894"
+    },
+    {
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "file": "2-1-1.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/1/1.png",
+      "bytes": 100190,
+      "sha256": "44311e0b7a7375c4ee081052b845193a75a267e86719b9ebc28437420fbd6738"
+    },
+    {
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "file": "2-2-1.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/2/1.png",
+      "bytes": 96963,
+      "sha256": "1fb09e3db4228dcd3e07752c30bdca870245a63c4941d136dc815fabe7957224"
+    },
+    {
+      "z": 2,
+      "x": 3,
+      "y": 1,
+      "file": "2-3-1.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/3/1.png",
+      "bytes": 107585,
+      "sha256": "254aba02738c986c577996cfb3a5169723c76f6749e46418bec3a38b24800658"
+    },
+    {
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "file": "2-0-2.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/0/2.png",
+      "bytes": 96878,
+      "sha256": "d7cf7d5ca9c1f755e8695f7d337a32908f60142535df96b35f54ef5cca268a98"
+    },
+    {
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "file": "2-1-2.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/1/2.png",
+      "bytes": 99433,
+      "sha256": "fd1fc16d94109d4c359cf272d61204b6dcc5a968add049d18d7f73c209e6882f"
+    },
+    {
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "file": "2-2-2.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/2/2.png",
+      "bytes": 100328,
+      "sha256": "e3c9502292cefde2e5c1ac27c3ac3d296af567f39d23100bfe467e004e41362e"
+    },
+    {
+      "z": 2,
+      "x": 3,
+      "y": 2,
+      "file": "2-3-2.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/3/2.png",
+      "bytes": 101066,
+      "sha256": "4bcbe10c0202e2c3ed4e63deb904e87482b4d52e8a76432368ad4cc796989f84"
+    },
+    {
+      "z": 2,
+      "x": 0,
+      "y": 3,
+      "file": "2-0-3.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/0/3.png",
+      "bytes": 75416,
+      "sha256": "65160606ef2a352988d7b4e05841d32f8286ccbb0ee76ee3b38b59b4cf9d230c"
+    },
+    {
+      "z": 2,
+      "x": 1,
+      "y": 3,
+      "file": "2-1-3.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/1/3.png",
+      "bytes": 77515,
+      "sha256": "8e53a42a4137d05caa2760de8858f07700e2d5127c8998e37100a9e55fa75427"
+    },
+    {
+      "z": 2,
+      "x": 2,
+      "y": 3,
+      "file": "2-2-3.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/2/3.png",
+      "bytes": 67621,
+      "sha256": "90ee84660becef9101fbc76cf41b6a37088bea478bdc6e502f3c0fbf617c3e7a"
+    },
+    {
+      "z": 2,
+      "x": 3,
+      "y": 3,
+      "file": "2-3-3.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/2/3/3.png",
+      "bytes": 70104,
+      "sha256": "134a98c45a73e33138483f99422578a9f6016ab9209c6e3a26f7a62f3533e1d6"
+    }
+  ]
+}

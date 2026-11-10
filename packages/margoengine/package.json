@@ -634,6 +634,10 @@
       "types": "./dist/clustered/shadow-atlas.d.ts",
       "import": "./dist/clustered/shadow-atlas.js"
     },
+    "./clustered/cube-projector": {
+      "types": "./dist/clustered/cube-projector.d.ts",
+      "import": "./dist/clustered/cube-projector.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"
@@ -3458,6 +3462,10 @@
       "types": "./dist/sciviz/curvilinear.d.ts",
       "import": "./dist/sciviz/curvilinear.js"
     },
+    "./sciviz/geo-lod": {
+      "types": "./dist/sciviz/geo-lod.d.ts",
+      "import": "./dist/sciviz/geo-lod.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -4977,10 +4985,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./clustered/cube-projector": {
-      "types": "./dist/clustered/cube-projector.d.ts",
-      "import": "./dist/clustered/cube-projector.js"
     }
   },
   "dependencies": {

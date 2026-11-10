@@ -1035,3 +1035,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document generated /sciviz/curvilinear alias alongside the optional scientific volume entries.
 - @margoengine/clustered (batch 186 job 3): document CubeProjectorLights, six-face order/orientation, setCubes plus inherited spot setProjectors, quaternion rotation, sRGB/linear/alpha filtering, limits, restoration and copied pixels; examples deferred.
 - margoengine (batch 186 job 3): document clustered/cube-projector forwarding entry; examples deferred.
+
+
+
+
+- @margoengine/sciviz (batch 180 job 1): document geo-lod, selection/cache/fades, terrain stream and quantized height adapters, cancellation, errors, provider attribution and real AWS demo; margoengine generated geo-lod alias.

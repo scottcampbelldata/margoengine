@@ -4902,3 +4902,10 @@ Batch 186 job 3: no open correctness defect found in cube projection or mixed sp
 Batch 186 job 3 regression: toggling cubes while spot images keep the shared hook active now invalidates cached shader declarations and bind layouts. The CPU regression fails on the pre-fix build, and live removal/reactivation is checked on both GPU backends.
 
 Batch 186 composition follow-up: all three clustered list buffers plus rectangle, shape, directional, IES, spot-cookie and cube-cookie storage total nine fragment storage bindings, above the minimum WebGPU device limit of eight. Repro: activate all those optional hooks together on a default-limits device. Cause: cube cookies currently retain a separate pixel buffer beside spot storage, even for cube-only lists. Ordinary cube and mixed spot/cube projection passes; consolidate cookie storage in the fix phase without changing core.
+
+
+
+
+Batch 180 job 1: no open defect found in the view/cache/height contract. XYZ source polar coverage, conservative visibility and native-preview refusal are recorded limits; geo-lod.test.js and geo-lod-browser.mjs cover this entry.
+
+GPU runner lane identity (observed during batch 180): simultaneous serial scripts/gpu-package-tests.mjs --no-build --only=<package> from separate worktrees both request owner check:gpu-packages. gpu-lock status showed lane check queued behind another worktree while 2 of 5 slots were free. Cause: the generic owner collapses independent lanes in admission. Use lane-specific outer gpu-lock run --owner=<lane> for direct runs; repair the runner identity in its owning tooling lane during the fix phase.

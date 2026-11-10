@@ -163,6 +163,10 @@
     "./curvilinear": {
       "types": "./dist/curvilinear.d.ts",
       "import": "./dist/curvilinear.js"
+    },
+    "./geo-lod": {
+      "types": "./dist/geo-lod.d.ts",
+      "import": "./dist/geo-lod.js"
     }
   },
   "files": [
@@ -187,22 +191,24 @@
     "@margoengine/points": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/sky": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/terrain": "^1.0.0",
+    "@margoengine/tiles": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs && node tests/derive-browser.mjs && node tests/pipeline-browser.mjs && node tests/contour-browser.mjs && node tests/clip-browser.mjs && node tests/probe-browser.mjs && node tests/calc-browser.mjs && node tests/glyph-browser.mjs && node tests/transfer-browser.mjs && node tests/labels-browser.mjs && node tests/cinematic-browser.mjs && node tests/volume-depth-browser.mjs && node tests/volume-quality-browser.mjs && node tests/link-browser.mjs && node tests/datasets-browser.mjs && node tests/curvilinear-browser.mjs",
+    "test:browser": "npm run build && node scripts/browser-root.mjs tests/sciviz-browser.mjs && node scripts/browser-root.mjs tests/bricks-browser.mjs && node scripts/browser-root.mjs tests/entries-browser.mjs && node scripts/browser-root.mjs tests/restoration-browser.mjs && node scripts/browser-root.mjs tests/demos-browser.mjs && node scripts/browser-root.mjs tests/webgl2-browser.mjs && node scripts/browser-root.mjs tests/formats-browser.mjs && node scripts/browser-root.mjs tests/derive-browser.mjs && node scripts/browser-root.mjs tests/pipeline-browser.mjs && node scripts/browser-root.mjs tests/contour-browser.mjs && node scripts/browser-root.mjs tests/clip-browser.mjs && node scripts/browser-root.mjs tests/probe-browser.mjs && node scripts/browser-root.mjs tests/calc-browser.mjs && node scripts/browser-root.mjs tests/glyph-browser.mjs && node scripts/browser-root.mjs tests/transfer-browser.mjs && node scripts/browser-root.mjs tests/labels-browser.mjs && node scripts/browser-root.mjs tests/cinematic-browser.mjs && node scripts/browser-root.mjs tests/volume-depth-browser.mjs && node scripts/browser-root.mjs tests/volume-quality-browser.mjs && node scripts/browser-root.mjs tests/link-browser.mjs && node scripts/browser-root.mjs tests/datasets-browser.mjs && node scripts/browser-root.mjs tests/curvilinear-browser.mjs && node scripts/browser-root.mjs tests/geo-lod-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
     "build:flow": "node scripts/build-flow.mjs",
     "test:flow-kernel": "node scripts/build-flow.mjs --test",
     "test:fallback-kernel": "node scripts/build-fallback.mjs --test",
-    "test:webgl2": "npm run build && node tests/webgl2-browser.mjs",
-    "test:browser:atmosphere": "node tests/atmosphere-browser.mjs",
-    "test:browser:contour2d": "node tests/contour2d-browser.mjs",
-    "test:browser:export-vector": "node tests/export-vector-browser.mjs",
-    "test:browser:stats": "node tests/stats-browser.mjs",
-    "test:browser:omezarr": "node tests/omezarr-browser.mjs"
+    "test:webgl2": "npm run build && node scripts/browser-root.mjs tests/webgl2-browser.mjs",
+    "test:browser:atmosphere": "node scripts/browser-root.mjs tests/atmosphere-browser.mjs",
+    "test:browser:contour2d": "node scripts/browser-root.mjs tests/contour2d-browser.mjs",
+    "test:browser:export-vector": "node scripts/browser-root.mjs tests/export-vector-browser.mjs",
+    "test:browser:stats": "node scripts/browser-root.mjs tests/stats-browser.mjs",
+    "test:browser:omezarr": "node scripts/browser-root.mjs tests/omezarr-browser.mjs"
   }
 }
