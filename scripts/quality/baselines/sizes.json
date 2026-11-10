@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13603387,
+  "total": 13607327,
   "history": [
     {
       "date": "2026-10-24",
@@ -7074,6 +7074,12 @@
       "commit": "batch-190",
       "reason": "oit/peel: new optional exact texture depth peeling entry, 0 to 3037 B gzip; 3293 B ceiling, no core or stage growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-235-job-1",
+      "reason": "New optional water/ripples: absent to 3683 B gzip, ceiling 3940 B. GPU local wave propagation, swept disturbances and query composition belong together; a split would duplicate lifecycle and field bindings. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7701,6 +7707,7 @@
     "@margoengine/oit/exact": 4820,
     "@margoengine/oit/meshes": 747,
     "@margoengine/oit/moments": 5512,
+    "@margoengine/oit/peel": 3293,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
     "@margoengine/physics/decomposition": 11130,
@@ -7824,6 +7831,7 @@
     "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/mtoon": 9827,
+    "@margoengine/rigging/pose-tracking": 5128,
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/rigging/springs": 5069,
     "@margoengine/rigging/transfer": 3680,
@@ -8200,6 +8208,7 @@
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/query": 4719,
+    "@margoengine/water/ripples": 3940,
     "@margoengine/weather": 5230,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/data": 2788,
@@ -8353,8 +8362,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/rigging/pose-tracking": 5128,
-    "@margoengine/oit/peel": 3293
+    "margoengine/web": 577
   }
 }

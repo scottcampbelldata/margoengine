@@ -4462,6 +4462,10 @@
       "types": "./dist/water/caustics.d.ts",
       "import": "./dist/water/caustics.js"
     },
+    "./water/ripples": {
+      "types": "./dist/water/ripples.d.ts",
+      "import": "./dist/water/ripples.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

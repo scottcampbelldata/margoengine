@@ -8,20 +8,28 @@ declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
 
 export class SurfaceCapture {
   private token?: GPUBuffer;
+  private shader = '';
   private coordinates?: GPUBuffer;
   private pipelines: GPURenderPipeline[] = [];
 
   draw(c: Context, source: object, uniform: GPUBuffer, targets: GPUTexture[], depths: GPUTexture[]): void {
     const state = queryStates.get(source)?.();
     if (!state || state.device !== c.device)
-      throw fault('state', 'Surface capture needs a live Water or FFTOcean rendered on the same device before composition');
-    if (this.token !== state.token) this.build(c.device, state);
+      throw fault(
+        'state',
+        'Surface capture needs a live Water or FFTOcean rendered on the same device before composition',
+      );
+    if (this.token !== state.token || this.shader !== state.shader) {
+      this.build(c.device, state);
+      this.shader = state.shader;
+    }
     const resources =
       state.kind === 'water'
         ? [
             { binding: 0, resource: { buffer: state.token } },
             { binding: 3, resource: state.resources![3] },
             { binding: 7, resource: state.resources![7] },
+            ...(state.extraBindings ?? []),
           ]
         : [
             { binding: 0, resource: { buffer: state.token } },

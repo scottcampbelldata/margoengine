@@ -4710,3 +4710,6 @@ Build-phase documentation follow-up: current main already contains orphan >>>>>>
 
 Batch 248 job 5 precision follow-up (rule 22): FontVariations normalizes in floating point. Repro: a linear wght axis min/default=200, max=900 at 350 produces normalized 0.21428571428571427 before avar instead of the specified fixed-point 2.14 result 0.21429443359375. Cause: the normalization path omits the OpenType 16.16 and final 2.14 round trips. Unhinted outlines/advances can differ slightly from a fixed-coordinate rasterizer; no hinting or FeatureVariation conditions are consumed here. Fix phase: implement specified rounding and compare independent fixed-coordinate outline fixtures; preserve the existing floating-oracle evidence as an explicitly different reference.
 Batch 240 job 1: box-model metadata must survive scalar worker and RGB-light world copies. Both adapters now forward the prepared model data; model tests exercise RGB attachment with a custom model. No open defect is accepted for the custom box-model job.
+### Batch 235 job 1: ripple composition
+
+Optional geometry effects propagate their bindings into GPU queries and caustic captures; capture pipelines invalidate when the surface shader changes. Regression: packages/water/test/ripples.browser.mjs checks query displacement and vertical velocity on both backends. No open defect identified in this job.

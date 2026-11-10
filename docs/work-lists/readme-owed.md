@@ -779,3 +779,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 240 job 1): document the voxel/models umbrella entry alongside the optional package in the README phase.
 - `@margoengine/rigging` (batch 213 job 5): document pose-tracking body/hand solvers, Tasks/Holistic frames, coordinate/mirror/aspect conventions, confidence/calibration/smoothing/loss, native VRM binding/cancellation/disposal and root-motion limits; runnable README examples wait for README phase.
 - `margoengine` (batch 213 job 5): document the generated rigging/pose-tracking alias in README phase.
+- @margoengine/water and margoengine (batch 235 job 1): cover /ripples attachment, drops, swept boat/character wakes, camera following, query/capture composition, defaults, limits, cancellation and disposal; examples deferred.

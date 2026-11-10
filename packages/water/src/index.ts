@@ -19,6 +19,7 @@ export type { FogLike } from '../../shared/fog.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
 import { queryStates, surfacePasses } from './query-state.js';
+import { surfaceEffects } from './surface-effects.js';
 import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
@@ -403,6 +404,8 @@ export class Water implements EnginePlugin {
   private view?: WaterView;
   private built = 0;
   private shaderCode = '';
+  private effectBindings: GPUBindGroupEntry[] = [];
+  private vertexBindings: GPUBindGroupEntry[] = [];
   private capture?: WaterCapture;
   private capturePipeline?: GPURenderPipeline;
   private captureKey = '';
@@ -625,6 +628,8 @@ export class Water implements EnginePlugin {
             positions: this.positions,
             resources: this.view.resources[this.view.drawn],
             coast: this.coastal,
+            extraBindings: this.vertexBindings,
+            extraVelocity: (surfaceEffects.get(this) ?? []).map((e) => e.velocity).filter((v): v is string => !!v),
             still: this.shaderCode.includes('const STILL=true;'),
           },
     );
@@ -921,14 +926,39 @@ export class Water implements EnginePlugin {
       });
       c.device.queue.writeBuffer(this.fogBuffer, 0, this.fogData);
     }
-    const format = c.format + ':' + samples + ':' + depth.format + ':' + !!shadows + (fog ? ':fog' : '');
+    const effects = surfaceEffects.get(this) ?? [];
+    const extra: GPUBindGroupEntry[] = [];
+    const vertexExtra: GPUBindGroupEntry[] = [];
+    let effectBinding = 9;
+    for (const effect of effects) {
+      for (const resource of effect.prepare(c)) {
+        const entry = { binding: effectBinding++, resource };
+        extra.push(entry);
+        if (effect.vertex) vertexExtra.push(entry);
+      }
+    }
+    if (
+      extra.length !== this.effectBindings.length ||
+      extra.some((e, i) => e.resource !== this.effectBindings[i].resource)
+    )
+      this.built++;
+    this.effectBindings = extra;
+    this.vertexBindings = vertexExtra;
+    const effectKey = effects.map((e) => e.key).join(',');
+    const format =
+      effectKey + ':' + c.format + ':' + samples + ':' + depth.format + ':' + !!shadows + (fog ? ':fog' : '');
     if (this.format !== format) {
       // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
-      const code =
+      let code =
         shader
           .replace('const HORIZON=false;', `const HORIZON=${this.horizon};`)
           .replace('const STILL=false;', `const STILL=${!!this.options.still};`) +
         (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed);
+      let binding = 9;
+      for (const effect of effects) {
+        code = effect.shader(code, binding);
+        binding += effect.count;
+      }
       this.shaderCode = fog ? foggedShader(code) : code;
       const module = c.device.createShaderModule({ code: this.shaderCode });
       this.pipeline = c.device.createRenderPipeline({
@@ -1049,7 +1079,12 @@ export class Water implements EnginePlugin {
             { buffer: this.coastal?.connected ?? this.uniform! },
           ];
           if (fog) resources.push({ buffer: this.fogBuffer! });
-          view.groups.push(group(c.device, this.pipeline!, resources));
+          view.groups.push(
+            c.device.createBindGroup({
+              layout: this.pipeline!.getBindGroupLayout(0),
+              entries: [...resources.map((resource, binding) => ({ binding, resource })), ...this.effectBindings],
+            }),
+          );
           view.resources.push(resources);
         }
       view.built = this.built;
@@ -1182,7 +1217,13 @@ export class Water implements EnginePlugin {
     // The capture fragment ends before the fog mix, so its layout has no fog binding (resource 8).
     if (!view.captureGroups.length)
       view.captureGroups = view.resources.map((resources) =>
-        group(c.device, this.capturePipeline!, resources.slice(0, 8)),
+        c.device.createBindGroup({
+          layout: this.capturePipeline!.getBindGroupLayout(0),
+          entries: [
+            ...resources.slice(0, 8).map((resource, binding) => ({ binding, resource })),
+            ...this.effectBindings,
+          ],
+        }),
       );
     const entries = shadows?.bindings();
     if (entries && this.captureShadowEntries !== entries) {

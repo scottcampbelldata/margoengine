@@ -5325,3 +5325,8 @@ Queries and VoxelCharacter sweeps use exact boxes, VoxelPhysics builds model tri
 
 Batch 240 job 1 measured gzip entry sizes: query 3,683 to 4,053 B, physics 9,852 to 11,079 B, models 0 to 5,323 B. The optional ceilings become 4,309 / 11,412 / 5,552 B respectively. Exact boxes and common union extraction add the bytes; splitting would duplicate collision data or require a second query API, losing automatic VoxelCharacter/solver integration. Models lazily loads the existing materials renderer. Core + stage remains 24,209 B, below 25,000 B.
 - `@margoengine/rigging/pose-tracking`: 4,872 B gzip, ceiling 5,128 B. Exactly 33 body / 21 hand landmarks; 20 body rotations, 16 per hand, 50 distinct combined. Confidence default 0.5, smoothing 0.05 s, loss hold 0.2 s. Monocular depth and isolated-segment twist remain ambiguous; hips translation is tracker-relative. [Pose tracking contract](rigging-pose-tracking.md). Core + stage 24,209 B unchanged.
+### Batch 235: interactive water ripples
+
+The optional /ripples entry uses a 16..512 square GPU height/velocity field over 1..10000 m, 64 events/update, a 0.25 s stall cap and at most 512 CFL substeps. Radius >= one cell. Views share the first drawn camera field. Constant-speed disturbances do not overturn or solve rigid-body coupling. Settings and proofs: [water-ripples.md](water-ripples.md). Core plus stage remains 24209 B gzip.
+
+Batch 235 job 1 measured entry gzip: water root 20443 B (before 20210 B), ripples 3692 B (new), query 4512 B, caustics 9042 B. Existing root budget remains sufficient; ripples ceiling is 3940 B.

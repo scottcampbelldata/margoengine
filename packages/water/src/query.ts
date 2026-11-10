@@ -87,6 +87,7 @@ function captureShader(state: QueryState): string {
  if(HORIZON){base+=frame.grid.xy;}
  let width=coordinates[o+2u];let v=surface(base,width);var velocity=waveVelocity(base,width);
  if(inCoast(base)){velocity=mix(velocity,coastalVelocity(base),coastal(base).blend.z);}
+ ${state.extraVelocity?.map((v) => `velocity+=${v};`).join('\n') ?? ''}
  vertices[i*3u]=vec4f(v.position,base.x);vertices[i*3u+1u]=vec4f(v.normal,base.y);vertices[i*3u+2u]=vec4f(velocity,0);
 }`
     );
@@ -176,6 +177,7 @@ export class WaveQuery {
               { binding: 0, resource: { buffer: uniform } },
               { binding: 3, resource: state.resources![3] },
               { binding: 7, resource: state.resources![7] },
+              ...(state.extraBindings ?? []),
             ]
           : [
               { binding: 0, resource: { buffer: uniform } },

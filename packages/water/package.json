@@ -37,6 +37,10 @@
     "./caustics": {
       "types": "./dist/caustics.d.ts",
       "import": "./dist/caustics.js"
+    },
+    "./ripples": {
+      "types": "./dist/ripples.d.ts",
+      "import": "./dist/ripples.js"
     }
   },
   "files": [
@@ -57,7 +61,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js water",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "npm run build && node test/caustics-project.browser.mjs && node test/caustics-energy.browser.mjs && node test/caustics.browser.mjs && node test/query.browser.mjs && node test/fft.browser.mjs && node test/flow.browser.mjs && node test/surface.browser.mjs && node test/coast.browser.mjs && node test/stack.browser.mjs && node test/horizon.browser.mjs && node test/still.browser.mjs",
+    "test:gpu": "node test/ripples.browser.mjs && npm run build && node test/caustics-project.browser.mjs && node test/caustics-energy.browser.mjs && node test/caustics.browser.mjs && node test/query.browser.mjs && node test/fft.browser.mjs && node test/flow.browser.mjs && node test/surface.browser.mjs && node test/coast.browser.mjs && node test/stack.browser.mjs && node test/horizon.browser.mjs && node test/still.browser.mjs",
     "prepack": "npm run build",
     "test:gpu:preview": "node test/caustics-preview.browser.mjs"
   }

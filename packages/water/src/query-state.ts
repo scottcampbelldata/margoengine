@@ -14,6 +14,8 @@ export interface QueryState {
   segments: number;
   positions?: Float32Array;
   resources?: GPUBindingResource[];
+  extraBindings?: GPUBindGroupEntry[];
+  extraVelocity?: string[];
   coast?: CoastalFlow;
   still?: boolean;
   resolution?: number;
