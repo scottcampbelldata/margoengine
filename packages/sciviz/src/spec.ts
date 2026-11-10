@@ -13,6 +13,7 @@ import {
   type SpecIOOptions,
   type SpecValue,
 } from './spec-values.js';
+import { annotationControllers } from './annotation-state.js';
 import { attachSpecRecorder } from './spec-hooks.js';
 import { isGpuArray } from './layer.js';
 export { loadSpecData, specHash } from './spec-values.js';
@@ -167,7 +168,7 @@ const updates = [
   'setDate',
 ] as const;
 function signalArguments(args: readonly unknown[], signal: AbortSignal | undefined, kind: string): unknown[] {
-  if (!signal || !['glyph','lic','tiles','particles','globe','selection-binding'].includes(kind)) return [...args];
+  if (!signal || !['glyph', 'lic', 'tiles', 'particles', 'globe', 'selection-binding'].includes(kind)) return [...args];
   const result = [...args],
     last = result.length - 1;
   result[last] = { ...(result[last] as Record<string, unknown>), signal };
@@ -180,19 +181,22 @@ async function builtinCodec(kind: string): Promise<FigureCodec | undefined> {
     case 'selection-binding': {
       const { bindSelection } = await import('@margoengine/sciviz/link');
       return {
-        create: (f, args, signal) => Reflect.apply(bindSelection, undefined, [f, ...signalArguments(args, signal, kind)]),
+        create: (f, args, signal) =>
+          Reflect.apply(bindSelection, undefined, [f, ...signalArguments(args, signal, kind)]),
       };
     }
     case 'particles': {
       const { flowParticles } = await import('@margoengine/sciviz/flow');
       return {
-        create: (f, args, signal) => Reflect.apply(flowParticles, undefined, [f, ...signalArguments(args, signal, kind)]),
+        create: (f, args, signal) =>
+          Reflect.apply(flowParticles, undefined, [f, ...signalArguments(args, signal, kind)]),
       };
     }
     case 'globe': {
       const { globeAtmosphere } = await import('@margoengine/sciviz/atmosphere');
       return {
-        create: (f, args, signal) => Reflect.apply(globeAtmosphere, undefined, [f, ...signalArguments(args, signal, kind)]),
+        create: (f, args, signal) =>
+          Reflect.apply(globeAtmosphere, undefined, [f, ...signalArguments(args, signal, kind)]),
       };
     }
     case 'globe.ground':
@@ -234,23 +238,28 @@ async function builtinCodec(kind: string): Promise<FigureCodec | undefined> {
     case 'fusion': {
       const { fusionVolume } = await import('@margoengine/sciviz/labels');
       return {
-        create: (f, args, signal) => Reflect.apply(fusionVolume, undefined, [f, ...signalArguments(args, signal, kind)]),
+        create: (f, args, signal) =>
+          Reflect.apply(fusionVolume, undefined, [f, ...signalArguments(args, signal, kind)]),
       };
     }
     case 'lic': {
       const { lic } = await import('@margoengine/sciviz/lic');
-      return { create: (f, args, signal) => Reflect.apply(lic, undefined, [f, ...signalArguments(args, signal, kind)]) };
+      return {
+        create: (f, args, signal) => Reflect.apply(lic, undefined, [f, ...signalArguments(args, signal, kind)]),
+      };
     }
     case 'cinematic': {
       const { cinematicVolume } = await import('@margoengine/sciviz/cinematic');
       return {
-        create: (f, args, signal) => Reflect.apply(cinematicVolume, undefined, [f, ...signalArguments(args, signal, kind)]),
+        create: (f, args, signal) =>
+          Reflect.apply(cinematicVolume, undefined, [f, ...signalArguments(args, signal, kind)]),
       };
     }
     case 'bricks': {
       const { brickedVolume } = await import('@margoengine/sciviz/bricks');
       return {
-        create: (f, args, signal) => Reflect.apply(brickedVolume, undefined, [f, ...signalArguments(args, signal, kind)]),
+        create: (f, args, signal) =>
+          Reflect.apply(brickedVolume, undefined, [f, ...signalArguments(args, signal, kind)]),
       };
     }
   }
@@ -410,7 +419,8 @@ function portable(base: BaseFigure, options: FigureOptions): Figure {
             try {
               const object = observe(figure, state, method, (await snapshotConsumedInput(args)) as unknown[], layer);
               if (method === 'isosurface' && isGpuArray(args[0]))
-                state.records.find((item) => item.object === object)!.refreshInput = () => snapshotConsumedInput(args[0]);
+                state.records.find((item) => item.object === object)!.refreshInput = () =>
+                  snapshotConsumedInput(args[0]);
               return object;
             } catch (error) {
               figure.remove(layer as Layer);
@@ -659,6 +669,7 @@ async function populate(figure: Figure, spec: FigureSpec, options: FigureLoadOpt
       return array;
     }),
     refs = new Map<string, object>();
+  annotationControllers.get(figure)?.dispose();
   for (const layer of [...figure.layers]) figure.remove(layer);
   for (const recipe of [...state.records])
     if (!recipe.dead && ['slice', 'colorbar', 'cinematic'].includes(recipe.kind))
@@ -714,7 +725,16 @@ async function populate(figure: Figure, spec: FigureSpec, options: FigureLoadOpt
   figure.dragMode = spec.dragMode as Figure['dragMode'];
   if (spec.selection) figure.setSelection((await io.decode(spec.selection, refs)) as PointSelection, { emit: false });
   else figure.setSelection(undefined, { emit: false });
-  if (spec.annotations !== undefined) figure.annotations = await io.decode(spec.annotations);
+  if (spec.annotations !== undefined) {
+    figure.annotations = await io.decode(spec.annotations);
+    const state = figure.annotations as { format?: string; version?: number; records?: unknown; editable?: boolean };
+    if (state?.format === 'margo-annotations') {
+      if (state.version !== 1 || !Array.isArray(state.records))
+        throw typeError('Invalid annotation state; supply version 1 records', 'sciviz');
+      const { annotate } = await import('@margoengine/sciviz/annotate');
+      annotate(figure, { annotations: state.records, editable: state.editable, signal: options.signal });
+    }
+  } else delete figure.annotations;
   state.selection = figure.selection;
   await figure.ready();
   io.check();

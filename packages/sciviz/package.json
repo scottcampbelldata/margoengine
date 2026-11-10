@@ -271,6 +271,10 @@
     "./pick-gpu": {
       "types": "./dist/pick-gpu.d.ts",
       "import": "./dist/pick-gpu.js"
+    },
+    "./annotate": {
+      "types": "./dist/annotate.d.ts",
+      "import": "./dist/annotate.js"
     }
   },
   "files": [
@@ -331,6 +335,7 @@
     "test:browser:stream": "node scripts/browser-root.mjs tests/stream-browser.mjs",
     "test:browser:query": "node scripts/browser-root.mjs tests/query-browser.mjs",
     "test:browser:colors": "node scripts/browser-root.mjs tests/colors-browser.mjs",
-    "test:browser:pick-gpu": "node scripts/browser-root.mjs tests/pick-gpu-browser.mjs"
+    "test:browser:pick-gpu": "node scripts/browser-root.mjs tests/pick-gpu-browser.mjs",
+    "test:browser:annotate": "node scripts/browser-root.mjs tests/annotate-browser.mjs"
   }
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15215333,
+  "total": 15223013,
   "history": [
     {
       "date": "2026-10-24",
@@ -7863,6 +7863,11 @@
       "date": "2026-11-10",
       "reason": "Batch 180 job 3: geo-time new 0 -> 39860 B gzip, ceiling 41056 B. Full clean-room SGP4 including deep space, trajectory sampling/playback and WMTS time frame lifecycle justify one optional entry. Sharing geo-vector/geo-lod rendering avoids duplicate GPU state; splitting would add loading and lifecycle coordination. Core + stage unchanged 24209 B. Final main colour-scale integration changed the shared rendering closure from 38901 to 39860 B; keep those colours and raise the optional ceiling instead of duplicating or splitting rendering state.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-174-job5",
+      "reason": "Annotations entry absent to 7424 B gzip. Physical widgets, exact first-hit DDA, grid picking and one export/state lifecycle stay together; splitting duplicates projection and lifecycle. Owning sciviz figure fits descending source bounds. [{\"id\":\"@margoengine/sciviz/annotate\",\"prior\":0,\"now\":7424,\"ceiling\":7680}]"
     }
   ],
   "items": {
@@ -9276,6 +9281,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/sciviz/geo-time": 41056
+    "@margoengine/sciviz/geo-time": 41056,
+    "@margoengine/sciviz/annotate": 7680
   }
 }

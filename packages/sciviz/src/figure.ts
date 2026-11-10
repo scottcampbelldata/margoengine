@@ -25,7 +25,7 @@ import { Timeline, type TimelineFrame, type PlayOptions, type TimelineOptions } 
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
-import { publicationLabels, disposePublicationLabels } from './publication-labels.js';
+import { publicationLabels, publicationOverlays, disposePublicationLabels } from './publication-labels.js';
 
 import { projectPoint } from '@margoengine/math/mat4';
 import {
@@ -671,7 +671,10 @@ export class Figure extends EventTarget {
    * Native axes accept data units by default. `space: 'plot'` restores already-mapped windows without remapping.
    * Custom axis mappings own plot units by default.
    */
-  setLimits(limits?: Bounds | readonly [number, number, number, number], options: { readonly space?: 'data' | 'plot' } = {}): void {
+  setLimits(
+    limits?: Bounds | readonly [number, number, number, number],
+    options: { readonly space?: 'data' | 'plot' } = {},
+  ): void {
     this.#check();
     if (limits) this.#checkBounds(limits, 'Figure limits');
     if (options.space !== undefined && options.space !== 'data' && options.space !== 'plot')
@@ -683,12 +686,14 @@ export class Figure extends EventTarget {
   #full(b: Bounds | readonly [number, number, number, number], map = true): Bounds {
     const result: Bounds = b.length === 4 ? [b[0], b[1], b[2], b[3], -1, 1] : ([...b] as Bounds);
     // Built-in limits are data units, just like layer input. A custom mapping owns its plot coordinates.
-    if (map && !this.#customScales) for (let axis = 0; axis < b.length / 2; axis++) {
-      const map = this.#forward(axis, [b[axis * 2]]);
-      result[axis * 2] = map(b[axis * 2]); result[axis * 2 + 1] = map(b[axis * 2 + 1]);
-      if (!Number.isFinite(result[axis * 2]) || !Number.isFinite(result[axis * 2 + 1]))
-        throw rangeError('Figure limits must be in the domain of their axis scales', 'sciviz');
-    }
+    if (map && !this.#customScales)
+      for (let axis = 0; axis < b.length / 2; axis++) {
+        const map = this.#forward(axis, [b[axis * 2]]);
+        result[axis * 2] = map(b[axis * 2]);
+        result[axis * 2 + 1] = map(b[axis * 2 + 1]);
+        if (!Number.isFinite(result[axis * 2]) || !Number.isFinite(result[axis * 2 + 1]))
+          throw rangeError('Figure limits must be in the domain of their axis scales', 'sciviz');
+      }
     return result;
   }
 
@@ -914,7 +919,15 @@ export class Figure extends EventTarget {
     let b: Bounds | undefined = fixed ? ([...fixed] as Bounds) : undefined;
     if (!b)
       for (const layer of this.#layers) {
-        const lb = layer.bounds;
+        const raw = layer.bounds,
+          lb: Bounds = [
+            Math.min(raw[0], raw[1]),
+            Math.max(raw[0], raw[1]),
+            Math.min(raw[2], raw[3]),
+            Math.max(raw[2], raw[3]),
+            Math.min(raw[4], raw[5]),
+            Math.max(raw[4], raw[5]),
+          ];
         b = b
           ? [
               Math.min(b[0], lb[0]),
@@ -1575,6 +1588,8 @@ export class Figure extends EventTarget {
         swatches(this.#overlayRoots(), origin),
       );
     }
+    if (options.overlays ?? true)
+      for (const overlay of publicationOverlays(this)) overlay.paint(g, bitmap.width, bitmap.height);
     bitmap.close();
     return out.convertToBlob({ type: 'image/png' });
   }
@@ -1618,7 +1633,11 @@ export class Figure extends EventTarget {
       ),
       text = svgText(textRuns(this.#overlayRoots(), origin)),
       boxes = svgSwatches(swatches(this.#overlayRoots(), origin));
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${body}\n${bars}\n${boxes}\n${text}\n</svg>\n`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${body}\n${bars}\n${boxes}\n${text}\n${publicationOverlays(
+      this,
+    )
+      .map((o) => o.svg(width, height))
+      .join('\n')}\n</svg>\n`;
   }
 
   // A 2D chart as SVG shapes: background, grid and frame, then rectangles, points and lines in drawing order, clipped
