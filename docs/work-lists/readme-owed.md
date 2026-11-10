@@ -303,7 +303,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document generated mcp/http alias (batch 267 job 3).
 
 - @margoengine/mcp: cover both HTTP protocol eras, modern per-request metadata, discovery, encoded/custom headers and distinct disconnect cancellation semantics.
-=======
 - @margoengine/cache: document cache/stream StreamingAssetCache, pull-driven bodies, consume/cancel before flush, EOF commit, failure behavior, budgets and service worker waitUntil.
 - margoengine: document the generated cache/stream alias and StreamingAssetCache lifecycle in the README phase.
->>>>>>> 36cf4fe0f (feat(cache): stream cache misses before complete-body storage)

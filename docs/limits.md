@@ -4273,40 +4273,4 @@ ECS root for serializer support: 4538 B (parent-source replay) to 4559 B min+gzi
 Batch 267 job 3 entry size: mcp/http new 4872 B gzip, ceiling 5128 B. The cohesive current/legacy protocol adapter, metadata validation, authorization and bounded request/session lifecycle justify this optional entry; splitting it would duplicate lifecycle state. Core plus stage is unchanged by this job at 24209 B.
 
 Batch 267 final baseline merge repair: @margoengine/water: measured 20210 B before and after this metadata repair, ceiling 20185 to 20817 B; @margoengine/webgl2-compat lazy compute runtime and read-back: measured 31756 B before and after this metadata repair, ceiling 31741 to 32709 B. No runtime bytes are introduced by these metadata repairs. Existing upstream rendering/compute behavior remains intact; a split for 25/15 B would add complexity without a quality benefit. The core plus stage limit is unchanged. Other restored ceilings come from the already validated batch-267-http build record, rather than new growth.
-=======
 Batch 208 job 1: cache/stream exports StreamingAssetCache, with all AssetCache options and pull-driven full-file 200 miss/replacement responses. Consume or cancel every body before flush or disposal can finish. Successful EOF commits the complete response; cancel/abort/error commits nothing and leaves an older copy intact. Already delivered bytes cannot be replaced with an offline fallback if a changed response fails later. Ranged replacements retain the existing buffered range behavior. In-memory retained bytes stop at maxBytes; complete cacheable assets still require one full retained body. New entry 3,398 B min+gzip including cache implementation (previously absent); cache root 3,005 B, core + stage 24,209 B, unchanged. Optional entry budget includes the complete cache because the subclass must inherit its storage semantics; splitting would add a second cache API without reducing the required work.
-
-
-Batch 208 landing gate: a full package rebuild exposed stale quality size ceilings for the existing exact-version core guard. The root build already enforces the approved 21,776 B strict ceiling (measured core 21,775 B); its quality ceiling is aligned to the same strict value. Optional entries retain all version checks, with their allowed ceiling aligned to measured bytes plus standard headroom. Splitting checks would weaken attachment-time version protection. Core + stage stays 24,209 B. No runtime source changed for this correction.
-
-| Entry | Previous ceiling B | Rebuilt gzip B | Aligned ceiling B |
-| --- | ---: | ---: | ---: |
-| @margoengine/audio | 7716 | 7762 | 8018 |
-| @margoengine/biomes/view | 10454 | 10517 | 10833 |
-| @margoengine/clustered/area | 10461 | 10526 | 10842 |
-| @margoengine/controls | 27517 | 27530 | 28356 |
-| @margoengine/core | 21630 | 21775 | 21776 |
-| @margoengine/creative | 19177 | 19244 | 19822 |
-| @margoengine/environment/cube-camera | 5691 | 5756 | 6012 |
-| @margoengine/lines | 19671 | 19703 | 20295 |
-| @margoengine/physics2d | 8199 | 8241 | 8497 |
-| @margoengine/post | 42058 | 42105 | 43369 |
-| @margoengine/post/bloom | 7005 | 7046 | 7302 |
-| @margoengine/post/fxaa | 4699 | 4729 | 4985 |
-| @margoengine/post/smaa | 6244 | 6276 | 6532 |
-| @margoengine/post/anamorphic | 6551 | 6575 | 6831 |
-| @margoengine/post/blur | 6203 | 6239 | 6495 |
-| @margoengine/post/lens | 6887 | 6916 | 7172 |
-| @margoengine/scatter/tiles | 3415 | 3479 | 3735 |
-| @margoengine/scenery/scenes | 19213 | 19334 | 19915 |
-| @margoengine/sciviz/webgl2 | 4476 | 4527 | 4783 |
-| @margoengine/shader/effects | 8306 | 8364 | 8620 |
-| @margoengine/taa/upscale | 7112 | 7179 | 7435 |
-| @margoengine/terrain/stream | 12100 | 12112 | 12476 |
-| @margoengine/text | 16406 | 16494 | 16989 |
-| @margoengine/transitions/mask | 5522 | 5536 | 5792 |
-| @margoengine/transitions/custom | 5275 | 5305 | 5561 |
-| @margoengine/water | 20185 | 20210 | 20817 |
-| @margoengine/xr | 8967 | 9138 | 9413 |
-| @margoengine/webgl2-compat lazy compute runtime and read-back | 31741 | 31756 | 32709 |
->>>>>>> 36cf4fe0f (feat(cache): stream cache misses before complete-body storage)
