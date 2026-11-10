@@ -4716,6 +4716,13 @@ At the unchanged p-extrude resolutions, lathe revolution and tube radial sin/cos
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
 
+### Batch 169 terrain uniform work (2026-11-10)
+
+A still terrain view uploads no uniform bytes: 0 writes instead of 12 per frame for three
+rings with two cascades and one local layer, and every buffer holds the parent's bytes
+after every frame. Regression: `packages/terrain/test/uniform-workcount.test.js`;
+[oracle and sources](batch-169.md#job-5-terrain-uniform-uploads). No timing claim.
+
 ### Batch 169 splines intersection work (2026-11-10)
 
 `intersectSplines` evaluates each segment's four reconstruction points once per call: two

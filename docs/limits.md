@@ -6663,6 +6663,19 @@ Batch 162 lathe/tube angular reuse: per-call Float64 tables add 16 bytes per ang
 
 Batch 162 primitive angular reuse: sphere/cylinder/capsule/torus allocate a temporary Float64 sin/cos table of 16 bytes per angular column including the seam (at most 1,040 bytes per affected p-primitives builder). No cache survives a call. Geometry buffers and groups match the parent byte for byte on the same JavaScript runtime; cross-runtime transcendental bit identity is not promised. Operation counts are not a runtime or competitive speed claim. [Evidence](whitepaper/batch-162-workcounts.md).
 
+### Terrain clipmap triangulation error (batch 169, 2026-11-10)
+
+`TerrainQuery` answers the bilinear heightmap surface exactly (66049 of 66049 samples equal
+the source). The clipmap draws each ring as two triangles per cell at that ring's spacing,
+so the drawn surface differs from the bilinear one. On a 257 x 257 fbm fixture spanning 100
+height units, the measured max error is 2.27 at the finest ring and 8.14, 15.97, 27.17 and
+62.39 at 2, 4, 8 and 16 cell spacing (RMS 0.22 to 12.89). Coarse rings sit far from the
+camera by design. [Values](whitepaper/batch-169.md#job-5-terrain-uniform-uploads).
+
+Entry size: @margoengine/terrain 13,295 to 13,310 B gzip (+15 B) for the changed-only
+uniform uploads; recorded as deliberate growth in the sizes baseline. Core and stage
+unchanged.
+
 ### Subdivision face counts against Blender (batch 169, 2026-11-10)
 
 `subdivideMesh` keeps every face planar, so each curved quad of the result is stored as

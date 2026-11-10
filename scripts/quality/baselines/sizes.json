@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14693266,
+  "total": 14693681,
   "history": [
     {
       "date": "2026-10-24",
@@ -8141,6 +8141,12 @@
       "commit": "8221e9422",
       "reason": "toon/hatch +7 B: halftone dots sized by the clipped disc area so dark tones reach full ink (batch 132 audit)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "6df42fc71",
+      "reason": "batch 169 job 5: terrain uploads only changed uniforms (+15 B; unchanged frames write 0 of 12 uniforms)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9202,7 +9208,7 @@
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 7593,
     "@margoengine/taa/upscale-velocity": 19045,
-    "@margoengine/terrain": 13295,
+    "@margoengine/terrain": 13710,
     "@margoengine/terrain/blend": 3676,
     "@margoengine/terrain/deform": 5192,
     "@margoengine/terrain/displace": 4342,

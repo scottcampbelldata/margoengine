@@ -471,3 +471,5 @@ Build-ready controls and external-install commands: [sciviz-rivals](../sciviz-ri
 - Batch 169 job 3 mesh-edit: time `subdivideMesh` levels 1 to 4 on the cube and cylinder fixtures, and Blender's modifier on the same meshes through `scripts/bp-169-mesh-oracle.mjs` inputs, in the quiet window. Edge-ID parses 1260 to 0 with identical bytes. Count Margo's planar triangle split separately from Blender's whole quads.
 
 - Batch 169 job 4 splines: time intersectSplines on the six intersect-workcount pairs and larger 64-segment curves in the quiet window; point evaluations 512 to 64 on two 8-segment curves with identical bytes. three.js has no curve intersection, so only value parity (4.44e-16) is shared.
+
+- Batch 169 job 5 terrain: time a still and a moving camera over the terrain GPU scenes in the quiet window; unchanged frames now write 0 of 12 uniforms (2112 bytes) with identical buffer contents.

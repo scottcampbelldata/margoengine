@@ -93,6 +93,9 @@ Physical WebGPU regression: `node packages/terrain/test/wetness.browser.mjs` fro
 the repository root after building the packages.
 
 Optional geometry clipmaps with vertex texture height/normal sampling and 4 to 16 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
+Each ring's 176-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
+differ from the last upload to that buffer, so a still camera under unchanged light uploads nothing; buffers made
+after a device restore always get their first write.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';

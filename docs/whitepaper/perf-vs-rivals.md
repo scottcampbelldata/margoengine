@@ -197,6 +197,14 @@ edge differences. The independent trace confirms the weighted image loss, not an
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
 
+## Batch 169 terrain: work counts, 2026-11-10
+
+| Work | Before | After | Output | Oracle | Status |
+| --- | --- | --- | --- | --- | --- |
+| Eight frames, 3 rings, 2 cascades, 1 local layer | 96 uniform writes (12 per frame) | 45 (0 on unchanged frames) | 12 buffers hold identical bytes after every frame | TerrainQuery equals all 66049 source samples; clipmap triangulation error per level recorded | `perf(terrain): upload only changed ring uniforms`; timing pending the quiet rerun |
+
+Values and commands: [batch-169.md](batch-169.md#job-5-terrain-uniform-uploads).
+
 ## Batch 169 splines: work counts, 2026-11-10
 
 | Work | Before | After | Output | Black-box oracle | Status |

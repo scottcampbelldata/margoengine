@@ -180,6 +180,9 @@ export class Terrain implements EnginePlugin {
   private ringGroup?: (buffer: GPUBuffer) => GPUBindGroup;
   private occluder?: { samples: number; pipeline: GPURenderPipeline };
   private rings: Ring[] = [];
+  /** The bits each uniform buffer last received, so an unchanged frame uploads nothing. Buffers made anew start empty. */
+  private readonly sent = new WeakMap<GPUBuffer, Uint32Array>();
+  private readonly bitViews = new WeakMap<Float32Array, Uint32Array>();
   private pipelines = new Map<string, GPURenderPipeline>();
   private lightingGroups = new Map<GPURenderPipeline, LightingGroup>();
   private lighting = new Set<TerrainLighting>();
@@ -498,7 +501,7 @@ export class Terrain implements EnginePlugin {
       values[41] = heightOffset;
       values[42] = layers;
       values[43] = hdr;
-      c.device.queue.writeBuffer(this.rings[i].uniform, 0, values as Float32Array<ArrayBuffer>);
+      this.upload(c.device.queue, this.rings[i].uniform, values);
       previousX = x;
       previousZ = z;
     }
@@ -778,7 +781,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       const r = this.rings[i];
       r.shadowValues.set(r.values);
       r.shadowValues.set(matrix);
-      context.device.queue.writeBuffer(r.shadowUniforms[cascade], 0, r.shadowValues as Float32Array<ArrayBuffer>);
+      this.upload(context.device.queue, r.shadowUniforms[cascade], r.shadowValues);
       pass.setBindGroup(0, r.shadowGroups[cascade]);
       pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
       pass.drawIndexed(i ? this.ringCount : this.centerCount);
@@ -828,11 +831,28 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       }
       r.shadowValues.set(r.values);
       r.shadowValues.set(matrix);
-      device.queue.writeBuffer(buffer, 0, r.shadowValues as Float32Array<ArrayBuffer>);
+      this.upload(device.queue, buffer, r.shadowValues);
       pass.setBindGroup(0, r.localGroups[layer]);
       pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
       pass.drawIndexed(i ? this.ringCount : this.centerCount);
     }
+  }
+  /** Writes `values` to `buffer` unless the buffer already holds exactly these bits (compared bit for bit, so -0 and NaN count). */
+  private upload(queue: GPUQueue, buffer: GPUBuffer, values: Float32Array): void {
+    let bits = this.bitViews.get(values);
+    if (!bits) this.bitViews.set(values, (bits = new Uint32Array(values.buffer, values.byteOffset, values.length)));
+    let last = this.sent.get(buffer);
+    if (last) {
+      let same = true;
+      for (let i = 0; i < bits.length; i++)
+        if (bits[i] !== last[i]) {
+          same = false;
+          break;
+        }
+      if (same) return;
+    } else this.sent.set(buffer, (last = new Uint32Array(bits.length)));
+    last.set(bits);
+    queue.writeBuffer(buffer, 0, values as Float32Array<ArrayBuffer>);
   }
   private release(): void {
     for (const texture of new Set(

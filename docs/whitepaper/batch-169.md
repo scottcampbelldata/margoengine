@@ -8,9 +8,44 @@ No wall-clock benchmarks or budget changes. Timing pending the quiet rerun.
 | 2 | text | DONE in `perf(text): reuse logical kerning and shaped prefix advances` | 1198 to 599 pair calls; 35 to 18 prefix calls; 35 byte-identical layouts; Canvas/Troika value oracle |
 | 3 | mesh-edit | DONE in `perf(mesh-edit): index subdivision edges numerically` | 1260 to 0 edge-ID parses; 482650 identical bytes; Blender 5.3 vertices match within Float32 |
 | 4 | splines | DONE in `perf(splines): rebuild intersection cubics once per curve` | 512 to 64 point evaluations; 1264 identical bytes; three.js Catmull-Rom values within 4.44e-16 |
-| 5 | terrain | Pending | Source-height and clipmap error |
+| 5 | terrain | DONE in `perf(terrain): upload only changed ring uniforms` | 12 to 0 uniform writes on an unchanged frame; identical buffer bytes; source heights exact, clipmap error per level recorded |
 | 6 | wfc | Pending | Constraint satisfaction and work count |
 | 7 | procedural | Pending | Published noise values, Poisson spacing and work count |
+
+## Job 5: terrain uniform uploads
+
+Cause: every frame `Terrain` wrote each ring's 176-byte uniform with `queue.writeBuffer`,
+and every shadow cascade and local shadow layer wrote its copy too, even when the camera,
+light and shadow matrix had not changed. With three rings, two cascades and one local layer
+that is 12 writes (2112 bytes) per frame for a still view. The change keeps the bits each
+uniform buffer last received and skips a write whose 44 floats are identical bit for bit
+(so -0 and NaN patterns count as changes). Buffers made after a device restore start
+empty and always get their first write. Writes that do happen keep their order.
+
+`packages/terrain/test/uniform-workcount.test.js` replays eight frames on the recording
+mock GPU: still, moved camera, changed light, changed shadow matrix. Writes per frame are
+12, 0, 0, 12, 0, 12, 9, 0 (parent: 12 every frame, 96 in all). The contents of all 12
+uniform buffers after every frame hash to
+`653e78b09281c96ea35d464ddb70c6a50d61b98c0ba937ef307e3a6ee10a3982`, captured on the parent,
+so every draw reads the same bytes. The package's real-GPU suites pass unchanged.
+
+Value oracle (`scripts/bp-169-terrain-oracle.mjs`): `TerrainQuery.height` on a 257 x 257
+fbm simplex heightmap equals every source sample times heightScale plus offset exactly
+(66049 samples, error 0). The geometry-clipmap triangulation error against the bilinear
+surface (Losasso and Hoppe 2004), heights spanning 100 units, per ring spacing of 1, 2,
+4, 8 and 16 cells: max 2.27, 8.14, 15.97, 27.17, 62.39; RMS 0.22, 1.24, 3.08, 6.63, 12.89.
+The fixture's finest octave repeats every two cells, so these are high-frequency upper
+values; smoother terrain gives less. No rival was run for this job.
+
+Reproduce after `npm run build:packages`:
+`node --test packages/terrain/test/uniform-workcount.test.js` and
+`node scripts/bp-169-terrain-oracle.mjs`. No time is measured.
+
+Research: F. Losasso and H. Hoppe, *Geometry Clipmaps: Terrain Rendering Using Nested
+Regular Grids*, SIGGRAPH 2004, https://doi.org/10.1145/1015706.1015799; A. Asirvatham and
+H. Hoppe, *Terrain Rendering Using GPU-Based Geometry Clipmaps*, GPU Gems 2 chapter 2
+(2005), which updates per-level constants as the view moves; W3C *WebGPU*,
+`GPUQueue.writeBuffer` (2026), https://www.w3.org/TR/webgpu/#dom-gpuqueue-writebuffer.
 
 ## Job 4: splines curve intersection
 
