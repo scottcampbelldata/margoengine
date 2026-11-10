@@ -63,11 +63,23 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 
 ## Install only what you import
 
-Each row is a separate npm package (not published yet: until then, build from source with `npm ci && npm run build:packages`). Install the ones you import; bundlers drop the rest.
+There are three ways in: `@margoengine/core` or `@margoengine/stage` alone, a domain install profile, or
+`margoengine` for every feature. For a web app, `npm create margo@latest my-app -- --template web` scaffolds a
+working scene that depends on `@margoengine/web`; game, viz, React and Next starters also install their own profile.
+Publication is pending: the [kits guide](guides/kits.md) documents the verified private tarball route and package
+counts. No release command here publishes anything.
+
+Each row below is also available as an independent npm package. The examples later in this guide use full-install
+aliases to keep the comparisons readable. With a profile, replace `margoengine/controls/orbit` with
+`@margoengine/web/controls/orbit`, or import `@margoengine/controls/orbit` directly if that package is installed.
+All packages share a release version. A profile preserves module identity and tree-shaking; it also reduces what
+npm installs. See [the starting-path review](guides/kit-migration.md) for the full install-to-frame audit.
 
 ```sh
 npm install @margoengine/core                      # engine, camera, meshes, constant PBR material
-npm install margoengine                            # optional facade: createStage('#app'), app.box(), addGLTF(app, url)
+npm install @margoengine/stage                     # facade plus core only
+npm install @margoengine/web                       # web domain profile
+npm install margoengine                            # every feature package
 npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @margoengine/controls
 ```
 

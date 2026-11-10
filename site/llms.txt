@@ -18,7 +18,8 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [A mobile-first architectural walkthrough in ~50 lines](https://margoengine.com/llms/docs/guides/walkthrough.md): Step-by-step first scene to a loaded model
 - [Which import do I need?](https://margoengine.com/llms/docs/guides/imports.md): Which import to use: margoengine/<name> versus @margoengine/<name>
 - [Quality tiers: one app that runs at 60 FPS on a laptop and looks its best on a fast PC](https://margoengine.com/llms/docs/guides/quality-tiers.md): High and low quality tiers and how a page picks one
-- [Kits](https://margoengine.com/llms/docs/guides/kits.md): Kits: one import for a whole domain (CAD, games, viz, web)
+- [Kits](https://margoengine.com/llms/docs/guides/kits.md): Independent install profiles for games, web, visualization and React
+- [Starting from three.js](https://margoengine.com/llms/docs/guides/kit-migration.md): Install-to-frame review for developers coming from three.js
 - [Prepare assets with margo-convert](https://margoengine.com/llms/docs/guides/asset-pipeline.md): margo-convert build: optimise, compress and package models for the web and for Unity, Unreal, Godot and Roblox
 - [Coming from three.js](https://margoengine.com/llms/docs/from-threejs.md): Moving from three.js: the same task in Margo, name by name
 - [Design envelope](https://margoengine.com/llms/docs/limits.md): Measured limits and sizes, with the commands that measure them
@@ -27,9 +28,13 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 
 ## Packages: Start here
 
-- [margoengine](https://margoengine.com/llms/packages/margoengine.md): Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react).
 - [@margoengine/stage](https://margoengine.com/llms/packages/stage.md): The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.
 - [@margoengine/core](https://margoengine.com/llms/packages/core.md): WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package.
+- [@margoengine/game](https://margoengine.com/llms/packages/game.md): Games: models, animation, light and shadow, sky, physics, audio, input, effects
+- [@margoengine/web](https://margoengine.com/llms/packages/web.md): Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top
+- [@margoengine/viz](https://margoengine.com/llms/packages/viz.md): Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text
+- [@margoengine/react-kit](https://margoengine.com/llms/packages/react-kit.md): React and Next.js web install profile
+- [margoengine](https://margoengine.com/llms/packages/margoengine.md): Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react).
 
 ## Packages: Setup and diagnostics
 
@@ -163,9 +168,13 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 
 One page per package: every exported name with its declaration, generated from the compiled types (`npm run api:check` fails when it changes by accident).
 
-- [margoengine API](https://margoengine.com/llms/api/margoengine.md): 4 entry points
 - [@margoengine/stage API](https://margoengine.com/llms/api/stage.md): 13 entry points
 - [@margoengine/core API](https://margoengine.com/llms/api/core.md): 2 entry points
+- [@margoengine/game API](https://margoengine.com/llms/api/game.md): 1 entry point
+- [@margoengine/web API](https://margoengine.com/llms/api/web.md): 1 entry point
+- [@margoengine/viz API](https://margoengine.com/llms/api/viz.md): 1 entry point
+- [@margoengine/react-kit API](https://margoengine.com/llms/api/react-kit.md): 1 entry point
+- [margoengine API](https://margoengine.com/llms/api/margoengine.md): 4 entry points
 - [@margoengine/math API](https://margoengine.com/llms/api/math.md): 34 entry points
 - [@margoengine/quality API](https://margoengine.com/llms/api/quality.md): 8 entry points
 - [@margoengine/webgl2-compat API](https://margoengine.com/llms/api/webgl2-compat.md): 12 entry points
@@ -258,7 +267,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 13 entry points
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 6 entry points
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 17 entry points
-- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 61 entry points
+- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 67 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 10 entry points
 - [@margoengine/react API](https://margoengine.com/llms/api/react.md): 40 entry points
 
@@ -266,7 +275,7 @@ One page per package: every exported name with its declaration, generated from t
 
 - [Public API surface](https://margoengine.com/llms/docs/api-surface.md): Generated by `npm run api:update` from the reports in `api/` (one per package `exports` entry; `npm run api:check`, part of `npm run…
 - [Mixer finite-FIR true-peak bound](https://margoengine.com/llms/docs/architecture/mixer-true-peak.md): `mixer/worklet` uses the four 12-tap phases printed in ITU-R BS.1770-5 Annex 2. This is a ceiling for that specified reconstruction…
-- [Engine architecture and quality reference](https://margoengine.com/llms/docs/architecture/operational-playbook.md): The internal materials native-glass adapter owns the scene capture, snapshots and transfer-function shader. gltf-pro acquires it for…
+- [Engine architecture and quality reference](https://margoengine.com/llms/docs/architecture/operational-playbook.md): The optional entry observes only opted-in spec figures and preserves successful mutations, property assignments and removals. Replaying…
 - [Exact finite certificates in the 2D contact solver](https://margoengine.com/llms/docs/architecture/physics2d-finite-certificates.md): The four-lane normal solver removes two redundant finite predicates while preserving its arithmetic, accepted lanes and scalar fallback…
 - [Exact frame-preparation checks in the 2D kernel](https://margoengine.com/llms/docs/architecture/physics2d-frame-preparation.md): Two changes avoid evaluating predicates whose result is already known. They preserve public input validation, derived-overflow refusal…
 - [Exact rectangle SAT and certified face-distance decision](https://margoengine.com/llms/docs/architecture/physics2d-manifold-proof.md): This note proves two restricted replacements in the physics2d four-quad narrow phase. The first evaluates the same eight SAT axes with…
@@ -274,7 +283,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Bending tangent of the supported four-box column](https://margoengine.com/llms/docs/architecture/physics2d-support-bending.md): The centered 1:1000 column has a negative bending direction under Margo's existing steady contact force law. The calculation includes the…
 - [Own 2D sustained support](https://margoengine.com/llms/docs/architecture/physics2d-support-proof.md): This note derives the correction to the contact support ceiling found on `47f81f909`. It concerns the owned Rust/Wasm kernel, not the…
 - [Benchmarking](https://margoengine.com/llms/docs/benchmarking.md): Margo has one benchmark tool: `npm run bench`. It measures bytes, startup, rendering, objects, kernel maths, glTF, loaders, assemblies…
-- [Clean room](https://margoengine.com/llms/docs/clean-room.md): Research compared James T. Kajiya, The Rendering Equation (SIGGRAPH, 1986)…
+- [Clean room](https://margoengine.com/llms/docs/clean-room.md): Build-record generator correction: compared Git Project contributors, gitattributes end-of-line conversion (2026)…
 - [Core version compatibility](https://margoengine.com/llms/docs/core-version-guard.md): The guard is an approved core bug repair. A package cannot own the engine's identity or validate every plugin before core's registration…
 - [Content Security Policy](https://margoengine.com/llms/docs/csp.md): Core and stage compile the Rust transform kernel, so every Margo engine page under a strict CSP needs `'wasm-unsafe-eval'`. For a…
 - [Demo cold-load measurements](https://margoengine.com/llms/docs/demo-loading.md): Scope: all seven pages shipped by `scripts/build-site.js`, including both robot entry points. The phased startup and 180 ms effect…
@@ -320,6 +329,7 @@ One page per package: every exported name with its declaration, generated from t
 - [VRM 0.x runtime conversion](https://margoengine.com/llms/docs/rigging-vrm0.md): Batch 213 job 1 adds only `@margoengine/rigging/vrm0` and its umbrella alias. `readVRM` remains a 1.x reader. `loadVRM0` converts before…
 - [VRM animation](https://margoengine.com/llms/docs/rigging-vrma.md): The optional `@margoengine/rigging/vrma` entry loads VRMC_vrm_animation 1.0 from GLB bytes, JSON plus supplied buffers, or a URL with…
 - [Road design entries (batch 233)](https://margoengine.com/llms/docs/road-design.md): `@margoengine/road/intersections` exports `intersections(roads, options)`, an async CPU builder. Each input uses the existing JunctionRoad…
+- [Exact spatial aggregation](https://margoengine.com/llms/docs/sciviz-aggregate.md): Batch 175 job 3 adds the optional `@margoengine/sciviz/aggregate` entry. `aggregateRaster` accepts a `ColumnarTable` or `CrossFilter`…
 - [Scientific analysis filters, batch 172](https://margoengine.com/llms/docs/sciviz-analysis.md): The optional `@margoengine/sciviz/pipeline` entry exports `FilterPipeline`. It imports no renderer and starts no work on construction. A…
 - [Scientific colour encodings](https://margoengine.com/llms/docs/sciviz-colors.md): Batch 178 job 4 extends the existing optional `@margoengine/sciviz/colormaps` entry. Core and stage have no new imports or features.
 - [docs/sciviz-link.md](https://margoengine.com/llms/docs/sciviz-link.md): The optional @margoengine/sciviz/link entry exports SelectionStore, selectionOperation and bindSelection. A store owns unique string or…

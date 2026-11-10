@@ -1,6 +1,11 @@
 # Which import do I need?
 
-One install covers everything:
+Choose core/stage alone, a domain profile, or the full engine. Core requires no other engine package; stage adds
+only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
+The [kits guide](kits.md) lists the contents and measured install sizes. A new app can use
+`npm create margo@latest my-app -- --template web`; each template installs its profile rather than the umbrella.
+
+For the install-everything option:
 
 ```bash
 npm i margoengine
@@ -8,8 +13,9 @@ npm i margoengine
 
 Then import what you use. Every package is a subpath of `margoengine`: `margoengine/shadows` is the package
 `@margoengine/shadows`, the same module and the same classes. An app bundles only what it imports, however many
-packages are installed. For a ready-made set, import a [kit](kits.md) instead (`margoengine/game`, `/viz`,
-`/web`).
+packages are installed. The legacy `margoengine/game`, `/viz` and `/web` imports remain part of the full install.
+Independent profiles instead use `@margoengine/web` for common names or `@margoengine/web/controls/orbit` for a
+member entry. To use a capability outside the profile, install its scoped package at the same release version.
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
      Snippets may use the ambient names engine, canvas, mesh and model. -->

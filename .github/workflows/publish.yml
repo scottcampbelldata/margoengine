@@ -64,6 +64,10 @@ jobs:
         env:
           DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
         run: |
-          npm publish --workspace packages --provenance --access public --ignore-scripts $DRY
+          mkdir -p test-results
+          node scripts/publish-order.mjs > test-results/publish-order.txt
+          while IFS= read -r workspace; do
+            npm publish "./$workspace" --provenance --access public --ignore-scripts $DRY
+          done < test-results/publish-order.txt
           npm publish ./tools/margo-convert --provenance --access public --ignore-scripts $DRY
           npm publish ./tools/create-margo --provenance --access public --ignore-scripts $DRY

@@ -1291,3 +1291,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 174 job 6): document LinkedCameras physical range/camera defaults and stopped-engine sync, FigureLayout ownership and factory, ComparativeGrid time/parameter graphs and registry/output disposal, VolumeQuad physical nearest-sample crosshair and isotropic resize, AbortSignal and disposal.
 - margoengine (batch 174 job 6): document generated sciviz/views optional alias.
 - @margoengine/viz (batch 174 job 6): document the generated sciviz/views domain-profile alias.
+
+- create-margo: document web/game/viz/react-kit standalone template installs and prefix changes, keep the one-line create command, and refresh all template README examples in the README phase.

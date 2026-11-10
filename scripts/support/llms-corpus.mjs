@@ -16,7 +16,8 @@ export const GUIDES = [
   ['docs/guides/walkthrough.md', 'Step-by-step first scene to a loaded model'],
   ['docs/guides/imports.md', 'Which import to use: margoengine/<name> versus @margoengine/<name>'],
   ['docs/guides/quality-tiers.md', 'High and low quality tiers and how a page picks one'],
-  ['docs/guides/kits.md', 'Kits: one import for a whole domain (CAD, games, viz, web)'],
+  ['docs/guides/kits.md', 'Independent install profiles for games, web, visualization and React'],
+  ['docs/guides/kit-migration.md', 'Install-to-frame review for developers coming from three.js'],
   [
     'docs/guides/asset-pipeline.md',
     'margo-convert build: optimise, compress and package models for the web and for Unity, Unreal, Godot and Roblox',

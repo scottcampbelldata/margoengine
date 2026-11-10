@@ -6,8 +6,8 @@ import {
   PointCloud,
   PointsPlugin,
   createStage,
-} from 'margoengine/viz';
-import { Bloom } from 'margoengine/post/bloom';
+} from '@margoengine/viz';
+import { Bloom } from '@margoengine/viz/post/bloom';
 
 // 300,000 stars in a turning three-armed galaxy over a grid, with bloom and labels. Drag to orbit, scroll to zoom.
 async function start() {

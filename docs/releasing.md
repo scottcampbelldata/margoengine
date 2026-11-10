@@ -60,7 +60,7 @@ unchecked. Order inside the workflow:
 
 1. Leaf workspace packages under `packages/`, in dependency order, including core and stage.
 2. `@margoengine/game`, `@margoengine/web`, `@margoengine/viz` and `@margoengine/react-kit`, after their members.
-3. `margoengine`, the install-everything option. The existing workspace publish command includes the four profiles;
+3. `margoengine`, the install-everything option. scripts/publish-order.mjs derives this order from the workspace dependency graph; the workflow publishes one tarball at a time in that order. The four profiles are included automatically;
    do not expose create-margo until all names at the shared version are available. The registry may be temporarily
    incomplete during publication, so the release announcement follows the last successful publish.
 4. `margo-convert` (depends on the `@margoengine` packages).

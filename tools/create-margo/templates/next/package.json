@@ -9,10 +9,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "margoengine": "^1.0.0",
     "next": "^16.4.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@margoengine/react-kit": "^1.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

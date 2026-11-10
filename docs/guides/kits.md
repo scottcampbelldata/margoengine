@@ -20,6 +20,22 @@ engine implementation. Its root provides common names; its subpaths expose every
 Installing a kit never installs `margoengine`. Physics development remains on hold; the game kit exposes the
 already-built physics package without changing it.
 
+With a `<canvas id="viewport"></canvas>` in the page, a web profile starts a scene directly:
+
+```ts
+import {createStage} from '@margoengine/web';
+
+const stage = await createStage('#viewport');
+stage.box({color: '#84d6bd'});
+```
+
+For a complete app, `npm create margo@latest my-app -- --template web`, then `cd my-app`, `npm install` and
+`npm run dev`. Choose `game`, `viz`, `react` or `next` for the other starters. Each template declares one domain
+profile; React and Next use `@margoengine/react-kit`. The full engine is never a template dependency.
+`scripts/template-install-check.mjs` runs this actual create command through the private packed registry, installs
+and builds all five templates, and checks their exact engine dependency closures. Its separate
+`scripts/template-browser-check.mjs` proves a first frame from each production build, including Next's server.
+
 To add a capability outside a profile, install its package at the same release version, for example
 `npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
 Optional third-party peers, including React and Rapier, remain app choices and are never silently installed by a kit.

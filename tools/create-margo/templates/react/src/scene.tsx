@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import type { Mesh as MeshHandle } from 'margoengine';
+import type { Mesh as MeshHandle } from '@margoengine/react-kit/core';
 import {
   Bloom,
   Box,
@@ -12,7 +12,7 @@ import {
   Sphere,
   Tonemap,
   useFrame,
-} from 'margoengine/react';
+} from '@margoengine/react-kit';
 
 /** Three shapes in afternoon sun: a spinning gold cube, a jade sphere and a coral ball, with soft shadows and bloom. */
 function Shapes() {

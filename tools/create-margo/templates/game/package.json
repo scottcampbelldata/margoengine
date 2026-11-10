@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
-    "margoengine": "^1.0.0"
+    "@margoengine/game": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

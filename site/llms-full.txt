@@ -304,15 +304,19 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-98 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+102 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
-### Start here (3)
+### Start here (7)
 
 | Package | What it is |
 | --- | --- |
-| [`margoengine`](packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 | [`@margoengine/stage`](packages/stage/README.md) | The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine. |
 | [`@margoengine/core`](packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package. |
+| [`@margoengine/game`](packages/game/README.md) | Games: models, animation, light and shadow, sky, physics, audio, input, effects |
+| [`@margoengine/web`](packages/web/README.md) | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
+| [`@margoengine/viz`](packages/viz/README.md) | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
+| [`@margoengine/react-kit`](packages/react-kit/README.md) | React and Next.js web install profile |
+| [`margoengine`](packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 
 ### Setup and diagnostics (6)
 
@@ -973,7 +977,12 @@ Measured, not estimated (records in `examples/package-benchmarks/results/`):
 
 # Which import do I need?
 
-One install covers everything:
+Choose core/stage alone, a domain profile, or the full engine. Core requires no other engine package; stage adds
+only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
+The [kits guide](kits.md) lists the contents and measured install sizes. A new app can use
+`npm create margo@latest my-app -- --template web`; each template installs its profile rather than the umbrella.
+
+For the install-everything option:
 
 ```bash
 npm i margoengine
@@ -981,8 +990,9 @@ npm i margoengine
 
 Then import what you use. Every package is a subpath of `margoengine`: `margoengine/shadows` is the package
 `@margoengine/shadows`, the same module and the same classes. An app bundles only what it imports, however many
-packages are installed. For a ready-made set, import a [kit](kits.md) instead (`margoengine/game`, `/viz`,
-`/web`).
+packages are installed. The legacy `margoengine/game`, `/viz` and `/web` imports remain part of the full install.
+Independent profiles instead use `@margoengine/web` for common names or `@margoengine/web/controls/orbit` for a
+member entry. To use a capability outside the profile, install its scoped package at the same release version.
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
      Snippets may use the ambient names engine, canvas, mesh and model. -->
@@ -1186,61 +1196,143 @@ Notes:
 
 # Kits
 
-A kit is one import line with the set of classes an app of one kind usually needs. It is part of `margoengine` (no
-extra install), and it costs nothing you do not use: a bundler keeps only the names you import, so
-`import {Shadows, createStage} from 'margoengine/game'` bundles the same bytes as importing them from their packages
-(`tests/umbrella.test.js` compares the two).
+Choose one of three ways in: install core or stage alone, install a domain kit, or install everything.
+All packages in a release share one version. npm publication is pending; the checks below use packed private
+repository builds and never the unrelated registry placeholder.
 
-<!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
-     Snippets may use the ambient names engine, canvas, mesh and model. -->
+| Install | What it gives you |
+| --- | --- |
+| `npm install @margoengine/core` | Rendering and transforms, no other engine package |
+| `npm install @margoengine/stage` | The stage facade plus core, nothing else required |
+| `npm install @margoengine/game` | Game systems, rendering, input, animation, worlds, audio and navigation |
+| `npm install @margoengine/web` | Product viewers and interactive web scenes |
+| `npm install @margoengine/viz` | Scientific figures, compute, spatial data, terrain, points and lines |
+| `npm install @margoengine/react-kit react react-dom` | The web profile with React bindings and sky, also used by Next.js |
+| `npm install margoengine` | Every engine package |
+
+A kit is a small package of typed re-exports, with a dependency on each member it exposes. It contains no copied
+engine implementation. Its root provides common names; its subpaths expose every entry of its members. Existing
+`margoengine/game`, `margoengine/web` and `margoengine/viz` imports remain supported by the full install.
+Installing a kit never installs `margoengine`. Physics development remains on hold; the game kit exposes the
+already-built physics package without changing it.
+
+With a `<canvas id="viewport"></canvas>` in the page, a web profile starts a scene directly:
+
+```ts
+import {createStage} from '@margoengine/web';
+
+const stage = await createStage('#viewport');
+stage.box({color: '#84d6bd'});
+```
+
+For a complete app, `npm create margo@latest my-app -- --template web`, then `cd my-app`, `npm install` and
+`npm run dev`. Choose `game`, `viz`, `react` or `next` for the other starters. Each template declares one domain
+profile; React and Next use `@margoengine/react-kit`. The full engine is never a template dependency.
+`scripts/template-install-check.mjs` runs this actual create command through the private packed registry, installs
+and builds all five templates, and checks their exact engine dependency closures. Its separate
+`scripts/template-browser-check.mjs` proves a first frame from each production build, including Next's server.
+
+To add a capability outside a profile, install its package at the same release version, for example
+`npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
+Optional third-party peers, including React and Rapier, remain app choices and are never silently installed by a kit.
+
+Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/web/gltf-pro'` (or
+`@margoengine/game/gltf-pro`). The loader is installed with the profile, but a page importing only the root emits
+no Draco or Basis files. Bundlers discover decoder assets before tree-shaking, so the root deliberately keeps the
+loader entry separate. A model app keeps the full glTF/compression support of the existing loader. No loader,
+core or stage implementation changed.
+
+## Research and format choice
+
+Reviewed 2026-11-10, public documentation and published package metadata only. Registry versions, dependency
+maps and unpacked bytes are frozen in [kits-registry.json](kits-registry.json); no rival implementation was read.
+
+| Project | Public packaging behaviour | Decision for Margo |
+| --- | --- | --- |
+| [three.js installation](https://threejs.org/manual/pages/installation.html) | One install contains the engine and separately imported addons; matching versions/CDNs are recommended | Keep the full umbrella and familiar subpath imports, add actual install profiles |
+| [Babylon npm packages](https://doc.babylonjs.com/setup/frameworkPackages/npmSupport/) | Scoped core, loaders, GUI and other ES modules install independently | Retain independent scoped packages beneath profiles |
+| [PlayCanvas standalone](https://developer.playcanvas.com/user-manual/engine/standalone/) | Engine install and create CLI; React is separate | Keep one-line scaffolding and a separate React profile |
+| [Bevy profiles](https://docs.rs/bevy/latest/bevy/#profiles) | Disable defaults and choose 2d, 3d, ui; individual crates remain available | Use domain dependency sets, without a JS runtime feature switch |
+| [Pixi v8 migration](https://pixijs.com/8.x/guides/migrations/v8) | Returned from separate packages to one package because mixed versions conflicted with shared caches | One release version and cross-kit singleton checks. `@pixi/core` stops at 7.4.3 because v8 consolidated into `pixi.js`, currently 8.22.0 in the snapshot |
+| [Godot build profiles](https://docs.godotengine.org/en/latest/engine_details/development/compiling/optimizing_for_size.html) | Custom export builds disable unused domains | Domain selection is useful; no custom engine build should be needed to install a Margo kit. Godot is an export target, not the web parity bar |
+| [Phaser installation](https://www.phaser.io/oss/docs/phaser/getting-started/installation) | One package or a create CLI template | Preserve the short starting path |
+| [Vite guide](https://vite.dev/guide/) | Separate tool and template scaffolder, third-party plugins | Keep create-margo separate from runtime profiles |
+| [Angular releases](https://angular.dev/reference/releases) | Related framework packages follow coordinated releases | Keep the existing single release version |
+| [Nx release policy](https://nx.dev/docs/reference/releases) | nx and scoped plugins release together in lockstep | Check every published package and template range together |
+| [Lodash per-method packages](https://lodash.com/per-method-packages) | Per-method installs duplicate shared internals, unlike the main package | Re-export the original modules; never bundle copies into each kit |
+
+The design combines information hiding from David L. Parnas, *On the Criteria To Be Used in Decomposing Systems
+into Modules* (1972), [paper record](https://doi.org/10.1184/r1/6607958), with declarative product membership from
+Don Batory, *Feature Models, Grammars, and Propositional Formulas* (2005),
+[paper](https://www.cs.utexas.edu/ftp/techreports/tr05-14.pdf), and the npm contributors'
+[package exports, dependencies and optional peers specification](https://docs.npmjs.com/cli/v11/configuring-npm/package-json)
+(2026). Domain profiles choose dependencies; subpaths choose loaded code. React merits a fourth profile because
+its peer/runtime and server-boundary requirements differ from plain web applications. A separate 2D-only kit is
+not claimed: the game profile already exposes the built sprites, tilemaps, pixel and 2D lighting entries.
+
+## Measured installs and correctness
+
+The unchanged legacy bundle profiles below are min+gzip startup JavaScript when every root name is used.
+They describe browser bundles, separately from npm install bytes. Lazy parts and decoder assets are extra.
+`tests/umbrella.test.js` checks these existing budgets within 3 percent.
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 365,936 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 256,216 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 95,846 B |
+| `margoengine/game` | Games | 365,936 B |
+| `margoengine/viz` | Visualization | 256,216 B |
+| `margoengine/web` | Web scenes | 95,846 B |
 
-The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 24,209 B). Wasm decoders, workers and lazily loaded parts
-are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
-moves more than 3%.
+`node scripts/kit-install-check.mjs` packs the checkout, serves a read-only local registry, installs in new folders
+inside this lane's ignored test-results directory with an isolated cache, and compares every installed engine
+package to the exact required transitive closure. It rejects version drift and any engine download outside our
+tarballs. Tooling is excluded from the measurement; React/React DOM are included for the React profile only.
+Bytes are actual file bytes in node_modules, including its generated lock metadata, not disk allocation or browser
+transfer. Packed bytes sum engine tarballs only. These numbers are a snapshot, not a speed claim or a size ceiling.
 
-Each kit also re-exports `createStage` and `Stage`, so a whole app can start from one line. Option types and the
-rest of each package stay in that package: `import type {ShadowsOptions} from 'margoengine/shadows'`.
+<!-- install-sizes:start -->
+| Profile | Engine packages | Installed B | Packed engine B |
+| --- | --- | --- | --- |
+| core | 1 | 152,779 | 54,848 |
+| stage | 2 | 273,999 | 94,057 |
+| game | 70 | 24,506,552 | 7,764,823 |
+| web | 40 | 19,773,382 | 6,321,003 |
+| viz | 42 | 22,561,981 | 7,181,870 |
+| react-kit | 42 | 29,121,993 | 6,611,210 |
+| together | 83 | 32,273,316 | 10,251,352 |
+| all | 98 | 55,744,429 | 16,206,128 |
+<!-- install-sizes:end -->
 
-`loadGLTF` is not in a kit: `import {loadGLTF} from 'margoengine/gltf-pro'`. It reaches the Draco and Basis decoders, and
-a bundler copies their Wasm files when it reads the module, before tree-shaking, so a kit that held it would put
-720 KB of files in every build, used or not.
+CPU tests check every kit subpath's binding identity, declared imports, current generation, optional boundaries,
+and root tree-shaking. The GPU check draws an actual packed application on native WebGPU, with core alone and
+stage plus core; each kit also draws with the separately installed WebGL2 compatibility package. The compatibility
+package is added only after recording the base install. No symlink to workspace engine code participates.
 
-## A game in one import
-
-```ts
-import {Physics, Shadows, createStage} from 'margoengine/game';
-
-await Physics.load();
-const stage = await createStage('#viewport');
-const physics = new Physics(stage.engine);
-const shadows = Shadows.attach(stage.engine, {resolution: 2048});
-const floor = stage.box({size: [10, 1, 10], position: [0, -0.5, 0]});
-const crate = stage.box({position: [0, 4, 0], color: '#c08040'});
-physics.addBody(floor, {type: 'fixed'});
-physics.addBody(crate, {colliders: {shape: 'box', restitution: 0.3}});
-shadows.add(floor);
-shadows.add(crate);
-```
-
-## Which kit
-
-- Most apps start with a kit and add single packages (`margoengine/<package>`) for anything else.
-- The kits overlap where apps overlap (orbit controls, the stage, post-processing); the same name is the same class
-  in every kit.
-- `npm create margo@latest my-game -- --template game` (or `viz`) starts an app from a kit.
+Reproduce: build packages; run `node scripts/kit-install-check.mjs`; then run
+`node scripts/gpu-lock.mjs run --owner=kit-check --wait-max=60 --max=4 --gpu=packed-kit-first-frames -- node scripts/kit-browser-check.mjs`.
+The packed-install CPU check is part of local CI's verify. Lanes run the fast gate only. README examples are owed
+in [readme-owed.md](../work-lists/readme-owed.md) during the build phase.
 
 ## Contents
 
 Generated from `scripts/umbrella.mjs` (`node scripts/umbrella.mjs` rewrites this section).
 
 <!-- kits:start -->
+### Install profile `@margoengine/game`
+
+`stage`, `core`, `animation`, `animator`, `materials`, `geometry`, `shadows`, `clustered`, `environment`, `sky`, `controls`, `input`, `physics`, `navmesh`, `audio`, `vfx`, `text`, `tween`, `post`, `tonemap`, `ecs`, `fsm`, `net`, `netcode`, `behavior`, `save`, `cutscene`, `cinematic`, `cameras`, `terrain`, `water`, `weather`, `biomes`, `scenery`, `creative`, `procedural`, `wfc`, `road`, `splines`, `tilemap`, `sprites`, `pixel`, `lighting2d`, `ui`, `rigging`, `ragdoll`, `mixer`, `transitions`, `toon`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `gltf`, `gltf-pro`, `decoders`, `loaders`, `bvh`, `selection`, `quality`, `stats`, `staging`, `lightmap`, `shader`, `compute`. Every exported subpath of each member is available as `@margoengine/game/<member>[/<entry>]`.
+
+### Install profile `@margoengine/web`
+
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `gltf-pro`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `staging`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`. Every exported subpath of each member is available as `@margoengine/web/<member>[/<entry>]`.
+
+### Install profile `@margoengine/viz`
+
+`stage`, `core`, `points`, `sciviz`, `compute`, `lines`, `splats`, `terrain`, `text`, `labels`, `html`, `controls`, `cameras`, `environment`, `tween`, `stats`, `post`, `tonemap`, `geometry`, `materials`, `loaders`, `exporters`, `gltf`, `gltf-pro`, `decoders`, `selection`, `viewcube`, `bvh`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `tiles`, `splines`. Every exported subpath of each member is available as `@margoengine/viz/<member>[/<entry>]`.
+
+### Install profile `@margoengine/react-kit`
+
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `gltf-pro`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `staging`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`, `react`, `sky`. Every exported subpath of each member is available as `@margoengine/react-kit/<member>[/<entry>]`.
+
 ### `margoengine/game`
 
 Games: models, animation, light and shadow, sky, physics, audio, input, effects.
@@ -1312,6 +1404,61 @@ Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on 
 | `margoengine/post/fxaa` | `FXAA` |
 | `margoengine/tonemap` | `Tonemap` |
 <!-- kits:end -->
+
+=== Starting from three.js (docs/guides/kit-migration.md) ===
+
+# Starting from three.js
+
+Choose core or stage alone for the smallest install, a domain profile for an application, or `margoengine` for
+everything. Start with the [kits guide](kits.md), then the [API comparisons](../from-threejs.md) and the
+[porting matrix](../threejs-parity.md). The MCP porting guide is generated from those same documents.
+
+For an existing HTML page with `<canvas id="viewport"></canvas>`, install `@margoengine/web` and start with:
+
+```ts
+import {createStage} from '@margoengine/web';
+
+const stage = await createStage('#viewport');
+const cube = stage.box({color: '#84d6bd'});
+stage.onTick((delta) => { cube.rotation.y += delta; });
+```
+
+For a new app, the path reviewed here is:
+
+1. `npm create margo@latest my-app -- --template web` (or game, viz, react, next).
+2. `cd my-app` and `npm install`.
+3. `npm run dev`, or `npm run build` followed by the production server.
+
+The packed-registry rehearsal actually executes npm create, installs without workspace symlinks, builds all five
+starters with their own build scripts, and checks every resolved engine package and version. The GPU half serves
+the built files, starts Next's production server, checks drawn pixels, application HUD/error state and page errors.
+Thus the evidence covers install, imports, build, model assets, application initialization and an actual frame.
+The game keeps its existing public-domain Pete model and licence; no new demo data was introduced.
+
+## Comparison and friction found
+
+The comparison uses public documentation only: three.js contributors, *Installation* and *Creating a scene*
+(2026), [installation](https://threejs.org/manual/pages/installation.html) and
+[scene](https://threejs.org/manual/pages/creating-a-scene.html). The manual's npm path installs the engine and Vite
+and then authors HTML, camera, renderer, mesh and a frame loop. Margo's scaffold authors these files; the stage
+manages mounting, default controls, resize and its loop. These are work counts and behaviour, not a timing claim.
+
+| Point in the path | Finding and action |
+| --- | --- |
+| Selecting an install | Previously every template installed all 98 engine packages. Each now has one profile dependency: web 40 engine packages, game 70, viz 42, React/Next 42 in the packed check. |
+| Mapping an addon import | Standalone profiles and full-install aliases had been conflated. The imports and from-threejs guides now distinguish installation from bundling and show the prefix mapping. |
+| Starting a scene | WebGPU setup is asynchronous, unlike the documented synchronous WebGL constructor. The stage example includes the required await; the generated app handles startup errors. |
+| Model loading | Loaders stay in a one-line profile subpath so a root-only page emits no Draco/Basis assets. The game starter actually loads its unchanged licensed model. |
+| Matching versions | Every published package and template range is checked together; a combined game/web/viz app proves shared binding identity and one installed core. |
+| Browsers without WebGPU | Full WebGL2 is a separate optional package, an extra installation compared with an included WebGL renderer. This boundary is documented and the kit compatibility frames pass; the extra-step usability gap is recorded in known-bugs. |
+| Public one-line create | Publication is pending, so the released-registry path cannot be completed yet. The private packed registry proves the actual npm command without publishing; the release gap is recorded in known-bugs. |
+| Template README examples | Remain owed under the build-phase rule. Runtime code, guides and checks are updated; no README example was authored or edited. |
+| Elapsed time | Deferred by the build-phase speed rule. The install-to-interactive-frame timing scene is retained in speed-phase.md, with no timing assertion or benchmark run. |
+
+Reproduce with `node scripts/template-install-check.mjs`, then
+`node scripts/gpu-lock.mjs run --owner=template-check --wait-max=60 --max=2 --gpu=packed-template-first-frames -- node scripts/template-browser-check.mjs`.
+Reports, build logs and first-frame PNGs are under `test-results/template-installs`. This audit does not claim
+unmeasured installation speed or universal parity outside the profile and starter contract.
 
 === Prepare assets with margo-convert (docs/guides/asset-pipeline.md) ===
 
@@ -1540,11 +1687,23 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 
 ## Install only what you import
 
-Each row is a separate npm package (not published yet: until then, build from source with `npm ci && npm run build:packages`). Install the ones you import; bundlers drop the rest.
+There are three ways in: `@margoengine/core` or `@margoengine/stage` alone, a domain install profile, or
+`margoengine` for every feature. For a web app, `npm create margo@latest my-app -- --template web` scaffolds a
+working scene that depends on `@margoengine/web`; game, viz, React and Next starters also install their own profile.
+Publication is pending: the [kits guide](guides/kits.md) documents the verified private tarball route and package
+counts. No release command here publishes anything.
+
+Each row below is also available as an independent npm package. The examples later in this guide use full-install
+aliases to keep the comparisons readable. With a profile, replace `margoengine/controls/orbit` with
+`@margoengine/web/controls/orbit`, or import `@margoengine/controls/orbit` directly if that package is installed.
+All packages share a release version. A profile preserves module identity and tree-shaking; it also reduces what
+npm installs. See [the starting-path review](guides/kit-migration.md) for the full install-to-frame audit.
 
 ```sh
 npm install @margoengine/core                      # engine, camera, meshes, constant PBR material
-npm install margoengine                            # optional facade: createStage('#app'), app.box(), addGLTF(app, url)
+npm install @margoengine/stage                     # facade plus core only
+npm install @margoengine/web                       # web domain profile
+npm install margoengine                            # every feature package
 npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @margoengine/controls
 ```
 
@@ -2681,6 +2840,11 @@ features add no core or stage functionality.
 === Design envelope (docs/limits.md) ===
 
 # Design envelope
+
+- Batch 179 job 4 size: sciviz/provenance 0 to 24,854 B gzip, ceiling 25,600 B. The entry includes exact portable numeric/GPU argument decoding and its shared colour data, bounded runnable history, compressed PNG/SVG records and build versions. Splitting would duplicate lifecycle handling or require applications to assemble the export/trace feature. Core + stage stays 24,209 B; no speed claim.
+
+- Batch 179 provenance: opt-in /provenance factories or withProvenance() add PNG/SVG records and trace() to an instance. Version 1 records contain the full portable spec, typed-array/source and numeric-JSON hashes, timestamp, exact build-resolved Margo runtime dependency versions, adapter information and browser identity. Browser privacy can leave adapter fields empty; no driver identity is guessed. Compressed PNG iTXt parsing checks every CRC and bounds the input and inflated text to 256 MiB by default. The record SHA-256 detects content changes and is not an authorship signature. Trace defaults to 10000 retained successful calls and a conservative 256 MiB argument budget; exceeding a bound releases history and makes trace() reject, without interrupting figure rendering. Final portable state preserves camera/time, pipeline, selection, callbacks represented as frames and external data writes; application codecs/operator registries remain explicit replay inputs. Returned ESM needs the normal package resolver, bundler or import map. There is no global prototype patch and no core/stage change.
+
 
 ## K2 rendering and test limits
 
@@ -8294,7 +8458,7 @@ The optional materials/transmission-layers entry is 4,937 B gzip (new entry, bef
 
 Compressed KTX2 sampled as both colour and data on WebGL2 compatibility uses two direct GPU uploads, one per internal format. Each alone uses one copy; native WebGPU retains the one-copy viewFormats path. Source update and disposal invalidate both cached copies. This avoids unsupported compressed view reinterpretation without changing decoded texels.
 
-The KTX2 landing repair changes materials/batched from 37,459 to 37,641 B gzip (+182 B); its ceiling rises from 37,624 to 38,771 B. This keeps the direct per-format compressed cache in its owning upload path; a separate entry would duplicate Texture lifecycle state and complicate every compressed caller. Materials root changes 63,217 to 63,361 B; transmission-layers stays 4,937 B. Reproduction uses the same build-optional settings and declareCoreRequirement step on the original and repaired upload sources.
+The KTX2 landing repair changes materials/batched from 37,459 to 37,641 B gzip (+182 B); its ceiling rises from 37,624 to 39,860 B. This keeps the direct per-format compressed cache in its owning upload path; a separate entry would duplicate Texture lifecycle state and complicate every compressed caller. Materials root changes 63,217 to 63,361 B; transmission-layers stays 4,937 B. Reproduction uses the same build-optional settings and declareCoreRequirement step on the original and repaired upload sources.
 
 ## Batch 214 job 3: multi-goal IK
 The optional @margoengine/kinematics-constraints/multi-goal entry accepts 1..256 joints and at most 256 combined goals and loop closures. Fixed, revolute and prismatic scalar joints compose into spherical and floating joints; rest/attachment quaternions use x,y,z,w and normalize nonzero inputs. Joint parents may be unordered but must form a forest; explicit attachment-frame closures join branches, trees or world anchors. World position and rotation-vector channel masks and nonnegative objective weights are supported. Hard scalar bounds apply to every returned pose, including failed solves. All active constraints must meet unweighted physical tolerances before resolved is true; conflicting weighted goals return a bounded best compromise with resolved false. Defaults: 128 iterations per seed, 4 deterministic seeds, 1e-5 metre/radian tolerances, 0.01 initial damping, 0.25 radian/metre maximum scalar step, +Z joint axes, identity rest/attachment transforms, unbounded scalars, initial value zero. Inputs and scalar bounds have magnitude at most 1e6; omitted bounds may be infinite. Weights are in 0..1e6, iterations in 1..4096, seeds in 1..64, damping in 1e-6..1e3. Point closures match position by default; orientation is opt-in. The dense local nonlinear solve is bounded and not a proof of global feasibility; iteration-limit and stalled are explicit. Returned failures are diagnostic poses, not certified closed chains. Rotation masks select world logarithm components, not Euler angles. No dynamic constraints, obstacle/path certificate, renderer, core or stage dependency is added. Use existing optional chain/swept entries for collision queries. No speed result is published.
@@ -8838,7 +9002,9 @@ water/bodies WaterBodies takes 1 to 64 bodies: closed outlines (3 to 4096 points
 
 ### List 3 batch 66 job 5: underwater view
 
-Underwater options: absorption and scattering three channels 0..100 /m; anisotropy -0.99..0.99; shafts 0..10; steps integer 1..128; shaftDistance 0.1..10000 m; maxDistance 0.1..100000 m; shaftExtent 1..10000 m; resolution power of two 16..1024 (copied); waterline 0..64 px; refractiveIndex 1..2. The waterline is one probe plane under the camera per frame; the surface seen from below keeps Water's own shading; several views per frame share one uniform. Focusing is clamped to 0.1..10. Owned GPU memory: three rgba32float plus depth32float targets (viewport, resolution squared, 1x1).
+Underwater options: absorption and scattering three channels 0..100 /m; anisotropy -0.99..0.99; shafts 0..10; steps integer 1..128; shaftDistance 0.1..10000 m; maxDistance 0.1..100000 m; shaftExtent 1..10000 m; resolution power of two 16..1024 (copied); waterline 0..64 px; refractiveIndex 1..2. The waterline is one probe plane under the camera per frame; several views per frame share one uniform. Focusing is clamped to 0.1..10. Owned GPU memory: three rgba32float plus depth32float targets (viewport, resolution squared, 1x1), plus viewport-sized opaque HDR colour and depth32float snapshots.
+
+Batch 234.3 underwater underside: exact dielectric Fresnel, total internal reflection and Snell window on the submitted Water/FFT normals. Screen traces visit at most raySteps pixels (integer 1..2048, default 512) per ray, within maxDistance. Depth-plane validation uses thickness (0.001..10 m, default 0.05) plus the local pixel footprint. Live borrowed environment: sampleable single-sample 2D rgba16float equirectangular sky; fallback skyHorizon [0.38,0.53,0.67], skyZenith [0.045,0.16,0.34], RGB 0..100. Hidden/off-screen or budget-exhausted rays use sky for air and ambient-medium radiance for water. Source bundle gzip 6,888 to 9,219 B; installed entry 9,274 B, ceiling 7,161 to 9,553 B. Extra bytes hold complete boundary transport, robust pixel traversal and opaque snapshots in the owning entry; a split would duplicate capture ownership. Core plus stage 24,209 B, unchanged by this job and below 25,000 B. No performance claim.
 
 
 Review 3 T1: transitions/glsl preserves scalar equality and inequality results for vectors, matrices and nested structures. Typed comparison helpers are shared per translated type and evaluate operands once. GLSL ES 1.00 still excludes array and sampler comparisons, including containing structures. Existing source, token and nesting limits and native pixel comparison bars stay unchanged.
@@ -8910,10 +9076,46 @@ Basic-scene size evidence follows main's full PBR Stage/gltf path (3d7dd74c9). T
 Optional /pick-gpu is 5953 B min+gzip from 0 B, with a new 6209 B ceiling; existing root/grids ceilings are unchanged. Core plus stage remains 24209 B. One rgba32uint ID texel, one depth32float texel and a 256-byte aligned readback cost 276 descriptor bytes per picker; supported layers add 320-byte uniforms. CPU point/cell uploads use 12/16 bytes per item and must fit maxBufferSize. Each volume's voxel index is u32 (at most 2^32 voxels), x-fastest. The ray traverses the complete clipped box in at most 2048 midpoint samples, using current quality/classification/density and default step-opacity threshold 0.002. Query timeout defaults to 30000 ms, including queue wait. Native WebGPU and full WebGL2 compatibility are covered; native WebGL2 without compatibility rejects before allocation. Custom unsupported layer kinds are excluded. CPU-backed arrays require invalidate after in-place edits. No CPU item projections occur per query; GPU work remains proportional to input geometry. Strict nearest-centre ranking differs from the existing CPU half-pixel tie rule; original triangle cell IDs differ from the CPU height-field nearest-sample ID. First hit is not MIP-peak or perceptual structure picking. Normalized binary16 input precision and f32 voxel-boundary ambiguity remain. See sciviz-pick-gpu.md for complete semantics and independent reference proof. No speed result is claimed.
 
 - Review 3 SV3: VolumeLayer.getClassification returns an owned CPU snapshot of a custom classifier, or undefined for the original colormap/opacity. bindTransfer restores that prior snapshot on disposal or abort while the layer is valid; it does not recreate a disposed volume. Snapshot storage is four bytes per classifier texel plus metadata. No core/stage or shader change.
+Batch 180 job 3, optional sciviz/geo-time: full WGS72 SGP4, 518 published state vectors across 29 element sets at <0.1 m position and <0.1 mm/s velocity norm error. These are implementation-agreement bars, not real-world forecast accuracy; element sets age and contain model/observation uncertainty. TEME of date, Unix UTC milliseconds, optional DUT1 for GMST; no polar motion or representable leap-second instant. Propagation offsets are bounded to ten years for loop/resource safety, not an accuracy guarantee. TLE checksum and catalog matching are on by default. OMM defaults omitted CelesTrak metadata to Earth/TEME/UTC/SGP4 and preserves larger IDs.
+Trips use caller-defined shared time units, float64 strictly increasing keys, shortest-longitude linear, step or great-circle interpolation, no extrapolation outside availability, exact clipped trails and 1..64 fade buckets (default 16, trail 600 time units). Boundary clipping is exact in time; fading is quantized by bucket. Each seek rebuilds bounded retained primitives; efficient in-place updates remain polish. WMTS REST/KVP dimensions use the owning builder. Explicit service matrices and EPSG:4326 mosaics reuse tiles/imagery, then Canvas crops/scales or reprojects geographic rows to each target Mercator tile; no JavaScript pixel loop. Latest frame at/before time, endpoint clamp, 1..16 retained frame caches (default 2), each bounded by geo-lod tile budgets. The static source helper accepts provider matrix labels. No interpolation of raster measurements is claimed by this imagery entry.
+
+Optional sciviz/geo-time entry: previous 0 B, new 39,860 B gzip, ceiling 41,056 B. Full SGP4, track sampling and playback plus reused retained geographic rendering and WMTS frame lifecycle justify the bytes. A split would add loading and lifecycle coordination. Core + stage remains 24,209 B, under 25,000 B.
+- Batch 174 job 5: optional sciviz/annotate absent to 7424 B min+gzip, ceiling 7680 B. sciviz root 60026 to 60613 B with optional overlay hooks and canonical descending-source bounds; spec 27208 B. Core + stage unchanged, 24209 B. Widgets use linear physical xyz coordinates and CSS widths (2px default), #rrggbb colours (#ffd166 default), 13px labels and a 12,-12px label offset; dragging stays in the initial camera plane. Scale bars measure supplied physical endpoints. Box ROIs are axis-aligned; sphere radius uses centre plus radius handle. Shapes/measurements project over the image, without depth occlusion. Angle units are degrees; degenerate angles have no measurement. First-hit volume picking requires CPU samples, dimensions >=2, finite nonzero endpoint spans and an explicit occupancy predicate matching the displayed classification (default finite value >0). Bounds locate sample centres; voxel support extends half a sample past outer centres. Grid picking walks boundary triangles with original cell IDs. Exact voxel crossings have no hidden step cap; no speed claim. FigureSpec annotations format margo-annotations/version 1 restores the optional renderer; PNG and SVG omit edit handles. Existing arbitrary annotation metadata remains supported. Optional hooks stay in sciviz; no core or stage edits.
+
+
+
+
+## Batch 120 install profiles
+
+Batch 120 adds standalone @margoengine/game, /web, /viz and /react-kit install profiles. Root forwarding entries measure 740, 321, 578 and 158 B min+gzip respectively, previously absent (0 B); their strict quality ceilings are 996, 577, 834 and 485 B. Member alias entries reuse the original package implementation and bytes. The core + stage root remains 24,209 B min+gzip before and after. Model loading is installed but exposed through /gltf-pro, so a root-only app emits no decoder files. Packed native installs contain 70/40/42/42 engine packages versus 98 for the umbrella; React additionally installs its explicit React and React DOM peers. Exact dated installed/packed byte snapshots and closure definitions are in docs/guides/kit-install-sizes.json and docs/guides/kits.md; these are file-byte measurements, not speed claims. Optional third-party peers and the optional WebGL2 backend are not part of a plain profile install.
+### Batch 176: adaptive mesh refinement
+sciviz/amr accepts nonoverlapping Cartesian cell-centred blocks with integer refinement ratios and finer faces aligned to coarse cells. Coarse masks hide completely covered cells; NaN denotes missing values. Native AMReX/BoxLib Header, Cell_H and IEEE32/64 FAB data support endian descriptors, scalar selection and stored ghost-box trimming. Enzo ASCII/HDF5 hierarchies and grouped HDF5 baryons support active or ghost-inclusive arrays. FLASH HDF5 uses only node-type-1 leaves. Non-Cartesian solver coordinates, AMReX headerless/raw and HDF5 plotfiles, staggered/nodal fields, Enzo particle arrays and FLASH CORNERS output need separate format extensions; readers do not silently treat these as the supported cell-centred layout.
+Direct volume rendering uses a disjoint k-d tree of block boundaries and packed scalar textures; no finest-resolution dense volume is allocated. Default interpolation is linear inside each block, clamped at that block's outer cell centres. Composite and sampled MIP, scalar transfer functions, density, scene-depth clipping, up to four clip planes, device restoration and level outlines work on WebGPU and WebGL2 compatibility. Gradient/preintegrated classifiers are rejected. There are at most 2048 integration samples per leaf interval. Construction defaults to 1,000,000 nodes, rejects depth over 128, and exact f32 indexing limits samples to 2^24 and packed texels to 2^23 (device texture limits may be lower). An explicit referenceStep defaults to the smallest physical cell spacing.
+Masked slices preserve the original cell values and native resolution. Contours use a shared point lattice at finest spacing by default, bounded to 2,000,000 sample points, with explicit dims for coarser extraction. This resampling is analysis only and is never used by the volume renderer. The openly licensed demonstration is Natarajan's final oscillating-cylinder AMReX timestep (CC BY 4.0), with one unscaled float64 velocity field; same-level rectangular packing changes storage only. Nyx native plotfiles are provided by yt expressly for experimentation/testing, a narrower permission than the CC BY demo; no CC0 licence is asserted. No speed number is claimed during the build phase.
+
+AMR optional entry size: new entry, 0 to 30,067 B gzip; ceiling 30,374 B. The bytes include native solver readers, HDF5 parsing, masks, k-d integration and analysis helpers. Splitting these into mandatory companion entries would complicate one coherent AMR API and its loading contract. Core plus stage remains 24,209 B.
+
+AMR scalar transfer lookup also accepts the shared log/symmetric-log, binned and under/over colour encodings, using unfilterable float textures and explicit lookup. Below-range negative samples remain eligible for MIP; missing NaNs are skipped rather than confused with a numeric sentinel.
+
+
+
+
+### Batch 175 job 3: exact aggregation
+Optional sciviz/aggregate defaults to 256x256 bins, edges 1..4096, at most 1048576 bins and 16777216 bin/category cells. Partial GPU storage is bins*(280+categories)*4 B and must fit maxStorageBufferBindingSize. Chunk rows default to 32768, maximum 65536, with at most 8388608 row/bin tests per dispatch. Finite binary64 values retain all bits; sums and means round once, ties to even. Geometry uses projected f32 coordinates; point bin ownership is corrected at f32 boundaries. Mesh values are cell values, polygons use even/odd pixel-centre coverage and segments use pixel-box intersection. Fractional antialiasing and vertex interpolation are outside this contract. Exhaustive work is O(rows*bins); no throughput claim. The 100M physical-row WebGPU check repeats 4096 original TLC observations, uses 2400000000 B input arrays, 8442384 B peak staging, 17920 B partial output, 1526 dispatches and 1600000000 row/bin tests. All 100M rows contribute. Details and evidence: docs/sciviz-aggregate.md.
+
+Batch 175 job 3 measured optional entry: sciviz/aggregate 0 -> 28201 B gzip, ceiling 29019 B. Exact full-range binary64 accumulators, five glyphs, all reductions and one coherent figure/shading lifecycle justify the bytes. Splitting would fragment table/trace ownership. Core + stage remains 24209 B.
+- Batch 174 job 6: optional sciviz/views absent to 4786 B min+gzip, ceiling 5042 B. Current sciviz root 60851 B; this job changes no root source. Core + stage remains 24209 B. Each FigureLayout cell owns one engine and canvas; there is no shared GPU-resource or single-canvas claim. Defaults: ceil(sqrt(count)) columns, 320px cell height, 12px gap; labels default View N. Links default to 3D cameras or 2D x/y physical ranges, with first-figure initial state; selected axes, programmatic sync and AbortSignal are supported. Polling follows changes on the next active engine frame; call sync for stopped engines. All linked figures must have the same dimensionality. Camera projection overrides are borrowed functions. ComparativeGrid uses independent FilterPipeline caches with a shared registry; complete node params replace per-cell params, time defaults to zero, and all outputs are released by the owning pipeline's operator contracts. VolumeQuad owns three orthographic nearest-sample heatmaps and a 3D volume plus three slice planes. It clamps and snaps the crosshair to exact sample centres, retains voxel IDs/orientation, and keeps physical screen scale isotropic across resize. Source CPU samples are borrowed, dimensions must each be >=2, and total voxel count must fit uint32 provenance IDs. Default colormap gray; one shared colour range comes from the 3D volume. Box extent/spacing is axis aligned; no oblique reslicing or patient-space registration is added. Layouts/controllers are disposable; individual setCrosshair signals cancel unpublished work and ready accepts an abortable wait. No timing or clinical claim.
+
+
+## Batch 120 scaffold profile routing
+
+The five create-margo starters install one engine profile each: web 40 engine packages, game 70, viz 42, React and Next 42 in the packed rehearsal. React, React DOM, Next, Rapier and development tools remain explicit app dependencies as appropriate. All five production builds draw a first frame; Next runs its own production server. Profile entry sizes and core + stage remain unchanged. scripts/template-install-check.mjs and template-browser-check.mjs reproduce this route from packed engine and CLI tarballs with no workspace engine symlink. The starting-path review is docs/guides/kit-migration.md. Timing is deferred to the speed phase; template README examples remain owed.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
 
 
@@ -9010,7 +9212,7 @@ the unchanged 0.005 bar; independent dry/above-water projector checks remain
 exact zero. Full package and visual acceptance now pass. See the
 [caustics record](water-caustics.md) for optics and retained failures.
 
-### PARKED: batch 234 job 3 underwater reflection artifact
+### Historical: batch 234 job 3 underwater reflection artifact
 
 The underwater implementation is retained on `batch-234` and
 `batch-234-checkpoint-6e16c0d72`, not accepted or landed. Repro in that retained
@@ -9032,6 +9234,8 @@ and sampled radiance. No fourth speculative tracing round or acceptance claim.
 List 3 batch 66 job 5 then built water/underwater fresh on main without the screen traces (fog, absorption, waterline and shafts only); the underside reflection remains open in finish-later.md.
 The independent caustics job landed as `3369f2e4f`; the retained underwater
 branches above must not be deleted. This note accompanies batch 213 job 1.
+
+Batch 234 continuation on 2026-11-10 completes the missing underside in the newer main implementation. It replaces the rejected distance-march/binary-depth-crossing strategy with exact pixel-edge traversal and locally reconstructed depth-plane intersections. The independent analytic test initially exposed skipped corner texels and float32 cracks at exact texel boundaries; supercover visits and a relative arithmetic envelope fix those causes. Regression: underwater-optics.browser.mjs covers 1,026 rays including oblique planes and holes. underwater.browser.mjs independently checks every submitted FFT underside pixel against dielectric Fresnel and catches first-frame self-intersections if the opaque depth snapshot is replaced with FFT's later surface depth. The original parked branch remains historical, not reintroduced. Finite screen capture and multi-view limitations remain listed in docs/limits.md.
 
 ### Fixed: batch 133 lazy asset package grouping
 
@@ -13635,7 +13839,6 @@ Batch 222 job 3 outline fixture repair: a cold compatibility compute import can 
 Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The extra physical-composition compatibility run reproduces the already recorded 16 texture units limit when all material maps, shadows, clustered storage and IBL are composed. The new spec/gloss fixture uses neither this worst-case composition nor additional sampler bindings; the existing source fixture is unchanged and its owning compatibility follow-up remains under rule 21.
 
 
-- Batch 242 inventory: node scripts/gpu-package-tests.mjs --only=voxel-net --list fails before filtering because cameras panorama/stereo, splats lod-sog and weather parity browser drivers are not registered in the plan at this main revision; package script discovery and browser-driver inventory disagree. Outside voxel-net; voxel-net has no GPU scripts or rendering.
 
 - Voxel-net /rooms: reconnecting with a consumed room URL gets 1008, because its single-use admission nonce is removed when the player joins. The parked player retains capacity until the server resume timeout; obtain a new lobby reservation after it expires. Follow-up is resume-aware room authorization and separate account identity from seat identity.
 
@@ -13877,7 +14080,6 @@ Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative del
 
 - Existing atmosphere exact-capture defect after main merge: run SPEC_DEMOS=atmosphere SPEC_BACKENDS=webgl2 with packages/sciviz/tests/spec-demos-browser.mjs under the GPU lock. In batch174/j4-land-gpu.log, three blue-channel bytes differ by 1 (offsets 1360474, 1360478, 1365274); sameSourceDiff is also 3 for the unchanged source figure, and camera/limits match. The failure originates in repeated atmosphere compatibility drawing, rather than date/log window restoration; the particular nondeterministic draw operation is not isolated. Record for fix phase under rule 21; exact assertion is unchanged.
 Batch 178 job 4: no open correctness defect in the requested colour/legend contract. Surface NaN heights still form holes because they have no geometric position; diagnostic CVD simulation makes no universal distinguishability promise. The PDF equal-stop gap and finite-first volume MIP state are covered by regression tests in the same job.
-Review 2 integration, stage viewer extras: `node scripts/gpu-package-tests.mjs --no-build --select=water/test:gpu` stops before selection because packages/stage/test/gpu/viewer-extras-check.mjs is not referenced by a declared stage GPU script after 431d257dd. Cause: the global browser inventory validates all packages before filtering. Owning stage lane follow-up; water declared scripts are run directly under the shared GPU lock for this review.
 
 Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with MARGO_COMPAT=1 and no --compat argument writes compatibility hardware/results under a webgpu suffix (now test-results/water-query-webgpu.json after the separate tracked-record correction). Cause: its output suffix reads argv instead of actual browser hardware.compat. Numerical assertions pass; output labeling is a build-phase tooling follow-up.
 
@@ -13906,6 +14108,20 @@ relative stopping test (Drmac and Veselic, LAPACK Working Note 170, 2007, sectio
 converging). Fix to build: treat a column whose norm falls below eps times the largest column norm as numerically
 zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
 relative accuracy the Jacobi method keeps for graded columns.
+
+Review 3 SV4 (61928c3a0): bindTransfer checks signal before its initial apply(), but installs the abort listener after options.render runs. Repro: bindTransfer(layer, tf, { signal: controller.signal, render: () => controller.abort() }); the returned binding leaves the gradient classifier installed, and tf.update(tf.state) performs another upload. Expected: restore the previous classifier and detach updates. Cause: the synchronous render callback can abort before the listener exists; abort events are not replayed to later listeners. Normal asynchronous abort and explicit disposal pass. Small lifecycle follow-up deferred to the fix phase under Scott rules 21/22; register/check lifetime state around the caller callback and retain the exact regression. Lane Q repro: private/review-3-transfer-reentrant-abort.test.mjs; test-results/review-3-sciviz-transfer/reentrant-abort-red.log.
+
+
+- Batch 120 incidental gate finding, base 2ed6fd460: node --test tests/check-fixed-waits.test.js flags packages/biomes/tests/water-check.html line 101, a fixed 90-frame loop absent from the baseline. Cause: the biomes test waits for frame count instead of GPU readiness; unrelated to profile installation, deferred to its owning lane under efficiency rule 21.
+Batch 176 job 4: no open defect found in the supported Cartesian cell-centred AMR contract. Format extensions, block-edge reconstruction and explicit sample/index budgets are documented in limits.md; refinements remain on the private finish-later list.
+
+Batch 176 inspection: node scripts/gpu-package-tests.mjs --only=sciviz --no-build --list fails before selection because packages/stage/test/gpu/viewer-extras-check.mjs has no registered browser script. Cause: global discovery validates an unregistered upstream stage test before applying --only. Outside this job; the AMR suite runs directly with the shared GPU lock on both backends.
+- Batch 174 annotation keyboard focus: on a running figure, focus an editable SVG handle and let the next engine frame run; focus returns to the document because Annotations.render replaces every SVG child with innerHTML on each frame. Pointer dragging still uses capture on the stable SVG root. Preserve/reconcile the focused handle across frame paints in the fix phase; current keyboard regression covers stopped figures.
+
+
+- Batch 120 path audit: public npm create margo@latest still reaches the prerelease placeholder until Scott authorizes publication; cause is intentionally pending registry release. The actual create/install/build/frame path is proven against the private packed registry.
+- Batch 120 path audit: a browser without WebGPU needs an explicit @margoengine/webgl2-compat install, one extra step compared with a bundled WebGL renderer. Cause is the deliberate optional backend boundary; documentation and both kit-backend checks cover it, while reducing the extra setup remains a release UX decision.
+- Batch 120 incidental documentation gate, base b4404cddb: node --test tests/from-threejs-snippets.test.js flags docs/guides/react-test-offscreen.md because it has no ts fence recognized by the snippet harness. All changed kit/import/migration guide snippets pass; the unrelated React guide/harness mismatch is deferred to its owner under rule 21.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -14003,6 +14219,117 @@ This project uses Margo Engine (WebGPU). Docs for AI: https://margoengine.com/ll
 | `margoengine.com/llms/...` pages | `scripts/build-site.js` | `npm run site:check` |
 | `@margoengine/mcp` corpus | `packages/mcp/scripts/build-corpus.mjs`, at package build | `packages/mcp/tests/` |
 
+=== @margoengine/stage (packages/stage/README.md) ===
+
+# @margoengine/stage
+
+You normally use this package as [`margoengine`](../margoengine/README.md): `import {createStage} from 'margoengine'` is this package. The packages are not on npm yet; see the [Install](../../README.md#install) section for the routes that work today.
+
+High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl2-compat/preview` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
+
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics`, `@dimforge/rapier3d-compat` and `@margoengine/save` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+
+Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
+
+The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,000 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
+
+Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
+
+```ts
+import {createStage} from 'margoengine';
+const app = await createStage('#scene');
+const orb = app.sphere({color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1]});
+app.onTick(delta => {orb.rotation.z += delta;});
+window.addEventListener('pagehide', () => app.dispose(), {once: true});
+```
+
+Use a selector, an HTMLElement container or an existing canvas. The wrapper appends its own accessible canvas to containers. `app.dispose()` stops rendering, aborts active imports, removes controls and removes an owned canvas. Existing canvases and their styles remain available after disposal. Call disposal when your page or component unmounts. `onTick` returns an unsubscribe function.
+
+`createStage(target, options)` accepts core camera/backend/capacity options and `controls`, `autoStart`, `label` and `onError`. Controls and rendering start by default. Use `autoStart: false` for manual rendering through `app.engine`. Camera validation and initial rendering finish before creation resolves.
+
+| API | Behavior |
+| --- | --- |
+| `app.sphere({radius, segments, ...options})` | Creates an orb with the same material/transform options as boxes |
+| `app.box({size, color, roughness, metalness, position, rotation, scale, parent, name})` | Creates a box and returns the existing mutable mesh handle |
+| `app.mesh(geometry, options)` | Attaches existing or custom geometry with the same options |
+| `app.onTick(delta => { ... })` | Runs once per frame with delta in seconds; returns an unsubscribe function |
+| `app.fit()` / `app.fit(model.meshes)` | Fits visible geometry, including world transforms and hierarchy |
+| `app.use(plugin)` | Attaches an existing plugin and returns it |
+| `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
+| `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
+
+## CAD camera controls
+
+[README continues: https://margoengine.com/llms/packages/stage.md]
+
+=== @margoengine/core (packages/core/README.md) ===
+
+# @margoengine/core
+
+Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl2-compat/preview`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth and picking. Materials are color, roughness, and metalness.
+
+Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample rendering with a DPR cap of 2. For slower desktop GPUs, set `globalThis.margoLow` to a pixel ratio (for example `1` or `1.5`) before creating the engine: scenes then render single-sampled with the DPR capped at that value, which on an Intel Arc 140V laptop cut the island demo's GPU frame from about 20 to 10 ms (particles off) compared with 4× MSAA. The site demos choose this light tier by measuring the GPU rather than guessing from the device. Color and depth targets follow canvas resize. Optional scene captures retain that sampling policy and expose single-sample resolved textures. CSS layout and HTML text retain native density.
+
+`engine.pick(x, y)` updates scene state without forcing a color frame. One readback runs at a time and overlapping calls wait their turn, so a loop of picks costs one readback a point; `pickMany` of `@margoengine/selection` answers many points from one. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`. On a canvas without client size (an `OffscreenCanvas` in a worker) pick coordinates are canvas pixels.
+
+Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values or the layers changed; a mesh that culling or `visible` shows or hides moves one row of its batch (shown: the batch's next row; hidden: the batch's last row takes its place), a moved mesh rewrites its own row, and the WebGPU renderer uploads only the changed rows, one `writeBuffer` for each run of neighbouring rows. On an Intel Arc 140V laptop the kernel part made the kernel 2.6-4x cheaper and let 50,000 CAD parts orbit at 92 FPS instead of 49 (CAD measurements, before the row change). An orbiting camera no longer re-collects every frame: with 50,000 boxes and 500 culling flips a frame, the frame does 50,000 byte compares, 1,000 map lookups, 12,000 float copies and uploads 48 KB in at most 500 writes, where it did 100,000 lookups, 1.2 million float copies and a 4.8 MB upload (counted in `tests/core-instance-cache.test.js`; not timed yet). Several cameras on one scene flip most rows, and then cost what a full collection costs. Draw order among the instances of one geometry follows these row moves, so it changes after a flip; opaque pixels are the same except for two core meshes at exactly the same depth. Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them, except a package that claims a batch and uploads its changed rows with `uploadRows`, see "Bulk poses and instance rows"; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
+
+[README continues: https://margoengine.com/llms/packages/core.md]
+
+=== @margoengine/game (packages/game/README.md) ===
+
+# @margoengine/game
+
+Games: models, animation, light and shadow, sky, physics, audio, input, effects.
+
+This package installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+
+=== @margoengine/web (packages/web/README.md) ===
+
+# @margoengine/web
+
+Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top.
+
+This package installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+
+=== @margoengine/viz (packages/viz/README.md) ===
+
+# @margoengine/viz
+
+Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text.
+
+This package installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+
+=== @margoengine/react-kit (packages/react-kit/README.md) ===
+
+# @margoengine/react-kit
+
+The web install profile with React bindings and sky.
+
+This package installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts. Build-phase examples are tracked in docs/work-lists/readme-owed.md.
+
 === margoengine (packages/margoengine/README.md) ===
 
 # margoengine
@@ -14080,65 +14407,6 @@ The kits `margoengine/game`, `/web` and `/viz` include `loadGLTF`, so their buil
 fetches them only for a file that uses Draco or KTX2.
 
 Without them nothing else changes; the package that needs one says which to install when you use it.
-
-=== @margoengine/stage (packages/stage/README.md) ===
-
-# @margoengine/stage
-
-You normally use this package as [`margoengine`](../margoengine/README.md): `import {createStage} from 'margoengine'` is this package. The packages are not on npm yet; see the [Install](../../README.md#install) section for the routes that work today.
-
-High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl2-compat/preview` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
-
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics`, `@dimforge/rapier3d-compat` and `@margoengine/save` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
-
-Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
-
-The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,000 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
-
-Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
-
-```ts
-import {createStage} from 'margoengine';
-const app = await createStage('#scene');
-const orb = app.sphere({color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1]});
-app.onTick(delta => {orb.rotation.z += delta;});
-window.addEventListener('pagehide', () => app.dispose(), {once: true});
-```
-
-Use a selector, an HTMLElement container or an existing canvas. The wrapper appends its own accessible canvas to containers. `app.dispose()` stops rendering, aborts active imports, removes controls and removes an owned canvas. Existing canvases and their styles remain available after disposal. Call disposal when your page or component unmounts. `onTick` returns an unsubscribe function.
-
-`createStage(target, options)` accepts core camera/backend/capacity options and `controls`, `autoStart`, `label` and `onError`. Controls and rendering start by default. Use `autoStart: false` for manual rendering through `app.engine`. Camera validation and initial rendering finish before creation resolves.
-
-| API | Behavior |
-| --- | --- |
-| `app.sphere({radius, segments, ...options})` | Creates an orb with the same material/transform options as boxes |
-| `app.box({size, color, roughness, metalness, position, rotation, scale, parent, name})` | Creates a box and returns the existing mutable mesh handle |
-| `app.mesh(geometry, options)` | Attaches existing or custom geometry with the same options |
-| `app.onTick(delta => { ... })` | Runs once per frame with delta in seconds; returns an unsubscribe function |
-| `app.fit()` / `app.fit(model.meshes)` | Fits visible geometry, including world transforms and hierarchy |
-| `app.use(plugin)` | Attaches an existing plugin and returns it |
-| `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
-| `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
-
-## CAD camera controls
-
-[README continues: https://margoengine.com/llms/packages/stage.md]
-
-=== @margoengine/core (packages/core/README.md) ===
-
-# @margoengine/core
-
-Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
-
-WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl2-compat/preview`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth and picking. Materials are color, roughness, and metalness.
-
-Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample rendering with a DPR cap of 2. For slower desktop GPUs, set `globalThis.margoLow` to a pixel ratio (for example `1` or `1.5`) before creating the engine: scenes then render single-sampled with the DPR capped at that value, which on an Intel Arc 140V laptop cut the island demo's GPU frame from about 20 to 10 ms (particles off) compared with 4× MSAA. The site demos choose this light tier by measuring the GPU rather than guessing from the device. Color and depth targets follow canvas resize. Optional scene captures retain that sampling policy and expose single-sample resolved textures. CSS layout and HTML text retain native density.
-
-`engine.pick(x, y)` updates scene state without forcing a color frame. One readback runs at a time and overlapping calls wait their turn, so a loop of picks costs one readback a point; `pickMany` of `@margoengine/selection` answers many points from one. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`. On a canvas without client size (an `OffscreenCanvas` in a worker) pick coordinates are canvas pixels.
-
-Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values or the layers changed; a mesh that culling or `visible` shows or hides moves one row of its batch (shown: the batch's next row; hidden: the batch's last row takes its place), a moved mesh rewrites its own row, and the WebGPU renderer uploads only the changed rows, one `writeBuffer` for each run of neighbouring rows. On an Intel Arc 140V laptop the kernel part made the kernel 2.6-4x cheaper and let 50,000 CAD parts orbit at 92 FPS instead of 49 (CAD measurements, before the row change). An orbiting camera no longer re-collects every frame: with 50,000 boxes and 500 culling flips a frame, the frame does 50,000 byte compares, 1,000 map lookups, 12,000 float copies and uploads 48 KB in at most 500 writes, where it did 100,000 lookups, 1.2 million float copies and a 4.8 MB upload (counted in `tests/core-instance-cache.test.js`; not timed yet). Several cameras on one scene flip most rows, and then cost what a full collection costs. Draw order among the instances of one geometry follows these row moves, so it changes after a flip; opaque pixels are the same except for two core meshes at exactly the same depth. Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them, except a package that claims a batch and uploads its changed rows with `uploadRows`, see "Bulk poses and instance rows"; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
-
-[README continues: https://margoengine.com/llms/packages/core.md]
 
 === @margoengine/math (packages/math/README.md) ===
 
