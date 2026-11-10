@@ -974,3 +974,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated decoders/ktx2-hdr6 alias and retain the environment/prefiltered alias emitted by the umbrella generator.
 
 - @margoengine/sciviz and margoengine/sciviz/contour2d (batch 177 job 1): grid and scattered contours, saddle ties, polygon bands/holes, inline labels, SVG options/defaults, cancellation, climate demo and limits.
+
+
+- @margoengine/environment (batch 188 job 3): document /reflector-pbr, Fresnel/IOR/metalness/baseColor, roughness and world blurDistance, geometric-normal and constant-base limits, capture lifecycle and supported backends.
+- @margoengine/vfx (batch 188 manifest repair): describe the complete recurring parity GPU gate and its native/full-compatibility cases; no API changed.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14111287,
+  "total": 14114843,
   "history": [
     {
       "date": "2026-10-24",
@@ -7441,6 +7441,12 @@
       "commit": "f428a581f",
       "reason": "Batch 177 contour2d: absent (0 B) to 3802 B gzip, 4058 B initial ceiling; grid/scattered topology, exact predicates, bands and vector SVG stay together without duplicate orchestration; core+stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-188",
+      "reason": "New optional environment/reflector-pbr: 0 to 3340 B gzip; shared capture hooks preserve Fresnel and world-depth blur without duplicating the reflector.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8790,6 +8796,7 @@
     "@margoengine/quality/events": 1223,
     "@margoengine/gltf-pro/dds": 7076,
     "@margoengine/decoders/ktx2-hdr6": 44540,
-    "@margoengine/sciviz/contour2d": 4058
+    "@margoengine/sciviz/contour2d": 4058,
+    "@margoengine/environment/reflector-pbr": 3556
   }
 }

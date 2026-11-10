@@ -4,7 +4,7 @@
 
 ```ts
 import { Camera, EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { FrameGraph } from "@margoengine/core/extension";
+import { FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
 export type CapturePassFilter = (pass: {
@@ -50,6 +50,7 @@ export abstract class PlanarSurface {
     normalRepeat: [number, number];
     normalScroll: [number, number];
     protected engine?: EngineKernel;
+    protected readonly target: CaptureTarget;
     protected readonly origin: [number, number, number];
     protected readonly normal: [number, number, number];
     constructor(kind: string, count: number, options: PlanarOptions);
@@ -79,6 +80,10 @@ export abstract class PlanarSurface {
     onDeviceRestored(): void;
     protected abstract aim(main: Camera): boolean;
     protected abstract faces(side: number): boolean;
+    protected get surfaceShader(): string;
+    protected get surfaceUniformLength(): number;
+    protected get surfaceDepth(): GPUTextureView | undefined;
+    protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void;
     protected clip(main: Camera, n: Vec3, w: number): boolean;
     update(): boolean;
     dispose(): void;
@@ -95,4 +100,39 @@ export class Reflector extends PlanarSurface {
 export type ReflectorOptions = PlanarOptions;
 
 export const scenePasses: CapturePassFilter;
+
+// Not exported from this entry, but used by the exports above:
+
+class CaptureTarget {
+    device?: GPUDevice;
+    color?: GPUTexture;
+    depth?: GPUTexture;
+    scene?: SceneTarget;
+    width: number;
+    height: number;
+    ensure(device: GPUDevice, width: number, height: number, samples: number, depthFormat: GPUTextureFormat): void;
+    dispose(): void;
+}
+
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
+
+type PlanarContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+class SceneTarget {
+  constructor(device: GPUDevice, color: GPUTexture, depth: GPUTexture, samples?: number);
+  readonly samples: number;
+  readonly color: GPUTextureView;
+  readonly depth: GPUTextureView;
+  readonly resolvedColor: GPUTexture;
+  readonly resolvedDepth: GPUTexture;
+  readonly depthSource?: GPUTextureView;
+  begin(context: Context): void;
+  resolve(encoder: GPUCommandEncoder, final?: boolean): void;
+  copyDepth(encoder: GPUCommandEncoder, view: GPUTextureView, count: number, format?: GPUTextureFormat): void;
+  restore(context: Context): void;
+  present(context: Context): void;
+  dispose(): void;
+}
 ```

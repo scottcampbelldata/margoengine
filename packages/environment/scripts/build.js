@@ -27,6 +27,7 @@ for (const [entry, emptyOutDir] of [
   ['fog-volumes', false],
   ['studio', false],
   ['prefiltered', false],
+  ['reflector-pbr', false],
 ])
   await build({
     root,
@@ -45,6 +46,7 @@ for (const [entry, emptyOutDir] of [
           id === '@margoengine/core' ||
           id === '@margoengine/core/extension' ||
           id === '@margoengine/environment' ||
+          id.startsWith('@margoengine/environment/') ||
           (id === './loaders.js' && entry !== 'loaders') ||
           (id === './main.js' && entry === 'index'),
       },

@@ -148,7 +148,13 @@ interface DeviceState {
   pipelines: Map<string, GPURenderPipeline>;
   reduce?: GPURenderPipeline;
   normal?: { source: GPUTexture | NormalMapImage; texture: GPUTexture; view: GPUTextureView; owned: boolean };
-  group?: { pipeline: GPURenderPipeline; image: GPUTextureView; normal: GPUTextureView; value: GPUBindGroup };
+  group?: {
+    pipeline: GPURenderPipeline;
+    image: GPUTextureView;
+    normal: GPUTextureView;
+    depth?: GPUTextureView;
+    value: GPUBindGroup;
+  };
 }
 interface Blur {
   texture: GPUTexture;
@@ -188,12 +194,13 @@ export abstract class PlanarSurface {
   private distortionValue = 0.03;
   private layersValue = 0xffffffff;
   private normalSource?: GPUTexture | NormalMapImage;
-  private readonly target = new CaptureTarget();
+  /** Capture resources owned by this surface, available to optional surface renderers. */
+  protected readonly target = new CaptureTarget();
   private blur?: Blur;
   private state?: DeviceState;
   private captured = false;
   private readonly captureMatrix = new Float32Array(16);
-  private readonly values = new Float32Array(64);
+  private readonly values: Float32Array;
   private time = 0;
   private stopFrames?: () => void;
   private disposed = false;
@@ -208,6 +215,7 @@ export abstract class PlanarSurface {
   protected readonly normal: [number, number, number] = [0, 0, 1];
 
   constructor(kind: string, count: number, options: PlanarOptions) {
+    this.values = new Float32Array(this.surfaceUniformLength);
     this.name = options.name ?? `${kind}-${count}`;
     if (typeof this.name !== 'string' || !this.name)
       throw new TypeError(`${kind} name must be a non-empty string; pass a name or omit it`);
@@ -349,6 +357,20 @@ export abstract class PlanarSurface {
   protected abstract aim(main: Camera): boolean;
   /** True when the surface is drawn for an eye at signed distance `side` from its plane (positive on the +Z side). */
   protected abstract faces(side: number): boolean;
+  /** Surface shader, overridable by optional material entries. */
+  protected get surfaceShader(): string {
+    return SURFACE;
+  }
+  /** Number of floats in the surface uniform. Default 64. */
+  protected get surfaceUniformLength(): number {
+    return 64;
+  }
+  /** Optional capture-depth binding for a material variant. Default none. */
+  protected get surfaceDepth(): GPUTextureView | undefined {
+    return undefined;
+  }
+  /** Append live uniforms for an optional surface renderer before upload. */
+  protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void {}
   /** Sets the oblique clip: keep points with `n · p + w >= 0` (world), then the capture camera's projection. */
   protected clip(main: Camera, n: Vec3, w: number): boolean {
     const camera = this.camera,
@@ -500,7 +522,7 @@ export abstract class PlanarSurface {
       key = `${c.format}:${samples}:${depthFormat}`;
     let pipeline = state.pipelines.get(key);
     if (!pipeline) {
-      const module = c.device.createShaderModule({ label: 'planar surface', code: SURFACE });
+      const module = c.device.createShaderModule({ label: 'planar surface', code: this.surfaceShader });
       pipeline = c.device.createRenderPipeline({
         label: 'planar surface',
         layout: 'auto',
@@ -513,17 +535,20 @@ export abstract class PlanarSurface {
     }
     const blur = this.roughnessValue > 0 ? this.blur : undefined,
       image = blur?.view ?? this.view(color),
-      normal = this.normalView(state);
+      normal = this.normalView(state),
+      depth = this.surfaceDepth;
     if (
       !state.group ||
       state.group.pipeline !== pipeline ||
       state.group.image !== image ||
-      state.group.normal !== normal
+      state.group.normal !== normal ||
+      state.group.depth !== depth
     )
       state.group = {
         pipeline,
         image,
         normal,
+        depth,
         value: c.device.createBindGroup({
           label: 'planar surface',
           layout: pipeline.getBindGroupLayout(0),
@@ -533,6 +558,7 @@ export abstract class PlanarSurface {
             { binding: 2, resource: normal },
             { binding: 3, resource: state.clampSampler },
             { binding: 4, resource: state.repeatSampler },
+            ...(depth ? [{ binding: 5, resource: depth }] : []),
           ],
         }),
       };
@@ -553,6 +579,7 @@ export abstract class PlanarSurface {
     v[60] = this.normalSource ? 1 : 0;
     v[61] = c.format === 'rgba16float' ? 1 : 0;
     v[62] = v[63] = 0;
+    this.surfaceUniforms(c, v);
     c.device.queue.writeBuffer(state.uniform, 0, v);
     const stencil = depthFormat.includes('stencil');
     const pass = c.encoder.beginRenderPass({
@@ -621,7 +648,7 @@ export abstract class PlanarSurface {
       device,
       uniform: device.createBuffer({
         label: 'planar surface',
-        size: 256,
+        size: this.surfaceUniformLength * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       }),
       clampSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }),

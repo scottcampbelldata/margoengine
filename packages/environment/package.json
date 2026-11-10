@@ -39,6 +39,7 @@
     "test:fog-volumes:browser": "npm run build && node scripts/test-browser.js --page=fog-volumes",
     "test:studio:browser": "npm run build && node scripts/test-browser.js --page=studio",
     "test:prefiltered:browser": "npm run build && node scripts/test-browser.js --page=prefiltered",
+    "test:reflector-pbr:browser": "npm run build && node scripts/test-browser.js --page=reflector-pbr",
     "test:probe-capture:browser": "npm run build && node scripts/test-browser.js --page=probe-capture",
     "test:fog-transparent:browser": "npm run build && node scripts/test-browser.js --page=volumetric-transparent",
     "test:reflection-shapes:browser": "npm run build && node scripts/test-browser.js --page=reflection-shapes",
@@ -98,6 +99,10 @@
     "./prefiltered": {
       "types": "./dist/prefiltered.d.ts",
       "import": "./dist/prefiltered.js"
+    },
+    "./reflector-pbr": {
+      "types": "./dist/reflector-pbr.d.ts",
+      "import": "./dist/reflector-pbr.js"
     }
   },
   "files": [
