@@ -389,3 +389,5 @@ Batch 221: quiet-machine single-worker versus multi-worker BVH construction (one
 - Batch 249 ecs/parallel: quiet-phase throughput comparison of identical serial and shared-worker module systems with matching outputs; use the real worker fixtures and declared hazards. Atomic overlap is proven now; no wall-clock gain is claimed.
 
 Batch 208: quiet-machine real-network throttle throughput, burst behavior and prefetch impact on foreground downloads in window/service worker. Build-phase proof checks deterministic requested timer debt, exact bytes, idle scheduling and persistence, with no elapsed-time assertion or speed claim.
+
+- Batch 247 GI temporal reuse: deterministic buffer preservation proves skipped surface and upper-cascade traces on identical input, with identical rendered output to forced-fresh computation. Quiet-machine timing across static/painted/moving scenes remains owed before release; no timing assertion or benchmark was run during build phase.

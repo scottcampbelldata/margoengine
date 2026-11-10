@@ -630,3 +630,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/terrain | overlays: metre-width strokes, polygon holes, all GeoJSON families, projection/style callbacks and atomic live edits; RVT addSurface/refreshSurfaces and imagery virtualTexture ordering/ownership | batch-229 job 2 |
 | margoengine | Generated terrain/overlays facade | batch-229 job 2 |
+- @margoengine/lighting2d (batch 247 job 2): document painted diffuse faces/albedo, exact temporal reuse default true, resetHistory(), source/scene edit invalidation, per-encoder snapshot sharing, memory/lifetime, and replace stale no-history/GI correctness-exception language with the documented fixture bounds.

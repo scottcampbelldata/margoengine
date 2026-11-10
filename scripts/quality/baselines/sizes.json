@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13344699,
+  "total": 13345397,
   "history": [
     {
       "date": "2026-10-24",
@@ -6799,6 +6799,12 @@
       "commit": "46b67d860",
       "reason": "Batch 229 job 2: overlays new 3805 B gzip, RVT 5302 to 6339 B for ordered vector and imagery providers plus identical steep/far fallback. Imagery 5985 to 6207 B; planet 7282 to 7291 B. One shared cache avoids a second renderer and extra terrain draws; core/stage stays 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-247-job2",
+      "reason": "Scott optional-size ruling: GI 9670 to 10348 B gzip (ceiling 9961 to 10659 B) for painted diffuse faces, exact temporal interval reuse and owner-safe disposal. SDF 2667 to 2911 B remains within 2923 B. A split would separate the synchronous trace and bounce contract and add API plumbing. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7228,7 +7234,7 @@
     "@margoengine/lighting2d": 5895,
     "@margoengine/lighting2d/cookie": 7875,
     "@margoengine/lighting2d/emissive": 4410,
-    "@margoengine/lighting2d/gi": 9961,
+    "@margoengine/lighting2d/gi": 10659,
     "@margoengine/lighting2d/height": 7337,
     "@margoengine/lighting2d/sdf": 2923,
     "@margoengine/lighting2d/soft": 6392,

@@ -15,6 +15,7 @@ export class SDFScene2D implements Disposable {
     emissionIntensity: number;
     constructor(options: SDFScene2DOptions);
     get distanceTexture(): GPUTexture | undefined;
+    get changeBuffer(): GPUBuffer | undefined;
     encode(device: GPUDevice, encoder: GPUCommandEncoder): void;
     bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup;
     dispose(): void;

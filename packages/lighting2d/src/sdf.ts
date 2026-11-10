@@ -25,6 +25,9 @@ struct Settings { camera:vec4f, material:vec4f }
 @group(0)@binding(3)var<storage,read_write>hull:array<vec2f>;
 @group(0)@binding(4)var<storage,read_write>squared:array<f32>;
 @group(0)@binding(5)var field:texture_storage_2d<rgba32float,write>;
+@group(0)@binding(6)var emission:texture_2d<f32>;
+@group(0)@binding(7)var<storage,read_write>history:array<vec4f>;
+@group(0)@binding(8)var<storage,read_write>changed:atomic<u32>;
 const INF:f32=1e20;
 @compute @workgroup_size(64)fn horizontal(@builtin(global_invocation_id)id:vec3u){
  let size=textureDimensions(image);let y=id.x;if(y>=size.y){return;}
@@ -69,6 +72,9 @@ const INF:f32=1e20;
 @compute @workgroup_size(8,8)fn finish(@builtin(global_invocation_id)id:vec3u){
  let size=textureDimensions(image);if(any(id.xy>=size)){return;}
  let a=textureLoad(image,id.xy,0).a;let solid=a>0&&a>=u.material.x;let i=id.y*size.x+id.x;
+ let color=textureLoad(image,id.xy,0);let light=textureLoad(emission,id.xy,0);
+ if(any(color!=history[i*2u])||any(light!=history[i*2u+1u])){atomicOr(&changed,1u);}
+ history[i*2u]=color;history[i*2u+1u]=light;
  var d=sqrt(squared[i]);if(solid){d=-sqrt(squared[size.x*size.y+i]);}
  textureStore(field,id.xy,vec4f(d,select(0.0,1.0,solid),0,0));
 }
@@ -94,6 +100,8 @@ export class SDFScene2D implements Disposable {
   #source?: GPUTexture;
   #emission?: GPUTexture;
   #disposed = false;
+  #historyKey?: string;
+  #lastEncoder?: GPUCommandEncoder;
 
   constructor(options: SDFScene2DOptions) {
     if (!options?.source) throw typeError('SDFScene2D source is required', 'pixel-lighting');
@@ -112,11 +120,14 @@ export class SDFScene2D implements Disposable {
   }
   /** Current rgba32float field: R signed distance in source pixels, G occupancy. Replaced on resize/restore. */
   get distanceTexture(): GPUTexture | undefined { return this.#field; }
+  /** GPU flag for exact source/emission/configuration changes in the current encoded snapshot. */
+  get changeBuffer(): GPUBuffer | undefined { return this.#buffers[5]; }
 
   /** Encode the three exact transform passes into the caller's frame. GILighting2D calls this automatically. */
   encode(device: GPUDevice, encoder: GPUCommandEncoder): void {
     if (this.#disposed) throw fault('disposed', 'SDFScene2D disposed; create a new one', 'pixel-lighting');
     this.#validate();
+    if (this.#lastEncoder === encoder && this.#device === device) return;
     const pick = (source: TextureSource) => typeof source === 'function' ? source() : source;
     const source = pick(this.source), emission = pick(this.emission ?? this.source);
     for (const image of [source, emission]) {
@@ -127,7 +138,7 @@ export class SDFScene2D implements Disposable {
     if (source.width !== emission.width || source.height !== emission.height)
       throw rangeError('SDF emission dimensions must match source', 'pixel-lighting');
     const count = source.width * source.height;
-    if (count * 16 > device.limits.maxStorageBufferBindingSize || count * 16 > device.limits.maxBufferSize)
+    if (count * 32 > device.limits.maxStorageBufferBindingSize || count * 32 > device.limits.maxBufferSize)
       throw rangeError('SDF scratch exceeds device buffer limit', 'pixel-lighting');
     if (Math.ceil(Math.max(source.width * 2, source.height) / 64) > device.limits.maxComputeWorkgroupsPerDimension ||
         Math.ceil(Math.max(source.width, source.height) / 8) > device.limits.maxComputeWorkgroupsPerDimension)
@@ -140,6 +151,8 @@ export class SDFScene2D implements Disposable {
         { binding: 1, visibility, texture: { sampleType: 'unfilterable-float' } },
         ...[2, 3, 4].map(binding => ({ binding, visibility, buffer: { type: 'storage' as const } })),
         { binding: 5, visibility, storageTexture: { access: 'write-only', format: 'rgba32float' } },
+        { binding: 6, visibility, texture: { sampleType: 'unfilterable-float' } },
+        ...[7, 8].map(binding => ({ binding, visibility, buffer: { type: 'storage' as const } })),
       ] });
       const module = device.createShaderModule({ label: 'exact painted distance transform', code: transformShader });
       const layout = device.createPipelineLayout({ bindGroupLayouts: [this.#layout] });
@@ -150,20 +163,26 @@ export class SDFScene2D implements Disposable {
     if (!this.#field || this.#field.width !== source.width || this.#field.height !== source.height) {
       this.#field?.destroy();
       for (const buffer of this.#buffers) buffer.destroy();
-      this.#buffers = [32, count * 8, count * 16, count * 8].map((size, i) => device.createBuffer({
+      this.#historyKey = undefined;
+      this.#buffers = [32, count * 8, count * 16, count * 8, count * 32, 16].map((size, i) => device.createBuffer({
         size, usage: (i ? 128 : 64) | 8,
       }));
       this.#field = device.createTexture({ label: 'painted signed distance', size: [source.width, source.height],
         format: 'rgba32float', usage: 4 | 8 | 1 });
     }
     this.#source = source; this.#emission = emission;
+    const key = JSON.stringify([this.camera, this.alphaThreshold, this.emissionIntensity]);
+    device.queue.writeBuffer(this.#buffers[5], 0, new Uint32Array([this.#historyKey === key ? 0 : 1]));
     device.queue.writeBuffer(this.#buffers[0], 0, new Float32Array([
       this.camera.x, this.camera.y, this.camera.zoom, 0, this.alphaThreshold, this.emissionIntensity, 0, 0,
     ]));
     const group = device.createBindGroup({ layout: this.#layout, entries: [
       { binding: 0, resource: { buffer: this.#buffers[0] } }, { binding: 1, resource: source.createView() },
-      ...this.#buffers.slice(1).map((buffer, i) => ({ binding: i + 2, resource: { buffer } })),
+      ...this.#buffers.slice(1, 4).map((buffer, i) => ({ binding: i + 2, resource: { buffer } })),
       { binding: 5, resource: this.#field.createView() },
+      { binding: 6, resource: emission.createView() },
+      { binding: 7, resource: { buffer: this.#buffers[4] } },
+      { binding: 8, resource: { buffer: this.#buffers[5] } },
     ] });
     this.#pipelines.forEach((pipeline, i) => {
       const pass = encoder.beginComputePass(); pass.setPipeline(pipeline); pass.setBindGroup(0, group);
@@ -171,6 +190,7 @@ export class SDFScene2D implements Disposable {
       else pass.dispatchWorkgroups(Math.ceil((i ? source.width * 2 : source.height) / 64));
       pass.end();
     });
+    this.#historyKey = key; this.#lastEncoder = encoder;
   }
   /** Bind the encoded field, source and emission for an owning lighting pass. */
   bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup {
@@ -179,6 +199,7 @@ export class SDFScene2D implements Disposable {
       { binding: 0, resource: { buffer: this.#buffers[0] } },
       { binding: 1, resource: this.#source!.createView() }, { binding: 2, resource: this.#emission!.createView() },
       { binding: 3, resource: this.#field.createView() },
+      { binding: 4, resource: { buffer: this.#buffers[5] } },
     ] });
   }
   #release(): void {
@@ -186,6 +207,7 @@ export class SDFScene2D implements Disposable {
     for (const buffer of this.#buffers) buffer.destroy();
     this.#buffers = []; this.#pipelines = []; this.#layout = undefined; this.#device = undefined;
     this.#source = this.#emission = undefined;
+    this.#historyKey = undefined; this.#lastEncoder = undefined;
   }
   /** Release owned scratch and field textures; source textures remain borrowed. */
   dispose(): void { if (!this.#disposed) { this.#disposed = true; this.#release(); } }

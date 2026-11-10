@@ -36,3 +36,26 @@ test('painted GI retains explicit WebGPU-only setup', () => {
   assert.throws(() => pass.setup({ backend: 'webgl2' }), { code: 'unsupported' });
   assert.throws(() => pass.setup({ backend: 'webgpu', gpu: null }), { code: 'unsupported' });
 });
+
+test('GI temporal configuration is explicit and resettable', () => {
+  assert.equal(new GILighting2D({ target: {} }).temporal, true);
+  assert.equal(new GILighting2D({ target: {}, temporal: false }).temporal, false);
+  assert.throws(() => new GILighting2D({ target: {}, temporal: 1 }), /temporal/);
+  const pass = new GILighting2D({ target: {} });
+  pass.resetHistory();
+  pass.dispose();
+});
+
+test('GI disposal removes only its owning scene registration', () => {
+  const removed = [];
+  const owner = { removePlugin: name => removed.push(name) };
+  const engine = { backend: 'webgpu', gpu: {}, frameGraph: { add() {} }, sceneOf: () => owner,
+    removePlugin() { assert.fail('must use owner, not active scene'); } };
+  const pass = new GILighting2D({ name: 'owned-gi', target: {} });
+  pass.setup(engine);
+  pass.dispose(); pass.dispose();
+  assert.deepEqual(removed, ['owned-gi']);
+  const detached = new GILighting2D({ name: 'detached', target: {} });
+  detached.setup({ ...engine, sceneOf: () => undefined });
+  detached.dispose();
+});

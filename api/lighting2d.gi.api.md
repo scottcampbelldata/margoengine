@@ -20,6 +20,7 @@ export interface EmissiveSprite2D {
 }
 
 export class GILighting2D implements EnginePlugin, Disposable {
+    temporal: boolean;
     painted?: SDFScene2D;
     name: string;
     order: number;
@@ -37,12 +38,14 @@ export class GILighting2D implements EnginePlugin, Disposable {
     constructor(options: GILighting2DOptions);
     static attach(instance: EngineKernel, options: GILighting2DOptions): GILighting2D;
     setup(engine: Engine): void;
+    resetHistory(): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }
 
 export interface GILighting2DOptions {
+    readonly temporal?: boolean;
     readonly painted?: SDFScene2D;
     readonly layer?: number;
     readonly target: GPUTexture | (() => GPUTexture);
@@ -191,6 +194,7 @@ class SDFScene2D implements Disposable {
     emissionIntensity: number;
     constructor(options: SDFScene2DOptions);
     get distanceTexture(): GPUTexture | undefined;
+    get changeBuffer(): GPUBuffer | undefined;
     encode(device: GPUDevice, encoder: GPUCommandEncoder): void;
     bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup;
     dispose(): void;
