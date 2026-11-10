@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshRuntime, type Geometry, type Mesh as RuntimeMesh } from '@margoengine/core/extension';
 import type { PointCloud } from '@margoengine/points';
@@ -131,6 +131,11 @@ export function Decal({ mesh, geometry: supplied, position = [0, 0, 0], rotation
   }, [source?.geometry, supplied, at]);
   const value = useMemo<Scene>(() => ({ ...scene, registry: null }), [scene]);
   const [root, setRoot] = useState<MeshHandle | null>(null);
-  useCommit(() => { if (root && source) root.setParent(source.mesh); }, [root, source?.mesh]);
-  return data && source ? <Context.Provider value={value}><TextureProvider><Mesh ref={setRoot}><GeometryResource geometry={data} /><PbrMaterial {...material} />{children}</Mesh></TextureProvider></Context.Provider> : null;
+  const liveRoot = useRef<MeshHandle | null>(null);
+  const bindRoot = useCallback((value: MeshHandle | null) => { liveRoot.current = value; setRoot(value); }, []);
+  useCommit(() => {
+    const target = mesh ? meshRuntime(mesh) : scene.registry?.current;
+    if (liveRoot.current && target) liveRoot.current.setParent(target);
+  }, [root, source?.mesh, mesh, scene.registry]);
+  return data && source ? <Context.Provider value={value}><TextureProvider><Mesh ref={bindRoot}><GeometryResource geometry={data} /><PbrMaterial {...material} />{children}</Mesh></TextureProvider></Context.Provider> : null;
 }

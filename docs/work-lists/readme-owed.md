@@ -10,6 +10,9 @@
 - @margoengine/materials and @margoengine/gltf-pro (fixes K2 job 1): document automatic per-surface native display glass snapshots, linear addition, capture cost and HDR behavior; examples deferred.
 - @margoengine/oit (fixes K2 job 1): test fixtures account for native glass capture; no OIT runtime API or README example changes.
 
+- @margoengine/react (fixes K2 job 2): document packed-consumer test dependencies and the repository-root override for contributor-script tests; README examples remain deferred.
+- @margoengine/react (K2 packed follow-up): cover portal/decal ownership across React 18 and 19 StrictMode replay; examples deferred.
+
 - @margoengine/clustered (batch 186 job 1): document /area-shapes AreaShapes, disk/sphere LTC and castShadow settings, shared LocalShadows casters, four shaped plus four rectangular shadow slots, radius-scaled PCSS and defaults; examples deferred.
 - margoengine (batch 186 job 1): document clustered/area-shapes forwarding entry; examples deferred.
 

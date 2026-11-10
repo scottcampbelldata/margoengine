@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PerformanceController } from '@margoengine/react/performance';
-import { advanceFrames, bridgeFrames, frameOutput, FrameCallbacks, subscribeFrame, xrFrameScope } from '../src/frame-priority.ts';
+import { advanceFrames, bridgeFrames, frameOutput, FrameCallbacks, subscribeFrame, xrFrameScope } from '../dist/frame-priority.js';
 
 function samples(controller, ms, windows = 1) { for(let i = 0; i < windows; i++) controller.sample(ms); }
 test('measured frame windows lower and restore quality, publish averages and preserve a deadband', () => {

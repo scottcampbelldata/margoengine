@@ -26,7 +26,13 @@ import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
 import { waitForPageReady } from './support/page-ready.js';
 import { pages } from './support/doc-snippets.mjs';
-import { packageMarkdown, readmeExamples, README_BINDING, README_GLOBALS, README_PROJECT } from './support/readme-types.mjs';
+import {
+  packageMarkdown,
+  readmeExamples,
+  README_BINDING,
+  README_GLOBALS,
+  README_PROJECT,
+} from './support/readme-types.mjs';
 import { BUNDLED } from './supply-chain.mjs';
 
 const names = [
@@ -124,6 +130,7 @@ const dependencies = {
   '@types/react-dom': '^18.3.0',
   '@types/node': JSON.parse(await readFile('node_modules/@types/node/package.json', 'utf8')).version,
   '@testing-library/react': '16.3.3',
+  '@playwright/test': JSON.parse(await readFile('package.json', 'utf8')).devDependencies['@playwright/test'],
   jsdom: '26.1.0',
   vite: JSON.parse(await readFile('package.json', 'utf8')).devDependencies.vite,
   '@dimforge/rapier3d-compat': JSON.parse(await readFile('node_modules/@dimforge/rapier3d-compat/package.json', 'utf8'))
@@ -490,11 +497,11 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   const tsc = resolve('node_modules/typescript/bin/tsc'),
     failures = [];
   // A child process in the fixture; its output is kept and printed when it ends.
-  const task = (label, args) =>
+  const task = (label, args, env = process.env) =>
     new Promise((done) => {
       const started = performance.now(),
         chunks = [],
-        child = spawn(process.execPath, args, { cwd: fixture, stdio: ['ignore', 'pipe', 'pipe'] });
+        child = spawn(process.execPath, args, { cwd: fixture, env, stdio: ['ignore', 'pipe', 'pipe'] });
       child.stdout.on('data', (chunk) => chunks.push(chunk));
       child.stderr.on('data', (chunk) => chunks.push(chunk));
       const end = (code, extra = '') => {
@@ -518,7 +525,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
       for (const file of await readdir('packages/react/' + directory, { withFileTypes: true })) {
         // These packaging/bundler checks require the workspace and already run in
         // the full Node gate; all component lifecycle tests also run on React 18.
-        if (!file.isFile() || !file.name.endsWith('.js') || file.name === 'subpaths.test.js') continue;
+        if (!file.isFile() || !/\.(?:m?js)$/.test(file.name) || file.name === 'subpaths.test.js') continue;
         const relative = directory + '/' + file.name;
         await copyFile('packages/react/' + relative, join(reactRoot, relative));
         if (file.name.endsWith('.test.js')) reactTests.push(relative);
@@ -527,11 +534,40 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
     reactTests.sort();
     await mkdir(join(supportRoot, '@margoengine/gltf-pro/src'), { recursive: true });
     await mkdir(join(supportRoot, 'docs'), { recursive: true });
-    await copyFile('packages/gltf-pro/src/shader.ts', join(supportRoot, '@margoengine/gltf-pro/src/shader.ts'));
+    // Vite sets NODE_ENV while building. Keep that tool state out of the consumer/test child environment.
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        "import {writeFile} from 'node:fs/promises'; import {bundleBytes} from './scripts/measure-size.js'; await writeFile(process.argv[2], await bundleBytes(process.argv[1]));",
+        resolve('packages/gltf-pro/src/shader.ts'),
+        join(supportRoot, '@margoengine/gltf-pro/src/shader.js'),
+      ],
+      { stdio: 'inherit', timeout: 120000 },
+    );
     await mkdir(join(supportRoot, '@margoengine/shared'), { recursive: true });
     await copyFile('packages/shared/aces.js', join(supportRoot, '@margoengine/shared/aces.js'));
     for (const file of ['react-integration.md', 'react-r3f.md'])
       await copyFile('docs/' + file, join(supportRoot, 'docs', file));
+    for (const file of [
+      'tests/support/optional-gpu.js',
+      'tests/support/postfx-gpu.js',
+      'examples/assets/kaykit/dungeon/pieces/dungeon_texture.png',
+      'examples/assets/khronos-samples/CesiumMan.jpg',
+    ]) {
+      const target = join(supportRoot, file);
+      await mkdir(dirname(target), { recursive: true });
+      if (file.endsWith('postfx-gpu.js'))
+        await writeFile(
+          target,
+          (await readFile(file, 'utf8')).replace(
+            '../../packages/core/dist/extension.js',
+            '@margoengine/core/extension',
+          ),
+        );
+      else await copyFile(file, target);
+    }
   }
   // The packed browser's first page load (a cold dev server transforming every package) is the slowest, most CPU-hungry
   // part. Started together with the type-check shards it missed the 30 s navigation limit twice in a row on a busy
@@ -627,11 +663,11 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   if (reactScope) pipelines.push(task('React docs tsc', [tsc, '-p', join(fixture, 'docs/tsconfig.json')]), browserRun);
   if (reactUnitTests)
     pipelines.push(
-      task('React unit tests', [
-        '--experimental-test-module-mocks',
-        '--test',
-        ...reactTests.map((file) => join(reactRoot, file)),
-      ]),
+      task(
+        'React unit tests',
+        ['--experimental-test-module-mocks', '--test', ...reactTests.map((file) => join(reactRoot, file))],
+        { ...process.env, MARGOENGINE_TEST_REPOSITORY: resolve('.') },
+      ),
     );
   const settled = await Promise.allSettled(pipelines);
   console.log(`package test timings: ${timings.join(', ')}`);

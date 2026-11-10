@@ -41,7 +41,8 @@ test('every native material class binds all map slots in both Scenes, survives u
     assert.equal(models()[0].material.emissiveMap, texture);
     assert.equal(material.map, null, 'borrowed material unchanged');
     assert.equal(models()[0].material.metalRoughnessMap, texture);
-    const { pbrShader } = await import('../../gltf-pro/src/shader.ts');
+    const { pbrShader } = await import(process.env.MARGOENGINE_TEST_REPOSITORY
+      ? '../../gltf-pro/src/shader.js' : '../../gltf-pro/src/shader.ts');
     assert.ok(!models()[0].material.shader(pbrShader, 3).includes('mr.b*f.factors.y'), 'roughness leaves metalness independent');
     view.rerender(tree(child(0.2))); await act(async () => {});
     assert.equal(models().length, 1);
@@ -69,7 +70,8 @@ test('a separate roughness map preserves a borrowed material metalness map and s
   await act(async () => {});
   const model = [...scene.world.plugins.values()].find((plugin) => plugin.primitives);
   assert.equal(model.material.metalRoughnessMap, metalness);
-  const { pbrShader } = await import('../../gltf-pro/src/shader.ts');
+  const { pbrShader } = await import(process.env.MARGOENGINE_TEST_REPOSITORY
+    ? '../../gltf-pro/src/shader.js' : '../../gltf-pro/src/shader.ts');
   const shader = model.material.features[0].shader(model.material.shader(pbrShader, 3), 3, model.material);
   assert.ok(shader.includes('mr.b*f.factors.y'), 'the original blue channel still controls metalness');
   assert.ok(shader.includes('textureSample(reactRoughness,reactRoughnessSampler,reactRoughUV(i)).g*f.factors.x'));

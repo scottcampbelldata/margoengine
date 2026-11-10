@@ -4,6 +4,10 @@
 
 Claim: native gltf-pro glass on display-encoded scene targets combines transmitted and lit light in linear values. The materials adapter snapshots each surface's background, decodes the two light contributions and encodes their sum. Proof: packages/materials/test/native-glass-browser.mjs fails before the fix and checks one/two overlapping surfaces at 1x/4x on both GPU backends against an independent transfer-function reference (one 8-bit quantization step). CPU ownership and shader regressions live in packages/materials/tests/native-glass.test.js. Scope: the native sightline-tint path, preserving its existing tone mapping; no equivalence claim for refracted HDR rendering or measured speed. Research sources and costs are in the operational playbook and limits.
 
+### K2 React packed consumer
+
+The packed React 18.3.1 consumer runs its component lifecycle assertions against installed package modules, including portal and decal StrictMode ownership. Tooling-script assertions use the explicit contributor repository and retain every original assertion. Evidence: modern:test:packages -- --packages=react, effects-extra.test.js, portals.test.js and the relocated tooling regression packed-react-repository.test.js. The consumer fixture declares Playwright types and supplies its own JavaScript/image test support; no source tree or new runtime dependency is shipped.
+
 ## Batch 187: lightmap visibility
 
 Opaque back faces block area-light visibility and diffuse gathers. Front-side emission cannot pass through their

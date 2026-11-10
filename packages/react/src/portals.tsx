@@ -4,7 +4,7 @@ import { Camera, type CameraOptions } from '@margoengine/core';
 import type { RenderView as View } from '@margoengine/core/extension';
 import type { Texture } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
-import { Context, assignRef, useCommit, useCreated, useScene, type Scene, type Views, type World } from './internal.js';
+import { Context, assignRef, useCommit, useCreated, useResourceEffect, useScene, type Scene, type Views, type World } from './internal.js';
 import { useFrame } from './components.js';
 import { optionalPeer } from './optional.js';
 
@@ -34,7 +34,7 @@ function mainView(scene: Scene, owner: object): () => void {
 function useWorld(camera?: Camera, options?: CameraOptions, background?: string | null) {
   const parent = useScene(), [world, setWorld] = useState<World | null>(null);
   const local = useMemo(() => camera ?? new Camera(options), [camera]);
-  useCommit(() => {
+  useResourceEffect(() => {
     const made = parent.engine.createScene(`react-portal:${++serial}`); setWorld(made);
     return () => { setWorld(value => value === made ? null : value); if (!parent.engine.disposed) made.dispose(); };
   }, [parent.engine]);

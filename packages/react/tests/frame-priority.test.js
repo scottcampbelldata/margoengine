@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceFrames, bridgeFrames, FrameCallbacks, frameTakeover, subscribeFrame, xrFrameScope } from '../src/frame-priority.ts';
+import { advanceFrames, bridgeFrames, FrameCallbacks, frameTakeover, subscribeFrame, xrFrameScope } from '../dist/frame-priority.js';
 
 function fixture() {
   const calls = [], callbacks = new Set();

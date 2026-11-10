@@ -7,6 +7,10 @@ K2 native glass scope: automatic per-surface snapshots apply to graph-managed En
 K2 native glass measured gzip before/after: gltf-pro 78058/79666 B, model 58923/60402 B, progressive 86739/88346 B, worker 78581/80160 B. Core plus stage remains 24209 B. Three optional ceilings grow in the generated sizes baseline; model remains within its existing ceiling. The synchronous draw adapter, shared lifecycle and scene-copy shader stay together; splitting them would introduce a package cycle or an async gap during model draws. No speed claim.
 
 
+K2 React packed tests: component lifecycle tests continue to import the installed tarball. Tests of contributor browser scripts use MARGOENGINE_TEST_REPOSITORY to locate the actual repository scripts, while keeping the tests themselves in the packed consumer. The consumer installs the root-pinned @playwright/test dev dependency for its typed browser fixture. No runtime package dependency, public export or GPU shader changes.
+
+K2 React lifecycle: portal worlds retain their committed resource through StrictMode replay and release after real unmount; decal parenting follows the live mesh ref and live parent registry. The packed suite exercises React 18.3.1, while workspace CPU/browser checks use the installed React 19 version. Private shader fixtures are bundled test support, not a new public gltf-pro API or shipped source file.
+
 ## Batch 187: existing lightmap parity entries and opaque visibility
 
 Batch 54 already supplies indexed mesh baking on UV1 (the second UV set), progressive WebGPU compute with a live
