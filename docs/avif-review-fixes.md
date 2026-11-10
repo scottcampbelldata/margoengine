@@ -46,3 +46,23 @@ independent U horizontal ramp and V vertical ramp. Hand-derived interpolated
 values and BT.709 equations check every RGBA16 pixel exactly at positions 0, 1
 and 2, including edge clamping. Before the fix position 1 at (1, 0) produced blue
 25192 instead of 32800. No GPU path, public TypeScript API or import graph changes.
+
+## L2: reserved OBU header bits
+
+Confirmed against AV1 OBU header and extension header semantics: a decoder ignores
+obu_reserved_1bit and extension_header_reserved_3bits. The parser now ignores
+those bits while retaining the forbidden-bit, size and truncation checks. The
+iterator regression covers both header-bit values, all eight extension-reserved
+values, exact payload/layer ids, sized config/sample iteration, an unsized sample
+and malformed boundaries. Derived white-image fixtures set the header bit in
+both item and av1C OBUs and optionally set extension-reserved bits on the frame;
+their RGBA must equal the original exactly. Both regressions failed with Invalid
+before the fix. The old reserved-extension negative case becomes a genuinely
+truncated payload case; no assertion is relaxed.
+
+The standard Node CPU test discovery now runs test-avif-native.mjs, so check:merge
+and local CI execute all three native spec regressions plus existing independent
+native/Wasm pixel and transform references. The generic Rust kernel discovery
+does not scan native/avif. The package test command drops its duplicate explicit
+native invocation. The bounded wrapper kills its process tree on a hard timeout.
+No GPU implementation, public export or production import changes.

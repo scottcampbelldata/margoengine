@@ -211,3 +211,47 @@ fn cycles_conflicting_pixel_depths_and_padded_workspace_limits_reject() {
         Some(Error::Limit)
     );
 }
+#[test]
+fn reserved_obu_header_bits_preserve_item_and_config_pixels() {
+    use margoengine_avif::bits::leb128;
+    let expected = decode(&derived(false, false, false), LIMITS).unwrap();
+    for add_extension in [false, true] {
+        let bytes = derived_obus(false, false, false, |coded, config| {
+            let mut rewritten = Vec::new();
+            let mut at = 0;
+            while at < coded.len() {
+                let start = rewritten.len();
+                let mut header = coded[at] | 1;
+                at += 1;
+                let kind = (header >> 3) & 15;
+                let extension = if header & 4 != 0 {
+                    let extension = coded[at] | 7;
+                    at += 1;
+                    Some(extension)
+                } else if add_extension && matches!(kind, 3 | 4 | 6 | 7 | 15) {
+                    header |= 4;
+                    Some(7)
+                } else {
+                    None
+                };
+                rewritten.push(header);
+                rewritten.extend(extension);
+                let size_at = at;
+                let size = leb128(coded, &mut at).unwrap() as usize;
+                rewritten.extend(&coded[size_at..at + size]);
+                at += size;
+                if kind == 1 {
+                    config.truncate(4);
+                    config.extend(&rewritten[start..]);
+                }
+            }
+            *coded = rewritten;
+        });
+        let actual = decode(&bytes, LIMITS).unwrap();
+        assert_eq!(
+            (actual.width, actual.height),
+            (expected.width, expected.height)
+        );
+        assert_eq!(actual.rgba, expected.rgba);
+    }
+}

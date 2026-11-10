@@ -7060,3 +7060,6 @@ the former raw-literal codec and checks exact independent and Margo round trips.
 Final fast-gate and dual-backend exporter GPU results are recorded with the job.
 Throughput and peak-memory comparisons remain owed in the deferred speed phase;
 no wall-clock performance claim is made. Legacy bundled encoder files are removed.
+
+### Section 5 evidence: AVIF review regression discovery (2026-11-10)
+The optional decoders CPU pipeline now discovers avif-native.test.js, which runs the existing bounded test-avif-native.mjs suite. This closes the native/avif discovery gap in the generic Rust kernel finder and makes check:merge/local CI exercise final unsized sample OBUs, strict av1C sizes, chroma positions 0/1/2 and ignored OBU reserved bits, alongside exact independent native/Wasm YUV and transform references. The package test script invokes that suite once through Node discovery. The new wrapper has a 600 s hard process-tree limit; each native suite stage retains its 180 s limit. No GPU, backend, core or stage code changed, so no GPU slot is required. Device diversity and quiet speed evidence remain outstanding as before. Sources, authored fixtures and failure-before-fix evidence are in docs/avif-review-fixes.md.

@@ -6434,3 +6434,5 @@ from 271457 / 84726 B. Bundle and file figures are not additive. These added
 bytes buy lossless literal coding and quality parity; splitting would require
 another codec ABI and fetch. Existing optional size ceilings suffice. Core plus
 stage remains 24209 gzip B, below 25000 B.
+
+AVIF review L2 (2026-11-10): OBU reserved header/extension bits are ignored as required for decoders; forbidden-bit, strict config-size and truncated-payload checks remain enforced. The standard CPU tests now include the native/Wasm spec regressions; see docs/avif-review-fixes.md.

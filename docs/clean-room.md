@@ -8510,3 +8510,6 @@ bounded eleven-bit tree smooths rare frequency counts when needed; FSE weight
 descriptions and reverse streams follow the normative RFC. The existing Margo
 Zstandard decoder supplied independent in-repository interoperability checks.
 No RDO objective, fitting code, corpus or quality assertion changed in round 10.
+
+## AVIF review L2 (2026-11-10)
+Compared AV1 OBU/header/extension syntax with their decoder semantics (Peter de Rivaz and Jack Haughton, AV1 Bitstream and Decoding Process Specification, 2018, errata 2023, https://aomediacodec.github.io/av1-spec/#obu-header-semantics and https://aomediacodec.github.io/av1-spec/#obu-extension-header-semantics), retaining AV1-ISOBMFF config/sample size rules (Cyril Concolato, Dimitri Podborski, Wan-Teh Chang, 2024, https://aomediacodec.github.io/av1-isobmff/v1.3.0.html). Reserved bits are ignored by decoders; the forbidden bit remains an error. All bit combinations and authored item/config fixtures cover this distinction. Standard CPU discovery now runs the native/Wasm spec suite once; details in docs/avif-review-fixes.md. No other repository implementation read or copied.
