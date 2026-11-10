@@ -229,3 +229,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document /stats/panels alias.
 | @margoengine/water | Optional caustics entry, source-ready scheduling, receiver projection, shadows, limits and lifecycle | Batch 234 caustics |
 | margoengine | water/caustics optional facade | Batch 234 caustics |
+
+- @margoengine/worker (batch 257 job 4): document Firefox WebGL2 worker evidence, browser-matrix and strict browser selection, default-profile WebGPU gaps and the distinction between Windows WebKit fallback and unproved native Safari.

@@ -3305,3 +3305,5 @@ The packed and single-output bundled cases distinguish runtime identities even a
 [Scope and sources](../core-version-guard.md).
 
 - Stats panels (batch 264): four rolling FPS, CPU-work, completed-GPU and labelled-memory graphs with averages/peaks and a named GPU pass list on both backends. Proof: packages/stats/test/panels.test.js, panel-gpu.test.js, scene-owner.test.js and scripts/test-stats-parity.mjs. WebGPU render/compute labels stay paired with the completed query slots; unsupported readings remain missing. No speed, complete-process-memory or presentation-latency claim.
+
+Batch 257 job 4 is DONE under Scott's 95% rule, with native Safari proof owed in private/handoffs/finish-later.md. Local Firefox 157.0 WebGL2 worker rendering and Windows Playwright WebKit 27.2 page fallback are proved by browser-matrix.mjs, with identical centre RGBA [213,26,1,255]. This does not claim Firefox WebGPU or native Safari support. Test receipts: test-results/worker-matrix-firefox.json and worker-matrix-webkit.json.

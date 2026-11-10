@@ -2807,3 +2807,5 @@ Rebase onto browser-host repair 919fdc09e before the water gates. The original
 flow gate now completes on both backends at its unchanged bound. Run the fast
 gate and affected tests; full verify belongs to local CI and README work waits.
 See results/batch234-caustics-landing.json for all outcomes and runner corrections.
+
+Batch 257 job 4 branch-only reproduction: install browsers with node node_modules/playwright/cli.js install firefox webkit (optionally set PLAYWRIGHT_BROWSERS_PATH to a folder inside this worktree). Run node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-matrix.mjs --browser=firefox, then the same with --browser=webkit. Run the original strict suite with browser-check.mjs --browser=<name> to expose missing WebGPU/worker capabilities without weakening assertions. Windows WebKit receipts are supplementary; a native Safari run on Apple hardware remains owed.

@@ -8,7 +8,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
 
-const context = await openBrowser({ startPath: '/packages/worker/tests/browser-check.html', port: 'free' }),
+const browserName = process.argv.find((arg) => arg.startsWith('--browser='))?.slice('--browser='.length) ?? 'chromium';
+const context = await openBrowser({
+    browserName,
+    startPath: '/packages/worker/tests/browser-check.html',
+    port: 'free',
+  }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -137,7 +142,10 @@ try {
   assert.equal(result.first.error, undefined);
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/worker-browser.json', JSON.stringify({ hardware, result }, null, 1));
+  await writeFile(
+    `test-results/worker-browser${browserName === 'chromium' ? '' : '-' + browserName}.json`,
+    JSON.stringify({ hardware, result }, null, 1),
+  );
   console.log(
     'ok worker:',
     result.pageTicks,
