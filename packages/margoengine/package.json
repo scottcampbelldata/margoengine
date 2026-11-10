@@ -1534,6 +1534,10 @@
       "types": "./dist/gltf-pro/material-draw.d.ts",
       "import": "./dist/gltf-pro/material-draw.js"
     },
+    "./gltf-pro/spec-gloss": {
+      "types": "./dist/gltf-pro/spec-gloss.d.ts",
+      "import": "./dist/gltf-pro/spec-gloss.js"
+    },
     "./headless": {
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"

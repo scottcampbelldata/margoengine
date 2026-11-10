@@ -646,6 +646,8 @@ export function transmissionPBR(code: string, declarations: string): string {
  * -1 for the slot's default value. Base slots 0-4 always keep their own bindings 0-9 (text patches use them).
  */
 export interface ExtendedPlan {
+  /** Optional spec/gloss conversion, implemented only by the spec-gloss entry. Defaults to false. */
+  readonly specularGlossiness?: boolean;
   readonly slots: readonly number[];
   readonly iridescence: boolean;
   readonly anisotropy: boolean;

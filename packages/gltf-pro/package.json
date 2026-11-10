@@ -31,7 +31,8 @@
     "test:extensions:browser": "cd ../.. && node packages/gltf-pro/scripts/test-extensions-browser.js",
     "test:gpu:materials": "cd ../.. && node scripts/gltf-pro-materials-gpu-check.js",
     "test:gpu:viewer": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node scripts/stage-viewer-gpu-check.js --compat",
-    "test:gpu:native-volume": "cd ../.. && node packages/gltf-pro/scripts/test-native-volume.mjs && node packages/gltf-pro/scripts/test-native-volume.mjs --compat"
+    "test:gpu:native-volume": "cd ../.. && node packages/gltf-pro/scripts/test-native-volume.mjs && node packages/gltf-pro/scripts/test-native-volume.mjs --compat",
+    "test:gpu:spec-gloss": "cd ../.. && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
@@ -98,6 +99,10 @@
     "./material-draw": {
       "types": "./dist/material-draw.d.ts",
       "import": "./dist/material-draw.js"
+    },
+    "./spec-gloss": {
+      "types": "./dist/spec-gloss.d.ts",
+      "import": "./dist/spec-gloss.js"
     }
   },
   "files": [

@@ -9,6 +9,7 @@ import { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from "@margoeng
 import { Splats } from "@margoengine/splats";
 
 export interface ExtendedPlan {
+    readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;
     readonly anisotropy: boolean;
@@ -116,6 +117,8 @@ export interface GLTFDocument extends GLTFProperty {
 }
 
 export interface GLTFExtendedMaterials {
+    readonly extensions?: readonly string[];
+    convert?(material: GLTFMaterial): GLTFMaterial;
     parse(extensions: GLTFExtensions): {
         features: Omit<ExtendedPlan, 'slots'>;
         maps: (GLTFTextureInfo | undefined)[];

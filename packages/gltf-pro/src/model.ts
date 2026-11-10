@@ -1690,6 +1690,7 @@ export function textureTransform(x: TextureTransform = {}, texCoord = 0): number
 // `extended`: decoders.materials (@margoengine/gltf-pro/extended), which reads iridescence, anisotropy and diffuse
 // transmission; without it they are ignored, as glTF allows for an optional extension.
 function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBRMaterial {
+  def = extended?.convert?.(def) ?? def;
   const p = def.pbrMetallicRoughness ?? {},
     alpha = def.alphaMode ?? 'OPAQUE',
     // Imported physical lobes are optional: the newest default leaves their metadata for MaterialInstallation.

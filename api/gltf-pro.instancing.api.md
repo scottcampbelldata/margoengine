@@ -41,6 +41,7 @@ export const instancing: {
 // Not exported from this entry, but used by the exports above:
 
 interface ExtendedPlan {
+    readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;
     readonly anisotropy: boolean;
@@ -183,6 +184,8 @@ interface GLTFDracoGeometry {
 }
 
 interface GLTFExtendedMaterials {
+    readonly extensions?: readonly string[];
+    convert?(material: GLTFMaterial): GLTFMaterial;
     parse(extensions: GLTFExtensions): {
         features: Omit<ExtendedPlan, 'slots'>;
         maps: (GLTFTextureInfo | undefined)[];

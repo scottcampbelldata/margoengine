@@ -4,6 +4,7 @@
 
 ```ts
 export interface ExtendedPlan {
+    readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;
     readonly anisotropy: boolean;
@@ -13,6 +14,8 @@ export interface ExtendedPlan {
 }
 
 export interface GLTFExtendedMaterials {
+    readonly extensions?: readonly string[];
+    convert?(material: GLTFMaterial): GLTFMaterial;
     parse(extensions: GLTFExtensions): {
         features: Omit<ExtendedPlan, 'slots'>;
         maps: (GLTFTextureInfo | undefined)[];
@@ -127,6 +130,23 @@ interface GLTFLightDefinition extends GLTFProperty {
   intensity?: number;
   range?: number;
   spot?: { innerConeAngle?: number; outerConeAngle?: number };
+}
+
+interface GLTFMaterial extends GLTFProperty {
+  pbrMetallicRoughness?: {
+    baseColorFactor?: number[];
+    metallicFactor?: number;
+    roughnessFactor?: number;
+    baseColorTexture?: GLTFTextureInfo;
+    metallicRoughnessTexture?: GLTFTextureInfo;
+  };
+  normalTexture?: GLTFTextureInfo;
+  occlusionTexture?: GLTFTextureInfo;
+  emissiveTexture?: GLTFTextureInfo;
+  emissiveFactor?: number[];
+  alphaMode?: string;
+  alphaCutoff?: number;
+  doubleSided?: boolean;
 }
 
 interface GLTFMeshopt {

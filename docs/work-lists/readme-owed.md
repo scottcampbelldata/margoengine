@@ -787,3 +787,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/viewcube (batch 198 job 1): document /up UpViewCube, up/front defaults, widget tuple directions, world home poses, frame conversion, pole and control conventions.
 - margoengine (batch 198 job 1): document viewcube/up forwarding.
 - @margoengine/cameras (batch 198 job 1): document that pole detection follows camera world up and that projection.up must be nonparallel to the view axis.
+- @margoengine/gltf-pro (batch 201 job 1): document automatic async spec/gloss loading, explicit synchronous specGlossMaterials, the linear CPU conversion helper, independent texture UVs/transforms and the metal/rough approximation limits; add runnable examples in the README phase.
+- margoengine (batch 201 job 1): include the generated gltf-pro/spec-gloss alias in import guidance during the README phase.

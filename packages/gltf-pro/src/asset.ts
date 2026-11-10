@@ -17,6 +17,7 @@ import type {
   GLTFExtensions,
   GLTFPrimitive,
   GLTFTextureInfo,
+  GLTFMaterial,
 } from '../../shared/gltf.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
@@ -161,6 +162,10 @@ export interface GLTFDracoGeometry {
 }
 /** What gltf-pro needs to shade extended materials (`extendedMaterials` from @margoengine/gltf-pro/extended implements it). */
 export interface GLTFExtendedMaterials {
+  /** Additional required extensions implemented by this optional material reader. Defaults to none. */
+  readonly extensions?: readonly string[];
+  /** Converts an authored material before packing its factors and maps. Defaults to the original material. */
+  convert?(material: GLTFMaterial): GLTFMaterial;
   /**
    * A glTF material's `extensions` read for its thin film, anisotropy, diffuse transmission and bump, or undefined when
    * none is in use (every factor 0): the features, map slots 13-18 (texture infos) and 16 uniform floats (rows iri, aniso,
@@ -425,7 +430,8 @@ export class GLTFAsset {
       (name: string) =>
         !supported.has(name) &&
         ![dracoExtension, meshoptExtension, 'KHR_meshopt_compression', basisuExtension].includes(name) &&
-        !hooks[hookFor[name]],
+        !hooks[hookFor[name]] &&
+        !(hooks.materials && hooks.materials.extensions?.includes(name)),
     );
     if (missing.length)
       throw margoError(

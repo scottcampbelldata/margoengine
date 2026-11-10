@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13613882,
+  "total": 13631297,
   "history": [
     {
       "date": "2026-10-24",
@@ -7092,6 +7092,12 @@
       "commit": "batch-198-job1",
       "reason": "New optional viewcube/up: 0 to 5672 B gzip, ceiling 5897. Complete arbitrary frame navigation shares existing cube hooks. Core/stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "856e8f21d",
+      "reason": "Batch 201 optional spec-gloss conversion after texture filtering preserves independent UVs and avoids lossy texture baking; core and stage unchanged. Sizes in docs/limits.md.",
+      "grew": 6
     }
   ],
   "items": {
@@ -7455,10 +7461,10 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7210,
-    "@margoengine/gltf-pro": 69426,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 27240,
+    "@margoengine/gltf-pro": 71602,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 28845,
     "@margoengine/gltf-pro dist/workers/progressive.js": 16170,
-    "@margoengine/gltf-pro/asset": 5490,
+    "@margoengine/gltf-pro/asset": 5754,
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 8224,
     "@margoengine/gltf-pro/instancing": 3350,
@@ -7468,11 +7474,12 @@
     "@margoengine/gltf-pro/metadata": 2432,
     "@margoengine/gltf-pro/model": 57606,
     "@margoengine/gltf-pro/physics": 8977,
-    "@margoengine/gltf-pro/prepare": 23410,
+    "@margoengine/gltf-pro/prepare": 24874,
     "@margoengine/gltf-pro/progressive": 78509,
     "@margoengine/gltf-pro/scene": 1471,
+    "@margoengine/gltf-pro/spec-gloss": 9712,
     "@margoengine/gltf-pro/splats": 2100,
-    "@margoengine/gltf-pro/worker": 69880,
+    "@margoengine/gltf-pro/worker": 72074,
     "@margoengine/gltf/auto": 14750,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
@@ -8150,6 +8157,7 @@
     "@margoengine/video/record": 1396,
     "@margoengine/viewcube": 5321,
     "@margoengine/viewcube/axes": 6029,
+    "@margoengine/viewcube/up": 5897,
     "@margoengine/voxel": 6127,
     "@margoengine/voxel dist/workers/light.js": 10527,
     "@margoengine/voxel dist/workers/mesher.js": 6162,
@@ -8374,7 +8382,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/viewcube/up": 5897
+    "margoengine/web": 577
   }
 }

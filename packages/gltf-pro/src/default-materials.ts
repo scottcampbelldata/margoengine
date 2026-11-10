@@ -29,6 +29,8 @@ export async function withMaterials(doc: GLTFDocument, decoders: GLTFDecoderHook
     decoders = { ...decoders, splats: (await import('./splats.js')).gaussianSplats };
   else if (decoders.splats === false) decoders = { ...decoders, splats: undefined };
   if (decoders.materials !== undefined) return decoders.materials ? decoders : { ...decoders, materials: undefined };
+  if (doc.materials?.some((m) => m?.extensions?.KHR_materials_pbrSpecularGlossiness !== undefined))
+    return { ...decoders, materials: (await import('./spec-gloss.js')).specGlossMaterials };
   const uses = (doc.materials ?? []).some(
     (m) => !!m?.extensions && typeof m.extensions === 'object' && physical.some((name) => name in m.extensions!),
   );
