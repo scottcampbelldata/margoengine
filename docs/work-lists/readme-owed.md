@@ -1360,3 +1360,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/worker: document /rpc onProgress and RpcContext.progress, transferable progress payloads, observer failures and channel isolation.
 - margoengine: document the generated /sciviz/workers alias after the build phase.
 - @margoengine/viz: document the generated /sciviz/workers alias after the build phase.
+
+- Integration J2 tooling: document the generated C2 Works with matrix and composition runner after all adapters land; README examples and Works with generation wait for the README phase.
+

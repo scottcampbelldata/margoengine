@@ -6910,3 +6910,12 @@ Native axis/frame/grid/tick styles and SVG share resolved tokens. Homogeneous ti
 # Batch 175 job 6 reader isolation (section 5 evidence)
 
 Scientific reader sessions own dedicated workers through worker/rpc. Transfer lists deduplicate backing buffers; output snapshots keep retained lazy caches valid. Cancellation terminates the session, including synchronous decoding, and disposes reverse callbacks. Evidence includes exact CPU comparisons on real fixtures, lazy NetCDF/Zarr/VTK XML repeats and the seven-format demo rendered on WebGPU and WebGL2. No core, stage, GPU math or backend source changed. Milestone progress reports buffer bytes rather than invented percentages. See docs/sciviz-workers.md; load-time and inflater timing proof is still owed in the deferred speed phase.
+
+### Section 4.1 gate: C2 composition
+
+check:gpu-packages ROOT includes test:composition:browser. Generated page imports register the composition footprint in affected-gpu.mjs. One shared GPU slot runs both backends and 1x/4x MSAA; no timing assertions. Generator drift and binary tuple coverage have CPU regressions.
+
+### Section 5 evidence: C2 composition J2
+
+The initial executable set covers post/FXAA, TAA, DOF and Tonemap (six positive pairs). Four material probes, two background probes, core drawCalls, validation scopes and rejection/error collectors provide value evidence. The 24-member generator proves 276 positive pairs and all four presence states on the CPU; remaining GPU adapters are still missing. No C1 fixture shape or lifetime harness changes. Research, reproduction and limits: docs/integration-composition.md.
+

@@ -230,6 +230,7 @@
     "test:modules:browser": "node scripts/margo-module-tests.js",
     "test:catalog:browser": "node --test tests/browser/catalog.test.js",
     "test:lifecycle:browser": "node scripts/lifecycle-browser-tests.mjs",
+    "test:composition:browser": "node scripts/composition-browser-tests.mjs",
     "test:python:browser": "node python/build-frontend.mjs && node python/tests/jupyter-browser.mjs",
     "setup:python-test": "node python/setup-test-venv.mjs",
     "test:modules:packages": "node scripts/margo-package-tests.js",

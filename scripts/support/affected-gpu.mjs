@@ -438,6 +438,14 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
       if (test.name === 'test:catalog:browser') print.patterns.push(/^docs\/(?!.*\.md$)/);
       // The Python package is not a workspace: every file under python/ is this suite's.
       if (test.name === 'test:python:browser') print.patterns.push(/^python\//);
+      // Generated pages name their imports explicitly. Include each row and its packages, rather than trusting
+      // a computed URL in the browser runner to be discovered by the source scanner.
+      if (test.name === 'test:composition:browser') {
+        const matrix = JSON.parse(readText(root, 'tests/composition/generated.json'));
+        print = merge(print, ...matrix.rows.map((row) => ofScript(`tests/composition/${row.id}.html`)));
+        print.files.add('tests/composition/generated.json');
+        print.files.add('scripts/generate-composition.mjs');
+      }
       // A suite whose sources name no package at all cannot be mapped: run it whenever a package is affected.
       if (!(print.packages.size || print.files.size)) print = everything(print);
     } else {

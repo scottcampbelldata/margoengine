@@ -1,0 +1,78 @@
+{
+  "contract": "C2",
+  "target": [
+    "post",
+    "taa",
+    "dof",
+    "tonemap",
+    "oit",
+    "shadows",
+    "clustered",
+    "pixel",
+    "creative",
+    "toon",
+    "transitions",
+    "scenery",
+    "voxel-pathtracer",
+    "water",
+    "sky",
+    "vfx",
+    "lines",
+    "points",
+    "labels",
+    "text",
+    "sprites",
+    "splats",
+    "lighting2d",
+    "xr"
+  ],
+  "implemented": [
+    "post",
+    "taa",
+    "dof",
+    "tonemap"
+  ],
+  "coverage": {
+    "covered": 6,
+    "total": 276
+  },
+  "rows": [
+    {
+      "id": "c2-001",
+      "members": [
+        "post",
+        "taa",
+        "dof",
+        "tonemap"
+      ]
+    },
+    {
+      "id": "c2-002",
+      "members": []
+    },
+    {
+      "id": "c2-003",
+      "members": [
+        "taa"
+      ]
+    },
+    {
+      "id": "c2-004",
+      "members": [
+        "post"
+      ]
+    },
+    {
+      "id": "c2-005",
+      "members": [
+        "dof"
+      ]
+    },
+    {
+      "id": "c2-006",
+      "members": [
+        "tonemap"
+      ]
+    }
+  ]
+}

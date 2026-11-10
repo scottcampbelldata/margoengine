@@ -557,6 +557,7 @@ test('verify keeps its checks and adds the preview contract after hygiene, asset
   assert.deepEqual(
     PARALLEL.flat().sort(),
     [
+      'node scripts/kit-install-check.mjs',
       'npm run api:check',
       'npm run quality',
       'npm run check:parity',
@@ -837,16 +838,29 @@ test('case 5: runner files run the smoke list plus the tests of the packages tha
   }
 });
 
-test('an optional staging integrator peer selects its real downstream GPU coverage', () => {
+test('an optional staging integrator peer retains its downstream coverage after the closure exceeds the full-run threshold', () => {
   const { decision, planned } = planFor(['packages/voxel-pathtracer/package.json']);
-  assert.equal(decision.mode, 'affected');
+  assert.equal(decision.mode, 'full');
+  assert.match(decision.reason, /packages affected, more than 12/);
+  const downstream = dependents(workspaces, new Set(['@margoengine/voxel-pathtracer']));
   for (const name of ['@margoengine/voxel-pathtracer', '@margoengine/staging', '@margoengine/stage'])
-    assert.ok(decision.affected.includes(name), name);
-  const ids = selected(planned);
-  for (const t of tests.filter((x) => ['voxel-pathtracer', 'staging', 'stage'].includes(x.dir)))
-    assert.ok(ids.includes(testId(t)), testId(t));
-  assert.ok(ids.includes('root/test:lifecycle:browser'), 'lifecycle imports stage, which depends on staging');
-  assert.ok(!ids.includes('water/test:gpu'));
+    assert.ok(downstream.has(name), name);
+  assert.deepEqual(
+    planned,
+    steps.map((command) => ({ command })),
+  );
+  assert.ok(tests.some((t) => testId(t) === 'root/test:lifecycle:browser'));
+});
+
+test('C2 generated scenes register explicit package and file footprints', () => {
+  const footprint = real['gpu/root/test:composition:browser'];
+  for (const name of ['post', 'taa', 'dof', 'tonemap']) assert.ok(footprint.packages.has(`@margoengine/${name}`));
+  assert.ok(footprint.files.has('tests/composition/c2-001.html'));
+  assert.ok(footprint.files.has('tests/composition/c2-001.ts'));
+  assert.ok(footprint.files.has('tests/composition/harness.ts'));
+  assert.ok(footprint.files.has('tests/composition/generated.json'));
+  const { planned } = planFor(['tests/composition/c2-001.ts']);
+  assert.ok(selected(planned).includes('root/test:composition:browser'));
 });
 
 test('combined voxel and triangle-integrator changes retain the unchanged full-run safety threshold', () => {
