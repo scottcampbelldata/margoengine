@@ -17,7 +17,8 @@ in the root installation guide, rather than the unrelated registry package.
 
 - [Analysis and scientific datasets](docs/analysis.md): pipeline, contour, clip, probe,
   calculator, glyphs, normalized datasets and scientific file readers.
-- [Scientific volumes](docs/volumes.md): transfer functions, MIP and MinIP, categorical fusion,
+- [Scientific volumes](docs/volumes.md): transfer functions, MIP and MinIP, multi-volume and multi-component
+  mixing (`/multivolume`), categorical fusion,
   cinematic and quality wrappers, mapped/tetrahedral/AMR volumes and atmosphere.
 - [Charts and linked data](docs/charts.md): selections, tables, queries, statistics,
   formatting, streaming and publication.

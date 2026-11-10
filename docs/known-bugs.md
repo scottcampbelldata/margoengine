@@ -2166,7 +2166,6 @@ Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-
 feature that a web rival or desktop tool documents, with no export, README section or test in `@margoengine/sciviz`.
 Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
 
-- **No multi-component or general multi-volume compositing.** Label maps fuse over one scalar volume only.
 - **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
 - **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
   for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.

@@ -1791,6 +1791,10 @@
       "types": "./dist/sciviz/molecule.d.ts",
       "import": "./dist/sciviz/molecule.js"
     },
+    "./sciviz/multivolume": {
+      "types": "./dist/sciviz/multivolume.d.ts",
+      "import": "./dist/sciviz/multivolume.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

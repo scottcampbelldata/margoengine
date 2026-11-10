@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14689310,
+  "total": 14713468,
   "history": [
     {
       "date": "2026-10-24",
@@ -8153,6 +8153,12 @@
       "commit": "6df42fc71",
       "reason": "batch 170 stats: overlay timers skip refreshes with nothing new to draw (idle 8,580 canvas commands per 10 s to 0); +50 B gzip for the change key",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e89263ea7",
+      "reason": "New optional entry @margoengine/sciviz/multivolume (multi-volume and multi-component ray marching); paid only by importers",
+      "grew": 1
     }
   ],
   "items": {
@@ -9060,6 +9066,7 @@
     "@margoengine/sciviz/molecule": 5419,
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/mrc": 3427,
+    "@margoengine/sciviz/multivolume": 24158,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/notebook": 2064,
     "@margoengine/sciviz/nrrd": 1216,

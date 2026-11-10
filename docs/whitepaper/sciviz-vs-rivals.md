@@ -33,7 +33,7 @@ current on that date.
 | Row | Margo (evidence) | Web rivals (their docs) | Desktop tools (expectation) |
 | --- | --- | --- | --- |
 | Chart types | scatter, line, bar, histogram, heatmap, surface, contour, error bars, box, violin, area, density, parallel coordinates, polar, ternary, Sankey and more (`tests/charts.test.js`, `tests/stats.test.js`, `tests/charts-extra.test.js`, `tests/parcoords.test.js`, `tests/contour2d.test.js`), scatterplot matrix with every cell placed to the closed form, cell brushing, flip and reorder on both backends (`tests/splom-browser.mjs`) | Plotly lists 40+ trace types; ECharts 20+ series; Vega-Lite composes marks with transforms | Matplotlib-style breadth |
-| 3D scalar volume | 1D and 2D transfer functions, pre-integration, label maps, MIP and MinIP (`tests/volume-modes-browser.mjs`, `tests/minip-kinds-browser.mjs`), ambient occlusion, shadows, GPU and CPU isosurfaces (`tests/transfer.test.js`, `tests/labels.test.js`, `tests/cinematic.test.js`, `tests/fallback.test.js`) | VTK.js volume mapper: composite, additive, MIP, MinIP; Plotly volume and isosurface traces | ParaView and Slicer: all of these plus multi-volume |
+| 3D scalar volume | 1D and 2D transfer functions, pre-integration, label maps, MIP and MinIP (`tests/volume-modes-browser.mjs`, `tests/minip-kinds-browser.mjs`), up to four mixed volumes or components in one ray march (`tests/multivolume-browser.mjs`), ambient occlusion, shadows, GPU and CPU isosurfaces (`tests/transfer.test.js`, `tests/labels.test.js`, `tests/cinematic.test.js`, `tests/fallback.test.js`) | VTK.js volume mapper: composite, additive, MIP, MinIP; Plotly volume and isosurface traces | ParaView and Slicer: all of these plus multi-volume |
 | Vector and tensor | quiver, RK4 streamlines, particles and pathlines, LIC, tubes and ribbons, tensor glyphs, DTI fibre tracking (README "Vector fields", `tests/flow.test.js`, `tests/lic.test.js`, `tests/tubes.test.js`, `tests/tensor.test.js`, `tests/tensor-real.test.js`) | Plotly cone and streamtube traces; VTK.js glyph mapper | ParaView stream tracer, LIC, tensor glyphs |
 | Volume scale | bricked level-of-detail volumes, OME-Zarr multiscale, N5, precomputed chunks (README "Bricked volumes", `tests/bricks.test.js`, `tests/omezarr.test.js`) | Neuroglancer reads precomputed, N5 and OME-Zarr chunked sources | Out-of-core readers |
 | Grid types | image, structured, rectilinear, curvilinear, unstructured, polydata, multiblock, polyhedra, higher-order cells, AMR (`tests/grids.test.js`, `tests/datasets.test.js`, `tests/datasets-elements.test.js`, `tests/amr.test.js`) | VTK.js documents ImageData and PolyData | ParaView: every VTK data type |
@@ -137,8 +137,8 @@ included.
 
 ## Not found in Margo today
 
-Multi-component and general multi-volume compositing. This is listed in docs/known-bugs.md
-under "Sciviz comparison gaps".
+None of the batch 182 feature gaps remain; docs/known-bugs.md "Sciviz comparison gaps" keeps the unmeasured rival
+accuracy rows and the Cosmograph appearance note.
 
 ## Reproduce
 

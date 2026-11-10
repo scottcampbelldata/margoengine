@@ -259,3 +259,31 @@ for (let z = 6; z < 18; z++) for (let y = 6; y < 18; y++) for (let x = 6; x < 18
 const volume = fig.volume(data, { dims: [n, n, n], colormap: 'gray', range: [0, 1], opacity: [[0, 1], [1, 1]], mode: 'minip' });
 volume.mode = 'mip'; // switch at any time
 ```
+
+## Several volumes and multi-component data
+
+`@margoengine/sciviz/multivolume` ray marches up to four scalar channels in one pass over the union of their boxes.
+Each channel keeps its own grid, bounds, colour map, range and opacity; where boxes overlap, the samples of one step
+mix as independent absorbers (opacity `1 - prod(1 - a_i)`, colour `sum(a_i c_i) / sum(a_i)`, after Cai and Sakas,
+Computer Graphics Forum 18(3), 1999) and the steps composite front to back. `componentChannels(data, k, dims)` splits
+interleaved k-component tuples into channels sharing one box. Defaults: grey map, the channel's finite min and max,
+opacity `t * t`, density 1, quality 1.5 samples per finest voxel. `tests/multivolume-browser.mjs` checks the mixed
+grey, a half-box channel and the component split against closed forms on both backends.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { multiVolume, componentChannels } from '@margoengine/sciviz/multivolume';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+const n = 8, dims: [number, number, number] = [n, n, n];
+const ct = new Float32Array(n * n * n).map((_, i) => (i % n) / (n - 1));
+const pet = new Float32Array(n * n * n).fill(1);
+const fused = multiVolume(fig, [
+  { data: ct, dims, bounds: [0, 1, 0, 1, 0, 1], colormap: 'gray' },
+  { data: pet, dims, bounds: [0, 0.5, 0, 1, 0, 1], colormap: 'inferno', range: [0, 2] },
+]);
+const rg = new Float32Array(n * n * n * 2).map((_, i) => (i % 2 ? 0.8 : 0.2));
+const components = multiVolume(fig, componentChannels(rg, 2, dims, [{ colormap: 'viridis' }, { colormap: 'magma' }]));
+console.log(fused.bounds, components.bounds);
+```
+
