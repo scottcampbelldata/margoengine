@@ -3655,6 +3655,10 @@
       "types": "./dist/sciviz/a11y.d.ts",
       "import": "./dist/sciviz/a11y.js"
     },
+    "./sciviz/progressive": {
+      "types": "./dist/sciviz/progressive.d.ts",
+      "import": "./dist/sciviz/progressive.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

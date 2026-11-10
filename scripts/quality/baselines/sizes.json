@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15330151,
+  "total": 15335153,
   "history": [
     {
       "date": "2026-10-24",
@@ -7909,6 +7909,12 @@
       "commit": "batch178-job5",
       "reason": "Optional a11y before 0 -> 6233 B gzip; sciviz root 60026 -> 61010 B, spec 27106 -> 27127 B, format 7306 -> 7598 B. Complete source adapters, keyboard/table access, abortable Web Audio, per-instance themes and 24px pressed legend controls. Raise format ceiling 7562 -> 7826 and add a11y ceiling 6480. A split would duplicate row/source and lifetime ownership or require application glue, and save no core bytes. Core + stage remains 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "93b4ce4e5",
+      "reason": "Batch 181 job 5: new optional sciviz/progressive entry 0 to 4746 B min+gzip, ceiling 5002 B. Scene target/depth reconstruction, latency feedback, per-view refinement and disposal retain one owner; splitting would add orchestration without reducing the complete feature. Existing ceilings are not raised. Core plus stage unchanged 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8765,6 +8771,8 @@
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 61750,
+    "@margoengine/sciviz/a11y": 6480,
+    "@margoengine/sciviz/aggregate": 29019,
     "@margoengine/sciviz/amr": 30374,
     "@margoengine/sciviz/annotate": 7680,
     "@margoengine/sciviz/atmosphere": 35321,
@@ -8816,8 +8824,10 @@
     "@margoengine/sciviz/pipeline": 2086,
     "@margoengine/sciviz/pointcloud": 22723,
     "@margoengine/sciviz/probe": 6844,
+    "@margoengine/sciviz/progressive": 5002,
     "@margoengine/sciviz/provenance": 27770,
     "@margoengine/sciviz/query": 7381,
+    "@margoengine/sciviz/share": 5289,
     "@margoengine/sciviz/spec": 27920,
     "@margoengine/sciviz/stats": 6975,
     "@margoengine/sciviz/stream": 4450,
@@ -8825,6 +8835,7 @@
     "@margoengine/sciviz/tetvolume": 6578,
     "@margoengine/sciviz/transfer": 6252,
     "@margoengine/sciviz/tubes": 2789,
+    "@margoengine/sciviz/views": 5042,
     "@margoengine/sciviz/volume-quality": 8765,
     "@margoengine/sciviz/vtk": 6746,
     "@margoengine/sciviz/webgl2": 4667,
@@ -9329,10 +9340,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sciviz/aggregate": 29019,
-    "@margoengine/sciviz/views": 5042,
-    "@margoengine/sciviz/share": 5289,
-    "@margoengine/sciviz/a11y": 6480
+    "margoengine/web": 577
   }
 }

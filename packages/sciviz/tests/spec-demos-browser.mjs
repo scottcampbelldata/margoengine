@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { writeFile, mkdir } from 'node:fs/promises';
+import { specCapturePlugin } from './spec-capture-plugin.mjs';
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 
 const names = (
@@ -9,23 +10,19 @@ const names = (
   'head,stars,wind,moving-flow,lic,tubes,derive,aeroflow,astrometrics,medical,formats,pipeline,contour,clip,glyph,calc,probe,transfer,labels,cinematic,atmosphere,surface,volume,points'
 ).split(',');
 const reports = [];
-const backends = process.env.SPEC_BACKENDS === 'webgl2' ? [true] : process.env.SPEC_BACKENDS === 'webgpu' ? [false] : [false,true];
+const backends =
+  process.env.SPEC_BACKENDS === 'webgl2' ? [true] : process.env.SPEC_BACKENDS === 'webgpu' ? [false] : [false, true];
 for (const compat of backends) {
-  const browser = await openBrowser({ startPath: '/packages/sciviz/tests/sciviz.html', port: 'free', compat });
+  const browser = await openBrowser({
+    startPath: '/packages/sciviz/tests/sciviz.html',
+    port: 'free',
+    compat,
+    plugins: [specCapturePlugin()],
+  });
   browser.page.setDefaultTimeout(120000);
   await browser.page.emulateMedia({ reducedMotion: 'reduce' });
   // Exact byte comparisons use the engine's documented pixel-exact mode. MSAA blending can differ
   // by one output byte even between two captures of the same unchanged transparent source scene.
-  await browser.page.route('**/sciviz-*.ts*', async (route) => {
-    const response = await route.fetch();
-    const setup = `import { Engine as SpecCaptureEngine } from '/packages/core/dist/index.js';
-      if (!SpecCaptureEngine.specCapture) {
-        const create = SpecCaptureEngine.create.bind(SpecCaptureEngine);
-        SpecCaptureEngine.create = (canvas, options = {}) => create(canvas, { exactSize: [Math.round(canvas.clientWidth * devicePixelRatio), Math.round(canvas.clientHeight * devicePixelRatio)], ...options });
-        SpecCaptureEngine.specCapture = true;
-      }\n`;
-    await route.fulfill({ response, body: setup + (await response.text()) });
-  });
   try {
     for (const name of names) {
       const fixture = ['aeroflow', 'astrometrics', 'medical'].includes(name);

@@ -162,7 +162,15 @@ export class CurvilinearVolume implements Drawable {
     v.set(this.source.model);
     invertMatrix(this.source.model, v.subarray(16, 32));
     v.set([...g.dims, g.spherical ? 1 : 0], 32);
-    v.set([this.#reference, this.source.quality, this.source.density, this.source.mode === 'mip' ? 1 : 0], 36);
+    v.set(
+      [
+        this.#reference,
+        this.source.quality * (this.#figure.renderer.samplingScale ?? 1),
+        this.source.density,
+        this.source.mode === 'mip' ? 1 : 0,
+      ],
+      36,
+    );
     v.fill(0, 44, 80);
     v.set(this.source.classificationUniforms(), 40);
     v.set([g.bounds[0], g.bounds[2], g.bounds[4], g.nodes.length / 8], 48);

@@ -4457,3 +4457,9 @@ web/game/viz/react/next templates declare web/game/viz/react-kit/react-kit respe
 - Batch 179 share/embed: `packages/sciviz/tests/share.test.js` checks compressed/dictionary round trips, bounded inflation, cancellation, URL limits, source hashes and inert HTML. `packages/sciviz/tests/share-browser.mjs` restores real OpenNeuro MRI camera/time links, exercises iframe camera/time/selection acknowledgements and events, rejects invalid camera and spoofed source requests, opens an exported file with HTTP(S) requests blocked, and renders on WebGPU and the WebGL2 compatibility layer. This matches the requested JSON-link, standalone-data viewer and iframe-control row; no claim of matching unrelated Glance analysis tools or a hosted sharing service.
 ### Batch 178 job 5: accessible scientific exploration
 Optional keyboard series/record focus, complete pageable tables, generated count/range/extreme/trend descriptions and explicit Web Audio listening share original scalar sources. Native/compatibility browser and independent CPU evidence: [contract](../sciviz-a11y.md), [ledger](results/batch178-a11y.json). Every sciviz demo scores 100 in the recorded loaded-page Lighthouse accessibility snapshot. This is an automated audit claim, not complete WCAG certification or a sonification efficacy claim.
+
+
+
+## Batch 181 job 5: progressive scientific interaction
+
+The optional sciviz/progressive controller reduces target dimensions and integration counts during camera motion, responds to a soft frame budget, and restores original quality over resting frames. Proof: packages/sciviz/tests/progressive.test.js and progressive-browser.mjs, on native WebGPU and full WebGL2 with actual device replacement, EMDB EMD-8117 and TCIA CT-ORG. Intermediate images intentionally differ; final images use the original renderer. No frame-rate or GPU-time guarantee is claimed. Policies and sources: docs/sciviz-progressive.md.

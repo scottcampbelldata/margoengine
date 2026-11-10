@@ -3832,3 +3832,9 @@ After building the packages, run node scripts/template-install-check.mjs. This p
 - Batch 179 share/embed: build packages, then run `node --test packages/sciviz/tests/share.test.js`. For GPU correctness run `node scripts/gpu-lock.mjs run --owner=share-review --wait-max=60 --max=3 -- node packages/sciviz/tests/share-browser.mjs` under a hard process-tree timeout. It creates `test-results/batch179-mri-standalone-{webgpu,webgl2}.html`, raw pinned MRI data, camera/time deep-link text and screenshots. Serve the repository for the deep link while opening the standalone directly from disk requires no network. Input is the existing CC0 OpenNeuro MRI asset; source/licence remain in examples/assets/sciviz. Bundle only: `node packages/sciviz/scripts/bundle-share.mjs test-results/share-runtime.js`.
 ### Batch 178 job 5
 Run sciviz a11y.test.js after build; run tests/a11y-browser.mjs and chart-polish-browser.mjs through the shared GPU lock on both backends. For the pinned Lighthouse 13.6.0 snapshot runner, isolated installation, browser executable, complete readiness rule, viewport and machine-local output, follow docs/sciviz-a11y.md. No audits are disabled; all sciviz-*.html pages are selected by default. No speed claims or timing assertions.
+
+
+
+## Batch 181 job 5 progressive rendering
+
+After build:packages, run `node --experimental-test-module-mocks --test --test-timeout=60000 packages/sciviz/tests/progressive.test.js`. GPU correctness: `node scripts/gpu-lock.mjs run --owner=progressive-review --max=6 --wait-max=60 -- node packages/sciviz/tests/progressive-browser.mjs`. The suite covers both backends and writes test-results/batch181-j5-progressive.json. Serve examples/sciviz-progressive.html for the bricked EMDB/cinematic EMDB/TCIA demo; append ?backend=webgl2 for compatibility. Existing layer restoration suites remain part of the sciviz package GPU gate. No benchmark or timing-only assertion is run.

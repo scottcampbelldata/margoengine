@@ -73,6 +73,8 @@ let serial = 0;
  * place yourself.
  */
 export class SciRenderer implements EnginePlugin {
+  /** @internal Per-frame ray integration multiplier, owned by the optional progressive controller. Default 1. */
+  samplingScale = 1;
   /** @internal Optional CPU extractor, installed only by sciviz/fallback. */
   cpuIsosurface?: (data: Float32Array, level: number, options: {
     dims: readonly [number, number, number]; maxTriangles: number; signal: AbortSignal;

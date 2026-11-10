@@ -299,6 +299,10 @@
     "./a11y": {
       "types": "./dist/a11y.d.ts",
       "import": "./dist/a11y.js"
+    },
+    "./progressive": {
+      "types": "./dist/progressive.d.ts",
+      "import": "./dist/progressive.js"
     }
   },
   "files": [
@@ -368,6 +372,7 @@
     "test:browser:views": "node scripts/browser-root.mjs tests/views-browser.mjs",
     "test:browser:share": "node scripts/browser-root.mjs tests/share-browser.mjs",
     "test:browser:a11y": "node scripts/browser-root.mjs tests/a11y-browser.mjs",
-    "audit:a11y": "node scripts/audit-accessibility.mjs"
+    "audit:a11y": "node scripts/audit-accessibility.mjs",
+    "test:browser:progressive": "node scripts/browser-root.mjs tests/progressive-browser.mjs"
   }
 }

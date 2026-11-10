@@ -383,7 +383,10 @@ export class FusionLayer implements Drawable {
       inverse = new Float32Array(16);
     invertMatrix(this.#model, inverse);
     v.set(inverse);
-    v.set([this.bounds[0], this.bounds[2], this.bounds[4], this.#options.quality], 16);
+    v.set(
+      [this.bounds[0], this.bounds[2], this.bounds[4], this.#options.quality * (this.#renderer.samplingScale ?? 1)],
+      16,
+    );
     v.set([this.bounds[1], this.bounds[3], this.bounds[5], this.#options.density], 20);
     v.set([mixCode(this.#options.mix), mixCode(this.#options.componentMix), 0, 0], 24);
     this.#sources.forEach((s, i) => {

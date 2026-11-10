@@ -6279,3 +6279,11 @@ Measured job 5 gzip: a11y 0 -> 6233 B, sciviz root 60026 -> 61010 B, format 7306
 Final integration: all 50 current scientific demo pages score 100. Rebased root 61327 B, a11y 6233 B, format 7598 B, spec 27443 B; core + stage 24209 B.
 
 The share viewer audit uses a complete LIGO share URL as its input; no missing-link error screen is substituted for a restored scientific figure.
+
+
+
+## Batch 181 job 5: progressive rendering
+
+Optional sciviz/progressive reduces moving dimensions (default 0.5) and ray/lighting integration (default 0.25); after 2 settling and 8 refinement frames it returns exactly to the original rendering path. Soft submitted-frame latency budget defaults to 16.7 ms and is not a deadline or throughput claim. Temporary nearest-reconstructed single-sample images have no scalar/image error guarantee. One controller per engine, one reduced colour/depth target per retained view, normal device texture limits. Native WebGPU and full WebGL2 compatibility are covered; native preview rejects before attachment. CPU-backed layers restore through their owners; external GPU-only sources retain the documented application recreation contract. Full policy and options: docs/sciviz-progressive.md. Core/stage source unchanged.
+
+New progressive entry: absent (0 B) to 4746 B min+gzip, ceiling 5002 B. The optional controller retains one target/depth/lifecycle owner and deterministic policy; splitting those parts would add orchestration without reducing the complete feature. Existing entry ceilings are retained. Core plus stage remains 24209 B.

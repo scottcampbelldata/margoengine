@@ -439,3 +439,6 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 - Batch 175 job 3: quiet-machine throughput for exact sciviz/aggregate at 100M rows and several bin dimensions, all five glyphs and both backends. Preserve all observations and binary64 exact sums; current proof records exhaustive row/bin tests, dispatches and staging bytes only. No timing gate or paired run was added during the build phase.
 
 - Batch 120 job 7: time the first install through the interactive frame for core/stage, each packed create-margo template (web, game, viz, React and Next), and the documented rival path on a quiet machine before release. Preserve scripts/template-install-check.mjs and template-browser-check.mjs scenes and the original 300 s quickstart budget where applicable; report per-step distributions and cold/warm cache conditions. During the build phase only dependency counts, module identity, builds and pixel correctness were run, with no timing assertion or paired benchmark.
+
+
+- Batch 181 job 5, sciviz/progressive: quiet-machine frame-budget response and motion/rest frame-time distributions on bricked EMDB and batch 173 cinematic EMDB/TCIA, both backends. Retain original quality at rest and record target pixels/integration work alongside timing. Deferred during build; no speed claim.

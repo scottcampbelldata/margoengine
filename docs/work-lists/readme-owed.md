@@ -1299,3 +1299,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 178 job 5): a11y attach/disposal, keyboard focus, native/custom complete table adapters, contrast/motion, explicit sonification, source precision and automated-audit limits.
 
 - margoengine and @margoengine/viz (batch 178 job 5): generated sciviz/a11y alias and explicit optional installation.
+
+
+- @margoengine/sciviz (batch 181 job 5): document /progressive controller, defaults, soft frame budget, moving/refined states, per-view target/sample policy, disposal, device restore/GPU source ownership and the real-data demo; README examples deferred.
+- margoengine (batch 181 job 5): document the generated sciviz/progressive alias; README examples deferred.
+
+- @margoengine/viz (batch 181 job 5): document the generated sciviz/progressive profile alias; README examples deferred.

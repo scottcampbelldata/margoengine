@@ -420,6 +420,7 @@ export interface ScatterLayerOptions {
 }
 
 export class SciRenderer implements EnginePlugin {
+    samplingScale: number;
     cpuIsosurface?: (data: Float32Array, level: number, options: {
         dims: readonly [number, number, number];
         maxTriangles: number;

@@ -136,3 +136,31 @@ test('progressive image resets on camera, classifier, source, model, clips and r
   );
   assert.throws(() => layer.configure({}), /disposed/);
 });
+
+test('progressive sampling changes shader integration counts without changing source or lighting options', () => {
+  const f = fixture();
+  const layer = new CinematicVolume(f.renderer, f.volume, {
+    ambientOcclusion: { directions: 8, steps: 12 },
+    shadows: { steps: 32 },
+    pathTracing: { samples: 64, bounces: 4 },
+  });
+  f.renderer.samplingScale = 0.25;
+  layer.prepare(f.context);
+  const reduced = f.uploads.at(-1);
+  assert.equal(reduced[60], 0.5);
+  assert.equal(reduced[63], 64, 'accumulation target retains its meaning');
+  assert.equal(reduced[64], 2);
+  assert.equal(reduced[66], 3);
+  assert.equal(reduced[71], 8);
+  assert.equal(reduced[74], 4, 'path bounce depth is unchanged');
+  f.renderer.samplingScale = 1;
+  layer.prepare(f.context);
+  const refined = f.uploads.at(-1);
+  assert.equal(refined[60], 2);
+  assert.equal(refined[64], 8);
+  assert.equal(refined[66], 12);
+  assert.equal(refined[71], 32);
+  assert.equal(f.volume.quality, 2);
+  assert.equal(layer.samples, 1, 'incompatible sample history is discarded');
+  layer.dispose();
+});

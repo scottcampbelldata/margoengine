@@ -122,7 +122,15 @@ export class TetrahedralVolume implements Drawable {
       throw rangeError('Tetrahedral quality and density must be finite and positive', 'sciviz');
     v.set(this.source.model);
     invertMatrix(this.source.model, v.subarray(16, 32));
-    v.set([this.#reference, this.source.quality, this.source.density, this.source.mode === 'mip' ? 1 : 0], 32);
+    v.set(
+      [
+        this.#reference,
+        this.source.quality * (this.#figure.renderer.samplingScale ?? 1),
+        this.source.density,
+        this.source.mode === 'mip' ? 1 : 0,
+      ],
+      32,
+    );
     v.set(this.source.classificationUniforms().slice(0, 4), 36);
     v.set([b[0], b[2], b[4], this.#mesh.nodes.length / 8], 40);
     const maximumSpan = Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]);

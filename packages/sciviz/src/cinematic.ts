@@ -254,11 +254,35 @@ export class CinematicVolume implements Drawable {
     const voxel = Math.min(...volume.dims.map((n, a) => Math.hypot(...volume.model.slice(a * 4, a * 4 + 3)) / (n - 1)));
     if (!(voxel > 0) || !Number.isFinite(voxel))
       throw rangeError('Cinematic volume transform must be invertible', 'sciviz');
-    v.set([volume.quality, volume.density, voxel, o.pathTracing ? (o.pathTracing.samples ?? 4096) : 1], 60);
+    v.set(
+      [
+        volume.quality * (this.#renderer.samplingScale ?? 1),
+        volume.density,
+        voxel,
+        o.pathTracing ? (o.pathTracing.samples ?? 4096) : 1,
+      ],
+      60,
+    );
     const ao = o.ambientOcclusion,
       pt = o.pathTracing;
-    v.set(ao ? [ao.directions ?? 8, ao.radius ?? 8, ao.steps ?? 8, 0] : [0, 0, 0, 0], 64);
-    v.set([...(o.lightDirection ?? [0.4, 0.6, 1]), o.shadows ? (o.shadows.steps ?? 32) : 0], 68);
+    v.set(
+      ao
+        ? [
+            Math.max(1, Math.round((ao.directions ?? 8) * (this.#renderer.samplingScale ?? 1))),
+            ao.radius ?? 8,
+            Math.max(1, Math.round((ao.steps ?? 8) * (this.#renderer.samplingScale ?? 1))),
+            0,
+          ]
+        : [0, 0, 0, 0],
+      64,
+    );
+    v.set(
+      [
+        ...(o.lightDirection ?? [0.4, 0.6, 1]),
+        o.shadows ? Math.max(1, Math.round((o.shadows.steps ?? 32) * (this.#renderer.samplingScale ?? 1))) : 0,
+      ],
+      68,
+    );
     v.set([0, pt ? (pt.anisotropy ?? 0) : 0, pt ? (pt.bounces ?? 8) : 0, pt ? (pt.albedo ?? 0.9) : 0], 72);
     v.set([...(o.ambient ?? [0.3, 0.3, 0.3]), 0], 76);
     v.set([...(o.light ?? [0.7, 0.7, 0.7]), 0], 80);

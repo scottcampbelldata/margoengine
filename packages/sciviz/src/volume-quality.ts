@@ -265,7 +265,7 @@ export class QualityVolume implements Drawable {
     const voxel = Math.min(...volume.dims.map((n, a) => Math.hypot(...volume.model.slice(a * 4, a * 4 + 3)) / (n - 1)));
     if (!(voxel > 0) || !Number.isFinite(voxel))
       throw rangeError('Quality volume needs an invertible transform', 'sciviz');
-    v.set([volume.quality, volume.density, volume.shading ? 1 : 0, voxel], 52);
+    v.set([volume.quality * (this.#renderer.samplingScale ?? 1), volume.density, volume.shading ? 1 : 0, voxel], 52);
     v.set(volume.classificationUniforms(), 56);
     v.fill(0, 64, 80);
     volume.clip.forEach((p, k) => v.set([...p.normal, p.offset], 64 + k * 4));

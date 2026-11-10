@@ -795,7 +795,15 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
     n[15] = 1;
     v.set(n, 32);
     v.set([this.dims[0], this.dims[1], this.dims[2], this.#clip.length], 48);
-    v.set([this.quality, this.mode === 'mip' ? 1 : 0, this.density, this.shading ? 1 : 0], 52);
+    v.set(
+      [
+        this.quality * (this.#renderer.samplingScale ?? 1),
+        this.mode === 'mip' ? 1 : 0,
+        this.density,
+        this.shading ? 1 : 0,
+      ],
+      52,
+    );
     v.fill(0, 56, 72);
     this.#clip.forEach((p, k) => v.set([...p.normal, p.offset], 56 + k * 4));
     const { brickSize, border } = this.plan,
