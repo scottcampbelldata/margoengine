@@ -3294,6 +3294,10 @@
       "types": "./dist/sciviz/transfer.d.ts",
       "import": "./dist/sciviz/transfer.js"
     },
+    "./sciviz/labels": {
+      "types": "./dist/sciviz/labels.d.ts",
+      "import": "./dist/sciviz/labels.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

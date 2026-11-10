@@ -1,0 +1,78 @@
+{
+  "source": "https://msd-for-monai.s3.us-west-2.amazonaws.com/Task01_BrainTumour.tar",
+  "dataset": "Medical Segmentation Decathlon Task01_BrainTumour, BRATS_457",
+  "citation": "Antonelli et al., The Medical Segmentation Decathlon, Nature Communications 13, 4128 (2022), https://doi.org/10.1038/s41467-022-30695-9",
+  "license": "CC-BY-SA-4.0",
+  "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "demoOnly": true,
+  "originalImageSHA256": "9860667a745293f449e0885e95fc5627f4f65efd52597ff7d1c41801c9bc34fc",
+  "originalLabelSHA256": "ab30e8774ef7a679531eb95dec3adb8aa9aef0e109c0207eb4d435da184c4249",
+  "dims": [
+    60,
+    60,
+    39
+  ],
+  "originalDims": [
+    240,
+    240,
+    155
+  ],
+  "transform": [
+    236,
+    0,
+    0,
+    0,
+    0,
+    236,
+    0,
+    0,
+    0,
+    0,
+    152,
+    0,
+    0,
+    0,
+    0,
+    1
+  ],
+  "stride": [
+    4,
+    4,
+    4
+  ],
+  "reduction": "Retain original voxel samples at stride 4 on every axis, no interpolation or intensity scaling. Interleave four modalities; gzip little-endian float32. Labels are gzip uint8. Output data remains CC BY-SA 4.0; engine source is independently authored.",
+  "modalities": {
+    "0": "FLAIR",
+    "1": "T1w",
+    "2": "t1gd",
+    "3": "T2w"
+  },
+  "labels": {
+    "0": "background",
+    "1": "edema",
+    "2": "non-enhancing tumor",
+    "3": "enhancing tumour"
+  },
+  "ranges": [
+    [
+      0,
+      801
+    ],
+    [
+      0,
+      1124
+    ],
+    [
+      0,
+      350
+    ],
+    [
+      0,
+      866
+    ]
+  ],
+  "imageSHA256": "8c0b8327791b273c7d1fe9e637a5b433199fa116300481c2246ff5f0ada34951",
+  "labelSHA256": "cde7ecf4341fae2e0f1d0466d14777885ddc29a701fe147a1b905552c6ebd839",
+  "imageBytes": 180024,
+  "labelBytes": 661
+}

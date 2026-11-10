@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13654757,
+  "total": 13661305,
   "history": [
     {
       "date": "2026-10-24",
@@ -7115,6 +7115,12 @@
       "commit": "e0c40332b",
       "reason": "Batch 269 adds optional stereo and half-dome video projection; no core or stage changes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-173-labels",
+      "reason": "Batch 173 job 2: optional sciviz/labels 0 to 6292 B min+gzip, ceiling 6548 B. Categorical palettes, nearest IDs/pixel outlines, RGB/RGBA, component functions, affine registration and sample mixing share one march/lifecycle. Splitting duplicates ownership. Root stays 52045 B; core+stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8402,6 +8408,7 @@
     "margoengine/web": 577,
     "@margoengine/voxel-net/rooms": 19966,
     "@margoengine/kinematics-constraints/joint-limits": 1468,
-    "@margoengine/video/dome": 2026
+    "@margoengine/video/dome": 2026,
+    "@margoengine/sciviz/labels": 6548
   }
 }
