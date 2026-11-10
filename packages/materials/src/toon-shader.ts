@@ -1,5 +1,7 @@
 // Toon shading: Lambert's diffuse with n.l replaced by a ramp. The ramp's coordinate is the
-// half-Lambert u = n.l * 0.5 + 0.5 (Mitchell, McTaggart and Green 2006, "Shading in Valve's Source Engine"), so the
+// half-Lambert u = n.l * 0.5 + 0.5 with Team Fortress 2's exponent 1 (Mitchell, Francke and Eng 2007, "Illustrative
+// Rendering in Team Fortress 2", Eq. 1 with alpha = beta = 0.5, gamma = 1; Half-Life's form in Mitchell, McTaggart and
+// Green 2006 also squares it, which a gradient map can still do), so the
 // whole sphere of normals maps onto [0, 1]: a gradient map's RGB at (u, 0.5), or `steps` flat bands, band k of n
 // holding k / (n - 1), which is what a nearest-filtered gradient of n texels ramping 0 to 1 gives. The sun, clustered
 // point, spot and directional lights all go through the ramp; the hemisphere, an IBL ambient and baked light stay the
@@ -9,7 +11,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { clusterBrdf } from '../../shared/light-terms.js';
 
 /** Module-scope WGSL of the toon ramp in bind group `group`. */
-// Ramp lookup on half-Lambert n.l x 0.5 + 0.5: Mitchell, McTaggart and Green 2006 ("Shading in Valve's Source Engine").
+// Ramp lookup on half-Lambert n.l x 0.5 + 0.5, unsquared: the warp w() of Mitchell, Francke and Eng 2007 (NPAR), Eq. 1.
 export const toonDeclarations = (group: number): string => `@group(${group}) @binding(191) var<uniform> margoToon:vec4f;
 @group(${group}) @binding(192) var margoToonMap:texture_2d<f32>;
 @group(${group}) @binding(193) var margoToonSampler:sampler;

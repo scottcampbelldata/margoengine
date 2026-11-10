@@ -19,7 +19,7 @@ for (const compat of [false, true]) {
       }
       await page.waitForFunction(() => window.furDraft);
       const image = async (label) => {
-        const bytes = await page.locator('canvas').screenshot();
+        const bytes = await page.locator('canvas').first().screenshot();
         await writeFile(
           `test-results/batch184/fur/${compat ? 'compat' : 'native'}-${single ? 1 : 4}x-${label}.png`,
           bytes,
@@ -41,6 +41,24 @@ for (const compat of [false, true]) {
           }
         return { changed, max };
       };
+      // Root coverage: the share of a flat shell's area its strands cover is the coverage option, also above pi / 4
+      // (where a disc no longer fits its cell) and near the cell edges (where the old jitter cut discs short).
+      const covered = async (c) => {
+        await page.evaluate(() => window.furDraft.coverage(0));
+        const empty = (await decodePNG(await page.locator('#coverage').screenshot())).data;
+        await page.evaluate((v) => window.furDraft.coverage(v), c);
+        const shot = (await decodePNG(await page.locator('#coverage').screenshot())).data;
+        let hit = 0;
+        for (let k = 0; k < shot.length; k += 4)
+          hit += +(
+            Math.abs(shot[k] - empty[k]) + Math.abs(shot[k + 1] - empty[k + 1]) + Math.abs(shot[k + 2] - empty[k + 2]) >
+            96
+          );
+        return hit / (shot.length / 4);
+      };
+      const coverage = { 0.3: await covered(0.3), 0.65: await covered(0.65), 1: await covered(1) };
+      for (const [c, share] of Object.entries(coverage))
+        assert.ok(Math.abs(share - Number(c)) < 0.015, `coverage ${c} covers ${share.toFixed(4)} of the shell`);
       const full = await render({ length: 0.3 }, 'full');
       const short = await render({ length: 0.05 }, 'short');
       const length = difference(full, short);
@@ -85,6 +103,7 @@ for (const compat of [false, true]) {
         resetExact: true,
         restoreExact: true,
         caster: true,
+        coverage,
       });
     }
     assert.deepEqual(errors, []);

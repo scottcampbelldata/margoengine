@@ -71,12 +71,31 @@ fn margoFurMove(n:vec3f,uv:vec2f)->vec3f {
 fn margoFurCoverage(uv:vec2f)->f32 {
   let layer=margoFur.shape.x;if(layer<=0.0){return 1.0;}
   if(margoFur.shape.z<=0.0){return 0.0;}let cell=uv*margoFur.shape.z;let base=floor(cell);let random=margoFurHash(base);
-  let center=vec2f(margoFurHash(base+vec2f(97,13)),margoFurHash(base+vec2f(7,157)))*0.3+0.35;
+  // shape.w is the root radius (furRootRadius); the centre moves only as far as keeps that disc inside its cell.
+  let center=0.5+(vec2f(margoFurHash(base+vec2f(97,13)),margoFurHash(base+vec2f(7,157)))-0.5)*max(1.0-2.0*margoFur.shape.w,0.0);
   let height=0.35+0.65*random;
-  let radius=sqrt(margoFur.shape.w/3.14159265)*max(1.0-layer/height,0.0);
+  let radius=margoFur.shape.w*max(1.0-layer/height,0.0);
   return select(0.0,1.0,layer<height&&distance(fract(cell),center)<radius);
 }
 `;
+/**
+ * The root radius, in cell widths, of a strand disc covering `coverage` of its unit cell. Up to pi / 4 that is
+ * sqrt(coverage / pi) and the disc fits the cell; above it the disc is centred and its corners are cut by the cell's
+ * sides, so its area is pi r^2 less four circular segments r^2 acos(1 / 2r) - (1 / 2) sqrt(r^2 - 1 / 4), solved by
+ * bisection up to r = sqrt(2) / 2, where the cell is covered.
+ */
+function furRootRadius(coverage: number): number {
+  if (coverage <= Math.PI / 4) return Math.sqrt(coverage / Math.PI);
+  const area = (r: number) => Math.PI * r * r - 4 * (r * r * Math.acos(0.5 / r) - 0.5 * Math.sqrt(r * r - 0.25));
+  let low = 0.5,
+    high = Math.SQRT1_2;
+  for (let k = 0; k < 40; k++) {
+    const mid = (low + high) / 2;
+    if (area(mid) < coverage) low = mid;
+    else high = mid;
+  }
+  return high;
+}
 let serial = 0;
 /**
  * One displaced, cut-out shell of a fur volume. createFur makes a complete stack. PBR maps and lighting stay native;
@@ -125,7 +144,7 @@ export class FurMaterial extends Material {
       o.layer,
       o.length,
       o.density,
-      o.coverage,
+      furRootRadius(o.coverage),
       ...o.gravity,
       0,
       ...o.wind,

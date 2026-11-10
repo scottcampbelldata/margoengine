@@ -46,7 +46,10 @@ export interface NormalMapNode {
   scale?: ValueNode;
   texCoord?: 0 | 1;
 }
-/** Scalar inputs use their value; vec4 inputs use roughness G and metal B. */
+/**
+ * Scalar inputs use their value; vec4 inputs use roughness G and metal B. Missing roughness means 1; missing metal means
+ * 0 without a texture and 1 (the texture's B alone) with one. Roughness is kept within 0.045 to 1, metal within 0 to 1.
+ */
 export interface MetalRoughNode {
   type: 'metalRough';
   roughness?: ValueNode;
