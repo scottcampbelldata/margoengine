@@ -53,6 +53,10 @@
     "./gl": {
       "types": "./dist/gl.d.ts",
       "import": "./dist/gl.js"
+    },
+    "./panels": {
+      "types": "./dist/panels.d.ts",
+      "import": "./dist/panels.js"
     }
   },
   "files": [

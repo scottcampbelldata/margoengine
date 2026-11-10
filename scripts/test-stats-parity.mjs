@@ -12,6 +12,7 @@ try {
     const { GeometryStats } = await import('/packages/stats/dist/geometry.js');
     const { GLStats } = await import('/packages/stats/dist/gl.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
+    const { StatsPanels } = await import('/packages/stats/dist/panels.js');
     const check = (ok, message) => {
       if (!ok) throw new Error(message);
     };
@@ -24,6 +25,7 @@ try {
       document.body.append(canvas);
       const engine = await EngineKernel.create(canvas, {
         backend,
+        features: ['timestamp-query'],
         fallback: webglRenderer,
         camera: { position: [0, 0, 6], target: [0, 0, 0] },
       });
@@ -78,6 +80,63 @@ try {
           );
           results.glTiming = timing;
         }
+        glStats?.dispose();
+        geometry.dispose();
+        const panels = StatsPanels.attach(engine, { samples: 64 });
+        const runtime = engineRuntime(engine);
+        let buffer;
+        if (runtime.gpu) {
+          const device = runtime.gpu;
+          buffer = device.createBuffer({ size: 4096, usage: GPUBufferUsage.COPY_DST });
+          const module = device.createShaderModule({ code: '@compute @workgroup_size(1) fn main() {}' });
+          const pipeline = device.createComputePipeline({ layout: 'auto', compute: { module } });
+          runtime.frameGraph.add({
+            name: 'panel-compute',
+            order: 2,
+            execute: (context) => {
+              const pass = context.encoder.beginComputePass({ label: 'panel-compute' });
+              pass.setPipeline(pipeline);
+              pass.dispatchWorkgroups(1);
+              pass.end();
+            },
+          });
+        } else
+          runtime.frameGraph.add({
+            name: 'panel-post',
+            order: 3,
+            execute: (context) => {
+              context.gl.clear(context.gl.DEPTH_BUFFER_BIT);
+            },
+          });
+        try {
+          engine.start();
+          for (let i = 0; i < 48; i++) await new Promise(requestAnimationFrame);
+          engine.stop();
+          panels.refresh();
+          const history = panels.toJSON();
+          check(
+            history.fps.length >= 30 && history.cpuMilliseconds.every((value) => value >= 0),
+            backend + ': CPU/FPS histories',
+          );
+          check(
+            history.gpuMilliseconds.some((value) => value !== null),
+            backend + ': GPU history',
+          );
+          check(
+            history.memoryBytes.some((value) => value !== null && value > 0),
+            backend + ': memory history',
+          );
+          const expected = backend === 'webgpu' ? 'panel-compute' : 'panel-post';
+          check(
+            history.passes.some((pass) => pass.name === expected),
+            backend + ': named panel GPU pass',
+          );
+          check(panels.element.querySelectorAll('canvas[role="img"]').length === 4, backend + ': four labelled graphs');
+          results[backend + 'Panels'] = history;
+        } finally {
+          panels.dispose();
+          buffer?.destroy();
+        }
       } finally {
         glStats?.dispose();
         geometry.dispose();
@@ -85,9 +144,26 @@ try {
         canvas.remove();
       }
     }
+    const review = new StatsPanels({ samples: 64 });
+    const history = results.webgpuPanels;
+    for (let i = 0; i < history.fps.length; i++)
+      review.sample({
+        fps: history.fps[i],
+        cpuMilliseconds: history.cpuMilliseconds[i],
+        gpuMilliseconds: history.gpuMilliseconds[i],
+        memoryBytes: history.memoryBytes[i],
+        passes: history.passes,
+      });
+    review.refresh();
+    window.__panelsReview = review;
     return results;
   });
   assert.deepEqual(errors, []);
+  await browser.page.screenshot({ path: 'test-results/stats-panels-hardware.png' });
+  await browser.page.evaluate(() => {
+    window.__panelsReview.dispose();
+    delete window.__panelsReview;
+  });
   console.log(JSON.stringify({ hardware: browser.hardware, proof }, null, 2));
 } finally {
   await browser.close();

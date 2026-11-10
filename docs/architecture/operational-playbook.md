@@ -5651,3 +5651,7 @@ attachment and runtime-access boundaries. Packed duplicate installs and stale bu
 are rejected with linked code `version`; matching imports remain identical. Core/stage 23950 to
 24209 B, unchanged 25000 B limit. Core 21584 -> 21775 B (+191 B); the core-only ratchet
 remains at the final measured size. Optional ceiling receipts are in docs/limits.md. [Design and research](../core-version-guard.md).
+
+### Section 5 evidence: Stats panels (batch 264)
+
+Four histories keep CPU work, frame cadence, GPU execution and memory source distinct. The optional entry composes existing collectors and keeps WebGPU pass labels with their timestamp slots; it never changes core, stage or backend implementations. Native evidence covers both renderers and a named compute pass, query availability, DOM graphs and memory; CPU evidence covers foreign timestamp ownership, unsupported devices, missing-data graphs and scene/disposal ownership. The hardware screenshot has been visually reviewed. Remaining naming and chart polish is tracked privately for the finish phase.

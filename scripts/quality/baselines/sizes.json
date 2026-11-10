@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12441007,
+  "total": 12451199,
   "history": [
     {
       "date": "2026-10-24",
@@ -5983,6 +5983,12 @@
       "commit": "version-guard",
       "reason": "XR rebase: unguarded 8965 B, guarded 9041 B. Apply the same exact 191 B version-guard allowance to its 8967 B ceiling, now 9158 B; the engine identity check and attachment declaration cannot split without losing the package build identity. Core/stage remain 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-264",
+      "reason": "@margoengine/stats/panels: optional Stats parity entry, 0 to 9895 B gzip; full collector ownership and native graphs, separate from root and core/stage.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7077,6 +7083,7 @@
     "@margoengine/xr/ar-extra": 3289,
     "@margoengine/html/inline": 2744,
     "@margoengine/wfc/assemble": 1721,
-    "@margoengine/xr/performance": 1582
+    "@margoengine/xr/performance": 1582,
+    "@margoengine/stats/panels": 10192
   }
 }

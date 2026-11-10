@@ -223,3 +223,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | CORE_VERSION re-export and version-skew errors across umbrella and scoped imports. | version-guard |
 
 | @margoengine/xr | Core version guard declarations at XR attachment boundaries. | version-guard |
+
+- @margoengine/stats: document /panels attach and custom samples, four metric sources, defaults, units/averages/peaks, GPU pass names and async cadence, memory scope, null gaps, borrowed versus owned Stats and disposal.
+- margoengine: document /stats/panels alias.

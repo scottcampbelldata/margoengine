@@ -3292,3 +3292,5 @@ linked MargoError before plugin setup/registration/disposal; the packed regressi
 packages/core/tests/version-guard.test.js. The emitter regression is tests/core-requirements.test.js.
 The packed and single-output bundled cases distinguish runtime identities even at one output URL.
 [Scope and sources](../core-version-guard.md).
+
+- Stats panels (batch 264): four rolling FPS, CPU-work, completed-GPU and labelled-memory graphs with averages/peaks and a named GPU pass list on both backends. Proof: packages/stats/test/panels.test.js, panel-gpu.test.js, scene-owner.test.js and scripts/test-stats-parity.mjs. WebGPU render/compute labels stay paired with the completed query slots; unsupported readings remain missing. No speed, complete-process-memory or presentation-latency claim.

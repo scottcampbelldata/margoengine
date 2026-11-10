@@ -3158,6 +3158,10 @@
       "types": "./dist/stats/gl.d.ts",
       "import": "./dist/stats/gl.js"
     },
+    "./stats/panels": {
+      "types": "./dist/stats/panels.d.ts",
+      "import": "./dist/stats/panels.js"
+    },
     "./taa": {
       "types": "./dist/taa.d.ts",
       "import": "./dist/taa.js"
@@ -3966,6 +3970,10 @@
       "types": "./dist/xr/ar-extra.d.ts",
       "import": "./dist/xr/ar-extra.js"
     },
+    "./xr/performance": {
+      "types": "./dist/xr/performance.d.ts",
+      "import": "./dist/xr/performance.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
@@ -3977,10 +3985,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./xr/performance": {
-      "types": "./dist/xr/performance.d.ts",
-      "import": "./dist/xr/performance.js"
     }
   },
   "dependencies": {

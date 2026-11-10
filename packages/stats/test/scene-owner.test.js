@@ -6,12 +6,18 @@ import { Stats } from '../dist/index.js';
 import { FrameBeacon } from '../dist/beacon.js';
 import { PipelineCompiles } from '../dist/compile.js';
 import { FramePhases } from '../dist/phases.js';
+import { GeometryStats } from '../dist/geometry.js';
+import { GLStats } from '../dist/gl.js';
+import { StatsPanels } from '../dist/panels.js';
 
 const cases = [
   ['Stats', (parent) => new Stats({ parent })],
   ['FrameBeacon', () => new FrameBeacon({ endpoint: 'https://example.test/frames', intervalMilliseconds: 0 })],
   ['PipelineCompiles', () => new PipelineCompiles()],
   ['FramePhases', () => new FramePhases()],
+  ['GeometryStats', () => new GeometryStats()],
+  ['GLStats', () => new GLStats()],
+  ['StatsPanels', (parent) => new StatsPanels({ parent })],
 ];
 
 for (const [name, make] of cases)
@@ -29,7 +35,13 @@ for (const [name, make] of cases)
         plugin = make(dom.window.document.body);
       scene.use(plugin);
       let defaultDisposals = 0;
-      const primary = { name: plugin.name, setup() {}, dispose() { defaultDisposals++; } };
+      const primary = {
+        name: plugin.name,
+        setup() {},
+        dispose() {
+          defaultDisposals++;
+        },
+      };
       engine.use(primary);
       plugin.onDeviceRestored?.(engine);
       assert.equal(engine.sceneOf(plugin), scene);

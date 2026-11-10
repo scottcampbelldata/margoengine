@@ -2784,3 +2784,5 @@ Core version guard: build packages, then run `node --test --test-timeout=120000 
 The packed test extracts the same npm tarball to two real installation paths and also supplies a
 stale build requirement; it needs npm and tar, uses no network, and cleans its own worktree scratch.
 Run `npm run measure:size` for the unchanged 25000 B core/stage limit.
+
+- Stats panels: build packages; run `node --test packages/stats/test/panels.test.js packages/stats/test/panel-gpu.test.js packages/stats/test/scene-owner.test.js`. Run the shared-lock Stats parity script above on the native GPU. It requests timestamp-query, renders 48 frames per backend, checks four histories and named compute/post pass samples, and saves test-results/stats-panels-hardware.png for visual inspection. Durations are observations only; there are no speed thresholds.
