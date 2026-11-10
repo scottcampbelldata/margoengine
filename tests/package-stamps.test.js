@@ -70,6 +70,39 @@ test('a changed source file, shared module or build tool makes the right package
   assert.deepEqual(stalePackages(root), []);
 });
 
+// Regression (2026-11-10): the stamp hashed a fixed list of build tools and only each package's own tsconfig.json, so a
+// change to a helper module a build tool imports, to a script a package's build command runs, or to the tsconfig.json a
+// package extends (92 packages extend packages/gltf/tsconfig.json) left the old dist looking current, and the API report
+// read declarations built from other sources.
+test('a build helper, a package build script outside the package or an extended tsconfig makes the right packages stale', (t) => {
+  const { root, write, built, cleanup } = fixture();
+  t.after(cleanup);
+  write('scripts/build-modern.js', "import { helper } from './helper.js';\n");
+  write('scripts/helper.js', "export const helper = 'v1';\n");
+  write('scripts/build-optional.js', "import './optional-helper.mjs';\n");
+  write('scripts/optional-helper.mjs', '// v1\n');
+  write(
+    'packages/c/package.json',
+    JSON.stringify({
+      name: '@margoengine/c',
+      scripts: { build: 'node ../../scripts/build-optional.js c' },
+      exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+    }),
+  );
+  write('packages/a/tsconfig.json', JSON.stringify({ compilerOptions: { strict: true } }));
+  write('packages/c/tsconfig.json', JSON.stringify({ extends: '../a/tsconfig.json', include: ['src'] }));
+  built();
+  assert.deepEqual(stalePackages(root), []);
+  write('scripts/helper.js', "export const helper = 'v2';\n");
+  assert.deepEqual(stalePackages(root), ['a', 'b', 'c'], 'a module build-modern imports');
+  built();
+  write('scripts/optional-helper.mjs', '// v2\n');
+  assert.deepEqual(stalePackages(root), ['c'], "a module c's build command loads");
+  built();
+  write('packages/a/tsconfig.json', JSON.stringify({ compilerOptions: { strict: false } }));
+  assert.deepEqual(stalePackages(root), ['a', 'b', 'c'], 'c extends the tsconfig.json of a without depending on a');
+});
+
 test('a package with no stamp, or a cleared one, is stale', (t) => {
   const { root, built, cleanup } = fixture();
   t.after(cleanup);

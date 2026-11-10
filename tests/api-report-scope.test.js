@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
+  gzipCell,
   mergeScopedApiSurface,
   packageMatchesApiReportScope,
   parseApiReportArguments,
+  refreshApiSurfaceGzip,
+  refreshSurfaceGzip,
 } from '../scripts/api-report-scope.mjs';
 
 test('API report scope requires an explicit package for an entry and rejects unknown arguments', () => {
@@ -41,8 +47,48 @@ test('a scoped API update changes only its package row and the aggregate summary
   });
 
   assert.match(after, /^2 packages, 4 entries, 22 exported names\.$/m);
-  assert.match(after, /^\| @margoengine\/biomes \| `\.` 4, `\.\/disturbance` 12 \| 2 \|  \| 100 \|$/m);
+  // The row is the one the full run writes, Gzip included (it once kept the old figure, so a scoped check passed on it).
+  assert.match(after, /^\| @margoengine\/biomes \| `\.` 4, `\.\/disturbance` 12 \| 2 \|  \| 999 \|$/m);
   assert.equal(after.split('\n').filter((line) => line === scatter).length, 1);
+});
+
+// Regression (2026-11-10): the Gzip column is entry-sizes.json's root-entry figure, but entry-sizes.mjs rewrote that
+// record without touching docs/api-surface.md and a scoped report kept every old Gzip cell. A lane that measured sizes
+// after its api:check pushed 72 stale cells (f235e21f0) and main's own api:check failed until someone regenerated it.
+test('the Gzip column follows entry-sizes.json, and measuring sizes rewrites it', (t) => {
+  const surface = [
+    '2 packages, 2 entries, 7 exported names.',
+    '',
+    '| Package | Exports per entry | Unexported | `any` | Gzip |',
+    '| --- | --- | ---: | ---: | ---: |',
+    '| @margoengine/biomes | `.` 4 | 1 |  | 100 |',
+    '| @margoengine/scatter | `.` 3 | 9 |  | 200 |',
+    '',
+  ].join('\n');
+  const sizes = { packages: { '@margoengine/biomes': { '.': { gzip: 1234 } }, '@margoengine/scatter': {} } };
+  assert.equal(gzipCell(sizes, '@margoengine/biomes'), '1,234');
+  assert.equal(gzipCell(sizes, '@margoengine/scatter'), '');
+  const refreshed = refreshSurfaceGzip(surface, sizes);
+  assert.match(refreshed, /^\| @margoengine\/biomes \| `\.` 4 \| 1 \|  \| 1,234 \|$/m);
+  assert.match(refreshed, /^\| @margoengine\/scatter \| `\.` 3 \| 9 \|  \|  \|$/m);
+  assert.equal(refreshSurfaceGzip(refreshed.replaceAll('\n', '\r\n'), sizes), refreshed.replaceAll('\n', '\r\n'));
+
+  const root = mkdtempSync(join(tmpdir(), 'margo-surface-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'docs'));
+  mkdirSync(join(root, 'examples/package-benchmarks/results'), { recursive: true });
+  writeFileSync(join(root, 'docs/api-surface.md'), surface);
+  writeFileSync(join(root, 'examples/package-benchmarks/results/entry-sizes.json'), JSON.stringify(sizes));
+  refreshApiSurfaceGzip(root);
+  assert.equal(readFileSync(join(root, 'docs/api-surface.md'), 'utf8'), refreshed);
+
+  const measure = readFileSync(new URL('../examples/package-benchmarks/entry-sizes.mjs', import.meta.url), 'utf8')
+    .replaceAll('\r\n', '\n');
+  assert.match(
+    measure,
+    /await writeFile\(resolve\(import\.meta\.dirname, 'results\/entry-sizes\.json'\)[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*refreshApiSurfaceGzip\(root\);/,
+    'entry-sizes.mjs rewrites the Gzip column right after it writes the record',
+  );
 });
 
 test('scoped API updates reject unresolved boundaries before they can split the table and duplicate package rows', () => {
@@ -63,7 +109,6 @@ test('scoped API updates reject unresolved boundaries before they can split the 
       assert.throws(() => mergeScopedApiSurface(text, replacement), /unresolved merge boundary.*npm run api:update/);
   }
 });
-import { readFileSync } from 'node:fs';
 test('committed API totals include every package table row and the umbrella exports', () => {
   const text = readFileSync(new URL('../docs/api-surface.md', import.meta.url), 'utf8');
   const summary = text.match(/^(\d+) packages, (\d+) entries, (\d+) exported names\.$/m);

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 export function parseApiReportArguments(arguments_) {
   let update = false;
   let packageSelector;
@@ -51,7 +54,7 @@ export function mergeScopedApiSurface(current, replacement) {
   const rowIndex = lines.findIndex((line, index) => index >= firstRow && index < endRow && line.startsWith(prefix));
   const previous = rowIndex < 0 ? { entries: 0, exports: 0 } : rowCounts(lines[rowIndex]);
 
-  if (rowIndex >= 0) lines[rowIndex] = preserveGzip(lines[rowIndex], replacement.row);
+  if (rowIndex >= 0) lines[rowIndex] = replacement.row;
   else {
     const insertAt = lines.findIndex(
       (line, index) => index >= firstRow && index < endRow && packageName(line) > replacement.packageName,
@@ -66,13 +69,42 @@ export function mergeScopedApiSurface(current, replacement) {
   return lines.join('\n');
 }
 
-function preserveGzip(previousRow, replacementRow) {
-  const previous = previousRow.split('|');
-  const replacement = replacementRow.split('|');
-  if (previous.length !== 7 || replacement.length !== 7)
-    throw new Error(`Unrecognized API surface package row: ${previousRow}`);
-  replacement[5] = previous[5];
-  return replacement.join('|');
+// The Gzip column of docs/api-surface.md is the root entry's min+gzip bytes from the committed entry-sizes.json, not a
+// figure of its own. Bug (2026-11-10): a scoped report kept every old Gzip cell (its own row's too) and entry-sizes.mjs
+// rewrote the record without touching the column, so a lane that measured sizes after its api:check, or checked one
+// package, pushed stale cells (72 of them in f235e21f0) and main's own api:check failed. Now both write the column from
+// the record, the same way the full report does.
+export const ENTRY_SIZES = 'examples/package-benchmarks/results/entry-sizes.json';
+export const API_SURFACE = 'docs/api-surface.md';
+
+/** A package row's Gzip cell: its root entry's gzip bytes in `sizes` (entry-sizes.json), or empty. */
+export function gzipCell(sizes, packageName) {
+  const gzip = sizes?.packages?.[packageName]?.['.']?.gzip;
+  return gzip ? gzip.toLocaleString('en-US') : '';
+}
+
+/** docs/api-surface.md text with every package row's Gzip cell set from `sizes`; everything else (line ends too) kept. */
+export function refreshSurfaceGzip(text, sizes) {
+  return text
+    .split('\n')
+    .map((line) => {
+      if (!/^\| (?:@margoengine\/[^|]+|margoengine) \|/.test(line)) return line;
+      const cells = line.split('|');
+      if (cells.length !== 7) throw new Error(`Unrecognized API surface package row: ${line}`);
+      cells[5] = ` ${gzipCell(sizes, cells[1].trim())} `;
+      return cells.join('|');
+    })
+    .join('\n');
+}
+
+/** Rewrites the Gzip column of `root`/docs/api-surface.md from `root`'s entry-sizes.json; no write when it matches. */
+export function refreshApiSurfaceGzip(root) {
+  const surfacePath = join(root, API_SURFACE),
+    sizesPath = join(root, ENTRY_SIZES);
+  if (!existsSync(surfacePath) || !existsSync(sizesPath)) return;
+  const text = readFileSync(surfacePath, 'utf8'),
+    refreshed = refreshSurfaceGzip(text, JSON.parse(readFileSync(sizesPath, 'utf8')));
+  if (refreshed !== text) writeFileSync(surfacePath, refreshed);
 }
 
 function rowCounts(row) {

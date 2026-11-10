@@ -1277,6 +1277,16 @@ The byte ceilings above are approved; all normal checks are required before push
 
 ## Checks
 
+### The KTX2 HDR 6x6 decoder's lazy files are missing from the sizes page
+
+- **What:** `tests/sizes-page.test.js` "sizes page lists every file loaded later" fails on main since 9de13807a:
+  `packages/decoders/dist/hdr6.wasm` and `packages/decoders/dist/hdr6.worker.js` are built and loaded lazily but are not in
+  `scripts/lazy-files.js`, so entry-sizes.json and margoengine.com/sizes.html do not measure them. Found 2026-11-10 by the
+  api:check stamp fix (9694f64ac tree).
+- **Repro:** `npm run build:packages`, then `node --test tests/sizes-page.test.js`.
+- **Needed to close:** two `LAZY_FILES` rows for the decoders `./ktx2-hdr6` entry (owner: the decoders lane), then
+  `node examples/package-benchmarks/entry-sizes.mjs`.
+
 ### SSAO's orthographic picture moves with the eye
 
 - **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the

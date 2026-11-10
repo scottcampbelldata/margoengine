@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { CORE_STAGE_GZIP_LIMIT } from '../../scripts/core-budget.js';
 import { LAZY_FILES, LAZY_SPLITS } from '../../scripts/lazy-files.js';
+import { refreshApiSurfaceGzip } from '../../scripts/api-report-scope.mjs';
 import { bundleBytes as bundle, bundleSplit, measureCoreStage } from '../../scripts/measure-size.js';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -98,4 +99,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     dirty = git('status', '--porcelain', '--', 'packages') !== '';
   const report = { commit, dirty, ...(await measureEntries()) };
   await writeFile(resolve(import.meta.dirname, 'results/entry-sizes.json'), JSON.stringify(report, null, 2) + '\n');
+  // docs/api-surface.md's Gzip column is this record's root-entry figures: rewrite it with the record, never in a later
+  // step a lane can skip (scripts/api-report-scope.mjs).
+  refreshApiSurfaceGzip(root);
 }

@@ -24,7 +24,14 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isUmbrellaAlias } from './umbrella.mjs';
-import { mergeScopedApiSurface, packageMatchesApiReportScope, parseApiReportArguments } from './api-report-scope.mjs';
+import {
+  ENTRY_SIZES,
+  gzipCell,
+  mergeScopedApiSurface,
+  packageMatchesApiReportScope,
+  parseApiReportArguments,
+  refreshSurfaceGzip,
+} from './api-report-scope.mjs';
 import { createGlobalReports } from './api-report-globals.mjs';
 import { stalePackages } from './package-stamps.mjs';
 import { execFileSync } from 'node:child_process';
@@ -360,13 +367,18 @@ function stripComments(text) {
 // Write or compare.
 const selectedReports = reports.flat().filter((item) => !entrySelector || item.entry.subpath === entrySelector);
 const expected = new Map(selectedReports.map((item) => [item.entry.report, item.text]));
+// A scoped run also sets every row's Gzip cell from entry-sizes.json, as the full run does: those cells need no build, and
+// a scoped check that kept them passed on 72 stale cells (f235e21f0).
 const summary = scopedPackage
-  ? mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
-      packageName: scopedPackage.name,
-      row: surfaceRow(reports[0]),
-      entries: reports[0].length,
-      exports: reports[0].reduce((sum, item) => sum + item.counts.exports, 0),
-    })
+  ? refreshSurfaceGzip(
+      mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
+        packageName: scopedPackage.name,
+        row: surfaceRow(reports[0]),
+        entries: reports[0].length,
+        exports: reports[0].reduce((sum, item) => sum + item.counts.exports, 0),
+      }),
+      entrySizes(),
+    )
   : surface();
 if (update) {
   mkdirSync(apiDir, { recursive: true });
@@ -451,9 +463,13 @@ function diff(a, b) {
     .join('\n');
 }
 
+function entrySizes() {
+  const sizesFile = join(root, ENTRY_SIZES);
+  return existsSync(sizesFile) ? JSON.parse(readFileSync(sizesFile, 'utf8')) : {};
+}
+
 function surface() {
-  const sizesFile = join(root, 'examples', 'package-benchmarks', 'results', 'entry-sizes.json');
-  const sizes = existsSync(sizesFile) ? JSON.parse(readFileSync(sizesFile, 'utf8')) : {};
+  const sizes = entrySizes();
   const rows = reports.map((entries) => surfaceRow(entries, sizes));
   return [
     '# Public API surface',
@@ -477,11 +493,9 @@ function surface() {
 }
 
 function surfaceRow(entries, providedSizes) {
-  const sizesFile = join(root, 'examples', 'package-benchmarks', 'results', 'entry-sizes.json');
-  const sizes = providedSizes ?? (existsSync(sizesFile) ? JSON.parse(readFileSync(sizesFile, 'utf8')) : {});
+  const sizes = providedSizes ?? entrySizes();
   const { pkg } = entries[0];
   const list = entries.map((item) => `\`${item.entry.subpath}\` ${item.counts.exports}`).join(', ');
   const sum = (field) => entries.reduce((total, item) => total + item.counts[field], 0);
-  const gzip = sizes.packages?.[pkg.name]?.['.']?.gzip;
-  return `| ${pkg.name} | ${list} | ${sum('unexported') || ''} | ${sum('any') || ''} | ${gzip ? gzip.toLocaleString('en-US') : ''} |`;
+  return `| ${pkg.name} | ${list} | ${sum('unexported') || ''} | ${sum('any') || ''} | ${gzipCell(sizes, pkg.name)} |`;
 }
