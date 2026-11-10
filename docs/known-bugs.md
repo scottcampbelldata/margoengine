@@ -4732,3 +4732,4 @@ Batch 203 gate discovery: node scripts/gpu-package-tests.mjs --no-build --only=d
 Batch 240 job 2: object-block tests cover source-disposal independence, invalid graph rejection before defining an id, per-instance culling and streamed removal. No open defect accepted for this job.
 
 - Fixed during batch 242 replay build: Node Buffer.slice returned an alias and a Buffer-typed payload in decodeVoxelRecording. Payloads now copy into owned Uint8Arrays; replay.test.js mutates the original recording and requires decoded messages to remain intact.
+Batch 270 job 1: no new open defects identified in space. The cutscene compatibility replay finding is resolved by the batch 217 fixture readiness correction already on main; no cutscene or browser lifecycle files changed here.

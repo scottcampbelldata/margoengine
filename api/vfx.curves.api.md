@@ -138,6 +138,7 @@ interface VFXFeatures {
     flipbook?: VFXExtension<VFXFlipbook>;
     shadows?: VFXExtension<VFXShadows>;
     nodes?: VFXExtension<VFXNodes>;
+    space?: VFXExtension<import('./space.js').VFXSpace>;
 }
 
 interface VFXFields {
@@ -218,6 +219,7 @@ interface VFXOptions {
     texture?: VFXTexture;
     curves?: VFXCurves;
     emitter?: VFXEmitter;
+    space?: import('./space.js').VFXSpace;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
@@ -247,6 +249,7 @@ interface VFXRibbons {
 }
 
 interface VFXRuntime {
+    emission?(delta: number): number;
     compute?: GPUBindGroupEntry[];
     render?: GPUBindGroupEntry[];
     write?(c: Context): void;

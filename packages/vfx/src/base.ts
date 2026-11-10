@@ -96,6 +96,8 @@ export interface VFXOptions {
   curves?: VFXCurves;
   /** Where births start and which way `speed` pushes them: a sphere, a cone or the surface of a triangle mesh. The shape (and a mesh) is read at attach; the numbers each frame. Needs the `emitter` feature. */
   emitter?: VFXEmitter;
+  /** Moving emitter frame, inherited velocity and distance births. Needs `space` from `@margoengine/vfx/space`. */
+  space?: import('./space.js').VFXSpace;
   /** A ribbon behind each particle through its last positions, for smoke and magic trails. Needs `ribbons` from `@margoengine/vfx/ribbons`. */
   ribbons?: VFXRibbons;
   /** Draw each particle as a small lit triangle mesh instead of a billboard. Needs `mesh` from `@margoengine/vfx/mesh`. */
@@ -449,6 +451,8 @@ export interface VFXState {
 
 /** The GPU side of an added feature, made at attach and again after device restoration. */
 export interface VFXRuntime {
+  /** Additional whole births before the frame budget is packed; called once per simulation step. */
+  emission?(delta: number): number;
   /** Entries added to the simulation's bind group. */
   compute?: GPUBindGroupEntry[];
   /** Entries added to the billboard's bind group. */
@@ -495,6 +499,7 @@ const extensions = [
   'flipbook',
   'shadows',
   'nodes',
+  'space',
 ] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
@@ -563,6 +568,7 @@ export interface VFXFeatures {
   flipbook?: VFXExtension<VFXFlipbook>;
   shadows?: VFXExtension<VFXShadows>;
   nodes?: VFXExtension<VFXNodes>;
+  space?: VFXExtension<import('./space.js').VFXSpace>;
 }
 let nextId = 0;
 /**
@@ -959,9 +965,10 @@ export class VFX implements EnginePlugin {
     this.validate();
     const o = this.options;
     this.time += c.delta;
+    const extraBirths = this.runtimes.reduce((sum, runtime) => sum + (runtime.emission?.(c.delta) ?? 0), 0);
     const emissions = (o.rate ?? this.capacity / 2) * c.delta + this.remainder;
     this.remainder = emissions % 1;
-    const budget = Math.min(this.capacity, Math.floor(emissions) + this.burstCount);
+    const budget = Math.min(this.capacity, Math.floor(emissions) + this.burstCount + extraBirths);
     this.burstCount = 0;
     this.values.set(c.camera.matrix);
     viewMatrix(this.view, c.camera);

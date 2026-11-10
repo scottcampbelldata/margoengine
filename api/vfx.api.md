@@ -131,6 +131,7 @@ export interface VFXFeatures {
     flipbook?: VFXExtension<VFXFlipbook>;
     shadows?: VFXExtension<VFXShadows>;
     nodes?: VFXExtension<VFXNodes>;
+    space?: VFXExtension<import('./space.js').VFXSpace>;
 }
 
 export interface VFXFields {
@@ -220,6 +221,7 @@ export interface VFXOptions {
     texture?: VFXTexture;
     curves?: VFXCurves;
     emitter?: VFXEmitter;
+    space?: import('./space.js').VFXSpace;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
@@ -277,6 +279,13 @@ export interface VFXSkinnedPrimitive {
     readonly indices: ArrayLike<number>;
     readonly deformed?: GPUBuffer;
     readonly deformedOffset?: number;
+}
+
+export interface VFXSpace {
+    mode?: 'local' | 'world';
+    transform?: ArrayLike<number>;
+    inheritVelocity?: number;
+    ratePerDistance?: number;
 }
 
 export interface VFXStretch {
@@ -352,6 +361,7 @@ interface VFXExtension<T> {
 }
 
 interface VFXRuntime {
+    emission?(delta: number): number;
     compute?: GPUBindGroupEntry[];
     render?: GPUBindGroupEntry[];
     write?(c: Context): void;

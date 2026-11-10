@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13700295,
+  "total": 13703428,
   "history": [
     {
       "date": "2026-10-24",
@@ -7144,6 +7144,12 @@
       "commit": "batch-206-clips",
       "reason": "Complete value clips with composition provenance, bounded frame playback, templates and retiming. [{\"key\":\"@margoengine/usdz/compose\",\"before\":19101,\"bytes\":19388,\"ceiling\":19970},{\"key\":\"@margoengine/usdz/clips\",\"before\":0,\"bytes\":23150,\"ceiling\":23845},{\"key\":\"@margoengine/usdz dist/workers/usdz.js\",\"before\":131528,\"bytes\":132031,\"ceiling\":135992}]; splitting would duplicate existing layer/scene loading or create a second cache sampler.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f4f1aa88b",
+      "reason": "Batch 270 job 1: vfx root 31561 to 32530 B, base 11214 to 11311 B, new space 1441 B. Rigid frames, inheritance and distance births, accepted optional growth. A separate root facade would complicate the existing feature convention.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8178,7 +8184,7 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 14210,
-    "@margoengine/vfx": 32070,
+    "@margoengine/vfx": 33506,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/depth-collide": 2262,
@@ -8436,6 +8442,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/voxel-net/replay": 3840,
-    "@margoengine/usdz/clips": 23845
+    "@margoengine/usdz/clips": 23845,
+    "@margoengine/vfx/space": 1697
   }
 }

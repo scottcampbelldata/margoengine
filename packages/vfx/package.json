@@ -113,6 +113,10 @@
     "./nodes": {
       "types": "./dist/nodes.d.ts",
       "import": "./dist/nodes.js"
+    },
+    "./space": {
+      "types": "./dist/space.d.ts",
+      "import": "./dist/space.js"
     }
   },
   "files": [

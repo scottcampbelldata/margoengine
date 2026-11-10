@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>VFX parity correctness</title></head><body>
+<script type="module">
+import {VFX} from '/packages/vfx/dist/index.js';
+import {Camera} from '/packages/core/dist/extension.js';
+const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice(),errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const camera=new Camera({position:[0,0,10],target:[0,0,0]});camera.update(1,true);
+const still={capacity:32,rate:0,velocity:[0,0,0],position:[0,0,0],spread:0,turbulence:0,gravity:[0,0,0],ground:-100,lifetime:[10,10]};
+async function read(effect){const b=effect.gpuState.particles,copy=device.createBuffer({size:b.size,usage:9}),encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(b,0,copy,0,b.size);device.queue.submit([encoder.finish()]);await copy.mapAsync(1);const data=[...new Float32Array(copy.getMappedRange().slice(0))];copy.destroy();return data;}
+function step(effect,delta=0.1){const encoder=device.createCommandEncoder();effect.simulate({backend:'webgpu',device,delta,camera,width:64,height:64,encoder});device.queue.submit([encoder.finish()]);}
+async function ready(effect){effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});if(globalThis.__margoCompat){for(let i=0;i<1000&&!effect.route;i++){await new Promise(r=>setTimeout(r,10));}if(!effect.route)throw Error('compat route did not load');await device.queue.onSubmittedWorkDone();}effect.reset();}
+window.checkSpace=async()=>{
+ device.pushErrorScope('validation');const results={};
+ for(const mode of ['local','world']){
+  const effect=new VFX({...still,space:{mode,inheritVelocity:0.5}});await ready(effect);effect.burst(1);step(effect);
+  effect.options.position=[2,0,0];effect.burst(1);step(effect);const p=await read(effect);
+  results[mode]={old:p.slice(0,8),born:p.slice(8,16)};
+  effect.reset();effect.options.position=[0,0,0];effect.options.space={mode,ratePerDistance:4};step(effect);
+  effect.options.position=[2,0,0];step(effect);results[mode].distance=(await read(effect)).slice(0,64);
+  effect.dispose();
+ }
+ const transform=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],e=new VFX({...still,position:[1,0,0],space:{mode:'local',transform}});
+ await ready(e);e.burst(1);step(e);transform.splice(0,16,0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1);step(e);results.rotated=(await read(e)).slice(0,8);e.dispose();
+ return {results,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
+};
+window.ready=true;
+</script></body></html>

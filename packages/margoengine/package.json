@@ -4182,6 +4182,10 @@
       "types": "./dist/vfx/nodes.d.ts",
       "import": "./dist/vfx/nodes.js"
     },
+    "./vfx/space": {
+      "types": "./dist/vfx/space.d.ts",
+      "import": "./dist/vfx/space.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"
