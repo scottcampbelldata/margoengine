@@ -53,6 +53,18 @@ try {
     assert.deepEqual(r.warm, r.replay);
     console.log('ok schedule: prewarm equals five ordinary steps byte for byte, seeded bursts, exact reset');
   }
+  if (process.argv.includes('--json')) {
+    const r = await page.evaluate(() => window.checkJSON());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.stable, true);
+    assert.deepEqual(r.state, r.copy);
+    assert.ok(r.image.some((n) => n > 0));
+    assert.deepEqual(r.image, r.reloaded);
+    console.log(
+      'ok JSON: stable authoring roundtrip, exact simulated particles and rendered pixels, all four new features, typed texture and fog',
+    );
+  }
   assert.deepEqual(pageErrors, []);
   console.log('ok space: local/world, rigid rotation, velocity inheritance, eight spaced distance births');
   if (process.argv.includes('--over-life')) {

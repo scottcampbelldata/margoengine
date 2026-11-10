@@ -1,6 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><title>VFX parity correctness</title></head><body>
 <script type="module">
 import {VFX} from '/packages/vfx/dist/index.js';
+import {serializeEffect,createEffect} from '/packages/vfx/dist/json.js';
 import {Camera} from '/packages/core/dist/extension.js';
 const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice(),errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -51,6 +52,17 @@ window.checkSchedule=async()=>{
  const e=new VFX({...still,capacity:32,velocity:[1,0,0],schedule:plan});await ready(e);step(e,0.125);const warm=await read(e);e.reset();step(e,0.125);const replay=await read(e);e.dispose();
  const ref=new VFX({...still,capacity:32,velocity:[1,0,0],schedule:{...plan,prewarm:0}});await ready(ref);for(let i=0;i<5;i++)step(ref,0.125);const manual=await read(ref);ref.dispose();
  return{warm,replay,manual,live:warm.filter((_,i)=>i<256&&i%8===3&&warm[i]>0).length,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
+};
+async function picture(effect){
+ const color=device.createTexture({size:[64,64],format:'rgba8unorm',usage:17}),depth=device.createTexture({size:[64,64],format:'depth32float',usage:16}),copy=device.createBuffer({size:64*64*4,usage:9}),encoder=device.createCommandEncoder(),colorView=color.createView(),depthView=depth.createView();
+ encoder.beginRenderPass({colorAttachments:[{view:colorView,loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}],depthStencilAttachment:{view:depthView,depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}}).end();
+ effect.draw({backend:'webgpu',device,delta:0,camera,width:64,height:64,format:'rgba8unorm',color:colorView,depth:depthView,descriptor:{multisample:{count:1},depthStencil:{format:'depth32float'}},encoder});encoder.copyTextureToBuffer({texture:color},{buffer:copy,bytesPerRow:256},[64,64]);device.queue.submit([encoder.finish()]);await copy.mapAsync(1);const pixels=[...new Uint8Array(copy.getMappedRange().slice(0))];color.destroy();depth.destroy();copy.destroy();return pixels;
+}
+window.checkJSON=async()=>{
+ device.pushErrorScope('validation');const original=new VFX({...still,size:0.8,emitter:{shape:'torus'},overLife:{size:[1,2],speed:[0,2],spin:[0,4]},space:{mode:'local'},schedule:{prewarm:0.25,step:0.125,bursts:[{time:0,count:4}]},texture:{width:1,height:1,data:new Uint8Array([255,128,64,255])}}).setFog({color:'#8090a0',near:1,far:20});
+ const text=serializeEffect(original),loaded=createEffect(text);await ready(original);await ready(loaded);for(let i=0;i<3;i++){step(original,0.125);step(loaded,0.125);}const state=await read(original),copy=await read(loaded),image=await picture(original),reloaded=await picture(loaded);original.dispose();loaded.dispose();
+ const again=createEffect(text),stable=serializeEffect(again)===text;again.dispose();
+ return{state,copy,image,reloaded,stable,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
 };
 window.ready=true;
 </script></body></html>

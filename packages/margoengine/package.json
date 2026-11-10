@@ -4278,6 +4278,10 @@
       "types": "./dist/vfx/schedule.d.ts",
       "import": "./dist/vfx/schedule.js"
     },
+    "./vfx/json": {
+      "types": "./dist/vfx/json.d.ts",
+      "import": "./dist/vfx/json.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

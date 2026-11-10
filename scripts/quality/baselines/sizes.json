@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13920374,
+  "total": 13923234,
   "history": [
     {
       "date": "2026-10-24",
@@ -7340,6 +7340,12 @@
       "commit": "batch-191-job-3",
       "reason": "New optional post/pixelate: 0 to 8755 B gzip. The full normal-capture owner and geometric cell sampler belong together; splitting would require a second plugin for default normal highlights. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-270-job5",
+      "reason": "Versioned authoring JSON: new json entry 0 to 2604 B gzip, root 35448 B and base 11398 B. The public root constructor remains the single validator and is shared through the self-package entry. Typed assets, bindings, fog and URL loading stay together; splitting would duplicate validation/ownership. Optional size accepted by Scott; core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8672,6 +8678,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/post/pixelate": 9018
+    "@margoengine/post/pixelate": 9018,
+    "@margoengine/vfx/json": 2860
   }
 }

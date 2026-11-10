@@ -912,3 +912,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 192): document generated taa/upscale-velocity alias; examples deferred.
 
 - @margoengine/post: document Pixelate defaults, LDR stack order, pixel-size/edge controls, optional model normal capture, supplied normal textures and disposal.
+- @margoengine/vfx (batch 270 job 5): document /json format/version, serialize/parse/create/load, typed assets and signed zero, explicit resource binding ownership, fog, validation budgets, AbortSignal and authoring-state scope; examples deferred.
+- margoengine (batch 270 job 5): document generated vfx/json alias; examples deferred.
