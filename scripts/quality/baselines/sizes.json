@@ -1,7 +1,11 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
+<<<<<<< HEAD
   "total": 12425529,
+=======
+  "total": 12423519,
+>>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
   "history": [
     {
       "date": "2026-10-24",
@@ -5719,8 +5723,13 @@
     },
     {
       "date": "2026-11-10",
+<<<<<<< HEAD
       "commit": "batch-268-ar-extra",
       "reason": "New optional AR tracking entry, 0 to 3033 B gzip. Four native AR module consumers with copied observations and safe resource ownership; geometry loads only for visualization.",
+=======
+      "commit": "25af5c823",
+      "reason": "Batch 249 relation-query: new optional pair joins, 0 -> 1023 B gzip; return source/target rows with live membership checks.",
+>>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
       "grew": 1
     }
   ],
@@ -5945,7 +5954,9 @@
     "@margoengine/ecs/changes": 882,
     "@margoengine/ecs/engine": 2064,
     "@margoengine/ecs/growable": 2237,
+    "@margoengine/ecs/objects": 1580,
     "@margoengine/ecs/query": 1021,
+    "@margoengine/ecs/relation-query": 1279,
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/environment": 31917,
@@ -6511,6 +6522,7 @@
     "@margoengine/stats/beacon": 1639,
     "@margoengine/stats/compile": 1882,
     "@margoengine/stats/geometry": 1824,
+    "@margoengine/stats/gl": 2537,
     "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
@@ -6808,9 +6820,13 @@
     "margoengine/game": 996,
     "margoengine/react/instances": 318,
     "margoengine/viz": 800,
+<<<<<<< HEAD
     "margoengine/web": 577,
     "@margoengine/ecs/objects": 1580,
     "@margoengine/stats/gl": 2537,
     "@margoengine/xr/ar-extra": 3289
+=======
+    "margoengine/web": 577
+>>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
   }
 }

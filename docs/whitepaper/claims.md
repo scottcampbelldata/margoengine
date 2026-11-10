@@ -3263,6 +3263,11 @@ Batch 257 job 3: worker canvas pointer-lock forwarding supports page/worker requ
 Batch 249 job 1: ecs/objects stores arbitrary JS values beside numeric fields and participates in existing queries, tracking and destruction. Proof: packages/ecs/test/objects.test.js. No performance or GPU claim.
 
 - Stats WebGL2 (batch 264): asynchronous GPU frame and named-pass elapsed times with native preview draw counters. Proof: packages/stats/test/gl.test.js and scripts/test-stats-parity.mjs. Disjoint/lost/overflow samples invalidate atomically; unsupported timing never substitutes a CPU duration. No benchmark or presentation-latency claim.
+<<<<<<< HEAD
 ### XR AR extras
 
 The optional xr/ar-extra entry supports native DOM overlays, image/marker tracking, detected triangle meshes and persistent anchor save/restore/delete. CPU coverage includes copied snapshots, pose-only movement, removal, callback disposal, abort and concurrent anchor ownership. Stereo rendering compares detected standard Box meshes on both routes and backends; browser stand-ins exercise negotiated module APIs. These software tests do not prove real marker detection, mapping accuracy or persistence across device restarts.
+=======
+
+Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pairs with component filters and exposes target entity ids and component rows. Proof: packages/ecs/test/relation-query.test.js; no performance claim.
+>>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)

@@ -53,6 +53,10 @@
     "./objects": {
       "types": "./dist/objects.d.ts",
       "import": "./dist/objects.js"
+    },
+    "./relation-query": {
+      "types": "./dist/relation-query.d.ts",
+      "import": "./dist/relation-query.js"
     }
   },
   "files": [

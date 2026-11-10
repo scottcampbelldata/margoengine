@@ -166,6 +166,10 @@
       "types": "./dist/audio/voices.d.ts",
       "import": "./dist/audio/voices.js"
     },
+    "./audio/sprites": {
+      "types": "./dist/audio/sprites.d.ts",
+      "import": "./dist/audio/sprites.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
@@ -905,6 +909,10 @@
     "./ecs/objects": {
       "types": "./dist/ecs/objects.d.ts",
       "import": "./dist/ecs/objects.js"
+    },
+    "./ecs/relation-query": {
+      "types": "./dist/ecs/relation-query.d.ts",
+      "import": "./dist/ecs/relation-query.js"
     },
     "./environment": {
       "types": "./dist/environment.d.ts",
@@ -3938,6 +3946,14 @@
       "types": "./dist/xr/locomotion.d.ts",
       "import": "./dist/xr/locomotion.js"
     },
+    "./xr/hands": {
+      "types": "./dist/xr/hands.d.ts",
+      "import": "./dist/xr/hands.js"
+    },
+    "./xr/ar-extra": {
+      "types": "./dist/xr/ar-extra.d.ts",
+      "import": "./dist/xr/ar-extra.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
@@ -3949,14 +3965,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./xr/hands": {
-      "types": "./dist/xr/hands.d.ts",
-      "import": "./dist/xr/hands.js"
-    },
-    "./xr/ar-extra": {
-      "types": "./dist/xr/ar-extra.d.ts",
-      "import": "./dist/xr/ar-extra.js"
     }
   },
   "dependencies": {

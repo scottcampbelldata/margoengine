@@ -2758,6 +2758,11 @@ Batch 257 job 3: build packages, run node --test --test-timeout=10000 packages/w
 Batch 249 job 1: build packages then node --test --test-timeout=120000 packages/ecs/test/objects.test.js. Synthetic identity/lifecycle fixtures, no asset downloads required.
 
 - Stats WebGL2: `node --test packages/stats/test/gl.test.js`; then the shared-lock scripts/test-stats-parity.mjs command in the geometry proof above. The hardware proof requires EXT_disjoint_timer_query_webgl2, polls across requestAnimationFrame tasks, checks completed named intervals and frame accounting, and uses no timing threshold. Existing native Stats pass and browser suites remain applicable to the package.
+<<<<<<< HEAD
 ### XR AR extras
 
 After build:packages run `node --test packages/xr/tests/ar-extra.test.js`, then the registered xr test:gpu:ar-extra through the shared GPU lock. It injects native module stand-ins into Margo's stereo fixture, displays a detected mesh derived from the licensed Khronos/Cesium Box, verifies DOM selection suppression, image scores/observations and anchor save/restore/delete, and writes test-results/xr-ar-extra-browser.json. Native device tracking and storage proof remain job 1's hardware gap.
+=======
+
+Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-query.test.js after building packages; original synthetic tuple/lifecycle fixtures.
+>>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)

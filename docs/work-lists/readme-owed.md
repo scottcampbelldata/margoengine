@@ -180,4 +180,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/stats: document /gl asynchronous frame/pass timing, early plugin registration, explicit scopes, disjoint/loss handling, limits, unavailable state, draw counts, reports, panel and disposal.
 - margoengine: document /stats/gl alias.
+<<<<<<< HEAD
 - @margoengine/xr: document xr/ar-extra session negotiation, DOM overlay root ownership, current/legacy image targets, copied observations, mesh visualization and persistent anchor lifetime/abort cleanup.
+=======
+
+- @margoengine/ecs (batch 249 job 2): RelationQuery exact/wildcard terms, source filters, returned target ids/rows, products and mutation semantics.
+- margoengine (batch 249 job 2): generated ecs/relation-query alias.
+>>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
