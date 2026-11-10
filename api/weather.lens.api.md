@@ -34,5 +34,7 @@ export interface LensDropsOptions {
 
 export function lensField(x: number, y: number, time: number, options?: LensDropsOptions): readonly [number, number, number];
 
+export function lensSettings(options: LensDropsOptions, time: number, out?: Float32Array): Float32Array;
+
 export const lensWGSL: string;
 ```

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15164189,
+  "total": 15164494,
   "history": [
     {
       "date": "2026-10-24",
@@ -7829,6 +7829,12 @@
       "commit": "d4145eda4",
       "reason": "Inherited main tiled-camera capture and allocation inventory grow lines/debug from 9549 to 9874 gzip B; ceiling 9836 to 10171. Retain shared Line/LineBatch camera and resource ownership; splitting would duplicate it. Budget-only landing repair, no lines runtime change; core plus stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "fef89cbaa",
+      "reason": "weather/lens grows 3815 to 3869 B gzip: lensSettings splits long lens travel into whole cells so drops stay exact at long times (review 5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8062,6 +8068,7 @@
     "@margoengine/cutscene/vfx": 1832,
     "@margoengine/cutscene/viewport": 1646,
     "@margoengine/decoders": 492515,
+    "@margoengine/decoders/avif": 279011,
     "@margoengine/decoders/bc": 3890,
     "@margoengine/decoders/bmp": 1774,
     "@margoengine/decoders/brotli": 69438,
@@ -8069,7 +8076,7 @@
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/draco-native": 67462,
     "@margoengine/decoders/draco-points": 154011,
-    "@margoengine/decoders/image": 1068813,
+    "@margoengine/decoders/image": 1068811,
     "@margoengine/decoders/jpeg": 4030,
     "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 2851,
@@ -9089,7 +9096,7 @@
     "@margoengine/weather/drive": 1714,
     "@margoengine/weather/gltf": 5203,
     "@margoengine/weather/hail": 5489,
-    "@margoengine/weather/lens": 3815,
+    "@margoengine/weather/lens": 4125,
     "@margoengine/weather/puddles": 4070,
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
@@ -9239,7 +9246,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/decoders/avif": 279014
+    "margoengine/web": 577
   }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LensDrops, lensField, lensWGSL } from '../dist/lens.js';
+import { LensDrops, lensField, lensSettings, lensWGSL } from '../dist/lens.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -56,4 +56,18 @@ test('PostStack owns joining, restoration and disposal',()=>{
  effect.setup(engine);effect.onDeviceRestored(engine);assert.equal(freed,1);
  effect.dispose();effect.dispose();assert.equal(freed,2);
  assert.throws(()=>effect.onPreUpdate(0),{code:'disposed'});
+});
+
+test('settings split long travel into whole cells and a sub-cell remainder (review 5: f32 drift at large times)',()=>{
+ // Before the fix the shader got time 1000000 and speed 0.08 and formed 80000 - y in f32, whose step is 1/128 of the
+ // image height: drops jumped about half a radius. The remainder must stay below one cell and the cells must be exact.
+ const v=lensSettings({wetness:1},1000000),cells=new Uint32Array(v.buffer)[7];
+ assert.equal(v[3],1);assert.ok(v[1]>=0&&v[1]<0.15,String(v[1]));
+ assert.equal(cells,Math.floor(80000/0.15));
+ assert.ok(Math.abs(cells*0.15+v[1]-80000)<1e-6);
+ const short=lensSettings({wetness:0.3,speed:0.5,radius:0.01,seed:9,streaks:0.2,distortion:1},0.01);
+ assert.equal(new Uint32Array(short.buffer)[7],0);assert.ok(Math.abs(short[1]-0.005)<1e-9);
+ assert.deepEqual(Array.from(short.subarray(4,7)),[1,Math.fround(0.2),9]);
+ assert.deepEqual(lensSettings({enabled:false},3)[0],0);
+ assert.throws(()=>lensSettings({},-1),RangeError);
 });

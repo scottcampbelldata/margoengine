@@ -14,6 +14,7 @@ try {
   }
   if(name==='lens'){
     assert.ok(result.math.cases>=2000&&result.math.worst<1e-4&&result.math.wet>100,JSON.stringify(result.math));
+    assert.ok(result.longTime.cases>=2000&&result.longTime.worst<1e-4&&result.longTime.wet>100,JSON.stringify(result.longTime));
     assert.equal(result.repeat,0);assert.equal(result.disabled,0);
     for(const key of ['wet','moved','streaks','seeded'])assert.ok(result[key]>100,`${key}: ${result[key]}`);
   }

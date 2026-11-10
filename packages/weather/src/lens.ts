@@ -77,17 +77,40 @@ export function lensField(x: number, y: number, time: number, options: LensDrops
   return [nx,ny,mask];
 }
 
-/** Pure field WGSL: lens_field(p, settingsA, settingsB) returns slope.xy and mask.z. */
+/**
+ * Packs the two settings vectors of {@link lensWGSL} for pattern time `time`. The falling layer's travel,
+ * time * speed, is split in double precision into whole drop cells (u32 bits in b.w) and a remainder below one
+ * cell (a.y, with a.w = 1), so the shader keeps full f32 precision at any time up to 1000000 seconds.
+ */
+export function lensSettings(options: LensDropsOptions, time: number, out: Float32Array = new Float32Array(8)): Float32Array {
+  validate(options);
+  if (!Number.isFinite(time) || time < 0) throw new RangeError('Lens time must be finite and nonnegative; pass seconds');
+  const radius = options.radius ?? 0.025, spacing = 6 * radius, travel = time * (options.speed ?? 0.08);
+  const cells = Math.floor(travel / spacing);
+  out.set([options.enabled === false ? 0 : options.weather?.wetness ?? options.wetness ?? 0.6, travel - cells * spacing, radius, 1,
+    options.distortion ?? 0.7, options.streaks ?? 0.65, options.seed ?? 1, 0]);
+  new Uint32Array(out.buffer, out.byteOffset + 28, 1)[0] = cells >>> 0;
+  return out;
+}
+
+/**
+ * Pure field WGSL: lens_field(p, a, b) returns slope.xy and mask.z, with a = (wetness, time, radius, speed) and
+ * b = (distortion, streaks, seed, whole cells of extra travel as u32 bits, 0 for none). Use {@link lensSettings}
+ * for long or seeked times: a raw time * speed product loses f32 precision.
+ */
 export const lensWGSL: string = `${noiseWGSL}
+fn lens_lattice(c:vec2f,shift:u32,layer:u32)->f32 {
+  return f32(weather_pcg(weather_pcg(bitcast<u32>(i32(c.x)))^(bitcast<u32>(i32(c.y))-shift)^(layer*0x9e3779b9u))>>8u)*5.9604645e-8;
+}
 fn lens_field(p:vec2f,a:vec4f,b:vec4f)->vec3f {
  var result=vec3f(0);let spacing=6.0*a.z;
  for(var layer=0u;layer<2u;layer++){
-  let q=p-vec2f(0,select(0.0,a.y*a.w,layer==1u));let cell=floor(q/spacing);let k=u32(b.z)+layer*3u;
+  let q=p-vec2f(0,select(0.0,a.y*a.w,layer==1u));let cell=floor(q/spacing);let k=u32(b.z)+layer*3u;let n=select(0u,bitcast<u32>(b.w),layer==1u);
   for(var j=-1;j<=1;j++){for(var i=-1;i<=1;i++){
-   let c=cell+vec2f(f32(i),f32(j));let random=weather_lattice(c,k);
+   let c=cell+vec2f(f32(i),f32(j));let random=lens_lattice(c,n,k);
    let activation=smoothstep(random,random+0.12,a.x);
-   let r=a.z*(0.55+0.45*weather_lattice(c,k+1u))*select(0.55,1.0,layer==1u);
-   let centre=(c+vec2f(0.2)+0.6*vec2f(weather_lattice(c,k+2u),weather_lattice(c+vec2f(17,0),k+2u)))*spacing;
+   let r=a.z*(0.55+0.45*lens_lattice(c,n,k+1u))*select(0.55,1.0,layer==1u);
+   let centre=(c+vec2f(0.2)+0.6*vec2f(lens_lattice(c,n,k+2u),lens_lattice(c+vec2f(17,0),n,k+2u)))*spacing;
    let v=(q-centre)/r;let dome=max(0.0,1.0-dot(v,v));let head=smoothstep(0.0,0.18,dome);let length=b.y*4.0;
    var trail=0.0;if(layer==1u&&v.y<0.0&&v.y> -1.0-length){trail=(1.0-smoothstep(0.08,0.22,abs(v.x)))*smoothstep(-1.0-length,-0.8-length,v.y);}
    result.x+=(v.x*sqrt(dome)*head+v.x*trail)*activation;result.y+=v.y*sqrt(dome)*head*activation;
@@ -172,7 +195,7 @@ export class LensDrops implements EnginePlugin {
   private draw(c: Context, input: GPUTextureView, output: StageOutput): void {
     const o=this.options;
     validate(o);
-    this.values.set([o.enabled===false?0:o.weather?.wetness??o.wetness??0.6,o.time??this.clock,o.radius??0.025,o.speed??0.08,o.distortion??0.7,o.streaks??0.65,o.seed??1,0]);
+    lensSettings(o,o.time??this.clock,this.values);
     c.device.queue.writeBuffer(this.uniform!,0,this.values);
     const key=output.format+':'+(output.multisample?.count??1)+':'+output.hdr;
     let pipeline=this.pipelines.get(key);
