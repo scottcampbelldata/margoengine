@@ -61,6 +61,62 @@ const pick = (f, faceIndex = 0, barycoord = [0.8, 0.1, 0.1]) => ({
   faceIndex,
   barycoord,
 });
+
+for (const kind of ['model', 'points']) {
+  test(`pending ${kind} decoration releases its prior owner after controller disposal`, async () => {
+    const f = fixture();
+    let finish;
+    let released = 0;
+    const pending = new Promise((resolve) => { finish = resolve; });
+    const features = new TileFeatures(f.engine, { decorate: () => pending });
+    const work = features.decorate({ ...f.context, kind });
+    features.dispose();
+    finish({ bytes: 1, dispose() { released++; } });
+    await assert.rejects(work, { code: 'disposed' });
+    assert.equal(released, 1);
+  });
+}
+
+test('aborting a pending preceding decorator releases it and preserves a falsy reason', async () => {
+  const f = fixture(), controller = new AbortController();
+  let finish;
+  let released = 0;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  const features = new TileFeatures(f.engine, { decorate: () => pending });
+  const work = features.decorate({ ...f.context, signal: controller.signal });
+  controller.abort(false);
+  finish({ bytes: 1, dispose() { released++; } });
+  try {
+    await assert.rejects(work, (error) => error === false);
+    assert.equal(released, 1);
+    assert.equal(features.resolve(pick(f)), undefined);
+  } finally {
+    features.dispose();
+  }
+});
+
+test('controller disposal during feature image decoding rejects the decoration and releases its prior owner', async () => {
+  const f = fixture((doc) => {
+    const set = doc.meshes[0].primitives[0].extensions.EXT_mesh_features.featureIds[0];
+    delete set.attribute;
+    set.texture = { index: 0, channels: [0] };
+    doc.textures = [{ source: 0 }];
+  });
+  let finish, started;
+  let released = 0;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  const decoding = new Promise((resolve) => { started = resolve; });
+  const features = new TileFeatures(f.engine, {
+    decorate: () => ({ bytes: 1, dispose() { released++; } }),
+    image: () => { started(); return pending; },
+  });
+  const work = features.decorate(f.context);
+  await decoding;
+  features.dispose();
+  finish({ width: 1, height: 1, data: new Uint8Array(4) });
+  await assert.rejects(work, { code: 'disposed' });
+  assert.equal(released, 1);
+});
 test('real CC0 sample: ray hits resolve feature ID and the exact structural metadata row', async () => {
   const f = fixture(),
     features = new TileFeatures(f.engine),

@@ -1069,3 +1069,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/decoders (batch 174 job 2): raw Snappy and bounded lazy columnar block codecs, cancellation and decoded-size limits.
 - @margoengine/sciviz (batch 178 job 2): document /pdf and /math, caller-owned font coverage, metadata/physical sizing, TeX subset, native MathML and shared PNG/SVG/PDF formula overlays, disposal and accepted layout differences; examples deferred.
 - margoengine (batch 178 job 2): document generated sciviz/math and sciviz/pdf aliases; examples deferred.
+
+- @margoengine/tiles (review 2): document feature decorator cancellation/disposal during preceding decoration and asynchronous feature image decoding.

@@ -96,11 +96,14 @@ export class TileFeatures implements EnginePlugin, Disposable {
   /** Registers loaded content, and removes it before eviction. Uses the existing renderer decorator hook. */
   readonly decorate = async (context: TilesDecorationContext): Promise<TilesContentDecoration> => {
     this.check();
+    context.signal?.throwIfAborted();
     const prior = await this.options.decorate?.(context),
       made: Entry[] = [];
-    if (context.kind === 'points') return prior ?? { bytes: 0, dispose() {} };
-    const model = context.model as PBRModel;
     try {
+      this.check();
+      context.signal?.throwIfAborted();
+      if (context.kind === 'points') return prior ?? { bytes: 0, dispose() {} };
+      const model = context.model as PBRModel;
       const bytes = context.kind === 'model' || context.kind === 'splats' ? context.content.gltf : undefined;
       const metadata = bytes
         ? readStructuralMetadata(bytes, {
@@ -158,6 +161,8 @@ export class TileFeatures implements EnginePlugin, Disposable {
         made.push(entry);
         for (const set of sets) if (set.texture) await this.prepareImage(entry, set);
       }
+      this.check();
+      context.signal?.throwIfAborted();
     } catch (error) {
       for (const entry of made) this.entries.delete(entry.primitive);
       prior?.dispose();
