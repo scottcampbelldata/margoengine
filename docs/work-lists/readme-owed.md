@@ -1020,3 +1020,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/quality (batch 195 job 2): document /knobs live raster/target bindings, particle rate ladder, disposal/device restore and deferred MSAA prepare then Engine.create with no live hardware-change claim.
 - margoengine (batch 195 job 2): document generated quality/knobs alias in the README phase.
+
+
+- @margoengine/environment (batch 188 job 4): document /exr-codecs decodeEXR/loadEXR, supported codecs, Node/browser workers, data windows and layer selection, limits/cancellation, emitted assets/CSP and the standard prebuilt decoder provenance; root parseEXR remains the small loader.

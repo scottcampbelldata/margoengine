@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
+import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { restoreWorkerUrls } from '../../../scripts/build-workers.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -28,6 +30,8 @@ for (const [entry, emptyOutDir] of [
   ['studio', false],
   ['prefiltered', false],
   ['reflector-pbr', false],
+  ['exr-codecs', false],
+  ['exr-codecs-worker', false],
 ])
   await build({
     root,
@@ -38,12 +42,17 @@ for (const [entry, emptyOutDir] of [
       outDir: resolve(root, 'dist'),
       emptyOutDir,
       target: 'es2022',
-      lib: { entry: resolve(root, `src/${entry}.ts`), formats: ['es'], fileName: entry },
+      lib: {
+        entry: resolve(root, `src/${entry}.ts`),
+        formats: ['es'],
+        fileName: entry === 'exr-codecs-worker' ? 'workers/exr-codecs' : entry,
+      },
       // index.js only re-exports dist/main.js and dist/loaders.js (src/main.ts), and every entry reaches the image
       // decoders through dist/loaders.js, which EnvironmentLighting.load imports on its first URL.
       rollupOptions: {
         external: (id) =>
           id === '@margoengine/core' ||
+          id.startsWith('node:') ||
           id === '@margoengine/core/extension' ||
           id === '@margoengine/environment' ||
           id.startsWith('@margoengine/environment/') ||
@@ -61,3 +70,13 @@ execFileSync(
 await packageDeclarations(root);
 
 await declarePackageCore(root);
+await mkdir(resolve(root, 'dist/vendor/exr-codecs'), { recursive: true });
+for (const name of ['exrview.js', 'exrview.wasm', 'LICENSE.txt', 'ThirdPartyNotices.txt'])
+  await copyFile(resolve(root, 'vendor/exr-codecs', name), resolve(root, 'dist/vendor/exr-codecs', name));
+await copyFile(resolve(root, 'vendor/exr-codecs/exrview.js'), resolve(root, 'dist/vendor/exr-codecs/exrview.cjs'));
+// ESM export adapter around unchanged prebuilt decoder glue for module workers.
+await writeFile(
+  resolve(root, 'dist/vendor/exr-codecs/exrview.mjs'),
+  (await readFile(resolve(root, 'vendor/exr-codecs/exrview.js'), 'utf8')) + '\nexport default createExrViewModule;\n',
+);
+await restoreWorkerUrls(resolve(root, 'dist'));

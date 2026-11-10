@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14248782,
+  "total": 14252346,
   "history": [
     {
       "date": "2026-10-24",
@@ -7531,6 +7531,12 @@
       "commit": "batch-195-knobs",
       "reason": "New optional quality/knobs: 0 to 2181 B min+gzip (ceiling 2437 B); umbrella alias 60 B. Live raster prefiltering, resource ownership, particle birth ladders and honest deferred MSAA are one cohesive feature; splitting would complicate resource restoration without quality gain. Core + stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-188",
+      "reason": "New optional environment/exr-codecs: 0 to 1473 B gzip; worker 0 to 1579 B. Complete requested codec coverage via the standard prebuilt OpenEXR exception (467081 B raw Wasm / 161371 B gzip), isolated and lazy, preserves quality instead of partial host codecs.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8894,6 +8900,8 @@
     "@margoengine/sciviz/stats": 6975,
     "@margoengine/sciviz/omezarr": 21492,
     "@margoengine/compute/cpu-wasm": 41443,
-    "@margoengine/quality/knobs": 2437
+    "@margoengine/quality/knobs": 2437,
+    "@margoengine/environment/exr-codecs": 1729,
+    "@margoengine/environment dist/workers/exr-codecs.js": 1835
   }
 }

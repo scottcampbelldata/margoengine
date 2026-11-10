@@ -1,0 +1,13 @@
+{
+  "source": "https://sergeneren.gallery.vsassets.io/_apis/public/gallery/publisher/sergeneren/extension/exrview/0.2.1/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage",
+  "version": "EXRView 0.2.1, OpenEXR 3.5.2",
+  "downloaded": "2026-11-10",
+  "archiveSha256": "fe3def11d9763267d8d7b99a0e824890961939d0bee0c8d2c27cf6a638188131",
+  "wasmSha256": "2fac0a44bc323db1954481c041df84364d418d231778fb57be71563c2c089388",
+  "glueSha256": "9d88ccd616e4d653bbaa66a8ab0cb85b1fda3be164da32a2236c86d53d9d998d",
+  "exception": "Standard prebuilt decoder only, AGENTS.md standard-file exception. No viewer or decoder implementation source copied or read; only documented ABI declarations inspected. Original compiled glue and Wasm unchanged. Build adds one ESM export adapter; Node uses a CJS copy.",
+  "licenses": [
+    "MIT: Sergen Eren, 2026",
+    "OpenEXR, Imath, OpenJPH, libdeflate, Zstandard notices in ThirdPartyNotices.txt"
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "oracle": "OpenEXR 3.5.3",
+  "source": "Greg Zaal / Poly Haven Venice Sunset, CC0; sample x*27,y*9, 37x45, clamp 65504",
+  "fixtures": [
+    {
+      "name": "venice-half-pxr24",
+      "compression": "pxr24",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "874a89aff1979991a6bf928f3132c12c3a96d983bb82eb0811ad5ede7d059b53"
+    },
+    {
+      "name": "venice-half-pxr24-tiled",
+      "compression": "pxr24",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "40018551ec84169d93fa3cc4a762d7479fdf5c448196d74cd5976a05841cb3dd"
+    },
+    {
+      "name": "venice-half-b44",
+      "compression": "b44",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "104756cf86eeb7c2afceefeb3f9479f504470bd5b50dea8d83464209e7139de3"
+    },
+    {
+      "name": "venice-half-b44-tiled",
+      "compression": "b44",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "780cf542db2311d327e6ae46064434d0338b64319b53574b4cf8ea133cd15ea1"
+    },
+    {
+      "name": "venice-half-b44a",
+      "compression": "b44a",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "e9cb31bfeebf9dd73684f83cf685e468c183df1933689d46ae19764ca000b4e8"
+    },
+    {
+      "name": "venice-half-b44a-tiled",
+      "compression": "b44a",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "2184443245bdff669709a9f86596ba581f44a863dac1665857e5fc3b0cb868cd"
+    },
+    {
+      "name": "venice-half-dwaa",
+      "compression": "dwaa",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "0039e3d654d58114cfe26e3c71e37d820726bf3a0826197a826dc470744f255c"
+    },
+    {
+      "name": "venice-half-dwaa-tiled",
+      "compression": "dwaa",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "68fb5fbb1c07344d687ae24fc2f8822ff5a98926b3f326e42b496f19e4d14ed7"
+    },
+    {
+      "name": "venice-half-dwab",
+      "compression": "dwab",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "1e771d2c8b11b5daf0fde761e35953bc341145993125726b5334284def39d91c"
+    },
+    {
+      "name": "venice-half-dwab-tiled",
+      "compression": "dwab",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "ce8011a1ef9a5dd2fdc4a6de22b03fd2ea6b068c786f188a0eb3907720a3f360"
+    },
+    {
+      "name": "venice-float-pxr24",
+      "compression": "pxr24",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "48312983ec29a6c89fb265fbc677dd741b1c328440ab171ab2a10ac4e796f544"
+    },
+    {
+      "name": "venice-float-pxr24-tiled",
+      "compression": "pxr24",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "223b1181c2ae141bac977be0797f6b42b9ea9eb2d1834c11bb4f528810283595"
+    },
+    {
+      "name": "venice-float-b44",
+      "compression": "b44",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "5a48de65ccef48a8600bedd2cb8063ec5d8961d7242e9512889611ebf3f30a9b"
+    },
+    {
+      "name": "venice-float-b44-tiled",
+      "compression": "b44",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "447a9b078af96a214c5fcbda0058b312191c7939a6d44ce8a862878d43b017ef"
+    },
+    {
+      "name": "venice-float-b44a",
+      "compression": "b44a",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "edf6b4b8d08ba60674d8d04af837306266fca586df61045f3531f696387ae00a"
+    },
+    {
+      "name": "venice-float-b44a-tiled",
+      "compression": "b44a",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "8548c795500fb7669ef5c72da361d0317d849c518acef35aa158577ea9b418f1"
+    },
+    {
+      "name": "venice-float-dwaa",
+      "compression": "dwaa",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "b0aa0b1e0eea85d87374c55a410a6e7150647ec28d69fadc3bcdda7160e51be2"
+    },
+    {
+      "name": "venice-float-dwaa-tiled",
+      "compression": "dwaa",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "8d54a96979716fe69640b7f9dc963c97343b978a26109f275a11cb8783f188e7"
+    },
+    {
+      "name": "venice-float-dwab",
+      "compression": "dwab",
+      "storage": "scanline",
+      "width": 37,
+      "height": 45,
+      "sha256": "bade4e46672ca37453d3d52801b7e0e67e2f822a34d90a0b8d57361c1497bb79"
+    },
+    {
+      "name": "venice-float-dwab-tiled",
+      "compression": "dwab",
+      "storage": "tiled",
+      "width": 37,
+      "height": 45,
+      "sha256": "df255219115aa802343677ef267455da5430b8e6930d1800736aefb49d0e09cf"
+    }
+  ],
+  "multipart": {
+    "name": "venice-parts.exr",
+    "sha256": "cf09bddf75ab8d3159ad6c95a0105d4ef0af8498e82f7de13e0495fd1a8e1d1f"
+  }
+}

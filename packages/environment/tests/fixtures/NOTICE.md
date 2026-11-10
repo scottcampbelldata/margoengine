@@ -57,3 +57,7 @@ Fixtures are used only by the tests and are not part of the published package (`
 ## Venice Sunset (batch 188)
 
 venice_sunset_1k.hdr: Greg Zaal / Poly Haven, CC0 1.0, https://polyhaven.com/a/venice_sunset and https://polyhaven.com/license . Downloaded unchanged from https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/venice_sunset_1k.hdr on 2026-11-10. SHA-256 92fe2b29b1957828fb8925a57633540bbba5bf380d9285ed553443e834249352. Real radiance photograph, standard test data only; no external code.
+
+## EXR codec photographic derivatives (batch 188)
+
+codecs/venice-*.exr and native expected .f32 arrays derive from the attributed CC0 Venice Sunset above: 37x45 pixels sampled at (27*x,9*y), radiance capped at 65504 for HALF conversion. OpenEXR 3.5.3 independently writes and reads PXR24, B44, B44A, DWAA and DWAB in scanline and tiled HALF/FLOAT variants with data-window origin (-3,7), and a named-layer multipart file. CC0 retained. Generation scripts and hashes: codecs/reference.json, source.mjs and generate.py. No external implementation source is included in these scripts.
