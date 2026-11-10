@@ -100,3 +100,29 @@ test('figure adapter, abort identity and explicit rejection of unsupported SVG',
   await assert.rejects(svgToPDF('<not-svg/>', { font }), /well-formed/);
   await assert.rejects(svgToPDF(svg(''), { font, widthMM: 0 }), RangeError);
 });
+test('security: SVG for PDF is read as strict XML with no DOM parser; hostile values stay data', async () => {
+  const saved = [globalThis.DOMParser, globalThis.XMLSerializer];
+  delete globalThis.DOMParser;
+  delete globalThis.XMLSerializer;
+  try {
+    const { streams } = await decode(
+      await svgToPDF(svg('<rect x="10" y="20" width="30" height="40" fill="#ff0000"/><text x="5" y="50">&lt;script&gt;</text>'), {
+        font,
+      }),
+    );
+    assert.ok(streams.some((s) => s.includes('1 0 0 rg') && s.includes('10 20 m')));
+    await assert.rejects(
+      svgToPDF(
+        '<!DOCTYPE svg [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;">]><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9"><text>&b;</text></svg>',
+        { font },
+      ),
+      /well-formed SVG: DTD internal subsets/,
+    );
+    await assert.rejects(svgToPDF(svg('<img src=x onerror=alert(1)>'), { font }), /well-formed/);
+    // A paint value is one escaped attribute of the colour probe, so markup in it is an unsupported colour.
+    for (const fill of ['&amp;bad;', '#f00&quot;/&gt;&lt;rect fill=&quot;#0f0'])
+      await assert.rejects(svgToPDF(svg(`<rect width="9" height="9" fill="${fill}"/>`), { font }), /Unsupported colour/);
+  } finally {
+    [globalThis.DOMParser, globalThis.XMLSerializer] = saved;
+  }
+});

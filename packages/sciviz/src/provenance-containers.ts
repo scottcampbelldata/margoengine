@@ -2,6 +2,8 @@ import { crc32 } from '../../shared/crc32.js';
 import { PNG_SIGNATURE } from '../../shared/png.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { FigureProvenance } from './provenance.js';
+import { parseXMLDocument, type XMLDocumentTree, type XMLElement } from '../../shared/xml-document.js';
+import { markupText } from './markup.js';
 
 const encoder = new TextEncoder(),
   decoder = new TextDecoder('utf-8', { fatal: true });
@@ -152,27 +154,56 @@ export async function readPNGProvenance(
     throw rangeError('Provenance exceeds maxBytes; raise the explicit bound', 'sciviz');
   return JSON.parse(decoder.decode(bytes)) as FigureProvenance;
 }
-function parseSVG(svg: string): Document {
-  const document = new DOMParser().parseFromString(svg, 'image/svg+xml');
-  if (document.querySelector('parsererror') || document.documentElement.localName !== 'svg')
+const svgNamespace = 'http://www.w3.org/2000/svg';
+function parseSVG(svg: string): XMLDocumentTree {
+  const document = parseXMLDocument(svg, {
+    fail: (reason) => {
+      throw typeError(`Expected valid SVG XML (${reason}); supply an SVG document`, 'sciviz');
+    },
+  });
+  if (document.documentElement.localName !== 'svg')
     throw typeError('Expected valid SVG XML; supply an SVG document', 'sciviz');
   return document;
 }
 /** Put a UTF-8 JSON record inside namespaced SVG metadata, replacing only Margo's previous record. */
 export function embedSVGProvenance(svg: string, record: FigureProvenance): string {
-  const document = parseSVG(svg);
-  for (const element of Array.from(document.getElementsByTagNameNS(namespace, 'provenance'))) {
-    const parent = element.parentElement;
-    element.remove();
-    if (parent?.localName === 'metadata' && !parent.attributes.length && !parent.childNodes.length) parent.remove();
-  }
-  const metadata = document.createElementNS('http://www.w3.org/2000/svg', 'metadata');
-  const value = document.createElementNS(namespace, 'margo:provenance');
-  value.setAttribute('type', 'application/json');
-  value.textContent = JSON.stringify(record);
-  metadata.append(value);
-  document.documentElement.prepend(metadata);
-  return new XMLSerializer().serializeToString(document);
+  const document = parseSVG(svg),
+    root = document.documentElement,
+    previous = document.getElementsByTagNameNS(namespace, 'provenance');
+  // Cut earlier records, and a bare metadata element they leave empty, out of the source text. Everything else stays
+  // byte for byte, and no file text is ever parsed as HTML or placed in a live document.
+  const cuts = previous
+    .map((element) => {
+      const parent = element.parentElement!;
+      const emptied =
+        parent !== root &&
+        parent.localName === 'metadata' &&
+        !parent.attributes.length &&
+        parent.childNodes.every((n) => previous.includes(n as XMLElement));
+      return emptied ? parent : element;
+    })
+    .sort((a, b) => a.start - b.start)
+    .filter((element, i, all) => !all.slice(0, i).some((outer) => element.start < outer.end));
+  let body = svg;
+  for (const element of cuts.reverse()) body = body.slice(0, element.start) + body.slice(element.end);
+  const metadata = markupText([
+    {
+      tag: 'metadata',
+      attributes: root.prefix === null && root.namespaceURI === svgNamespace ? undefined : { xmlns: svgNamespace },
+      children: [
+        {
+          tag: 'margo:provenance',
+          attributes: { 'xmlns:margo': namespace, type: 'application/json' },
+          children: [JSON.stringify(record)],
+        },
+      ],
+    },
+  ]);
+  const at = root.contentStart;
+  if (root.end === at)
+    // A self-closing root: open it, add the metadata and close it.
+    return `${body.slice(0, body.lastIndexOf('/', at))}>${metadata}</${root.tagName}>${body.slice(at)}`;
+  return body.slice(0, at) + metadata + body.slice(at);
 }
 /** Read only the namespaced Margo metadata; unrelated application metadata is retained. */
 export function readSVGProvenance(svg: string): FigureProvenance | undefined {

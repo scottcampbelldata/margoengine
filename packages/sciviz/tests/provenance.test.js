@@ -159,3 +159,45 @@ test('PDF information contains full spec, data hashes and environment as Unicode
   fig.dispose();
   env.window.close();
 });
+test('security: SVG provenance reads untrusted SVG as strict XML with no DOM parser, keeping file text as data', async () => {
+  const saved = [globalThis.DOMParser, globalThis.XMLSerializer];
+  delete globalThis.DOMParser;
+  delete globalThis.XMLSerializer;
+  try {
+    const fig = await Figure.attach(engine(), { axes: false });
+    const record = await captureProvenance(fig, {
+      packages: { label: ']]></margo:provenance></metadata><script>bad()</script><img src=x onerror=bad()>' },
+    });
+    // Unrelated content is kept byte for byte; a self-closing or prefixed root still gains one record.
+    const source =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><metadata id="other">keep</metadata><rect width="20" height="20"/></svg>';
+    const svg = embedSVGProvenance(embedSVGProvenance(source, record), record);
+    assert.deepEqual(readSVGProvenance(svg), record);
+    assert.equal(svg.replace(/<metadata><margo:provenance[^]*?<\/margo:provenance><\/metadata>/, ''), source);
+    assert.ok(!svg.includes('<script>') && !svg.includes('<img'));
+    for (const root of [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>',
+      '<s:svg xmlns:s="http://www.w3.org/2000/svg" width="2" height="2"><s:rect width="2" height="2"/></s:svg>',
+    ]) {
+      const out = embedSVGProvenance(root, record);
+      assert.deepEqual(readSVGProvenance(out), record);
+      assert.deepEqual(readSVGProvenance(embedSVGProvenance(out, record)), record);
+    }
+    // Entity declarations, HTML-only syntax and duplicates are refused rather than expanded or guessed.
+    for (const hostile of [
+      '<!DOCTYPE svg [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;">]><svg xmlns="http://www.w3.org/2000/svg">&b;</svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg"><img src=x onerror=bad()></svg>',
+      '<html><body><svg></svg></body></html>',
+    ]) {
+      assert.throws(() => embedSVGProvenance(hostile, record), TypeError, hostile);
+      assert.throws(() => readSVGProvenance(hostile), TypeError, hostile);
+    }
+    assert.throws(
+      () => readSVGProvenance(svg.replace('</svg>', `<metadata>${svg.match(/<margo:provenance[^]*?<\/margo:provenance>/)[0]}</metadata></svg>`)),
+      /Duplicate/,
+    );
+    fig.dispose();
+  } finally {
+    [globalThis.DOMParser, globalThis.XMLSerializer] = saved;
+  }
+});

@@ -72,3 +72,22 @@ test('MathML text is escaped and labels retain one export outline without HTML i
   assert.equal(el.querySelector('mtext').textContent, '<script> & data');
   assert.equal(JSON.parse(el.dataset.scivizMath).path, result.path);
 });
+test('security: math labels build MathML elements without parsing HTML, and hostile TeX text stays literal', () => {
+  const doc = new JSDOM('<div id="label"></div>').window.document,
+    el = doc.getElementById('label');
+  Object.defineProperty(el, 'innerHTML', {
+    set() {
+      throw new Error('math label parsed an HTML string');
+    },
+  });
+  const hostile = '"><img src=x onerror=alert(1)></math><script>alert(1)</script>';
+  mathLabel(el, String.raw`\text{${hostile}}+x`, { font });
+  const math = el.firstElementChild;
+  assert.equal(math.namespaceURI, 'http://www.w3.org/1998/Math/MathML');
+  assert.equal(math.localName, 'math');
+  assert.equal(math.getAttribute('aria-label'), String.raw`\text{${hostile}}+x`);
+  assert.equal(el.querySelectorAll('img,script').length, 0);
+  assert.equal(el.querySelector('mtext').textContent, hostile);
+  assert.equal(el.querySelector('mtext').namespaceURI, 'http://www.w3.org/1998/Math/MathML');
+  assert.ok(mathML(String.raw`\text{${hostile}}`).includes('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;'));
+});

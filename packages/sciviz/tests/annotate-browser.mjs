@@ -77,6 +77,33 @@ for (const compat of [false, true]) {
         svg.includes('&lt;script&gt;&amp;&quot;') && !svg.includes('data-handle='),
         'SVG escapes text and omits handles',
       );
+      // Security: the live overlay is built with createElementNS, setAttribute and text nodes. HTML parsing is trapped,
+      // and a hostile ID and label stay literal attribute and text values.
+      Object.defineProperty(d.ctAnnotations.element, 'innerHTML', {
+        set() {
+          throw new Error('annotation overlay parsed an HTML string');
+        },
+      });
+      const hostile = '"><img src=x onerror="window.__annotationXSS=1"><script>window.__annotationXSS=1</script>';
+      d.ctAnnotations.add({ id: hostile, kind: 'text', points: ruler.points.slice(0, 1), text: hostile });
+      d.ctAnnotations.render();
+      const overlay = d.ctAnnotations.element;
+      check(!overlay.querySelector('img,script'), 'hostile annotation strings create no elements');
+      check(
+        [...overlay.querySelectorAll('*')].every((e) => ![...e.attributes].some((a) => /^on/i.test(a.name))),
+        'hostile annotation strings create no event handler attributes',
+      );
+      check(
+        [...overlay.querySelectorAll('circle')].some((c) => c.getAttribute('data-id') === hostile) &&
+          [...overlay.querySelectorAll('text')].some((t) => t.textContent === hostile),
+        'hostile ID and label stay literal',
+      );
+      check(window.__annotationXSS === undefined, 'no hostile script ran');
+      check(
+        (await d.ct.toSVG()).includes('&quot;&gt;&lt;img src=x onerror=&quot;window.__annotationXSS=1&quot;&gt;'),
+        'exported SVG escapes the hostile label',
+      );
+      d.ctAnnotations.remove(hostile);
       const image = async (overlays) => {
         const b = await createImageBitmap(await d.ct.toPNG({ overlays })),
           c = new OffscreenCanvas(b.width, b.height),

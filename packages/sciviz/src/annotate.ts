@@ -5,6 +5,7 @@ import { annotationControllers } from './annotation-state.js';
 import type { Figure } from './figure.js';
 import { dataToClip, screenRay } from './pick.js';
 import { registerPublicationOverlay } from './publication-labels.js';
+import { markupText, renderMarkup, type Markup } from './markup.js';
 import {
   annotationSnapshot,
   annotationMeasure,
@@ -39,8 +40,6 @@ export interface AnnotationOptions {
 type Path = { points: number[][]; color: string; width: number; closed?: boolean };
 type Label = { point: number[]; text: string; color: string };
 const managers = annotationControllers;
-const xml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);
 const svgNS = 'http://www.w3.org/2000/svg';
 
 /** Figure annotations, measurement handles, picking and export/state lifecycle. */
@@ -142,7 +141,7 @@ export class Annotations extends EventTarget {
       }),
     );
     this.#offExport = registerPublicationOverlay(figure, {
-      svg: (width, height) => this.#svg(width, height, false),
+      svg: (width, height) => markupText([this.#markup(width, height, false)]),
       paint: (ctx, width, height) => this.#paint(ctx, width, height),
       dispose: () => this.dispose(),
     });
@@ -322,33 +321,65 @@ export class Annotations extends EventTarget {
     }
     return { paths, labels };
   }
-  #svg(width: number, height: number, handles: boolean): string {
+  #markup(width: number, height: number, handles: boolean): Markup {
     const r = this.#canvas.getBoundingClientRect(),
-      { paths, labels } = this.#scene();
-    let content = paths
-      .map(
-        (p) =>
-          `<polyline points="${p.points
+      { paths, labels } = this.#scene(),
+      content: Markup[] = paths.map((p) => ({
+        tag: 'polyline',
+        attributes: {
+          points: p.points
             .concat(p.closed ? [p.points[0]] : [])
             .map((v) => v.slice(0, 2).join(','))
-            .join(' ')}" fill="none" stroke="${xml(p.color)}" stroke-width="${p.width}"/>`,
-      )
-      .join('');
-    content += labels
-      .map(
-        (l) =>
-          `<text x="${l.point[0]}" y="${l.point[1]}" fill="${xml(l.color)}" font-family="system-ui,sans-serif" font-size="13">${xml(l.text)}</text>`,
-      )
-      .join('');
+            .join(' '),
+          fill: 'none',
+          stroke: p.color,
+          'stroke-width': p.width,
+        },
+      }));
+    for (const l of labels)
+      content.push({
+        tag: 'text',
+        attributes: {
+          x: l.point[0],
+          y: l.point[1],
+          fill: l.color,
+          'font-family': 'system-ui,sans-serif',
+          'font-size': 13,
+        },
+        children: [l.text],
+      });
     if (handles && this.#editable)
       for (const [record, a] of [...this.#records.values()].entries())
         if (a.visible !== false)
           for (const [index, p] of a.points.entries()) {
             const v = this.#project(p);
             if (v)
-              content += `<circle cx="${v[0]}" cy="${v[1]}" r="5" fill="#ffffff" stroke="${a.color ?? '#ffd166'}" style="pointer-events:all;cursor:move" tabindex="0" role="button" aria-label="${xml(a.id)} handle ${index + 1}" data-id="${xml(a.id)}" data-record="${record}" data-handle="${index}"/>`;
+              content.push({
+                tag: 'circle',
+                attributes: {
+                  cx: v[0],
+                  cy: v[1],
+                  r: 5,
+                  fill: '#ffffff',
+                  stroke: a.color ?? '#ffd166',
+                  style: 'pointer-events:all;cursor:move',
+                  tabindex: 0,
+                  role: 'button',
+                  'aria-label': `${a.id} handle ${index + 1}`,
+                  'data-id': a.id,
+                  'data-record': record,
+                  'data-handle': index,
+                },
+              });
           }
-    return `<g data-sciviz-annotations="" transform="scale(${width / (r.width || 1)},${height / (r.height || 1)})">${content}</g>`;
+    return {
+      tag: 'g',
+      attributes: {
+        'data-sciviz-annotations': '',
+        transform: `scale(${width / (r.width || 1)},${height / (r.height || 1)})`,
+      },
+      children: content,
+    };
   }
   #paint(ctx: OffscreenCanvasRenderingContext2D, width: number, height: number): void {
     const r = this.#canvas.getBoundingClientRect(),
@@ -378,7 +409,7 @@ export class Annotations extends EventTarget {
     this.element.style.top = `${this.#canvas.offsetTop}px`;
     this.element.setAttribute('width', String(r.width));
     this.element.setAttribute('height', String(r.height));
-    this.element.innerHTML = this.#svg(r.width, r.height, true);
+    renderMarkup(this.element, svgNS, [this.#markup(r.width, r.height, true)]);
   }
   dispose(): void {
     if (this.#disposed) return;

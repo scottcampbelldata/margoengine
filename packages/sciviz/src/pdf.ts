@@ -2,6 +2,8 @@ import type { OutlineFont, OutlineCommand } from '@margoengine/loaders/font';
 import type { Figure } from './figure.js';
 import { outlineText } from './math.js';
 import { fault, rangeError } from '../../shared/errors.js';
+import { parseXMLDocument, type XMLAttribute, type XMLElement } from '../../shared/xml-document.js';
+import { escapeXML } from '../../shared/xml-escape.js';
 
 /** Outline font, physical page size, document metadata and cancellation for PDF export. */
 export interface PDFOptions {
@@ -187,7 +189,7 @@ const inherited = [
   'visibility',
 ];
 type Style = Record<string, string>;
-const styleOf = (el: Element, parent: Style): Style => {
+const styleOf = (el: XMLElement, parent: Style): Style => {
   const s = { ...parent };
   for (const k of [...inherited, 'opacity', 'display', 'clip-path']) {
     const a = el.getAttribute(k);
@@ -206,9 +208,9 @@ const styleOf = (el: Element, parent: Style): Style => {
  */
 export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> {
   options.signal?.throwIfAborted();
-  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml'),
+  const doc = parseXMLDocument(svg, { fail: (reason) => fail(`Expected well-formed SVG: ${reason}.`) }),
     root = doc.documentElement;
-  if (root.localName !== 'svg' || doc.querySelector('parsererror')) fail('Expected well-formed SVG.');
+  if (root.localName !== 'svg') fail('Expected well-formed SVG.');
   const view = numbers(root.getAttribute('viewBox') ?? ''),
     width = Number.parseFloat(root.getAttribute('width') ?? '') || view[2],
     height = Number.parseFloat(root.getAttribute('height') ?? '') || view[3];
@@ -237,24 +239,30 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
     return `/${name} gs`;
   };
   const { parseSVG } = await import('@margoengine/loaders/svg');
-  const commands = (el: Element, w: number, h: number): OutlineCommand[] => {
-    const copy = el.cloneNode(false) as Element;
-    copy.removeAttribute('transform');
-    copy.removeAttribute('style');
-    copy.setAttribute('fill', '#000');
-    copy.setAttribute('stroke', 'none');
-    for (const attr of [...copy.attributes])
-      if (attr.value.endsWith('%'))
-        copy.setAttribute(
-          attr.name,
-          String((Number.parseFloat(attr.value) / 100) * (/^(y|height|cy|ry)$/.test(attr.name) ? h : w)),
-        );
-    const r = parseSVG(`<svg xmlns="http://www.w3.org/2000/svg">${new XMLSerializer().serializeToString(copy)}</svg>`);
+  // One shape element as outline commands: its geometry only, painted later, with percentages resolved.
+  const commands = (
+    name: string,
+    attributes: readonly Pick<XMLAttribute, 'name' | 'value'>[],
+    w: number,
+    h: number,
+  ): OutlineCommand[] => {
+    const values = new Map<string, string>();
+    for (const a of attributes) if (a.name !== 'transform' && a.name !== 'style') values.set(a.name, a.value);
+    values.set('fill', '#000');
+    values.set('stroke', 'none');
+    let shape = `<${name}`;
+    for (const [key, value] of values)
+      shape += ` ${key}="${escapeXML(
+        value.endsWith('%')
+          ? String((Number.parseFloat(value) / 100) * (/^(y|height|cy|ry)$/.test(key) ? h : w))
+          : value,
+      )}"`;
+    const r = parseSVG(`<svg xmlns="http://www.w3.org/2000/svg">${shape}/></svg>`);
     if (r.warnings.length) fail(r.warnings.join('; '));
     return r.paths[0]?.commands ?? [];
   };
   const color = (value: string): { rgb: number[]; a: number } => {
-    const c = parseSVG(`<svg><rect width="1" height="1" fill="${value.replace(/"/g, '&quot;')}"/></svg>`);
+    const c = parseSVG(`<svg><rect width="1" height="1" fill="${escapeXML(value)}"/></svg>`);
     const p = c.paths[0];
     if (!p?.fill || c.warnings.length) fail(`Unsupported colour ${value}.`);
     return { rgb: p.fill, a: p.fillOpacity };
@@ -354,7 +362,7 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
   };
   let visited = 0;
   const visit = async (
-    el: Element,
+    el: XMLElement,
     parent: Style,
     w: number,
     h: number,
@@ -414,14 +422,14 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
       const id = clip.match(/^url\(#([^)]*)\)$/)?.[1],
         cp = id ? doc.getElementById(id) : null;
       if (cp?.localName !== 'clipPath') fail('Unknown clipping path.');
-      const list = [...cp.children].flatMap((c) => commands(c, w, h));
+      const list = cp.children.flatMap((c) => commands(c.localName, c.attributes, w, h));
       out.push(contentPath(list), 'W n');
     }
     if (name === 'g' || name === 'svg') {
       for (const child of el.children) await visit(child, s, w, h, effective, depth + 1);
     } else if (s.visibility === 'hidden') {
     } else if (['rect', 'circle', 'ellipse', 'path', 'line', 'polyline', 'polygon'].includes(name))
-      paint(commands(el, w, h), s, effective);
+      paint(commands(name, el.attributes, w, h), s, effective);
     else if (name === 'text') {
       if (el.children.length) fail('Nested text spans are not emitted by figures.');
       const size = ratio(s['font-size'], 16),
@@ -435,10 +443,8 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
           (s['dominant-baseline'] === 'central'
             ? (((font.ascender + font.descender) / font.unitsPerEm) * size) / 2
             : 0);
-      const path = doc.createElementNS(root.namespaceURI, 'path');
-      path.setAttribute('d', t.path);
       out.push(`1 0 0 1 ${number(x)} ${number(y)} cm`);
-      paint(commands(path, w, h), s, effective);
+      paint(commands('path', [{ name: 'd', value: t.path }], w, h), s, effective);
     } else if (name === 'image') {
       const href = el.getAttribute('href') ?? el.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ?? '';
       if (!/^data:image\/(png|jpeg|webp);base64,/i.test(href))

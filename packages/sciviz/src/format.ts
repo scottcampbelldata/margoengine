@@ -5,6 +5,7 @@ import { RectsLayer } from './rects.js';
 import { axisScale, type Scale } from './scales.js';
 import { ticks } from './ticks.js';
 import { rangeError, fault } from '../../shared/errors.js';
+import { markupText, renderMarkup, type Markup } from './markup.js';
 import { chartDataAdapters } from './chart-data.js';
 
 /** Numeric display. Defaults: locale en-US, mode number, maximumFractionDigits 3. Dates use UTC unless timeZone is supplied. */
@@ -142,8 +143,6 @@ export function tooltipTemplate(template: string, values: Readonly<Record<string
     )(v);
   });
 }
-const xml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);
 const visible = (l: Layer) =>
   'cloud' in l ? l.cloud.visible : 'line' in l ? l.line.visible : !('visible' in l) || l.visible !== false;
 const visibility = (l: Layer, v: boolean) => {
@@ -540,19 +539,28 @@ export class ChartPolish extends EventTarget {
     this.dispatchEvent(new CustomEvent('hover', { detail: this.#hover }));
     this.relayout();
   }
-  #svg(): string {
+  #markup(): Markup[] {
     const p = this.figure.plotArea,
       b = this.figure.bounds,
       theme = this.figure.theme,
       xf = numberFormatter(this.#options.xFormat),
       yf = numberFormatter(this.#options.yFormat),
-      out: string[] = [];
+      out: Markup[] = [];
     const path = (d: string, c = theme.axis, w = theme.axisWidth ?? 1) =>
-        out.push(`<path d="${d}" stroke="${c}" stroke-width="${w}" fill="none"/>`),
+        out.push({ tag: 'path', attributes: { d, stroke: c, 'stroke-width': w, fill: 'none' } }),
       text = (x: number, y: number, s: string, anchor = 'middle') =>
-        out.push(
-          `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${theme.text}" font-family="${xml(theme.fontFamily ?? 'system-ui')}" font-size="${theme.fontSize ?? 12}">${xml(s)}</text>`,
-        );
+        out.push({
+          tag: 'text',
+          attributes: {
+            x,
+            y,
+            'text-anchor': anchor,
+            fill: theme.text,
+            'font-family': theme.fontFamily ?? 'system-ui',
+            'font-size': theme.fontSize ?? 12,
+          },
+          children: [s],
+        });
     const axis = (mapping: BrokenScale, vertical: boolean, secondary = false) => {
       const bound = (v: number, side: 0 | 1) => {
           const x = mapping.inverse(v);
@@ -612,12 +620,18 @@ export class ChartPolish extends EventTarget {
         if (vertical) {
           const y = pz[1],
             h = pa[1] - y;
-          out.push(`<rect x="${p.x - 2}" y="${y}" width="${p.width + 4}" height="${h}" fill="${theme.background}"/>`);
+          out.push({
+            tag: 'rect',
+            attributes: { x: p.x - 2, y, width: p.width + 4, height: h, fill: theme.background },
+          });
           path(`M${p.x - 4},${y + 2}l8,-4M${p.x - 4},${y + h + 2}l8,-4`);
         } else {
           const x = pa[0],
             w = pz[0] - x;
-          out.push(`<rect x="${x}" y="${p.y - 2}" width="${w}" height="${p.height + 4}" fill="${theme.background}"/>`);
+          out.push({
+            tag: 'rect',
+            attributes: { x, y: p.y - 2, width: w, height: p.height + 4, fill: theme.background },
+          });
           path(`M${x - 2},${p.y + p.height + 4}l4,-8M${x + w - 2},${p.y + p.height + 4}l4,-8`);
         }
       }
@@ -636,7 +650,7 @@ export class ChartPolish extends EventTarget {
         path(`M${a},${p.y + p.height}V${z}H${p.x}`, theme.axis);
       }
     }
-    return out.join('');
+    return out;
   }
   /** Update axis chrome and inset layout after resize, zoom or data changes. Automatically called on figure frames. */
   relayout(): void {
@@ -665,7 +679,7 @@ export class ChartPolish extends EventTarget {
       background: this.figure.theme.background,
       borderColor: this.figure.theme.axis,
     });
-    this.element.innerHTML = this.#svg();
+    renderMarkup(this.element, 'http://www.w3.org/2000/svg', this.#markup());
     for (const i of this.#insets) {
       i.host.style.left = canvas.offsetLeft + i.rect[0] * canvas.clientWidth + 'px';
       i.host.style.top = canvas.offsetTop + i.rect[1] * canvas.clientHeight + 'px';
@@ -753,7 +767,7 @@ export class ChartPolish extends EventTarget {
   async toSVG(): Promise<string> {
     this.#check();
     const base = await this.figure.toSVG();
-    let body = this.#svg();
+    let body = markupText(this.#markup());
     for (const [index, i] of this.#insets.entries()) {
       const s = (await i.chart.toSVG())
         .replace(/id="([^"]+)"/g, (_, id) => `id="inset${index}-${id}"`)

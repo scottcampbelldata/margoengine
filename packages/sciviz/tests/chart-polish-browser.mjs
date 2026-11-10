@@ -48,6 +48,49 @@ for (const compat of [false, true]) {
       if (d.cluster.rows.order.length !== 12 || d.cluster.columns.order.length !== 28)
         throw Error('Cluster dimensions lost');
       if (d.cluster.dendrogram.innerHTML.includes('NaN')) throw Error('Invalid dendrogram coordinate');
+      // Security: axis chrome and the dendrogram are built with createElementNS, setAttribute and text nodes. HTML
+      // parsing is trapped while a chart with hostile labels and categories lays out and both overlays redraw.
+      const sink = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+      Object.defineProperty(Element.prototype, 'innerHTML', {
+        configurable: true,
+        get: sink.get,
+        set() {
+          throw Error('chart overlay parsed an HTML string');
+        },
+      });
+      try {
+        const hostile = '"><img src=x onerror="window.__chartXSS=1"><script>window.__chartXSS=1</script>',
+          host = document.createElement('div'),
+          canvas = document.createElement('canvas');
+        host.style.cssText = 'position:relative;width:320px;height:200px';
+        canvas.style.cssText = 'width:320px;height:200px';
+        host.append(canvas);
+        document.body.append(host);
+        const { createFigure } = await import('/examples/sciviz-demo.ts'),
+          { polishFigure } = await import('/packages/sciviz/dist/format.js');
+        const hostileFigure = await createFigure(canvas, { mode: '2d', theme: 'light', tooltips: false, legend: false });
+        const hostileChart = await polishFigure(hostileFigure, {
+          xLabel: hostile,
+          yLabel: hostile,
+          categories: { x: [hostile, 'b'] },
+          y: { domain: [0, 1] },
+        });
+        hostileChart.relayout();
+        const overlay = hostileChart.element;
+        if (overlay.querySelector('img,script')) throw Error('Hostile chart labels created elements');
+        if ([...overlay.querySelectorAll('text')].filter((t) => t.textContent === hostile).length < 3)
+          throw Error('Hostile chart labels did not stay literal text');
+        if (!(await hostileChart.toSVG()).includes('&quot;&gt;&lt;img src=x onerror=&quot;window.__chartXSS=1&quot;'))
+          throw Error('Exported chart SVG does not escape hostile labels');
+        await d.cluster.toSVG();
+        if (d.cluster.dendrogram.querySelectorAll('path').length !== 1) throw Error('Dendrogram did not redraw');
+        if (window.__chartXSS !== undefined) throw Error('A hostile chart label ran script');
+        hostileChart.dispose();
+        hostileFigure.dispose();
+        host.remove();
+      } finally {
+        Object.defineProperty(Element.prototype, 'innerHTML', sink);
+      }
       for (const f of [d.imageFigure, d.clusterFigure]) {
         f.render();
         const c = f.engine.canvas,

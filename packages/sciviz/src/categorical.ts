@@ -2,6 +2,7 @@
 import type { Figure } from './figure.js';
 import { RectsLayer, packColour } from './rects.js';
 import { rangeError } from '../../shared/errors.js';
+import { markupText, renderMarkup, type Markup } from './markup.js';
 import { colormap, type Colormap } from './colormaps.js';
 
 /** Ordered unique categories, output interval default [0,1], paddingInner .1, paddingOuter .05. */
@@ -292,6 +293,7 @@ export function dendrogramHeatmap(
   svg.dataset.scivizDendrogram = '';
   svg.style.cssText = 'position:absolute;pointer-events:none;z-index:2';
   canvas.parentElement!.append(svg);
+  let path: Markup | undefined;
   const draw = () => {
     const p = figure.plotArea,
       b = figure.bounds,
@@ -316,7 +318,16 @@ export function dendrogramHeatmap(
     svg.setAttribute('height', String(canvas.clientHeight));
     svg.style.left = canvas.offsetLeft + 'px';
     svg.style.top = canvas.offsetTop + 'px';
-    svg.innerHTML = `<path d="${segments(rows, true)} ${segments(columns, false)}" fill="none" stroke="${figure.theme.text}" stroke-width="1.5"/>`;
+    path = {
+      tag: 'path',
+      attributes: {
+        d: `${segments(rows, true)} ${segments(columns, false)}`,
+        fill: 'none',
+        stroke: figure.theme.text,
+        'stroke-width': 1.5,
+      },
+    };
+    renderMarkup(svg, 'http://www.w3.org/2000/svg', [path]);
   };
   const resize = new ResizeObserver(draw);
   resize.observe(canvas);
@@ -338,7 +349,7 @@ export function dendrogramHeatmap(
     dendrogram: svg,
     async toSVG() {
       draw();
-      return (await figure.toSVG()).replace('</svg>', svg.innerHTML + '</svg>');
+      return (await figure.toSVG()).replace('</svg>', markupText([path!]) + '</svg>');
     },
     dispose,
     [Symbol.dispose]: dispose,

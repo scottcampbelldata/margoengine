@@ -26,7 +26,13 @@ workers.
   `DOMParser`, `srcdoc` or inline event-handler attributes (`tests/security.test.js` fails if one appears). The
   inspector tree, the frame debugger panel, the stats HUD and the view cube write node names, GPU labels and numbers
   with `textContent`. No Margo API takes an HTML string; the label/html overlays take an element your app built, so
-  its content is yours.
+  its content is yours. Sciviz overlays (annotations, chart axes, dendrograms, MathML labels) are built with
+  `createElementNS`, `setAttribute` and text nodes from the same description as their escaped SVG export.
+- **Untrusted XML is read as XML, never HTML.** SCXML (`@margoengine/fsm/scxml`) and SVG given to sciviz PDF export
+  and provenance go through Margo's strict XML 1.0 and namespaces reader (`packages/shared/xml-document.js`), which
+  builds a detached read-only tree: malformed XML, DTD internal subsets and undefined entities are refused, so there is
+  no entity expansion and no external fetch. Regression tests: `tests/shared-xml-document.test.js`, the hostile
+  cases in `packages/fsm/test/scxml.test.js` and the `security:` tests in `packages/sciviz/tests`.
 - **No prototype pollution.** JSON from glTF/GLB and .margo is parsed with `__proto__`, `constructor` and `prototype`
   keys removed at every depth, so `extras` and extensions you get back are safe to `Object.assign` or merge. Objects
   keyed by names from a file (3MF `metadata`, VTK `attributes`, USD fields, Draco attributes, XML attributes) have a

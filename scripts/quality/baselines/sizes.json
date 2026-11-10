@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14713585,
+  "total": 14723321,
   "history": [
     {
       "date": "2026-10-24",
@@ -8165,6 +8165,12 @@
       "commit": "e89263ea7",
       "reason": "batch 170 cache: a burst of hits stamps last-used times in one IndexedDB write (41 B gzip)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "1b2cde729",
+      "reason": "Security fix sec-sinks: untrusted SCXML and SVG are read by the strict shared XML 1.0 reader (packages/shared/xml-document.js) instead of DOMParser, and sciviz overlays and MathML labels are built with createElementNS/setAttribute/text nodes instead of innerHTML. Ceilings before to measured after (min+gzip B): fsm/scxml 5226 to 7494, sciviz/pdf 5700 to 8100, sciviz/provenance 27770 to 30369 (each now carries the XML reader, about 2.3 to 2.6 KB); sciviz/math 5002 to 5145, sciviz/format 8085 to 8159, sciviz/annotate 7680 to 7740 (shared escaped-markup and DOM builder only; the reader is a separate chunk loaded only by pdf and provenance). Core + stage unchanged. A smaller reader would drop well-formedness or namespace checks that keep file text as data.",
+      "grew": 6
     }
   ],
   "items": {
@@ -8534,7 +8540,7 @@
     "@margoengine/fsm/inspect": 2798,
     "@margoengine/fsm/invoke": 3865,
     "@margoengine/fsm/parallel": 2607,
-    "@margoengine/fsm/scxml": 5226,
+    "@margoengine/fsm/scxml": 7750,
     "@margoengine/fsm/trace": 1863,
     "@margoengine/game": 996,
     "@margoengine/geometry": 24691,
@@ -9028,7 +9034,7 @@
     "@margoengine/sciviz/a11y": 6480,
     "@margoengine/sciviz/aggregate": 29019,
     "@margoengine/sciviz/amr": 30374,
-    "@margoengine/sciviz/annotate": 7680,
+    "@margoengine/sciviz/annotate": 7996,
     "@margoengine/sciviz/atmosphere": 35321,
     "@margoengine/sciviz/bench": 1425,
     "@margoengine/sciviz/bricks": 29625,
@@ -9053,7 +9059,7 @@
     "@margoengine/sciviz/fallback": 2258,
     "@margoengine/sciviz/fits": 5164,
     "@margoengine/sciviz/flow": 9392,
-    "@margoengine/sciviz/format": 8085,
+    "@margoengine/sciviz/format": 8415,
     "@margoengine/sciviz/formats": 21089,
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/geo-lod": 7509,
@@ -9067,7 +9073,7 @@
     "@margoengine/sciviz/labels": 6821,
     "@margoengine/sciviz/lic": 25985,
     "@margoengine/sciviz/link": 5335,
-    "@margoengine/sciviz/math": 5002,
+    "@margoengine/sciviz/math": 5401,
     "@margoengine/sciviz/maths": 9120,
     "@margoengine/sciviz/molecule": 5419,
     "@margoengine/sciviz/monitor": 2714,
@@ -9080,14 +9086,14 @@
     "@margoengine/sciviz/omezarr": 21492,
     "@margoengine/sciviz/openfoam": 10883,
     "@margoengine/sciviz/parcoords": 9555,
-    "@margoengine/sciviz/pdf": 5700,
+    "@margoengine/sciviz/pdf": 8356,
     "@margoengine/sciviz/pick-gpu": 6209,
     "@margoengine/sciviz/pipeline": 2086,
     "@margoengine/sciviz/pointcloud": 22722,
     "@margoengine/sciviz/probe": 6844,
     "@margoengine/sciviz/progressive": 5002,
     "@margoengine/sciviz/projections": 2584,
-    "@margoengine/sciviz/provenance": 27770,
+    "@margoengine/sciviz/provenance": 31281,
     "@margoengine/sciviz/query": 7381,
     "@margoengine/sciviz/series": 14169,
     "@margoengine/sciviz/share": 5286,

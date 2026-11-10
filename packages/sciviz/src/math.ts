@@ -1,6 +1,7 @@
 import type { OutlineFont, OutlineCommand } from '@margoengine/loaders/font';
 import { fault, rangeError } from '../../shared/errors.js';
-import { parseMath, mathML, mathXML, type MathNode } from './math-parser.js';
+import { parseMath, mathTree, mathXML, type MathNode } from './math-parser.js';
+import { markupText, renderMarkup } from './markup.js';
 import type { Figure } from './figure.js';
 import { registerPublicationLabel } from './publication-labels.js';
 export { parseMath, mathML } from './math-parser.js';
@@ -266,12 +267,13 @@ export function renderMath(source: string, options: MathOptions): MathLayout {
     }
     return b;
   };
-  const b = layout(parseMath(source), size),
+  const ast = parseMath(source),
+    b = layout(ast, size),
     path = placed(b, 0, b.a).join(''),
     width = Math.max(b.w, 0.01),
     height = Math.max(b.a + b.d, 0.01);
   return {
-    mathML: mathML(source, options.display),
+    mathML: markupText([mathTree(source, options.display, ast)]),
     path,
     width,
     height,
@@ -283,7 +285,7 @@ export function renderMath(source: string, options: MathOptions): MathLayout {
 /** Replace a figure HTML label with native MathML and retain the identical path layout for SVG/PNG/PDF exports. */
 export function mathLabel(element: HTMLElement, source: string, options: MathOptions): MathLayout {
   const result = renderMath(source, options);
-  element.innerHTML = result.mathML;
+  renderMarkup(element, 'http://www.w3.org/1998/Math/MathML', [mathTree(source, options.display)]);
   element.dataset.scivizMath = JSON.stringify({ path: result.path, width: result.width, height: result.height });
   element.style.fontSize = `${options.size ?? 16}px`;
   return result;

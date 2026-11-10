@@ -1,4 +1,5 @@
 import { fault } from '../../shared/errors.js';
+import { markupText, type Markup } from './markup.js';
 
 /** Parsed, inert math syntax. No macros, HTML or executable expansion. */
 export interface MathNode {
@@ -202,19 +203,24 @@ export function parseMath(source: string): MathNode {
 
 export const mathXML = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-/** Accessible native MathML; input is escaped, never inserted as markup. */
-export function mathML(source: string, display = false): string {
-  const emit = (n: MathNode): string => {
-    const c = n.children.map(emit).join('');
+/** @internal The MathML element tree of `source`; text stays text, so no input becomes markup. */
+export function mathTree(source: string, display = false, ast: MathNode = parseMath(source)): Markup {
+  const el = (tag: string, children: (Markup | string)[], attributes?: Record<string, string>): Markup => ({
+    tag,
+    attributes,
+    children,
+  });
+  const emit = (n: MathNode): Markup => {
+    const c = n.children.map(emit);
     switch (n.kind) {
       case 'row':
-        return `<mrow>${c}</mrow>`;
+        return el('mrow', c);
       case 'frac':
-        return `<mfrac>${c}</mfrac>`;
+        return el('mfrac', c);
       case 'root':
-        return n.children.length === 2 ? `<mroot>${c}</mroot>` : `<msqrt>${c}</msqrt>`;
+        return el(n.children.length === 2 ? 'mroot' : 'msqrt', c);
       case 'scripts':
-        return `<msubsup>${c}</msubsup>`;
+        return el('msubsup', c);
       case 'matrix': {
         const pairs: Record<string, string[]> = {
           pmatrix: ['(', ')'],
@@ -225,10 +231,17 @@ export function mathML(source: string, display = false): string {
           cases: ['{', ''],
         };
         const p = pairs[n.text!] ?? ['', ''];
-        return `<mrow><mo stretchy="true">${mathXML(p[0])}</mo><mtable>${c}</mtable><mo stretchy="true">${mathXML(p[1])}</mo></mrow>`;
+        return el('mrow', [
+          el('mo', [p[0]], { stretchy: 'true' }),
+          el('mtable', c),
+          el('mo', [p[1]], { stretchy: 'true' }),
+        ]);
       }
       case 'tr':
-        return `<mtr>${n.children.map((x) => `<mtd>${emit(x)}</mtd>`).join('')}</mtr>`;
+        return el(
+          'mtr',
+          n.children.map((x) => el('mtd', [emit(x)])),
+        );
       case 'accent': {
         const marks: Record<string, string> = {
           hat: '^',
@@ -242,16 +255,29 @@ export function mathML(source: string, display = false): string {
           tilde: '~',
           widetilde: '~',
         };
-        const tag = n.text === 'underline' ? 'munder' : 'mover';
-        return `<${tag} accent="true">${c}<mo stretchy="true">${marks[n.text!]}</mo></${tag}>`;
+        return el(n.text === 'underline' ? 'munder' : 'mover', [...c, el('mo', [marks[n.text!]], { stretchy: 'true' })], {
+          accent: 'true',
+        });
       }
       case 'space':
-        return `<mspace width="${n.text === 'qquad' ? 2 : n.text === 'quad' ? 1 : n.text === '!' ? -0.167 : 0.167}em"/>`;
-      default: {
-        const tag = n.kind === 'text' ? 'mtext' : n.kind === 'operator' || n.kind === 'delimiter' ? 'mo' : n.kind;
-        return `<${tag}>${mathXML(n.text ?? '')}</${tag}>`;
-      }
+        return {
+          tag: 'mspace',
+          attributes: { width: `${n.text === 'qquad' ? 2 : n.text === 'quad' ? 1 : n.text === '!' ? -0.167 : 0.167}em` },
+        };
+      default:
+        return el(
+          n.kind === 'text' ? 'mtext' : n.kind === 'operator' || n.kind === 'delimiter' ? 'mo' : n.kind,
+          [n.text ?? ''],
+        );
     }
   };
-  return `<math xmlns="http://www.w3.org/1998/Math/MathML" display="${display ? 'block' : 'inline'}" aria-label="${mathXML(source)}">${emit(parseMath(source))}</math>`;
+  return el('math', [emit(ast)], {
+    xmlns: 'http://www.w3.org/1998/Math/MathML',
+    display: display ? 'block' : 'inline',
+    'aria-label': source,
+  });
+}
+/** Accessible native MathML; input is escaped, never inserted as markup. */
+export function mathML(source: string, display = false): string {
+  return markupText([mathTree(source, display)]);
 }
