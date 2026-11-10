@@ -15,6 +15,31 @@ Batch 190 job 2: no open defect found in float32 weighted accumulation. The entr
 
 Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
 
+### WebKit draws its own MediaRecorder VP8 WebM 10 levels too bright (batch 121, 2026-11-10)
+
+- **What:** `packages/video/test/record-check.mjs` fails in Playwright WebKit 2370 on the Apple M6: a recording of #336699
+  (51, 102, 153) reads back through WebKit's `<video>` as (61, 113, 164), outside the check's 4 levels. MP4 from the same page
+  reads (50, 101, 151).
+- **Repro:** record a plain 2D canvas filled with #336699 for 1.5 s with `recordCanvas(canvas, { format: 'webm' })` in WebKit,
+  seek the decoded `<video>` to 0.5 s and read the centre pixel. No engine code is involved.
+- **Cause:** WebKit's side. ffmpeg reads the same file as Y 95, Cb 159, Cr 100, the BT.601 limited-range code of #336699, and
+  draws (47, 103, 155); the WebM carries no colour range, and WebKit's player draws it as full range. Not fixed: Margo writes
+  neither the container nor the decoder. The check is unchanged and stays red in WebKit.
+
+### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
+
+- **What:** the `tools/real-proof/safari` page in Safari 27.2 at 07:52 recorded Fox for 3 s with `recordCanvas` MP4 and got 2
+  frames (at 0 and 1.33 s) in a file whose duration AVFoundation and ffprobe read as 5,576.2 s. The page's loop drew 1 frame.
+- **Not known:** whether the page was hidden then (the Mac locked at 08:06; later runs reported `hidden` and the page now skips
+  recording when hidden). Playwright WebKit's MP4 of the same kind is right (1.5 s, 44 frames in AVFoundation).
+- **Needed to close:** the Safari recording run in Scott's list in docs/whitepaper/proof-audit.md, with the screen unlocked.
+
+### WebKit `headless` browser check: lossy WebP encode is refused (batch 121, 2026-11-10, open)
+
+- **What:** `packages/headless/tests/browser-check.mjs` passes its WebM and MP4 rows in Playwright WebKit and then stops on
+  `This runtime cannot encode lossy WebP`. WebKit's canvas has no WebP encoder, and the library says so with its coded error;
+  the check expects every browser to encode WebP. Not changed in batch 121.
+
 ### Batch 238 follow-up: transformed bitmap alpha precision
 
 Whole untransformed straight-alpha bitmap uploads now preserve every channel. A cropped, flipped or explicitly premultiplied ImageBitmap still passes through Canvas2D in webgl2-compat/device/render.ts and can quantize low-alpha RGB. Repro: crop the 61x23 diagnostic WebP from splats/test/gpu/check.mjs before copying it and compare straight RGB at alpha 0 or 1. Cause: Canvas2D stores premultiplied colour; a GPU transform path is needed to retain straight RGB through these operations. This existing transformed-copy gap is outside the progressive-loading job; unchanged-bitmap regression and existing transform semantics both pass.

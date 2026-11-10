@@ -75,7 +75,7 @@ Part of each claim stands on the real thing. The table names the part that does 
 | LIM-281: FBX type 0 under a sheared parent | A real Maya rig for the rest. This case is a hand-worked result. | Stand-in | What the FBX SDK really gives. | A real file with it, or the SDK's output. | Not run. |
 | LIM-282: Automatic rig | Real meshes, joints measured against authored skeletons. No rigged mesh was drawn on a GPU or opened in another tool. | Own reader | Whether the rig deforms well: a joint in the right place can still bend badly. | Export a rigged mesh, pose it in Blender, and look. | Not run. |
 | LIM-283, LIM-286, LIM-289, LIM-290: Exact and moment transparency, blending in OIT, depth of glass | Real GPU against blending worked out by hand. Generated planes stand in for real glass. | Stand-in | A real model with deep overlapping glass. | A real transparent model drawn against a path traced picture. | Not run. |
-| LIM-291: Render to video | Real GPU and the own encoders of the browser and decoders, on one machine. The scene and tone are generated. | Stand-in | Whether a player outside the browser opens the file. | Open a rendered file in VLC or QuickTime. | Not run. |
+| LIM-291: Render to video | Real GPU and the own encoders of the browser and decoders, on one machine. The scene and tone are generated. | Stand-in | Whether a player outside the browser opens the file. | Open a rendered file in VLC or QuickTime. | AVFoundation, under QuickTime Player, opens the MP4 from Chrome and from WebKit: 60 frames at i / 30, the tone from 1.000 s by `afconvert`. Running it in WebKit found three faults, fixed in `ba89faa5a`. QuickTime Player itself and VLC not run. |
 | LIM-292: Take recorder | Real `Mesh`, `Camera` and `Input` classes, with events dispatched by the test. | Stand-in | A real device and a person playing a take. | Record a take with a real gamepad or mouse. | Not run. |
 | LIM-253: USDZ of 25 static GLBs | `usdchecker --arkit`, `usdcat --flatten` with our bounds maths, SceneKit on one file. | Validator | What a person sees on a phone, at what size, and how it behaves in AR. A valid file is not a usable one: LIM-265 passed everything on a Mac and failed on the first iPhone. | AR Quick Look on an iPhone, for a sample. | Blender 5.3 USD importer: 27 of 27 equal in meshes, triangles and bounds within 2e-7, with three settled by plain glTF maths in the file's favour. Quick Look thumbnails on the Mac: 18 of 28 read by eye, right way up and textured; 10 not drawn, the system extension stopped answering. |
 
@@ -159,14 +159,33 @@ These were in the tables above until batch 121 ran them.
 | LIM-095 | ABeautifulGame: Apple `usdcat --flatten` composes 49 meshes from 10 classes and 44 references, and Blender 5.3 reads 49 meshes and 1,499,072 triangles, bounds gap 4.22e-8. Status back to PROVEN. |
 | LIM-233 | Safari 27.2 on an Apple M6 ran the browser path on 9 of 9 fixtures, Wasm hashes equal 9 of 9. It also found an open bug: `bench_oriented_brg` is red in Safari and green from the Wasm path, as the Wasm path applies no colour profile (known-bugs.md). |
 
+## Apple proofs on the Mac, list 4 (2026-11-10)
+
+Batch 121 again, on the M6 Mac mini, Apple tools first. The screen was locked from 08:06, which matters: Safari's page reported itself hidden, so it drew and decoded but presented no canvas frames, and `qlmanage` hung where `QLThumbnailGenerator` did not.
+
+| What ran | Tool | Result |
+| --- | --- | --- |
+| The `tools/real-proof/safari` page: 5 models, 9 JPEG XL files | Safari 27.2 (WebGPU on Metal), and the same page in Chrome | 5 of 5 models draw with no error and look the same in both. JPEG XL: Wasm hashes equal 9 of 9, and `bench_oriented_brg` now agrees within 1 of 255 between Safari and the Wasm path (LIM-233 updated). |
+| `renderCutscene` to WebM and MP4 (LIM-291) | Playwright WebKit, Chrome, then AVFoundation (`tools/real-proof/avfoundation_video.swift`) and `afconvert` | WebKit failed: its AAC description is a whole ES_Descriptor, it stamps chunks from each AudioData, and with no `roll` group its `decodeAudioData` cut the lead-in twice (tone 44 ms early). Fixed with three tests in `ba89faa5a`; now passes in both, and Apple's frameworks read both files right. |
+| `recordCanvas` MP4 (LIM-571) | Chrome, then AVFoundation | Chrome's own MP4 was VP9, and AVFoundation said "Cannot Decode". Fixed in `34463ac6d` (H.264, with AAC for sound); the new file opens, 87 frames. |
+| `recordCanvas` WebM colour (LIM-571) | Playwright WebKit, ffmpeg | WebKit draws its own VP8 recording of #336699 as (61, 113, 164); ffmpeg reads the same file as (47, 103, 155). A plain 2D canvas does the same, so it is WebKit's, in known-bugs.md. |
+| `recordCanvas` in Safari | Safari 27.2 | Not proved. From 08:06 the page was hidden and recorded nothing; an earlier run (07:52, page state not logged) made a 2-frame MP4 whose header says 5,576 s, and AVFoundation reads it so. Open in known-bugs.md; needs the screen unlocked (Scott's list below). |
+| 25 static, 31 animated and 8 textured USDZ from current main | `usdchecker --arkit` | 64 of 64 pass, 4 with the known normal-scale warning. |
+| The 31 animated files at set heights | RealityKit `visualBounds` | Every height as asked (Fox 0.45, robot 1.0, RiggedFigure 1.8) and the floor at 0, robot-expressive's posed parts aside. MorphStressTest's 3 clips have no animation in RealityKit: morph weights are not written, so they are still files (LIM-265 corrected). |
+| 6 of those files | Quick Look thumbnails (`QLThumbnailGenerator`) | All 6 draw upright and textured. ToyCar's cloth is black where glTF's sheen makes it red: a USDZ cannot hold sheen, as limits.md says. |
+
+Not installed on the Mac, so not run here: Godot, PrusaSlicer, Unity, Unreal, VLC. Blender 5.3 is installed and was not rerun: its earlier rows stand. The Playwright WebKit sweep of every package's GPU suite (2026-11-10, 06:45) failed 47 commands; batch 121 triaged only the video ones, and the rest are in finish-later.md.
+
 ## Tests only Scott can do
 
 An agent has no phone, no headset and no account, so these wait for a person. Each takes minutes once the files are on the device.
 
 | Test | What it closes | What to look at |
 | --- | --- | --- |
-| Open the static and animated USDZ files on an iPhone in AR Quick Look | LIM-253, LIM-265, "Animated USDZ: the fix for the first iPhone failure awaits a retest", "RiggedFigure first loads off the floor" | Right size against the room, standing on the floor, clip plays, textures right. |
+| Open the static and animated USDZ files on an iPhone in AR Quick Look: the set made on 2026-11-10 is in `~/Development/Projects/margo-device-tests/2026-11-10/` on the Mac (`static`, `animated` at set heights, `textured`), AirDrop the folder | LIM-253, LIM-265, "Animated USDZ: the fix for the first iPhone failure awaits a retest", "RiggedFigure first loads off the floor" | Right size against the room, standing on the floor, clip plays, textures right. |
 | Open the eight files of `scripts/make-usdz-quicklook-kit.mjs` on an iPhone | "USDZ export with textures: Quick Look on a Mac only" | Compare with the file descriptions at the top of that script. |
 | Open the stage XR example in a headset browser with WebXR and WebGPU, and the WebGL2 layer example in one with WebGL2 | LIM-120, LIM-151, "WebXR AR hit testing: never run on an AR device" | The session starts, the view tracks the head, a hit test lands on a real surface. |
+| Unlock the Mac, keep Safari in front, and open `http://127.0.0.1:18765/index.html?only=record` while `python3 tools/real-proof/safari/server.py tools/real-proof/safari/dist 18765 report.json` runs | LIM-571 in Safari | `record.mp4` beside `report.json` opens in QuickTime Player, about 3 s, Fox turning. |
+| Play `cutscene-chrome.mp4` and `cutscene-webkit.mp4` from the same folder on the iPhone | LIM-291 on a device | A cube moves right, the shot cuts at 1 s, a tone starts at 1 s. |
 | Sign in to Unity Hub on the PC | The Unity sampler add-on and postprocessor row above | Then an agent runs the import. |
 | Open a Roblox Studio account | The Roblox preset row above | Then an agent or Scott imports the preset file. |

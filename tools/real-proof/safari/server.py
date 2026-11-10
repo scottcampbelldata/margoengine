@@ -1,10 +1,11 @@
 # Serves the page and takes its reports. Python only: there is no node on the Mac.
 import http.server, sys, json, os
-os.chdir(sys.argv[1])
+sys.argv[3] = os.path.abspath(sys.argv[3]); os.chdir(sys.argv[1])
 class H(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get('content-length', 0)); b = self.rfile.read(n)
-        open(sys.argv[3], 'wb').write(b)
+        name = self.path[len('/file/'):] if self.path.startswith('/file/') else None
+        open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[3])), os.path.basename(name)) if name else sys.argv[3], 'wb').write(b)
         self.send_response(204); self.end_headers()
     def log_message(self, *a): pass
     def end_headers(self):

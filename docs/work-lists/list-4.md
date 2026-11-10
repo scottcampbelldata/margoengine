@@ -5,7 +5,7 @@ prompts are in `list-4-prompts.md`.
 
 | Stream | Work | Batch | Package | Jobs | Status |
 | --- | --- | --- | --- | --- | --- |
-| K | Apple proofs first | 121 | proof audit | 4 | running (Mac) |
+| K | Apple proofs first | 121 | proof audit | 4 | done |
 | L | review | R5 | list 2 and 3 packages | 22 | running (Mac) |
 | M | research audit | 132 | every package except sciviz (still building on the dev PC) | 6 | running (Mac) |
 
