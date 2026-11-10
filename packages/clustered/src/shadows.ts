@@ -152,6 +152,10 @@ const SUN_LIST = 16,
   AREA_SLOTS = AREA + AREA_LIST * 4,
   AREA_MATRICES = AREA_SLOTS + AREA_SHADOW_SLOTS * 4,
   EXTENDED_FLOATS = AREA_MATRICES + AREA_SHADOW_SLOTS * 6 * 16,
+  // While some point or spot light has a shadow radius: per slot its UV extent at unit depth and guard band, then near,
+  // far and radius (two vec4f), after the directional and area data.
+  SOFT = EXTENDED_FLOATS,
+  SOFT_FLOATS = SOFT + MAX_LIGHTS * 8,
   TOTAL_LAYERS = LAYERS + MAX_DIRECTIONAL_SHADOWS * 4 + AREA_SHADOW_SLOTS * 6,
   SIGNATURE = 18,
   noSuns: readonly DirectionalShadowLight[] = [],
@@ -160,9 +164,9 @@ const SUN_LIST = 16,
 // A point light picks the cube face by the major axis of the offset receiver, so faces need no seam filtering.
 // 3x3 PCF (Reeves, Salesin & Cook 1987) with slope and normal offsets (Holbert 2011); the default bias 1 and
 // normalBias 1.5 texels are Margo's.
-const sampling = (group: number, sun = false, area = false) =>
+const sampling = (group: number, sun = false, area = false, soft = false) =>
   /* wgsl */ `
-struct LocalShadowFrame {settings:vec4f,lights:array<vec4f,${MAX_LIGHTS}>,matrices:array<mat4x4f,${LAYERS}>${sun || area ? extendedFrame : ''}}
+struct LocalShadowFrame {settings:vec4f,lights:array<vec4f,${MAX_LIGHTS}>,matrices:array<mat4x4f,${LAYERS}>${sun || area || soft ? extendedFrame : ''}${soft ? `,soft:array<vec4f,${MAX_LIGHTS * 2}>` : ''}}
 @group(${group}) @binding(14) var<uniform> localShadowFrame:LocalShadowFrame;
 @group(${group}) @binding(15) var localShadowMap:texture_depth_2d_array;
 @group(${group}) @binding(16) var localShadowSampler:sampler_comparison;
@@ -175,13 +179,15 @@ fn clusterShadow(light:ClusterLight,position:vec3f,n:vec3f)->f32 {
     if(a.x>=a.y&&a.x>=a.z){layer+=select(1u,0u,d.x>0);}else if(a.y>=a.z){layer+=select(3u,2u,d.y>0);}else{layer+=select(5u,4u,d.z>0);}}
   let clip=localShadowFrame.matrices[layer]*vec4f(p,1);if(clip.w<=0){return 1.0;}
   let ndc=clip.xyz/clip.w;let uv=ndc.xy*vec2f(0.5,-0.5)+0.5;if(any(uv<vec2f(0))||any(uv>vec2f(1))||ndc.z<=0){return 1.0;}
-  var lit=0.0;
+${soft ? '  if(localShadowFrame.soft[slot*2u-2u].x>0){return clusterSoftShadow(slot-1u,localShadowFrame.matrices[layer],p,n,clip.w,uv,ndc.z,i32(layer),distance);}\n' : ''}  var lit=0.0;
   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+vec2f(f32(x),f32(y))*localShadowFrame.settings.w,i32(layer),ndc.z);}}
   return lit/9.0;
 }
 ` +
   (sun ? sunShadow : '') +
-  (area ? areaShadow : '');
+  (area || soft ? shadowTap : '') +
+  (area ? areaShadow : '') +
+  (soft ? softShadow : '');
 const extendedFrame = `,sun:array<vec4f,${SUN_LIST}>,sunCascades:array<vec4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,sunMatrices:array<mat4x4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,area:array<vec4f,${AREA_LIST}>,areaSlots:array<vec4f,${AREA_SHADOW_SLOTS}>,areaMatrices:array<mat4x4f,${AREA_SHADOW_SLOTS * 6}>`;
 // Directional light j: sun[j] is (first layer, slot + 1, cascades); per cascade, the world size of a texel and the UV box
 // whose 3x3 filter stays inside the map. The finest cascade holding the receiver shades it; outside all of them it is lit.
@@ -208,8 +214,9 @@ const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n
 // tangent plane mapped into the face (planes stay planes under a projection) is the reference depth at every tap.
 // Taps on a Vogel 1979 spiral (golden angle 2.39996323); receiver-plane depth bias after Isidoro 2006 (GDC). The 16
 // blocker / 24 filter taps, the x3 reach and the 0.01 x distance tangent are Margo tuning.
-const areaShadow = /* wgsl */ `fn localShadowTap(i:u32,count:u32)->vec2f {let a=f32(i)*2.39996323;return vec2f(cos(a),sin(a))*sqrt(f32(i)/f32(count));}
-fn localAreaVisibility(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {
+const shadowTap = /* wgsl */ `fn localShadowTap(i:u32,count:u32)->vec2f {let a=f32(i)*2.39996323;return vec2f(cos(a),sin(a))*sqrt(f32(i)/f32(count));}
+`;
+const areaShadow = /* wgsl */ `fn localAreaVisibility(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {
   let info=localShadowFrame.area[j];if(info.y<0.5){return 1.0;}
   let slot=u32(info.y)-1u;let s=localShadowFrame.areaSlots[slot];let distance=length(c);let texel=s.x*distance;
   let p=position+n*(texel*localShadowFrame.settings.z)+c/max(distance,0.0001)*(texel*localShadowFrame.settings.y);
@@ -243,6 +250,32 @@ fn localAreaVisibility(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphe
 fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {return localAreaVisibility(j,position,n,c,r,u,false);}
 fn clusterShapeShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {return localAreaVisibility(j+64u,position,n,c,r,u,sphere);}
 `;
+// Point or spot light slot k with a shadow radius R (soft[2k]: R / (2 tan) per UV axis at unit depth, guard band;
+// soft[2k + 1]: near, far, R). PCSS (Fernando 2005) as the area lights': the blocker search covers the light's
+// footprint at the receiver (x3, blockers down to a quarter of the receiver's depth), the penumbra is the light's
+// extent at the receiver times (receiver - blocker) / blocker depth, and the receiver's tangent plane is the reference
+// depth at every tap (Isidoro 2006). The maps of these lights cover the light's cone plus the guard band (1.25 x its
+// tangent, as an area light's faces), so a filter up to the guard band reads the face's own map.
+const softShadow = /* wgsl */ `fn clusterSoftShadow(k:u32,m:mat4x4f,p:vec3f,n:vec3f,w:f32,uv:vec2f,z:f32,layer:i32,distance:f32)->f32 {
+  let s=localShadowFrame.soft[k*2u];let d=localShadowFrame.soft[k*2u+1u];let smallest=1.5*localShadowFrame.settings.w;
+  let t1=normalize(cross(n,select(vec3f(1,0,0),vec3f(0,1,0),abs(n.x)>0.9)))*(distance*0.01);let t2=cross(n,t1);
+  let c1=m*vec4f(p+t1,1);let c2=m*vec4f(p+t2,1);
+  let d1=vec3f(c1.xy/c1.w*vec2f(0.5,-0.5)+0.5-uv,c1.z/c1.w-z);let d2=vec3f(c2.xy/c2.w*vec2f(0.5,-0.5)+0.5-uv,c2.z/c2.w-z);
+  let det=d1.x*d2.y-d1.y*d2.x;
+  let slope=select(vec2f(0),vec2f(d1.z*d2.y-d2.z*d1.y,d1.x*d2.z-d2.x*d1.z)/det,abs(det)>1e-12);
+  let extent=s.xy/w;let size=vec2f(textureDimensions(localShadowMap));let reach=min(extent*3.0,vec2f(s.z));
+  var blockers=0.0;var depth=0.0;
+  for(var i=0u;i<16u;i++){
+    let o=localShadowTap(i,16u)*reach;let stored=textureLoad(localShadowMap,vec2i(clamp((uv+o)*size,vec2f(0),size-1)),layer,0);
+    if(stored>z+dot(slope,o)){blockers+=1.0;depth+=d.x*d.y/(stored*(d.y-d.x)+d.x);}
+  }
+  if(blockers<0.5){return 1.0;}
+  let blocker=depth/blockers;let radius=clamp(extent*max(w-blocker,0.0)/blocker,vec2f(smallest),vec2f(max(s.z,smallest)));
+  var lit=0.0;
+  for(var i=0u;i<24u;i++){let o=localShadowTap(i,24u)*radius;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
+  return lit/24.0;
+}
+`;
 // Same text shape as @margoengine/shadows' depth shader, so shared/instances.js instancedDepth applies.
 const depth = (pbr: boolean, transformed: boolean) => /* wgsl */ `
 @group(0) @binding(0) var<uniform> camera:mat4x4f;
@@ -264,6 +297,13 @@ const axes = [
   [0, 0, -1],
 ] as const;
 /** Reversed-depth perspective view-projection looking along unit `f` from `e` (column-major, into `out` at `o`). */
+const frameFloats = (sun: boolean, area: boolean, soft: boolean) =>
+  soft ? SOFT_FLOATS : sun || area ? EXTENDED_FLOATS : FRAME_FLOATS;
+/** A castShadow light's `shadow.radius` (validated by `Clustered.setLights`), 0 when unset. */
+function shadowRadius(light: { shadow?: boolean | { radius?: number } } | undefined): number {
+  const shadow = light?.shadow;
+  return (shadow && typeof shadow === 'object' && shadow.radius) || 0;
+}
 function lightMatrix(
   out: Float32Array,
   o: number,
@@ -343,7 +383,8 @@ function fits(width: number, height: number, size: number, kind: string): void {
     );
 }
 /**
- * Shadows for clustered point lights (six cube faces) and spot lights (one perspective map) in one depth texture array.
+ * Shadows for clustered point lights (six cube faces) and spot lights (one perspective map) in one depth texture array,
+ * filtered 3x3, or by PCSS for a light with a `shadow.radius` above 0.
  * Lights with `castShadow` take slots in list order up to `maxLights`. The same array, casters and biases shadow
  * `DirectionalLights` with `castShadow` (orthographic maps: a `bounds` box or one to four camera-fitted cascades, 3x3
  * PCF) and `AreaLights` with `castShadow` (cube faces around the light, PCSS penumbrae scaled by its size), without
@@ -392,7 +433,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private draws = new Map<Mesh, Map<object, Draw>>();
   private sources: Source[] = [];
   /** The frame with the directional and area data; `values` is its point and spot part, uploaded alone otherwise. */
-  private readonly all = new Float32Array(EXTENDED_FLOATS);
+  private readonly all = new Float32Array(SOFT_FLOATS);
   private readonly values = this.all.subarray(0, FRAME_FLOATS);
   private readonly matrices = new Float32Array(TOTAL_LAYERS * 64);
   /** Receivers' matrices per layer: the depth pass's, or for a smaller map the same mapped into its corner. */
@@ -410,6 +451,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** Some directional (area) light casts: the WGSL and the frame carry their data. */
   private sunShadows = false;
   private areaShadows = false;
+  /** Some shadowed point or spot light has a `shadow.radius`: the WGSL and the frame carry its PCSS data. */
+  private softShadows = false;
+  /** Each light's `shadow.radius` as `setLights` took it (light objects are the caller's), and the list it came from. */
+  private readonly radii = new Float32Array(1024);
+  private radiusList?: readonly unknown[];
   /** Layers the depth-pass camera buffer holds; it grows past the point and spot layers only for directional and area maps. */
   private cameraLayers = 0;
   private readonly list: Draw[] = [];
@@ -501,7 +547,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   }
   /** @internal ClusteredShadow: WGSL for the light loop. */
   declarations(group: number): string {
-    return sampling(group, this.sunShadows, this.areaShadows);
+    return sampling(group, this.sunShadows, this.areaShadows, this.softShadows);
   }
   /** @internal ClusteredShadow: bindings 14-16 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
@@ -603,15 +649,17 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
    * Turns the directional and area parts of the frame and WGSL on or off: a larger frame buffer while either casts, and
    * Clustered rebuilds its shaders with the new declarations.
    */
-  private extend(sun: boolean, area: boolean): void {
-    if (sun === this.sunShadows && area === this.areaShadows) return;
-    const resize = sun || area ? !(this.sunShadows || this.areaShadows) : true;
+  private extend(sun: boolean, area: boolean, soft: boolean): void {
+    if (sun === this.sunShadows && area === this.areaShadows && soft === this.softShadows) return;
+    const floats = frameFloats(sun, area, soft),
+      resize = floats !== frameFloats(this.sunShadows, this.areaShadows, this.softShadows);
     this.sunShadows = sun;
     this.areaShadows = area;
+    this.softShadows = soft;
     if (resize) {
       this.frame!.destroy();
       this.frame = this.device!.createBuffer({
-        size: (sun || area ? EXTENDED_FLOATS : FRAME_FLOATS) * 4,
+        size: floats * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
       this.bind();
@@ -641,13 +689,21 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       values = this.values;
     // Slots from the clustered list: params.z is the 1-based shadow ordinal.
     let used = 0,
-      layers = 0;
-    const bases = this.bases.fill(0);
+      layers = 0,
+      soft = false;
+    const bases = this.bases.fill(0),
+      lightList = this.lights.list,
+      radii = this.radii;
+    if (lightList !== this.radiusList) {
+      this.radiusList = lightList;
+      for (let j = 0; j < count; j++) radii[j] = shadowRadius(lightList[j]);
+    }
     for (let j = 0; j < count; j++) {
       const at = j * 16,
         slot = data[at + 14] - 1;
       if (slot < 0 || slot >= max) continue;
       used = Math.max(used, slot + 1);
+      if (radii[j] > 0) soft = true;
       // A hemisphere spot (cosine data[at + 11]) is shadowed as a point light: six cube faces.
       const point = data[at + 13] < 0.5 || hemisphere(data[at + 11]);
       bases[slot] = point ? 6 : 1;
@@ -672,7 +728,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.areaBases[s] = layers;
       layers += areas[s].twoSided ? 6 : 5;
     }
-    this.extend(sunCount > 0, areaCount > 0);
+    this.extend(sunCount > 0, areaCount > 0, soft);
     if (layers > this.layers) this.allocate(layers);
     for (let j = 0; j < count; j++) {
       const at = j * 16,
@@ -692,7 +748,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         throw new RangeError(
           `A castShadow light's shadow.resolution exceeds LocalShadows resolution ${size}; lower it or raise resolution`,
         );
-      let same = slots[s + 11] === base && slots[s + 10] === (point ? 1 : 0);
+      const radius = radii[j];
+      let same = slots[s + 11] === base && slots[s + 10] === (point ? 1 : 0) && slots[s + 9] === radius;
       const smaller = width !== size || height !== size;
       if (this.viewports[base * 2] !== (smaller ? width : 0) || this.viewports[base * 2 + 1] !== (smaller ? height : 0)) same = false;
       for (let k = 0; k < 8; k++) if (slots[s + k] !== data[at + (k < 4 ? k : k + 4)]) same = false;
@@ -701,19 +758,36 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       if (same && !this.changed) continue;
       for (let k = 0; k < 8; k++) slots[s + k] = data[at + (k < 4 ? k : k + 4)];
       slots[s + 8] = size;
+      slots[s + 9] = radius;
       slots[s + 10] = point ? 1 : 0;
       slots[s + 11] = base;
       for (let k = 0; k < 4; k++) slots[s + 12 + k] = cameras[c + k];
       // Two texels of margin per side keep the 3x3 filter inside a cube face; the spot frustum covers the outer cone.
       // A smaller map draws into its layers' top-left corner: viewportMatrix keeps that margin and maps the UVs.
+      // A light with a shadow radius covers its cone plus an area light's guard band (AREA_FACE_TAN) for the PCSS filter.
       const scaled = width !== size || height !== size,
         margin = size / (size - 4),
         cos = data[at + 11],
         cone = point ? 1 : Math.sqrt(1 - cos * cos) / cos,
-        tan = scaled ? cone : cone * margin;
+        tan = radius > 0 ? cone * AREA_FACE_TAN : scaled ? cone : cone * margin,
+        small = Math.min(width, height);
       values[4 + slot * 4] = base;
       values[5 + slot * 4] = point ? 1 : 0;
-      values[6 + slot * 4] = scaled ? (2 * cone) / (Math.min(width, height) - 4) : (2 * tan) / size;
+      values[6 + slot * 4] =
+        radius > 0 ? (2 * tan) / (small - (scaled ? 4 : 0)) : scaled ? (2 * cone) / (small - 4) : (2 * tan) / size;
+      const q = SOFT + slot * 8;
+      if (radius > 0) {
+        // UV per world unit at unit depth along each axis (a smaller map's corner, less its two-texel margins), the
+        // guard band as the area lights', and near, far, radius for the blocker depths.
+        const inner = scaled ? (small - 4) / small : 1,
+          smallest = 1.5 / size;
+        this.all[q] = (radius * (scaled ? (width - 4) / size : 1)) / (2 * tan);
+        this.all[q + 1] = (radius * (scaled ? (height - 4) / size : 1)) / (2 * tan);
+        this.all[q + 2] = Math.max(((0.5 - (0.5 * inner) / AREA_FACE_TAN) * small) / size - smallest, smallest);
+        this.all[q + 4] = near;
+        this.all[q + 5] = range;
+        this.all[q + 6] = radius;
+      } else this.all.fill(0, q, q + 8);
       for (let face = 0; face < (point ? 6 : 1); face++) {
         const layer = base + face;
         lightMatrix(
@@ -733,8 +807,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         this.signatures[layer * SIGNATURE] = NaN;
       }
     }
-    const extended = this.sunShadows || this.areaShadows;
-    if (extended) this.extras(c, suns, sunCount, areas, areaCount, size);
+    const extended = this.sunShadows || this.areaShadows || this.softShadows;
+    if (this.sunShadows || this.areaShadows) this.extras(c, suns, sunCount, areas, areaCount, size);
     values[0] = used;
     values[1] = o.bias ?? 1;
     values[2] = o.normalBias ?? 1.5;
@@ -745,7 +819,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       0,
       (extended ? this.all : values) as Float32Array<ArrayBuffer>,
       0,
-      extended ? EXTENDED_FLOATS : 4 + MAX_LIGHTS * 4 + pointLayers * 16,
+      extended
+        ? frameFloats(this.sunShadows, this.areaShadows, this.softShadows)
+        : 4 + MAX_LIGHTS * 4 + pointLayers * 16,
     );
     // Casters: any change re-renders every layer (ponytail: per-light caster bounds would limit it to the lights it reaches).
     const engine = this.engine!;
@@ -1159,7 +1235,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.layers = 0;
     this.slots.fill(NaN);
     this.signatures.fill(NaN);
-    this.sunShadows = this.areaShadows = false;
+    this.sunShadows = this.areaShadows = this.softShadows = false;
     this.cameraLayers = 0;
     this.changed = true;
   }

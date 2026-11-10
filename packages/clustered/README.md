@@ -361,8 +361,48 @@ lights.setLights([{position: [0, 4, 0], range: 12, castShadow: true, shadow: {re
 local.add(blocker);
 ```
 
+### Soft point and spot shadows
+
+A castShadow point or spot light's `shadow.radius` (world units, default 0) gives it the size of a bulb: its
+`LocalShadows` penumbra widens with the receiver's distance behind the blocker, as a real lamp's does, instead of the
+fixed 3x3 filter:
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const floor = engine.createMesh().setGeometry(box()).setScale([10, 0.1, 10]);
+const bar = engine.createMesh().setGeometry(box()).setScale([1, 0.05, 6]).setPosition([0, 1.5, 0]);
+const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});
+lights.setLights([
+  {position: [0, 3, 0], range: 20, intensity: 30, castShadow: true, shadow: {radius: 0.4}},
+  {position: [3, 3, 0], range: 20, direction: [0, -1, 0], angle: 1, intensity: 30, castShadow: true, shadow: {radius: 0.2}},
+]);
+local.add(floor);
+local.add(bar);
+engine.start();
+```
+
+- The method is the area lights' PCSS (Fernando 2005): 16 depth reads find the blockers within the light's footprint,
+  their mean depth sets the filter radius `radius * (receiver - blocker) / blocker` (depths from the light), and 24
+  comparisons filter it against the receiver's tangent plane. Such a light's map covers its cone (a point light's
+  cube face) plus a 0.1 UV guard band, the area lights' face tangent of 1.25, so the filter reads its own face; the
+  map is the same size, so its texels are 25% wider than a radius 0 light's.
+- Proof, on an Apple Mac mini GPU (Metal) through `scripts/clustered-shadow-gpu-check.js`: a bar 1.5 over a
+  floor, lights 3 and 4.5 high. The 10-90% penumbra on the floor is within 2% of a disc light's analytic width,
+  `1.374 radius (receiver - blocker) / blocker`, for a point light of radius 0.2 and 0.4 at blocker ratio 1, radius
+  0.4 at ratio 0.5, and a spot of radius 0.4; doubling the radius or the ratio doubles it.
+- Limits, as the area lights': the filter stops at the guard band, so very wide penumbrae are clipped; blockers nearer
+  the light than a quarter of the receiver's depth can fall outside the search; 24 taps can band on very wide
+  penumbrae. Each lookup costs 40 texture reads instead of 9 (not timed yet). The integrated maps
+  (`ClusteredOptions.shadows`) keep the 3x3 filter and ignore `radius`.
+- Off is exact: while no shadowed light has a radius above 0, the shaders, frame buffer and uploads are byte for
+  byte the plain ones (unit-tested; images and probe radiance compared on a real GPU). The radius is read when
+  `setLights` runs; a changed radius re-renders that light's maps.
+
 Without `ClusteredOptions.shadows` a castShadow light's `shadow` may hold only `resolution`, `near` (default far /
-1000) and `far`: `LocalShadows` takes its biases, in texels, from its options. A size above its `resolution` throws
+1000) and `far` (and `radius`, above): `LocalShadows` takes its biases, in texels, from its options. A size above its `resolution` throws
 when the maps render. With both systems attached, a light with `castShadow` and a `shadow` object is shadowed by both.
 
 `addShadowCaster()` accepts core meshes, individual loaded glTF/FBX nodes and sources exposing `shadowPrimitives`
@@ -376,7 +416,7 @@ local lighting. Custom-only `drawShadow()` sources such as clipmap terrain are
 not local shadow casters in this version; terrain can receive the shadows.
 
 Local depth passes run before clustered culling and main shading, redraw active
-faces each frame, and use a fixed 3×3 comparison filter. Shadows multiply only
+faces each frame, and use a fixed 3×3 comparison filter (`LocalShadows` lights with a `shadow.radius` filter by PCSS, above). Shadows multiply only
 their own light's contribution. Ambient, unshadowed local lights and directional
 cascades retain their responses. Bias and resolution control acne and detached
 edges; this filter does not model area-light penumbrae (area lights' own shadows do, below). Device restoration

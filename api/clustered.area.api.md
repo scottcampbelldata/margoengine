@@ -180,6 +180,7 @@ interface LocalLightShadow {
     bias?: number;
     normalBias?: number;
     resolution?: number | readonly [number, number];
+    radius?: number;
 }
 
 interface LocalShadowOptions {

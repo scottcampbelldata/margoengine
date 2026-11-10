@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14492900,
+  "total": 14494240,
   "history": [
     {
       "date": "2026-10-24",
@@ -7679,6 +7679,12 @@
       "commit": "1df5dd2e1",
       "reason": "landed with push-anyway: feat(environment): read tiled and mipmapped EXR levels (@margoengine/environment/exr-tiled)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "f539b6456",
+      "reason": "landed with push-anyway: feat(clustered): soft point and spot shadows from a light's shadow.radius (PCSS in LocalShadows)",
+      "grew": 2
     }
   ],
   "items": {
@@ -7833,8 +7839,8 @@
     "@margoengine/clustered/ies": 4268,
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
-    "@margoengine/clustered/shadow-atlas": 14448,
-    "@margoengine/clustered/shadows": 12145,
+    "@margoengine/clustered/shadow-atlas": 14979,
+    "@margoengine/clustered/shadows": 12954,
     "@margoengine/clustered/shapes": 12255,
     "@margoengine/clustered/stochastic": 2513,
     "@margoengine/clustered/units": 1089,

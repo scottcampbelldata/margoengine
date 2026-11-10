@@ -5,6 +5,7 @@ import { TiledNavMesh } from '../dist/tiles.js';
 import { encodeNavMesh } from '../dist/codec.js';
 import { fileURLToPath } from 'node:url';
 import { bundleBytes } from '../../../scripts/measure-size.js';
+import { fileURLToPath } from 'node:url';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 

@@ -165,6 +165,7 @@ export interface LocalLightShadow {
     bias?: number;
     normalBias?: number;
     resolution?: number | readonly [number, number];
+    radius?: number;
 }
 
 export interface LocalShadowOptions {

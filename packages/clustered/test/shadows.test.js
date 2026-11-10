@@ -764,3 +764,80 @@ test('local shadows: the per-map cull bounds sheared node matrices (rotated chil
   shadows.dispose();
   lights.dispose();
 });
+
+test('local shadows: a point or spot shadow radius turns on PCSS; radius 0 uploads and compiles what plain lights do', () => {
+  const h = harness(),
+    begin = h.context.encoder.beginRenderPass,
+    lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 2, resolution: 64 }),
+    point = { position: [0, 3, 0], range: 10, castShadow: true },
+    spot = { position: [4, 3, 0], range: 10, direction: [0, -1, 0], outerAngle: 0.6, castShadow: true },
+    frame = () => new Float32Array(shadows.bindings()[0].resource.buffer.data);
+  h.context.encoder.beginRenderPass = (d) => ({ ...begin(d), setViewport() {} });
+  shadows.add(caster(h.engine));
+  try {
+    for (const radius of [-1, Infinity, Number.NaN, '1', 1e40])
+      assert.throws(() => lights.setLights([{ ...point, shadow: { radius } }]), RangeError, `radius ${String(radius)}`);
+    assert.throws(() => lights.setLights([{ ...point, castShadow: false, shadow: { radius: 1 } }]), /castShadow/);
+    lights.setLights([point, spot]);
+    h.frame();
+    const plain = frame().slice(),
+      plainShader = h.context.shader;
+    assert.ok(!plainShader.includes('clusterSoftShadow'));
+    lights.setLights([
+      { ...point, shadow: { radius: 0 } },
+      { ...spot, shadow: { radius: 0 } },
+    ]);
+    shadows.invalidate();
+    h.frame();
+    assert.deepEqual(frame(), plain, 'radius 0 is the 3x3 filter, byte for byte');
+    assert.equal(h.context.shader, plainShader);
+    // A point light of radius 0.5 and a spot of radius 0.2 at a full-size (64) map.
+    const soft = { ...point, shadow: { radius: 0.5, near: 0.1 } };
+    lights.setLights([soft, { ...spot, shadow: { radius: 0.2 } }]);
+    h.frame();
+    assert.equal(h.passes.length, 7, 'a new radius re-renders both lights');
+    assert.match(h.context.shader, /if\(localShadowFrame\.soft\[slot\*2u-2u\]\.x>0\)\{return clusterSoftShadow\(/);
+    assert.match(h.context.shader, /fn clusterSoftShadow\(/);
+    assert.match(h.context.shader, /soft:array<vec4f,32>/);
+    const v = frame(),
+      at = v.length - 16 * 8,
+      tanSpot = Math.tan(0.6) * 1.25,
+      guard = 0.1 - 1.5 / 64;
+    assert.equal(v.length, at + 128, 'the frame grows by two vec4f per slot');
+    const close = (a, b, name) => assert.ok(Math.abs(a - b) < 1e-5, `${name}: ${a} vs ${b}`);
+    close(v[at], 0.5 / 2.5, 'point UV per unit at unit depth: R / (2 tan), tan 1.25');
+    close(v[at + 1], 0.5 / 2.5, 'point y');
+    close(v[at + 2], guard, 'guard band');
+    close(v[at + 4], 0.1, 'near');
+    close(v[at + 5], 10, 'far: the range');
+    close(v[at + 6], 0.5, 'radius');
+    close(v[at + 8], 0.2 / (2 * tanSpot), 'spot UV per unit at unit depth');
+    close(v[6], 2.5 / 64, 'texel size per unit distance of the wider face');
+    // The first cube face's sampling matrix: x row r / tan with tan 1.25 (a 45-degree face plus the guard band).
+    const m = v.subarray(4 + 64, 4 + 64 + 16);
+    close(Math.hypot(m[0], m[4], m[8]), 1 / 1.25, 'face tangent 1.25');
+    h.frame();
+    assert.equal(h.passes.length, 0, 'unchanged soft lights stay cached');
+    // The radius is the one setLights took: mutating the caller's object changes nothing until setLights.
+    soft.shadow.radius = 0;
+    h.frame();
+    assert.equal(h.passes.length, 0);
+    assert.match(h.context.shader, /clusterSoftShadow/);
+    // A smaller map: its corner's UVs less the two-texel margins.
+    lights.setLights([{ ...point, shadow: { radius: 0.5, resolution: [32, 16] } }]);
+    h.frame();
+    const w = frame();
+    close(w[at], (0.5 * 28) / 64 / 2.5, 'x of a 32-wide corner');
+    close(w[at + 1], (0.5 * 12) / 64 / 2.5, 'y of a 16-high corner');
+    close(w[at + 2], Math.max(((0.5 - (0.5 * 12) / 16 / 1.25) * 16) / 64 - 1.5 / 64, 1.5 / 64), 'guard of the corner');
+    lights.setLights([point, spot]);
+    shadows.invalidate();
+    h.frame();
+    assert.equal(h.context.shader, plainShader, 'back to radius 0: the original shader');
+    assert.deepEqual(frame(), plain, 'and the original frame');
+  } finally {
+    shadows.dispose();
+    lights.dispose();
+  }
+});

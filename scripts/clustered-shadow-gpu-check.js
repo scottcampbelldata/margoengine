@@ -98,6 +98,11 @@ try {
     async function visibility(config, points) {
       const off = structuredClone(config);
       for (const light of [...(off.suns ?? []), ...(off.areas ?? [])]) light.castShadow = false;
+      // An unshadowed point or spot light may not keep a shadow object without ClusteredOptions.shadows.
+      for (const light of off.points ?? []) {
+        light.castShadow = false;
+        delete light.shadow;
+      }
       await call('scene', off);
       await call('render', 1);
       const open = await call('probe', points);
@@ -247,6 +252,73 @@ try {
         ratio,
       });
     }
+    // Point and spot lights with a shadow radius R (PCSS): a sphere light at height H over the same bar (y 1.5, x -0.5
+    // to 0.5) and floor. The hard edge falls at x = 0.5 H / (H - 1.5). Blocker depth H - 1.5, receiver depth H, so the
+    // penumbra's half width on the floor is R s with s = 1.5 / (H - 1.5), and a disc light's 10-90% rise (the visible
+    // share past offset t of a disc is (acos(t / R) - (t / R) sqrt(1 - (t / R)^2)) / pi) is 1.374 R s wide.
+    const softWidths = {};
+    for (const [kind, R, H] of [
+      ['point', 0.2, 3],
+      ['point', 0.4, 3],
+      ['point', 0.4, 4.5],
+      ['spot', 0.4, 3],
+    ]) {
+      const edge = (0.5 * H) / (H - 1.5),
+        scale = 1.5 / (H - 1.5),
+        analytic = 1.374 * R * scale,
+        ramp2 = line(0, 0, [0, 1, 0], Math.max(0, edge - 1.2), edge + 1.2, 0.02),
+        light = {
+          position: [0, H, 0],
+          range: 20,
+          intensity: 5,
+          castShadow: true,
+          shadow: { radius: R, far: 20 },
+          ...(kind === 'spot' ? { direction: [0, -1, 0], outerAngle: 1.1 } : {}),
+        },
+        label = `${kind} radius ${R} at height ${H}`,
+        { values, rendered } = await visibility(
+          { meshes: ['floor', 'bar'], local: { resolution: 1024 }, points: [light] },
+          ramp2,
+        );
+      // Umbra and full light: the analytic edges R scale from the hard edge, plus a margin of the filter's spread.
+      expect(`${label}: umbra floor points 0, fully lit points 1`, ramp2, values, (p) =>
+        p[0] < edge - R * scale - 0.1 ? 0 : p[0] > edge + R * scale + 0.1 ? 1 : undefined,
+      );
+      const cross = (level) => ramp2.find((p, i) => values[i] >= level)?.[0];
+      softWidths[label] = { from10: cross(0.1), to90: cross(0.9), analytic };
+      softWidths[label].measured = softWidths[label].to90 - softWidths[label].from10;
+      const ratio = softWidths[label].measured / analytic;
+      check(
+        `${label}: 10-90% penumbra within 0.8-1.2x of the analytic ${analytic.toFixed(3)}`,
+        ratio > 0.8 && ratio < 1.2,
+        {
+          ...softWidths[label],
+          ratio,
+        },
+      );
+      check(
+        `${label}: ${kind === 'spot' ? 'one layer' : 'six cube faces'} rendered`,
+        rendered.stats.layers === (kind === 'spot' ? 1 : 6),
+        rendered.stats,
+      );
+      const compiled = await call('compile');
+      check(
+        `${label}: WGSL compiles without errors or warnings`,
+        !compiled.core.length && !compiled.probe.length,
+        compiled,
+      );
+      await capture(`soft-${kind}-${R}-${H}`);
+    }
+    check(
+      'soft point penumbra widens with the light: radius 0.4 vs 0.2',
+      softWidths['point radius 0.4 at height 3'].measured > 1.5 * softWidths['point radius 0.2 at height 3'].measured,
+      softWidths,
+    );
+    check(
+      'soft point penumbra widens with the receiver behind its blocker: (H - 1.5) / 1.5 of 1 vs 0.5',
+      softWidths['point radius 0.4 at height 3'].measured > 1.5 * softWidths['point radius 0.4 at height 4.5'].measured,
+      softWidths,
+    );
     // twoSided: the back face shadows the ceiling (y 6) through a bar at y 4.5, as the front face shadows the floor.
     const twoSided = {
         meshes: ['floor', 'bar', 'ceiling', 'topBar'],

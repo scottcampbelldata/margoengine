@@ -345,6 +345,16 @@ export class Clustered implements EnginePlugin {
           );
         shadowCamera(settings, light.range);
       }
+      if (
+        settings?.radius !== undefined &&
+        !(
+          light.castShadow &&
+          typeof settings.radius === 'number' &&
+          Number.isFinite(Math.fround(settings.radius)) &&
+          settings.radius >= 0
+        )
+      )
+        throw new RangeError('Light shadow radius: give a castShadow light a finite radius of 0 or more (world units)');
       if ('direction' in light) {
         finiteVector(light.direction, 3, 'Spot direction');
         const { angle, penumbra = 0 } = light;

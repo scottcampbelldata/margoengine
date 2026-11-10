@@ -1674,6 +1674,7 @@ carry the same citation as a one-line comment in the code.
 | C14 | IES LM-63 parse, 1 deg x 5 deg resample, flux by midpoint rule, type-C orientation | clustered/src/ies.ts | ANSI/IES LM-63 |
 | C15 | projector light: perspective projection of an image, sRGB decode | clustered/src/projector.ts | IEC 61966-2-1 |
 | C16 | spot smoothstep(cos outer, cos inner); luminance check 0.2126/0.7152/0.0722 | clustered/src/index.ts, clustered/src/area.ts, clustered/src/directional.ts | ITU-R BT.709 luma weights |
+| C17 | point and spot light PCSS (`shadow.radius`): blocker search, penumbra radius x (receiver - blocker) / blocker, Vogel disk taps, receiver-plane depth bias, face tangent 1.25 guard band; GPU check's disc-light 10-90% width 1.374 R from the circular-segment area | clustered/src/shadows.ts, scripts/clustered-shadow-gpu-check.js | Fernando 2005, "Percentage-Closer Soft Shadows" (SIGGRAPH sketch; GPU Gems 2 ch. 8 not reread for this job, the method as C10); Vogel 1979; Isidoro 2006 GDC; circular-segment area (textbook geometry); guard band Margo-own as C11 |
 
 ### core
 

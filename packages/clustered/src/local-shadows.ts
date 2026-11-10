@@ -65,6 +65,13 @@ export interface LocalLightShadow {
    * a guard band for the 3x3 filter.
    */
   resolution?: number | readonly [number, number];
+  /**
+   * `LocalShadows` only (a `castShadow` point or spot light): the light's radius in world units, 0 or more (default 0,
+   * the 3x3 filter). Above 0 the shadow is PCSS: the penumbra widens with the receiver's distance behind its blocker,
+   * `radius * (receiver - blocker) / blocker` (depths from the light), up to the map's guard band. Such a light's map
+   * covers its cone plus a 0.1 UV guard band, as an area light's faces.
+   */
+  radius?: number;
 }
 /**
  * A caster primitive of a `LocalShadowSource` (gltf-pro and materials `shadowPrimitives`): vertex and index buffers of
