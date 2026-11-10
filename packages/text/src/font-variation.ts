@@ -119,10 +119,13 @@ export class FontVariations {
       avar.seek(0);const major=avar.u16();avar.u16();avar.u16();
       if(major!==1 || avar.u16()!==this.axes.length) fontError('avar version or axis count is invalid');
       for(let i=0;i<this.axes.length;i++) {
-        const count=avar.u16(),pairs=Array.from({length:count},()=>[f2(avar),f2(avar)]);
-        if(count<3||pairs[0][0]!==-1||pairs[0][1]!==-1||pairs[count-1][0]!==1||pairs[count-1][1]!==1||!pairs.some(p=>p[0]===0&&p[1]===0)||pairs.some((p,i)=>p.some(v=>Math.abs(v)>1)||(i>0&&p[0]<=pairs[i-1][0]))) fontError('avar segment map lacks required endpoints');
-        for(let j=1;j<count;j++) {
-          if(pairs[j][0]<=pairs[j-1][0]) fontError('avar input coordinates are not ordered');
+        const count=avar.u16(),pairs:number[][]=[];
+        avar.check(avar.pos,count*4);
+        // OpenType avar: a record whose from (or to) does not increase on the last kept one may be ignored; a map
+        // without all of -1 to -1, 0 to 0 and 1 to 1 (an empty map included) leaves the axis unmodified.
+        for(let j=0;j<count;j++){const p=[f2(avar),f2(avar)],last=pairs[pairs.length-1];if(!last||(p[0]>last[0]&&p[1]>=last[1]))pairs.push(p);}
+        if(![-1,0,1].every(v=>pairs.some(p=>p[0]===v&&p[1]===v))) continue;
+        for(let j=1;j<pairs.length;j++) {
           const v=this.coordinates[i];
           if(v>=pairs[j-1][0]&&v<=pairs[j][0]) {
             this.coordinates[i]=pairs[j-1][1]+(pairs[j][1]-pairs[j-1][1])*(v-pairs[j-1][0])/(pairs[j][0]-pairs[j-1][0]);
@@ -178,22 +181,17 @@ export class FontVariations {
       const selected=h.index&0x2000?packedPoints(data,count):sharedPoints;
       const n=selected?.length??count,x=packedDeltas(data,n),y=packedDeltas(data,n);
       let scalar=1;
+      // The region scalar of the OpenType variations overview; a non-intermediate region spans zero to its peak.
       for(let a=0;a<this.axes.length;a++) {
-        const v=this.coordinates[a],peak=h.peak[a];
-        if(peak===0)continue;
-        if(h.start&&h.end) {
-          const start=h.start[a],end=h.end[a];
-          if(start>peak||peak>end){scalar=0;break;}
-          if(v<start||v>end){scalar=0;break;}
-          if(v!==peak)scalar*=v<peak?(v-start)/(peak-start):(end-v)/(end-peak);
-        } else {
-          if(v===0||v*peak<0||Math.abs(v)>Math.abs(peak)){scalar=0;break;}
-          scalar*=v/peak;
-        }
+        const v=this.coordinates[a],peak=h.peak[a],start=h.start?h.start[a]:Math.min(peak,0),end=h.end?h.end[a]:Math.max(peak,0);
+        if(start>peak||peak>end||(start<0&&end>0&&peak!==0)||peak===0)continue;
+        if(v<start||v>end){scalar=0;break;}
+        if(v!==peak)scalar*=v<peak?(v-start)/(peak-start):(end-v)/(end-peak);
       }
       if(!scalar)continue;
       const xs=new Array<number|undefined>(count),ys=new Array<number|undefined>(count);
-      for(let i=0;i<n;i++){const at=selected?.[i]??i;xs[at]=x[i];ys[at]=y[i];}
+      // A repeated point number carries several deltas, applied cumulatively (OpenType packed point numbers).
+      for(let i=0;i<n;i++){const at=selected?.[i]??i;xs[at]=(xs[at]??0)+x[i];ys[at]=(ys[at]??0)+y[i];}
       if(selected&&!composite){iup(points,ends,xs,0);iup(points,ends,ys,1);}
       for(let i=0;i<count;i++){dx[i]+=(xs[i]??0)*scalar;dy[i]+=(ys[i]??0)*scalar;}
     }
@@ -206,7 +204,7 @@ function packedPoints(r:Reader,total:number):number[]|null {
   if(count>total)fontError('gvar point count exceeds glyph points');
   const out:number[]=[];let value=0;
   while(out.length<count){const run=r.u8(),n=(run&0x7f)+1;if(out.length+n>count)fontError('gvar point run exceeds its count');
-    for(let i=0;i<n;i++){value+=run&0x80?r.u16():r.u8();if(value>=total||(out.length&&value<=out[out.length-1]))fontError('gvar point index is invalid');out.push(value);}}
+    for(let i=0;i<n;i++){value+=run&0x80?r.u16():r.u8();if(value>=total)fontError('gvar point index is invalid');out.push(value);}}
   return out;
 }
 function packedDeltas(r:Reader,count:number):number[] {

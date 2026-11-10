@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {parseFontOutlines, extrudeText} from '@margoengine/text/extrude';
+import {ttf,tables as fontTables,sfnt,simple,u16 as be16,u32 as be32} from './extrude-fixtures.js';
 const reference=JSON.parse(readFileSync(new URL('./fixtures/fonts/variable-reference.json',import.meta.url),'utf8'));
 const close=(a,b,epsilon=1e-7)=>assert.ok(Math.abs(a-b)<=epsilon,`${a} vs ${b}`);
 for(const extension of ['ttf','otf']) test(`variable ${extension} outlines and widths match independent public font oracle`,()=>{
@@ -74,4 +75,55 @@ test('null HVAR variation subtables mean no width adjustment and malformed axes 
  const shortStore=Uint8Array.from(original);
  new DataView(shortStore.buffer).setUint16(cff.offset+reference.fonts.otf.variationStoreOffset,1);
  assert.throws(()=>parseFontOutlines(shortStore),e=>e.code==='failed');
+});
+// Clean-room variable TrueType fixtures from the OpenType 1.9.1 fvar, gvar and avar chapters and the common
+// variation formats (tuple variation headers, packed point numbers, packed deltas).
+const square=simple([[0,0,1],[100,0,1],[100,100,1],[0,100,1]]);
+const f2=(v)=>be16(Math.round(v*16384)&0xffff);
+const fvarTable=()=>[...be16(1),...be16(0),...be16(16),...be16(2),...be16(1),...be16(20),...be16(0),...be16(8),
+ ...Array.from('wght',c=>c.charCodeAt(0)),...be32(100*65536),...be32(400*65536),...be32(900*65536),...be16(0),...be16(256)];
+// One glyph's variation data: tuple headers [{peak,start,end,data}] with private point numbers in each data block.
+function gvarTable(tuples) {
+ const headers=[],data=[];
+ for(const t of tuples){
+  headers.push(...be16(t.data.length),...be16(0x8000|0x2000|(t.start!==undefined?0x4000:0)),...f2(t.peak));
+  if(t.start!==undefined)headers.push(...f2(t.start),...f2(t.end));
+  data.push(...t.data);
+ }
+ const glyph=[...be16(tuples.length),...be16(4+headers.length),...headers,...data];
+ if(glyph.length%2)glyph.push(0);
+ return [...be16(1),...be16(0),...be16(1),...be16(0),...be32(20),...be16(1),...be16(0),...be32(24),...be16(0),...be16(glyph.length/2),...glyph];
+}
+function variableSquare(tuples,extra=new Map()) {
+ const entries=fontTables(ttf([square]));
+ entries.set('fvar',fvarTable());
+ entries.set('gvar',gvarTable(tuples));
+ for(const [tag,bytes] of extra)entries.set(tag,bytes);
+ return parseFontOutlines(sfnt(new Map([...entries].sort(([a],[b])=>a<b?-1:1))));
+}
+const xs=(font)=>font.getGlyphContours(0,1).flat().map(p=>p[0]);
+test('gvar: an intermediate region whose start passes its peak ignores that axis (OpenType region scalar)',()=>{
+ // All points (private count 0), x deltas 10 on the four outline points, zero y deltas.
+ const font=variableSquare([{peak:0.5,start:0.8,end:1,data:[0,0x07,10,10,10,10,0,0,0,0,0x87]}]);
+ // Every axis of the region is ignored, so its scalar is 1: the outline moves by the full 10 units.
+ assert.deepEqual(xs(font.withVariations({wght:900})).map(x=>Math.round(x*font.unitsPerEm*1e6)/1e6),[10,110,110,10]);
+});
+test('gvar: a repeated point number applies each of its deltas cumulatively (OpenType packed point numbers)',()=>{
+ // Points 0, 0, 1 (one run of three byte deltas: 0, 0, 1); x deltas 5 and 7 on point 0 and 12 on point 1.
+ const font=variableSquare([{peak:1,data:[3,0x02,0,0,1,0x02,5,7,12,0x82]}]);
+ const base=xs(font),varied=xs(font.withVariations({wght:900}));
+ varied.forEach((x,i)=>close(x-base[i],12/font.unitsPerEm,1e-12));
+});
+test('avar: a segment map without its required -1, 0, +1 maps, or with none, leaves that axis unmodified',()=>{
+ const gvar=[{peak:1,data:[0,0x07,100,100,100,100,0,0,0,0,0x87]}];
+ const plain=xs(variableSquare(gvar).withVariations({wght:650}));
+ const avar=(maps)=>[...be16(1),...be16(0),...be16(0),...be16(1),...be16(maps.length),...maps.flatMap(([a,b])=>[...f2(a),...f2(b)])];
+ for(const maps of [[],[[-1,-1],[0,0.25],[1,1]],[[-1,-1],[1,1]]]) {
+  const font=variableSquare(gvar,new Map([['avar',avar(maps)]]));
+  assert.deepEqual(xs(font.withVariations({wght:650})),plain,JSON.stringify(maps));
+ }
+ // A valid map still applies: 0.5 maps to 0.25, so a quarter of the delta.
+ const mapped=variableSquare(gvar,new Map([['avar',avar([[-1,-1],[0,0],[0.5,0.25],[1,1]])]]));
+ const base=xs(mapped);
+ xs(mapped.withVariations({wght:650})).forEach((x,i)=>close(x-base[i],25/mapped.unitsPerEm,1e-12));
 });
