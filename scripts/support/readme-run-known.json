@@ -1,7 +1,4 @@
 {
-  "animation/readme-cloning-and-retargeting-margoeng-88181c": "sample: RangeError: Retarget maps Hips to mixamorig:Hips, which the source does not have; fix the names map",
-  "animation/readme-geometry-caches-margoengine-anim-dcf6c5": "sample: MargoError: Geometry cache request failed with status 404; check the URL",
-  "animation/readme-gpu-morph-weights-margoengine-an-43200e": "sample: RangeError: Unknown animation clip; pass a clip name or an index from animation.clips",
   "cutscene/readme-render-to-video-4f9104": "sample: EncodingError: Unable to decode audio data",
   "exporters/readme-render-to-file-80cd28": "example: TypeError: Cannot read properties of undefined (reading '1')",
   "exporters/readme-unity-asset-and-support-bundles-a4fd05": "example: MargoError: Unity import profile requires the explicit Margo Mesh Studio source profile; use general GLB for other generators; change the scene or choose anothe",
@@ -19,7 +16,5 @@
   "rigging/readme-retarget-presets-margoengine-rig-9101f3": "sample: RangeError: Retarget source naming is not recognised; pass from (mixamo, godot, roblox, margo or humanoid)",
   "rigging/readme-spring-bones-and-jiggle-margoeng-a41e82": "sample: RangeError: Spring center must be the chain's first joint or an ancestor of it",
   "rigging/readme-vrm-avatars-margoengine-rigging-009c8e": "sample: RangeError: This VRM is invalid; fix it: humanoid bone leftUpperLeg is required; humanoid bone leftLowerLeg is required; humanoid bone leftFoot is required; hum",
-  "usdz/readme-composition-fbebfe": "sample: LoaderError: load: request for /toy_car.usdz returned HTTP 404",
-  "voxel-edit/readme-voxel-files-657e4f": "sample: RangeError: QB file holds 1634476140 matrices, over 4096; split the file",
   "xr/readme-ar-hit-testing-f7eedf": "example: MargoError: Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session."
 }

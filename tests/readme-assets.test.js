@@ -15,6 +15,8 @@ import {
 } from '../scripts/support/readme-assets.mjs';
 import { parseIES } from '../packages/clustered/dist/ies.js';
 import { parseUSDZ } from '../packages/usdz/dist/index.js';
+import { composition, parseUSDFiles } from '../packages/usdz/dist/compose.js';
+import { parseQB } from '../packages/voxel-edit/dist/formats.js';
 import { createHash } from 'node:crypto';
 import { parsePly, parseSplat, parseSpz, parseSog, validateSplats } from '../packages/splats/dist/data.js';
 import { MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD } from '../packages/decoders/dist/meshopt-simd.js';
@@ -170,6 +172,33 @@ test('the static USDZ introduction resolves the complete outside Blender box wit
   assert.equal(asset.meshes[0].uvs.length, 72);
   assert.deepEqual([...asset.entries.keys()], ['BoxTextured.glb.blender-5-1.usdc', 'textures/Image_0.png']);
   assert.deepEqual(asset.issues, []);
+});
+
+test('the USDZ composition and voxel-file READMEs resolve real files of their own format', async () => {
+  // These once fell through to no sample: /toy_car.usdz answered 404, the Kitchen Set (not free to redistribute) could not be
+  // read, and /models/robot.qb was read as a broken QB file.
+  const usdz = readFileSync(readmeFixture('/toy_car.usdz').path);
+  assert.equal(usdz.subarray(0, 4).toString('latin1'), 'PK');
+  // Cesium's BoxAnimated (CC-BY-4.0, packages/usdz/tests/fixtures/real/NOTICE.md), read as the README reads it.
+  const asset = await parseUSDZ(usdz, { extensions: [composition()] });
+  assert.equal(asset.meshes.length, 2);
+  assert.deepEqual(asset.issues, []);
+  // The folder scene: the usd-wg teapot (Apache-2.0), every layer of its payload, sublayer and references served by name.
+  const teapot = await parseUSDFiles('teapot.usd', (id) => readFileSync(readmeFixture(`/teapot/${id}`).path));
+  assert.equal(teapot.meshes.length, 1);
+  assert.equal(teapot.meshes[0].positions.length, 3 * 7416);
+  assert.ok(teapot.issues.every(({ code }) => code === 'unsupported'), 'only its subdivision scheme is noted');
+  // The variant pick: a Margo stand-in whose shadingVariant set turns its quad red.
+  const model = (variants) =>
+    parseUSDFiles('model.usd', () => readFileSync(readmeFixture('/model.usd').path), { variants });
+  assert.deepEqual([...(await model()).meshes[0].colors.subarray(0, 3)].map((c) => Math.round(c * 10)), [1, 2, 9]);
+  const red = await model({ '/Model': { shadingVariant: 'red' } });
+  assert.deepEqual([...red.meshes[0].colors.subarray(0, 3)].map((c) => Math.round(c * 10)), [9, 1, 1]);
+  const qb = parseQB(readFileSync(readmeFixture('/models/robot.qb').path));
+  assert.deepEqual(
+    qb.models.map(({ name }) => name),
+    ['Body', 'Head'],
+  );
 });
 
 test('the IES README resolves the complete published photometric profile and its candela values', () => {

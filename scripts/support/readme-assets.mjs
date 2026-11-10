@@ -24,6 +24,14 @@ export function readmeNodeFetch(request = globalThis.fetch, root = externalAsset
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
   '/xr-pointer-box.glb': 'packages/exporters/tests/fixtures/Box.glb',
+  '/models/robot.qb': 'packages/voxel-edit/tests/fixtures/readme/robot.qb',
+  '/toy_car.usdz': 'packages/usdz/tests/fixtures/real/animated/BoxAnimated.usdz',
+  '/model.usd': 'packages/usdz/tests/fixtures/readme/model.usda',
+  '/teapot/teapot.usd': 'packages/usdz/tests/fixtures/real/usd-wg/intent-vfx/assets/teapot/teapot.usd',
+  '/teapot/payload.usd': 'packages/usdz/tests/fixtures/real/usd-wg/intent-vfx/assets/teapot/payload.usd',
+  '/teapot/mtl.usd': 'packages/usdz/tests/fixtures/real/usd-wg/intent-vfx/assets/teapot/mtl.usd',
+  '/teapot/geo.usd': 'packages/usdz/tests/fixtures/real/usd-wg/intent-vfx/assets/teapot/geo.usd',
+  '/teapot/geo/UtahTeapot.usd': 'packages/usdz/tests/fixtures/real/usd-wg/intent-vfx/assets/teapot/geo/UtahTeapot.usd',
   '/mesh.drc': decoder + 'readme/avocado.drc',
   '/meshopt.bin': decoder + 'readme/cube-positions.bin',
   '/capture.splat': 'packages/splats/test/fixtures/raccoon-v2.splat',

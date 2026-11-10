@@ -47,7 +47,8 @@ const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
 // A .usdz: its layers come from the archive.
 const toy=await loadUSDZ(engine,'/toy_car.usdz',{extensions:[composition()]});
 // A scene spread over a folder: each layer and texture is fetched next to the root, and only those the stage uses.
-const kitchen=await loadUSDFiles(engine,'/Kitchen_set/Kitchen_set.usd',{maxVertices:8_000_000,maxTriangles:8_000_000});
+// The usd-wg teapot: a payload, a sublayer and two references over four files.
+const teapot=await loadUSDFiles(engine,'/teapot/teapot.usd',{maxVertices:8_000_000,maxTriangles:8_000_000});
 // Pick a variant, as a session layer would.
 const red=await loadUSDFiles(engine,'/model.usd',{variants:{'/Model':{shadingVariant:'red'}}});
 engine.start();

@@ -1,5 +1,6 @@
 // Voxel file readers and writers, against bytes built here from the formats' public descriptions.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { cellIndex } from '../dist/index.js';
 import { parseBinvox, parseKVX, parseQB, parseQEF, parseVXL, writeQB, writeQEF } from '../dist/formats.js';
@@ -328,4 +329,27 @@ test('VXL limits: cut off, wrong size, cells outside, budget', () => {
   assert.throws(() => parseVXL(span(0, 3, 1, 0), { size: [1, 1, 8] }), /ends before it starts/);
   assert.throws(() => parseVXL(one), /ends early/, 'default size is the full 512 x 512 x 64 map');
   assert.throws(() => parseVXL(one, { size: [64, 64, 64], maxCells: 8 }), /maxCells/);
+});
+
+test('QB: a file that is not Qubicle Binary is refused by its header, not read as matrices', () => {
+  // An HTML error page served in place of the file: its bytes 20..23 once read as 1.6 billion matrices.
+  const page = new TextEncoder().encode('<!doctype html><html lang="en"><head><title>Not found</title></head></html>');
+  assert.throws(() => parseQB(page), /Not a Qubicle Binary file/);
+  assert.throws(() => parseQB(join(u32s(0x102, 0, 1, 0, 0, 0))), /version 1\.1/, 'version 2.1');
+  for (const flags of [[2, 1, 0, 0], [0, 2, 0, 0], [0, 1, 2, 0], [0, 1, 0, 2]])
+    assert.throws(() => parseQB(join(u32s(0x101, ...flags, 0))), /flags of 0 or 1/, flags.join());
+  assert.equal(parseQB(join(u32s(0x101, 0, 1, 0, 0, 0))).models.length, 0, 'an empty 1.1 file still reads');
+});
+
+test('QB: the README sample (built from the format description) reads as two matrices', () => {
+  const file = parseQB(readFileSync(new URL('./fixtures/readme/robot.qb', import.meta.url)));
+  assert.deepEqual(
+    file.models.map(({ name, position, grid }) => [name, position, grid.size]),
+    [
+      ['Body', [0, 0, 0], [4, 5, 3]],
+      ['Head', [0, 5, 0], [4, 3, 3]],
+    ],
+  );
+  assert.deepEqual(colorAt(file, 1, 0, 1, 2), [80, 220, 255, 255]);
+  assert.equal(file.models[0].grid.voxels[cellIndex([4, 5, 3], 1, 0, 0)], 0, 'a gap between the legs');
 });

@@ -88,11 +88,19 @@ export function parseQB(bytes: Uint8Array | ArrayBuffer, limits: GridLimits = {}
     at += 4;
     return dv.getUint32(at - 4, true);
   };
-  u32();
-  const bgra = u32() === 1,
-    leftHanded = u32() === 0,
-    compressed = u32() === 1,
-    masked = u32() === 1,
+  // Qubicle Binary header: version bytes major.minor.release.build (1.1.0.0), then four flags that are 0 or 1. Anything
+  // else is not a QB file (an HTML error page, another format), and reading on would report nonsense counts.
+  const version = u32(),
+    flags = [u32(), u32(), u32(), u32()];
+  if ((version & 0xffff) !== 0x0101 || flags.some((flag) => flag > 1))
+    throw new RangeError(
+      'Not a Qubicle Binary file: the header needs version 1.1 and color format, z axis, compression and mask flags of 0 or 1; check the file and its URL',
+    );
+  const [format, zAxis, packed, mask] = flags,
+    bgra = format === 1,
+    leftHanded = zAxis === 0,
+    compressed = packed === 1,
+    masked = mask === 1,
     count = u32(),
     color = () => {
       if (at + 4 > data.length) short('QB file');
