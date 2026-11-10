@@ -6259,3 +6259,73 @@ Metadata-only face groups preserve the prior whole-mesh vertex-color average in 
 Metadata-only face groups preserve the prior whole-mesh vertex-color average in createMeshes; the existing material test now also asserts all seven source flag groups and a single visual mesh.
 
 Metadata-only face groups preserve the prior whole-mesh vertex-color average in createMeshes; the existing material test now also asserts all seven source flag groups and a single visual mesh.
+
+## Batch 245 job 4: independent skeletal JSON import
+
+Scott's coordinator decision supersedes the earlier blocked status: implement the
+whole public JSON format on the job 2 skeletal rig, while parsing, validating,
+retaining and round-tripping physics without evaluating it. Every physics
+constraint emits a named spine-physics-deferred warning on document load.
+
+Specification sources read before implementation:
+- Esoteric Software (accessed 2026-11-10), *JSON export format*,
+  https://esotericsoftware.com/spine-json-format : hierarchy, attachment records,
+  weighted per-influence bind coordinates, skins, curves, timelines and draw offsets.
+- Esoteric Software (2026), *4.3 API Reference*,
+  https://esotericsoftware.com/spine-api-reference : current unified constraint
+  layout semantics, transform property mappings, scale-Y modes, sequences, sliders
+  and physics fields. Compare the documented normalized legacy curves against
+  current absolute time/value controls rather than treating them as identical.
+- Esoteric Software (2026), *Bones*, *Transform constraints*, *IK constraints*,
+  *Paths*, *Path constraints* and *Physics constraints* user guides:
+  https://esotericsoftware.com/spine-bones ,
+  https://esotericsoftware.com/spine-transform-constraints ,
+  https://esotericsoftware.com/spine-ik-constraints ,
+  https://esotericsoftware.com/spine-paths ,
+  https://esotericsoftware.com/spine-path-constraints ,
+  https://esotericsoftware.com/spine-physics-constraints .
+  These descriptions supply inheritance choices, ordered constraints, spacing,
+  local/world transforms and the boundary of deliberately deferred simulation.
+
+Compared research:
+- J. P. Lewis, Matt Cordner and Nickson Fong (2000), *Pose Space Deformation: A
+  Unified Approach to Shape Interpolation and Skeleton-Driven Deformation*,
+  https://doi.org/10.1145/344779.344862 : skeleton subspace skinning, already used
+  by job 2. The importer keeps distinct local positions per influence instead of
+  collapsing a weighted export into one bind-space vertex or dropping weights.
+- Samuel R. Buss (2004), *Introduction to Inverse Kinematics with Jacobian
+  Transpose, Pseudoinverse and Damped Least Squares Methods*,
+  https://people.csail.mit.edu/jbarry/spring2011PR2/readings/jactrans.pdf : survey
+  of solver alternatives. Reuse the job 2 analytic two-bone/CCD solvers for this
+  planar format instead of introducing another solver or a numerical Jacobian.
+- Ivan E. Sutherland and Gary W. Hodgman (1974), *Reentrant Polygon Clipping*,
+  https://doi.org/10.1145/360767.360802 : repeated half-plane clipping. Combine
+  independent ear triangulation for concave simple clip polygons with clipping
+  each textured triangle against each clip triangle, interpolating UVs at cuts.
+- Marcelo Walter and Alain Fournier (1996), *Approximate Arc Length
+  Parametrization*, https://www.cs.ubc.ca/labs/imager/tr/1996/walter1996a/ : compare
+  fitted arc-length polynomials against a deterministic chord table. The reader
+  uses 128 chord intervals per cubic for transparent, seek-independent inversion;
+  exporter setup lengths retain the nonconstant-speed mode. No universal error
+  or performance bound is claimed.
+
+Only documentation, papers, and serialized sample assets were inspected. No
+runtime/editor source, paper companion code, other engine implementation or
+third-party code file was read or used. Current official vine, stretchyman and
+snowglobe exported JSON files under the spine-runtimes 4.3 examples were inspected
+as wire-layout data in test-results only, not redistributed; source URLs are
+https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/4.3/examples/vine/export/vine-pro.json ,
+https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/4.3/examples/stretchyman/export/stretchyman-pro.json ,
+https://raw.githubusercontent.com/EsotericSoftware/spine-runtimes/4.3/examples/snowglobe/export/snowglobe-pro.json .
+The earlier independent-reader licence review still applies. The committed test
+art is instead the openly licensed trees by Pawel Wojciechowicz, GNU GPL 2 or
+later, from https://opengameart.org/content/cge-trees-in-spine . Its original
+JSON/atlas/PNG files, attribution text and licence are isolated test assets under
+the AGENTS.md sample-asset exception, with THIRD-PARTY-NOTICES.md provenance.
+
+Evidence: spine.test.js checks analytic positions, every named format section,
+legacy/current layouts, constraints, curves, events, sequences, physics warnings
+and round-trips, resource/abort errors and actual licensed tree exports.
+spine-check.mjs compares 96 weighted/unweighted, clipped/unclipped, two-color,
+four-operator readbacks to independent compositing equations on each backend,
+then renders and seeks the real tree. No timing or speed assertion was added.

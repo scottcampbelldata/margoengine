@@ -5792,3 +5792,19 @@ Batch 224 batch evidence: exact-kernel.ts shares the existing binary BSP predica
 Tags/lifecycle remain optional and backend independent. Explicit observer instances wrap only one engine and its live mesh instances; imports change nothing. Transactional attach/clone notifications expose final transforms and metadata, and publish no failed-allocation transients. Per-mesh restoration handles source disposal, scene disposal, engine disposal and external wrappers. CPU event ordering, reentrancy, abort/failure and metadata checks combine with exact native/compatibility rendered-pixel invariance under classification and cloning. Core, stage and GPU backends are unchanged; no timing assertion.
 ### 5. Loader face-group evidence (batch 202)
 CPU tests preserve source face properties through fan triangulation, independently of GPU objects. The loader browser fixture also creates, renders and disposes PLY/OFF group-colored meshes. The loader browser runner now honors the existing compatibility shim, so the same fixture can run on both WebGPU and WebGL2. No core, stage or rendering math changes.
+
+### Section 5 evidence: skeletal JSON import, batch 245
+
+The optional sprites/spine reader owns serialization, validation and imported
+pose state. It maps onto Skeleton2D and SkinnedMesh from job 2. Per-influence
+local bind coordinates avoid inverse matrices for collapsed setup bones and
+avoid four-weight truncation. CPU constraints and deterministic cubic sampling
+stay in sprites. The skeletal GPU pass now uses light/dark tint, premultiplied
+output and ordered operator runs; multiply correction is interleaved per triangle
+to preserve transparent backdrop contributions. Core, stage and both backend
+implementations are unchanged. Evidence: sprites spine.test.js, existing
+skeletal/rigging tests and all sprites GPU suites on native/compatibility devices;
+spine-check.mjs supplies 96 independent blend/clipping readbacks per backend plus
+licensed tree animation and exact backwards seek. Physics is data-only, warns
+per named constraint and awaits the physics phase. Broader exporter/high-curvature
+path polish remains private. No speed gate or timing benchmark was added.

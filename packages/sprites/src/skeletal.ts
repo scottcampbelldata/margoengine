@@ -227,6 +227,8 @@ export interface SkinOptions {
   joints: ArrayLike<number>;
   /** Four weights per vertex, at least one above 0; each vertex's weights are scaled to sum to 1. */
   weights: ArrayLike<number>;
+  /** Optional x/y bind positions in each influence's bone space, eight numbers per vertex. Avoids inverse bind matrices. */
+  jointPositions?: ArrayLike<number>;
 }
 
 /**
@@ -246,6 +248,10 @@ export class SkinnedMesh {
   z = 0;
   /** Opacity, 0 to 1. Default 1. */
   alpha = 1;
+  /** RGB shadow tint for two-color textures. Default black. */
+  darkTint = 0;
+  /** Ordered premultiplied blending. Default normal. */
+  blendMode: 'normal' | 'add' | 'multiply' | 'screen' = 'normal';
   /** False leaves it out of the draw. Default true. */
   visible = true;
   /** @internal */
@@ -256,6 +262,7 @@ export class SkinnedMesh {
   private readonly joints: Uint32Array;
   private readonly weights: Float32Array;
   private readonly inverse: Float64Array[];
+  private readonly localBind?: Float64Array;
   private readonly skin = new Float64Array(0);
   private color = 0xffffff;
 
@@ -274,6 +281,11 @@ export class SkinnedMesh {
     this.indices = Uint32Array.from(indices);
     this.joints = Uint32Array.from(joints);
     this.weights = Float32Array.from(weights);
+    if (options.jointPositions !== undefined) {
+      this.localBind = Float64Array.from(options.jointPositions);
+      if (this.localBind.length !== n * 8 || !this.localBind.every(Number.isFinite))
+        throw rangeError('SkinnedMesh jointPositions needs eight finite numbers per vertex', 'sprite-options');
+    }
     if (!this.bind.every(Number.isFinite) || !this.uvs.every(Number.isFinite))
       throw rangeError('SkinnedMesh has a non-finite position or uv', 'sprite-options');
     for (let k = 0; k < indices.length; k++)
@@ -296,7 +308,7 @@ export class SkinnedMesh {
       for (let k = 0; k < 4; k++) this.weights[v * 4 + k] = weights[v * 4 + k] / maximum / sum;
     }
     skeleton.update();
-    this.inverse = skeleton.bones.map((b) => invert(b.world));
+    this.inverse = this.localBind ? [] : skeleton.bones.map((b) => invert(b.world));
     this.skin = new Float64Array(n * 2);
   }
   /** Colour multiplied with the atlas: set `0xrrggbb`, `'#rrggbb'` or `'#rgb'`, read `0xrrggbb`. Default white. */
@@ -324,8 +336,8 @@ export class SkinnedMesh {
         const j = this.joints[v * 4 + k],
           inv = this.inverse[j],
           m = bones[j].world,
-          bx = inv[0] * px + inv[2] * py + inv[4],
-          by = inv[1] * px + inv[3] * py + inv[5];
+          bx = this.localBind ? this.localBind[v * 8 + k * 2] : inv[0] * px + inv[2] * py + inv[4],
+          by = this.localBind ? this.localBind[v * 8 + k * 2 + 1] : inv[1] * px + inv[3] * py + inv[5];
         x += w * (m[0] * bx + m[2] * by + m[4]);
         y += w * (m[1] * bx + m[3] * by + m[5]);
       }
@@ -513,21 +525,27 @@ export interface SkeletalLayerOptions {
 }
 
 const shader = /* wgsl */ `
+override multiplyCorrection:bool=false;
 @group(0) @binding(0) var<uniform> size:vec4f;
 @group(0) @binding(1) var atlas:texture_2d<f32>;
-struct Varying{@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) @interpolate(flat) tint:vec4f}
-@vertex fn vertexMain(@location(0) p:vec2f,@location(1) uv:vec2f,@location(2) tint:vec4f)->Varying{
+struct Varying{@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) @interpolate(flat) tint:vec4f,@location(2) @interpolate(flat) dark:vec4f}
+@vertex fn vertexMain(@location(0) p:vec2f,@location(1) uv:vec2f,@location(2) tint:vec4f,@location(3) dark:vec4f)->Varying{
   var v:Varying;
   v.position=vec4f(p/size.xy*vec2f(2,-2)+vec2f(-1,1),0,1);
   v.uv=uv;
   v.tint=tint;
+  v.dark=dark;
   return v;
 }
 @fragment fn fragmentMain(v:Varying)->@location(0) vec4f{
   let t=vec2i(clamp(floor(v.uv),vec2f(0),vec2f(textureDimensions(atlas))-1));
-  let c=textureLoad(atlas,t,0)*v.tint;
+  let texel=textureLoad(atlas,t,0);
+  let c=vec4f(texel.rgb*v.tint.rgb+(vec3f(1)-texel.rgb)*v.dark.rgb,texel.a*v.tint.a);
   if(c.a==0){discard;}
-  return c;
+  let p=c.rgb*c.a;
+  if(!multiplyCorrection){return vec4f(p,c.a);}
+  let d=vec3f(1-c.a)+p;
+  return vec4f(select(p/d,vec3f(0),d==vec3f(0)),c.a);
 }`;
 
 interface ViewState {
@@ -561,6 +579,7 @@ export class SkeletalLayer implements EnginePlugin {
   private indexBuffer?: GPUBuffer;
   private vertexData = new ArrayBuffer(0);
   private indexData = new Uint32Array(0);
+  private readonly runs: { mode: SkinnedMesh['blendMode']; first: number; count: number }[] = [];
   private list: SkinnedMesh[] = [];
   private added = 0;
   private readonly rigs = new Map<Skeleton2D, number>();
@@ -700,6 +719,7 @@ export class SkeletalLayer implements EnginePlugin {
   }
   /** Skins every visible mesh into one vertex list; returns the index count. */
   private build(device: GPUDevice): number {
+    this.runs.length = 0;
     const records = this.list.map((mesh) => ({ mesh, index: mesh.index, slot: 0 }));
     for (const [skeleton, index] of this.rigs) {
       this.claimSkeleton(skeleton);
@@ -718,8 +738,8 @@ export class SkeletalLayer implements EnginePlugin {
       vertices += m.vertexCount;
       indices += m.indices.length;
     }
-    if (vertices * 20 > this.vertexData.byteLength) {
-      this.vertexData = new ArrayBuffer(Math.max(vertices * 20, this.vertexData.byteLength * 2));
+    if (vertices * 24 > this.vertexData.byteLength) {
+      this.vertexData = new ArrayBuffer(Math.max(vertices * 24, this.vertexData.byteLength * 2));
       this.vertices?.destroy();
       this.vertices = undefined;
     }
@@ -737,17 +757,28 @@ export class SkeletalLayer implements EnginePlugin {
     for (const m of meshes) {
       if (!Number.isFinite(m.x + m.y + m.z) || !(m.alpha >= 0 && m.alpha <= 1))
         throw rangeError('Invalid skinned mesh', 'sprite-options');
+      if (
+        !['normal', 'add', 'multiply', 'screen'].includes(m.blendMode) ||
+        !Number.isInteger(m.darkTint) ||
+        m.darkTint < 0 ||
+        m.darkTint > 0xffffff
+      )
+        throw rangeError('Invalid skeletal blend mode or dark tint', 'sprite-options');
       const skin = m.deform(),
         t = m.tint,
         tint = ((t >> 16) | (t & 0xff00) | ((t & 0xff) << 16) | (Math.round(m.alpha * 255) << 24)) >>> 0;
       for (let k = 0; k < m.vertexCount; k++) {
-        const at = (v + k) * 5;
+        const at = (v + k) * 6;
         floats[at] = (skin[k * 2] + m.x - cx) * zoom;
         floats[at + 1] = (skin[k * 2 + 1] + m.y - cy) * zoom;
         floats[at + 2] = m.uvs[k * 2];
         floats[at + 3] = m.uvs[k * 2 + 1];
         bits[at + 4] = tint;
+        bits[at + 5] = ((m.darkTint >> 16) | (m.darkTint & 0xff00) | ((m.darkTint & 0xff) << 16)) >>> 0;
       }
+      const last = this.runs.at(-1);
+      if (last?.mode === m.blendMode) last.count += m.indices.length;
+      else this.runs.push({ mode: m.blendMode, first: i, count: m.indices.length });
       for (const index of m.indices) this.indexData[i++] = index + v;
       v += m.vertexCount;
     }
@@ -762,7 +793,7 @@ export class SkeletalLayer implements EnginePlugin {
       size: this.indexData.byteLength,
       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(this.vertices, 0, this.vertexData, 0, v * 20);
+    device.queue.writeBuffer(this.vertices, 0, this.vertexData, 0, v * 24);
     device.queue.writeBuffer(this.indexBuffer, 0, this.indexData, 0, i);
     return i;
   }
@@ -787,44 +818,56 @@ export class SkeletalLayer implements EnginePlugin {
     }
     // Several views of a frame skin once: the first builds, later ones reuse its buffers.
     const count = view?.index ? this.lastCount : (this.lastCount = this.build(device));
-    const samples = c.descriptor.multisample?.count ?? 1,
-      key = `${c.format}/${samples}`;
-    let pipeline = this.pipelines.get(key);
-    if (!pipeline) {
-      pipeline = device.createRenderPipeline({
-        label: 'skeletal',
-        layout: device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
-        vertex: {
-          module: this.module!,
-          entryPoint: 'vertexMain',
-          buffers: [
-            {
-              arrayStride: 20,
-              attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x2' },
-                { shaderLocation: 1, offset: 8, format: 'float32x2' },
-                { shaderLocation: 2, offset: 16, format: 'unorm8x4' },
-              ],
-            },
-          ],
-        },
-        fragment: {
-          module: this.module!,
-          entryPoint: 'fragmentMain',
-          targets: [
-            {
-              format: c.format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+    const samples = c.descriptor.multisample?.count ?? 1;
+    const pipelineFor = (mode: SkinnedMesh['blendMode'], correction = false) => {
+      const key = `${c.format}/${samples}/${mode}/${correction}`;
+      let pipeline = this.pipelines.get(key);
+      if (!pipeline) {
+        pipeline = device.createRenderPipeline({
+          label: 'skeletal',
+          layout: device.createPipelineLayout({ bindGroupLayouts: [this.layout!] }),
+          vertex: {
+            module: this.module!,
+            entryPoint: 'vertexMain',
+            buffers: [
+              {
+                arrayStride: 24,
+                attributes: [
+                  { shaderLocation: 0, offset: 0, format: 'float32x2' },
+                  { shaderLocation: 1, offset: 8, format: 'float32x2' },
+                  { shaderLocation: 2, offset: 16, format: 'unorm8x4' },
+                  { shaderLocation: 3, offset: 20, format: 'unorm8x4' },
+                ],
               },
-            },
-          ],
-        },
-        multisample: { count: samples },
-      });
-      this.pipelines.set(key, pipeline);
-    }
+            ],
+          },
+          fragment: {
+            module: this.module!,
+            entryPoint: 'fragmentMain',
+            constants: { multiplyCorrection: Number(correction) },
+            targets: [
+              {
+                format: c.format,
+                writeMask: correction ? 7 : 15,
+                blend: {
+                  color: correction
+                    ? { srcFactor: 'one-minus-dst-alpha', dstFactor: 'one' }
+                    : mode === 'multiply'
+                      ? { srcFactor: 'dst', dstFactor: 'one-minus-src-alpha' }
+                      : mode === 'screen'
+                        ? { srcFactor: 'one', dstFactor: 'one-minus-src' }
+                        : { srcFactor: 'one', dstFactor: mode === 'add' ? 'one' : 'one-minus-src-alpha' },
+                  alpha: { srcFactor: 'one', dstFactor: mode === 'add' ? 'one' : 'one-minus-src-alpha' },
+                },
+              },
+            ],
+          },
+          multisample: { count: samples },
+        });
+        this.pipelines.set(key, pipeline);
+      }
+      return pipeline;
+    };
     const state = this.states.get(c),
       width = view ? view.viewport[2] : c.width,
       height = view ? view.viewport[3] : c.height;
@@ -846,11 +889,22 @@ export class SkeletalLayer implements EnginePlugin {
     const pass = c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] });
     applyView(pass, c);
     if (count) {
-      pass.setPipeline(pipeline);
       pass.setBindGroup(0, state.group!);
       pass.setVertexBuffer(0, this.vertices!);
       pass.setIndexBuffer(this.indexBuffer!, 'uint32');
-      pass.drawIndexed(count);
+      for (const run of this.runs) {
+        if (run.mode === 'multiply')
+          for (let i = run.first; i < run.first + run.count; i += 3) {
+            pass.setPipeline(pipelineFor(run.mode, true));
+            pass.drawIndexed(3, 1, i);
+            pass.setPipeline(pipelineFor(run.mode));
+            pass.drawIndexed(3, 1, i);
+          }
+        else {
+          pass.setPipeline(pipelineFor(run.mode));
+          pass.drawIndexed(run.count, 1, run.first);
+        }
+      }
     }
     pass.end();
   }

@@ -62,6 +62,10 @@
     "./blend": {
       "types": "./dist/blend.d.ts",
       "import": "./dist/blend.js"
+    },
+    "./spine": {
+      "types": "./dist/spine.d.ts",
+      "import": "./dist/spine.js"
     }
   },
   "files": [
@@ -89,6 +93,7 @@
     "test:gpu:slice": "cd ../.. && node packages/sprites/tests/slice-check.mjs",
     "test:gpu:rigging": "cd ../.. && node packages/sprites/tests/rigging-check.mjs",
     "test:gpu:pick": "cd ../.. && node packages/sprites/tests/pick-check.mjs",
-    "test:gpu:blend": "cd ../.. && node packages/sprites/tests/blend-check.mjs"
+    "test:gpu:blend": "cd ../.. && node packages/sprites/tests/blend-check.mjs",
+    "test:gpu:spine": "cd ../.. && node packages/sprites/tests/spine-check.mjs"
   }
 }

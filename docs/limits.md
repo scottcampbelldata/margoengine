@@ -4177,7 +4177,7 @@ Blending uses premultiplied colour in the target's blend space. Add sums colour 
 
 Measured gzip after the upstream core-version guard: blend 8208 B (new ceiling 8464 B), sprites root 7480 to 7613 B, slice 8614 to 8760 B; existing root/slice ceilings hold. The blend entry retains the shared renderer rather than copying it or splitting a cohesive operator API. Skeletal is 7436 B after the upstream guard; pick remains 1933 B. Core plus stage is 24209 B, including the guard already on main. This job does not change their source.
 
-Batch 245 skeleton JSON import is not shipped: full current Spine runtime parity includes physics constraints, while physics remains on hold. Scott must resolve the required import/runtime scope or resume that work; no partial importer is advertised.
+Batch 245 job 4 scope is resolved: skeletal JSON import is shipped as `@margoengine/sprites/spine`. Physics constraints are parsed, validated, retained and round-tripped. Each one emits `spine-physics-deferred` with its name when the document loads. Posing never simulates them; evaluation waits for Scott's physics phase.
 Batch 213 fresh-build integration with main core version guard: water root 20106 -> 20210 B gzip, ceiling 20185 -> 20289 B (exact growth, no extra headroom); caustics 8961 -> 9004 B under its existing 9230 B ceiling. Required package-registration validation stays with its owner, avoiding duplicated attachment contracts. Core plus stage is 24209 B; no core/stage source change in this job.
 
 SNORM compute storage uses the existing CPU route and native signed-byte textures for r8snorm, rg8snorm and rgba8snorm. Channel bytes remain 1, 2 and 4 per texel. Stores clamp to [-1, 1] and encode at scale 127; only written spans upload, with existing mip/layer synchronization. This does not add framebuffer renderability or change core/stage size. Exact signed-byte regression covers 9 format/dimension combinations. No speed claim.
@@ -4389,3 +4389,32 @@ Graph changes from 1998 B and clone from 1039 B to the measurements above add sh
 ### Loader face groups (batch 202)
 `@margoengine/loaders/ply` and `/off` expose the same parsers as the root without unrelated formats. Groups retain each original face's triangulated index range and optional sRGB RGBA. PLY `group.properties` owns raw scalar/list face properties other than the connectivity list. OFF keeps colormap indices as `properties.colorIndex`; mapping them requires the caller's external palette. Binary OFF uses big-endian int32 counts/indices and float32 attributes, four vertex color components and 0/1/3/4 face color components. Existing non-3D OFF variants remain unsupported. Face lists are capped at 65,536 corners; vertex and triangle limits retain their existing defaults.
 `/ply`: 3,702 to 3,973 B min+gzip; `/off`: 2,201 to 2,736 B. These now-public optional entries include owned face metadata and binary OFF validation. Their separate budgets include standard headroom; sharing the existing reader avoids duplicate parsers. Loader root: 52,087 to 52,868 B; core plus stage: 24,209 B unchanged.
+
+### Batch 245 skeletal JSON reader
+
+The optional sprites/spine entry covers bones with shear/inheritance, slots,
+skins, region/mesh/linked/weighted attachments, bounds/points/clipping/paths,
+IK/transform/path constraints, events, bone/slot/deform/sequence/constraint keys
+and curves. Newer unified constraint lists and transform property mappings are
+accepted alongside the documented legacy layouts. See docs/skeletal-json.md
+for public APIs, defaults, coordinate conversion, atlas ownership and evidence.
+Physics definitions and animation/reset keys round-trip unchanged, with one
+named coded warning per constraint; evaluation waits for the physics phase.
+
+Default reader budgets: 1,000,000 JSON values and explicit source mesh/path
+vertices, 64 JSON levels, and text length <= maxValues * 128. Event queries allow
+at most 10,000 crossed loops and 1,000,000 candidate events. Rendering uses one
+caller-provided loaded atlas; image page loading/packing and event audio playback
+belong to the consuming app. No binary skeleton reader or editor UI is claimed.
+Constant-speed path inversion uses 128 chord intervals per cubic. Collapsed
+clipping polygons draw no area; clipping expects simple polygons, as the format
+does. No full editor/runtime API parity, arbitrary accumulation error bound or
+speed result is claimed.
+
+Measured optional gzip: skeletal 7436 -> 7952 B, ceiling 7625 -> 8208 B; new
+spine reader 0 -> 16427 B, ceiling 16920 B. The skeletal growth buys direct
+bone-local bind positions, two-color tint and ordered blend runs needed by the
+reader, including correct transparent multiply. The cohesive reader retains
+validation, round-trip data and posing together; splitting would duplicate the
+schema, attachment maps and constraint/pose state. Core plus stage remains
+24209 B, below the unchanged 25000 B limit, with no core/stage source changes.

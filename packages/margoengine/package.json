@@ -3206,6 +3206,10 @@
       "types": "./dist/sprites/blend.d.ts",
       "import": "./dist/sprites/blend.js"
     },
+    "./sprites/spine": {
+      "types": "./dist/sprites/spine.d.ts",
+      "import": "./dist/sprites/spine.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

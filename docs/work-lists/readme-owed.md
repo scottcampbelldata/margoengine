@@ -367,3 +367,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/loaders (batch 202 job 1): document /ply and /off, face RGBA and scalar/list group properties, binary OFF and external colormap indices; correct stale Limits claims for VTK XML and 3MF textures (batch job 5).
 - margoengine (batch 202 job 1): document loaders/ply and loaders/off aliases.
 - margoengine (batch 202 rebase): document the generated exporters/sparse alias for the already-landed optional exporter.
+
+| @margoengine/sprites | /spine JSON parse/load/serialize, whole-format rig mapping, regions, skins, constraints/events/curves, named deferred physics warnings; skeletal jointPositions, dark tint and blend runs | batch-245 job 4 |
+| margoengine | Generated /sprites/spine alias | batch-245 job 4 |
+| margoengine | Restore the exporters/sparse alias for the export already on main | batch-245 landing mirror repair |

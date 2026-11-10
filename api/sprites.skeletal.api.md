@@ -126,6 +126,7 @@ export interface SkinOptions {
     indices: ArrayLike<number>;
     joints: ArrayLike<number>;
     weights: ArrayLike<number>;
+    jointPositions?: ArrayLike<number>;
 }
 
 export class SkinnedMesh {
@@ -137,6 +138,8 @@ export class SkinnedMesh {
     y: number;
     z: number;
     alpha: number;
+    darkTint: number;
+    blendMode: 'normal' | 'add' | 'multiply' | 'screen';
     visible: boolean;
     index: number;
     owner?: object;

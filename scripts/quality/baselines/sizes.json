@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12722412,
+  "total": 12739915,
   "history": [
     {
       "date": "2026-10-24",
@@ -6310,6 +6310,12 @@
       "commit": "batch-202",
       "reason": "Optional loader entries loaders:ply, loaders:off preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-245-job-4",
+      "reason": "Whole-format skeletal JSON reader: new spine entry 0 -> 16427 B gzip, ceiling 16920 B. Skeletal 7436 -> 7952 B, ceiling 7625 -> 8208 B, for direct bone-local bind positions, dark tint and ordered blends with transparent multiply. Keeping one cohesive schema/attachment/pose state avoids duplication from splits. Core/stage unchanged at 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7102,7 +7108,7 @@
     "@margoengine/sprites/blend": 8464,
     "@margoengine/sprites/pick": 2189,
     "@margoengine/sprites/shader": 1222,
-    "@margoengine/sprites/skeletal": 7625,
+    "@margoengine/sprites/skeletal": 8208,
     "@margoengine/sprites/slice": 8845,
     "@margoengine/stage": 3222,
     "@margoengine/stage/effects": 764,
@@ -7463,6 +7469,7 @@
     "@margoengine/loaders/ply": 4220,
     "margoengine/loaders/ply": 314,
     "@margoengine/loaders/off": 2992,
-    "margoengine/loaders/off": 314
+    "margoengine/loaders/off": 314,
+    "@margoengine/sprites/spine": 16920
   }
 }
