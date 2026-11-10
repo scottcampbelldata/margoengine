@@ -5606,3 +5606,5 @@ stencil, depth-after-stencil, MSAA and the CC0 real-image assertions. The backen
 unit regression fails before extension/aspect selection and proves ordinary-view
 aspect isolation. The compatibility feature and renderer matrix also gate the
 backend repair. No core or stage code changes.
+
+- Section 5 evidence, Stats geometry (batch 264): native command wrappers count WebGPU/WebGL2 submissions with preserved receivers. CPU tests exercise topology, instances, opaque commands, multiview reset and Stats wrapper composition. Hardware proof: scripts/test-stats-parity.mjs on both engine backends. Counts describe submitted candidates, with restart/opaque limitations in limits.md; core, stage and GPU math are unchanged.

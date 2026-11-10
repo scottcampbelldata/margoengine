@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Stats } from './index.js';
+import type { GeometryReport, GeometryStats } from './geometry.js';
 
 /** One group of live GPU objects. */
 export interface GPUMemoryGroup {
@@ -24,6 +25,7 @@ export interface StatsReport {
   /** Frame times in milliseconds, oldest first. */
   frames: number[];
   memory?: GPUMemoryReport;
+  geometry?: GeometryReport;
 }
 
 const SIZES: readonly [RegExp, number][] = [
@@ -156,7 +158,7 @@ export class GPUMemory {
 }
 
 /** The numbers of a `Stats`, and optionally a {@link GPUMemory}, as a plain object: `JSON.stringify(statsReport(stats))`. */
-export function statsReport(stats: Stats, memory?: GPUMemory): StatsReport {
+export function statsReport(stats: Stats, memory?: GPUMemory, geometry?: GeometryStats): StatsReport {
   const frames: number[] = [],
     length = stats.samples.length;
   for (let i = 0; i < stats.sampleCount; i++)
@@ -169,5 +171,6 @@ export function statsReport(stats: Stats, memory?: GPUMemory): StatsReport {
     gpuTime: stats.gpuTime,
     frames,
     ...(memory && { memory: memory.toJSON() }),
+    ...(geometry && { geometry: geometry.toJSON() }),
   };
 }

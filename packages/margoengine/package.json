@@ -3122,6 +3122,10 @@
       "types": "./dist/stats/report.d.ts",
       "import": "./dist/stats/report.js"
     },
+    "./stats/geometry": {
+      "types": "./dist/stats/geometry.d.ts",
+      "import": "./dist/stats/geometry.js"
+    },
     "./taa": {
       "types": "./dist/taa.d.ts",
       "import": "./dist/taa.js"

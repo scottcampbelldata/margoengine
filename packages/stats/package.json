@@ -45,6 +45,10 @@
     "./report": {
       "types": "./dist/report.d.ts",
       "import": "./dist/report.js"
+    },
+    "./geometry": {
+      "types": "./dist/geometry.d.ts",
+      "import": "./dist/geometry.js"
     }
   },
   "files": [

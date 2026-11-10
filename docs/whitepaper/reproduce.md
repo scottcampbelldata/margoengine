@@ -2746,3 +2746,5 @@ The backend aspect regression runs with node --test --test-timeout=120000
 packages/webgl2-compat/test/device.test.js. Run the owning backend features-browser.mjs
 and compat-browser-check.mjs under the shared GPU lock for sampling and renderer
 coverage. No timing assertions or benchmark measurements are involved.
+
+- Stats geometry: build packages, then `node --test packages/stats/test/geometry.test.js`. Hardware correctness on both backends: `node scripts/gpu-lock.mjs run --owner=stats-parity --wait-max=60 --max=3 --gpu=stats-native-render-counters -- node scripts/test-stats-parity.mjs`. The script renders two repository-owned boxes, checks submitted totals and frame reset, and releases the shared lock on exit. No timing benchmark.

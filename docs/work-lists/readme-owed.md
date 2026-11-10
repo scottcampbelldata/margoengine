@@ -164,3 +164,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Optional inspector/textures import and capture startup ordering. | Batch 262 job 4 |
 | @margoengine/webgl2-compat | Stencil-aspect sampling extension, coded capability refusal, depth restoration and ordinary-view aliases. | Batch 262 job 4 |
 | margoengine | Generated aliases for APIs already on main: save/scene-state, audio/binaural, materials/serialization, save/materials, shader/serialization and xr/locomotion; also inspector/textures. | Batch 262 job 4 |
+
+- @margoengine/stats: document /geometry counters, topology registration, indexed vertex semantics, indirect metadata, unknown bundle work, frame reset, panel, report and disposal.
+- margoengine: document /stats/geometry alias.

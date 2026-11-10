@@ -4013,3 +4013,7 @@ diagnostic. The compatibility device entry grows from 105626 to 105766 B gzip
 (+140 B) for aspect selection and ordinary-view alias separation, within its
 existing ceiling. Core plus stage remains 23950 B. Resolved-MSAA simultaneous
 depth/stencil aliasing is a separate backend fix-phase item in known-bugs.md.
+
+### Stats geometry entry
+
+`@margoengine/stats/geometry` provides GeometryStats, attach/beginFrame/track/trackDevice/trackGL/pipeline/view/toJSON/dispose. The geometry row and optional third statsReport argument expose triangles, submitted vertices, instances, drawCalls and unknownDraws. Indexed vertices include repetitions; instance totals sum non-empty draw submissions rather than unique scene objects. Triangle strips/fans count assembled candidates before restart markers, degeneracy, clipping or culling. Existing WebGPU pipelines default to triangle-list unless registered with pipeline(); future tracked device pipelines retain their topology. GPU-written indirect data and render bundles are opaque: supply the indirect CPU metadata callback where available; otherwise unknownDraws reports missing observations without inventing counts. Native methods still run with their original receivers. Multiple engine views in the same task accumulate; custom loops call beginFrame explicitly. No core or stage change. Entry: 1,568 B gzip, new ceiling 1,824 B. Root: 4,861 B; report: 1,165 B; combined core + stage: 23,950 B.

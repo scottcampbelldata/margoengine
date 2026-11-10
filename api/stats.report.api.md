@@ -36,13 +36,52 @@ export interface StatsReport {
     gpuTime: number | null;
     frames: number[];
     memory?: GPUMemoryReport;
+    geometry?: GeometryReport;
 }
 
-export function statsReport(stats: Stats, memory?: GPUMemory): StatsReport;
+export function statsReport(stats: Stats, memory?: GPUMemory, geometry?: GeometryStats): StatsReport;
 
 export function textureBytes(descriptor: GPUTextureDescriptor): number;
 
 // Not exported from this entry, but used by the exports above:
+
+interface GeometryOptions {
+    indirect?: (buffer: GPUBuffer, offset: number, indexed: boolean) => {
+        count: number;
+        instances: number;
+    } | undefined;
+}
+
+interface GeometryReport {
+    triangles: number;
+    vertices: number;
+    instances: number;
+    drawCalls: number;
+    unknownDraws: number;
+}
+
+class GeometryStats implements EnginePlugin {
+    readonly name = "stats-geometry";
+    triangles: number;
+    vertices: number;
+    instances: number;
+    drawCalls: number;
+    unknownDraws: number;
+    constructor(options?: GeometryOptions);
+    static attach(engine: EngineKernel, options?: GeometryOptions): GeometryStats;
+    beginFrame(): void;
+    pipeline(pipeline: GPURenderPipeline, topology: GPUPrimitiveTopology): this;
+    trackDevice(device: GPUDevice): void;
+    track(encoder: GPUCommandEncoder): void;
+    trackGL(gl: WebGL2RenderingContext): void;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    toJSON(): GeometryReport;
+    view(stats: Stats): this;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
 
 class Stats implements EnginePlugin {
     readonly name = "stats";

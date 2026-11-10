@@ -3251,3 +3251,5 @@ Native and compatibility assertions pass all listed formats/subresources,
 including stencil and restoration of depth sampling on the same texture.
 The layered-capture regression also proves preview outputs stay out of every
 capture from this module, including list change notifications.
+
+- Stats geometry (batch 264): optional command-derived triangle, submitted-vertex and instance counters with panel/JSON output. Proof: packages/stats/test/geometry.test.js and scripts/test-stats-parity.mjs; native WebGPU/WebGL2 boxes each submit 24 triangles, 72 vertices, 2 instances. Unknown indirect/bundle work remains explicit. No claim about shader invocations, unique geometry or elapsed speed.
