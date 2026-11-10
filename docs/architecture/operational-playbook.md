@@ -946,6 +946,15 @@ block unrelated work. Legacy entries still participate using their owner
 prefix when present; an old client with no worktree metadata cannot enforce the
 new rule itself. Nested acquisition in the same held lock remains a no-op.
 
+A holder entry is stale only when its pid is gone, its heartbeat (the entry
+file's mtime) is older than the lease, or it is past its hold limit. Holders
+release without the scheduler mutex, so a waiter can read an entry and then
+find the file gone: that entry counts as released, is not logged and nothing
+is removed. Any other failure to read the mtime leaves the pid check alone to
+decide, so a live, beating holder is never removed on a transient Windows
+stat error (`tests/gpu-lock-stale.test.js`; before 2026-11-10 a failed stat
+read as a beat at time 0).
+
 An independent heartbeat samples the complete Windows WDDM GPU Engine raw
 counter set and Win32_Process identities every 30 seconds, outside the mutex.
 RunningTime and Timestamp_Sys100NS remain uint64 strings and are compared with

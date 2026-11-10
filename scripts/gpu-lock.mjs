@@ -484,17 +484,33 @@ async function locked(fn, deadline) {
   }
 }
 
-/** Why a holder's entry is dead, or null when it is alive: its process is gone, its heartbeat stopped, or it overran. */
-function deadReason(entry, file) {
+/** deadReason's answer for an entry whose file went away after it was read: its owner released it. */
+export const RELEASED = 'released';
+
+/**
+ * Why a holder's entry is dead, or null when it is alive: its process is gone, its heartbeat stopped, or it overran.
+ * {@link RELEASED} when the file was removed between reading the entry and reading its heartbeat time.
+ * The heartbeat time is the file's mtime. A holder releases (and its heartbeat process removes the entry) without the
+ * mutex, so a waiter's read can succeed and the stat after it fail with ENOENT. That stat failure used to leave the beat
+ * time at 0 and report "no heartbeat for <seconds since 1970> s". Any other stat failure (EPERM, EBUSY while a scanner
+ * holds the file on Windows) says nothing about the holder, so the pid check alone decides, and the next look retries.
+ * @param {{pid?: number, beats?: boolean, deadline?: number}} entry
+ * @param {string} file
+ * @param {{stat?: typeof statSync, now?: number}} [options]
+ */
+export function deadReason(entry, file, { stat = statSync, now = Date.now() } = {}) {
   if (entry.pid && !alive(entry.pid)) return `pid ${entry.pid} gone`;
   if (entry.beats) {
-    let beat = 0;
+    let beat;
     try {
-      beat = statSync(file).mtimeMs;
-    } catch {}
-    if (Date.now() - beat > leaseMs()) return `no heartbeat for ${Math.round((Date.now() - beat) / 1000)} s`;
+      beat = stat(file).mtimeMs;
+    } catch (error) {
+      return error?.code === 'ENOENT' ? RELEASED : null;
+    }
+    if (!(beat > 0)) return null;
+    if (now - beat > leaseMs()) return `no heartbeat for ${Math.round((now - beat) / 1000)} s`;
     // The limit is enforced by the holder's wrapper and heartbeat process; this covers both having died.
-    if (entry.deadline && Date.now() > entry.deadline + 2 * MIN) return 'past its hold limit';
+    if (entry.deadline && now > entry.deadline + 2 * MIN) return 'past its hold limit';
   }
   return null;
 }
@@ -507,6 +523,7 @@ function snapshot(log, fresh = false) {
         entry = read(file);
       const reason = entry && deadReason(entry, file);
       if (entry && !reason) return [{ ...entry, file }];
+      if (reason === RELEASED) return [];
       if (entry) log?.(`gpu-lock: removing stale ${basename(dir)} entry of ${entry.owner} (${reason})`);
       try {
         unlinkSync(file);
@@ -520,7 +537,9 @@ function snapshot(log, fresh = false) {
     [legacyFile, legacy],
   ]) {
     const reason = entry && deadReason(entry, file);
-    if (reason) {
+    if (reason === RELEASED) {
+      if (entry === exclusive) exclusive = null;
+    } else if (reason) {
       log?.(`gpu-lock: taking over stale lock from ${entry.owner} (${reason})`);
       rmSync(file, { force: true });
       if (entry === exclusive) exclusive = null;

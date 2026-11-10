@@ -62,7 +62,7 @@ test('detached shared tickets retain FIFO order through observer timeout and adm
   };
   try {
     const gpu = await import('../scripts/gpu-lock.mjs?queue-test');
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < gpu.slots(); i++) {
       const worktree = join(folder, `held-${i}`);
       mkdirSync(join(worktree, '.git'), { recursive: true });
       held.push(await gpu.acquire({ owner: `occupied-${i}`, worktree, max: 2, log() {} }));
@@ -118,7 +118,11 @@ test('detached shared tickets retain FIFO order through observer timeout and adm
       assert.equal(readJob(job.ticket).state, 'passed');
       assert.equal(readJob(job.ticket).mode, 'shared');
     }
-    assert.equal(gpu.status().holders.length, 2, 'jobs use the free slot without disturbing the other holders');
+    assert.equal(
+      gpu.status().holders.length,
+      gpu.slots() - 1,
+      'jobs use the free slot without disturbing the other holders',
+    );
   } finally {
     for (const label of ['first', 'second', 'later']) writeFileSync(join(folder, `${label}-finish`), '');
     if (later && later.exitCode === null) await endTree(later.pid);
