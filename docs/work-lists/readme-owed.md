@@ -875,3 +875,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/voxel-net: document /server-runtimes Bun/Deno factories, native listener ownership, AbortSignal/await using, authentication facade, TLS types, shared test:runtimes command and Deno idle input requirement.
 
 - margoengine: document generated voxel-net/server-runtimes alias.
+
+
+- @margoengine/creative and margoengine (batch 271 job 3): document /grass-terrain async factory, scatter peer, segmented default blade, height/density and world colour rasters, seed/LOD/wind defaults, sphere interaction/recovery, abort and restoration; examples deferred.

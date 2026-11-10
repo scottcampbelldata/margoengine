@@ -3503,3 +3503,6 @@ To reproduce demo assets, download the EMD-8117 original from its source JSON, t
 The cinematic AO reference integrates sigma*exp(-sigma*t) times the six-direction average exp(-sigma*min(radius,boxExitDistance)), using exact homogeneous ray transmittance and 4096 axial quadrature points. Engine reboot is separately checked from lighting-only restore.
 
 - Batch 242 runtimes: build packages, install Bun and Deno outside the repository or set MARGO_BUN_BIN and MARGO_DENO_BIN to their executables, then npm run test:runtimes --workspace @margoengine/voxel-net. One shared Node assertion body launches native fixtures with per-child 40-second hard limits. Deno uses run --allow-all --node-modules-dir=manual for the local workspace. Node-only unsupported-runtime behavior is server-runtimes.test.js. The native contract fails on Deno worker stderr before the worker close-capability adapter.
+
+
+Batch 271 job 3: build packages, run `node --test --test-timeout=30000 packages/creative/tests/grass-terrain.test.js`; under the shared GPU lock run `node packages/creative/scripts/test-grass-terrain.js` and again with `--compat` (3-minute hold, 60-minute queue). Fixtures are original analytic maps, not a demo dataset. No dependent GPU run or timing suite.

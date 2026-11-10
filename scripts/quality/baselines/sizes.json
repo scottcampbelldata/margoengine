@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13840765,
+  "total": 13842997,
   "history": [
     {
       "date": "2026-10-24",
@@ -7256,6 +7256,12 @@
       "date": "2026-11-10",
       "commit": "batch-242",
       "reason": "New optional voxel-net/server-runtimes: absent (0 B) -> 19475 B gzip, including its lazy authoritative server, native Bun/Deno adapters, atomic pending accounting and request facade. Splitting out a required server factory would increase setup without reducing loaded bytes."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-271-grass",
+      "reason": "New optional terrain-grass composition: 0 to 1651 B gzip plus generated alias. Reuses scatter height/density/interaction and adds a retained world colour raster; splitting would separate one creation contract.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8571,6 +8577,8 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/sciviz/cinematic": 6262,
-    "@margoengine/voxel-net/server-runtimes": 20060
+    "@margoengine/voxel-net/server-runtimes": 20060,
+    "@margoengine/creative/grass-terrain": 1907,
+    "margoengine/creative/grass-terrain": 325
   }
 }

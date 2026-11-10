@@ -73,6 +73,10 @@
     "./planet-atmosphere": {
       "types": "./dist/planet-atmosphere.d.ts",
       "import": "./dist/planet-atmosphere.js"
+    },
+    "./grass-terrain": {
+      "types": "./dist/grass-terrain.d.ts",
+      "import": "./dist/grass-terrain.js"
     }
   },
   "files": [
@@ -82,13 +86,17 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/post": "^1.0.0",
-    "@margoengine/sky": "^1.0.0"
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/scatter": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/post": {
       "optional": true
     },
     "@margoengine/sky": {
+      "optional": true
+    },
+    "@margoengine/scatter": {
       "optional": true
     }
   },

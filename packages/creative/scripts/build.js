@@ -33,6 +33,7 @@ await build({
       external: [
         '@margoengine/post/stack',
         '@margoengine/sky/planet',
+        '@margoengine/scatter/interact',
         '@margoengine/core',
         '@margoengine/core/extension',
         '@margoengine/vfx/base',

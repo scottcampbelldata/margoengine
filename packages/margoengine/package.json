@@ -794,6 +794,10 @@
       "types": "./dist/creative/planet-atmosphere.d.ts",
       "import": "./dist/creative/planet-atmosphere.js"
     },
+    "./creative/grass-terrain": {
+      "types": "./dist/creative/grass-terrain.d.ts",
+      "import": "./dist/creative/grass-terrain.js"
+    },
     "./culling": {
       "types": "./dist/culling.d.ts",
       "import": "./dist/culling.js"
