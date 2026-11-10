@@ -4570,3 +4570,8 @@ No open correctness defect identified. The planar assignment replaces independen
 - Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
 
 Batch 238 formats: no open format defect found by the malformed-input, real-data getter, SH and PLY round-trip checks. Existing transformed-bitmap alpha precision follow-up above remains outside these CPU entries.
+
+
+### Batch 218 job 2
+
+The eight requested transition presets and their finite parameter contracts are built for frozen and live composition. Independent gradient pixel checks cover each preset in four cardinal directions, endpoints and intermediate eased progress at 1x/4x. No requested preset is deferred.

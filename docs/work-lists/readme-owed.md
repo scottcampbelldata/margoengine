@@ -623,3 +623,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 227 job 3): document lines/debug forwarding; generator also restores the missing clustered/shapes forwarding file required by umbrella consistency tests.
 
 - @margoengine/splats and margoengine: document /formats parseKsplat, parseCompressedPly and encodePly, supported revisions, SH, colour conversion, binary/ASCII export, opacity endpoints, synchronous decoding and existing covariance regularization.
+
+
+- @margoengine/transitions (batch 218 job 2): document /presets, all eight names, pure WGSL generation, frozen/live factories, polynomial easing, parameter defaults and geometric treatment limits; examples deferred.
+- margoengine (batch 218 job 2): document transitions/presets forwarding entry; examples deferred.

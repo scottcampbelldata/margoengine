@@ -3794,6 +3794,10 @@
       "types": "./dist/transitions/live.d.ts",
       "import": "./dist/transitions/live.js"
     },
+    "./transitions/presets": {
+      "types": "./dist/transitions/presets.d.ts",
+      "import": "./dist/transitions/presets.js"
+    },
     "./tween": {
       "types": "./dist/tween.d.ts",
       "import": "./dist/tween.js"

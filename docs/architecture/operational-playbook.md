@@ -6214,3 +6214,8 @@ The optional labels/callouts-route owns CPU planar assignment and exact orientat
 ### Immediate debug and arc evidence (batch 227 job 3)
 DebugLines batches queued commands by style and consumes them once in a frame pass after onPreUpdate marks a new frame. Picks prepare without consuming, and every destination/view shares active data. A following frame releases unused groups. Rendering remains in LineBatches; persistent ArcLine stays in Lines. CPU evidence covers deterministic draw counts, reuse and robust spherical frames; GPU evidence covers expiration, depth, views, arc picking and restoration at 1x/4x on both backends. No core/stage changes or speed claims.
 
+
+
+### Section 5 evidence: batch 218 presets
+
+The optional preset entry compiles pure inverse image-space mappings through the existing custom validator, with no new frame passes. Original gradient source scenes are quantized to RGBA8 and compared against CPU coordinate/coverage expectations for eight presets in four directions at 1x/4x on both backends. Cube intersects two rotated planes; curl inverts a cylindrical projection and shades the reverse side. The gradient grid is 12 by 12 so quarter-progress translations retain pixel-center samples rather than ambiguous float texel ties. No tolerance was increased.

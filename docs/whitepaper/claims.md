@@ -3811,3 +3811,8 @@ Immediate lines batch by style and expire on the next rendered frame while all v
 
 ### Batch 238 capture formats
 The optional formats entry reads KSplat 0.1 levels 0/1/2 and SuperSplat compressed PLY, and writes standard Gaussian PLY in binary little-endian or ASCII. packages/splats/test/formats.test.js compares the real MIT raccoon capture against 64 black-box getter samples per KSplat level, checks all compressed-PLY word fields and SH degrees 0-3 against independent attributes, rejects malformed layouts and round-trips the real capture's positions exactly and colour/SH/covariance within float32 conversion bounds. The GPU formats-check renders the three KSplat derivatives and PLY export on each backend. Covariance normalization/floor and the display/linear SH approximation are retained accepted differences. No runtime or compression-quality claim.
+
+
+### Batch 218 job 2: transition preset library
+
+Eight clean-room presets support validated direction, edge softness, easing and treatment-specific parameters for frozen and live inputs. Proof: presets.test.js checks validation and owned-resource lifecycle; presets-browser.js independently computes gradient pixel expectations for all eight treatments, cardinal directions and 1x/4x. This is numerical correctness coverage, not a speed or physical paper simulation claim.

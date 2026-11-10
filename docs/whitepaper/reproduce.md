@@ -3276,3 +3276,8 @@ After building, run node --test --test-timeout=120000 packages/lines/tests/debug
 
 ### Batch 238 formats
 Build packages, then node --test --test-timeout=120000 packages/splats/test/formats.test.js. The KSplat fixture source and exact regeneration arguments are in packages/splats/test/fixtures/NOTICE.md; rivals run in their external benchmark folder only. GPU: use gpu-lock run --owner=codex-batch238 --gpu=splats-format-render --max=2 --wait-max=60 -- node packages/splats/test/gpu/formats-check.mjs, normally and with --compat. All four render inputs derive from the existing MIT raccoon capture. No timed suite.
+
+
+### Batch 218 job 2
+
+The transitions package GPU command documented for job 1 now also runs presets-browser.js: 27,648 gradient pixel comparisons cover eight treatments, four directions, three progress values and both sample counts per backend. CPU: node --test --test-timeout=60000 packages/transitions/test/*.test.js. No benchmarks or timing assertions are part of this evidence.
