@@ -1055,3 +1055,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine (batch 274 job 4): document the generated compute/nn-extra subpath in the README phase.
 - @margoengine/webgl2-compat (batch 271 job 1 fix): note that a 3D texture slice drawn beside a depth or stencil attachment goes through a 2D stand-in (two blits per such pass; ANGLE Direct3D 11 drops those draws otherwise).
+- @margoengine/creative and margoengine (batch 271 job 1): document /targets-depth DepthTextureRenderTarget depth options and defaults, reversed-Z clear, 4x resolve (volume scratch copy), depthTexture(), generateMipmaps after mip 0, 256 MiB cap, restore and both GPU backends; examples deferred.

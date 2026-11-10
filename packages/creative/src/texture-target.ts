@@ -98,7 +98,7 @@ export class TextureRenderTarget {
       size: [o.width, o.height, o.depthOrLayers],
       mipLevelCount: o.mipLevelCount,
       format: o.format,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      usage: this.textureUsage(),
     });
     try {
       return { texture, view: texture.createView({ dimension: o.kind === 'array' ? '2d-array' : o.kind }) };
@@ -106,6 +106,11 @@ export class TextureRenderTarget {
       texture.destroy();
       throw error;
     }
+  }
+
+  /** Attachment extensions may request additional copy usages before allocation. */
+  protected textureUsage(): number {
+    return GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC;
   }
 
   #live(): void {

@@ -41,6 +41,7 @@ export interface TargetSurface {
 export class TextureRenderTarget {
     readonly options: Readonly<Required<TextureRenderTargetOptions>>;
     constructor(device: GPUDevice | null | undefined, options: TextureRenderTargetOptions);
+    protected textureUsage(): number;
     get texture(): GPUTexture;
     get view(): GPUTextureView;
     mipSize(mip?: number): readonly [number, number, number];

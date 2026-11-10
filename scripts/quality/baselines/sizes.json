@@ -7565,6 +7565,12 @@
       "commit": "b3e5e8f7d",
       "reason": "Batch 274 job 4: new optional compute/nn-extra, 0 to 20860 B gzip; ceiling 21486 B. Differentiable norms, grouped transposed convolution, recurrent layers and interpolation share Tensor ownership and existing primitives. Splitting would duplicate these helpers. Existing nn 19137 to 18873 B; core plus stage unchanged 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-271-targets-depth",
+      "reason": "New optional depth, MSAA and mip render targets: 0 to 3398 B gzip. Per-surface depth, 4x resolve with a 2D volume scratch and the area-filtered mip pass share one target lifecycle. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7764,6 +7770,7 @@
     "@margoengine/creative/post": 7366,
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 4277,
+    "@margoengine/creative/targets-depth": 3654,
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 14096,
     "@margoengine/culling/bounds": 19473,
@@ -8938,5 +8945,5 @@
     "@margoengine/sciviz/charts-extra": 7548,
     "@margoengine/compute/nn-extra": 21486
   },
-  "total": 14307062
+  "total": 14310716
 }

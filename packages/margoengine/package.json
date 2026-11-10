@@ -826,6 +826,10 @@
       "types": "./dist/creative/paint-aniso.d.ts",
       "import": "./dist/creative/paint-aniso.js"
     },
+    "./creative/targets-depth": {
+      "types": "./dist/creative/targets-depth.d.ts",
+      "import": "./dist/creative/targets-depth.js"
+    },
     "./culling": {
       "types": "./dist/culling.d.ts",
       "import": "./dist/culling.js"

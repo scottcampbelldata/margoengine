@@ -29,6 +29,7 @@
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:gpu:targets": "node scripts/test-targets.js",
     "test:gpu:paint": "node scripts/test-paint.js",
+    "test:gpu:targets-depth": "cd ../.. && node packages/creative/scripts/test-targets-depth.js",
     "dev": "vite --config vite.config.js",
     "prepack": "npm run build",
     "test:gpu:grass-atmosphere": "cd ../.. && node packages/creative/scripts/test-grass-terrain.js && node packages/creative/scripts/test-orbit-atmosphere.js",
@@ -83,6 +84,10 @@
     "./paint-aniso": {
       "types": "./dist/paint-aniso.d.ts",
       "import": "./dist/paint-aniso.js"
+    },
+    "./targets-depth": {
+      "types": "./dist/targets-depth.d.ts",
+      "import": "./dist/targets-depth.js"
     }
   },
   "files": [
