@@ -37,7 +37,14 @@ try {
   await page.evaluate(() => window.panel.history.undo());
   assert.equal(await page.evaluate(() => window.mesh.material.wgsl), red);
   assert.equal(await textarea.inputValue(), red);
-  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 200)));
+  await page.evaluate(async () => {
+    const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+    await waitForPipelines(async () => {
+      window.engine.render();
+      await window.engine.gpu.queue.onSubmittedWorkDone();
+    });
+    await new Promise(requestAnimationFrame);
+  });
   assert.deepEqual(await page.evaluate(() => window.errors), [], 'no uncaptured device error');
   assert.deepEqual(errors, []);
   console.log(

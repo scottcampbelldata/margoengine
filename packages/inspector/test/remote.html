@@ -13,7 +13,8 @@ window.setup=async(url,token)=>{
   engine.start();return engine.backend;
 };
 window.run=async()=>{
-  for(let i=0;i<50;i++){try{await window.viewer.request('stats');break;}catch{await new Promise(r=>setTimeout(r,100));}}
+  const deadline=performance.now()+30000;
+  while(!window.viewer.stats){if(performance.now()>=deadline)throw Error('Remote stats timed out');await new Promise(requestAnimationFrame);}
   const hello=await window.viewer.connect();
   const shot=await window.viewer.capture();
   const image=await createImageBitmap(await (await fetch(`data:${shot.mimeType};base64,${shot.data}`)).blob());

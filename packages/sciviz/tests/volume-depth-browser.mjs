@@ -38,6 +38,14 @@ for (const compat of [false, true]) {
       green.visible = false;
       const plane = green.slice('y', 0.5);
       await f.ready();
+      async function accumulate(samples) {
+        const deadline = performance.now() + 20000;
+        while (cinematic.samples < samples) {
+          if (performance.now() >= deadline) throw Error('Cinematic accumulation timed out');
+          f.engine.render();
+          await f.renderer.device.queue.onSubmittedWorkDone();
+        }
+      }
       async function pixel() {
         const b = await createImageBitmap(await f.toPNG({ overlays: false }));
         const c = new OffscreenCanvas(64, 64),
@@ -69,7 +77,7 @@ for (const compat of [false, true]) {
         ambient: [1, 1, 1],
         light: [0, 0, 0],
       });
-      for (let i = 0; i < 128; i++) f.engine.render();
+      await accumulate(128);
       // Move geometry in front of the volume after accumulation is saturated.
       plane.position = 0;
       const afterMove = await pixel();

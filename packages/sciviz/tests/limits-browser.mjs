@@ -26,9 +26,6 @@ const total = () =>
       all: 0,
     });
 const before = total();
-await new Promise((resolve) => setTimeout(resolve, 100));
-const after = total();
-const cpuLoad = after.all > before.all ? 1 - (after.idle - before.idle) / (after.all - before.all) : 0;
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', timeout: 10000 }).trim();
 const digest = createHash('sha256');
 const sources = ['packages/sciviz/tests/monitor-fixtures.js', 'packages/sciviz/tests/limits-browser.mjs'];
@@ -45,6 +42,9 @@ const provenance = {
   workingTree: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8', timeout: 10000 }).length > 0,
 };
 const browser = await openBrowser({ startPath: '/packages/sciviz/tests/volume-quality.html', port: 'free' });
+// Sample CPU counters over real setup work instead of sleeping to create a sampling interval.
+const after = total();
+const cpuLoad = after.all > before.all ? 1 - (after.idle - before.idle) / (after.all - before.all) : 0;
 const errors = [];
 browser.page.on('pageerror', (error) => errors.push(error.message));
 browser.page.setDefaultTimeout(120000);

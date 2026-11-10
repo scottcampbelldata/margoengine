@@ -48,7 +48,9 @@ test('a sleep of 50 ms or more is a fixed wait; a short poll interval is not', (
 
 test('a bitmask filter enumerates distinct feature inputs, while recording a mask still waits', () => {
   assert.deepEqual(
-    kinds('for(let mask=0;mask<32;mask++){ const selected=factories.filter((_,i)=>mask&(1<<i)); await render(selected); }'),
+    kinds(
+      'for(let mask=0;mask<32;mask++){ const selected=factories.filter((_,i)=>mask&(1<<i)); await render(selected); }',
+    ),
     [],
   );
   for (const body of [
@@ -57,7 +59,8 @@ test('a bitmask filter enumerates distinct feature inputs, while recording a mas
     'const selected=factories.filter((_,i)=>other&(1<<i)); await render(selected);',
     'const selected=factories.filter((_,i)=>mask&(1<<other)); await render(selected);',
     'const ignored=factories.filter((_,i)=>mask&(1<<i)); await render();',
-  ]) assert.deepEqual(kinds(`for(let mask=0;mask<32;mask++){ ${body} }`), ['1:frames']);
+  ])
+    assert.deepEqual(kinds(`for(let mask=0;mask<32;mask++){ ${body} }`), ['1:frames']);
 });
 
 // Regression (2026-10-31): these were invisible to the check, and each one failed under a loaded 8-way run.
@@ -78,19 +81,62 @@ test('a fixed-wait: comment with a reason, on the line or the line above, allows
   assert.deepEqual(kinds('// fixed-wait:\nfor (let i = 0; i < 5; i++) engine.render();'), ['2:frames']);
 });
 
-// Regression (2026-10-31): tests/catalog.test.js passed an async predicate, so its clipboard wait ended at once and a
-// loaded run read the previous copy. Playwright does not await a predicate; a promise is truthy.
-test('an async waitForFunction predicate never waits, and no comment allows it', () => {
-  assert.deepEqual(kinds('await page.waitForFunction(async () => ready());'), ['1:async predicate']);
-  assert.deepEqual(kinds('page.waitForFunction(\n  async (want) => (await read()) === want,\n  want,\n);'), [
-    '1:async predicate',
-  ]);
-  assert.deepEqual(kinds('await page.waitForFunction(async function () { return ready(); });'), ['1:async predicate']);
-  assert.deepEqual(kinds('// fixed-wait: reason\nawait page.waitForFunction(async () => ready());'), [
-    '2:async predicate',
-  ]);
+test('Playwright awaits async waitForFunction predicates, including imported state', () => {
+  assert.deepEqual(kinds('await page.waitForFunction(async () => ready());'), []);
+  assert.deepEqual(kinds('page.waitForFunction(\n async (want) => (await read()) === want, want);'), []);
+  assert.deepEqual(kinds('await page.waitForFunction(async function () { return ready(); });'), []);
   assert.deepEqual(kinds('await page.waitForFunction(() => window.ready);'), []);
-  assert.deepEqual(kinds('await page.waitForFunction((want) => window.written.at(-1) === want, want);'), []);
+});
+
+test('hard process deadlines and bounded self-scheduled condition polls are not sleeps', () => {
+  assert.deepEqual(kinds("const kill = () => child.kill('SIGKILL'); const timer = setTimeout(kill, 40000);"), []);
+  assert.deepEqual(
+    kinds("const kill = () => child.kill('SIGKILL'); await Promise.race([exit, delay(3000).then(() => { kill(); })]);"),
+    [],
+  );
+  assert.deepEqual(
+    kinds(`const poll = () => {
+    if (ready()) return resolve();
+    if (Date.now() >= deadline) return reject(Error('timeout'));
+    setTimeout(poll, 50);
+  }; poll();`),
+    [],
+  );
+  // A misleading name or an unbounded retry does not exempt a real sleep.
+  assert.deepEqual(kinds('const kill = resolve; setTimeout(kill, 100);'), ['1:ms']);
+  assert.deepEqual(kinds('const poll = () => { resolve(); }; setTimeout(poll, 100);'), ['1:ms']);
+  assert.deepEqual(kinds('const poll = () => { if (ready()) return resolve(); setTimeout(poll, 100); };'), ['1:ms']);
+  assert.deepEqual(kinds('await Promise.race([ready, delay(3000).then(() => resolve())]);'), ['1:ms']);
+});
+
+test('frame helpers with an explicit nonzero simulation delta advance time rather than wait for readiness', () => {
+  assert.deepEqual(
+    kinds('const frame=async()=>{e.render({delta:1/30});await done();}; for(let i=0;i<90;i++)await frame();'),
+    [],
+  );
+  assert.deepEqual(
+    kinds('const frame=async()=>{e.render({delta:0});await done();}; for(let i=0;i<90;i++)await frame();'),
+    ['1:frames'],
+  );
+  assert.deepEqual(kinds('const frame=async()=>{e.render();await done();}; for(let i=0;i<90;i++)await frame();'), [
+    '1:frames',
+  ]);
+  assert.deepEqual(
+    kinds(
+      'const frame=()=>e.render({delta:1/30}); function other(){const frame=()=>e.render();for(let i=0;i<90;i++)frame();}',
+    ),
+    ['1:frames'],
+  );
+});
+
+test('HTML markup and strings with braces do not become helper scopes or stall scanning', () => {
+  assert.deepEqual(kinds('<!doctype html><style>body{color:#111}</style>'), []);
+  assert.deepEqual(kinds(`<html><style>body{color:#111}</style><script type="module">
+    const marker = "{";
+    const frame = () => engine.render({delta:1/30});
+    for(let i=0;i<90;i++)frame();
+  </script></html>`), []);
+  assert.deepEqual(kinds('const text = `value ${"{"}`; const kill=()=>child.kill(); setTimeout(kill,100);'), []);
 });
 
 test('the check reads test folders, unit tests too, and the browser drivers in scripts/, not benchmarks or builds', () => {

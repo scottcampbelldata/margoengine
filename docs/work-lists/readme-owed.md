@@ -1,5 +1,10 @@
 # README work owed
 
+- @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase.
+- @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase.
+- @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase.
+- @margoengine/react: performance proof waits for target factor/dimensions and pipeline readiness; review test guidance in the README phase.
+
 - @margoengine/sciviz (batch 179 job 4): document /provenance opt-in factories, metadata schema and integrity checks, automatic PNG/SVG metadata, PDF info export, successful-call trace replay, history bounds and explicit application codecs/registries.
 - margoengine (batch 179 job 4): document generated sciviz/provenance alias.
 

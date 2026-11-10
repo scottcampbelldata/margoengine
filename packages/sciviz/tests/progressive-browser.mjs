@@ -36,7 +36,19 @@ for (const fallback of [false, true]) {
         await f.engine.gpu.queue.onSubmittedWorkDone();
       };
       const settle = async (f) => {
-        for (let i = 0; i < 7; i++) await frame(f);
+        const index = figures.indexOf(f),
+          controller = controllers[index],
+          light = lighting[index - 1];
+        const signal = AbortSignal.timeout(30000);
+        do {
+          signal.throwIfAborted();
+          await frame(f);
+        } while (
+          controller.state.progress < 1 ||
+          controller.state.sampleScale < 1 ||
+          controller.state.resolutionScale < 1 ||
+          (light && light.samples < 2)
+        );
       };
       const resident = async (f) => {
         const signal = AbortSignal.timeout(30000);
@@ -82,7 +94,7 @@ for (const fallback of [false, true]) {
           height = f.engine.canvas.height;
         const movingCost = i ? await lighting[i - 1].cost() : null;
         check(moving.resolutionScale === 0.5 && moving.sampleScale === 0.25, 'first camera frame reduces both costs');
-        for (let j = 0; j < 6; j++) await frame(f);
+        await settle(f);
         check(
           c.state.progress === 1 && c.state.sampleScale === 1 && c.state.resolutionScale === 1,
           'full resting refinement',

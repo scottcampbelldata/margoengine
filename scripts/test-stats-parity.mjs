@@ -110,7 +110,21 @@ try {
           });
         try {
           engine.start();
-          for (let i = 0; i < 48; i++) await new Promise(requestAnimationFrame);
+          const deadline = performance.now() + 20000;
+          const expected = backend === 'webgpu' ? 'panel-compute' : 'panel-post';
+          for (;;) {
+            panels.refresh();
+            const h = panels.toJSON();
+            if (
+              h.fps.length >= 30 &&
+              h.gpuMilliseconds.some((v) => v !== null) &&
+              h.memoryBytes.some((v) => v !== null && v > 0) &&
+              h.passes.some((p) => p.name === expected)
+            )
+              break;
+            if (performance.now() >= deadline) throw Error(backend + ': panel histories timed out');
+            await new Promise(requestAnimationFrame);
+          }
           engine.stop();
           panels.refresh();
           const history = panels.toJSON();
@@ -126,7 +140,6 @@ try {
             history.memoryBytes.some((value) => value !== null && value > 0),
             backend + ': memory history',
           );
-          const expected = backend === 'webgpu' ? 'panel-compute' : 'panel-post';
           check(
             history.passes.some((pass) => pass.name === expected),
             backend + ': named panel GPU pass',

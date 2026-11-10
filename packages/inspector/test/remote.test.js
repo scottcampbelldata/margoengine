@@ -21,6 +21,13 @@ async function scene() {
   engine.plugins.set(bloom.name, bloom);
   return { dom, engine, bloom };
 }
+async function until(predicate) {
+  const deadline = Date.now() + 10000;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw Error('Remote inspection state timed out');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 const pair = () => {
   const { port1, port2 } = new MessageChannel();
   return [channelTransport(port1), channelTransport(port2), () => (port1.close(), port2.close())];
@@ -54,7 +61,7 @@ test('a viewer lists, edits, undoes and refuses through a target, with its token
   // Stats arrive unasked; the target counts its frames.
   target.onPreUpdate(1 / 50);
   target.onPreUpdate(1 / 50);
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  await until(() => viewer.stats?.frames === 2);
   assert.equal(Math.round(viewer.stats.fps), 50);
   assert.equal(viewer.stats.frames, 2);
   // The panel lists the objects with inputs that edit the target.
@@ -63,7 +70,7 @@ test('a viewer lists, edits, undoes and refuses through a target, with its token
   assert.ok(input);
   input.value = '3';
   input.dispatchEvent(new dom.window.Event('change'));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await until(() => bloom.options.strength === 3);
   assert.equal(bloom.options.strength, 3);
   assert.match(root.querySelector('.status').textContent, /webgl2 300x150, 50 fps/);
 });

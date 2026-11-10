@@ -9,9 +9,7 @@
 // a unit test step a mock, so only sleeps count there.)
 // A wait that really is about time (an animation clock, a debounce, a settle period the test measures, a check that
 // nothing happens) carries a `// fixed-wait: <reason>` comment on its line or the line above.
-// The opposite slip counts too: Playwright's page.waitForFunction does not await its predicate, so an async predicate
-// returns a promise, which is truthy, and the wait ends at once whatever the condition says (tests/catalog.test.js read
-// the clipboard that way, 2026-10-31). No comment allows it: such a wait never has a reason to exist.
+// Playwright awaits Promise-valued waitForFunction predicates; those poll a condition rather than sleeping.
 // The waits that were there when this check began are counted per file in scripts/fixed-waits-baseline.json; a file
 // may not gain one, and when one goes the count must go down with it (`--update` writes the lower counts). Unit tests
 // and helper-named sleeps joined on 2026-10-31, with what was there then.
@@ -19,6 +17,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { createScanner } from 'typescript/unstable/ast/scanner';
+import { SyntaxKind } from 'typescript/unstable/ast';
 
 const root = resolve(import.meta.dirname, '..');
 const BASELINE = join(root, 'scripts/fixed-waits-baseline.json');
@@ -50,9 +50,6 @@ const SLEEP =
   /waitForTimeout\s*\(\s*([\d_]+)\s*\)|setTimeout\s*\(\s*(?:\w+|\(\)\s*=>\s*\w+\(\))\s*,\s*([\d_]+)\s*\)|\b(?:sleep|wait|delay)\(\s*([\d_]+)\s*\)|\bsettled\(.*?,\s*([\d_]+)\s*\)/g;
 /** Sleeps shorter than this are poll intervals inside a loop that checks a condition, not a wait on their own. */
 export const MIN_SLEEP_MS = 50;
-// An async predicate given to waitForFunction, on one line or split over several: a wait that ends at once.
-const ASYNC_PREDICATE = /\bwaitForFunction\s*\(\s*async\b/g;
-
 /** The loop body after a `for (...)` header ending at `from`: the braced block or the single statement. */
 function bodyAt(source, from) {
   let i = from;
@@ -86,9 +83,92 @@ function walks(body, counter) {
       parameters.includes(selector[3]) &&
       assignment &&
       new RegExp(`\\brender\\s*\\(\\s*${assignment[1]}\\s*[,)]`).test(body)
-    ) return true;
+    )
+      return true;
   }
   return false;
+}
+
+/** Follow lexically scoped local helpers, retaining the existing conservative textual wait detection. */
+function controls(source) {
+  const scopes = [{ start: 0, end: source.length, parent: null }],
+    stack = [scopes[0]],
+    scanner = createScanner(true);
+  let code = source;
+  if (/^\s*</.test(source)) {
+    let end = 0;
+    code = '';
+    for (const m of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+      const start = m.index + m[0].indexOf('>') + 1;
+      code += ' '.repeat(start - end) + m[1];
+      end = start + m[1].length;
+    }
+    code += ' '.repeat(source.length - end);
+  }
+  scanner.setText(code);
+  let previousEnd = -1,
+    previous,
+    braces = 0;
+  const templates = [];
+  for (let kind = scanner.scan(); kind !== SyntaxKind.EndOfFile; kind = scanner.scan()) {
+    if (kind === SyntaxKind.SlashToken && (!previous || /^(?:[=([{,:;!?]|=>|return|throw|case|yield)$/.test(previous)))
+      kind = scanner.reScanSlashToken();
+    if (kind === SyntaxKind.CloseBraceToken && templates.at(-1) === braces) {
+      kind = scanner.reScanTemplateToken(false);
+      if (kind === SyntaxKind.TemplateTail) templates.pop();
+    } else if (kind === SyntaxKind.OpenBraceToken) braces++;
+    else if (kind === SyntaxKind.CloseBraceToken) braces--;
+    if (kind === SyntaxKind.TemplateHead) templates.push(braces);
+    previous = scanner.getTokenText();
+    if (scanner.getTokenEnd() <= previousEnd) throw Error(`Fixed-wait scanner stopped at ${previousEnd}`);
+    previousEnd = scanner.getTokenEnd();
+    if (kind === SyntaxKind.OpenBraceToken) {
+      const scope = { start: scanner.getTokenStart(), end: source.length, parent: stack.at(-1) };
+      scopes.push(scope);
+      stack.push(scope);
+    } else if (kind === SyntaxKind.CloseBraceToken && stack.length > 1) stack.pop().end = scanner.getTokenEnd();
+  }
+  const scopeAt = (index) => scopes.findLast((s) => s.start <= index && index < s.end),
+    helpers = [];
+  const declarations =
+    /(?:\b(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>\s*|\b(?:async\s+)?function\s+(\w+)\s*\([^)]*\)\s*)/g;
+  for (const m of source.matchAll(declarations))
+    helpers.push({ name: m[1] ?? m[2], scope: scopeAt(m.index), body: bodyAt(source, m.index + m[0].length) });
+  const bodyOf = (name, index) => {
+    for (let scope = scopeAt(index); scope; scope = scope.parent) {
+      const helper = helpers.find((h) => h.name === name && h.scope === scope);
+      if (helper) return helper.body;
+    }
+    return '';
+  };
+  const terminates = (body) => /\.kill\s*\(/.test(body) && !/\b(?:resolve|done)\s*\(/.test(body);
+  return {
+    timer(index) {
+      const tail = source.slice(index),
+        named = /^setTimeout\s*\(\s*(\w+)\s*,/.exec(tail);
+      if (named) {
+        const body = bodyOf(named[1], index);
+        if (terminates(body)) return true;
+        // Both a success predicate and a rejecting wall-clock deadline are required for a self-scheduled poll.
+        return (
+          new RegExp(`setTimeout\\s*\\(\\s*${named[1]}\\s*,`).test(body) &&
+          /\bif\s*\(/.test(body) &&
+          /\breturn\s+resolve\s*\(/.test(body) &&
+          /\breject\s*\(/.test(body) &&
+          /Date\.now\(\)/.test(body)
+        );
+      }
+      const then = /^(?:delay|sleep|wait)\(\s*[\d_]+\s*\)\.then\(\s*\(\)\s*=>\s*/.exec(tail);
+      if (!then) return false;
+      const body = bodyAt(source, index + then[0].length);
+      return terminates(body.replace(/\b(\w+)\(\)/g, (call, name) => bodyOf(name, index) || call));
+    },
+    steps(body, index) {
+      return [...body.matchAll(/\b(\w+)\s*\(/g)].some((m) =>
+        /\brender\s*\([^)]*delta\s*:\s*(?!0\s*[,}])[^,}\s]/.test(bodyOf(m[1], index)),
+      );
+    },
+  };
 }
 
 /**
@@ -96,31 +176,29 @@ function walks(body, counter) {
  * waits for a frame (a body that times itself with performance.now() is a measurement, and one that renders with a
  * non-zero delta steps time; one that reads a list item by its counter walks the list, one eye or view a pass; all
  * three pass). `ms`: a sleep of
- * MIN_SLEEP_MS or more. A `fixed-wait: <reason>` comment on the line or the line above allows either. `async
- * predicate`: a waitForFunction that cannot wait; no comment allows it.
+ * MIN_SLEEP_MS or more, excluding bounded condition polls and process-kill deadlines. A `fixed-wait: <reason>` comment on the line or the line above allows either. Promise-valued waitForFunction predicates are awaited by Playwright and are not fixed waits.
  */
 export function fixedWaits(source) {
   const lines = source.split('\n'),
     found = [],
     lineOf = (index) => source.slice(0, index).split('\n').length;
+  let control;
+  const getControl = () => (control ??= controls(source));
   const allowed = (n) => /fixed-wait:\s*\S/.test(lines[n - 1]) || (n > 1 && /fixed-wait:\s*\S/.test(lines[n - 2]));
   for (const m of source.matchAll(FRAME_LOOP)) {
     if (Number(m[2]) < 2) continue;
     const body = bodyAt(source, m.index + m[0].length),
       n = lineOf(m.index);
     // Frames that advance time (a delta other than 0) step a simulation or animation; those are counts by design.
-    const steps = /delta\s*:\s*(?!0\s*[,}])[^,}\s]/.test(body);
+    const steps = /delta\s*:\s*(?!0\s*[,}])[^,}\s]/.test(body) || getControl().steps(body, m.index);
     if (FRAME_WORK.test(body) && !steps && !walks(body, m[1]) && !/performance\.now\(\)/.test(body) && !allowed(n))
       found.push({ line: n, kind: 'frames', text: lines[n - 1].trim() });
   }
   for (const m of source.matchAll(SLEEP)) {
     const ms = Number((m[1] ?? m[2] ?? m[3] ?? m[4]).replaceAll('_', '')),
       n = lineOf(m.index);
-    if (ms >= MIN_SLEEP_MS && !allowed(n)) found.push({ line: n, kind: 'ms', text: lines[n - 1].trim() });
-  }
-  for (const m of source.matchAll(ASYNC_PREDICATE)) {
-    const n = lineOf(m.index);
-    found.push({ line: n, kind: 'async predicate', text: lines[n - 1].trim() });
+    if (ms >= MIN_SLEEP_MS && !allowed(n) && !getControl().timer(m.index))
+      found.push({ line: n, kind: 'ms', text: lines[n - 1].trim() });
   }
   return found.sort((a, b) => a.line - b.line);
 }

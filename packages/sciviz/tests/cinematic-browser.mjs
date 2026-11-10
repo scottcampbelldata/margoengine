@@ -51,6 +51,14 @@ for (const compat of [false, true]) {
       });
       const c = cinematicVolume(f, volume, { ambient: [1, 1, 1], light: [0, 0, 0] });
       await f.ready();
+      async function accumulate(samples) {
+        const deadline = performance.now() + 20000;
+        while (c.samples < samples) {
+          if (performance.now() >= deadline) throw Error('Cinematic accumulation timed out');
+          f.engine.render();
+          await f.renderer.device.queue.onSubmittedWorkDone();
+        }
+      }
       async function pixels() {
         const bmp = await createImageBitmap(await f.toPNG({ overlays: false }));
         const canvas = new OffscreenCanvas(64, 64),
@@ -99,9 +107,9 @@ for (const compat of [false, true]) {
         light: [1, 1, 1],
       };
       c.configure(pathOptions);
-      for (let i = 0; i < 16; i++) f.engine.render();
+      await accumulate(16);
       const early = await pixels();
-      for (let i = 0; i < 256 && c.samples < 256; i++) f.engine.render();
+      await accumulate(256);
       const pathCost = await c.cost(),
         pathPixels = await pixels(),
         samples = c.samples;
@@ -119,7 +127,7 @@ for (const compat of [false, true]) {
         }
       mean /= count;
       c.configure({ ...pathOptions, pathTracing: { ...pathOptions.pathTracing, anisotropy: 0.6 } });
-      for (let i = 0; i < 256; i++) f.engine.render();
+      await accumulate(256);
       const forward = centre(await pixels());
       volume.setClassification({
         kind: 'gradient',
@@ -128,7 +136,7 @@ for (const compat of [false, true]) {
         rgba: new Uint8Array(Array.from({ length: 4 }, () => [255, 255, 255, 20]).flat()),
       });
       c.configure({ pathTracing: { bounces: 32, albedo: 1, samples: 128 }, ambient: [1, 1, 1], light: [0, 0, 0] });
-      for (let i = 0; i < 128; i++) f.engine.render();
+      await accumulate(128);
       const multipleCost = await c.cost(),
         multiplePixels = await pixels();
       let multipleMean = 0;
