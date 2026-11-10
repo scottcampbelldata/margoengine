@@ -1,3 +1,4 @@
+import { quantizePalette } from './palette.js';
 // Render to file. capture() renders one frame at an exact pixel size and returns its RGBA pixels; the encoders turn
 // frames into PNG/JPG files, numbered image sequences, an animated GIF or a WebM video. Time is the caller's: every
 // encoder asks frame(i) for frame i, so a deterministic timeline sets the scene state for i there and captures.
@@ -261,6 +262,10 @@ export interface GIFOptions {
   fps?: number;
   /** Ordered 4x4 Bayer dithering (+-15 levels) for frames that must be quantised. Default false. */
   dither?: boolean;
+  /** Repeat count: 0 forever, -1 once, or 1..65535 repeats. Default 0. */
+  loop?: number;
+  /** Stops awaiting the next frame and encoding. Default none. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -271,12 +276,51 @@ export interface GIFOptions {
  * 128 are transparent (index 0 of the frame's colour table); each frame replaces the previous one.
  * @throws RangeError for fps outside (0, 50], frames of different sizes, or a side above 65535.
  */
-export async function encodeGIF(
-  count: number,
-  frame: FrameSource,
-  { fps = 30, dither = false }: GIFOptions = {},
-): Promise<Uint8Array> {
+export async function encodeGIF(count: number, frame: FrameSource, options: GIFOptions = {}): Promise<Uint8Array> {
   checkCount(count);
+  async function* frames(): AsyncGenerator<Pixels> {
+    for (let index = 0; index < count; index++) yield await frame(index);
+  }
+  return encodeGIFFrames(frames(), options);
+}
+
+/** RGBA8 frame with optional duration in seconds (default 1/fps). */
+export interface GIFFrame extends Pixels {
+  /** 0.02..655.35 seconds. Delays are cumulatively rounded to GIF centiseconds. */
+  duration?: number;
+}
+
+/** Wait for a producer while cancellation remains responsive. */
+async function gifWait<T>(value: PromiseLike<T> | T, signal?: AbortSignal): Promise<T> {
+  if (!signal) return await value;
+  let stop!: () => void;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    stop = () => reject(signal.reason);
+    signal.addEventListener('abort', stop, { once: true });
+  });
+  try {
+    const pending = Promise.race([value, aborted]);
+    if (signal.aborted) stop();
+    return await pending;
+  } finally {
+    signal.removeEventListener('abort', stop);
+  }
+}
+
+/**
+ * Encodes sync or async RGBA frame streams, pulling one frame at a time and
+ * retaining only compressed output. Uses the shared /palette quantizer and
+ * GIF89a LZW. Stops and closes the source on abort, invalid input or failure.
+ * A producer with a pending next must also observe the signal to free its work.
+ */
+export async function encodeGIFFrames(
+  frames: AsyncIterable<GIFFrame> | Iterable<GIFFrame>,
+  { fps = 30, dither = false, loop = 0, signal }: GIFOptions = {},
+): Promise<Uint8Array> {
+  signal?.throwIfAborted();
+  if (!Number.isInteger(loop) || loop < -1 || loop > 65535)
+    throw new RangeError('GIF loop must be -1, 0, or an integer through 65535; choose once, forever, or repeats');
+  if (typeof dither !== 'boolean') throw new TypeError('GIF dither must be a boolean; pass true or false');
   if (!(fps >= 100 / 65535 && fps <= 50))
     throw new RangeError(`GIF fps ${fps} is outside 100/65535..50; delays are 1..65535 hundredths of a second`);
   let buffer = new Uint8Array(1 << 16),
@@ -294,127 +338,72 @@ export async function encodeGIF(
     }
   };
   const short = (value: number): void => put(value & 255, value >> 8);
-  for (let index = 0; index < count; index++) {
-    const pixels = checked(await frame(index));
-    if (!index) {
-      ({ width, height } = pixels);
-      if (width > 65535 || height > 65535)
-        throw new RangeError(`GIF frame ${width}x${height} is too large; capture at most 65535 pixels per side`);
-      put(...Array.from('GIF89a', (c) => c.charCodeAt(0)));
+  const iterator = Symbol.asyncIterator in frames ? frames[Symbol.asyncIterator]() : frames[Symbol.iterator]();
+  let index = 0,
+    elapsed = 0,
+    compensation = 0,
+    variableDuration = false,
+    ticks = 0,
+    done = false;
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const next = await gifWait(iterator.next(), signal);
+      signal?.throwIfAborted();
+      if (next.done) {
+        done = true;
+        break;
+      }
+      const pixels = checked(next.value),
+        duration = next.value.duration ?? 1 / fps;
+      if (!(duration >= 0.02 && duration <= 655.35) || !Number.isFinite(duration))
+        throw new RangeError('GIF frame duration must be 0.02..655.35 seconds; use a supported delay');
+      if (!index) {
+        ({ width, height } = pixels);
+        if (width > 65535 || height > 65535)
+          throw new RangeError(`GIF frame ${width}x${height} is too large; capture at most 65535 pixels per side`);
+        put(...Array.from('GIF89a', (c) => c.charCodeAt(0)));
+        short(width);
+        short(height);
+        put(0, 0, 0); // no global colour table: every frame has its own
+        if (loop >= 0)
+          put(0x21, 0xff, 11, ...Array.from('NETSCAPE2.0', (c) => c.charCodeAt(0)), 3, 1, loop & 255, loop >> 8, 0);
+      } else if (pixels.width !== width || pixels.height !== height)
+        throw new RangeError(
+          `GIF frame ${index} is ${pixels.width}x${pixels.height}, not ${width}x${height}; capture every frame at one size`,
+        );
+      variableDuration ||= next.value.duration !== undefined;
+      const increment = duration - compensation,
+        total = elapsed + increment;
+      compensation = total - elapsed - increment;
+      elapsed = total;
+      // Constant-rate timing stays the exact frame-index formula used by the
+      // original writer. Explicit delays use compensated cumulative summation.
+      const rounded = variableDuration ? Math.round(elapsed * 100) : Math.round(((index + 1) * 100) / fps),
+        { palette, indices, transparent } = quantizePalette(pixels, dither),
+        bits = Math.max(1, Math.ceil(Math.log2(palette.length / 3))),
+        delay = rounded - ticks;
+      ticks = rounded;
+      // Graphic control: dispose to background, delay, transparent index 0.
+      put(0x21, 0xf9, 4, (2 << 2) | (transparent ? 1 : 0));
+      short(delay);
+      put(0, 0, 0x2c);
+      short(0);
+      short(0);
       short(width);
       short(height);
-      put(0, 0, 0); // no global colour table: every frame has its own
-      put(0x21, 0xff, 11, ...Array.from('NETSCAPE2.0', (c) => c.charCodeAt(0)), 3, 1, 0, 0, 0); // loop forever
-    } else if (pixels.width !== width || pixels.height !== height)
-      throw new RangeError(
-        `GIF frame ${index} is ${pixels.width}x${pixels.height}, not ${width}x${height}; capture every frame at one size`,
-      );
-    const { palette, indices, transparent } = quantise(pixels, dither),
-      bits = Math.max(1, Math.ceil(Math.log2(palette.length / 3))),
-      delay = Math.round(((index + 1) * 100) / fps) - Math.round((index * 100) / fps);
-    // Graphic control: dispose to background, delay, transparent index 0.
-    put(0x21, 0xf9, 4, (2 << 2) | (transparent ? 1 : 0));
-    short(delay);
-    put(0, 0, 0x2c);
-    short(0);
-    short(0);
-    short(width);
-    short(height);
-    put(0x80 | (bits - 1));
-    for (let i = 0; i < 3 << bits; i++) put(palette[i] ?? 0);
-    lzw(put, indices, Math.max(2, bits));
+      put(0x80 | (bits - 1));
+      for (let i = 0; i < 3 << bits; i++) put(palette[i] ?? 0);
+      lzw(put, indices, Math.max(2, bits));
+      index++;
+    }
+  } finally {
+    if (!done && iterator.return) await gifWait(iterator.return(), signal);
   }
+  if (!index) throw new RangeError('GIF needs at least one frame; supply a nonempty stream');
+  signal?.throwIfAborted();
   put(0x3b);
   return buffer.slice(0, size);
-}
-
-const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-function quantise(
-  { data, width }: Pixels,
-  dither: boolean,
-): { palette: number[]; indices: Uint8Array; transparent: boolean } {
-  const n = data.length / 4,
-    indices = new Uint8Array(n),
-    exact = new Map<number, number>(),
-    rgb = (i: number): number => (data[i * 4] << 16) | (data[i * 4 + 1] << 8) | data[i * 4 + 2];
-  let transparent = false;
-  for (let i = 0; i < n; i++)
-    if (data[i * 4 + 3] < 128) transparent = true;
-    else if (exact.size <= 256 && !exact.has(rgb(i))) exact.set(rgb(i), exact.size);
-  const offset = transparent ? 1 : 0,
-    palette = transparent ? [0, 0, 0] : [];
-  if (exact.size + offset <= 256) {
-    for (const c of exact.keys()) palette.push(c >> 16, (c >> 8) & 255, c & 255);
-    for (let i = 0; i < n; i++) indices[i] = data[i * 4 + 3] < 128 ? 0 : exact.get(rgb(i))! + offset;
-    return { palette, indices, transparent };
-  }
-  // Median cut over 5-bit bins (key r5 << 10 | g5 << 5 | b5).
-  const key = (r: number, g: number, b: number): number => ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3),
-    counts = new Uint32Array(32768),
-    sums = new Float64Array(32768 * 3);
-  for (let i = 0; i < n; i++)
-    if (data[i * 4 + 3] >= 128) {
-      const k = key(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
-      counts[k]++;
-      for (let c = 0; c < 3; c++) sums[k * 3 + c] += data[i * 4 + c];
-    }
-  const boxes: number[][] = [[]];
-  for (let k = 0; k < 32768; k++) if (counts[k]) boxes[0].push(k);
-  while (boxes.length < 256 - offset) {
-    let best = -1,
-      widest = 0,
-      shift = 0;
-    boxes.forEach((box, b) => {
-      for (let s = 0; s <= 10; s += 5) {
-        let low = 31,
-          high = 0;
-        for (const k of box) {
-          const v = (k >> s) & 31;
-          low = Math.min(low, v);
-          high = Math.max(high, v);
-        }
-        if (high - low > widest) [best, widest, shift] = [b, high - low, s];
-      }
-    });
-    if (best < 0) break;
-    const box = boxes[best].sort((p, q) => ((p >> shift) & 31) - ((q >> shift) & 31));
-    let total = 0,
-      half = 0,
-      split = 0;
-    for (const k of box) total += counts[k];
-    while (split < box.length - 2 && (half += counts[box[split]]) < total / 2) split++;
-    boxes.push(box.splice(split + 1));
-  }
-  const lookup = new Int16Array(32768).fill(-1);
-  boxes.forEach((box, b) => {
-    const mean = [0, 0, 0];
-    let total = 0;
-    for (const k of box) {
-      total += counts[k];
-      for (let c = 0; c < 3; c++) mean[c] += sums[k * 3 + c];
-      lookup[k] = b + offset;
-    }
-    palette.push(...mean.map((v) => Math.round(v / total)));
-  });
-  for (let i = 0; i < n; i++) {
-    if (data[i * 4 + 3] < 128) continue; // index 0
-    const d = dither ? ((bayer[(((i / width) & 3) << 2) | ((i % width) & 3)] + 0.5) / 16 - 0.5) * 32 : 0,
-      [r, g, b] = [0, 1, 2].map((c) => Math.max(0, Math.min(255, Math.round(data[i * 4 + c] + d)))),
-      k = key(r, g, b);
-    if (lookup[k] < 0) {
-      // A dithered colour outside the histogram: the nearest palette entry to the bin centre.
-      let nearest = Infinity;
-      for (let p = offset; p < palette.length / 3; p++) {
-        const e =
-          (palette[p * 3] - ((r & 0xf8) | 4)) ** 2 +
-          (palette[p * 3 + 1] - ((g & 0xf8) | 4)) ** 2 +
-          (palette[p * 3 + 2] - ((b & 0xf8) | 4)) ** 2;
-        if (e < nearest) [nearest, lookup[k]] = [e, p];
-      }
-    }
-    indices[i] = lookup[k];
-  }
-  return { palette, indices, transparent };
 }
 
 // GIF LZW (GIF89a appendix F): variable-length codes packed LSB first into 255-byte sub-blocks, a clear code first and

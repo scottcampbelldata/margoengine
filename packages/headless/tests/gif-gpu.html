@@ -1,0 +1,38 @@
+<!doctype html><html><body><script type="module">
+import { Engine, Camera, box, PbrMaterial } from '@margoengine/core';
+import { createHeadlessCanvas } from '../src/index.ts';
+import { renderFrames } from '../src/video.ts';
+import { encodeGIF } from '../src/gif.ts';
+window.check = async (compatibility) => {
+  const compat = compatibility ? await import('@margoengine/webgl2-compat') : undefined;
+  if (compat) await compat.install({force:true});
+  const engine = await Engine.create(createHeadlessCanvas({width:64,height:48}), {backend:'webgpu',exactSize:true}),
+    mesh = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#84d6bd'})),
+    camera = new Camera({position:[1.6,1.4,2.6]}), source=[], errors=[];
+  engine.gpu.addEventListener('uncapturederror', event=>errors.push(event.error.message));
+  try {
+    async function* keep() {
+      for await (const frame of renderFrames(engine,{frames:3,fps:25,camera,update:({index})=>mesh.setRotation([0,index/4,0])})) {
+        source.push(frame.data); yield frame;
+      }
+    }
+    const bytes=await encodeGIF(keep(),{fps:25}), decoder=new ImageDecoder({data:bytes,type:'image/gif'});
+    try {
+      await decoder.tracks.ready;
+      const differences=[],durations=[];
+      for(let index=0;index<3;index++) {
+        const {image}=await decoder.decode({frameIndex:index});
+        try {
+          const data=new Uint8Array(image.allocationSize({format:'RGBA'}));
+          await image.copyTo(data,{format:'RGBA'});
+          let sum=0,largest=0;
+          for(let i=0;i<data.length;i++) { const error=Math.abs(data[i]-source[index][i]);sum+=error;largest=Math.max(largest,error); }
+          differences.push({mean:sum/data.length,largest});durations.push(image.duration);
+        } finally {image.close();}
+      }
+      return {differences,durations,count:decoder.tracks.selectedTrack.frameCount,errors,bytes:bytes.length};
+    } finally {decoder.close();}
+  } finally {engine.dispose();if(compat) compat.uninstall();}
+};
+window.ready=true;
+</script></body></html>

@@ -2213,6 +2213,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 209 GIF: shared exporter palette/codec CPU correctness includes LZW dictionary growth, transparent frames, async cancellation and centisecond rounding. gif-gpu.mjs renders through native WebGPU and full WebGL2 compatibility and independently decodes every frame; three-frame fixture error is zero. Existing exporter capture-browser checks pass on both paths. This changes no render math or core/stage code.
+
 Batch 209 headless/null uses the existing renderer injection API with a no-op renderer. Core/stage code and GPU math stay unchanged. CPU evidence proves real hierarchy matrices, multi-scene plugin isolation, animation sampling, disposal and no GPU request. No GPU rendering work is introduced or claimed, so this entry needs no GPU slot.
 
 Batch 207 lightmaps: independent normal-incidence coloured-sun truth validates Cycles E/pi conversion and linear HDR export. Both backends render the expected neutral-display pixel and do not double-count engine lights. Source UV0/UV1 separation and generated UV1 are covered; CPU Cycles restoration is checked on success/failure. Broader scene, chart seam, instance-bake and full-film comparisons are not claimed. No core/GPU-math change.

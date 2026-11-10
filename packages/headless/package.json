@@ -55,6 +55,10 @@
     "./null": {
       "types": "./dist/null.d.ts",
       "import": "./dist/null.js"
+    },
+    "./gif": {
+      "types": "./dist/gif.d.ts",
+      "import": "./dist/gif.js"
     }
   },
   "files": [
@@ -68,7 +72,8 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/stage": "^1.0.0",
-    "@margoengine/environment": "^1.0.0"
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/exporters": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js headless",
@@ -82,6 +87,9 @@
       "optional": true
     },
     "@margoengine/environment": {
+      "optional": true
+    },
+    "@margoengine/exporters": {
       "optional": true
     }
   }

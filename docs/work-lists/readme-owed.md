@@ -481,3 +481,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/tilemap | objects: ObjectTileMap, images keyed by source, ordered tile/object/image layers, buildMapQuads, anchors, flips, repeat, runtime edits and lifecycle | batch-246 job 1 |
 | margoengine | Generated tilemap/objects alias | batch-246 job 1 |
+
+
+- @margoengine/headless: document /gif encodeGIF over renderFrames and async pixel streams, optional exporters peer, repeat/duration/alpha options, cancellation and result bytes.
+
+- @margoengine/exporters and margoengine: document /palette quantizePalette plus paletteTexture, and /capture encodeGIFFrames stream, repeat/duration/cancellation options and delay rounding.

@@ -51,9 +51,15 @@ export interface CaptureOptions {
 
 export type FrameSource = (index: number) => Pixels | Promise<Pixels>;
 
+export interface GIFFrame extends Pixels {
+    duration?: number;
+}
+
 export interface GIFOptions {
     fps?: number;
     dither?: boolean;
+    loop?: number;
+    signal?: AbortSignal;
 }
 
 export interface Pixels {
@@ -124,7 +130,9 @@ export function capture(engine: EngineKernel, options: CaptureOptions): {
 
 export function encodeAtlasZIP(count: number, frame: FrameSource, { columns, maxSize, image, manifest, entries, maxBytes, signal, onProgress }?: AtlasZIPOptions): Promise<Uint8Array>;
 
-export function encodeGIF(count: number, frame: FrameSource, { fps, dither }?: GIFOptions): Promise<Uint8Array>;
+export function encodeGIF(count: number, frame: FrameSource, options?: GIFOptions): Promise<Uint8Array>;
+
+export function encodeGIFFrames(frames: AsyncIterable<GIFFrame> | Iterable<GIFFrame>, { fps, dither, loop, signal }?: GIFOptions): Promise<Uint8Array>;
 
 export function encodeJPEG(pixels: Pixels, quality?: number): Promise<Uint8Array>;
 

@@ -3642,3 +3642,7 @@ Batch 219 job 3: optional geometry/teapot tessellates the real 32-patch Utah Tea
 
 ### Batch 246 job 1: ordered map images
 Optional tilemap/objects draws tile cells, tile objects and image layers together in painter order with exact texel loads. CPU expectations cover anchors, animation, ordering and transforms; real GPU readback covers collection images, repeated layers, all flip combinations, quarter-turn objects and empty maps on both backends. Evidence: packages/tilemap/test/objects.test.js and objects-check.mjs. No speed claim.
+
+
+### Batch 209: GIF frame streams
+headless/gif uses the exporter writer and exporters/palette quantizer without duplication. Existing capture tests retain exact palettes, transparency, median-cut error bars, LZW growth/reset coverage and cumulative timing. New stream tests independently decode repeat policy and variable delays, assert pending-source abort/closure, and regress long-run 40 fps rounding. Native WebGPU and full WebGL2 compatibility render three cube frames that Chromium ImageDecoder reads with zero pixel difference and 40,000 microsecond delays. This proves those fixtures and codec controls, not a universal perceptual-quality or speed ranking.

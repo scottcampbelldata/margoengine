@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12999525,
+  "total": 13003434,
   "history": [
     {
       "date": "2026-10-24",
@@ -6492,6 +6492,11 @@
       "commit": "batch-246-job-1",
       "reason": "New optional tilemap/objects: 0 to 7038 B; ordered layer quads, per-image sources and instanced exact-texel drawing share one lifecycle.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "reason": "Batch 209 GIF: headless/gif absent -> 118 B (374 ceiling); exporters/palette absent -> 2597 B (2853 ceiling); capture 6944 -> 7667 B gzip (7241 -> 7923 ceiling). Shared median cut and one LZW writer, stream cancellation, variable delays and repeat policy. Splitting would duplicate codec logic or add loading plumbing. Core plus stage 24209 B unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -6739,7 +6744,7 @@
     "@margoengine/exporters": 37300,
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
-    "@margoengine/exporters/capture": 7241,
+    "@margoengine/exporters/capture": 7923,
     "@margoengine/exporters/collect": 10862,
     "@margoengine/exporters/dae": 12771,
     "@margoengine/exporters/draco": 186514,
@@ -7692,6 +7697,8 @@
     "leak @margoengine/lightmap/imported -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/lightmap -> @margoengine/materials": 1,
     "@margoengine/geometry/teapot": 2595,
-    "@margoengine/tilemap/objects": 7294
+    "@margoengine/tilemap/objects": 7294,
+    "@margoengine/headless/gif": 374,
+    "@margoengine/exporters/palette": 2853
   }
 }
