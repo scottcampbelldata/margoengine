@@ -18,6 +18,8 @@ import { Picking } from '../../../selection/dist/index.js';
 import { SplatSequence, SplatSkin } from '../../dist/animate.js';
 import { loadProgressiveSplats } from '../../dist/progressive.js';
 import { parseKsplat, encodePly } from '../../dist/formats.js';
+import { loadStreamedSog } from '../../dist/lod-sog.js';
+import { encodeSog } from '../../dist/data.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
@@ -240,6 +242,40 @@ window.check.lod = async (o) => {
     const at = sum.map((s) => s / n);
     camera = { position: [at[0] - (o.distance ?? 2.5), at[1], at[2]], target: at, near: 0.05, far: 1000 };
     source = buildSplatLod(data, { leafSize: 1024 });
+    if (o.streamed) {
+      const archive = await encodeSog(data),
+        view = new DataView(archive.buffer),
+        files = new Map();
+      for (let p = 0; view.getUint32(p, true) === 0x04034b50; ) {
+        const size = view.getUint32(p + 18, true),
+          length = view.getUint16(p + 26, true),
+          extra = view.getUint16(p + 28, true),
+          name = new TextDecoder().decode(archive.subarray(p + 30, p + 30 + length)),
+          start = p + 30 + length + extra;
+        files.set(name, archive.slice(start, start + size));
+        p = start + size;
+      }
+      const half = Math.floor(n / 2),
+        bound = { min: [-100, -100, -100], max: [100, 100, 100] },
+        leaf = (offset, count) => ({
+          bound,
+          lods: { 0: { file: 0, offset, count }, 1: { file: 1, offset, count } },
+          errors: [0, 1],
+        }),
+        manifest = {
+          version: 1,
+          lodLevels: 2,
+          lodErrors: true,
+          filenames: ['fine/meta.json', 'coarse/meta.json'],
+          tree: { bound, children: [leaf(0, half), leaf(half, n - half)] },
+        };
+      source = await loadStreamedSog('https://sog.local/lod-meta.json', {
+        fetch: async (url) => {
+          const name = new URL(url).pathname.split('/').at(-1);
+          return new Response(name === 'lod-meta.json' ? JSON.stringify(manifest) : files.get(name));
+        },
+      });
+    }
     if (o.plain) source = undefined;
     var plain = data;
   }
@@ -301,6 +337,37 @@ window.check.lod = async (o) => {
 };
 // ./set: two overlapping copies of the real capture (the second tinted green and moved 1 cm along the view) as two
 // clouds, as one merged cloud, or as two members of one SplatSet.
+window.check.sogV3 = async () => {
+  engine?.dispose();
+  canvas?.remove();
+  globalThis.margoLow = 1;
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:128px;height:128px';
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    preserveDrawingBuffer: true,
+    camera: { position: [0, 0, 3], target: [0, 0, 0] },
+  });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  const sh = new Float32Array(75);
+  sh[20 * 3] = 0.2;
+  const cloud = Splats.attach(engine, {
+    positions: new Float32Array(3),
+    covariances: new Float32Array([0.02, 0, 0, 0.02, 0, 0.02]),
+    colors: new Float32Array([0.5, 0.5, 0.5, 1.5625]),
+    sphericalHarmonics: sh,
+  });
+  await waitForPipelines(draw);
+  const staging = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+    encoder = engine.gpu.createCommandEncoder();
+  encoder.copyBufferToBuffer(cloud.gpuState.colors, 0, staging, 0, 16);
+  encoder.copyBufferToBuffer(cloud.gpuState.ellipses, 0, staging, 16, 32);
+  engine.gpu.queue.submit([encoder.finish()]);
+  await staging.mapAsync(GPUMapMode.READ);
+  const values = [...new Float32Array(staging.getMappedRange())];
+  staging.destroy();
+  return values;
+};
 window.check.set = async (o) => {
   engine?.dispose();
   canvas?.remove();

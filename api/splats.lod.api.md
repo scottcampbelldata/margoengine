@@ -64,6 +64,7 @@ export function chooseSplatNodes(nodes: readonly SplatLodNode[], view: SplatLodV
     maxError: number;
     budget: number;
     loaded: (index: number) => boolean;
+    maxNodes?: number;
 }): {
     selected: number[];
     wanted: number[];

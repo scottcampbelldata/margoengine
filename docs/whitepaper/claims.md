@@ -3899,3 +3899,8 @@ GLSL ES 1.00 transition(vec2) functions can be translated to WGSL and used throu
 
 ### Batch 244 job 3: CRT composite-video look
 CRT now covers the requested NTSC-style color bleed and chromatic offset row. The RGB split can move all three channels independently in two dimensions, as in the public PixiJS filter API, with an additional symmetric red/blue control. `crt.test.js` proves live uniform packing, range checks, grayscale/constant invariance, pre-clamp luma preservation, fractional offsets and premultiplied alpha. Seven new GPU readbacks cover full/partial bleed, integer/fractional/independent offsets, tube effects and live canvas changes on native WebGPU and full WebGL2. Existing all-off rational nearest tests stay exact. No RF-standard compliance or perceptual/timing superiority is claimed.
+
+
+
+### Batch 238 streamed SOG
+The optional lod-sog entry adapts streamed SOG v1 into SplatLodSource, including pre-release metadata, sparse levels, environment, shared chunks and independent cancellation. Splats handles SOG v3 degree 4 and opacity up to 1.5625 without discarding them. Evidence: packages/splats/test/lod-sog.test.js proves real storage-order runs, lazy/deduplicated requests, independent/last-subscriber aborts, LRU, malformed manifests, structural slot budgets, 24-bit labels, degree-4 rotation and SOG v3 round trip. GPU lod-sog-check.mjs compares the streamed MIT capture to its resident pool pixel for pixel, checks analytic Y(4,0) at the z axis and reads opacity 1.5625 after projection on WebGPU and compatibility. Full splats GPU checks retain rendering/editing/animation coverage. No runtime or interpolation-quality claim.

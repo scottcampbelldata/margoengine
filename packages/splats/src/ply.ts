@@ -34,7 +34,7 @@ const slope = (c: number): number => {
 
 /**
  * Decodes a Gaussian-splat PLY (`format binary_little_endian` or `ascii`, one `vertex` element with `x y z`,
- * `f_dc_0..2`, optional `f_rest_*` (degree 1-3), `opacity` (logit), `scale_0..2` (log) and `rot_0..3` (w x y z)).
+ * `f_dc_0..2`, optional `f_rest_*` (degree 1-4), `opacity` (logit), `scale_0..2` (log) and `rot_0..3` (w x y z)).
  * Opacity goes through the sigmoid, scales through exp, and rotation and scale become a covariance. Colours are
  * display (sRGB) values in these files, so the base colour is converted to linear exactly and the view-dependent
  * terms to first order around it (Margo's splat renderer works in linear). Coordinates are kept as stored: captures
@@ -111,8 +111,8 @@ export function parsePly(input: ArrayBuffer | ArrayBufferView): SplatData {
   let rest = 0;
   while (index.has(`f_rest_${rest}`)) rest++;
   const perChannel = rest / 3 + 1;
-  if (rest % 3 || ![1, 4, 9, 16].includes(perChannel))
-    throw new RangeError('Splat PLY f_rest_* must hold 3, 8 or 15 coefficients per colour channel (SH degree 1-3).');
+  if (rest % 3 || ![1, 4, 9, 16, 25].includes(perChannel))
+    throw new RangeError('Splat PLY f_rest_* must hold 3, 8, 15 or 24 coefficients per colour channel (SH degree 1-4).');
   // Read every vertex's properties as numbers, from binary records or ascii lines.
   const width = properties.length,
     values = new Float64Array(count * width);
@@ -182,7 +182,7 @@ export interface GaussianAttributes {
   rotations: Float32Array;
   /** Band-0 spherical-harmonic coefficients (display colour = 0.5 + C0 * dc), 3 floats per splat. */
   dc: Float32Array;
-  /** Opacity 0..1. */
+  /** Opacity 0..1.5625. */
   alphas: Float32Array;
   /** Bands 1 and up: `(perChannel - 1) * 3` floats per splat, coefficient-major with the colour channel innermost. */
   rest?: Float32Array;
@@ -198,9 +198,9 @@ export function splatsFromAttributes(raw: GaussianAttributes, { linear: stored =
   const { count } = raw,
     coefficients = raw.rest ? raw.rest.length / count / 3 : 0,
     perChannel = coefficients + 1;
-  if (!Number.isInteger(coefficients) || ![0, 3, 8, 15].includes(coefficients))
+  if (!Number.isInteger(coefficients) || ![0, 3, 8, 15, 24].includes(coefficients))
     throw new RangeError(
-      'Splat spherical harmonics must hold 3, 8 or 15 coefficients per colour channel (degree 1-3).',
+      'Splat spherical harmonics must hold 3, 8, 15 or 24 coefficients per colour channel (degree 1-4).',
     );
   const covariances = new Float32Array(count * 6),
     colors = new Float32Array(count * 4),
@@ -384,6 +384,8 @@ export function encodeSplat(data: SplatData): Uint8Array<ArrayBuffer> {
   const count = validateSplats(data),
     bytes = new Uint8Array(count * 32),
     view = new DataView(bytes.buffer);
+  if (data.colors.some((a, i) => i % 4 === 3 && a > 1))
+    throw new RangeError('The .splat format stores opacity through 1; use SOG for this cloud');
   for (let i = 0; i < count; i++) {
     const at = i * 32;
     for (let j = 0; j < 3; j++) view.setFloat32(at + j * 4, data.positions[i * 3 + j], true);

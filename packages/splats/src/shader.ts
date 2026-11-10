@@ -53,10 +53,13 @@ export const project =
 fn color(index:u32)->vec3f {
   if(f.counts.y==0){return colors[index].rgb;}
   var direction=normalize(positions[index].xyz-f.eye.xyz);if(f.settings.w>0.5){direction=-vec3f(f.view[0].z,f.view[1].z,f.view[2].z);}let x=direction.x;let y=direction.y;let z=direction.z;
-  var basis:array<f32,16>;basis[0]=0.2820947918;basis[1]=-0.4886025119*y;basis[2]=0.4886025119*z;basis[3]=-0.4886025119*x;
+  var basis:array<f32,25>;basis[0]=0.2820947918;basis[1]=-0.4886025119*y;basis[2]=0.4886025119*z;basis[3]=-0.4886025119*x;
   basis[4]=1.0925484306*x*y;basis[5]=-1.0925484306*y*z;basis[6]=0.3153915653*(3*z*z-1);basis[7]=-1.0925484306*x*z;basis[8]=0.5462742153*(x*x-y*y);
   basis[9]=-0.5900435899*y*(3*x*x-y*y);basis[10]=2.8906114426*x*y*z;basis[11]=-0.4570457995*y*(5*z*z-1);basis[12]=0.3731763326*z*(5*z*z-3);
   basis[13]=-0.4570457995*x*(5*z*z-1);basis[14]=1.4453057213*z*(x*x-y*y);basis[15]=-0.5900435899*x*(x*x-3*y*y);
+  basis[16]=2.5033429418*x*y*(x*x-y*y);basis[17]=-1.7701307698*y*z*(3*x*x-y*y);basis[18]=0.9461746958*x*y*(7*z*z-1);
+  basis[19]=-0.6690465436*y*z*(7*z*z-3);basis[20]=0.1057855469*(35*z*z*z*z-30*z*z+3);basis[21]=-0.6690465436*x*z*(7*z*z-3);
+  basis[22]=0.4730873479*(x*x-y*y)*(7*z*z-1);basis[23]=-1.7701307698*x*z*(x*x-3*y*y);basis[24]=0.6258357354*(x*x*x*x-6*x*x*y*y+y*y*y*y);
   var c=vec3f(0.5);for(var i=0u;i<f.counts.y;i++){let at=(index*f.counts.y+i)*3;c+=basis[i]*vec3f(sh[at],sh[at+1],sh[at+2]);}return max(c,vec3f(0));
 }
 @compute @workgroup_size(256) fn main(@builtin(global_invocation_id) id:vec3u) {

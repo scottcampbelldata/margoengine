@@ -81,6 +81,15 @@ function basis(x: number, y: number, z: number, out: Float64Array): Float64Array
   out[13] = -0.4570457995 * x * (5 * z * z - 1);
   out[14] = 1.4453057213 * z * (x * x - y * y);
   out[15] = -0.5900435899 * x * (x * x - 3 * y * y);
+  out[16] = 2.5033429418 * x * y * (x * x - y * y);
+  out[17] = -1.7701307698 * y * z * (3 * x * x - y * y);
+  out[18] = 0.9461746958 * x * y * (7 * z * z - 1);
+  out[19] = -0.6690465436 * y * z * (7 * z * z - 3);
+  out[20] = 0.1057855469 * (35 * z ** 4 - 30 * z * z + 3);
+  out[21] = -0.6690465436 * x * z * (7 * z * z - 3);
+  out[22] = 0.4730873479 * (x * x - y * y) * (7 * z * z - 1);
+  out[23] = -1.7701307698 * x * z * (x * x - 3 * y * y);
+  out[24] = 0.6258357354 * (x ** 4 - 6 * x * x * y * y + y ** 4);
   return out;
 }
 
@@ -90,7 +99,7 @@ function basis(x: number, y: number, z: number, out: Float64Array): Float64Array
  */
 function shRotation(r: readonly number[], n: number): Float64Array {
   const samples = 128,
-    b = new Float64Array(16),
+    b = new Float64Array(n),
     rows: Float64Array[] = [],
     rotated: Float64Array[] = [];
   for (let s = 0; s < samples; s++) {
@@ -99,7 +108,7 @@ function shRotation(r: readonly number[], n: number): Float64Array {
       radius = Math.sqrt(1 - y * y),
       phi = s * Math.PI * (3 - Math.sqrt(5)),
       d = [Math.cos(phi) * radius, y, Math.sin(phi) * radius];
-    rows.push(basis(d[0], d[1], d[2], new Float64Array(16)).slice(0, n));
+    rows.push(basis(d[0], d[1], d[2], new Float64Array(n)).slice(0, n));
     // f'(d) = f(R^T d): sample the original basis at the inverse-rotated direction.
     const back = [
       r[0] * d[0] + r[3] * d[1] + r[6] * d[2],
@@ -304,7 +313,8 @@ export function decimateSplats(data: SplatData, options: { cellSize: number }): 
   const result: SplatData = sh
     ? { positions, covariances, colors, sphericalHarmonics: sh }
     : { positions, covariances, colors };
-  for (let i = 0; i < total * 4; i++) result.colors[i] = Math.min(1, Math.max(0, result.colors[i]));
+  for (let i = 0; i < total * 4; i++)
+    result.colors[i] = Math.min(i % 4 === 3 ? 1.5625 : 1, Math.max(0, result.colors[i]));
   validateSplats(result);
   return result;
 }

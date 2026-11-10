@@ -3478,6 +3478,10 @@
       "types": "./dist/splats/formats.d.ts",
       "import": "./dist/splats/formats.js"
     },
+    "./splats/lod-sog": {
+      "types": "./dist/splats/lod-sog.d.ts",
+      "import": "./dist/splats/lod-sog.js"
+    },
     "./splines": {
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"

@@ -15,6 +15,7 @@ import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 import { encodeWebpLossless } from '../../src/webp.ts';
+import { checkStreamedSog } from './lod-sog-check.mjs';
 
 const release = await acquire({ owner: 'splats-gpu' });
 const context = await openBrowser({ startPath: '/packages/splats/test/gpu/splats.html', port: 'free' }),
@@ -545,6 +546,7 @@ try {
     'partial capture draws before the remaining network bytes',
   );
   report.progressive = { count: streamed.count, visible: streamed.visible };
+  await checkStreamedSog(page);
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));
   assert.deepEqual(errors.concat(pageErrors), [], 'no GPU or shader errors');

@@ -1,5 +1,5 @@
 // SPZ and SOG writers, so an edited capture ships small. Written from the same public format descriptions the readers
-// follow (Niantic Spatial's SPZ documentation; PlayCanvas's SOG version 2 documentation) and the ZIP format
+// follow (Niantic Spatial's SPZ documentation; PlayCanvas's SOG versions 2/3 documentation) and the ZIP format
 // description (PKWARE APPNOTE, stored entries), with the shared ISO 3309 CRC-32; no other implementation was read.
 // Both start from the stored Gaussian attributes (`attributesFromSplats`: axis scales and rotation by
 // eigen-decomposition, display colour), so what the readers decode is the cloud up to each format's quantisation.
@@ -34,6 +34,8 @@ export async function encodeSpz(data: SplatData, options: EncodeSpzOptions = {})
   const raw = attributesFromSplats(data),
     n = raw.count,
     rest = raw.rest ? raw.rest.length / n : 0;
+  if (rest > 45 || raw.alphas.some((a) => a > 1))
+    throw new RangeError('SPZ v3 stores SH through degree 3 and opacity through 1; use SOG for this cloud');
   let largest = 0;
   for (const v of raw.positions) largest = Math.max(largest, Math.abs(v));
   const limit = 2 ** 23 - 1,
@@ -155,8 +157,8 @@ export function codebook(values: Float32Array): { book: number[]; index: Uint8Ar
 }
 
 /**
- * Encodes a cloud as a bundled SOG scene (version 2: a ZIP of `meta.json` and lossless WebP textures), which
- * `parseSog` and SOG version 2 readers decode. Positions are 16-bit after a log transform within the cloud's bounds;
+ * Encodes a cloud as a bundled SOG scene (a ZIP of `meta.json` and lossless WebP textures), which
+ * `parseSog` decodes. Version 3 is selected for degree 4 or opacity above 1; otherwise version 2. Positions are 16-bit after a log transform within the cloud's bounds;
  * log scales and base colours are 256-entry codebooks; rotations are the smallest-three in bytes; opacity is a byte;
  * spherical harmonic bands are a palette of up to 65,536 entries (each splat's own when the cloud has at most that
  * many, else groups along the bands' principal axis) quantised with a 256-entry codebook.
@@ -167,6 +169,7 @@ export function codebook(values: Float32Array): { book: number[]; index: Uint8Ar
 export async function encodeSog(data: SplatData): Promise<Uint8Array<ArrayBuffer>> {
   const raw = attributesFromSplats(data),
     n = raw.count,
+    v3 = (raw.rest?.length ?? 0) / n === 72 || raw.alphas.some((a) => a > 1),
     width = Math.ceil(Math.sqrt(n)),
     height = Math.ceil(n / width),
     texture = () => new Uint8Array(width * height * 4).fill(255),
@@ -194,10 +197,19 @@ export async function encodeSog(data: SplatData): Promise<Uint8Array<ArrayBuffer
       scales[p + a] = scaleBook.index[i * 3 + a];
       sh0[p + a] = dcBook.index[i * 3 + a];
     }
-    sh0[p + 3] = Math.round(raw.alphas[i] * 255);
+    sh0[p + 3] = v3 ? Math.round(204 * Math.sqrt(raw.alphas[i])) : Math.round(raw.alphas[i] * 255);
     // (w, x, y, z): the largest made positive and omitted (mode 252 + its index), the other three in order.
     const q = raw.rotations.subarray(i * 4, i * 4 + 4),
       length = Math.hypot(q[0], q[1], q[2], q[3]);
+    if (v3) {
+      const sign = q[0] < 0 ? -1 : 1,
+        magnitude = Math.hypot(q[1], q[2], q[3]),
+        k = magnitude > 1e-10 ? (((2 / Math.PI) * Math.atan2(magnitude, q[0] * sign)) / magnitude) * sign : 0;
+      low[p + 3] = Math.round(q[1] * k * 127 + 128);
+      high[p + 3] = Math.round(q[2] * k * 127 + 128);
+      scales[p + 3] = Math.round(q[3] * k * 127 + 128);
+      continue;
+    }
     let mode = 0;
     for (let k = 1; k < 4; k++) if (Math.abs(q[k]) > Math.abs(q[mode])) mode = k;
     const sign = q[mode] < 0 ? -1 : 1;
@@ -206,20 +218,21 @@ export async function encodeSog(data: SplatData): Promise<Uint8Array<ArrayBuffer
     quats[p + 3] = 252 + mode;
   }
   const meta: Record<string, unknown> = {
-      version: 2,
+      version: v3 ? 3 : 2,
       count: n,
       means: { mins, maxs, files: ['means_l.webp', 'means_u.webp'] },
       scales: { codebook: scaleBook.book, files: ['scales.webp'] },
-      quats: { files: ['quats.webp'] },
+      ...(!v3 ? { quats: { files: ['quats.webp'] } } : {}),
+      ...(v3 ? { opacity: { max: raw.alphas.reduce((a, b) => Math.max(a, b), 0) } } : {}),
       sh0: { codebook: dcBook.book, files: ['sh0.webp'] },
     },
     files: Array<[string, Uint8Array]> = [
       ['means_l.webp', encodeWebpLossless(low, width, height)],
       ['means_u.webp', encodeWebpLossless(high, width, height)],
       ['scales.webp', encodeWebpLossless(scales, width, height)],
-      ['quats.webp', encodeWebpLossless(quats, width, height)],
       ['sh0.webp', encodeWebpLossless(sh0, width, height)],
     ];
+  if (!v3) files.push(['quats.webp', encodeWebpLossless(quats, width, height)]);
   if (raw.rest) {
     const coefficients = raw.rest.length / n / 3,
       { centroids, labels, count } = palette(raw.rest, n, coefficients * 3),
@@ -239,7 +252,7 @@ export async function encodeSog(data: SplatData): Promise<Uint8Array<ArrayBuffer
     }
     meta.shN = {
       count,
-      bands: DEGREE[coefficients],
+      bands: coefficients === 24 ? 4 : DEGREE[coefficients],
       codebook: book.book,
       files: ['shN_centroids.webp', 'shN_labels.webp'],
     };

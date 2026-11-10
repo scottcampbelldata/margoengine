@@ -74,6 +74,10 @@
     "./formats": {
       "types": "./dist/formats.d.ts",
       "import": "./dist/formats.js"
+    },
+    "./lod-sog": {
+      "types": "./dist/lod-sog.d.ts",
+      "import": "./dist/lod-sog.js"
     }
   },
   "files": [

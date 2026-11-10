@@ -124,12 +124,13 @@ export class Splats implements EnginePlugin {
     }
   }
   /**
-   * A cloud of `count` hidden splats (opacity 0) with `coefficients` SH coefficients per channel (0, 4, 9 or 16), to
+   * A cloud of `count` hidden splats (opacity 0) with `coefficients` SH coefficients per channel (0, 4, 9, 16 or 25), to
    * fill later with `write`: a pool for streamed or edited splats. Hidden splats are culled before the sort.
    * @throws RangeError for a count outside 1 to 3,000,000 or another coefficient count.
    */
   static reserve(count: number, coefficients = 0): Splats {
-    if (![0, 4, 9, 16].includes(coefficients)) throw new RangeError('Splat SH coefficients must be 0, 4, 9 or 16');
+    if (![0, 4, 9, 16, 25].includes(coefficients))
+      throw new RangeError('Splat SH coefficients must be 0, 4, 9, 16 or 25');
     if (!Number.isInteger(count) || count < 1 || count > 3_000_000)
       throw new RangeError('Splats.reserve needs 1 to 3,000,000 splats');
     const covariances = new Float32Array(count * 6);
@@ -141,7 +142,7 @@ export class Splats implements EnginePlugin {
       ...(coefficients ? { sphericalHarmonics: new Float32Array(count * coefficients * 3) } : {}),
     });
   }
-  /** SH coefficients per channel: 0, 4, 9 or 16. */
+  /** SH coefficients per channel: 0, 4, 9, 16 or 25. */
   get coefficients(): number {
     return this.sh.length === 4 ? 0 : this.sh.length / this.count / 3;
   }

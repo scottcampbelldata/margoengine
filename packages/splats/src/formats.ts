@@ -323,6 +323,8 @@ export function encodePly(data: SplatData, options: EncodePlyOptions = {}): Uint
     format = options.format ?? 'binary_little_endian';
   if (format !== 'binary_little_endian' && format !== 'ascii')
     throw new RangeError('Choose binary_little_endian or ascii as the PLY format');
+  if (data.colors.some((a, i) => i % 4 === 3 && a > 1))
+    throw new RangeError('Gaussian PLY logit opacity cannot exceed 1; use SOG for this cloud');
   const raw = attributesFromSplats(data),
     rest = (raw.rest?.length ?? 0) / count / 3;
   const names = [

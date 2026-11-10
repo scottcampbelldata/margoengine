@@ -30,7 +30,7 @@ export interface SplatLodNode {
   readonly radius: number;
   /** World-space size of the detail this node leaves out; 0 for a leaf (the trained splats). */
   readonly error: number;
-  /** Splats in the node's own cloud. */
+  /** Splats in the node's own cloud. Zero denotes a structural node, refined unconditionally without loading. */
   readonly count: number;
   /** Indices of the child nodes; empty for a leaf. */
   readonly children: readonly number[];
@@ -39,7 +39,7 @@ export interface SplatLodNode {
 /** A splat hierarchy: node 0 is the root. `load` returns a node's cloud; it may fetch it. */
 export interface SplatLodSource {
   readonly nodes: readonly SplatLodNode[];
-  /** Spherical-harmonics coefficients per channel of every node's cloud: 0, 4, 9 or 16. */
+  /** Spherical-harmonics coefficients per channel of every node's cloud: 0, 4, 9, 16 or 25. */
   readonly coefficients: number;
   load(index: number, signal: AbortSignal): Promise<SplatData>;
 }
@@ -210,7 +210,7 @@ export interface SplatLodView {
 export function chooseSplatNodes(
   nodes: readonly SplatLodNode[],
   view: SplatLodView,
-  options: { maxError: number; budget: number; loaded: (index: number) => boolean },
+  options: { maxError: number; budget: number; loaded: (index: number) => boolean; maxNodes?: number },
 ): { selected: number[]; wanted: number[] } {
   const wanted: number[] = [];
   if (!nodes.length) return { selected: [], wanted };
@@ -218,12 +218,14 @@ export function chooseSplatNodes(
   const pixels = (i: number) => {
     const n = nodes[i];
     if (!n.children.length) return 0;
+    if (!n.count) return Infinity;
     const d = Math.hypot(n.center[0] - view.eye[0], n.center[1] - view.eye[1], n.center[2] - view.eye[2]) - n.radius;
     return (n.error * view.focal) / Math.max(d, view.near);
   };
   const heap: Array<[number, number]> = [[pixels(0), 0]],
     kept: number[] = [];
-  let total = nodes[0].count;
+  let total = nodes[0].count,
+    occupied = +(nodes[0].count > 0);
   while (heap.length) {
     heap.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
     const [error, i] = heap.shift()!,
@@ -233,13 +235,15 @@ export function chooseSplatNodes(
       break;
     }
     const missing = n.children.filter((c) => !options.loaded(c)),
-      grown = total - n.count + n.children.reduce((s, c) => s + nodes[c].count, 0);
-    if (missing.length || grown > options.budget) {
-      if (missing.length && grown <= options.budget) wanted.push(...missing);
+      grown = total - n.count + n.children.reduce((s, c) => s + nodes[c].count, 0),
+      slots = occupied - +(n.count > 0) + n.children.filter((c) => nodes[c].count > 0).length;
+    if (missing.length || grown > options.budget || slots > (options.maxNodes ?? Infinity)) {
+      if (missing.length && grown <= options.budget && slots <= (options.maxNodes ?? Infinity)) wanted.push(...missing);
       kept.push(i);
       continue;
     }
     total = grown;
+    occupied = slots;
     for (const c of n.children) heap.push([pixels(c), c]);
   }
   return { selected: kept.sort((a, b) => a - b), wanted };
@@ -297,8 +301,8 @@ export class SplatLod implements EnginePlugin {
     const nodes = source?.nodes;
     if (!Array.isArray(nodes) || !nodes.length || typeof source.load !== 'function')
       throw new TypeError('SplatLod needs a source with nodes and load(index, signal)');
-    if (![0, 4, 9, 16].includes(source.coefficients))
-      throw new RangeError('SplatLod source coefficients must be 0, 4, 9 or 16');
+    if (![0, 4, 9, 16, 25].includes(source.coefficients))
+      throw new RangeError('SplatLod source coefficients must be 0, 4, 9, 16 or 25');
     const budget = options.budget ?? 1_000_000;
     this.maxError = options.maxError ?? 2;
     this.concurrency = options.concurrency ?? 4;
@@ -311,7 +315,8 @@ export class SplatLod implements EnginePlugin {
     let largest = 0;
     nodes.forEach((n: SplatLodNode, i: number) => {
       if (
-        !(n.count >= 1) ||
+        !(n.count >= 0) ||
+        (!n.count && !n.children.length) ||
         !Number.isInteger(n.count) ||
         !(n.radius >= 0) ||
         !(n.error >= 0) ||
@@ -332,6 +337,12 @@ export class SplatLod implements EnginePlugin {
     // splat pool of degree-3 SH for an 8,385-splat capture went past a Radeon 680M's storage limit).
     const leaves = nodes.filter((n: SplatLodNode) => !n.children.length).length;
     this.slots = new Array(Math.min(Math.floor(budget / largest), leaves)).fill(undefined);
+    const minimum = (i: number): number =>
+      nodes[i].count ? 1 : nodes[i].children.reduce((n: number, c: number) => n + minimum(c), 0);
+    if (minimum(0) > this.slots.length)
+      throw new RangeError(
+        `SplatLod budget needs at least ${minimum(0) * largest} splats to cover all structural branches; raise budget`,
+      );
     this.cacheSize = options.cache ?? this.slots.length * largest * 2;
     this.cloud = Splats.reserve(this.slots.length * largest, source.coefficients);
     options.signal?.addEventListener('abort', () => this.abort.abort(options.signal!.reason), { once: true });
@@ -393,23 +404,24 @@ export class SplatLod implements EnginePlugin {
         maxError: this.maxError,
         budget: this.slots.length * this.slot,
         loaded: (i) => this.loaded.has(i),
+        maxNodes: this.slots.length,
       });
     for (const i of wanted) this.request(i);
     const keep = new Set(selected);
     for (const i of this.cut)
-      if (!keep.has(i)) {
+      if (!keep.has(i) && this.source.nodes[i].count) {
         const s = this.at.get(i)!;
         this.cloud.clear(s * this.slot, this.slot);
         this.slots[s] = undefined;
         this.at.delete(i);
       }
     for (const i of selected)
-      if (!this.at.has(i)) {
+      if (this.source.nodes[i].count && !this.at.has(i)) {
         const s = this.slots.indexOf(undefined);
         this.slots[s] = i;
         this.at.set(i, s);
         this.cloud.clear(s * this.slot, this.slot);
-        this.cloud.write(s * this.slot, this.loaded.get(i)!);
+        if (this.source.nodes[i].count) this.cloud.write(s * this.slot, this.loaded.get(i)!);
       }
     this.cut = selected;
     this.used = selected.reduce((sum, i) => sum + this.source.nodes[i].count, 0);
@@ -421,6 +433,14 @@ export class SplatLod implements EnginePlugin {
     }
   }
   private request(index: number): void {
+    if (!this.source.nodes[index].count) {
+      this.loaded.set(index, {
+        positions: new Float32Array(),
+        covariances: new Float32Array(),
+        colors: new Float32Array(),
+      });
+      return;
+    }
     if (this.pending.has(index) || this.pending.size >= this.concurrency || this.abort.signal.aborted) return;
     if (this.failures.some((f) => (f as { node?: number }).node === index)) return;
     this.pending.add(index);

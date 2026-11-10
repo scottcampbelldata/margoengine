@@ -716,3 +716,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 218 job 3): document transitions/glsl forwarding entry; examples deferred.
 
 - @margoengine/pixel (batch 244 job 3): document CRT colorBleed, chromaticOffset and independent red/green/blue offsets, scalar/tuple source-pixel units and signs, fractional sampling, alpha/gamut behavior, defaults and stylized baseband limits; README examples deferred.
+
+
+
+- @margoengine/splats and margoengine (batch 238 job 3): document /lod-sog loadStreamedSog/StreamedSogSource, lazy ranges, metadata/cache/abort/disposal defaults, environment, structural-node budget and SOG v3 degree-4/extended-opacity read/write limits.

@@ -1,5 +1,5 @@
 // SOG (Spatially Ordered Gaussians) reader. Written from the public SOG format description (PlayCanvas developer
-// documentation, version 2); no other implementation was read.
+// documentation, versions 2/3); no other implementation was read.
 import { type DecodedImage, decodeWebpLossless } from '@margoengine/decoders/webp-lossless';
 import { MargoError } from '@margoengine/math/errors';
 import type { SplatData } from './data.js';
@@ -20,17 +20,17 @@ interface SogMeta {
   model?: string;
   means: { mins: number[]; maxs: number[]; files: string[] };
   scales: { codebook: number[]; files: string[] };
-  quats: { files: string[] };
+  quats?: { files: string[] };
   sh0: { codebook: number[]; files: string[] };
   shN?: { count: number; bands: number; codebook: number[]; files: string[] };
 }
 
 const asBytes = (v: ArrayBuffer | ArrayBufferView): Uint8Array =>
   v instanceof ArrayBuffer ? new Uint8Array(v) : new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-const COEFFICIENTS = [0, 3, 8, 15];
+const COEFFICIENTS = [0, 3, 8, 15, 24];
 
 /**
- * Decodes a SOG Gaussian-splat scene (version 2) to {@link SplatData}: either a bundled `.sog` file (a ZIP archive) or
+ * Decodes a SOG Gaussian-splat scene (version 2 or 3) to {@link SplatData}: either a bundled `.sog` file (a ZIP archive) or
  * the loose files of an unbundled one (`meta.json` plus its lossless WebP textures). Positions, scales, rotations,
  * colours, opacity and spherical harmonics are dequantised as the format describes; the splats keep the file's
  * coordinate frame. The textures are decoded by a built-in lossless WebP decoder, so it works in any runtime with
@@ -71,9 +71,9 @@ export async function parseSog(
   } catch {
     throw new RangeError('The SOG meta.json is not valid JSON; check that the file is complete.');
   }
-  if (meta.version !== 2)
+  if (meta.version !== 2 && meta.version !== 3)
     throw new RangeError(
-      `SOG version ${meta.version} is not supported; this reader handles version 2, re-export the scene.`,
+      `SOG version ${meta.version} is not supported; this reader handles versions 2 and 3, re-export the scene.`,
     );
   if (meta.model !== undefined && meta.model !== 'antialiased')
     throw new MargoError(
@@ -102,9 +102,9 @@ export async function parseSog(
     low = image(lowName),
     high = image(highName),
     scales = image(meta.scales?.files?.[0]),
-    quats = image(meta.quats?.files?.[0]),
+    quats = meta.version === 2 ? image(meta.quats?.files?.[0]) : undefined,
     sh0 = image(meta.sh0?.files?.[0]);
-  for (const t of [high, scales, quats, sh0])
+  for (const t of [high, scales, ...(quats ? [quats] : []), sh0])
     if (t.width !== low.width || t.height !== low.height)
       throw new RangeError('The SOG textures differ in size; the file is damaged.');
   if (low.width * low.height < count)
@@ -138,8 +138,18 @@ export async function parseSog(
       raw.logScales[i * 3 + a] = scaleBook[scales.data[p + a]];
       raw.dc[i * 3 + a] = dcBook[sh0.data[p + a]];
     }
-    raw.alphas[i] = sh0.data[p + 3] / 255;
-    const mode = quats.data[p + 3] - 252;
+    raw.alphas[i] = meta.version === 3 ? (sh0.data[p + 3] / 204) ** 2 : sh0.data[p + 3] / 255;
+    if (meta.version === 3) {
+      const x = (low.data[p + 3] - 128) / 127,
+        y = (high.data[p + 3] - 128) / 127,
+        z = (scales.data[p + 3] - 128) / 127,
+        length = Math.hypot(x, y, z),
+        angle = (length * Math.PI) / 2,
+        k = length > 1e-6 ? Math.sin(angle) / length : Math.PI / 2;
+      raw.rotations.set([Math.cos(angle), x * k, y * k, z * k], i * 4);
+      continue;
+    }
+    const mode = quats!.data[p + 3] - 252;
     if (mode < 0 || mode > 3) throw new RangeError('A SOG rotation has a reserved mode; the file is damaged.');
     // The three stored components are (w, x, y, z) without the omitted one, each in -sqrt(1/2)..sqrt(1/2).
     const q4 = [0, 0, 0, 0];
@@ -147,7 +157,7 @@ export async function parseSog(
       read = 0;
     for (let k = 0; k < 4; k++) {
       if (k === mode) continue;
-      const c = ((quats.data[p + read++] / 255) * 2 - 1) * Math.SQRT1_2;
+      const c = ((quats!.data[p + read++] / 255) * 2 - 1) * Math.SQRT1_2;
       q4[k] = c;
       sum += c * c;
     }
@@ -157,7 +167,16 @@ export async function parseSog(
   if (meta.shN) {
     const sh = meta.shN,
       coeffs = COEFFICIENTS[sh.bands];
-    if (!coeffs || !Array.isArray(sh.codebook) || sh.codebook.length !== 256 || !Array.isArray(sh.files))
+    if (
+      !coeffs ||
+      sh.bands > (meta.version === 3 ? 4 : 3) ||
+      !Number.isInteger(sh.count) ||
+      sh.count < 1 ||
+      sh.count > (meta.version === 3 ? 16777216 : 65536) ||
+      !Array.isArray(sh.codebook) ||
+      sh.codebook.length !== 256 ||
+      !Array.isArray(sh.files)
+    )
       throw new RangeError('The SOG shN block is damaged; bands must be 1 to 3 and the codebook 256 entries.');
     const centroids = image(sh.files[0]),
       labels = image(sh.files[1]);
@@ -167,7 +186,8 @@ export async function parseSog(
       );
     raw.rest = new Float32Array(count * coeffs * 3);
     for (let i = 0; i < count; i++) {
-      const label = labels.data[i * 4] + labels.data[i * 4 + 1] * 256;
+      const label =
+        labels.data[i * 4] + labels.data[i * 4 + 1] * 256 + (meta.version === 3 ? labels.data[i * 4 + 2] * 65536 : 0);
       if (label >= sh.count)
         throw new RangeError(
           'A SOG spherical-harmonic label is outside its palette; the file is damaged, re-export it',

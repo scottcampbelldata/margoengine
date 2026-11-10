@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13463887,
+  "total": 13486405,
   "history": [
     {
       "date": "2026-10-24",
@@ -6960,6 +6960,12 @@
       "commit": "fbffe7fd8",
       "reason": "batch-244-crt-2816-to-3775B-gzip-for-NTSC-chroma-and-independent-RGB-offsets-keep-one-pass-and-restore-lifetime-core-stage-unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-238-job3",
+      "reason": "Batch238 job3: optional streamed SOG reader and v3 degree-4/extended-opacity support; keep one validated codec and renderer instead of splitting data representations.",
+      "grew": 3
     }
   ],
   "items": {
@@ -7822,8 +7828,8 @@
     "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 32230,
-    "@margoengine/splats/animate": 20263,
-    "@margoengine/splats/data": 22135,
+    "@margoengine/splats/animate": 20993,
+    "@margoengine/splats/data": 22942,
     "@margoengine/splats/depth": 2119,
     "@margoengine/splats/edit": 3856,
     "@margoengine/splats/formats": 20847,
@@ -8220,6 +8226,7 @@
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/usdz/preview-surface": 5006,
     "@margoengine/mixer/fx": 3936,
-    "@margoengine/transitions/glsl": 16190
+    "@margoengine/transitions/glsl": 16190,
+    "@margoengine/splats/lod-sog": 20981
   }
 }

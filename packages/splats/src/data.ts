@@ -5,16 +5,16 @@ export interface SplatData {
   positions: Float32Array;
   /** Positive-definite 3D covariances, 6 floats per splat (xx, xy, xz, yy, yz, zz), world units squared. */
   covariances: Float32Array;
-  /** Linear RGB and opacity, 4 floats per splat, each 0..1. */
+  /** Linear RGB (0..1) and opacity (0..1.5625), 4 floats per splat. */
   colors: Float32Array;
-  /** Optional view-dependent colour: 4, 9 or 16 SH coefficients per splat, RGB interleaved; replaces `colors`' RGB. */
+  /** Optional view-dependent colour: 4, 9, 16 or 25 SH coefficients per splat, RGB interleaved; replaces `colors`' RGB. */
   sphericalHarmonics?: Float32Array;
 }
 /**
  * Checks a cloud and returns its splat count.
  * @throws TypeError when an attribute is not a Float32Array.
  * @throws RangeError on a wrong count or length, a non-finite value, a covariance that is not positive definite, or a
- * colour outside 0..1.
+ * RGB outside 0..1 or opacity outside 0..1.5625.
  */
 export function validateSplats(data: SplatData): number {
   if (
@@ -32,10 +32,10 @@ export function validateSplats(data: SplatData): number {
     count > 3_000_000 ||
     data.covariances.length !== count * 6 ||
     data.colors.length !== count * 4 ||
-    (sh !== undefined && (!(sh instanceof Float32Array) || ![4, 9, 16].includes(sh.length / count / 3)))
+    (sh !== undefined && (!(sh instanceof Float32Array) || ![4, 9, 16, 25].includes(sh.length / count / 3)))
   )
     throw new RangeError(
-      'Splat data needs 1 to 3,000,000 splats, covariances of 6 and colors of 4 per splat, and spherical harmonics of 4, 9 or 16 coefficients per channel; fix the array lengths.',
+      'Splat data needs 1 to 3,000,000 splats, covariances of 6 and colors of 4 per splat, and spherical harmonics of 4, 9, 16 or 25 coefficients per channel; fix the array lengths.',
     );
   for (const array of [data.positions, data.covariances, data.colors, ...(sh ? [sh] : [])])
     for (const value of array) if (!Number.isFinite(value)) throw new RangeError('Splat attributes must be finite');
@@ -50,8 +50,8 @@ export function validateSplats(data: SplatData): number {
     if (a <= 0 || a * d - b * b <= 0 || a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d) <= 0)
       throw new RangeError('Splat covariance must be positive definite');
     for (let j = 0; j < 4; j++)
-      if (data.colors[i * 4 + j] < 0 || data.colors[i * 4 + j] > 1)
-        throw new RangeError('Splat colors and opacity must be 0..1');
+      if (data.colors[i * 4 + j] < 0 || data.colors[i * 4 + j] > (j === 3 ? 1.5625 : 1))
+        throw new RangeError('Splat colors must be 0..1 and opacity 0..1.5625; fix the attribute values');
   }
   return count;
 }

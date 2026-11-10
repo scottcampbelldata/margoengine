@@ -4653,3 +4653,8 @@ GLSL importer fix-phase syntax edge cases (batch 218, rule 22): uniform float we
 
 ### Batch 244 job 3
 The CRT composite-video look is built with signal invariants and native/compatibility GPU readback regressions. No open defect identified in this job's scope; the intentionally stylized baseband model and unshifted glow ordering are documented in limits.
+
+
+Batch 238 job 3: no open reader defect found by real range extraction, cancellation, malformed manifest, v3 and both-backend GPU checks. Fixed owning LOD pool slot exhaustion for uneven nodes while adding structural sources; maxNodes regression in lod-sog.test.js covers it.
+
+Batch 238 dependent gate finding: npm test --workspace @margoengine/sciviz runs glyph-data.test.js from the package directory although its readFileSync paths start at repository-root examples/assets/sciviz/glyph; repro fails ENOENT displacement.e. Cause is the test working directory assumption. All 281 tests pass unchanged from the repository root; suite launcher repair belongs to the fix phase.
