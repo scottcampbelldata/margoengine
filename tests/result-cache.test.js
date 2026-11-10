@@ -643,6 +643,7 @@ test('building three small packages twice gives the same bytes', { timeout: 120_
     });
   cpSync(join(repo, 'packages/shared'), join(tree, 'packages/shared'), { recursive: true });
   cpSync(join(repo, 'packages/core/src/wasm.ts'), join(tree, 'packages/core/src/wasm.ts'));
+  cpSync(join(repo, 'packages/core/src/version.ts'), join(tree, 'packages/core/src/version.ts'));
   cpSync(join(repo, 'packages/gltf/tsconfig.json'), join(tree, 'packages/gltf/tsconfig.json'));
   // The build's modules read every package's manifest when they load.
   for (const name of readdirSync(join(repo, 'packages'))) {

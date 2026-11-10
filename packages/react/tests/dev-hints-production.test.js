@@ -1,3 +1,4 @@
+import { assertCore, coreRequirement } from '../../core/dist/version.js';
 // In a production build (NODE_ENV=production) the development hints never print.
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,7 @@ import React from 'react';
 process.env.NODE_ENV = 'production';
 mock.module('@margoengine/core/extension', {
   namedExports: {
+    assertCore, coreRequirement,
     Engine: {
       async create(canvas) {
         return {

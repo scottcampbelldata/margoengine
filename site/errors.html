@@ -17,12 +17,18 @@
       branch on <code>error.code</code>, not on the message. Optional packages follow the same pattern.</p>
     <h2>Codes</h2>
     <ul>
+      <li><a href="#version"><code>version</code></a></li>
       <li><a href="#disposed"><code>disposed</code></a></li>
       <li><a href="#unsupported"><code>unsupported</code></a></li>
       <li><a href="#state"><code>state</code></a></li>
       <li><a href="#failed"><code>failed</code></a></li>
       <li><a href="#timeout"><code>timeout</code></a></li>
     </ul>
+    <section id="version">
+      <h2><a href="#version">version: incompatible core installations or package builds</a></h2>
+      <p><strong>Cause.</strong> A package and engine resolve different core module paths, or the package was built against a different exact core version. Separate installs have separate class identities and registries even when their version numbers match.</p>
+      <p><strong>Fix.</strong> Use one @margoengine/core installation and rebuild or update the packages to its exact version. Check the versions and module paths in the error. Deduplicate dependencies and map umbrella and scoped imports to the same core. The check runs before plugin setup or runtime access and does not create a global registry.</p>
+    </section>
     <section id="disposed">
       <h2><a href="#disposed">disposed: used after dispose()</a></h2>
       <p class="messages"><code>Engine disposed</code> <code>Mesh disposed</code> <code>Transforms disposed</code></p>

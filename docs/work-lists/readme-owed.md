@@ -199,3 +199,27 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document generated wfc/assemble alias and pre-existing audio/voices and xr/hands aliases (batch 237 job 1).
 - @margoengine/xr: document xr/performance negotiation, per-session framebufferScale, fixedFoveation, runtime capability checks, frame-owned camera textures and disposal.
 - @margoengine/webgl2-compat: document xr createProjectionLayer scaleFactor overriding installXR framebufferScale for one session, with defaults and float validation.
+
+| @margoengine/core | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/math | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/bvh | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/controls | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/creative | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/decoders | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/environment | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/exporters | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/geometry | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/labels | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/lines | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/loaders | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/physics | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/points | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/text | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/usdz | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/react | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/shader | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/viewcube | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/stage | Core version guard at stage attachment boundaries and matching core imports. | version-guard |
+| margoengine | CORE_VERSION re-export and version-skew errors across umbrella and scoped imports. | version-guard |
+
+| @margoengine/xr | Core version guard declarations at XR attachment boundaries. | version-guard |

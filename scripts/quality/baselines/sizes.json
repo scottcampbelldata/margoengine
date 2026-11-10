@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12436278,
+  "total": 12441007,
   "history": [
     {
       "date": "2026-10-24",
@@ -5752,6 +5752,237 @@
       "commit": "batch-268-performance-transport",
       "reason": "Optional XR root 8965 to 9060 B gzip, ceiling 8967 to 9332: validated projection scale transport and layer getter are needed by xr/performance. A separate wrapper cannot reach the private session layer creation; core/stage stay unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "28b15ccca",
+      "reason": "Batch 249 relation-query: new optional pair joins, 0 to 1023 B gzip; source/target rows with live membership checks. Restored from malformed upstream merge.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "996e1760c",
+      "reason": "New optional splines/kinds: 0 to 2802 B gzip; exact cubic geometry and tested public operations. Restored from malformed upstream merge.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "57750c4d6",
+      "reason": "Scott's later version-guard ruling: core 21584 to 21775 B (+191 B), shrunk from +238 B. Keep the core ratchet at its measured size; each of the 26 failing optional ceilings gains exactly 191 B for core version-skew prevention. No other ceilings change. The same 191 B allowance applies to shader whole-entry and viewcube unit ceilings; their minimal/axis limits remain unchanged.",
+      "grew": 27,
+      "entries": [
+        {
+          "entry": "@margoengine/animation/interactivity",
+          "before": 24787,
+          "after": 24906,
+          "ceilingBefore": 24902,
+          "ceilingAfter": 25093
+        },
+        {
+          "entry": "@margoengine/animator/graph",
+          "before": 8527,
+          "after": 8597,
+          "ceilingBefore": 8542,
+          "ceilingAfter": 8733
+        },
+        {
+          "entry": "@margoengine/audio",
+          "before": 7687,
+          "after": 7762,
+          "ceilingBefore": 7716,
+          "ceilingAfter": 7907
+        },
+        {
+          "entry": "@margoengine/biomes/view",
+          "before": 10454,
+          "after": 10517,
+          "ceilingBefore": 10454,
+          "ceilingAfter": 10645
+        },
+        {
+          "entry": "@margoengine/clustered/area",
+          "before": 10445,
+          "after": 10526,
+          "ceilingBefore": 10461,
+          "ceilingAfter": 10652
+        },
+        {
+          "entry": "@margoengine/core",
+          "before": 21584,
+          "after": 21775,
+          "ceilingBefore": 21630,
+          "ceilingAfter": 21775
+        },
+        {
+          "entry": "@margoengine/creative",
+          "before": 19172,
+          "after": 19244,
+          "ceilingBefore": 19177,
+          "ceilingAfter": 19368
+        },
+        {
+          "entry": "@margoengine/environment/cube-camera",
+          "before": 5688,
+          "after": 5756,
+          "ceilingBefore": 5691,
+          "ceilingAfter": 5882
+        },
+        {
+          "entry": "@margoengine/lines",
+          "before": 19635,
+          "after": 19703,
+          "ceilingBefore": 19671,
+          "ceilingAfter": 19862
+        },
+        {
+          "entry": "@margoengine/physics2d",
+          "before": 8169,
+          "after": 8241,
+          "ceilingBefore": 8199,
+          "ceilingAfter": 8390
+        },
+        {
+          "entry": "@margoengine/post",
+          "before": 42021,
+          "after": 42105,
+          "ceilingBefore": 42058,
+          "ceilingAfter": 42249
+        },
+        {
+          "entry": "@margoengine/post/bloom",
+          "before": 6978,
+          "after": 7046,
+          "ceilingBefore": 7005,
+          "ceilingAfter": 7196
+        },
+        {
+          "entry": "@margoengine/post/fxaa",
+          "before": 4667,
+          "after": 4729,
+          "ceilingBefore": 4699,
+          "ceilingAfter": 4890
+        },
+        {
+          "entry": "@margoengine/post/smaa",
+          "before": 6207,
+          "after": 6276,
+          "ceilingBefore": 6244,
+          "ceilingAfter": 6435
+        },
+        {
+          "entry": "@margoengine/post/anamorphic",
+          "before": 6523,
+          "after": 6575,
+          "ceilingBefore": 6551,
+          "ceilingAfter": 6742
+        },
+        {
+          "entry": "@margoengine/post/blur",
+          "before": 6183,
+          "after": 6239,
+          "ceilingBefore": 6203,
+          "ceilingAfter": 6394
+        },
+        {
+          "entry": "@margoengine/post/lens",
+          "before": 6862,
+          "after": 6916,
+          "ceilingBefore": 6887,
+          "ceilingAfter": 7078
+        },
+        {
+          "entry": "@margoengine/scatter/tiles",
+          "before": 3401,
+          "after": 3479,
+          "ceilingBefore": 3415,
+          "ceilingAfter": 3606
+        },
+        {
+          "entry": "@margoengine/scenery/scenes",
+          "before": 19197,
+          "after": 19334,
+          "ceilingBefore": 19213,
+          "ceilingAfter": 19404
+        },
+        {
+          "entry": "@margoengine/sciviz/webgl2",
+          "before": 4476,
+          "after": 4527,
+          "ceilingBefore": 4476,
+          "ceilingAfter": 4667
+        },
+        {
+          "entry": "@margoengine/shader/effects",
+          "before": 8300,
+          "after": 8364,
+          "ceilingBefore": 8306,
+          "ceilingAfter": 8497
+        },
+        {
+          "entry": "@margoengine/taa/upscale",
+          "before": 7112,
+          "after": 7179,
+          "ceilingBefore": 7112,
+          "ceilingAfter": 7303
+        },
+        {
+          "entry": "@margoengine/terrain/stream",
+          "before": 12050,
+          "after": 12112,
+          "ceilingBefore": 12100,
+          "ceilingAfter": 12291
+        },
+        {
+          "entry": "@margoengine/text",
+          "before": 16395,
+          "after": 16494,
+          "ceilingBefore": 16406,
+          "ceilingAfter": 16597
+        },
+        {
+          "entry": "@margoengine/transitions/mask",
+          "before": 5460,
+          "after": 5536,
+          "ceilingBefore": 5522,
+          "ceilingAfter": 5713
+        },
+        {
+          "entry": "@margoengine/transitions/custom",
+          "before": 5234,
+          "after": 5305,
+          "ceilingBefore": 5275,
+          "ceilingAfter": 5466
+        },
+        {
+          "entry": "@margoengine/controls",
+          "before": 27469,
+          "after": 27530,
+          "ceilingBefore": 27517,
+          "ceilingAfter": 27708
+        }
+      ],
+      "unitCeilings": [
+        {
+          "entry": "@margoengine/shader (whole-entry unit ceiling)",
+          "before": 18489,
+          "after": 18568,
+          "ceilingBefore": 18500,
+          "ceilingAfter": 18691
+        },
+        {
+          "entry": "@margoengine/viewcube (unit ceiling)",
+          "before": 5130,
+          "after": 5220,
+          "ceilingBefore": 5150,
+          "ceilingAfter": 5341
+        }
+      ]
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "version-guard",
+      "reason": "XR rebase: unguarded 8965 B, guarded 9041 B. Apply the same exact 191 B version-guard allowance to its 8967 B ceiling, now 9158 B; the engine identity check and attachment declaration cannot split without losing the package build identity. Core/stage remain 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5777,7 +6008,7 @@
     "@margoengine/animator/spline-ik": 4094,
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
-    "@margoengine/audio": 7716,
+    "@margoengine/audio": 7907,
     "@margoengine/audio/ambisonics": 2175,
     "@margoengine/audio/binaural": 2065,
     "@margoengine/audio/doppler": 1346,
@@ -5834,7 +6065,7 @@
     "@margoengine/biomes/splines": 2870,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
-    "@margoengine/biomes/view": 10454,
+    "@margoengine/biomes/view": 10645,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4339,
@@ -5880,7 +6111,7 @@
     "@margoengine/cinematic/lens": 1269,
     "@margoengine/cinematic/noise": 1612,
     "@margoengine/clustered": 13989,
-    "@margoengine/clustered/area": 10461,
+    "@margoengine/clustered/area": 10652,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/directional": 2535,
     "@margoengine/clustered/flicker": 845,
@@ -5902,7 +6133,7 @@
     "@margoengine/compute/sparse": 7238,
     "@margoengine/compute/stream": 1324,
     "@margoengine/compute/subgroups": 2537,
-    "@margoengine/controls": 27517,
+    "@margoengine/controls": 27708,
     "@margoengine/controls/arcball": 8637,
     "@margoengine/controls/box-gizmo": 6842,
     "@margoengine/controls/collide": 7341,
@@ -5918,9 +6149,9 @@
     "@margoengine/controls/transform": 12121,
     "@margoengine/controls/transitions": 14087,
     "@margoengine/controls/walk": 14348,
-    "@margoengine/core": 21630,
+    "@margoengine/core": 21775,
     "@margoengine/core/extension": 21951,
-    "@margoengine/creative": 19177,
+    "@margoengine/creative": 19368,
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/paint": 3329,
     "@margoengine/creative/particles": 759,
@@ -5982,7 +6213,7 @@
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/environment": 31917,
     "@margoengine/environment/blend": 4687,
-    "@margoengine/environment/cube-camera": 5691,
+    "@margoengine/environment/cube-camera": 5882,
     "@margoengine/environment/exr-write": 2084,
     "@margoengine/environment/fog-volumes": 1638,
     "@margoengine/environment/gi": 18611,
@@ -6139,7 +6370,7 @@
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/mesh": 3272,
     "@margoengine/lightmap/refracted": 7846,
-    "@margoengine/lines": 19671,
+    "@margoengine/lines": 19862,
     "@margoengine/lines/batch": 6519,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
@@ -6293,7 +6524,7 @@
     "@margoengine/physics": 19679,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/next": 188444,
-    "@margoengine/physics2d": 8199,
+    "@margoengine/physics2d": 8390,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/crt": 3072,
@@ -6311,26 +6542,26 @@
     "@margoengine/points/pick": 5274,
     "@margoengine/points/potree": 17694,
     "@margoengine/points/surfels": 14851,
-    "@margoengine/post": 42058,
+    "@margoengine/post": 42249,
     "@margoengine/post/afterimage": 6079,
-    "@margoengine/post/anamorphic": 6551,
-    "@margoengine/post/bloom": 7005,
-    "@margoengine/post/blur": 6203,
+    "@margoengine/post/anamorphic": 6742,
+    "@margoengine/post/bloom": 7196,
+    "@margoengine/post/blur": 6394,
     "@margoengine/post/contact-shadows": 6852,
     "@margoengine/post/decals": 5499,
     "@margoengine/post/depth": 3876,
-    "@margoengine/post/fxaa": 4699,
+    "@margoengine/post/fxaa": 4890,
     "@margoengine/post/glitch": 6672,
     "@margoengine/post/gtao": 12524,
     "@margoengine/post/image": 12478,
-    "@margoengine/post/lens": 6887,
+    "@margoengine/post/lens": 7078,
     "@margoengine/post/lens-flare": 7016,
     "@margoengine/post/material-decals": 8835,
     "@margoengine/post/motion-blur": 8245,
     "@margoengine/post/mrt": 3753,
     "@margoengine/post/outline": 6510,
     "@margoengine/post/scene-fade": 3074,
-    "@margoengine/post/smaa": 6244,
+    "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10083,
     "@margoengine/post/ssgi": 13052,
     "@margoengine/post/ssr": 13257,
@@ -6427,14 +6658,14 @@
     "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
-    "@margoengine/scatter/tiles": 3415,
+    "@margoengine/scatter/tiles": 3606,
     "@margoengine/scene": 1974,
     "@margoengine/scene/bulk": 1764,
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/aurora": 5866,
     "@margoengine/scenery/presets": 1233,
-    "@margoengine/scenery/scenes": 19213,
+    "@margoengine/scenery/scenes": 19404,
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 51813,
@@ -6454,14 +6685,14 @@
     "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/sciviz/tubes": 2789,
     "@margoengine/sciviz/vtk": 6201,
-    "@margoengine/sciviz/webgl2": 4476,
+    "@margoengine/sciviz/webgl2": 4667,
     "@margoengine/selection": 21142,
     "@margoengine/selection/spatial": 2313,
     "@margoengine/shader": 19028,
     "@margoengine/shader/compute-texture": 4761,
     "@margoengine/shader/deform": 5535,
     "@margoengine/shader/editor": 24745,
-    "@margoengine/shader/effects": 8306,
+    "@margoengine/shader/effects": 8497,
     "@margoengine/shader/graph": 14462,
     "@margoengine/shader/lighting": 10314,
     "@margoengine/shader/noise": 5772,
@@ -6550,7 +6781,7 @@
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 14629,
     "@margoengine/taa/sharpen": 1023,
-    "@margoengine/taa/upscale": 7112,
+    "@margoengine/taa/upscale": 7303,
     "@margoengine/terrain": 13295,
     "@margoengine/terrain/blend": 3676,
     "@margoengine/terrain/deform": 5192,
@@ -6561,8 +6792,8 @@
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/rvt": 5527,
     "@margoengine/terrain/sculpt": 4873,
-    "@margoengine/terrain/stream": 12100,
-    "@margoengine/text": 16406,
+    "@margoengine/terrain/stream": 12291,
+    "@margoengine/text": 16597,
     "@margoengine/text/animate": 11783,
     "@margoengine/text/extrude": 11160,
     "@margoengine/text/msdf": 4502,
@@ -6592,9 +6823,9 @@
     "@margoengine/toon/hatch": 1998,
     "@margoengine/toon/models": 4843,
     "@margoengine/transitions": 4563,
-    "@margoengine/transitions/custom": 5275,
+    "@margoengine/transitions/custom": 5466,
     "@margoengine/transitions/live": 2757,
-    "@margoengine/transitions/mask": 5522,
+    "@margoengine/transitions/mask": 5713,
     "@margoengine/tween": 5759,
     "@margoengine/tween/async": 3656,
     "@margoengine/tween/control": 3970,

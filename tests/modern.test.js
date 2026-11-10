@@ -809,7 +809,7 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
     react = await import('margoengine/react');
   assert.deepEqual(
     Object.keys(api).sort(),
-    ['Camera', 'Engine', 'EngineKernel', 'Geometry', 'PbrMaterial', 'box'].sort(),
+    ['CORE_VERSION', 'Camera', 'Engine', 'EngineKernel', 'Geometry', 'PbrMaterial', 'box'].sort(),
   );
   assert.equal(api.EngineKernel, api.Engine);
   assert.deepEqual(

@@ -54,6 +54,10 @@ const config = (entry, outDir, fileName, name, plugins = [], write = true) => ({
   configFile: false,
   publicDir: false,
   logLevel: 'warn',
+  // Classic scripts have no module URL. Keep core's identity/version checks, naming the published worker instead.
+  define: {
+    'import.meta.url': JSON.stringify(`@margoengine/${relative(packagesDir, resolve(outDir, fileName)).replaceAll('\\', '/')}`),
+  },
   plugins,
   resolve: { alias: aliases },
   build: {

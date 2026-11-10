@@ -3286,3 +3286,9 @@ assembleWFC converts solved IDs and source/orientation metadata into shared-geom
 ### XR performance controls
 
 The optional xr/performance entry forwards per-session scale on native and compatibility routes, controls runtime foveation and exposes frame-owned compatibility camera textures. CPU tests prove validation, defaults, restoration, session end and permissions. Real GPU/browser checks verify four route/backend combinations, a 0.625 scale forwarded to layer creation, 0.75 foveation and exact readback of a borrowed WebGL camera fixture. This proves API transport and texture ownership, without headset quality, sensor accuracy or speed claims.
+
+Core version guard: different core install paths and exact package build mismatches throw one
+linked MargoError before plugin setup/registration/disposal; the packed regression is
+packages/core/tests/version-guard.test.js. The emitter regression is tests/core-requirements.test.js.
+The packed and single-output bundled cases distinguish runtime identities even at one output URL.
+[Scope and sources](../core-version-guard.md).

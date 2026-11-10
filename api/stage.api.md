@@ -16,6 +16,8 @@ export class CADCameraControls {
     dispose(): void;
 }
 
+export { CORE_VERSION } from "@margoengine/core";
+
 export { Camera } from "@margoengine/core";
 
 export { CameraOptions } from "@margoengine/core";

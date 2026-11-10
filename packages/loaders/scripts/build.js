@@ -1,3 +1,4 @@
+import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { execFileSync } from 'node:child_process';
 import { rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -37,3 +38,5 @@ await rm(resolve(root, 'dist/usd.worker.js'));
 await buildWorkers(root);
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);
+
+await declarePackageCore(root);

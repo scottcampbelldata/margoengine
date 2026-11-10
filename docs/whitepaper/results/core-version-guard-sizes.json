@@ -1,0 +1,221 @@
+{
+  "baseline": "57750c4d6",
+  "draftCore": 21822,
+  "coreBefore": 21584,
+  "coreAfter": 21775,
+  "guardBytes": 191,
+  "coreStageBefore": 23950,
+  "coreStageAfter": 24209,
+  "coreOnlyStrictCeiling": {
+    "before": 21587,
+    "after": 21776
+  },
+  "entries": [
+    {
+      "entry": "@margoengine/animation/interactivity",
+      "before": 24787,
+      "after": 24906,
+      "ceilingBefore": 24902,
+      "ceilingAfter": 25093
+    },
+    {
+      "entry": "@margoengine/animator/graph",
+      "before": 8527,
+      "after": 8597,
+      "ceilingBefore": 8542,
+      "ceilingAfter": 8733
+    },
+    {
+      "entry": "@margoengine/audio",
+      "before": 7687,
+      "after": 7762,
+      "ceilingBefore": 7716,
+      "ceilingAfter": 7907
+    },
+    {
+      "entry": "@margoengine/biomes/view",
+      "before": 10454,
+      "after": 10517,
+      "ceilingBefore": 10454,
+      "ceilingAfter": 10645
+    },
+    {
+      "entry": "@margoengine/clustered/area",
+      "before": 10445,
+      "after": 10526,
+      "ceilingBefore": 10461,
+      "ceilingAfter": 10652
+    },
+    {
+      "entry": "@margoengine/core",
+      "before": 21584,
+      "after": 21775,
+      "ceilingBefore": 21630,
+      "ceilingAfter": 21775
+    },
+    {
+      "entry": "@margoengine/creative",
+      "before": 19172,
+      "after": 19244,
+      "ceilingBefore": 19177,
+      "ceilingAfter": 19368
+    },
+    {
+      "entry": "@margoengine/environment/cube-camera",
+      "before": 5688,
+      "after": 5756,
+      "ceilingBefore": 5691,
+      "ceilingAfter": 5882
+    },
+    {
+      "entry": "@margoengine/lines",
+      "before": 19635,
+      "after": 19703,
+      "ceilingBefore": 19671,
+      "ceilingAfter": 19862
+    },
+    {
+      "entry": "@margoengine/physics2d",
+      "before": 8169,
+      "after": 8241,
+      "ceilingBefore": 8199,
+      "ceilingAfter": 8390
+    },
+    {
+      "entry": "@margoengine/post",
+      "before": 42021,
+      "after": 42105,
+      "ceilingBefore": 42058,
+      "ceilingAfter": 42249
+    },
+    {
+      "entry": "@margoengine/post/bloom",
+      "before": 6978,
+      "after": 7046,
+      "ceilingBefore": 7005,
+      "ceilingAfter": 7196
+    },
+    {
+      "entry": "@margoengine/post/fxaa",
+      "before": 4667,
+      "after": 4729,
+      "ceilingBefore": 4699,
+      "ceilingAfter": 4890
+    },
+    {
+      "entry": "@margoengine/post/smaa",
+      "before": 6207,
+      "after": 6276,
+      "ceilingBefore": 6244,
+      "ceilingAfter": 6435
+    },
+    {
+      "entry": "@margoengine/post/anamorphic",
+      "before": 6523,
+      "after": 6575,
+      "ceilingBefore": 6551,
+      "ceilingAfter": 6742
+    },
+    {
+      "entry": "@margoengine/post/blur",
+      "before": 6183,
+      "after": 6239,
+      "ceilingBefore": 6203,
+      "ceilingAfter": 6394
+    },
+    {
+      "entry": "@margoengine/post/lens",
+      "before": 6862,
+      "after": 6916,
+      "ceilingBefore": 6887,
+      "ceilingAfter": 7078
+    },
+    {
+      "entry": "@margoengine/scatter/tiles",
+      "before": 3401,
+      "after": 3479,
+      "ceilingBefore": 3415,
+      "ceilingAfter": 3606
+    },
+    {
+      "entry": "@margoengine/scenery/scenes",
+      "before": 19197,
+      "after": 19334,
+      "ceilingBefore": 19213,
+      "ceilingAfter": 19404
+    },
+    {
+      "entry": "@margoengine/sciviz/webgl2",
+      "before": 4476,
+      "after": 4527,
+      "ceilingBefore": 4476,
+      "ceilingAfter": 4667
+    },
+    {
+      "entry": "@margoengine/shader/effects",
+      "before": 8300,
+      "after": 8364,
+      "ceilingBefore": 8306,
+      "ceilingAfter": 8497
+    },
+    {
+      "entry": "@margoengine/taa/upscale",
+      "before": 7112,
+      "after": 7179,
+      "ceilingBefore": 7112,
+      "ceilingAfter": 7303
+    },
+    {
+      "entry": "@margoengine/terrain/stream",
+      "before": 12050,
+      "after": 12112,
+      "ceilingBefore": 12100,
+      "ceilingAfter": 12291
+    },
+    {
+      "entry": "@margoengine/text",
+      "before": 16395,
+      "after": 16494,
+      "ceilingBefore": 16406,
+      "ceilingAfter": 16597
+    },
+    {
+      "entry": "@margoengine/transitions/mask",
+      "before": 5460,
+      "after": 5536,
+      "ceilingBefore": 5522,
+      "ceilingAfter": 5713
+    },
+    {
+      "entry": "@margoengine/transitions/custom",
+      "before": 5234,
+      "after": 5305,
+      "ceilingBefore": 5275,
+      "ceilingAfter": 5466
+    },
+    {
+      "entry": "@margoengine/controls",
+      "before": 27469,
+      "after": 27530,
+      "ceilingBefore": 27517,
+      "ceilingAfter": 27708
+    }
+  ],
+  "unitCeilings": [
+    {
+      "entry": "@margoengine/shader (whole-entry unit ceiling)",
+      "before": 18489,
+      "after": 18568,
+      "ceilingBefore": 18500,
+      "ceilingAfter": 18691
+    },
+    {
+      "entry": "@margoengine/viewcube (unit ceiling)",
+      "before": 5130,
+      "after": 5220,
+      "ceilingBefore": 5150,
+      "ceilingAfter": 5341
+    }
+  ],
+  "controlsBaseline": "d0629f9c6"
+}

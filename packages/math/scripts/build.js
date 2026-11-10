@@ -1,3 +1,4 @@
+import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 // One entry per export (like packages/creative) so `@margoengine/math/vector3` ships only Vector3.
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -39,3 +40,5 @@ execFileSync(
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
+
+await declarePackageCore(root);

@@ -11,7 +11,13 @@ export type { GeometryBuffers, Renderer, Batch, Lighting, RenderView, ViewDraw }
 export { uploadRows } from './renderer.js';
 import type { EngineKernel, Mesh as MeshHandle } from './api.js';
 import type { Engine, Mesh } from './engine.js';
-/** Type-only view of a public engine as its runtime `Engine` (no check or copy; same object). */
-export const engineRuntime = (engine: EngineKernel): Engine => engine as unknown as Engine;
+import { assertCore, coreRequirement, CORE_VERSION } from './version.js';
+export { CORE_VERSION, coreRequirement, assertCore } from './version.js';
+export type { CoreRequirement } from './version.js';
+/** Checked view of a public engine as its runtime Engine; returns the same object. */
+export const engineRuntime = (engine: EngineKernel, version = CORE_VERSION, source = import.meta.url): Engine => {
+  assertCore(engine, coreRequirement(version, source));
+  return engine as unknown as Engine;
+};
 /** Type-only view of a public mesh handle as its runtime `Mesh` (no check or copy; same object). */
 export const meshRuntime = (mesh: MeshHandle): Mesh => mesh as unknown as Mesh;

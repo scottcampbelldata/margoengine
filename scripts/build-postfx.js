@@ -1,3 +1,4 @@
+import { declarePackageCore } from './core-requirements.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -39,3 +40,5 @@ execFileSync(
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
+
+await declarePackageCore(root);

@@ -1,3 +1,4 @@
+import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -117,3 +118,5 @@ await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(dist, 'LI
 
 // Bundle shared runtime helpers into the packed package, including Wasm policy errors.
 await packageRuntime(root);
+
+await declarePackageCore(root);

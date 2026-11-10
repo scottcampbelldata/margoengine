@@ -9,5 +9,5 @@ export class MargoError extends Error {
     static [Symbol.hasInstance](value: unknown): boolean;
 }
 
-export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed' | 'timeout';
+export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed' | 'timeout' | 'version';
 ```

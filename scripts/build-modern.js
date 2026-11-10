@@ -13,6 +13,7 @@ import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
 import { importMap } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
+import { declarePackageCore } from './core-requirements.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
@@ -212,7 +213,10 @@ await buildInDependencyOrder(
   packageDependencies(manifests),
   jobs,
   // Under verify's recorder each package's reads form one job, so its build has its own content key, side by side too.
-  (name) => recordJob(`package:${name}`, () => buildPackage(name)),
+  (name) => recordJob(`package:${name}`, async () => {
+    await buildPackage(name);
+    await declarePackageCore(resolve(`packages/${name}`));
+  }),
 );
 if (only) process.exit(0);
 recordScope('size-records');
@@ -296,7 +300,9 @@ for (const name of packages) {
 // comment named before was a slip of arithmetic: `21 * 1024 + 512` enforced 22,016 B from 2026-10-27 until this line.
 // 2026-11-07: CADCameraControls moved to @margoengine/stage (core 21,586 -> 20,672 B), which made room under this same cap
 // for stable instance rows with changed-row uploads (+382 B) and Engine.writePoses (+231 B): core 21,285 B. Not raised.
-const CORE_ONLY_CEILING = 21_587;
+// Scott's later 2026-11-09 version-guard ruling keeps this ratchet: 21584 -> 21775 B (+191 B),
+// shrunk from the 238 B draft. Strict ceiling is one byte above the final measured core, with no growth headroom.
+const CORE_ONLY_CEILING = 21_776;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();

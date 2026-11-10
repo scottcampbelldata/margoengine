@@ -5,6 +5,8 @@
 ```ts
 export { CADCameraControls } from "@margoengine/stage";
 
+export { CORE_VERSION } from "@margoengine/core";
+
 export { Camera } from "@margoengine/core";
 
 export { CameraOptions } from "@margoengine/core";

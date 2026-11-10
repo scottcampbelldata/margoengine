@@ -2779,3 +2779,8 @@ Build packages, then run node --test --test-timeout=60000 packages/wfc/test/asse
 ### XR performance controls
 
 Build packages, run packages/xr/tests/performance.test.js and packages/webgl2-compat/test/xr.test.js with node --test, then run the registered xr test:gpu:performance and the existing compatibility test/xr-browser.mjs through the shared GPU lock. The performance leaf uses the existing stereo fixture and licensed Khronos/Cesium Box, writes test-results/xr-performance-browser.json, checks scale forwarding and foveation restoration, and reads known pixels from a browser-owned stand-in camera texture on the actual compatibility context. Real camera/headset proof remains separate.
+
+Core version guard: build packages, then run `node --test --test-timeout=120000 packages/core/tests/version-guard.test.js tests/core-requirements.test.js`.
+The packed test extracts the same npm tarball to two real installation paths and also supplies a
+stale build requirement; it needs npm and tar, uses no network, and cleans its own worktree scratch.
+Run `npm run measure:size` for the unchanged 25000 B core/stage limit.

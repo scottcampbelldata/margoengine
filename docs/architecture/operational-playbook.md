@@ -5644,3 +5644,10 @@ The optional wfc/assemble entry creates ordinary core meshes sharing template ge
 ### 5. XR projection scale, foveation and camera controls
 
 Optional XR transports a validated per-session projection scale, with the compatibility bridge translating it into framebufferScaleFactor while retaining its global default when unset. Foveation writes are range checked and restored only before session end. Raw camera textures stay owned by the browser and use its XR-compatible GL context; the native WebGPU unsupported path is explicit. CPU and real-GPU stand-in coverage exists for option transport and texture ownership, while device quality/performance and actual sensor frames remain unmeasured. Core/stage bytes are unchanged.
+
+Section 5, core version guard: core owns each engine's version/module identity and checks plugin
+requirements before changing registries. The emitter freezes package build versions at plugin,
+attachment and runtime-access boundaries. Packed duplicate installs and stale build declarations
+are rejected with linked code `version`; matching imports remain identical. Core/stage 23950 to
+24209 B, unchanged 25000 B limit. Core 21584 -> 21775 B (+191 B); the core-only ratchet
+remains at the final measured size. Optional ceiling receipts are in docs/limits.md. [Design and research](../core-version-guard.md).

@@ -1,3 +1,4 @@
+import { assertCore, coreRequirement } from '../../core/dist/version.js';
 // Graceful degradation in the Canvas: `loadFallback` runs only without WebGPU, `fallbackContent` replaces the text.
 // Also the Canvas's engine options: `powerPreference` reaches Engine.create.
 import test, { afterEach, mock } from 'node:test';
@@ -8,6 +9,7 @@ import React from 'react';
 const created = [];
 mock.module('@margoengine/core/extension', {
   namedExports: {
+    assertCore, coreRequirement,
     // Like core: WebGPU needs `navigator.gpu`; otherwise the fallback factory, or a coded 'unsupported' error.
     Engine: {
       async create(canvas, options) {

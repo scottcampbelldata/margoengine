@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { copyLegal } from './package-legal.js';
+import { declarePackageCore } from './core-requirements.mjs';
 
 const name = process.argv[2];
 assert.ok(/^[a-z][a-z0-9-]*$/.test(name ?? ''), 'Expected an optional package name');
@@ -63,3 +64,4 @@ execFileSync(
 );
 await packageDeclarations(root);
 if (Object.values(manifest.exports).some((value) => value['react-server'])) await writeServerEntries(root);
+await declarePackageCore(root);

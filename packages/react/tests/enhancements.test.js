@@ -1,3 +1,4 @@
+import { assertCore, coreRequirement } from '../../core/dist/version.js';
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -67,6 +68,7 @@ class Node {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
+    assertCore, coreRequirement,
     Engine: {
       async create(canvas, options) {
         const engine = {

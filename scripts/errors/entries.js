@@ -14,6 +14,14 @@ export const entries = [
       "Planet atmosphere needs radii at most 100000 km and vertical scattering depth at most 6; reduce the medium",
       "Planet frame needs finite transforms, nonzero sun, illuminance 0..1000000 and exposure -20..20",],cause:'The planet frame or medium is outside its physical numeric domain, or its resources were disposed.',fix:'Use a WebGPU or compatibility GPUDevice, finite kilometre transforms, an observer outside ground, nonzero sun and bounded atmosphere parameters. Recreate disposed resources.' },
   {
+    id: 'version',
+    title: 'version: incompatible core installations or package builds',
+    kind: 'code',
+    messages: [],
+    cause: 'A package and engine resolve different core module paths, or the package was built against a different exact core version. Separate installs have separate class identities and registries even when their version numbers match.',
+    fix: 'Use one @margoengine/core installation and rebuild or update the packages to its exact version. Check the versions and module paths in the error. Deduplicate dependencies and map umbrella and scoped imports to the same core. The check runs before plugin setup or runtime access and does not create a global registry.',
+  },
+  {
     id: 'csp',
     title: 'Content Security Policy and WebAssembly',
     kind: 'family',

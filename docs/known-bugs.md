@@ -4211,3 +4211,16 @@ Repro: start a decoded Audio, then manager.add(sound,{gain:()=>NaN}) throws for 
 
 Fixed immediately after batch 171 landing: a88cfd4fe contained unresolved boundaries in docs/api-surface.md after a native helper failed but its PowerShell caller continued. Authoritative api:update regenerates the summary; generated-metadata-conflicts.test.js fails on that published artifact and passes on the repair. No engine or atmosphere runtime source changed.
 
+
+Fixed core version skew: missing engine-local version/module identity checks allowed a plugin from
+a second install or a stale build to mutate core's ownership registries silently. The packed
+two-install and stale-build regressions now reject before plugin work; same-path matching imports
+pass. [Design, regression and size evidence](core-version-guard.md).
+
+GPU queue owner collision: start gpu-package-tests.mjs in two worktrees; both use owner check:gpu-packages, so gpu-admission.mjs sameLane treats them as one lane and the second can wait for the first entire suite chain despite free slots. Repro: parallel runner in lane-T queued from 02:01:58 UTC behind lane-P; no tests ran. Cause: the generic owner is used as a lane identity in addition to the distinct worktree identity. This guard landing uses the supported gpu-lock run CLI with explicit owner lane-T-version-guard and serial nested suites; repair default runner owners in the fix phase.
+
+Dependent audio GPU validation is incomplete for the version-guard landing: the shared GPU monitor reclaimed lane-T-version-guard at 2026-11-10T02:28:06.439Z after 211623 ms without GPU activity, while audio/scripts/test-browser.js awaited its browser evaluations before writing audio-browser.json. The suite produced no report and did not reach its own 10 min limit. Root cause of the uncompleted audio evaluation is unconfirmed; monitor evidence is in the local GPU idle record and test-results/version-guard-resume/gpu-lane-T.log. No timeout or idle threshold was raised.
+
+WebGL2 compatibility SNORM storage defect: MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs fails at line 74 for rgba8snorm, with incomplete framebuffer status 0x8cd6. Cause: WebGL2 compatibility compute writes use a framebuffer for the native RGBA8_SNORM texture even though device/formats.ts correctly marks that format non-renderable. The format/compute code is unchanged by the guard. Needs a supported storage-write representation and exact normalized conversion in webgl2-compat; no shader assertions, tolerances or ceilings were weakened. Native checks and core/stage compatibility checks pass. Reproduced once on clean origin/main 2cff40372 with rebuilt packages (test-results/version-guard-resume/clean-main-snorm-leaf.log); this unchanged dependent GPU defect is outside the version-guard push gate under lane rule 23.
+
+Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.

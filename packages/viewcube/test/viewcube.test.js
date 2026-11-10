@@ -872,7 +872,8 @@ test('size budget', async (t) => {
   console.log(`viewcube gzip: ${gzip} B`);
   // 3,394 B before drag to orbit; drag measured 3,709 B, home view 4,101 B, roll 4,619 B, themes 5,065 B, the build
   // and draw hooks for the axis triad 5,130 B (2026-11-08).
-  assert.ok(gzip < 5150, `${gzip} B`);
+  // Scott's version-guard allowance: the ceiling gains exactly the final 191 B core guard cost.
+  assert.ok(gzip < 5341, `${gzip} B`);
 });
 
 test('axis triad size budget: the axes entry over the cube it imports', async (t) => {

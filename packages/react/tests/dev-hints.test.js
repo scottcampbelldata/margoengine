@@ -1,3 +1,4 @@
+import { assertCore, coreRequirement } from '../../core/dist/version.js';
 // Development-only hints in the Canvas: lowercase R3F tags, pointer handlers on the WebGL2 fallback, and `maxDpr`.
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,7 @@ import React from 'react';
 const created = [];
 mock.module('@margoengine/core/extension', {
   namedExports: {
+    assertCore, coreRequirement,
     Engine: {
       async create(canvas, options) {
         const engine = {

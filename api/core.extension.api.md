@@ -17,6 +17,8 @@ export interface Batch {
     claimed?: boolean;
 }
 
+export const CORE_VERSION = "1.0.0";
+
 export class Camera {
     fov: number;
     near: number;
@@ -46,6 +48,15 @@ export interface CameraOptions {
     far?: number;
 }
 
+export interface CoreRequirement {
+    readonly version: string;
+    readonly source: string;
+    readonly runtime: {
+        readonly version: string;
+        readonly source: string;
+    };
+}
+
 export interface DrawOptions {
     pipeline?: GPURenderPipeline;
     bindings?: GPUBindGroupEntry[];
@@ -63,6 +74,7 @@ export class Engine {
     readonly canvas: HTMLCanvasElement;
     readonly store: TransformStore;
     readonly fallbackReason: string | null;
+    readonly coreRequirement: import("./version.js").CoreRequirement;
     [Symbol.dispose]: () => void;
     readonly scene: Scene;
     readonly scenes: Set<Scene>;
@@ -128,6 +140,7 @@ export interface EngineOptions {
 }
 
 export interface EnginePlugin {
+    readonly coreRequirement?: import('./version.js').CoreRequirement;
     name: string;
     setup(engine: Engine): void;
     onPreUpdate?(delta: number): void;
@@ -366,9 +379,15 @@ export interface ViewDraw {
     };
 }
 
+export function assertCore<T extends {
+    readonly coreRequirement?: CoreRequirement;
+}>(engine: T, required?: CoreRequirement): T;
+
 export function box(width?: number, height?: number, depth?: number): Geometry;
 
-export const engineRuntime: (engine: EngineKernel) => Engine;
+export function coreRequirement(version?: string, source?: string): CoreRequirement;
+
+export const engineRuntime: (engine: EngineKernel, version?: string, source?: string) => Engine;
 
 export const meshRuntime: (mesh: MeshHandle) => Mesh;
 
@@ -377,6 +396,7 @@ export function uploadRows(queue: GPUQueue, buffer: GPUBuffer, batch: Batch, all
 // Not exported from this entry, but used by the exports above:
 
 interface EngineKernel {
+    readonly coreRequirement?: import('./version.js').CoreRequirement;
     readonly canvas: HTMLCanvasElement;
     readonly camera: Camera;
     readonly backend: 'webgpu' | 'webgl2';
@@ -419,6 +439,7 @@ const EngineKernel: {
 };
 
 interface EnginePlugin {
+    readonly coreRequirement?: import('./version.js').CoreRequirement;
     name: string;
     setup(engine: EngineKernel): void;
     onPreUpdate?(delta: number): void;

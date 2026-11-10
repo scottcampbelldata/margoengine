@@ -88,6 +88,8 @@ export interface Scene {
  * `Engine.create(canvas, options)`. Frame deltas are seconds.
  */
 export interface EngineKernel {
+  /** Core module identity for package compatibility checks; absent on structural stand-ins. */
+  readonly coreRequirement?: import('./version.js').CoreRequirement;
   readonly canvas: HTMLCanvasElement;
   readonly camera: Camera;
   readonly backend: 'webgpu' | 'webgl2';
@@ -145,6 +147,8 @@ export interface EngineKernel {
  * attach, `onPreUpdate` receives each frame's delta in seconds, and `dispose` runs on removal or engine disposal.
  */
 export interface EnginePlugin {
+  /** The package's exact build requirement; checked before setup or registration. */
+  readonly coreRequirement?: import('./version.js').CoreRequirement;
   name: string;
   setup(engine: EngineKernel): void;
   onPreUpdate?(delta: number): void;

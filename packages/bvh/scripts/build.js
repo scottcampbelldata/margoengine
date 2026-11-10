@@ -1,3 +1,4 @@
+import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { execFileSync } from 'node:child_process';
 import { copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -26,3 +27,5 @@ for (const name of ['raycaster.js', 'snapshot-source.js']) {
 }
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);
+
+await declarePackageCore(root);

@@ -12,6 +12,7 @@
     "imports": "import { createStage } from 'margoengine';",
     "exports": [
       "CADCameraControls",
+      "CORE_VERSION",
       "Camera",
       "Engine",
       "EngineKernel",
@@ -38,6 +39,7 @@
     "imports": "import { CADCameraControls } from '@margoengine/stage';",
     "exports": [
       "CADCameraControls",
+      "CORE_VERSION",
       "Camera",
       "Engine",
       "EngineKernel",
@@ -59,6 +61,7 @@
     "install": "npm install @margoengine/core@1.0.0",
     "imports": "import { Engine, box, PbrMaterial } from '@margoengine/core';",
     "exports": [
+      "CORE_VERSION",
       "Camera",
       "Engine",
       "EngineKernel",

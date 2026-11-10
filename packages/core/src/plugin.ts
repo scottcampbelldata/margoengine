@@ -114,6 +114,8 @@ export interface FramePass {
  * seconds, `onPick` replaces the built-in pick, and `dispose` runs on removal or engine disposal.
  */
 export interface EnginePlugin {
+  /** The package's exact build requirement; checked before setup or registration. */
+  readonly coreRequirement?: import('./version.js').CoreRequirement;
   name: string;
   setup(engine: Engine): void;
   onPreUpdate?(delta: number): void;

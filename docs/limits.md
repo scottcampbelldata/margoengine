@@ -4064,3 +4064,58 @@ Entry size: wfc/assemble 1,465 B min+gzip (new entry, previous 0 B); ceiling 1,7
 - xr/performance: 0 to 1326 B gzip, ceiling 1582 B for the new optional foveation, scale and camera controls entry. Core + stage remains 23950 B.
 
 - Optional XR root: 8965 to 9060 B gzip; ceiling 8967 to 9332 B. Session scale validation/transport and the projectionLayer getter support xr/performance. Keeping this transport in XR avoids a duplicate session implementation; core + stage stays 23950 B.
+
+Core version compatibility: core 21584 -> 21775 B gzip (+191 B, reduced from the +238 B draft);
+core plus stage 23950 -> 24209 B gzip, below the unchanged 25000 B hard limit. Different module
+paths or exact package build versions reject with code `version` before plugin setup. Matching
+same-path imports pass. Structural stand-ins remain supported; custom plugins declare requirements.
+Scott's later 2026-11-09 ruling retains the core-only ratchet: strict build ceiling 21587 -> 21776 B
+(allows at most 21775 B); inclusive quality ceiling 21630 -> 21775 B. Each of the 25 failing optional
+ceilings gains exactly the final guard's 191 B, without further headroom. The two additional unit
+ceilings below receive the same 191 B allowance. No other ceilings change.
+The guard stays in core to protect engine identity before registry mutations; splitting package
+declarations would add imports without reducing the required exact build identity.
+[Design and research](core-version-guard.md), [machine-readable size record](whitepaper/results/core-version-guard-sizes.json).
+
+All values below are gzip bytes. The optional table includes every ceiling changed:
+
+| Entry | Measured before | Measured after | Ceiling before | Ceiling after |
+| --- | ---: | ---: | ---: | ---: |
+| `@margoengine/animation/interactivity` | 24787 | 24906 | 24902 | 25093 |
+| `@margoengine/animator/graph` | 8527 | 8597 | 8542 | 8733 |
+| `@margoengine/audio` | 7687 | 7762 | 7716 | 7907 |
+| `@margoengine/biomes/view` | 10454 | 10517 | 10454 | 10645 |
+| `@margoengine/clustered/area` | 10445 | 10526 | 10461 | 10652 |
+| `@margoengine/core` | 21584 | 21775 | 21630 | 21775 |
+| `@margoengine/creative` | 19172 | 19244 | 19177 | 19368 |
+| `@margoengine/environment/cube-camera` | 5688 | 5756 | 5691 | 5882 |
+| `@margoengine/lines` | 19635 | 19703 | 19671 | 19862 |
+| `@margoengine/physics2d` | 8169 | 8241 | 8199 | 8390 |
+| `@margoengine/post` | 42021 | 42105 | 42058 | 42249 |
+| `@margoengine/post/bloom` | 6978 | 7046 | 7005 | 7196 |
+| `@margoengine/post/fxaa` | 4667 | 4729 | 4699 | 4890 |
+| `@margoengine/post/smaa` | 6207 | 6276 | 6244 | 6435 |
+| `@margoengine/post/anamorphic` | 6523 | 6575 | 6551 | 6742 |
+| `@margoengine/post/blur` | 6183 | 6239 | 6203 | 6394 |
+| `@margoengine/post/lens` | 6862 | 6916 | 6887 | 7078 |
+| `@margoengine/scatter/tiles` | 3401 | 3479 | 3415 | 3606 |
+| `@margoengine/scenery/scenes` | 19197 | 19334 | 19213 | 19404 |
+| `@margoengine/sciviz/webgl2` | 4476 | 4527 | 4476 | 4667 |
+| `@margoengine/shader/effects` | 8300 | 8364 | 8306 | 8497 |
+| `@margoengine/taa/upscale` | 7112 | 7179 | 7112 | 7303 |
+| `@margoengine/terrain/stream` | 12050 | 12112 | 12100 | 12291 |
+| `@margoengine/text` | 16395 | 16494 | 16406 | 16597 |
+| `@margoengine/transitions/mask` | 5460 | 5536 | 5522 | 5713 |
+| `@margoengine/transitions/custom` | 5234 | 5305 | 5275 | 5466 |
+
+The same authorized 191 B allowance applies to these additional package unit ceilings. Shader
+minimal stays below 9000 B, its 60% ratio stays unchanged, and viewcube axes stays below 1200 B.
+
+| Unit entry | Measured before | Measured after | Ceiling before | Ceiling after |
+| --- | ---: | ---: | ---: | ---: |
+| `@margoengine/shader (whole-entry unit ceiling)` | 18489 | 18568 | 18500 | 18691 |
+| `@margoengine/viewcube (unit ceiling)` | 5130 | 5220 | 5150 | 5341 |
+
+After rebasing onto d0629f9c6, controls also exceeds its existing ceiling: its emitted guard adds 61 B (27469 -> 27530 B gzip). The controls ceiling alone gains the same authorized 191 B, 27517 -> 27708 B. This brings the failing optional entries to 26; no nonfailing ceiling is raised.
+
+Version-guard final rebase: XR measures 8965 B without emitter declarations and 9041 B with them; its 8967 B ceiling gains exactly 191 B to 9158 B. The optional allowance keeps build identity at attachment boundaries, without another import or duplicated version logic. Core/stage stay 24209 B.

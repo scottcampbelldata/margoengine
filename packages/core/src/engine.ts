@@ -11,6 +11,7 @@ import {
   type RenderView,
 } from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
+import { assertCore, coreRequirement } from './version.js';
 import { sceneSamples } from './quality.js';
 import { checkLayers, layerRegistry, meshLayers, validateRectangle } from '../../shared/view-rect.js';
 import { fault, rangeError, typeError, vectorAssignment } from '../../shared/errors.js';
@@ -387,6 +388,8 @@ export class Scene {
  * [0, 1] with RangeError.
  */
 export class Engine {
+  /** Engine-local module identity, shared by the public and extension entry points. */
+  readonly coreRequirement = coreRequirement();
   /** `dispose()`, for `using` (set at the end of this file where the runtime has `Symbol.dispose`). */
   declare [Symbol.dispose]: () => void;
   /** The default scene. */
@@ -601,6 +604,7 @@ export class Engine {
   }
   use(plugin: EnginePlugin, scene: Scene = this.active): this {
     this.live();
+    if (plugin.coreRequirement) assertCore(this, plugin.coreRequirement);
     this.checkScene(scene);
     const name = plugin.name,
       plugins = scene.plugins as Map<string, EnginePlugin>;

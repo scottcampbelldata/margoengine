@@ -586,5 +586,6 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // 7,800 B (from 6,500 B) with the depth passes' view of a graph and normals after positionNode, which NodeMaterial holds,
   // then 18,500 B and a minimal 8,700 B with the input table of the stages (view space, tangents, matrices, instances),
   // then a minimal 9,000 B with the main camera in depth passes and the velocity variant, which NodeMaterial holds.
-  assert.ok(minimal.gzip < 9000 && all.gzip < 18500, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // Scott's version-guard allowance: only the whole entry ceiling gains the final 191 B core guard cost.
+  assert.ok(minimal.gzip < 9000 && all.gzip < 18691, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });
