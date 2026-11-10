@@ -2470,6 +2470,10 @@
       "types": "./dist/pixel/scale.d.ts",
       "import": "./dist/pixel/scale.js"
     },
+    "./pixel/follow": {
+      "types": "./dist/pixel/follow.d.ts",
+      "import": "./dist/pixel/follow.js"
+    },
     "./pixel/crt": {
       "types": "./dist/pixel/crt.d.ts",
       "import": "./dist/pixel/crt.js"

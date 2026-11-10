@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13386649,
+  "total": 13390510,
   "history": [
     {
       "date": "2026-10-24",
@@ -6858,6 +6858,12 @@
       "commit": "ac902a65b",
       "reason": "Batch 231: culling/depth 0 to 6064 B, scatter/occlusion 0 to 1177 B. Scatter root measures 19262 B (previous ceiling 19252, new ceiling 19518). Shared depth and separate colour/shadow rings preserve casters; splitting would duplicate state. Core/stage 24209 B unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "78c0082ce",
+      "reason": "batch-244-follow-new-optional-entry-0-to-3605B-gzip-camera-and-overlay-no-core-stage-growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -8104,6 +8110,7 @@
     "margoengine/web": 577,
     "@margoengine/text/fit": 10636,
     "@margoengine/culling/depth": 6320,
-    "@margoengine/scatter/occlusion": 1433
+    "@margoengine/scatter/occlusion": 1433,
+    "@margoengine/pixel/follow": 3861
   }
 }

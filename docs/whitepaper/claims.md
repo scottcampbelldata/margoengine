@@ -3855,3 +3855,6 @@ OccludedScatter removes camera-hidden instances from colour indirect draws witho
 >>>>>>> 5657dbe29 (feat(scatter): cull colour instances with shared Hi-Z depth)
 >>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
 >>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+
+### Batch 244 job 1: whole-pixel camera rig
+`pixel/follow` implements the requested follower, lerp, dead zone, world bounds, shake, flash and fade row. `packages/pixel/tests/follow.test.js` proves hand-computed traces, fractional accumulation, refresh-rate equality, unit conversion, bounds, shake determinism and effect composition; `follow-check.mjs` reads every viewport pixel for colored flash/fade, layer masks, separate views and disposal on native WebGPU and full WebGL2. This claims behavior parity with the public Phaser camera manual, not image similarity to proprietary game footage. No core/stage changes or timing claim.

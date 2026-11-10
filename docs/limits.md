@@ -5126,3 +5126,7 @@ The new `culling/depth` public entry exposes `DepthPyramid` and `depthPyramidSha
 >>>>>>> 5657dbe29 (feat(scatter): cull colour instances with shared Hi-Z depth)
 >>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
 >>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+
+- Batch 244 job 1: `@margoengine/pixel/follow` adds `PixelFollow`, manual `update(seconds)` or automatic engine attachment. Defaults: lerp 1 at 60 Hz, zero dead zone/offset, unlimited world bounds, overlay order 100/layers 1. Low-res pixel snapping occurs after fractional integration. Dead-zone sizes are low-res pixels, positions/bounds are world units. A world smaller than the view is centered on the pixel lattice. Shake is deterministic at 60 Hz ticks, decays and stays inside world bounds; flash and fade overlay the complete canvas viewport. Fade-out holds until replaced/reset. A manual rig exposes overlay RGBA for another renderer; the attached overlay requires the full WebGPU or WebGL2 tier. No rotation/zoom tween or follow velocity prediction is claimed.
+
+Batch 244 job 1 entry size: pixel/follow 0 -> 3605 B gzip. A single optional entry shares ScreenPass and keeps camera tracking plus overlays cohesive; core + stage remains 24209 B gzip. No root import pays these bytes.

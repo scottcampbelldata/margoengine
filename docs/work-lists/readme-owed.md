@@ -665,3 +665,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 >>>>>>> 5657dbe29 (feat(scatter): cull colour instances with shared Hi-Z depth)
 >>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
 >>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+
+- @margoengine/pixel (batch 244 job 1): document /follow, PixelFollow manual/attach, target/getter, per-axis lerp/dead-zone/offset/world units, bounds/undersized worlds, seeded shake, flash/fade/reset, overlay RGBA, timing, defaults and disposal.
+- margoengine (batch 244 job 1): document generated pixel/follow forwarding entry.

@@ -4605,3 +4605,8 @@ Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage;
 
 - Batch 231 scope finding: `node packages/culling/test/gpu/meshes-occlusion-check.mjs --compat` fails its native Hi-Z draw-count assertion (1509/1509 behind the wall). Cause: existing CulledMeshes compatibility route intentionally performs frustum-only culling (`src/compat.ts`), separate from the new DepthPyramid API; software `culling/webgl2` is a separate API. New scatter/occlusion performs real Hi-Z on both backends. Deferred legacy parity per build-phase rule 21.
 >>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
+
+### Batch 244 job 1
+The camera rig is built with direct CPU trace and GPU overlay regressions. No open defect identified in this job's scope; other known defects remain in their existing entries.
+
+Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing unregistered headless/rigging/splats/worker browser files before selecting pixel. Repro: node scripts/gpu-package-tests.mjs --no-build --only=pixel. Cause: global registration audit precedes selection. Pixel package GPU scripts run directly on both backends for this batch.
