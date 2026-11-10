@@ -5,7 +5,7 @@ import type { Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import type { InstancesContent } from './formats.js';
 import { type TileMatrix, Y_UP_TO_Z_UP, invert, multiply, translation } from './matrix.js';
-import type { TilesContentHost, TilesInstancesDrawer, TilesModel } from './renderer.js';
+import type { TilesContentHost, TilesInstancesDrawer, TilesModel, TilesContentDecoration } from './renderer.js';
 import type { TileRenderable, TilesetTile } from './tileset.js';
 
 /** An engine mesh with its world matrix (the engine's Mesh class has it; the Mesh interface leaves it out). */
@@ -84,6 +84,7 @@ export const i3dm: TilesInstancesDrawer = async (
     host.loadModel(gltf, signal) as Promise<InstancedModel>,
   ]);
   let nodes = 0;
+  let decoration: TilesContentDecoration | undefined;
   try {
     signal.throwIfAborted();
     if (!Array.isArray(model.primitives))
@@ -112,6 +113,7 @@ export const i3dm: TilesInstancesDrawer = async (
     nodes = byNode.size;
     host.place(root, host.contentMatrix(tile, [rtc[0] + center[0], rtc[1] + center[1], rtc[2] + center[2]], false));
     root.visible = false;
+    decoration = host.decorate?.({ kind: 'instances', model, content, tile });
   } catch (error) {
     model.dispose();
     throw error;
@@ -119,7 +121,7 @@ export const i3dm: TilesInstancesDrawer = async (
   // Under budget 'gpu': the model once, plus each node's instance rows (24 float32 per instance, as PBRInstances holds).
   const rows = host.budget === 'gpu' ? nodes * content.length * 24 * 4 : 0;
   return {
-    bytes: host.measure(model, content.byteLength) + rows,
+    bytes: host.measure(model, content.byteLength) + rows + (decoration?.bytes ?? 0),
     get visible() {
       return model.root.visible;
     },
@@ -127,6 +129,7 @@ export const i3dm: TilesInstancesDrawer = async (
       model.root.visible = value;
     },
     dispose: () => {
+      decoration?.dispose();
       host.forget(model.root);
       model.dispose();
     },

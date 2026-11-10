@@ -8,6 +8,8 @@ import { glbChunks } from '../../shared/glb.js';
 import { i3dm } from '../dist/i3dm.js';
 import { splats, tileSplats } from '../dist/splats.js';
 import { terrain } from '../dist/terrain.js';
+import { TilesStyle } from '../dist/style.js';
+import { PointCloud, PointsPlugin } from '../../points/dist/index.js';
 import { Splats, transformSplats } from '../../splats/dist/index.js';
 import { TilesRenderer } from '../dist/index.js';
 import { cityTileset, groveTileset, memoryFetch } from './generator.js';
@@ -85,6 +87,58 @@ function snapshot() {
 }
 
 async function run(name: string): Promise<unknown> {
+  if (name === 'style') {
+    // Real OGC metadata sample, already licensed in examples/assets/3d-tiles/NOTICE.md.
+    const start = errors.length;
+    engine.camera.position = [0.5, 0.5, 2];
+    engine.camera.target = [0.5, 0.5, 0];
+    const folder = '../../../examples/assets/3d-tiles/EXT_structural_metadata/FeatureIdAttributeAndPropertyTable/';
+    const style = new TilesStyle({ show: '${example_VEC3_FLOAT32}[0] < 2', color: 'color("red")' });
+    const matrices = [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]; // cancel tiles' y-up to z-up turn
+    tiles = await TilesRenderer.load(engine, new URL(folder + 'tileset.json', import.meta.url), {
+      frame: matrices,
+      decorate: style.decorate,
+    });
+    tiles.tileset.on('error', ({ error }) => errors.push(String(error)));
+    await converge();
+    const data = pixels();
+    const samples = [
+      [0.2, 0.2, 0],
+      [0.8, 0.2, 0],
+      [0.2, 0.8, 0],
+      [0.8, 0.8, 0],
+    ].map((p) => {
+      const [x, y] = project(p),
+        at = (Math.round(y) * W + Math.round(x)) * 4;
+      return [...data.slice(at, at + 3)];
+    });
+    tiles.dispose();
+    await frame();
+    engine.camera.position = [0, 0, 2];
+    engine.camera.target = [0, 0, 0];
+    const points = PointsPlugin.attach(engine, { name: 'style-point-proof' });
+    const cloud = points.add(new PointCloud({ positions: [-0.3, 0, 0, 0.3, 0, 0], material: { minPixelSize: 20 } }));
+    const handle = new TilesStyle({ show: '${id} === 0', color: 'color("lime")', pointSize: 10 }).bindPoints(
+      cloud,
+      (i) => ({ id: i }),
+    );
+    await frame();
+    const pointPixels = pixels();
+    const pointSamples = [
+      [-0.3, 0, 0],
+      [0.3, 0, 0],
+    ].map((p) => {
+      const [x, y] = project(p),
+        at = (Math.round(y) * W + Math.round(x)) * 4;
+      return [...pointPixels.slice(at, at + 3)];
+    });
+    const greenPixels = Array.from({ length: W * H }, (_, i) => i * 4).filter(
+      (i) => pointPixels[i] < 5 && pointPixels[i + 1] > 30 && pointPixels[i + 2] < 5,
+    ).length;
+    handle.dispose();
+    points.dispose();
+    return { samples, pointSamples, greenPixels, errors: errors.slice(start) };
+  }
   if (name === 'grove') {
     // 25 box trees from one i3dm tile (EAST_NORTH_UP, RTC_CENTER, ECEF), drawn as instances through gltf-pro.
     const grove = groveTileset({ n: 5, spacing: 40, height: 12 }),

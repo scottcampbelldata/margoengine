@@ -100,6 +100,19 @@ try {
     globe.selected >= 2 && globe.lit > 10_000 && globe.red > 500 && globe.blue > 500,
     globe,
   );
+  const style = (results.style = await call((n) => window.tilesFixture.run(n), 'style'));
+  assert.deepEqual(style.errors, [], 'style: GPU or tile errors');
+  check(
+    'style: real metadata attributes show two red features and hide two features',
+    style.samples.slice(0, 2).every((c) => c[0] > 30 && c[1] < 5 && c[2] < 5) &&
+      style.samples.slice(2).every((c) => c.every((v) => v < 5)),
+    style,
+  );
+  check(
+    'style: hidden points discard despite authored minimum size and visible point size is ten pixels',
+    style.pointSamples[0][1] > 30 && style.pointSamples[1].every((v) => v < 5) && style.greenPixels === 100,
+    style,
+  );
 
   const memory = (results.gpuMemory = await call((n) => window.tilesFixture.run(n), 'gpu-memory'));
   assert.deepEqual(memory.errors, [], 'gpu-memory: WebGPU or engine errors');

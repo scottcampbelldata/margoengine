@@ -2474,3 +2474,6 @@ measurement, benchmark or exclusive GPU lease is required.
 FSM payload proof: build fsm, then node --test --test-timeout=120000 packages/fsm/test/events.test.js. No GPU or timing measurement is involved.
 
 FSM final/always proof: node --test --test-timeout=120000 packages/fsm/test/final.test.js after building packages. Includes delay split equivalence and cycle rejection without wall-clock assertions.
+### Batch 239 job 1: tile property styling
+
+Build packages, then run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tiles-style --wait-max=60 --max=5 -- node packages/tiles/tests/tiles-browser.mjs`, then the same command with `--compat` on the browser script. The style case colours the first two features red and hides the other two based on the sample's structural metadata values. Input provenance is in examples/assets/3d-tiles/NOTICE.md. No benchmark or timing assertion is required.

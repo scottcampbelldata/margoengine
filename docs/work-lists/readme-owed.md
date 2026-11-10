@@ -9,3 +9,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated fsm/events alias and payload entry availability | batch-250 job 1 |
 | @margoengine/fsm | final: FinalMachine, final leaf constraints, done.state.parent, always guards, macrostep bound, stopped top-level final and goto restart | batch-250 job 2 |
 | margoengine | Generated fsm/final alias | batch-250 job 2 |
+| @margoengine/tiles | tiles/style expressions, conditions/defines, renderer decorator and model/instance/point binding lifecycle | batch 239 job 1 |
+| margoengine | tiles/style generated optional re-export | batch 239 job 1 |

@@ -3046,6 +3046,10 @@
       "types": "./dist/tilemap/fov.d.ts",
       "import": "./dist/tilemap/fov.js"
     },
+    "./tiles/style": {
+      "types": "./dist/tiles/style.d.ts",
+      "import": "./dist/tiles/style.js"
+    },
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"

@@ -2908,3 +2908,6 @@ EventMachine delivers the same data object to guards, exit/entry hooks and Event
 
 ### FSM final and eventless transitions (batch 250 job 2)
 FinalMachine settles initial and event-triggered eventless chains, raises completion on the containing state once per final entry, stops at a top-level final, and preserves split-update behavior across delayed/eventless chains. Proof: packages/fsm/test/final.test.js against SCXML macrostep order and documented Stately final/always behavior, cited in docs/clean-room.md. No full SCXML interpreter claim.
+### Batch 239 job 1: tile property styling
+
+The optional tiles/style entry evaluates color, show and pointSize from feature properties, including first-match conditions, nonrecursive defines, vectors and regular expressions. It binds to existing PBR model, instance and point rendering APIs; a renderer decorator follows streaming creation and disposal. Proof: packages/tiles/tests/style.test.js and the `style` case of packages/tiles/tests/tiles-browser.mjs, using the real CC0 FeatureIdAttributeAndPropertyTable sample. The claim covers the visual-property row, not vector label/billboard styling or the separate feature/property texture jobs. No performance result is claimed.

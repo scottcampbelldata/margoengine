@@ -26,6 +26,9 @@ export {
   type TilesOrigin,
   type TilesModel,
   type TilesModelDrawer,
+  type TilesContentDecorator,
+  type TilesContentDecoration,
+  type TilesDecorationContext,
 } from './renderer.js';
 export { modelGpuBytes, textureBytes, type MeasurableModel } from './memory.js';
 export {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12044771,
+  "total": 12054828,
   "history": [
     {
       "date": "2026-10-24",
@@ -5312,6 +5312,12 @@
       "commit": "batch-250",
       "reason": "New optional fsm/final: 0 to 2825 B gzip, includes complete runtime and validation; splitting would add indirection",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "fdbd648f3",
+      "reason": "Batch 239 job 1 adds optional tiles/style; 0 to 9.7 kB for the bounded OGC interpreter and live render bindings. Core and stage unchanged; a split would duplicate parser state and lifecycle.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6315,6 +6321,7 @@
     "margoengine/game": 996,
     "margoengine/react/instances": 318,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/tiles/style": 10057
   }
 }

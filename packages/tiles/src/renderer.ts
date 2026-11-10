@@ -20,6 +20,19 @@ import {
 import { type TilesetTile, type TileRenderable, Tileset, type TilesetOptions, type TilesFrame } from './tileset.js';
 import { cartographicToEcef, eastNorthUpToEcef } from './wgs84.js';
 
+/** Optional content decoration owned and disposed with its tile. Bytes are added to the tile budget. */
+export interface TilesContentDecoration {
+  readonly bytes: number;
+  dispose(): void;
+}
+/** A loaded content item exposed to an optional decorator, before the tile becomes visible. */
+export type TilesDecorationContext =
+  | { kind: 'model'; model: TilesModel; content: ModelContent; tile: TilesetTile }
+  | { kind: 'points'; cloud: unknown; content: PointsContent; tile: TilesetTile }
+  | { kind: 'instances'; model: TilesModel; content: InstancesContent; tile: TilesetTile };
+/** Optional entry hook for feature styling and selection. No optional implementation is imported by tiles root. */
+export type TilesContentDecorator = (context: TilesDecorationContext) => TilesContentDecoration;
+
 /** A floating origin (such as `FloatingOrigin` from `@margoengine/cameras/origin`): float64 placement around the camera. */
 export interface TilesOrigin {
   /** Places a root mesh at a float64 world position and keeps it there across rebases. */
@@ -40,6 +53,8 @@ export interface TilesModel {
 
 /** What a content drawer (such as `i3dm` from `@margoengine/tiles/i3dm`) gets from the renderer. */
 export interface TilesContentHost {
+  /** Decorates content using the renderer option, if provided. */
+  decorate(context: TilesDecorationContext): TilesContentDecoration | undefined;
   readonly engine: EngineKernel;
   /** The tileset JSON's URL. */
   readonly url: string;
@@ -93,6 +108,8 @@ export type TilesInstancesDrawer = (
 
 /** Options of `TilesRenderer.load`. */
 export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
+  /** Optional content decoration, for example `style.decorate` from tiles/style. Default: none. */
+  decorate?: TilesContentDecorator;
   /**
    * Tileset to world: `'enu'` (default) puts the east-north-up frame at the root volume's centre at the world origin
    * (x east, y up, -z north), so city-scale data stays within a few kilometres of 0; `'local'` only turns z-up into
@@ -158,6 +175,7 @@ export class TilesRenderer implements EnginePlugin {
   private readonly i3dm?: TilesInstancesDrawer;
   private readonly dracoPoints?: TilesRendererOptions['dracoPoints'];
   private readonly splats?: TilesModelDrawer;
+  private readonly decorate?: TilesContentDecorator;
   private readonly listeners = new Set<() => void>();
   private host?: TilesContentHost;
   private points?: Promise<{ host: PointsHost; PointCloud: new (options: object) => object }>;
@@ -193,6 +211,7 @@ export class TilesRenderer implements EnginePlugin {
     this.i3dm = options.i3dm;
     this.dracoPoints = options.dracoPoints;
     this.splats = options.splats;
+    this.decorate = options.decorate;
     this.loadModel =
       options.loadModel ??
       (async (engine, gltf, signal) => {
@@ -316,8 +335,16 @@ export class TilesRenderer implements EnginePlugin {
         }
         this.place(model.root, this.contentMatrix(tile, content.type === 'b3dm' ? content.rtcCenter : undefined));
         model.root.visible = false;
+        let decoration: TilesContentDecoration | undefined;
+        try {
+          decoration = this.decorate?.({ kind: 'model', model, content, tile });
+        } catch (error) {
+          this.origin?.forget(model.root);
+          model.dispose();
+          throw error;
+        }
         return {
-          bytes: this.measure(model, content.byteLength),
+          bytes: this.measure(model, content.byteLength) + (decoration?.bytes ?? 0),
           get visible() {
             return model.root.visible;
           },
@@ -325,6 +352,7 @@ export class TilesRenderer implements EnginePlugin {
             model.root.visible = value;
           },
           dispose: () => {
+            decoration?.dispose();
             this.origin?.forget(model.root);
             model.dispose();
           },
@@ -354,9 +382,20 @@ export class TilesRenderer implements EnginePlugin {
         ) as { visible: boolean; attach(mesh: Mesh): void };
         cloud.attach(anchor);
         cloud.visible = false;
+        let decoration: TilesContentDecoration | undefined;
+        try {
+          decoration = this.decorate?.({ kind: 'points', cloud, content, tile });
+        } catch (error) {
+          host.remove(cloud);
+          this.origin?.forget(anchor);
+          anchor.dispose();
+          throw error;
+        }
         return {
           // Points upload their positions (float32 xyz) and RGBA8 colours.
-          bytes: this.budget === 'gpu' ? (content.positions.length / 3) * (12 + (colors ? 4 : 0)) : content.byteLength,
+          bytes:
+            (this.budget === 'gpu' ? (content.positions.length / 3) * (12 + (colors ? 4 : 0)) : content.byteLength) +
+            (decoration?.bytes ?? 0),
           get visible() {
             return cloud.visible;
           },
@@ -364,6 +403,7 @@ export class TilesRenderer implements EnginePlugin {
             cloud.visible = value;
           },
           dispose: () => {
+            decoration?.dispose();
             host.remove(cloud);
             this.origin?.forget(anchor);
             anchor.dispose();
@@ -413,6 +453,7 @@ export class TilesRenderer implements EnginePlugin {
   }
   private contentHost(engine: EngineKernel): TilesContentHost {
     return {
+      decorate: (context) => this.decorate?.(context),
       budget: this.budget,
       measure: (model, fileBytes) => this.measure(model, fileBytes),
       engine,

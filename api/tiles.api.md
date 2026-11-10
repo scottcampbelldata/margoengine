@@ -224,6 +224,30 @@ export interface TileRenderable {
 
 export type TileState = 'unloaded' | 'loading' | 'ready' | 'failed';
 
+export interface TilesContentDecoration {
+    readonly bytes: number;
+    dispose(): void;
+}
+
+export type TilesContentDecorator = (context: TilesDecorationContext) => TilesContentDecoration;
+
+export type TilesDecorationContext = {
+    kind: 'model';
+    model: TilesModel;
+    content: ModelContent;
+    tile: TilesetTile;
+} | {
+    kind: 'points';
+    cloud: unknown;
+    content: PointsContent;
+    tile: TilesetTile;
+} | {
+    kind: 'instances';
+    model: TilesModel;
+    content: InstancesContent;
+    tile: TilesetTile;
+};
+
 export interface TilesFrame {
     readonly selected: readonly TilesetTile[];
     readonly pending: number;
@@ -280,6 +304,7 @@ export class TilesRenderer implements EnginePlugin {
 }
 
 export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
+    decorate?: TilesContentDecorator;
     frame?: 'enu' | 'local' | ArrayLike<number>;
     origin?: TilesOrigin;
     loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
@@ -538,6 +563,7 @@ interface TextureJSON {
 }
 
 interface TilesContentHost {
+    decorate(context: TilesDecorationContext): TilesContentDecoration | undefined;
     readonly engine: EngineKernel;
     readonly url: string;
     loadModel(gltf: Uint8Array, signal: AbortSignal): Promise<TilesModel>;

@@ -152,7 +152,13 @@ interface TileRenderable {
 
 type TileState = 'unloaded' | 'loading' | 'ready' | 'failed';
 
+interface TilesContentDecoration {
+    readonly bytes: number;
+    dispose(): void;
+}
+
 interface TilesContentHost {
+    decorate(context: TilesDecorationContext): TilesContentDecoration | undefined;
     readonly engine: EngineKernel;
     readonly url: string;
     loadModel(gltf: Uint8Array, signal: AbortSignal): Promise<TilesModel>;
@@ -165,6 +171,23 @@ interface TilesContentHost {
     onUpdate(listener: () => void): () => void;
     offset(): Vec3;
 }
+
+type TilesDecorationContext = {
+    kind: 'model';
+    model: TilesModel;
+    content: ModelContent;
+    tile: TilesetTile;
+} | {
+    kind: 'points';
+    cloud: unknown;
+    content: PointsContent;
+    tile: TilesetTile;
+} | {
+    kind: 'instances';
+    model: TilesModel;
+    content: InstancesContent;
+    tile: TilesetTile;
+};
 
 type TilesInstancesDrawer = (host: TilesContentHost, content: InstancesContent, tile: TilesetTile, signal: AbortSignal) => Promise<TileRenderable>;
 
