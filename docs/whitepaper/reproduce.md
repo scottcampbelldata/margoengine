@@ -3061,3 +3061,5 @@ After building, run `node --test --test-timeout=60000 packages/ui/tests/i18n.tes
 
 ### Batch 243 mesh PBR channels
 Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtracer/tests/mesh-pbr.test.js. GPU correctness uses node scripts/gpu-lock.mjs run --owner=codex-batch243 --wait-max=60 --max=5 -- node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs. The latter tests native and WebGL2/Vulkan, compares maps with independent equivalent scalar/vertex scenes and snapshots the existing licensed Khronos Box before disposing its loaded model. Results: test-results/voxel-pathtracer-mesh-pbr.json. README work remains deferred in docs/work-lists/readme-owed.md.
+### Batch 233 job 1: road intersections
+After building packages: node --test --test-timeout=120000 packages/road/test/intersections.test.js. Rendering: node scripts/gpu-lock.mjs run --owner=codex-batch233 --max=8 --wait-max=60 -- node packages/road/test/browser-check.mjs. Both backends check separate layer pixels, restoration and disposal. Analytic fixtures use independent equations, no timing assertions. See [road-design.md](../road-design.md).

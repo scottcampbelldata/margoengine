@@ -423,3 +423,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/voxel-pathtracer: mesh-pbr factory, material channels and samplers, independent mesh material ids, loaded glTF snapshot ownership and compressed-image callback.
 - margoengine: optional voxel-pathtracer/mesh-pbr re-export and typed loaded-glTF interop.
+- @margoengine/road (batch 233 job 1): intersections joins/caps, curb returns, height field, curb/sidewalk layers, defaults, bounds, ownership and runnable example after build phase.
+- margoengine (batch 233 job 1): optional road/intersections forwarding entry after build phase.

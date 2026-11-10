@@ -2758,6 +2758,10 @@
       "types": "./dist/road/graph.d.ts",
       "import": "./dist/road/graph.js"
     },
+    "./road/intersections": {
+      "types": "./dist/road/intersections.d.ts",
+      "import": "./dist/road/intersections.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

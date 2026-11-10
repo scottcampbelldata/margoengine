@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12880336,
+  "total": 12882757,
   "history": [
     {
       "date": "2026-10-24",
@@ -6392,6 +6392,12 @@
       "commit": "batch-259",
       "reason": "Optional ui/i18n: absent to 1680 B min+gzip, ceiling 1936 B. Type-only UI bindings call existing widget setters and own disposable locale/abort subscriptions. Splitting would complicate this small optional API; core/stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c6f4ca875",
+      "reason": "Batch 233 job 1: new optional road/intersections entry, 0 bytes before; measured 2165 bytes gzip with standard headroom. Curbs, returns and sidewalks remain together to avoid splitting one design operation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7565,6 +7571,7 @@
     "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1,
     "@margoengine/headless/tiles": 2466,
     "@margoengine/ui/i18n": 1936,
-    "@margoengine/voxel-pathtracer/mesh-pbr": 38350
+    "@margoengine/voxel-pathtracer/mesh-pbr": 38350,
+    "@margoengine/road/intersections": 2421
   }
 }

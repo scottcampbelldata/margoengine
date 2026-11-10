@@ -49,6 +49,10 @@
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
+    },
+    "./intersections": {
+      "types": "./dist/intersections.d.ts",
+      "import": "./dist/intersections.js"
     }
   },
   "files": [
