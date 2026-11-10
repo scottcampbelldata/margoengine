@@ -7,7 +7,7 @@ mock.module('@playwright/test', {
   namedExports: {
     chromium: { launch: async () => current.browser },
     firefox: {},
-    webkit: {},
+    webkit: { launch: async () => current.browser },
   },
 });
 // The event log lookup of scripts/support/driver-resets.mjs, replaced: these runs must not read this PC's real log.
@@ -159,4 +159,18 @@ test('a WebGPU device the driver takes away fails the page wait at once, naming 
     { code: 'gpu-device-lost' },
   );
   await session.close();
+});
+
+test('a MARGO_BROWSER=webkit run names webkit as its browser, not chromium', async () => {
+  const previous = process.env.MARGO_BROWSER;
+  process.env.MARGO_BROWSER = 'webkit';
+  try {
+    fixture([]);
+    const session = await openBrowser();
+    assert.equal(session.hardware.browserName, 'webkit');
+    await session.close();
+  } finally {
+    if (previous === undefined) delete process.env.MARGO_BROWSER;
+    else process.env.MARGO_BROWSER = previous;
+  }
 });

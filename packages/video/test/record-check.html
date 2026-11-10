@@ -3,6 +3,27 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
 import {recordCanvas} from '/packages/video/dist/record.js';
+// The recorded WebM's first VP8 key frame as raw planes, decoded with WebCodecs and read before any colour conversion:
+// what the encoder wrote (Y, Cb, Cr at the centre), independent of how the browser's <video> converts it to RGB.
+async function webmCentreYUV(bytes){
+  const masters=new Set([0x18538067,0x1f43b675]);let key=null;
+  const vint=(p,id)=>{const w=Math.clz32(bytes[p])-23;let n=id?bytes[p]:bytes[p]&(255>>>w),all=n===(255>>>w);for(let i=1;i<w;i++){n=n*256+bytes[p+i];all&&=bytes[p+i]===255;}return{n,w,unknown:!id&&all};};
+  for(let p=0;p<bytes.length&&!key;){
+    const id=vint(p,true),size=vint(p+id.w,false),body=p+id.w+size.w;
+    if(masters.has(id.n)){p=body;continue;}
+    // SimpleBlock: track number, 16-bit time, flags, then the frame; a VP8 key frame carries the start code 9d 01 2a.
+    if(id.n===0xa3){const f=body+vint(body,false).w+3;if(bytes[f+3]===0x9d&&bytes[f+4]===0x01&&bytes[f+5]===0x2a)key=bytes.slice(f,body+size.n);}
+    if(size.unknown)return null;p=body+size.n;
+  }
+  if(!key||typeof VideoDecoder!=='function')return null;
+  const frame=await new Promise((resolve,reject)=>{const d=new VideoDecoder({output:resolve,error:reject});d.configure({codec:'vp8',codedWidth:64,codedHeight:64});d.decode(new EncodedVideoChunk({type:'key',timestamp:0,data:key}));d.flush().catch(reject);});
+  try{
+    const space=frame.colorSpace.toJSON(),data=new Uint8Array(frame.allocationSize()),[y,u,v]=await frame.copyTo(data),centre=data[y.offset+32*y.stride+32];
+    if(frame.format==='I420')return {format:frame.format,space,yuv:[centre,data[u.offset+16*u.stride+16],data[v.offset+16*v.stride+16]]};
+    if(frame.format==='NV12')return {format:frame.format,space,yuv:[centre,data[u.offset+16*u.stride+32],data[u.offset+16*u.stride+33]]};
+    return {format:frame.format,space};
+  }finally{frame.close();}
+}
 window.check=async()=>{
   const results=[];
   for(const backend of ['webgpu','webgl2']) for(const format of ['webm','mp4']) {
@@ -36,7 +57,8 @@ window.check=async()=>{
         const start=Math.floor(samples.length/4),end=Math.floor(samples.length*3/4);
         for(let i=start;i<end;i++){energy+=samples[i]**2;if(i>start&&samples[i-1]<=0&&samples[i]>0)crossings++;}
         const rms=Math.sqrt(energy/(end-start)),hz=crossings*sound.sampleRate/(end-start);
-        results.push({backend,format,bytes:blob.size,type:blob.type,width:video.videoWidth,height:video.videoHeight,pixel,audioSeconds:sound.duration,rms,hz,callerAudio:dest.stream.getAudioTracks()[0].readyState});
+        const encoded=format==='webm'&&!blob.type.includes('mp4')?await webmCentreYUV(new Uint8Array(buffer)):null;
+        results.push({backend,format,encoded,bytes:blob.size,type:blob.type,width:video.videoWidth,height:video.videoHeight,pixel,audioSeconds:sound.duration,rms,hz,callerAudio:dest.stream.getAudioTracks()[0].readyState});
       }finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url);}
       const abort=new AbortController(),cancelled=recordCanvas(canvas,{signal:abort.signal});abort.abort();
       try{await cancelled.result;throw Error('abort resolved');}catch(e){if(e.name!=='AbortError')throw e;}

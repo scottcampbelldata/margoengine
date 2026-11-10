@@ -33,6 +33,19 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 - **Cause:** WebKit's side. ffmpeg reads the same file as Y 95, Cb 159, Cr 100, the BT.601 limited-range code of #336699, and
   draws (47, 103, 155); the WebM carries no colour range, and WebKit's player draws it as full range. Not fixed: Margo writes
   neither the container nor the decoder. The check is unchanged and stays red in WebKit.
+- **Coded as a known browser defect (lane L, 2026-11-10, Scott's list-4 Mac fix):** `record-check.html` now also decodes
+  the WebM's first VP8 key frame with WebCodecs `VideoDecoder` and reads the raw planes at the centre, before any colour
+  conversion. WebKit 27.2 gives NV12 Y 95, Cb 159, Cr 100 (the BT.601 limited-range code of #336699, as ffmpeg reads it;
+  WebKit's frame is labelled `bt709`, limited); Chrome 156 gives I420 Y 97, Cb 156, Cr 104 (BT.709 limited) and draws
+  (51, 101, 153). `record-check.mjs` checks every WebM row's code values against the nearer of the two matrices within
+  2.5 levels, then accepts a wrong drawn colour only when the browser is WebKit, the row is WebM, the code is BT.601's and
+  the colour is (61, 113, 164) within 4, and prints `KNOWN BROWSER DEFECT webkit-vp8-webm-playback-colour`. Any change
+  in the encoded values, or another colour, still fails. The earlier "drawn as full range" explanation is withdrawn:
+  full-range BT.601 decoding of those values gives about (56, 104, 150), not what WebKit draws; how WebKit arrives at
+  (61, 113, 164) is not known. Not done: switching WebKit callers to MP4, since the WebM is correct and the caller asked
+  for it (limits.md, video/record). Found on the way: `scripts/browser.js` reported `hardware.browserName` as `chromium`
+  for every `MARGO_BROWSER=webkit` or `firefox` run, since those engines launch through the default Chromium path; it now
+  names the engine (`tests/browser-startup.test.js`, "a MARGO_BROWSER=webkit run names webkit").
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 

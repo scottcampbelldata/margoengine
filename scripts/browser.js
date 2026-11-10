@@ -578,7 +578,9 @@ export async function openBrowser({
       const refusal = softwareAdapterReason(resolveBrowser({ name: channel }), hardware.webgpu, { args });
       if (refusal) throw new Error(refusal);
     }
-    hardware.browserName = browserName;
+    // MARGO_BROWSER=webkit or firefox reaches a non-Chromium engine through the default 'chromium' launch path, so
+    // the engine resolved from the environment is the one named here (it said 'chromium' for WebKit before 2026-11-10).
+    hardware.browserName = browserName === 'chromium' ? resolveBrowser({ name: channel }).engine : browserName;
     hardware.browserVersion = browser.version();
     hardware.requestedChannel =
       browserName === 'chromium' ? (resolveBrowser({ name: channel }).channel ?? 'bundled') : null;
