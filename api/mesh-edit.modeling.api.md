@@ -88,7 +88,7 @@ export interface KnifeResult extends ComponentEditResult {
     cutEdges: string[];
 }
 
-export interface LODChainOptions extends Omit<SimplifyOptions, 'ratio' | 'targetTriangles'> {
+export interface LODChainOptions extends Omit<SimplifyOptions, 'ratio' | 'targetTriangles' | 'lockedVertices'> {
     ratios?: readonly number[];
 }
 
@@ -166,6 +166,7 @@ export interface SimplifyOptions {
     ratio?: number;
     targetTriangles?: number;
     maxError?: number;
+    lockedVertices?: readonly number[];
     mergeCoplanar?: boolean;
     createId?: () => string;
     signal?: AbortSignal;
@@ -178,6 +179,7 @@ export interface SimplifyResult {
         after: number;
     };
     error: number;
+    maxDeviation: number;
     faceMap: Record<string, string[]>;
     sourceVertices: number[];
 }

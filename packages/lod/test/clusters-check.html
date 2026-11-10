@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Cluster LOD: Flight Helmet</title></head><body><canvas width="256" height="256" style="width:256px;height:256px"></canvas><script type="module">
+// Real geometry: FlightHelmet, Gary Hsu / Microsoft, CC0. See examples/assets/ATTRIBUTION.md.
+import { Engine, Geometry } from '/packages/core/dist/index.js';
+import { loadGLTF } from '/packages/gltf-pro/dist/index.js';
+import { buildClusterLOD, ClusterLOD } from '/packages/lod/dist/clusters.js';
+import { LODSystem } from '/packages/lod/dist/index.js';
+import { LODFade } from '/packages/lod/dist/fade.js';
+const errors=[],canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',antialias:false,camera:{position:[0,0,4],target:[0,0,0]}});
+engine.stop();engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+LODFade.attach(engine, LODSystem.attach(engine));
+const model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb');
+const primitive=[...model.primitives].sort((a,b)=>b.indices.length-a.indices.length)[0];
+const positions=[],normals=[];
+for(let i=0;i<primitive.vertices.length;i+=20){positions.push(...primitive.vertices.subarray(i,i+3));normals.push(...primitive.vertices.subarray(i+4,i+7));}
+model.root.visible=false;
+const geometry=new Geometry(positions,normals,primitive.indices),hierarchy=await buildClusterLOD(geometry);
+const anchor=engine.createMesh(),other=engine.createMesh().setPosition([100,0,0]);
+const renderer=ClusterLOD.attach(engine,hierarchy,anchor),second=ClusterLOD.attach(engine,hierarchy,other);
+const [x,y,z,r]=geometry.bounds;
+engine.camera.position=[x,y,z+r*3.5];engine.camera.target=[x,y,z];
+engine.camera.near=r/1000;engine.camera.far=r*20;
+const frame=async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();engine.render();await engine.gpu.queue.onSubmittedWorkDone();};
+const image=()=>{engine.render();const c=new OffscreenCanvas(256,256),ctx=c.getContext('2d');ctx.drawImage(canvas,0,0);return Array.from(ctx.getImageData(0,0,256,256).data);};
+window.check={async run(){
+ const rows=[];
+
+
+ for(const error of [0.00001,4,16]){renderer.errorPixels=error;await frame();rows.push({error,triangles:renderer.selected.reduce((n,s)=>n+s.node.meshlets.reduce((sum,g)=>sum+g.indices.length/3,0),0),nodes:renderer.selected.length,picture:image()});}
+ const full=rows[0].picture;let lit=0,covered=0;
+ for(let i=0;i<full.length;i+=4)if(full[i]+full[i+1]+full[i+2]>60){lit++;if(rows[2].picture[i]+rows[2].picture[i+1]+rows[2].picture[i+2]>60)covered++;}
+ const active=rows.map(({picture,...r})=>r);second.dispose();renderer.dispose();
+ return {rows:active,triangles:hierarchy.triangles,nodes:hierarchy.nodes.length,lit,coverage:covered/lit,errors};
+}};
+window.ready=true;
+</script></body></html>

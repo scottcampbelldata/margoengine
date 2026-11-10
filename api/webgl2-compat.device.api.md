@@ -126,7 +126,7 @@ export class CompatBuffer {
     destroyed: boolean;
     constructor(device: CompatDevice, descriptor: GPUBufferDescriptor);
     write(offset: number, bytes: Uint8Array): void;
-    settle(): boolean;
+    settle(force?: boolean): boolean;
     land(offset: number, bytes: Uint8Array): void;
     bytes(): Uint8Array;
     dataTexture(): {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13270407,
+  "total": 13275041,
   "history": [
     {
       "date": "2026-10-24",
@@ -6735,6 +6735,18 @@
       "commit": "batch-213-job3",
       "reason": "New optional VRM constraint reader, stateless evaluator and scene/Animator controller: 0 to 2998 B min+gzip, ceiling 0 to 3254 B. Shared rest-space math and ownership belong together; splitting would duplicate state without saving an optional import. Core plus stage unchanged at 24209 B. Restore eight incoming-main ceilings and remove six stale umbrella keys accidentally restored by the previous local rebase helper.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7bc69e403",
+      "reason": "Batch 222 adds optional lod/clusters: 0 to 3424 B gzip for boundary-pinned hierarchy selection and dither rendering; splitting its small builder and renderer would add API and lifecycle complexity without avoiding a heavy static import.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "9d6d24c0e",
+      "reason": "Batch 222 readiness: webgl2-compat/device 105937 to 106384 B; lazy compute/readback 31753 to 31757 B crosses its 31756 B ceiling by 1 B. Keep nonforcing buffer-local mapping and queued/loss semantics; splitting a four-byte lazy increase would add an artificial boundary.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7824,7 +7836,7 @@
     "@margoengine/weather/snow": 3300,
     "@margoengine/webgl2-compat": 107944,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 75875,
-    "@margoengine/webgl2-compat lazy compute runtime and read-back": 31756,
+    "@margoengine/webgl2-compat lazy compute runtime and read-back": 32710,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
@@ -7961,6 +7973,7 @@
     "margoengine/fbx/surfaces": 314,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/lod/clusters": 3680
   }
 }

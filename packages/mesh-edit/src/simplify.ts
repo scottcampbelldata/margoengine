@@ -12,6 +12,8 @@ export interface SimplifyOptions {
   targetTriangles?: number;
   /** Stop before any collapse whose quadric error (squared distance, local units) exceeds this. Default: no limit. */
   maxError?: number;
+  /** Input vertex indices that cannot move or disappear. Default none; use for shared cluster boundaries. */
+  lockedVertices?: readonly number[];
   /** Merge coplanar triangles of the same source face back into convex polygons (default true). */
   mergeCoplanar?: boolean;
   /** Face ID generator for faces beyond the first piece of each source face (default `crypto.randomUUID`). */
@@ -27,6 +29,8 @@ export interface SimplifyResult {
   triangles: { before: number; after: number };
   /** Largest quadric error of any collapse made (squared local units). */
   error: number;
+  /** Conservative maximum displacement in local units, including accumulated collapses (not a quadric cost). */
+  maxDeviation: number;
   /** For each input face ID, the output faces that carry it on (empty when collapsed away). */
   faceMap: Record<string, string[]>;
   /** For each output vertex, the input vertex it is (collapses keep one end, so positions are input positions). */
@@ -138,6 +142,10 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
   }
   const signal = options.signal;
   signal?.throwIfAborted();
+  const locked = new Set(options.lockedVertices ?? []);
+  for (const v of locked)
+    if (!Number.isInteger(v) || v < 0 || v >= mesh.vertices.length)
+      throw new RangeError('Simplify lockedVertices must name input vertices; pass valid vertex indices.');
   const P = mesh.vertices,
     // Triangles: corners (vertex indices), corner UVs and the source face.
     tv: number[][] = [],
@@ -223,11 +231,13 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
   // A vertex may move only along a feature edge when it lies on features: exactly two feature edges (a border or
   // seam runs through it) and the collapse follows one of them. Feature corners never move.
   const canMove = (u: number, v: number): boolean => {
+    if (locked.has(u)) return false;
     const features = featureEdges(u);
     if (!features.length) return true;
     return features.length === 2 && features.includes(v);
   };
   const stamp = new Int32Array(P.length),
+    deviation = new Float64Array(P.length),
     heap = new Heap(),
     removed = new Uint8Array(P.length);
   const consider = (u: number) => {
@@ -239,6 +249,7 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
   for (let u = 0; u < P.length; u++) if (around[u].size) consider(u);
   let triangles = before,
     error = 0,
+    maxDeviation = 0,
     steps = 0;
   /** Check and apply the collapse u -> v; false when it would break the mesh. */
   const collapse = (u: number, v: number): boolean => {
@@ -248,6 +259,9 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
     const nu = neighbors(u),
       nv = neighbors(v),
       opposite = new Set(shared.flatMap((t) => tv[t].filter((w) => w !== u && w !== v)));
+    // A shared boundary can meet another independently simplified region at vertices as well as edges. Creating a
+    // new edge between two pinned vertices may collide with that region's edge after joining the regions again.
+    if (locked.has(v)) for (const w of nu) if (w !== v && locked.has(w) && !nv.has(w)) return false;
     for (const w of nu) if (w !== v && nv.has(w) && !opposite.has(w)) return false;
     // UV for v in each of u's triangles: the triangle's own UV island's UV at v.
     const replacement = new Map<number, MutableVec2>(),
@@ -305,6 +319,8 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
       around[v].add(t);
     }
     removed[u] = 1;
+    deviation[v] = Math.max(deviation[v], deviation[u] + Math.hypot(...P[u].map((x, k) => x - P[v][k])));
+    maxDeviation = Math.max(maxDeviation, deviation[v]);
     for (let k = 0; k < 10; k++) Q[v][k] += Q[u][k];
     return true;
   };
@@ -354,7 +370,7 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
   }
   const output: PolygonMesh = { vertices, faces };
   assertPolygonMesh(output);
-  return { mesh: output, triangles: { before, after: triangles }, error, faceMap, sourceVertices };
+  return { mesh: output, triangles: { before, after: triangles }, error, maxDeviation, faceMap, sourceVertices };
 }
 
 /** Greedy merge of triangles across shared edges with continuous UVs while the union is a valid convex face. */
@@ -402,7 +418,7 @@ function mergePieces(
 }
 
 /** Options for {@link meshLODChain}. */
-export interface LODChainOptions extends Omit<SimplifyOptions, 'ratio' | 'targetTriangles'> {
+export interface LODChainOptions extends Omit<SimplifyOptions, 'ratio' | 'targetTriangles' | 'lockedVertices'> {
   /** Fraction of the input's triangles each level keeps, decreasing (default [0.5, 0.25, 0.125]). */
   ratios?: readonly number[];
 }

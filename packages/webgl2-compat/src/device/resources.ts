@@ -7,6 +7,7 @@ import { checkWGSL, WGSLError } from '../wgsl.js';
 import type { IRModule } from '../wgsl/ir.js';
 import { type FormatInfo, FORMATS } from './formats.js';
 import type { CompatDevice } from './device.js';
+import { nextGPUTask } from './tasks.js';
 
 /** WebGPU buffer usage bits. */
 const BufferUsage = {
@@ -154,12 +155,12 @@ export class CompatBuffer {
    * Applies the waiting writes in order, forcing readbacks that may be forced, and brings the shadow copy up to date
    * with the GPU. False when a write cannot land yet (query results not available): it and the writes after it wait.
    */
-  settle(): boolean {
+  settle(force = true): boolean {
     const gl = this.device.gl;
     while (this.readbacks.length) {
       const r = this.readbacks[0];
       if (!r.ready()) {
-        if (!r.forcible) return false;
+        if (!force || !r.forcible) return false;
         this.device.stalls++;
       }
       this.readbacks.shift();
@@ -245,10 +246,14 @@ export class CompatBuffer {
     void size;
     this.mapState = 'pending';
     this.mapMode = mode;
-    return this.device.idle().then(async () => {
+    return Promise.resolve(this.device.queue.waiting).then(async () => {
+      // Mapping waits for this buffer's writes, not a new fence after the entire device queue. Texture/query
+      // readbacks carry their own readiness; a GPU-only buffer copy without one still needs the queue fence.
+      if (!this.readbacks.length && !this.shadowValid) await this.device.idle();
+      else this.device.gl.flush();
       // Occlusion results arrive a task after the GPU finishes: wait for every write this buffer still expects.
-      while (!this.destroyed && !this.device.destroyed && this.mapState === 'pending' && !this.settle())
-        await new Promise((resolve) => setTimeout(resolve, 1));
+      while (!this.destroyed && !this.device.destroyed && this.mapState === 'pending' && !this.settle(false))
+        await nextGPUTask();
       if (this.destroyed || this.device.destroyed) {
         this.mapState = 'unmapped';
         throw new DOMException(

@@ -7,6 +7,7 @@ import { fault } from '../../../shared/errors.js';
 import { webgl2Capabilities, type WebGL2Capabilities, type CompatTier } from '../index.js';
 import type { TierFormats } from '../tiers.js';
 import { extensions, type Extensions, GLState } from './gl.js';
+import { nextGPUTask } from './tasks.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
@@ -443,13 +444,13 @@ export class CompatDevice extends EventTarget {
         }
         const status = gl.clientWaitSync(sync, 0, 0);
         if (status === gl.TIMEOUT_EXPIRED) {
-          setTimeout(poll, 1);
+          void nextGPUTask().then(poll);
           return;
         }
         gl.deleteSync(sync);
         resolve();
       };
-      setTimeout(poll, 0);
+      void nextGPUTask().then(poll);
     });
   }
 

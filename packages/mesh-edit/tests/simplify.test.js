@@ -5,6 +5,39 @@ import { area, assertClosed, assertNoDegenerate, euler, grid, ids, volume } from
 const K = { ...(await import('../dist/index.js')), ...(await import('../dist/modeling.js')) };
 const cube = () => K.createPrimitiveMesh('cube', 'box');
 
+test('locked vertices keep cluster boundaries intact and displacement bounds accumulated collapses', () => {
+  const mesh = grid(8),
+    lockedVertices = mesh.vertices.flatMap(([x, , z], i) => (x === 0 || x === 8 || z === 0 || z === 8 ? [i] : []));
+  const result = K.simplifyMesh(mesh, { ratio: 0.1, lockedVertices, mergeCoplanar: false });
+  for (const v of lockedVertices) assert.ok(result.sourceVertices.includes(v), `boundary vertex ${v} must survive`);
+  const originalEdges = new Set();
+  for (const face of mesh.faces)
+    for (let corner = 1; corner + 1 < face.vertices.length; corner++) {
+      const triangle = [face.vertices[0], face.vertices[corner], face.vertices[corner + 1]];
+      for (let k = 0; k < 3; k++)
+        originalEdges.add([triangle[k], triangle[(k + 1) % 3]].sort((a, b) => a - b).join(':'));
+    }
+  for (const face of result.mesh.faces)
+    for (let k = 0; k < face.vertices.length; k++) {
+      const a = result.sourceVertices[face.vertices[k]],
+        b = result.sourceVertices[face.vertices[(k + 1) % face.vertices.length]];
+      if (lockedVertices.includes(a) && lockedVertices.includes(b))
+        assert.ok(
+          originalEdges.has([a, b].sort((a, b) => a - b).join(':')),
+          'no new edge can collide with an adjacent cluster',
+        );
+    }
+  assert.ok(result.triangles.after < result.triangles.before);
+  assert.ok(result.maxDeviation > 0);
+  for (const p of mesh.vertices) {
+    const nearest = Math.min(...result.mesh.vertices.map((q) => Math.hypot(...p.map((x, k) => x - q[k]))));
+    assert.ok(nearest <= result.maxDeviation, `${nearest} <= ${result.maxDeviation}`);
+  }
+  assert.equal(K.simplifyMesh(mesh, { ratio: 0, lockedVertices: mesh.vertices.map((_, i) => i) }).triangles.after, 128);
+  assert.throws(() => K.simplifyMesh(mesh, { lockedVertices: [-1] }), RangeError);
+  assert.throws(() => K.simplifyMesh(mesh, { lockedVertices: [mesh.vertices.length] }), RangeError);
+});
+
 test('simplify a flat grid: borders stay, area and UVs stay exact, interior collapses', () => {
   const mesh = grid(8),
     result = K.simplifyMesh(mesh, { ratio: 0.05 });

@@ -45,18 +45,20 @@ export function fadeKeeps(x: number, y: number, value: number): boolean {
 const BINDING = 95;
 /** core's mesh shader with the fade: the mesh id, flat to the fragment, picks a value tested before anything is lit. */
 export function coreFadeShader(code: string): string {
-  if (!code.includes('@location(3) material:vec4f }')) return code;
-  return code
-    .replace(
-      '@location(3) material:vec4f }',
-      '@location(3) material:vec4f,@location(14) @interpolate(flat) lod_id:u32 }',
-    )
-    .replace('o.color=i.color.rgb;', 'o.color=i.color.rgb;o.lod_id=u32(i.factors.w);')
-    .replace(
-      /@fragment fn fragment\(i:Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f \{/,
-      (head) =>
-        `@group(0) @binding(${BINDING}) var<storage,read> lod_fades:array<f32>;\n${fadeTest}\n${head}\nif(!lod_fade_keep(i.clip.xy,lod_fades[i.lod_id])){discard;}`,
-    );
+  if (!code.includes('@location(3) material:vec4f') || code.includes('var<storage,read> lod_fades:')) return code;
+  const withId = code.includes('lod_id:u32')
+    ? code
+    : code
+        .replace(
+          '@location(3) material:vec4f }',
+          '@location(3) material:vec4f,@location(14) @interpolate(flat) lod_id:u32 }',
+        )
+        .replace('o.color=i.color.rgb;', 'o.color=i.color.rgb;o.lod_id=u32(i.factors.w);');
+  return withId.replace(
+    /@fragment fn fragment\(i:Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f \{/,
+    (head) =>
+      `@group(0) @binding(${BINDING}) var<storage,read> lod_fades:array<f32>;\n${fadeTest}\n${head}\nif(!lod_fade_keep(i.clip.xy,lod_fades[i.lod_id])){discard;}`,
+  );
 }
 /** gltf-pro's shader with the fade, on every entry that shades a surface, read from the uniform at `group` binding 97. */
 export function modelFadeShader(code: string, group: number): string {

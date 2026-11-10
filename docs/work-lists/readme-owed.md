@@ -601,3 +601,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/rigging (batch 213 job 3): vrm-constraints reader, evaluator, Animator/scene attachment, live weights, dependency rules and disposal.
 - @margoengine/gltf-pro (batch 213 job 3): retained required VRMC_node_constraint data and explicit optional runtime.
 - margoengine (batch 213 job 3): rigging/vrm-constraints alias.
+- @margoengine/lod (batch 222 job 1): document /clusters builder, hierarchy/error model, anchor renderer, meshlet limits, dither band, compatibility support and cancellation.
+- @margoengine/mesh-edit (batch 222 job 1): document simplifyMesh lockedVertices and maxDeviation; chain indices remain local to each invocation.
+- @margoengine/webgl2-compat (batch 222 LOD blocker): explain task-based fence/map readiness and retained async/loss semantics.
