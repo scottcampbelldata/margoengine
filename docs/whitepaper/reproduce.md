@@ -3677,3 +3677,6 @@ After npm run build:packages, run node --test --test-timeout=120000 packages/com
 
 The NN-extra landing detector regression runs with node --test --test-timeout=120000 tests/quality-gate.test.js; retain both positive GGX and negative convolution-geometry cases.
 Batch 271 job 1: build packages, then `node --test --test-timeout=30000 packages/creative/tests/targets-depth.test.js`; under a shared GPU lock run `node packages/creative/scripts/test-targets-depth.js` and again with `--compat` (164 surfaces each). The layer regression is `node packages/webgl2-compat/test/features-browser.mjs` (case volumeSliceDepth; it reads red on the layer without the stand-in). No timing run.
+### Batch 1 job 2: umbrella test discovery
+
+Run node --test --test-timeout=90000 tests/package-test-scripts.test.js and npm test --workspace packages/margoengine -- --test-timeout=90000. Removing scripts.test from packages/margoengine/package.json reproduces the missing tests/export-order.test.js report. No GPU or timing test is required for this manifest-only change.

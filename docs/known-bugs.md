@@ -4916,3 +4916,8 @@ API lock Day 0 audit (outside tooling scope, rule 21): node --test --test-timeou
 - Build-phase follow-up (batch 177 job 3): `node scripts/supply-chain.mjs` drops the manually appended notices after the generated document body; cause: render() emits only its ASSETS records. Repro: generate and diff THIRD-PARTY-NOTICES.md on main. Existing trailing credits preserved in this change; generator repair belongs to the fix phase.
 
 Batch 274 fix-phase API polish: Module.stateDict() and Tensor.read() in compute/nn expose no AbortSignal, so an in-flight large state readback cannot be cancelled by their callers. Repro: start model.stateDict() for a large model; there is no signal option to pass. Cause: the existing wrappers call GpuArray.read() without forwarding ReadOptions; BatchNorm follows that existing signature. Add optional wait/read options through nested modules in the fix phase. NN-extra numerical execution, gradients and saved state are complete.
+### Fixed: batch 1 umbrella package test discovery
+
+The original fourteen packages were repaired by 68b55c2ed. The later umbrella package added tests/export-order.test.js without scripts.test, reproducing the same class: node --test tests/package-test-scripts.test.js reported the missing file. Its manifest now runs every tests/*.test.js file. Existing regression: tests/package-test-scripts.test.js, which failed before the manifest change.
+
+The rebased cube-projector alias was appended after the umbrella kits, failing the existing generated-manifest and package export-order checks. Running scripts/umbrella.mjs restores its owning package position without changing the export set.
