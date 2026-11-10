@@ -5621,3 +5621,11 @@ The four audio entries are independently optional: pan 677 B, binaural 1809 B, v
 ### 5. XR AR extras ownership and evidence
 
 Mesh geometry and poses are copied from native frame observations; unchanged geometry retains its arrays while its pose can move each frame. Optional visualization uses package-owned normals and core Geometry through existing APIs, with an explicit scene subscription owner. Module feature failures remain visible. Persistent handles are browser/origin data, and abort cleanup preserves pre-existing or concurrently claimed handles. CPU and real-GPU stereo checks establish consumer behavior with stand-in XR observations; no sensor accuracy or cross-restart storage claim is made.
+#### 5. Batch 273 scatter shadow-culling proof
+
+The canonical shadow-culling fixture reads command buffers from the selected
+implementation's owner: native cascadeCull or compatibility route.shadow.
+The unchanged three-scene native and compatibility checks pass exact shadow
+depth/frame comparisons and complete per-ring/per-cascade count checks, including
+the CPU plane classifier and distant-tree exclusion. The fixture regression
+executes the actual counts method and fails on the old native-only lookup.

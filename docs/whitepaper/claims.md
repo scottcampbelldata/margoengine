@@ -3263,13 +3263,19 @@ Batch 257 job 3: worker canvas pointer-lock forwarding supports page/worker requ
 Batch 249 job 1: ecs/objects stores arbitrary JS values beside numeric fields and participates in existing queries, tracking and destruction. Proof: packages/ecs/test/objects.test.js. No performance or GPU claim.
 
 - Stats WebGL2 (batch 264): asynchronous GPU frame and named-pass elapsed times with native preview draw counters. Proof: packages/stats/test/gl.test.js and scripts/test-stats-parity.mjs. Disjoint/lost/overflow samples invalidate atomically; unsupported timing never substitutes a CPU duration. No benchmark or presentation-latency claim.
-<<<<<<< HEAD
 ### XR AR extras
 
 The optional xr/ar-extra entry supports native DOM overlays, image/marker tracking, detected triangle meshes and persistent anchor save/restore/delete. CPU coverage includes copied snapshots, pose-only movement, removal, callback disposal, abort and concurrent anchor ownership. Stereo rendering compares detected standard Box meshes on both routes and backends; browser stand-ins exercise negotiated module APIs. These software tests do not prove real marker detection, mapping accuracy or persistence across device restarts.
-=======
 
 Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pairs with component filters and exposes target entity ids and component rows. Proof: packages/ecs/test/relation-query.test.js; no performance claim.
->>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
 
 Batch 225 job 1: optional splines/kinds exactly implements centripetal/chordal/uniform Catmull-Rom geometry and analytic derivatives through third order, curvature and torsion for all existing spline kinds. Proof: packages/splines/test/kinds.test.js compares the independent published interpolation pyramid, known (t,t^2,t^3) derivatives, global scaling, repeated knots and periodic seams. No global intersection-free or speed claim.
+
+### Batch 273 scatter shadow-culling commands
+
+The unchanged canonical native/compatibility shadow-cull driver passes exact
+depth/frame comparisons and all instance counts. For example the scatter
+camera rings are [55,281,979] on both backends; the four shadow cascade rows
+are [39,8,0], [55,108,0], [55,274,91], [55,281,855]. The observation uses actual
+GPU-written command buffers. Regression: shadow-cull-fixture.test.js fails
+without the owning-route selection. No new speed or whole-package parity claim.

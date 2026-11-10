@@ -455,9 +455,9 @@ The bounded continuation is now complete: 89 of 115 selected correctness suites
 pass, combining the preserved 22, repaired clustered lighting, and 66 later
 passes. The following additional failures remain with batch 273:
 
-- `scatter/test:browser:shadow-cull`: the fixture reads `.commands` from an
-  undefined native command record in `shadow-cull.html:81`. Inspect the fixture's
-  native instrumentation assumptions against compatibility command recording.
+- Fixed `scatter/test:browser:shadow-cull`: observe the selected route's actual
+  GPU-written command buffer. The original complete native and compatibility
+  driver passes depth, frame and count assertions. Regression: shadow-cull-fixture.test.js.
 - `scenery/test:gpu`: the noon scene reads black ground, then compares zero to
   zero and reports `noon ground NaN of noon on screen`. Trace the presented scene
   and capture readiness; the lighting preset checks before it pass.
