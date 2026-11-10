@@ -6408,3 +6408,5 @@ AVIF review M1 (2026-11-10): the final OBU of an image item may omit its size an
 
 
 Stage glTF review M3: addGLTF uses the basic loader for plain opaque constant-colour triangles; advanced features select gltf-pro, with animation required for skins/morphs/clips. Root download budget remains 64 MiB. Only selected packages load, with a feature-specific coded refusal when missing. Basic results omit pbr. Core plus stage stays 24,209 B gzip. See [stage-gltf-routing.md](stage-gltf-routing.md).
+
+Draco encoder review L1: quantized float attributes require a finite float32 range, finite inverse and inverse-times-range, and a nonzero reconstruction step. Unrepresentable transforms reject with code unsupported before returning a stream; use bits 0 or rescale. Both extreme-range regressions and raw-float round trips run in draco-native.test.js. See [draco-float-ranges.md](draco-float-ranges.md).

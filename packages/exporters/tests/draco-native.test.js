@@ -58,6 +58,40 @@ function checked(job) {
   return { result, decoded: ours };
 }
 
+test('unrepresentable float quantization ranges reject with a coded error and no output', { timeout: 30000 }, () => {
+  for (const values of [
+    [0, 0, 0, 1e-36, 0, 0, 0, 1e-36, 0],
+    [0, 0, 0, 3e38, 0, 0, -3e38, 3e38, 0],
+  ]) {
+    for (const encodeSpeed of [0, 10]) {
+      assert.throws(
+        () =>
+          encodeNativeMesh(encoder, {
+            points: 3,
+            indices: new Uint32Array([0, 1, 2]),
+            attributes: [attr('POSITION', 'POSITION', 3, new Float32Array(values), 14)],
+            encodeSpeed,
+            decodeSpeed: encodeSpeed,
+          }),
+        { name: 'MargoError', code: 'unsupported', message: /attribute range.*representable/ },
+      );
+      assert.equal(encoder.encoder_output_length(), 0);
+    }
+    const raw = new Float32Array(values);
+    const { decoded } = checked({
+      points: 3,
+      indices: new Uint32Array([0, 1, 2]),
+      attributes: [attr('POSITION', 'POSITION', 3, raw), attr('_ID', 'GENERIC', 1, new Uint16Array([0, 1, 2]))],
+      encodeSpeed: 10,
+      decodeSpeed: 10,
+    });
+    for (let i = 0; i < decoded.vertexCount; i++) {
+      const id = decoded.attributes._ID.array[i];
+      assert.deepEqual(decoded.positions.slice(i * 3, i * 3 + 3), raw.slice(id * 3, id * 3 + 3));
+    }
+  }
+});
+
 function triangles(indices, ids) {
   const out = [];
   for (let i = 0; i < indices.length; i += 3) {

@@ -154,6 +154,13 @@ fn portable(attribute: &Attribute) -> Result<Portable, &'static str> {
     };
     let maximum = ((1u32 << attribute.bits) - 1) as f32;
     let inverse = maximum / range;
+    // The stream stores a float32 range and decoders reconstruct with a float32 step.
+    // Refuse a nonrepresentable transform before float-to-integer saturation can corrupt it.
+    if !range.is_finite() || !inverse.is_finite() || !(range * inverse).is_finite()
+        || range / maximum == 0.0
+    {
+        return Err("attribute range not representable");
+    }
     let values = floats
         .iter()
         .enumerate()

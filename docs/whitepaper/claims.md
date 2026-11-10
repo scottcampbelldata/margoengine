@@ -4531,3 +4531,5 @@ Claim: optional sciviz/molecule displays PDB and mmCIF structures as ball-and-st
 
 
 Stage glTF review M3: the one-call importer supports a basic-loader-only installation without loading pro or animation for plain geometry; JSON/GLB and missing-package regressions are in packages/stage/tests/gltf-routing.test.js and gltf-animation-missing.test.js. Full skin/morph/clip regressions remain in gltf-full.test.js. Research and limits: [loader selection](../stage-gltf-routing.md).
+
+Draco encoder review L1: ranges near 1e-36 or beyond float32 range now produce a coded unsupported encode refusal rather than corrupt or undecodable output. Sequential and topology-selection paths are covered in packages/exporters/tests/draco-native.test.js, including exact bits-0 round trips through both decoders. Research and reproduction: [float range safety](../draco-float-ranges.md).

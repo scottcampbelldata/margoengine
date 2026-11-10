@@ -310,6 +310,7 @@ mod wasm {
                 *output = encoded;
                 0
             }
+            Err("attribute range not representable") => 2,
             Err(_) => 1,
         }
     }

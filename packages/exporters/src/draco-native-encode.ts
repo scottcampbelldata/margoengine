@@ -83,7 +83,13 @@ export function encodeNativeMesh(module: NativeDracoEncoder, job: DracoJob): Dra
       bytes.set(new Uint8Array(a.values.buffer, a.values.byteOffset, a.values.byteLength), offset);
       offset += a.values.byteLength;
     }
-    if (module.encoder_encode(pointer, length) !== 0)
+    const status = module.encoder_encode(pointer, length);
+    if (status === 2)
+      throw margoError(
+        'unsupported',
+        'Draco attribute range is not representable in float32 quantization; use quantization bits 0 or rescale the attribute; see https://margoengine.com/errors#unsupported',
+      );
+    if (status !== 0)
       throw new RangeError('Draco could not encode the mesh; check finite attributes, quantization bits and indices');
     return {
       data: new Uint8Array(
