@@ -8,7 +8,7 @@
 // that fall behind the camera before they arrive are cancelled. Terrain is loaded with import() on attach, so this
 // entry costs nothing until it is used.
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
 import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -1053,8 +1053,8 @@ export class BiomeView implements Disposable {
       throw options.signal.reason;
     }
     // Streaming runs before every frame; `ready` resolves once the tiles around the camera are in.
-    engine.use({ name: `biomes-view:${++views}`, setup() {}, onPreUpdate: (delta) => view.#frame(delta) });
-    view.#name = `biomes-view:${views}`;
+    view.#plugin = { name: `biomes-view:${++views}`, setup() {}, onPreUpdate: (delta) => view.#frame(delta) };
+    engine.use(view.#plugin);
     view.#plan(true);
     return view;
   }
@@ -1110,7 +1110,8 @@ export class BiomeView implements Disposable {
   #placement?: import('@margoengine/biomes/placement').BiomePlacement;
   /** World cells per detail texel (the worker samples detail maps at it). */
   #detailStep = 1;
-  #name = '';
+  /** The streaming plugin, kept so dispose removes it from the scene that holds it. */
+  #plugin?: EnginePlugin;
 
   /**
    * Before each frame: track the camera, plan when it moved, copy arrived tiles in within the budget. A frame that
@@ -1616,7 +1617,8 @@ export class BiomeView implements Disposable {
     this.#pending.clear();
     this.#arrived.length = 0;
     clearTimeout(this.#drainTimer);
-    if (this.#name) this.#engine.removePlugin(this.#name);
+    // The engine's removePlugin acts on the active scene, which may have changed since attach.
+    if (this.#plugin) this.#engine.sceneOf(this.#plugin)?.removePlugin(this.#plugin.name);
     this.terrain.dispose();
     this.#objects?.dispose();
     this.#rivers?.dispose();

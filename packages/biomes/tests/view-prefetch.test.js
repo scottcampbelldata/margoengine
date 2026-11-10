@@ -21,6 +21,7 @@ async function fixture(t, options = {}, worldOptions = {}) {
       plugins.push(plugin);
     },
     removePlugin() {},
+    sceneOf: () => undefined,
   };
   const view = await BiomeView.attach(engine, world, {
     objects: false,

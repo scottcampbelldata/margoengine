@@ -512,7 +512,14 @@ async function seasonsView(dayOfYear = 20) {
       },
       queue: { writeTexture: () => {} },
     },
-    engine = { backend: 'webgpu', gpu: device, camera: { position: [0, 0, 0] }, use() {}, removePlugin() {} },
+    engine = {
+      backend: 'webgpu',
+      gpu: device,
+      camera: { position: [0, 0, 0] },
+      use() {},
+      removePlugin() {},
+      sceneOf: () => undefined,
+    },
     view = await BiomeView.attach(engine, world, {
       seasons,
       objects: false,
@@ -756,4 +763,30 @@ test('far forest: its cover raster stays within reason on huge worlds', async ()
   const { farStep } = await import('../dist/far.js');
   assert.equal(farStep({ bounds: [-2048, -2048, 2048, 2048] }), 16);
   assert.equal(farStep({ bounds: [-32768, -32768, 32768, 32768] }), 64);
+});
+
+// Batch 132 audit: the engine's removePlugin acts on the active scene. A view attached while one scene was active must
+// leave that scene on dispose, even after another scene became active, and must not touch the active scene.
+test('dispose removes the streaming plugin from its own scene, not the active scene', async () => {
+  const world = await BiomeWorld.create({ size: [256, 256], biomes: [presets.temperate], climate: { latitude: 45 } }),
+    calls = [];
+  let streaming;
+  const own = { removePlugin: (name) => calls.push(['own scene', name]) },
+    engine = {
+      backend: 'webgpu',
+      gpu: {
+        limits: { maxTextureDimension2D: 8192 },
+        createTexture: () => ({ destroy() {} }),
+        queue: { writeTexture() {} },
+      },
+      camera: { position: [0, 0, 0] },
+      use(plugin) {
+        streaming = plugin;
+      },
+      removePlugin: (name) => calls.push(['active scene', name]),
+      sceneOf: (plugin) => (plugin === streaming ? own : undefined),
+    },
+    view = await BiomeView.attach(engine, world, { objects: false, water: false, radius: 1, textureResolution: 16 });
+  view.dispose();
+  assert.deepEqual(calls, [['own scene', streaming.name]]);
 });

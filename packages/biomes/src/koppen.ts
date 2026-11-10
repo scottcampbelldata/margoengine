@@ -99,10 +99,10 @@ export function koppenClass(c: KoppenClimate): number {
     }
   }
   const map = c.rainfall,
-    // Ten times the dryness threshold, in mm: 20 MAT, +280 when 70 % of the rain falls in summer, +140 when neither
-    // half has 70 %. B (arid) below it, BW (desert) below half of it.
+    // Ten times the dryness threshold, in mm: 20 MAT, +280 when more than 70 % of the rain falls in summer, +140 when
+    // neither half has more than 70 % (Beck et al. 2018, Table 2 note). B (arid) below it, BW (desert) below half of it.
     threshold =
-      Math.floor((20 * mean) / 100) + (10 * summer >= 7 * total ? 280 : 10 * (total - summer) >= 7 * total ? 0 : 140);
+      Math.floor((20 * mean) / 100) + (10 * summer > 7 * total ? 280 : 10 * (total - summer) > 7 * total ? 0 : 140);
   if (map < threshold) return (map < threshold / 2 ? 3 : 5) + (mean >= 1800 ? 0 : 1); // BW or BS, h or k
   if (cold >= 1800) {
     if (dry >= 60_000) return 0; // Af
