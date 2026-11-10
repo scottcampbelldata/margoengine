@@ -126,4 +126,5 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 132 | viewcube | Batch 132 viewcube audit, partial: read the cube geometry, hit testing, fit and up-axis code line by line |
 | 132 | audio | Batch 132 audio audit, partial: read ambisonics.ts (ACN/SN3D order and rotation), binaural.ts, occlusion.ts, music.ts, voices.ts, voice-manager.ts and zones.ts line by line |
 | 132 | ecs | Batch 132 ecs audit, partial: read engine.ts, parallel.ts, parallel-runtime.ts, serialize.ts, serialize-codec.ts, reactive.ts, relation-query.ts and objects.ts line by line |
+| 132 | shadows | Batch 132 shadows audit, partial: fetch Donnelly and Lauritzen 2006 (I3D) from another copy; read index.ts, virtual.ts, pages.ts, distance.ts, rt.ts, rt-alpha.ts, light-function.ts and transmission.ts line by line |
 | E dispose | usdz | curves(): the lines and points plugins attach after an import's await, so they always join the default scene even when the model lives in another scene; attach them to the model's scene (dispose already removes them from their own scene) |
