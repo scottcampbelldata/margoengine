@@ -423,21 +423,44 @@ function lineHeight(line: Item[], innerHeight: number): number {
   return height;
 }
 
-/** Share the free main-axis space (`grow`) or the shortage (`shrink`) among `items`; returns the space they use. */
+/**
+ * Share the free main-axis space (`grow`) or the shortage (`shrink`) among `items`; returns the space they use.
+ * Follows CSS Flexible Box Layout Level 1, section 9.7 "Resolving Flexible Lengths": shrink weights are scaled by
+ * the base size, factors summing below 1 take only that fraction of the free space, and an item clamped by its min
+ * or max is frozen while the space it could not take goes round the others again.
+ */
 function distribute(items: Item[], innerMain: number, gap: number, row: boolean, scrolling: boolean): number {
   const margins = (it: Item) => (row ? horizontal(it.m) : vertical(it.m));
-  const gapTotal = gap * (items.length - 1);
-  const natural = items.reduce((sum, it) => sum + it.base + margins(it), 0) + gapTotal;
-  const free = scrolling ? Math.max(0, innerMain - natural) : innerMain - natural;
+  const outer = items.reduce((sum, it) => sum + margins(it), 0) + gap * (items.length - 1);
+  const natural = items.reduce((sum, it) => sum + it.base, outer);
+  const initial = scrolling ? Math.max(0, innerMain - natural) : innerMain - natural;
+  const growing = initial > 0;
+  const factor = (it: Item) => (growing ? it.grow : it.shrink);
   for (const it of items) it.size = it.base;
-  if (free > 0) {
-    const grow = items.reduce((sum, it) => sum + it.grow, 0);
-    if (grow > 0) for (const it of items) it.size = Math.min(it.max, it.base + (free * it.grow) / grow);
-  } else if (free < 0) {
-    const weight = items.reduce((sum, it) => sum + it.shrink * it.base, 0);
-    if (weight > 0) for (const it of items) it.size = Math.max(it.min, it.base + (free * it.shrink * it.base) / weight);
+  // Step 2: with no free space, or a zero factor, an item keeps its base size.
+  const frozen = new Set(items.filter((it) => initial === 0 || !(factor(it) > 0)));
+  while (frozen.size < items.length) {
+    const open = items.filter((it) => !frozen.has(it));
+    // Step 4b: the free space left after frozen sizes and open base sizes, capped by a factor sum below 1.
+    let free = innerMain - items.reduce((sum, it) => sum + (frozen.has(it) ? it.size : it.base), outer);
+    const factors = open.reduce((sum, it) => sum + factor(it), 0);
+    if (factors < 1 && Math.abs(initial * factors) < Math.abs(free)) free = initial * factors;
+    // Step 4c: grow by the grow ratio, shrink by the scaled shrink factor (shrink times base size).
+    const weight = (it: Item) => (growing ? it.grow : it.shrink * it.base);
+    const total = open.reduce((sum, it) => sum + weight(it), 0);
+    const targets = open.map((it) => it.base + (total > 0 ? (free * weight(it)) / total : 0));
+    let violation = 0;
+    open.forEach((it, i) => {
+      it.size = Math.max(it.min, Math.min(it.max, targets[i]));
+      violation += it.size - targets[i];
+    });
+    // Step 4d: no clamp freezes everything; otherwise freeze the min (positive) or max (negative) violators.
+    open.forEach((it, i) => {
+      const moved = it.size - targets[i];
+      if (Math.abs(violation) < 1e-9 || (violation > 0 && moved > 0) || (violation < 0 && moved < 0)) frozen.add(it);
+    });
   }
-  return items.reduce((sum, it) => sum + it.size + margins(it), 0) + gapTotal;
+  return items.reduce((sum, it) => sum + it.size, outer);
 }
 
 function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {

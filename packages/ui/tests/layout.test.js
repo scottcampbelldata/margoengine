@@ -253,3 +253,32 @@ test('the safe area insets the screen layer; bleed widgets fill the whole screen
   ui.layout();
   assert.deepEqual(rectOf(hud), [0, 0, 50, 50]);
 });
+
+// CSS Flexible Box Layout Level 1, section 9.7: a clamped item is frozen and the rest of the space goes round again.
+test('space a maxWidth child cannot take goes to the other growing children', () => {
+  const a = box(0, 10, { grow: 1, maxWidth: 50 }),
+    b = box(0, 10, { grow: 1 }),
+    root = node({ direction: 'row' }, [a, b]);
+  arrange(root, screen);
+  // One pass gave a 50 and b 200, leaving 150 empty; 9.7 freezes a at 50 and b takes the other 350.
+  near(a.rect.width, 50);
+  near(b.rect.width, 350);
+});
+
+test('a shortage a minWidth child cannot give up comes from the other children', () => {
+  const a = box(300, 10, { minWidth: 280 }),
+    b = box(300, 10),
+    root = node({ direction: 'row' }, [a, b]);
+  arrange(root, screen);
+  // 200 short: equal scaled shrink asks 100 of each; a stops at 280, so b gives the other 180.
+  near(a.rect.width, 280);
+  near(b.rect.width, 120);
+});
+
+test('grow factors summing below 1 take only that fraction of the free space', () => {
+  const a = box(100, 10, { grow: 0.5 }),
+    root = node({ direction: 'row' }, [a]);
+  arrange(root, screen);
+  // 300 free, factor sum 0.5: a grows by 150 (9.7 step 4b).
+  near(a.rect.width, 250);
+});

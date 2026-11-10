@@ -95,7 +95,15 @@ function decode(source: string, text: string, at: number): string {
     if (!ref) fail(source, at, "a bare '&' must be written &amp;");
     if (ref[0] === '#') {
       const code = ref[1] === 'x' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
-      if (!(code > 0 && code <= 0x10ffff)) fail(source, at, `${match} is not a character`);
+      // XML 1.0 section 2.2, production [2] Char: tab, newline, return and the planes without surrogates or U+FFFE/F.
+      const char =
+        code === 0x9 ||
+        code === 0xa ||
+        code === 0xd ||
+        (code >= 0x20 && code <= 0xd7ff) ||
+        (code >= 0xe000 && code <= 0xfffd) ||
+        (code >= 0x10000 && code <= 0x10ffff);
+      if (!char) fail(source, at, `${match} is not an XML character; write a code point XML 1.0 allows`);
       return String.fromCodePoint(code);
     }
     const named = NAMED[ref];

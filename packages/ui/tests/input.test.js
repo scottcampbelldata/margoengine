@@ -409,3 +409,17 @@ test('hit testing through Ui.hitTest uses CSS pixels', () => {
   ui2.add(new Panel({ background: 'surface', anchor: 'top-left', width: 50, height: 50 }));
   assert.ok(ui2.hitTest(10, 10));
 });
+
+test('a bound action that starts throwing after bindInput surfaces its error instead of being skipped', () => {
+  const ui = makeUi();
+  let broken = false;
+  ui.bindInput({
+    state: (name) => {
+      if (broken) throw new RangeError(`state read after dispose: ${name}`);
+      return { value: 0 };
+    },
+  });
+  ui.update(0.016);
+  broken = true;
+  assert.throws(() => ui.update(0.016), /state read after dispose/);
+});

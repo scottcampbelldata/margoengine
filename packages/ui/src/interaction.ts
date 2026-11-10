@@ -97,7 +97,7 @@ export class Interaction {
   private pointer = -1;
   private flash: { widget: Widget; left: number } | null = null;
   private restore: Widget | null = null;
-  private binding?: { input: Pick<Input, 'state'>; held: Map<UiCommand, number> };
+  private binding?: { input: Pick<Input, 'state'>; commands: UiCommand[]; held: Map<UiCommand, number> };
   private tipTarget: Widget | null = null;
   private tipTime = 0;
   private tipDismissed = false;
@@ -401,10 +401,11 @@ export class Interaction {
   bindInput(input: Pick<Input, 'state'>): void {
     if (!input || typeof input.state !== 'function')
       throw typeError('bindInput takes an Input from @margoengine/input made with uiActions()', 'ui');
-    const commands = Object.keys(UI_ACTIONS) as UiCommand[];
-    for (const command of commands) {
+    const commands: UiCommand[] = [];
+    for (const command of Object.keys(UI_ACTIONS) as UiCommand[]) {
       try {
         input.state(UI_ACTIONS[command]);
+        commands.push(command);
       } catch {
         // Only the directions and accept need to exist; the rest are optional.
         if (command === 'up' || command === 'down' || command === 'left' || command === 'right' || command === 'accept')
@@ -414,7 +415,7 @@ export class Interaction {
           );
       }
     }
-    this.binding = { input, held: new Map() };
+    this.binding = { input, commands, held: new Map() };
   }
 
   unbindInput(): void {
@@ -424,13 +425,9 @@ export class Interaction {
   private poll(dt: number): void {
     const binding = this.binding;
     if (!binding) return;
-    for (const command of Object.keys(UI_ACTIONS) as UiCommand[]) {
-      let value: number;
-      try {
-        value = binding.input.state(UI_ACTIONS[command]).value;
-      } catch {
-        continue;
-      }
+    // Only the actions the Input had at bindInput: a throw from one of them is a real error, not a missing action.
+    for (const command of binding.commands) {
+      const value = binding.input.state(UI_ACTIONS[command]).value;
       // An action's value is signed: "ui.down" bound to a stick axis reads negative when the stick is pushed up.
       const active = value > 0.5,
         held = binding.held.get(command);

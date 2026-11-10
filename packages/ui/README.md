@@ -545,7 +545,8 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
 - **Two instanced draws.** Rectangles are signed distance rounded boxes (crisp edges, outlines, soft shadows); glyphs are
   quads sampling the text package's atlases. Both read storage buffers by instance index, in the engine's own render pass
   after post-processing, with premultiplied alpha blending and one scissor per clip region.
-- **Layout.** A small flexbox: base sizes, then free space by `grow` and a shortage by `shrink`, then `justify` and
+- **Layout.** A small flexbox: base sizes, then free space by `grow` and a shortage by `shrink` (resolved as CSS Flexbox
+  section 9.7 does: a child held by its min or max size is frozen and the rest goes to the others), then `justify` and
   `align`. A wrapping row first breaks its children into lines by their base sizes, then does the same per line. Stacks anchor their children; grids fill cells row by row.
 - **No globals.** Nothing runs on import; the only DOM access is reading the safe area, and only when you ask for it.
 
@@ -571,7 +572,7 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 ## Limits
 
 - World panels require native WebGPU or the full compatibility layer and refuse the small preview during setup. Screen UI has a real preview route.
-- A world panel is a flat rectangle drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; no curved panels; one texture and one pair of glyph atlases per panel.
+- A world panel is drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; one texture and one pair of glyph atlases per panel. A `CurvedPanel` (`@margoengine/ui/curved`) is a tessellated cylinder or sphere patch; its rays hit the analytic surface.
 - Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
   words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of
   widgets keep left-to-right placement (no mirrored layout).
@@ -579,7 +580,7 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
   sheets have no pseudo-classes, attribute selectors, `+` or `~`, `@` rules or `!important`, and do not restyle a
   screen after it is built.
 - A `VirtualList` has one row height; rows of different heights need a `List`.
-- Layout is single-pass flexbox. A wrapping row breaks lines by its children's base sizes, so a child that would grow
+- A wrapping row breaks lines by its children's base sizes, so a child that would grow
   never pulls the next one up; columns do not wrap, and lines always stack down from the top (no `align-content`).
 
 ## Preview tier contract

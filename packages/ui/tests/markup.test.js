@@ -176,3 +176,10 @@ test('loadScreen fetches the markup and its style sheets, and stops on an aborte
   }
   assert.ok(fetched.includes('https://game.test/ui/hud.css'));
 });
+
+// XML 1.0 section 4.1 (WFC Legal Character) refers character references to production [2] Char.
+test('character references outside XML Char are refused: surrogates, C0 controls, U+FFFE', () => {
+  for (const ref of ['&#xD800;', '&#1;', '&#xFFFE;', '&#x110000;'])
+    assert.throws(() => parseMarkup(`<label>${ref}</label>`), /not an XML character/, ref);
+  assert.equal(parseMarkup('<label>&#x1F600;&#xE000;</label>')[0].text, '\u{1F600}\uE000');
+});

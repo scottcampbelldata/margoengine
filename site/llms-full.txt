@@ -21702,6 +21702,42 @@ and colour space, selection linked to a histogram), and [Wind field](../../examp
 [Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
 Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
 
+## Optional workflows
+
+Import only the entry you need. Every `@margoengine/sciviz/<entry>` below also has a
+`margoengine/sciviz/<entry>` forwarding entry; neither the figure root nor core/stage
+loads these features for you. Install matching private-repository builds as described
+in the root installation guide, rather than the unrelated registry package.
+
+- [Analysis and scientific datasets](docs/analysis.md): pipeline, contour, clip, probe,
+  calculator, glyphs, normalized datasets and scientific file readers.
+- [Scientific volumes](docs/volumes.md): transfer functions, categorical fusion,
+  cinematic and quality wrappers, mapped/tetrahedral/AMR volumes and atmosphere.
+- [Charts and linked data](docs/charts.md): selections, tables, queries, statistics,
+  formatting, streaming and publication.
+- [Large data and geography](docs/large-data.md): cloud volumes, point clouds,
+  aggregation, density, graph layout, time series, climate and map layers.
+- [State and application integration](docs/applications.md): portable state,
+  provenance, sharing, notebooks, accessibility, layouts, monitoring and workers.
+
+Works with the [scientific dashboard composition](../../docs/integration-sciviz.md):
+optional entries share a Figure, compute device, selection and publication lifecycle.
+The record gives the exact reproduction command and measured integration scope.
+
+## Contributor checks
+
+From the repository root run `npm run test --workspace @margoengine/sciviz` for CPU
+contracts and `npm run check:readme-run -- --packages=sciviz` for the examples here
+and in the package guides. Browser workspace commands use `scripts/browser-root.mjs`
+to establish the repository root; keep that launcher when invoking fallback, table,
+engineering and pointcloud suites. For example,
+`npm run test:browser:table --workspace @margoengine/sciviz`.
+Each browser suite declares its backend coverage. Full compatibility requires the
+full WebGL2 tier, not merely a WebGL2 context. Readiness checks use cinematic sample
+counts, progressive refinement state and submitted GPU work, rather than sleeps.
+CPU-load sampling starts after setup. Timing results remain deferred during the
+build phase and these correctness checks make no speed claim.
+
 ## Climate and solver files
 
 `@margoengine/sciviz/netcdf` opens CDF-1 classic and CDF-2 64-bit-offset files without eagerly decoding variables.
@@ -21722,43 +21758,6 @@ using fig = await Figure.create(document.querySelector<HTMLCanvasElement>('canva
 await fig.volume(grid.data, { dims: grid.dims, bounds: grid.bounds, range: [-11, 7] });
 await fig.ready();
 ```
-
-`@margoengine/sciviz/vtk` adapts the existing `@margoengine/loaders/vtk-xml` reader, retaining topology and every
-numeric point/cell array lazily. `.vtu`, `.vti` and `.vts` support ASCII, inline binary and raw/base64 appended
-arrays, both byte orders, UInt32/64 headers and the owner's zlib, LZ4 and LZMA decoders. `dataset.pieces` exposes
-metadata and individually readable arrays, including components not selected for drawing. `grid(name)` returns
-the selected piece's unstructured volume cells or structured hexahedra; `volume(name)` returns ImageData,
-including nonzero extents and descending axes. Options default to `piece: 0`, `association: 'point'`,
-`component: 0`. Pieces remain separate, including overlapping/ghost boundaries. `parseVtk` is the existing
-legacy unstructured reader extended through 5.1, ASCII and big-endian binary, with OFFSETS/CONNECTIVITY,
-metadata and attached FIELD scalar arrays. Its existing scalar-first-component and supported-cell policy remains.
-
-```ts
-import { Figure } from '@margoengine/sciviz';
-import { openVTK } from '@margoengine/sciviz/vtk';
-import { gridLayer } from '@margoengine/sciviz/grids';
-
-using file = await openVTK(new URL('/examples/assets/sciviz/wind.vtu', location.href));
-const grid = await file.grid('uwnd');
-using fig = await Figure.create(document.querySelector<HTMLCanvasElement>('canvas')!);
-gridLayer(fig, grid, { range: [-11, 7], colormap: 'viridis' });
-await fig.ready();
-```
-
-Both openers accept URL/string, bytes (snapshotted), or a `FileSource` with async `read(offset, length, signal)`.
-The source must remain immutable. HTTP Range is used for NetCDF hyperslabs and raw appended VTK arrays.
-Inline/base64 VTK needs its bounded file in memory. Servers ignoring Range are accepted only when their whole
-response fits `maxBytes`. The default 64 MiB bounds headers, single reads, decoded arrays and selections, not the
-remote file's total size. `signal` cancels the file lifetime; per-read `signal` cancels that read. `dispose()` and
-`Symbol.dispose` abort pending/future reads and are idempotent. Nothing loads on import beyond this entry's code.
-
-NetCDF-4/HDF5 is explicitly unsupported here: a reliable reader requires object headers, B-trees, chunk indexes
-and filter semantics, owned by the separate engineering-format job. Convert to classic with the format owner's
-tools. CDF-5, non-UTF-8 text metadata and indeterminate streaming record counts also reject. CF coordinate systems/calendars are retained
-as metadata, not guessed or reprojected. StructuredGrid drawing needs three non-singleton axes; oriented
-ImageData needs resampling before an axis-aligned volume. Other raw VTK cell types remain accessible but must
-match the existing grid renderer's supported types to draw. Integers outside exact JavaScript number precision
-reject. No HDF5, resampling, calendar or general VTK-renderer parity claim is made.
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 

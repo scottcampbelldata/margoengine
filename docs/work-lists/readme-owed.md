@@ -1510,3 +1510,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/react: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase. DONE (react-readme-phase).
 
 - @margoengine/webgl2-compat: document hardware implicit sampler footprints and the J6 product composition proof in docs/integration-product.md during the README phase.
+- @margoengine/ui: describe CurvedPanel and layoutPanels (ui/curved) with an example during the README phase (batch 132 audit).
