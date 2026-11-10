@@ -76,6 +76,8 @@ export class Highlight implements EnginePlugin {
   private format = '';
   private samples = 0;
   private disposed = false;
+  /** The engine it was attached to, so dispose() removes the effect from its own scene. */
+  private engine?: Engine;
   private views: GPUTextureView[] = [];
   private source?: GPUTextureView;
   private mask?: GPUTexture;
@@ -107,6 +109,7 @@ export class Highlight implements EnginePlugin {
     if (this.disposed) throw new MargoError('disposed', 'Highlight is disposed; create a new effect.');
     requireWebGPU(engine, 'Highlight');
     this.selection.setup(engine);
+    this.engine = engine;
     this.device = engine.gpu!;
     this.uniforms = [32, 32, 48].map((size) =>
       this.device!.createBuffer({ size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -244,6 +247,10 @@ export class Highlight implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    const engine = this.engine;
+    this.engine = undefined;
+    // The engine holds this wrapper, not the inner selection; removePlugin calls dispose again, which returns early.
+    engine?.sceneOf(this)?.removePlugin(this.name);
     this.selection.dispose();
     this.release();
   }

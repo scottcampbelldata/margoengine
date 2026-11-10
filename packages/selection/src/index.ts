@@ -588,7 +588,7 @@ export class Selection implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.sources.dispose();
     this.release();
     this.selected.clear();

@@ -16,6 +16,8 @@ export class XRaySelection implements EnginePlugin {
   private clock = 0;
   private manual = false;
   private disposed = false;
+  /** The engine it was attached to, so dispose() removes the effect from its own scene. */
+  private engine?: Engine;
   constructor(readonly options: XRaySelectionOptions = {}) {
     this.name = options.name ?? 'selection-xray';
     this.selection = new Selection({ ...options, name: this.name, xray: options.xray ?? true });
@@ -42,6 +44,7 @@ export class XRaySelection implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'XRaySelection is disposed; create a new effect.');
     this.selection.setup(engine);
+    this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({name:this.name+':pulse',order:39.99,execute:c=>{
@@ -66,6 +69,15 @@ export class XRaySelection implements EnginePlugin {
     return minimum+(1-minimum)*(0.5+0.5*Math.cos(time*2*Math.PI/period));
   }
   onDeviceRestored(engine: Engine): void { this.selection.onDeviceRestored(engine); }
-  dispose(): void { if(this.disposed)return;this.disposed=true;this.selection.dispose(); }
+  /** Removes the effect from the scene it was attached to (not the active one) and frees its selection. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    const engine = this.engine;
+    this.engine = undefined;
+    // The engine holds this wrapper, not the inner selection; removePlugin calls dispose again, which returns early.
+    engine?.sceneOf(this)?.removePlugin(this.name);
+    this.selection.dispose();
+  }
   [Symbol.dispose](): void { this.dispose(); }
 }
