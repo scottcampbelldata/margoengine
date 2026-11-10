@@ -148,6 +148,8 @@ const blend = alphaBlend;
  * selection.set([mesh]);
  */
 export class Selection implements EnginePlugin {
+  /** Optional mask consumers can suppress outline resources and compositing. */
+  protected outlineVisible = true;
   private readonly sources = new PickingPrimitives();
   readonly name: string;
   private engine?: Engine;
@@ -296,8 +298,10 @@ export class Selection implements EnginePlugin {
     });
     this.maskDraw.bindings = [{ binding: 1, resource: { buffer: this.buffer } }];
     this.uniform = engine.gpu.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.seed = compute(engine.gpu, seedCode);
-    this.jump = compute(engine.gpu, jumpCode);
+    if (this.outlineVisible) {
+      this.seed = compute(engine.gpu, seedCode);
+      this.jump = compute(engine.gpu, jumpCode);
+    }
     this.sources.setup(engine);
   }
   /**
@@ -343,27 +347,29 @@ export class Selection implements EnginePlugin {
       });
     this.maskView = this.mask.createView();
     this.msaaMaskView = this.msaaMask?.createView();
-    this.fields = [0, 1].map(() =>
-      c.device.createTexture({
-        size: [c.width, c.height],
-        format: 'rg32sint',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-      }),
-    );
-    this.seedGroup = group(c.device, this.seed!, [this.maskView, this.fields[0].createView()]);
-    let step = 2 ** Math.ceil(Math.log2(Math.max(c.width, c.height))) / 2,
-      index = 0;
-    for (; step >= 1; step /= 2, index++) {
-      const b = c.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.steps.push(b);
-      c.device.queue.writeBuffer(b, 0, new Int32Array([step, 0, 0, 0]));
-      this.jumps.push(
-        group(c.device, this.jump!, [
-          this.fields[index % 2].createView(),
-          this.fields[(index + 1) % 2].createView(),
-          { buffer: b },
-        ]),
+    let index = 0;
+    if (this.outlineVisible) {
+      this.fields = [0, 1].map(() =>
+        c.device.createTexture({
+          size: [c.width, c.height],
+          format: 'rg32sint',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+        }),
       );
+      this.seedGroup = group(c.device, this.seed!, [this.maskView, this.fields[0].createView()]);
+      let step = 2 ** Math.ceil(Math.log2(Math.max(c.width, c.height))) / 2;
+      for (; step >= 1; step /= 2, index++) {
+        const b = c.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        this.steps.push(b);
+        c.device.queue.writeBuffer(b, 0, new Int32Array([step, 0, 0, 0]));
+        this.jumps.push(
+          group(c.device, this.jump!, [
+            this.fields[index % 2].createView(),
+            this.fields[(index + 1) % 2].createView(),
+            { buffer: b },
+          ]),
+        );
+      }
     }
     const code =
       meshVertex +
@@ -377,6 +383,7 @@ export class Selection implements EnginePlugin {
       depthStencil: { ...c.descriptor.depthStencil!, depthWriteEnabled: false, depthCompare: 'equal' },
     });
     this.maskDraw.pipeline = this.maskPipeline;
+    if (!this.outlineVisible) return;
     this.composite = render(c.device, composite, c.format, { multisample: c.descriptor.multisample });
     const field = (this.fieldView = this.fields[index % 2].createView()),
       pipeline = this.composite,
@@ -410,6 +417,10 @@ export class Selection implements EnginePlugin {
           break;
         }
     c.device.queue.writeBuffer(this.buffer!, 0, this.flags as Uint32Array<ArrayBuffer>);
+    if (!this.outlineVisible) {
+      this.mark(c, this.maskDraw, false);
+      return;
+    }
     this.values[0] = this.options.width ?? 3;
     this.values[1] = +(this.options.algorithm === 'morphological');
     this.values.set(this.options.color ?? [1, 0.5, 0], 4);
@@ -455,7 +466,7 @@ export class Selection implements EnginePlugin {
           ],
         })
         .end();
-    if (this.options.algorithm !== 'morphological') {
+    if (this.outlineVisible && this.options.algorithm !== 'morphological') {
       dispatch(c, this.seed!, this.seedGroup!, Math.ceil(c.width / 8), Math.ceil(c.height / 8));
       for (const bind of this.jumps) dispatch(c, this.jump!, bind, Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     }

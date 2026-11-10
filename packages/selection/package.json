@@ -41,6 +41,10 @@
     "./area": {
       "types": "./dist/area.d.ts",
       "import": "./dist/area.js"
+    },
+    "./highlight": {
+      "types": "./dist/highlight.d.ts",
+      "import": "./dist/highlight.js"
     }
   },
   "files": [
@@ -64,7 +68,8 @@
     "test:browser": "node test/picking.browser.mjs && node test/pick-many.browser.mjs && node test/models.browser.mjs && node test/xray.browser.mjs && node test/hit-details.browser.mjs",
     "prepack": "npm run build",
     "test:browser:xray-pulse": "node test/pulse.browser.mjs",
-    "test:browser:area": "node test/area.browser.mjs"
+    "test:browser:area": "node test/area.browser.mjs",
+    "test:browser:highlight": "node test/highlight.browser.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {

@@ -448,3 +448,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated sciviz/clip alias with its owning optional entry.
 - @margoengine/usdz: pointInstancers() optional /instancer entry, timeCode/maxNodes, prototype sharing, masks, nesting and worker usage; sampled layers need composition().
 - margoengine: generated usdz/instancer alias; generated selection/hit-details alias restores the export map checked by the existing umbrella test.
+- @margoengine/selection: document highlight Highlight glow/fill, independent colours/opacities, inner/outer toggles, radius/sigma, current-pose visible masks, multiview/lifecycle, memory/defaults and separate named groups (batch 199 job 4).

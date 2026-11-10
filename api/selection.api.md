@@ -182,6 +182,7 @@ export type SelectOperation = 'replace' | 'add' | 'subtract';
 
 export class Selection implements EnginePlugin {
     readonly options: SelectionOptions;
+    protected outlineVisible: boolean;
     readonly name: string;
     constructor(options?: SelectionOptions);
     static attach(engine: EngineKernel, options?: SelectionOptions): Selection;
