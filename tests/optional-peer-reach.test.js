@@ -84,6 +84,11 @@ const REACT_EXTRA = {
   './tonemap': ['@margoengine/post'],
   './taa': ['@margoengine/post'],
   './ui': ['@margoengine/audio', '@margoengine/sprites', '@margoengine/sciviz'],
+  './controls-extra': ['@margoengine/controls'],
+  './portals': ['@margoengine/materials'],
+  './effects-extra': ['@margoengine/points', '@margoengine/lines', '@margoengine/geometry', '@margoengine/materials'],
+  './offscreen': ['@margoengine/worker'],
+  './test': ['@margoengine/headless'],
 };
 test('the React root reaches no optional package, and each subpath only the packages its name says', () => {
   const m = manifest('react'),
