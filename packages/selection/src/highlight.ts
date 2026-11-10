@@ -13,6 +13,7 @@ import { applyView } from '../../shared/view-rect.js';
 import { alphaBlend } from '../../shared/pass.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -104,6 +105,7 @@ export class Highlight implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'Highlight is disposed; create a new effect.');
+    requireWebGPU(engine, 'Highlight');
     this.selection.setup(engine);
     this.device = engine.gpu!;
     this.uniforms = [32, 32, 48].map((size) =>

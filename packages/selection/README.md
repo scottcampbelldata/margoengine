@@ -191,6 +191,8 @@ The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl
 
 `Selection` outlines already refused the preview; `Picking` can use the real `/pick` route when `webglPicking()` is attached first.
 
+`Highlight` refuses the small preview in its own setup through the shared `requireWebGPU` (`Highlight needs WebGPU`, code `unsupported`, help link). Before 2026-11-10 it refused only through its inner `Selection` (message `Selection requires WebGPU`), which the preview-contract gate cannot see, so `npm run verify` failed. The glow pass needs a WebGPU device; native WebGPU and the full compatibility layer are unchanged. Regression: `test/highlight.test.js`.
+
 ## Surface attributes: /hit-details
 
 Attach `HitDetails` **instead of** `Picking`: it has the same point, batch,

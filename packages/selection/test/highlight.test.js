@@ -57,3 +57,26 @@ test('a mask consumer with default Selection options does not allocate or dispat
   assert.ok(mask.maskTexture);
   mask.dispose();
 });
+
+test('highlight refuses the small WebGL2 preview during setup with its own coded WebGPU error and no retained plugin', async () => {
+  const { Engine, TransformStore } = await import('../../core/dist/extension.js');
+  const engine = new Engine({ width: 8, height: 8 }, await TransformStore.create(8), {
+    backend: 'webgl2',
+    add() {},
+    remove() {},
+    render() {},
+    dispose() {},
+  });
+  try {
+    assert.throws(
+      () => engine.use(new Highlight()),
+      (error) =>
+        error.code === 'unsupported' &&
+        error.message.startsWith('Highlight needs WebGPU') &&
+        error.message.includes('https://margoengine.com/errors#webgpu'),
+    );
+    assert.equal(engine.plugins.size, 0);
+  } finally {
+    engine.dispose();
+  }
+});
