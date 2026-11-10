@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>CC0 asset wiring correctness</title>
+<canvas width="160" height="160" style="width:160px;height:160px"></canvas><script type="module">
+import { createStage } from '/packages/stage/dist/index.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
+import { LivePageBridge } from '/packages/mcp/dist/live.js';
+import { AssetInstaller } from '/packages/mcp/dist/assets-page.js';
+import { UnlitMaterial, createMesh } from '/packages/materials/dist/index.js';
+import { boxGeometry } from '/packages/geometry/dist/primitives.js';
+import { waitForPipelines } from '/scripts/support/gpu-ready.js';
+window.assetSetup = async (backend, endpoint, token) => {
+  await window.assetDispose?.();
+  const old = document.querySelector('canvas'), canvas = old.cloneNode(); old.replaceWith(canvas);
+  const stage = await createStage(canvas, { backend, fallback:webglRenderer, autoStart:false, controls:false });
+  const material = new UnlitMaterial({ color:'#ffffff' });
+  const surface = createMesh(stage.engine, boxGeometry(), material);
+  stage.fit(); stage.engine.render();
+  const installer = new AssetInstaller(stage.engine, { materials: { surface:material } });
+  const bridge = new LivePageBridge({ enabled:true, endpoint, token, addAsset:installer.load });
+  stage.engine.use(bridge);
+  window.assetFixture = { stage, installer, bridge, material, surface };
+  window.assetSettle = () => waitForPipelines(async () => { stage.engine.render(); await stage.engine.gpu?.queue.onSubmittedWorkDone(); });
+  window.assetDispose = async () => { bridge.dispose(); await bridge.closed; installer.dispose(); surface.destroy(); material.dispose(); stage.dispose(); };
+  return stage.engine.backend;
+};
+</script></html>

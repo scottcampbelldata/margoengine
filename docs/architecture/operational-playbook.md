@@ -5701,3 +5701,7 @@ Batch 220 job 1, section 5 evidence: math/compat adds CPU-side camera transforms
 # Batch 204 evidence supplement (section 5)
 
 Optional exporter optimization uses accessor-backed `EXT_mesh_gpu_instancing` TRS batches, preserving each retained parent's transform and splitting reflection signs. CPU evidence covers exact emitted transforms, animation exclusion and glTF validation. The exporters browser and capture runners now accept the existing `MARGO_COMPAT=1` shim so the package's own checks exercise native WebGPU and the WebGL2 compatibility layer through one shared GPU slot. No core, stage or backend implementation changes are involved. Animation reduction and resource pruning remain CPU operations without the GPU lock.
+
+
+### Section 5 evidence: batch 267 asset wiring
+mcp/assets performs only bounded network/filesystem preparation; no GPU lock during real downloads. mcp/assets-page lazily delegates GPU loading to existing gltf-pro/environment/materials APIs. Both backends exercise real CC0 scene assets; GPU pipeline readiness uses completion state. No new GPU maths, core/stage feature or benchmark.

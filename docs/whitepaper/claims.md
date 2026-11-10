@@ -3347,3 +3347,17 @@ The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPi
 # Batch 204 optional optimization
 
 `@margoengine/exporters/optimize-extra` adds independently controlled redundant animation-key reduction, unused resource pruning and static sibling GPU instancing. The regression suite checks linear and STEP behavior, quaternion signs, morph-weight layout, resource reachability, exact instance TRS, multi-scene protection, opaque extension retention, cancellation and input immutability. The existing Khronos Box fixture supplies real licensed geometry; output validator errors remain zero. This is behavior evidence, with no measured speed claim or assertion that every asset shrinks.
+
+
+## Batch 237: WFC assembly
+assembleWFC converts solved IDs and source/orientation metadata into shared-geometry tile meshes from loaded glTF models. CPU tests cover every proper cube rotation, reflection, nested transforms, ownership, invalid inputs and rollback. assemble-browser.mjs checks four placed instances in one draw on native WebGPU and the WebGL2 compatibility layer. This is deterministic instancing evidence, with no speed claim.
+=======
+
+
+
+
+Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pairs with component filters and exposes target entity ids and component rows. Proof: packages/ecs/test/relation-query.test.js; no performance claim.
+
+
+Batch 267 job 2: asset tools search all three official catalogues, reject non-CC0 Khronos legal chains, download complete relative resources with licence/hash manifests and install real models, HDRIs and textures through existing optional packages. CPU: packages/mcp/tests/assets.test.js; reproducible real downloads: packages/mcp/tests/assets-prepare.mjs; both-backend rendered loading: packages/mcp/tests/assets-browser.mjs. This does not claim every variant is browser-decodable or compare speed.
+>>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)

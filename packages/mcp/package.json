@@ -24,11 +24,31 @@
   "sideEffects": false,
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/inspector": "^1.0.0"
+    "@margoengine/inspector": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
+    "@margoengine/environment": "^1.0.0"
   },
   "peerDependenciesMeta": {
-    "@margoengine/core": { "optional": true },
-    "@margoengine/inspector": { "optional": true }
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/inspector": {
+      "optional": true
+    },
+    "@margoengine/loaders": {
+      "optional": true
+    },
+    "@margoengine/gltf-pro": {
+      "optional": true
+    },
+    "@margoengine/materials": {
+      "optional": true
+    },
+    "@margoengine/environment": {
+      "optional": true
+    }
   },
   "bin": {
     "margoengine-mcp": "./bin/margoengine-mcp.js"
@@ -61,6 +81,14 @@
     "./resources": {
       "types": "./dist/resources.d.ts",
       "import": "./dist/resources.js"
+    },
+    "./assets": {
+      "types": "./dist/assets.d.ts",
+      "import": "./dist/assets.js"
+    },
+    "./assets-page": {
+      "types": "./dist/assets-page.d.ts",
+      "import": "./dist/assets-page.js"
     }
   },
   "files": [

@@ -183,6 +183,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/xr: document xr/ar-extra session negotiation, DOM overlay root ownership, current/legacy image targets, copied observations, mesh visualization and persistent anchor lifetime/abort cleanup.
 
 
+
+
 - @margoengine/ecs (batch 249 job 2): RelationQuery exact/wildcard terms, source filters, returned target ids/rows, products and mutation semantics.
 - margoengine (batch 249 job 2): generated ecs/relation-query alias.
 
@@ -267,3 +269,12 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 # Batch 204 exporters
 
 - `@margoengine/exporters/optimize-extra`: document independent resample, prune and static sibling instancing passes, defaults, conservative extension retention and abort handling.
+
+
+- @margoengine/wfc: document /assemble loaded glTF templates, variants, default placement, template visibility, shared-resource ownership, cleanup and limits (batch 237 job 1).
+- margoengine: document generated wfc/assemble alias and pre-existing audio/voices and xr/hands aliases (batch 237 job 1).
+=======
+
+- @margoengine/mcp: document assets library/search/variant/download/wire tools, manifests, provider limits, assets-page installer, public URL/material targets and disposal (batch 267 job 2).
+- margoengine: document generated mcp/assets and mcp/assets-page aliases (batch 267 job 2).
+>>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)

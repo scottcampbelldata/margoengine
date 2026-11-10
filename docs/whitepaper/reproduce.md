@@ -2803,6 +2803,13 @@ Run `npm run measure:size` for the unchanged 25000 B core/stage limit.
 - Stats panels: build packages; run `node --test packages/stats/test/panels.test.js packages/stats/test/panel-gpu.test.js packages/stats/test/scene-owner.test.js`. Run the shared-lock Stats parity script above on the native GPU. It requests timestamp-query, renders 48 frames per backend, checks four histories and named compute/post pass samples, and saves test-results/stats-panels-hardware.png for visual inspection. Durations are observations only; there are no speed thresholds.
 
 
+## Batch 237 assembly
+Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch237 --max=5 --wait-max=60 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
+=======
+
+
+
+
 Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-query.test.js after building packages; original synthetic tuple/lifecycle fixtures.
 
 
@@ -2853,3 +2860,6 @@ Batch 220 job 1: build packages, then node --test --test-timeout=120000 packages
 # Batch 204 exporter optimization
 
 After building packages, run `node --test --test-timeout=90000 packages/exporters/tests/optimize-extra.test.js` for deterministic key, resource and instance counts, geometry from the existing Khronos Box fixture, and Khronos validator checks. The exporters browser suite runs through the shared GPU lock; `MARGO_COMPAT=1` selects its WebGL2 compatibility path. `packages/exporters/tests/capture-browser.mjs` accepts the same compatibility flag. No wall-clock benchmark is part of this evidence.
+
+Batch 267 job 2: run node --test --test-timeout=90000 packages/mcp/tests/assets.test.js. Run node packages/mcp/tests/assets-prepare.mjs outside any GPU lock (downloads real CC0 metadata and data, stores licence manifests). Then node scripts/gpu-lock.mjs run --owner=assets-proof --max=5 --wait-max=60 -- node packages/mcp/tests/assets-browser.mjs. Fixtures cover Khronos Triangle, Poly Haven WoodenTable_02, venice_sunset HDRI and aerial_rocks_04 texture, plus the current ambientCG bricks result/zip. The saved fixtures.json records exact selected ids/variants and hashes; files are served locally for GPU checks.
+>>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)

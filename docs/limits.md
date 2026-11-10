@@ -4210,3 +4210,19 @@ Batch 220 job 1 size: math/compat 0 to 9929 B min+gzip, ceiling 10227 B. The ent
 # Batch 204 optional exporter optimization
 
 `@margoengine/exporters/optimize-extra` is a separate optional entry, 6,214 B minified gzip (new entry, previously absent; size ceiling 6,470 B). Core and stage sources are unchanged. It removes keys only when the stored Float32 LINEAR trajectory agrees, preserves STEP transitions and leaves CUBICSPLINE channels unchanged. Static mesh batches use `EXT_mesh_gpu_instancing` (required), default minimum two, grouped by parent and reflection sign. Animated, skinned, morphed, metadata-bearing and shared multi-scene nodes are retained. Empty transform leaves are pruned; hierarchy with remaining children is retained. Unknown index-bearing extensions disable index compaction and instancing conservatively. Application-specific extension rewriting is outside this pass. Inputs use the existing GLB reader's accessor validation and resource rules; cancellation is checked between samplers and batches. No speed claim is made.
+
+
+## WFC grid assembly (batch 237)
+Optional wfc/assemble places up to 1,000,000 X-fast cells. Loaded glTF/glTF-pro templates remain caller-owned; static primitive ancestry, local TRS, shared materials and geometry, visibility and shadow flags are retained. Orthogonal 3x3 orientations include all socket cube rotations and reflections; spacing is positive and defaults to unit, origin to zero. No skin/morph animation cloning or glTF extension-specific runtime controllers. Mesh-store capacity and hierarchy limits still apply; allocation, invalid placement and cancellation roll back created handles. Hidden source roots produce hidden cloned roots; set clone visibility when using hidden templates. CPU transforms are float32 in core.
+Entry size: wfc/assemble 1,465 B min+gzip (new entry, previous 0 B); ceiling 1,721 B. Core + stage root remains 23,950 B. The entry owns placement and resource cleanup, with no runtime loader dependency.
+=======
+
+
+
+| Optional entry | Limits (batch 267 job 2) |
+| --- | --- |
+| `@margoengine/mcp/assets` | Poly Haven, ambientCG v3, Khronos CC0-only samples. Ten results per provider by default (1 to 25); offset nonnegative; query at most 500 characters. Khronos examines up to four times the requested page size for legal verification. Metadata 16 MiB, whole operation 120 s, downloads plus unpacked data 256 MiB by default; ZIP at most 1000 entries with loaders/common CRC/expansion validation. Five validated HTTPS redirects; no unknown destination hosts. Search must precede variant/download. Each new directory carries source, credit, licence, original URL and SHA-256 file inventory. |
+| `@margoengine/mcp/assets-page` | Models wire glTF/GLB, HDRIs use environment decoders, ordinary textures bind to a named Material target and supported map slot. publicUrl must serve the configured download directory. Choose compatible variants; native DCC source files remain downloads. The installer replaces its own environment, owns its installed resources, and restores prior texture bindings on disposal. Production app loaders can supply their own live addAsset callback. |
+
+Batch 267 job 2 sizes: mcp/assets new 4409 B gzip, ceiling 4665 B; mcp/assets-page new 1035 B, ceiling 1291 B. Catalogue/download integrity and complete dependency wiring remain cohesive optional entries. Core plus stage unchanged at 23950 B.
+>>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)

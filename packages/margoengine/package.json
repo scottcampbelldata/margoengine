@@ -1930,6 +1930,14 @@
       "types": "./dist/mcp/resources.d.ts",
       "import": "./dist/mcp/resources.js"
     },
+    "./mcp/assets": {
+      "types": "./dist/mcp/assets.d.ts",
+      "import": "./dist/mcp/assets.js"
+    },
+    "./mcp/assets-page": {
+      "types": "./dist/mcp/assets-page.d.ts",
+      "import": "./dist/mcp/assets-page.js"
+    },
     "./mesh-edit": {
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"
