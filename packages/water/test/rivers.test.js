@@ -111,3 +111,16 @@ test('a source narrower than a cell feeds the one cell under it', () => {
   riverStep(m, 1 / 240, [{ position: [-50, 4], discharge: 6 }]);
   assert.ok(m.depth.every((d) => d === 0));
 });
+
+test('the inflow footprint uses the CPU cell size, never a GPU division of the coast size', () => {
+  // On the Radeon 680M, coast.zw / size gave 24 / 24 one f32 step under 1, and a source whose edge lies on a cell
+  // boundary (9.5 m - 1 m = 8.5 m, so ceil(8.5 / cell - 0.5)) then fed one column fewer: 0.27 m off the model after
+  // 1920 substeps (rivers.browser.mjs). frame.flow.yz is the cell the pipes and the model use, rounded once on the CPU.
+  const water = new Water(),
+    rivers = Rivers.attach(water, { sources: source }),
+    code = rivers.kernels.integrate;
+  assert.match(code, /let cell=frame\.flow\.yz;/);
+  assert.doesNotMatch(code, /frame\.coast\.zw\/vec2f\(size\)/);
+  rivers.dispose();
+  water.dispose();
+});

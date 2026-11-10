@@ -52,10 +52,13 @@ const flowShader = (ratio: number, froude: number) =>
  let outgoing=(q.x+q.y)/frame.flow.y+(q.z+q.w)/frame.flow.z;
  q*=min(1.0,v.x/max(0.000001,dt*outgoing));textureStore(next,p,q);
 }`;
+// The footprint's cell size is the CPU's (frame.flow.yz, the pipes' lengths), not coast.zw / size on the GPU: WGSL
+// division may be 2.5 ulp off, and on the Radeon 680M 24 m / 24 cells came out one step under 1, which moved a
+// source edge that lies exactly on a cell boundary (9.5 m - 1 m = 8.5 m) by a whole cell (list 5 R6 row 23).
 const inflow = `
 @group(0) @binding(5) var<uniform> sources:array<vec4f,${MAX_SOURCES + 1}>;
 fn inflow(p:vec2i,size:vec2i)->f32 {
- let cell=frame.coast.zw/vec2f(size);var rate=0.0;
+ let cell=frame.flow.yz;var rate=0.0;
  for(var i=0u;i<u32(sources[0].x);i++){let s=sources[i+1u];
   let c=floor((s.xy-frame.coast.xy)/cell);
   let lo=max(min(ceil((s.xy-s.w-frame.coast.xy)/cell-0.5),c),vec2f(0));let hi=min(max(floor((s.xy+s.w-frame.coast.xy)/cell-0.5),c),vec2f(size-1));
