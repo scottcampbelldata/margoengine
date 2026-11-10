@@ -4450,7 +4450,7 @@ The same incoming metadata merge reset28 approved size ceilings while leaving th
 
 Batch 267 job 3: no open HTTP transport defect found in the real-network correctness suite; supported revisions, JSON reply mode and deployment ownership are stated in docs/limits.md.
 
-Build-phase follow-up outside batch 267 HTTP: direct stdio/createMcpServer calls with concurrent tools/call messages reusing one id overwrite the running cancellation map, and the first finalizer can delete the second entry. Repro: send two pending calls with id 7, then notifications/cancelled for id 7. Cause: server.ts running.set/delete has no duplicate ownership check. HTTP legacy now rejects duplicate active ids before dispatch; direct/stdin ownership repair is deferred under lane rule 21.
+Fixed 2026-11-10: direct MCP duplicate active tool IDs. createMcpServer now rejects a duplicate active tools/call ID with the standard invalid-request protocol error before invoking the tool or replacing the original cancellation controller. Completion removes only its own controller. Direct and batch regressions in packages/mcp/tests/server.test.js fail on the parent, preserve numeric/string ID distinction and prove cancellation still reaches the original request. Stdio uses that same server handler; completed-ID behavior and HTTP transport are unchanged.
 
 Fixed 2026-11-10: Outside batch 267. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 Fixed 2026-11-10: Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8. notice regeneration preserves appended asset credits (a9aecea66). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
@@ -4511,7 +4511,7 @@ No open defect found in the requested row. Unrepresentable local shear is an exp
 ### Batch 226 clone
 No open defect found in the requested shared-geometry/material subtree-copy row. Plugin, animation and constraints remain owned by their packages and are outside mesh cloning.
 
-Outside batch 239: an extra forced-compat run of scripts/gltf-pro-materials-gpu-check.js exceeds the WebGL2 fragment texture-unit limit in the extended material plus all lighting composition. Native official material checks pass; the changed feature shader passes both backends. Cause: this worst-case combined resource plan needs more fragment textures than the compatibility adapter exposes. Track a capability-aware resource plan in the owning rendering packages during the fix phase.
+Fixed 2026-11-10: Outside batch 239 physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 ### Batch273 normal-map upload and blocking isolation: resolved
 ImageBitmap uploads ignored requested unpack flip/alpha settings at the WebGL boundary, making flipped mesh normal domes appear dented while unflipped glTF remained raised. Cropped drawable-source normalization fixes the owning upload path. The complete canonical native/compatibility normal-map matrix and round-trip exact images pass unchanged; external-image.test.js fails the parent.
@@ -4627,7 +4627,7 @@ depth masking. The visual approximations are listed in docs/limits.md.
 - Batch 213 MToon integration: an alpha-cutout shadow caster with a spatially varying UV animation mask uses the static alpha UV while beauty moves; optional shadow sampling does not receive the material's mask/time bindings. Beauty, normals, emission and hull animation are built; shadow integration is a fix-phase follow-up.
 
 - Existing gltf-pro GPU driver: test-extensions-browser.js reads argv[2] as a name filter, so --compat selects zero checks. Use MARGO_COMPAT=1 with no filter for the full compatibility run; driver repair waits for the fix phase.
-- Existing physical-material compatibility limit: scripts/gltf-pro-materials-gpu-check.js rejects the two 16-texture worst-case composed pipelines on RTX A6000 with MAX_TEXTURE_IMAGE_UNITS(16); all 160 BRDF numeric cases match and native pipelines pass. The direct shader fixture never attaches MToon; its shader/composition inputs are identical to parent 0d80e463b (hash proof in whitepaper/results/batch213-physical-compat-existing-failure.json). WebGL2 sampler-layout integration waits for the fix phase; no assertion or tolerance changed.
+Fixed 2026-11-10: Existing physical-material compatibility limit physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 Batch 246 job 3: no open plane-rendering defect found by the matrix, depth and real-GPU ray-plane checks. Existing cross-lane browser-inventory findings remain listed above.
 
@@ -4831,7 +4831,7 @@ Batch 222 job 3 fixed atlas sequence aliasing: registering a static imposter and
 Batch 222 job 3 gate repair: the inherited API summary omitted pixel/follow and retained an older package/export count. Full api:update regenerated the summary from current declarations; api:check now passes. No unrelated implementation changed, and the existing generated-report check catches recurrence.
 Batch 222 job 3 outline fixture repair: a cold compatibility compute import can hold submitted selection work while a synchronous capture sees a blank canvas (including the unchanged mesh outline). CompatQueue.hold/drain correctly orders that work. The fixture now awaits queue.onSubmittedWorkDone for each state, then renders/captures in one task; all original outline pixel assertions remain. This fixes test synchronization, without changing rendering or shutdown support.
 
-Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The extra physical-composition compatibility run reproduces the already recorded 16 texture units limit when all material maps, shadows, clustered storage and IBL are composed. The new spec/gloss fixture uses neither this worst-case composition nor additional sampler bindings; the existing source fixture is unchanged and its owning compatibility follow-up remains under rule 21.
+Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. Fixed 2026-11-10: the inherited full physical-composition compatibility sampler limit was repaired by aa3e347da; its unchanged 160-case BRDF and complete-lighting pipeline check now passes with no GPU/page errors. The spec/gloss implementation and its assertions are unchanged.
 
 
 
@@ -4875,7 +4875,7 @@ The post/compute graph editor gap is built in shader/editor-pass. No open defect
 
 - Batch 193 job 2: no open defect found in Grade/HueGrade cube export. Finite-grid interpolation and display-linear domain are documented limits; spatial and other Tonemap effects are outside the exported Grade.
 
-Batch 194 job 3 reobserved the existing physical-composition compatibility limit above: the extra MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js run fails the extended/transmissive plus all-lighting pipelines at MAX_TEXTURE_IMAGE_UNITS(16). The direct shader fixture, gltf-pro/src/shader.ts, shared/pbr-hooks.js and compatibility GLSL emitter are text-identical after line-ending normalization to this job's parent; it never calls PBRModel.draw or installs a material adapter. Primary cause and fix-phase owner remain the already recorded sampler-layout/resource plan; new model hatching and the material-layer draw regression pass both backends. No test or limit changed.
+Fixed 2026-11-10: Batch 194 job 3 reobserved physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 
 

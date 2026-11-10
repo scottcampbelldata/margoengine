@@ -3938,6 +3938,13 @@ the audio graph. Disposing an old handle again leaves a replacement registration
 owned. Regression: packages/audio/tests/voice-manager.test.js. Public signatures,
 voice budgets, ranking and valid-input waveform references are unchanged.
 
+## Direct MCP active request IDs (2026-11-10)
+The direct server, including stdio, rejects a duplicate active tools/call ID with
+JSON-RPC invalid request (-32600) before another tool invocation. The first
+request retains its cancellation signal until completion; numeric and string IDs
+remain distinct. Completed-ID handling and transport-level session policies are
+unchanged. Regression: packages/mcp/tests/server.test.js.
+
 ## Behavior tree text (batch 251)
 
 `parseTreeText` infers `TreeDocument` only when its options exclude subtree

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PROTOCOL_VERSIONS, RPC, VERSION, createMcpServer } from '../dist/index.js';
+import { PROTOCOL_VERSIONS, RPC, VERSION, createMcpServer, serveStdio } from '../dist/index.js';
 import { readFileSync } from 'node:fs';
+import { once } from 'node:events';
+import { createInterface } from 'node:readline';
+import { PassThrough } from 'node:stream';
 
 const echo = {
   name: 'echo',
@@ -32,6 +35,122 @@ const broken = {
   },
 };
 const request = (id, method, params) => ({ jsonrpc: '2.0', id, method, ...(params ? { params } : {}) });
+
+test('a duplicate active tool id rejects without replacing the original cancellation owner', {
+  timeout: 10000,
+}, async () => {
+  const calls = [];
+  const server = createMcpServer({
+    tools: [
+      {
+        ...slow,
+        run: (_args, { signal }) =>
+          new Promise((resolve) => {
+            calls.push({ signal, resolve });
+            signal.addEventListener('abort', () => resolve({ content: [{ type: 'text', text: 'cancelled' }] }), {
+              once: true,
+            });
+          }),
+      },
+    ],
+  });
+  const pending = [];
+  try {
+    pending.push(server.handle(request(7, 'tools/call', { name: 'slow' })));
+    const duplicate = server.handle(request(7, 'tools/call', { name: 'slow' }));
+    pending.push(duplicate);
+    assert.equal(calls.length, 1, 'a duplicate must not invoke the tool or overwrite its controller');
+    const rejected = await duplicate;
+    assert.equal(rejected.id, 7);
+    assert.equal(rejected.error.code, RPC.invalidRequest);
+    await server.handle({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 7 } });
+    assert.equal(calls[0].signal.aborted, true);
+    assert.equal((await pending[0]).result.content[0].text, 'cancelled');
+  } finally {
+    server.dispose();
+    await Promise.allSettled(pending);
+  }
+});
+
+test('batch duplicate ids preserve cancellation and numeric/string ids remain distinct', {
+  timeout: 10000,
+}, async () => {
+  const calls = [];
+  const server = createMcpServer({
+    tools: [
+      {
+        ...slow,
+        run: (_args, { signal }) =>
+          new Promise((resolve) => {
+            calls.push({ signal, resolve });
+            signal.addEventListener('abort', () => resolve({ content: [{ type: 'text', text: 'cancelled' }] }), {
+              once: true,
+            });
+          }),
+      },
+    ],
+  });
+  const pending = server.handle([
+    request(7, 'tools/call', { name: 'slow' }),
+    request(7, 'tools/call', { name: 'slow' }),
+    request('7', 'tools/call', { name: 'slow' }),
+  ]);
+  try {
+    assert.equal(calls.length, 2);
+    await server.handle({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 7 } });
+    assert.equal(calls[0].signal.aborted, true);
+    assert.equal(calls[1].signal.aborted, false);
+    calls[1].resolve({ content: [{ type: 'text', text: 'string id' }] });
+    const answers = await pending;
+    assert.equal(answers[0].result.content[0].text, 'cancelled');
+    assert.equal(answers[1].error.code, RPC.invalidRequest);
+    assert.equal(answers[2].result.content[0].text, 'string id');
+  } finally {
+    server.dispose();
+    await pending;
+  }
+});
+
+test('stdio rejects a duplicate without losing cancellation of the original call', { timeout: 10000 }, async () => {
+  let calls = 0;
+  const server = createMcpServer({
+    tools: [
+      {
+        ...slow,
+        run: (_args, { signal }) =>
+          new Promise((resolve) => {
+            calls++;
+            signal.addEventListener('abort', () => resolve({ content: [{ type: 'text', text: 'cancelled' }] }), {
+              once: true,
+            });
+          }),
+      },
+    ],
+  });
+  const input = new PassThrough(),
+    output = new PassThrough();
+  const lines = createInterface({ input: output });
+  const serving = serveStdio(server, { input, output });
+  try {
+    const duplicate = once(lines, 'line');
+    const message = JSON.stringify(request(7, 'tools/call', { name: 'slow' })) + '\n';
+    input.write(message + message);
+    assert.equal(JSON.parse((await duplicate)[0]).error.code, RPC.invalidRequest);
+    assert.equal(calls, 1);
+    const original = once(lines, 'line');
+    input.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 7 } }) + '\n');
+    assert.equal(JSON.parse((await original)[0]).result.content[0].text, 'cancelled');
+    input.end();
+    await serving;
+  } finally {
+    server.dispose();
+    input.end();
+    await serving;
+    lines.close();
+    input.destroy();
+    output.destroy();
+  }
+});
 
 test('the version matches the manifest', () => {
   assert.equal(VERSION, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);

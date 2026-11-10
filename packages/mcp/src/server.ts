@@ -251,6 +251,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           },
         };
       case 'tools/call': {
+        if (running.has(id)) return rpcError(id, RPC.invalidRequest, 'Request id is already active in this session');
         const tool = typeof params.name === 'string' ? tools.get(params.name) : undefined;
         if (!tool) return rpcError(id, RPC.invalidParams, `Unknown tool: ${String(params.name)}`);
         if (params.arguments !== undefined && !isRecord(params.arguments))
@@ -266,7 +267,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           // A tool failure is a result the model can read (isError), not a protocol error.
           return { jsonrpc: '2.0', id, result: failure(error) as unknown as Json };
         } finally {
-          running.delete(id);
+          if (running.get(id) === controller) running.delete(id);
           lifetime.signal.removeEventListener('abort', abort);
         }
       }
