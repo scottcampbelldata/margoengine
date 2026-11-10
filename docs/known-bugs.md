@@ -55,9 +55,12 @@ Initialize the timer before notifying peers and stop recovery work once authorit
 is ready. The synchronous-transport case in packages/netcode/tests/migrate.test.js
 fails before the change and stays ready past the deadline afterward.
 
-### Batch 258 image checks
+### Fixed: Batch 258 image checks
 
 Fixed within the image job: four-value slice arrays previously remained aliased after validation; defensive copies now cover construction, assignment and reads. Lazy creation of an unused SDF atlas placeholder changed generation after the upload key was captured, causing one redundant image-only second-frame upload. Both WebGPU and GL now retain the post-binding generation. image.test.js and image-browser.mjs preserve the regressions. No other UI defect is being repaired in this build job.
+
+Lane A sweep: the fixes are already on main in 12701037e. The unchanged image
+and text-input CPU regressions pass on current main; no README example was run.
 
 ### Batch 258 text fields
 
@@ -218,6 +221,12 @@ receipts remain available. Final missing-target/public-API memory acceptance
 remains open and the prebuilt decoder remains retained.
 
 ### Open: batch 134 BC1/BC3 source quality and remaining targets
+
+Lane A current-main audit, 2026-11-10: the default decoder and native Draco
+regressions pass 28 tests. Production still retains the prebuilt decoders;
+the replacement quality/target gaps below remain build work and are not a
+reproduced failure of that default API. ETC2/EAC hardware proof is excluded
+from this NVIDIA sweep. No private replacement draft was landed.
 
 The private discrete cluster-fit draft passes71 native tests before owned-range
 addition (72 afterward), and87/98 original-source BC1/BC3 pairs (1296 images,
@@ -428,7 +437,13 @@ gate retaining its existing five known failures and no new failure.
 - Fixed root glass: the interior inverse Snell candidates could offer the same unchanged direction through several face normals, adding their full light estimates while the path used one MIS share. A canonical box-exit face now offers that direction once, with the existing direction-equality predicate. The root glassfurnace GPU case rejects the old 1.03826 result and covers IOR 1, 1.000001, 1.0001 and 1.5 against analytic equilibrium.
 - Fixed spectral: wavelength-independent contributions now stay RGB on one path. Importance-sample a hero only at the first dispersive glass interface or active chromatic lens. The spectral GPU suite rejects the old 1.578737 channel spread and requires exactly zero spread and exact root equality at 1 and 64 spp; analytic radiance, lens and restoration bounds are unchanged.
 - Fixed composition transport: /compose selects all 32 subsets of five shared transforms with media conversion and atomic mesh storage. CPU, retained native transport/AOV proofs and the failed-only WebGL2/Vulkan continuation pass. Compatibility finishes within the unchanged 12-minute lease; the old uninstrumented timeout has no attributable phase. Triangle emitters and mesh deflectors remain part of full-scene work. Evidence: whitepaper/results/review-99-compose-20261109.json.
-- Full-scene meshes: missing UV textures, smooth normals, shared geometry instance transforms and emissive-triangle light sampling; zero-area triangles reject an entire scene and the BVH uses spatial medians. Real scene import needs each of these addressed, including SAH construction.
+- Resolved full-scene mesh source gaps: 5225908a6 supplies retained normal/UV
+  attributes, shared affine BLAS instances and degenerate-triangle accounting;
+  6e8863845 supplies PBR channels and glTF snapshots; b163daf9e supplies mesh
+  emitter sampling and the newer mesh builder. The lane A sweep passes all 26
+  unchanged attribute/build/instance/PBR/light CPU regressions. These replace
+  the old missing-API allegation; independent full-scene transport, guiding and
+  many-light GPU evidence below remain separate requirements. No speed claim.
 - Guiding evidence: guiding.html renders its convergence reference with the guided estimator itself and uses absolute bounds for dim scenes. Use an independent root/analytic reference and justified relative bounds.
 - Many-light evidence: restir.html covers diffuse receivers and absorption only. Rough metal, coat and scattering-media vertices need root-reference comparisons with relative bounds.
 - Reuse naming: /restir implements per-pixel RIS without spatial or temporal reuse. Implement reuse or rename the entry and documentation; retain the equal-cost work-count question without timing runs during the build phase.
@@ -552,10 +567,18 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   at 4x and 1x. No assertion or tolerance changed. Durable receipt:
   whitepaper/results/batch-273-stencil-checkpoint.json. Remaining batch failures
   are still open; this does not establish whole-package parity.
-- `materials/test:gpu:wireframe` reports
-  mirrored/reference pixel hashes and duplicate-edge alpha differences, and
-  `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
-  rasterization/orientation divergences still need numeric root-cause proof.
+- `materials/test:gpu:wireframe`: the current-main compatibility sweep passes
+  all 249 checks and 60 captures. A second control using the bitmap upload from
+  before c06603fef also passes, excluding that repair as its explanation.
+  The earlier mirrored/reference and duplicate-edge failure is not reproduced;
+  its precise fixing change remains unidentified, so it is not claimed closed.
+- Resolved `materials/test:gpu:normal-map` by c06603fef (bitmap orientation).
+  The unchanged complete compatibility suite passes, including derived,
+  authored/mirrored frames, lobes and export round trips. Replacing only the
+  bitmap upload with its pre-fix implementation reproduces the original dent:
+  mesh dome top/bottom 96/222, versus corrected 222/99. Constant tilt remains
+  221/75 in both controls. Current source and build were restored afterward;
+  no normal-map shader, image, threshold or assertion was changed.
 
 - Fixed `react/test:browser` XR preparation: the supported compatibility XR
   route is installed by the fixture; its complete canonical compatibility suite
@@ -577,6 +600,12 @@ passes. The following additional failures remain with batch 273:
 - `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
   prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
   The awaited operation after that marker remains unisolated.
+  Current-main sweep: the unchanged models command now finishes inside the
+  original 60 s body lease, including both 600-pixel perspective/orthographic
+  grids (600/600 agreement), silhouettes, outlines and occlusion. The loop
+  immediately after the old marker is the perspective pick/Raycaster grid.
+  Main's 48ac02963 readback/task-polling repair covers mapping progress; the
+  old hang is no longer reproduced. This does not waive a future timeout.
 - Resolved failure 18, shader readback: compatibility compute pipelines did not
   enforce advertised binding limits. Resource counts now reject overflow before
   either compute route runs; asynchronous pipeline errors also avoid assigning
@@ -585,9 +614,21 @@ passes. The following additional failures remain with batch 273:
 - `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
   4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
   those timing values are not accepted evidence during the build phase.
+  Current sweep: weather, volumetric, cloud-shadows, aerial and shafts now pass
+  at both sample counts before the unchanged 98 s investigation lease ends.
+  A second disjoint run passes the unfinished weather-fx, sleet, astro,
+  hillaire, albedo and presets at both sample counts, with teardown. All 22
+  feature groups have unchanged passing value assertions; no permanently
+  stalled await was found. The monolithic command's 98 s investigation limit
+  still expires and is not raised or claimed passed. Frame timings remain
+  diagnostics, not speed acceptance.
 - `splats/test:gpu`: all GPU checks print success, then the command does not exit
   before its 62 s body bound. This is not a passing suite. Cleanup remains with
   the dedicated teardown owner; no teardown repair is attempted in this lane.
+  Current-main sweep: the unchanged complete compatibility command passes and
+  exits with the 919fdc09e host teardown mechanism already on main. The recorded
+  command duration includes GPU queue contention; it is not a body-time speed
+  claim. No browser/shutdown code or teardown bound changed in this sweep.
 - Resolved reference selection for failures 21 and 25: the outer forced shim
   replaced the native baseline in seven comparison drivers. Each now opts out
   of that shim and retains its own backend selection. All seven setup
@@ -679,6 +720,13 @@ WideAngle and WideAngleCube, and missing detachment in NodePass (dispose dropped
 its engine reference but left registration). Their owning-package repairs have
 per-class inert-GPU regressions and a cross-package joinStack source guard.
 Physical GPU/README gates and the wider non-PostStack lifecycle audit remain open.
+
+Lane A sweep: all 95 existing scene-owner regressions pass across post, DOF,
+tonemap, creative, cinematic, shader and terrain. The concrete disposal causes
+above are already repaired in 257c0aaf6, 542bca326, daa740e55, 05f35486c,
+02fd42e4c, 6eb490883 and 7239d8752. The broader candidate inventory remains
+unclassified; no full-package GPU or manual lifecycle certification is inferred
+from these CPU results. README work stays deferred.
 
 ### Batch 56 review repair audit
 
@@ -958,6 +1006,12 @@ whitepaper/results/readme-node-basis-20261109.json.
 
 ### Open: batch 133 default replacement remains incomplete
 
+Lane A current-main audit: the default and native regression command passes
+28 tests; draco.ts still selects the prebuilt wrapper/Wasm. The missing
+specification-derived rules below remain an open replacement build, with the
+existing crafted-input black-box authorization. A passing default decoder
+does not complete or waive any replacement rule, corpus or quality bar.
+
 This is a replacement prerequisite, not a newly observed failure of the shipped decoder.
 Reproduce the source gap by following the published specification's connectivity
 dispatch for header encoder type 0, or its attribute decoder for generic,
@@ -994,6 +1048,11 @@ prediction, KD and memory regressions through `verify` and `check:merge`, with
 hard process-tree limits and no skip when Cargo is unavailable.
 
 ### Open: batch 134 Basis replacement remains unverified
+
+Lane A current-main audit: the retained default codec route passes its CPU
+regressions as part of the 28-test decoder/native run. This establishes no
+replacement identity, quality equivalence, fuzz, memory or GPU acceptance;
+those build prerequisites below remain open. No timing was measured or reused.
 
 Scott's ruling dated 2026-11-10 resolves the earlier byte-choice prerequisite:
 require identical output where specified and per-file quality no worse than the
@@ -1259,6 +1318,15 @@ The byte ceilings above are approved; all normal checks are required before push
 - **Needed to close:** save both pictures, find the pixels and which pass writes them, and fix it in the package that
   owns that pass.
 
+Lane A bounded sweep: the unchanged real-file command reproduces a maximum
+four-level repeat difference. A second focused capture saves every sorted
+pair at eight angles: 4x differs at 180 degrees (5 pixels, maximum 1) and 270
+degrees (31 pixels, maximum 4); every 1x pair is exact. One changed pixel is
+(185,250), RGB [42,42,23] versus [44,43,27]. The two affected regions are now
+localized, but the writing pass and deeper cause remain unisolated. No driver
+waiver or numerical tolerance applies. Private lane evidence: oit-focused
+PNGs/log; native WebGPU, RTX A6000, Edge 157.0.4341.42.
+
 ### A blurred edge of DOF spreads to one side only
 
 - **What:** a card out of focus in `@margoengine/dof` should spread across its outline, half inside and half outside. A far card
@@ -1269,6 +1337,17 @@ The byte ceilings above are approved; all normal checks are required before push
   behind a far card takes nothing from the card. The near gather always counts the foreground centre, at full weight.
 - **Needed to close:** decide from the published work on gather depth of field how a pixel behind a blurred edge takes its share
   without a sharp subject leaking onto its background, build it in `@margoengine/dof` and test the edge profile on the GPU.
+
+Lane A sweep reproduces the original card profiles on current main, with no
+GPU errors. At far-card x=464 with near focus, the green row jumps directly
+20 -> 154 -> 164 -> 173: background pixels receive no far-card contribution.
+With far focus, the near-card x=244 reaches 147 immediately before 208 and
+stays full-strength inside. Source audit confirms the far depth predicate and
+forced full near coverage still own these two asymmetries. A correction needs
+source-footprint coverage and a distinct background estimate at silhouettes;
+simply removing the depth predicate would not establish sharp-foreground
+occlusion. Compared Demers (2004), Hammon (2007) and Potmesil/Chakravarty (1981),
+cited in clean-room.md. No speculative shader or weaker edge bar was landed.
 
 ## README examples
 

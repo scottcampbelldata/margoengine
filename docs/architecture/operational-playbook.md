@@ -7035,6 +7035,22 @@ Native and compatibility voxel bevel checks retain their complete sample/layer,
 map, view, lightmap and restoration work. This is compiler-wait correctness,
 not a speed measurement. No browser shutdown owner, engine or package API changes.
 
+### Section 5 evidence: lane A known-bugs sweep
+
+The c06603fef bitmap orientation repair is isolated by an expected-red old-upload
+control: the unchanged normal-map GPU suite sees dome top/bottom 96/222 before
+and 222/99 afterward. Constant tilt remains 221/75. All source/build bytes are
+restored after the diagnostic. Compatibility selection completes both unchanged
+600-pixel grids, splats completes teardown, wireframe passes 249 checks and
+back-side materials passes 840 checks/256 captures. Ninety-five current scene-owner
+CPU regressions and 26 mesh attribute/build/instance/PBR/light regressions pass.
+These are scoped correctness results. The transformed low-alpha bitmap, BC7
+sRGB views, OIT repeat difference and DOF silhouettes remain open with their
+reproductions; the two disjoint sky runs cover all 22 feature groups but do not
+claim the monolithic 98-second investigation deadline passed. No new engine
+feature, speed result, README example or browser shutdown change is part of this
+tracker reconciliation. Remaining unclassified owners and proof gaps stay open.
+
 ### Section 5 evidence: batch 176 molecule impostors
 The optional sciviz/molecule entry owns the sphere/capped-cylinder pipelines, conservative projected-box quads, perspective/orthographic data-space ray reconstruction, inverse-transpose normals and reversed-Z fragment depth. Core and stage are unchanged. A molecule is one six-vertex instanced draw; CPU residue picking intersects the same analytic surfaces. Resource-failure unit tests cover every earlier allocation, disposal and snapshot ownership; device restore renders identical pixels. molecule-browser.mjs covers real CC0 1CRN modes, analytic roots (tangency, inside, caps, axial rays and misses), screen picking, same PDB/mmCIF pixels, and depth-order invariance on native WebGPU and compatibility WebGL2. GPU evidence concerns correctness, not a speed benchmark. Native WebGL2, crystal assembly expansion and optional ribbons remain outside this entry's supported contract.
 

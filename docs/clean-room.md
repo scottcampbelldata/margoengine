@@ -8348,6 +8348,33 @@ installation, then count the delayed render/compute promises. Timer callbacks ar
 controlled in the regression, so it tests settlement and identity without a speed
 budget. Native compile errors remain unchanged; no retry or fallback hides them.
 No other engine or companion implementation source was read or copied.
+
+## Lane A bounded rendering sweep (2026-11-10)
+
+Compared Joe Demers, Depth of Field: A Survey of Techniques (2004),
+https://developer.nvidia.com/gpugems/gpugems/part-iv-image-processing/chapter-23-depth-field-survey-techniques;
+Earl Hammon Jr., Practical Post-Process Depth of Field (2007),
+https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-28-practical-post-process-depth-field;
+and Michael Potmesil and Indranil Chakravarty, A Lens and Aperture Camera Model
+for Synthetic Image Generation (1981),
+https://ftp.bioeng.auckland.ac.nz/jtur044/references/virtual%20environments/p297-potmesil.pdf.
+Their lens-footprint and foreground/background coverage descriptions explain why
+the current centre-depth rejection and full near coverage do not reconstruct a
+blurred silhouette on both sides. A source-footprint gather also needs a distinct
+background estimate and sharp-foreground occlusion; deleting the depth test alone
+is not a demonstrated solution. No paper implementation or companion code was used.
+
+For normal maps, compared Khronos contributors, glTF 2.0 Specification (2021),
+https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html,
+with the WebGL bitmap orientation rules cited above. The controlled experiment
+replaces only Margo's bitmap upload with its own pre-c06603fef implementation:
+normal-map domes invert while constant tilt does not; restoring current Margo
+retains its already passing result. This proves the owning fix without changing
+normal-map maths, asset pixels or the existing +40 brightness assertion.
+Wireframe also passes the old-upload control, so that experiment does not attribute
+its previously reported failure to the bitmap repair. No external engine source
+was read or copied, and no performance comparison was run.
+
 ## Batch 176 job 6: molecules
 Written from public standards and papers, never other viewer code. IUCr, *CIF 1.1 file syntax* (2003), https://www.iucr.org/what-we-do/digital-standards/cif/cif1/file-syntax, and S. R. Hall, F. H. Allen and I. D. Brown, *The Crystallographic Information File (CIF): a new standard archive file for crystallography* (1991), https://doi.org/10.1107/S010876739101067X, define lexical quoting, semicolon fields, data names and loops. wwPDB, *Atomic Coordinate Entry Format 3.3* (2012), https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html, and *PDBx/mmCIF dictionary atom_site and struct_conn categories* (accessed 2026), https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Categories/atom_site.html and https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Categories/struct_conn.html, supply author/label identities, insertion codes, alternate/model selection and explicit connections. PDB parsing remains in loaders/pdb; mmCIF is an additive loaders/mmcif entry sharing the existing covalent-radius grid search, with residue metadata retained by both.
 Marco Tarini, Paolo Cignoni and Claudio Montani, *Ambient Occlusion and Edge Cueing to Enhance Real Time Molecular Visualization* (2006), https://doi.org/10.1109/TVCG.2006.115 (paper https://www.cgl.ucsf.edu/chimera/data/ambient-jul2014/Tarini_FinalVersionElec.pdf, section 3), compares tessellation with rectangular procedural sphere/cylinder impostors and motivates analytic depth and normals. Margo uses conservative projected data-space boxes, full-screen coverage when a box crosses the near plane, full perspective/orthographic ray intersections and closed cylinder caps. No ambient occlusion or edge-cueing implementation is claimed. Stable quadratic roots, axial cylinder bounds and cap-plane intersections are derived directly; CPU picking uses the same surfaces.
