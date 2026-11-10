@@ -3338,6 +3338,7 @@ Build packages, run node --test packages/cameras/test/*.test.js, then under the 
 
 ### Batch 231 instance attributes
 After build:packages run `node --test packages/scatter/test/attributes.test.js`, then in separate shared GPU runs `node packages/scatter/test/attributes.browser.mjs` and the same with `--compat`. The GPU matrix covers default colour, custom tint/translation, live edits, device restoration, multiple batches and 1x/4x MSAA against independent instances. Existing edges.browser.mjs covers the default fixed-instance renderer. No wall-clock assertion is used.
->>>>>>> d70b0d2eb (feat(scatter): add live per-instance colour and shader attributes)
 ### Batch 206 PreviewSurface
 Build packages, then node --test packages/usdz/tests/preview-surface.test.js packages/gltf-pro/tests/upload-image.test.js. Run scripts/modern-usdz-tests.js under the shared GPU lock, then --compat. The original generated PNG/USDZ fixture in packages/usdz/tests/preview-fixture.js checks 128/255 channel opacity, independent UV1, numeric storage interpolation, identical direct/worker renders and lifetime. gltf-pro texture checks run via scripts/gltf-texture-tests.js on both backends. No external demo asset.
+
+Job 0 conflict-marker reproduction: `node --test --test-timeout=120000 tests/hygiene-conflict-markers.test.js`, then `npm run hygiene`. The regression builds a worktree-local Git fixture containing tracked markers, safe near-matches, binary and LFS content; removing the scanner or hygiene invocation makes it fail. No GPU is used.

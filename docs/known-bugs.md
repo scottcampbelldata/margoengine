@@ -4598,7 +4598,7 @@ The VFX replay fixture recorded early frames on the CPU fallback while the lazy 
 ### Resolved: batch 200 meshless scene refusal
 The light loader rejected every model without a renderable primitive before sceneExtras.finish could expose cameras or lights. The optional scene-data entry now opts into empty scene acceptance through GLTFExtension.allowEmptyScene; strict root behaviour and malformed-file rollback remain. The two meshless tests in packages/gltf/test/scene-data.test.js fail on the parent and pass with this change.
 
-Batch 200 rebase finding: shared docs on origin/main 8ee384c7e retain nested merge markers from mixer/cutscene rebases (for example docs/clean-room.md, Batch 216 onward); cause is prior conflict markers retained during append resolution. Repro: search lines starting with seven <, = or > characters in the six shared docs. Preserve existing content here; owning lanes repair in the fix phase under rule 21.
+Resolved by Job 0 conflict-marker hygiene guard: shared docs on origin/main 8ee384c7e retain nested merge markers from mixer/cutscene rebases (for example docs/clean-room.md, Batch 216 onward); cause is prior conflict markers retained during append resolution. Repro: search lines starting with seven <, = or > characters in the six shared docs. All content lines from both sides are preserved; hygiene now rejects this class before landing.
 Batch 248 job 1: overflow/fit built with CPU and both-backend clipping coverage; no open defect identified in this job.
 
 - Batch 231 scope finding: `node packages/culling/test/gpu/meshes-occlusion-check.mjs --compat` fails its native Hi-Z draw-count assertion (1509/1509 behind the wall). Cause: existing CulledMeshes compatibility route intentionally performs frustum-only culling (`src/compat.ts`), separate from the new DepthPyramid API; software `culling/webgl2` is a separate API. New scatter/occlusion performs real Hi-Z on both backends. Deferred legacy parity per build-phase rule 21.
@@ -4636,3 +4636,4 @@ Batch 244 landing repair: the existing umbrella generated-file regression expose
 ### Batch 196 panorama
 
 No known open defect in the completed panorama entry; cancellation observes the pending map rejection before unmapping, covered by panorama-browser.mjs.
+Job 0 extra planner check on main 6081587c2: tests/check-merge-affected.test.js and tests/gpu-browser-registration.test.js fail before running because packages/weather/tests/parity-browser.mjs has no executable registration in the GPU plan. Cause: the new weather glTF browser driver was added without a test:gpu/test:browser script; owning weather lane follow-up under rule 21. Hygiene regression and affected tooling checks pass independently.
