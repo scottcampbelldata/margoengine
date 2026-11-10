@@ -493,8 +493,10 @@ export class Animation implements EnginePlugin {
     this.warnings = warnings;
   }
   static attach(model: PBRModel, options: AnimationOptions = {}): Animation {
-    const animation = new Animation(model, options);
-    model.root.engine.use(animation);
+    const animation = new Animation(model, options),
+      engine = model.root.engine;
+    // Into the model's scene: the deform pass runs only in the frame graph of the scene that draws the model.
+    engine.use(animation, engine.sceneOf(model) ?? model.root.scene);
     return animation;
   }
   private validate(): void {
