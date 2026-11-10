@@ -60,6 +60,8 @@ export class Timeline {
   private end = 0;
   private position = 0;
   private direction = 1;
+  /** Yoyo leg: -1 on a backward pass. Kept apart from direction so a replay starts the way reverse() set. */
+  private leg = 1;
   private left: number;
   private running = false;
   private finished = false;
@@ -149,6 +151,8 @@ export class Timeline {
   play(): this {
     if (this.finished) {
       this.finished = false;
+      this.left = this.options.repeat ?? 0;
+      this.leg = 1;
       this.seek(this.direction > 0 ? 0 : this.end);
     }
     this.running = true;
@@ -211,27 +215,28 @@ export class Timeline {
       if (this.wrap) {
         // Loop back lazily, so the last value of a pass stays visible until the next update.
         this.wrap = false;
-        this.position = this.direction > 0 ? 0 : this.end;
+        this.position = this.direction * this.leg > 0 ? 0 : this.end;
         this.began = false;
         this.apply();
       }
-      const from = this.position,
-        step = delta * this.speed * this.direction,
+      const way = this.direction * this.leg,
+        from = this.position,
+        step = delta * this.speed * way,
         to = Math.min(this.end, Math.max(0, from + step));
       this.position = to;
       this.apply();
       for (const call of this.calls)
         if (
-          this.direction > 0
+          way > 0
             ? (call.at > from || (!this.began && call.at === 0)) && call.at <= to
             : call.at < from && call.at >= to
         )
           call.fn();
       this.began = true;
-      if (to !== (this.direction > 0 ? this.end : 0) || (step === 0 && this.end > 0)) return;
+      if (to !== (way > 0 ? this.end : 0) || (step === 0 && this.end > 0)) return;
       if (this.left > 0) {
         if (this.left !== Infinity) this.left--;
-        if (this.options.yoyo) this.direction = -this.direction;
+        if (this.options.yoyo) this.leg = -this.leg;
         else this.wrap = true;
         return;
       }

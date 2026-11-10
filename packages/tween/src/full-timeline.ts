@@ -38,6 +38,8 @@ export class Timeline implements Disposable, PromiseLike<void> {
   private position = 0;
   private running = false;
   private direction = 1;
+  /** Yoyo leg: -1 on a backward pass. Kept apart from direction so a replay starts the way reverse() set. */
+  private leg = 1;
   private repeats = 0;
   private ended = false;
   private began = false;
@@ -201,7 +203,7 @@ export class Timeline implements Disposable, PromiseLike<void> {
     if (this.parent) throw new MargoError('state', 'Nested clock belongs to its parent; play the parent timeline');
     if(this.options.signal?.aborted) return this;
     if(this.settled) this.prepareReplay();
-    if (this.ended) { this.repeats = this.options.repeat ?? 0; this.ended = false; this.began = false; this.seek(this.direction > 0 ? 0 : this.duration); }
+    if (this.ended) { this.repeats = this.options.repeat ?? 0; this.leg = 1; this.ended = false; this.began = false; this.seek(this.direction > 0 ? 0 : this.duration); }
     this.running = true; return this;
   }
   private prepareReplay(): void {
@@ -296,9 +298,9 @@ export class Timeline implements Disposable, PromiseLike<void> {
     if (!Number.isFinite(remaining)) throw new RangeError('Scaled delta must be finite; reduce speed or delta');
     if (!this.duration && this.repeats === Infinity) throw new RangeError('An infinite repeat needs positive duration; add a clip');
     try { for (;;) {
-      const from = this.position, end = this.direction > 0 ? this.duration : 0;
+      const way = this.direction * this.leg, from = this.position, end = way > 0 ? this.duration : 0;
       const distance = Math.abs(end - from), consumed = Math.min(distance, remaining);
-      this.seek(from + consumed * this.direction);
+      this.seek(from + consumed * way);
       this.dispatch(from, this.position, !this.began);
       if(!this.running) return;
       this.began = true;
@@ -306,8 +308,8 @@ export class Timeline implements Disposable, PromiseLike<void> {
       if (consumed < distance) return;
       if (this.repeats === 0) { this.running = false; this.ended = true; this.complete(); return; }
       if (this.repeats !== Infinity) this.repeats--;
-      if (this.options.yoyo) this.direction *= -1;
-      else { this.seek(this.direction > 0 ? 0 : this.duration); this.began = false; }
+      if (this.options.yoyo) this.leg *= -1;
+      else { this.seek(way > 0 ? 0 : this.duration); this.began = false; }
       if (!remaining) return;
     } } catch(error) { this.cancel(error); throw error; }
   }

@@ -161,3 +161,18 @@ test('replay renews descendant completion and repeats; seek does not finish', as
   await Promise.all([child,parent]);
   assert.equal(calls,2);
 });
+
+test('replaying a finished odd-repeat yoyo starts forward again, and reverse() still sets the replay direction', () => {
+  const o = {x: 0};
+  const timeline = new Timeline({repeat: 1, yoyo: true}).to(o, 'x', 10, {duration: 1}).play();
+  timeline.update(0.5); near(o.x, 5);
+  timeline.update(1); near(o.x, 5);
+  timeline.update(1); near(o.x, 0);
+  timeline.play();
+  timeline.update(0.25); near(o.x, 2.5);
+  timeline.update(0.75); near(o.x, 10);
+  timeline.update(1); near(o.x, 0);
+  timeline.reverse().play();
+  timeline.update(0.25); near(o.x, 7.5);
+  timeline.update(2); near(o.x, 10);
+});
