@@ -4,6 +4,13 @@
 Optional decoders/ktx2-hdr6 owns its clean-room Rust/Wasm codec and worker assets; no core, stage or rendering backend changes. All 75 UASTC HDR6 configurations and both stream versions match independent ASTC, half-float and RGB9E5 output records. GPU upload/readback covers the real HDR image on WebGPU and WebGL2 (393,216 exact bytes each); native and compatibility browser suites cover emitted production worker/Wasm assets. HDR6 CPU tests cover malformed dimensions, indices and seek tables, pooling, transfer, abort and disposal. Throughput evidence remains deferred to the speed phase.
 # Engine architecture and quality reference
 
+Review 3, section 5 evidence (2026-11-10): the optional rigging MToon adapter now
+selects standard material primitives in their own alpha queues instead of hiding
+them in every beauty layer. CPU regression captures actual encoded fragment
+pipelines for opaque/mask/blend and outlines, with exact record restoration.
+The MToon light GPU fixture compares the same unlit foreground pixel before and
+after attachment on WebGPU and WebGL2 compatibility. No core/backend change.
+
 ## Batch 241 voxel format evidence (section 5 supplement)
 
 The optional voxel-edit/formats-extra entry reads KV6, CUB and VMAX without changing core, stage or either rendering backend. Its bounded CPU fixtures check implicit KV6 interiors, independent CUB coordinate probes, legacy/current VMAX storage, PNG/settings palettes, material slots and parent-composed placement. The owning optional decoders/lzfse entry is checked against black-box compressed original data for raw, LZVN, v1, v2, multiple blocks and reused tables, including every truncated prefix of the small fixtures. Existing decoders browser/Node GPU checks and voxel-edit shader/bulk-edit checks pass on native WebGPU and complete WebGL2 compatibility; dependent packages receive CPU coverage. This is format correctness evidence, with no performance claim or native-application VMAX interoperability claim. New optional gzip ceilings are 2,551 B and 5,190 B; core plus stage stays 24,209 B. Research and sample provenance are in docs/clean-room.md and THIRD-PARTY-NOTICES.md.

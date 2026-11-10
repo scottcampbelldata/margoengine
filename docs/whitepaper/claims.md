@@ -1,5 +1,12 @@
 # Claims and evidence
 
+Review 3 (2026-11-10): attaching MToon preserves standard PBR/unlit primitives in
+the same model. Evidence: packages/rigging/tests/mtoon.test.js captures visible
+body/outline pipelines across opaque, mask and blend queues;
+packages/rigging/tests/mtoon-light.browser.mjs compares the actual standard
+foreground pixel before/after attachment on both backends. Sources and repro are
+in docs/rigging-mtoon.md. No speed claim or new backend capability.
+
 Batch 175 job 1: optional sciviz/omezarr streams selected regions from OME-NGFF 0.4/0.5, N5 and Neuroglancer precomputed multiscale volumes through the existing Zarr ROI reader and brick renderer. A 10^12-sample metadata-only fixture opens without chunk IO; its single-sample read requests one 8-byte chunk. Original CC BY 4.0 light-sheet IDR, OpenOrganelle N5 and sharded FlyEM bytes produce separate 32^3 regions and nine resident bricks (105,040 GPU bytes) on both backends. Every IDR/N5 ROI sample matches an independent numcodecs/Python reference. FlyEM's existing JPEG decoder differs from Pillow by at most one sample value. Evidence: packages/sciviz/tests/omezarr.test.js, scripts/audit-sciviz-cloud.py, packages/sciviz/tests/omezarr-browser.mjs. Codec/storage variant limits and nearest-neighbour LOD semantics are explicit in limits.md. No billion-voxel full-residency, timing, or universal codec-parity claim.
 
 Batch 190 job 2: optional `oit/precise` removes half-float accumulation saturation while retaining the existing weighted approximation. At both 1x and 4x on native WebGPU and full WebGL2, eight half-opacity layers with radiance [1000,500,250] read [996,498,249] in the HDR scene target, against analytic [996.09375,498.046875,249.0234375]. The same scene in half-float OIT reads [16.3125,16.3125,16.3125]. Reordering gives the same result, ordinary radiance matches within 0.001, complete edge images match within one 8-bit count, and opaque occlusion plus a real PBR asset pass. This claims f32 accumulation range, not unlimited radiance, exact depth sorting or extra transmission support. No speed result.

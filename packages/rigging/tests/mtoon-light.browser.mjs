@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+await mkdir('test-results/mtoon', { recursive: true });
 const context = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
 const errors = [];
 context.page.on('pageerror', (e) => errors.push(e.message));
@@ -132,18 +133,51 @@ try {
       rows.push({ nl, shift, toony, rgba: await read() });
       effect.dispose();
     }
-    const validation = await d.popErrorScope();
     model.dispose();
+    // A foreground standard unlit material must survive the model-wide MToon adapter.
+    const mixedDoc = structuredClone(doc),
+      foreground = vertices.slice();
+    for (let i = 0; i < 4; i++) {
+      foreground[i * 20 + 2] = 0.1;
+      foreground.fill(1, i * 20 + 16, i * 20 + 20);
+    }
+    mixedDoc.materials.push({
+      pbrMetallicRoughness: { baseColorFactor: [0.1, 0.7, 0.2, 1] },
+      extensions: { KHR_materials_unlit: {} },
+    });
+    mixedDoc.meshes[0].primitives.push({ attributes: {}, material: 1 });
+    const mixed = parsePreparedPBR(engine, mixedDoc, [
+      [
+        { vertices, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) },
+        { vertices: foreground, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) },
+      ],
+    ]);
+    const render = async () => {
+      await waitForPipelines(async () => {
+        engine.render({ delta: 0 });
+        await d.queue.onSubmittedWorkDone();
+      });
+      return read();
+    };
+    const mixedBefore = await render(),
+      mixedEffect = MToon.attach(mixed),
+      mixedAfter = await render();
+    mixedEffect.dispose();
+    mixed.dispose();
+    const validation = await d.popErrorScope();
     engine.dispose();
     target.dispose();
     color.destroy();
     depth.destroy();
     output.destroy();
     staging.destroy();
-    return { rows, validation: validation?.message };
+    return { rows, mixedBefore, mixedAfter, validation: validation?.message };
   });
   assert.equal(result.validation, undefined);
   assert.deepEqual(errors, []);
+  assert.ok(result.mixedBefore[1] > 0.6, JSON.stringify(result));
+  for (let k = 0; k < 4; k++)
+    assert.ok(Math.abs(result.mixedBefore[k] - result.mixedAfter[k]) < 0.001, JSON.stringify(result));
   for (const row of result.rows) {
     const lo = -1 + row.toony,
       hi = 1 - row.toony;

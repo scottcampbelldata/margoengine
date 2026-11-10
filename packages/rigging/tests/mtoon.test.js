@@ -82,6 +82,60 @@ test('model-first disposal takes its MToon adapter and GPU resources with it', a
     f.engine.dispose();
   }
 });
+
+for (const [mode, outline] of [
+  ['OPAQUE', false],
+  ['MASK', true],
+  ['BLEND', true],
+])
+  test(`mixed MToon and ${mode} materials each reach the beauty pass exactly once (outline ${outline})`, async () => {
+    const f = await fixture(
+        [
+          {
+            specVersion: '1.0',
+            outlineWidthMode: outline ? 'worldCoordinates' : 'none',
+            outlineWidthFactor: outline ? 0.01 : 0,
+          },
+          undefined,
+        ],
+        ['OPAQUE', mode],
+      ),
+      original = f.model.primitives.map((p) => p.material),
+      effect = MToon.attach(f.model),
+      selected = f.model.primitives.map((p) => p.material),
+      draws = [];
+    const begin = f.gpu.context.encoder.beginRenderPass;
+    f.gpu.context.encoder.beginRenderPass = (...args) => {
+      const pass = begin(...args);
+      let pipeline;
+      return {
+        ...pass,
+        setPipeline(value) {
+          pipeline = value;
+        },
+        drawIndexed() {
+          draws.push(pipeline.fragment.module.code);
+        },
+      };
+    };
+    try {
+      f.frame();
+      const visible = draws.filter((code) => !/@fragment fn fragment\([^{]*\{\s*discard;/.test(code));
+      assert.equal(visible.length, outline ? 3 : 2, 'each body and enabled outline must draw once');
+      assert.deepEqual(
+        f.model.primitives.map((p) => p.material),
+        selected,
+      );
+      effect.dispose();
+      assert.deepEqual(
+        f.model.primitives.map((p) => p.material),
+        original,
+      );
+    } finally {
+      effect.dispose();
+      f.engine.dispose();
+    }
+  });
 test('all material validation completes before earlier records or scene ownership change', async () => {
   const f = await fixture([{ specVersion: '1.0' }, { specVersion: '1.0', outlineWidthFactor: -1 }]),
     original = f.model.primitives.map((p) => p.material);

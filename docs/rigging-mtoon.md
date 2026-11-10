@@ -131,6 +131,30 @@ README examples are deferred to docs/work-lists/readme-owed.md.
 
 ## Gate result
 
+Review 3 (2026-11-10): mixed models retain ordinary PBR/unlit primitives in
+their opaque, mask or blend queue while MToon body and outline layers run.
+The previous adapter hid ordinary primitives in every beauty draw. A two-material
+input therefore drew only its MToon primitive. The regression records the actual
+fragment pipelines for all three alpha modes and outlines, and compares an unlit
+foreground pixel before/after attachment on both backends. Material records are
+restored synchronously after each queue.
+
+The package's MToon GPU command sets the repository serving root and its first
+fixture creates the output directory. Constraints,
+VRMA and pose-tracking fixtures also select that root before opening a browser.
+This fixes their confirmed HTTP failures when launched from the package directory
+by check:gpu-packages, without changing the shared browser or shutdown helpers.
+
+Clean-room correction sources compared: Khronos 3D Formats Working Group,
+*glTF 2.0.1* (2021),
+https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (per-primitive materials
+and alpha coverage); VRM Consortium, *VRM material overview* (2026),
+https://vrm.dev/en/vrm/material/ (PBR, unlit and MToon may coexist); Alan Baker,
+Mehmet Oguz Derin and David Neto (editors), *WebGPU Shading Language* (2026),
+https://www.w3.org/TR/WGSL/#discard-statement (discarded fragments do not reach
+the color target). The fix preserves queue isolation while selecting ordinary
+materials exactly once. No external implementation source was read.
+
 The selected changed/dependent CPU run passes 5,554 assertions, with README work excluded by Scott's build-phase instruction. Both new eleven-case MToon browser runs and the original seventeen-check rigging suite pass on native and compatibility. gltf-pro shader equivalence, complete extension coverage, viewer/device restoration and volume pixel checks also pass on both backends. The extension suite needs MARGO_COMPAT=1 rather than the --compat positional filter.
 
 The existing physical-material shader-composition fixture passes native and all 160 BRDF numeric cases on compatibility, but its two worst-case 16-texture compatibility pipelines exceed MAX_TEXTURE_IMAGE_UNITS(16). No MToon adapter or PBRModel draw participates in that direct shader fixture. Parent-identical input hashes are in whitepaper/results/batch213-physical-compat-existing-failure.json; this separate optional compatibility defect remains in known-bugs under the build-phase scope rule. No test, assertion or tolerance was weakened.

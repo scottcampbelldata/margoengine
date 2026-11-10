@@ -297,19 +297,27 @@ export class MToon implements EnginePlugin {
       call.draw();
       return;
     }
-    const groups = [...new Set(parts.map((p) => this.queue(p.state)))].sort((a, b) => a - b);
+    const ordinary = model.primitives.filter((p) => !parts.some((part) => part.primitive === p));
+    const ordinaryQueue = (p: PBRPrimitive) =>
+      p.material.settings[0] === 2 ? 3000 : p.material.settings[0] === 1 ? 2450 : 2000;
+    const groups = [...new Set([...parts.map((p) => this.queue(p.state)), ...ordinary.map(ordinaryQueue)])].sort(
+      (a, b) => a - b,
+    );
     for (const queue of groups) {
-      const selected = parts.filter((p) => this.queue(p.state) === queue);
+      const selected = parts.filter((p) => this.queue(p.state) === queue),
+        standard = ordinary.filter((p) => ordinaryQueue(p) === queue);
       const saved = model.primitives.map((p) => p.material);
       try {
         for (const p of model.primitives) p.material = hide(p.material);
         for (const part of selected) part.primitive.material = part.body;
+        for (const p of standard) p.material = saved[model.primitives.indexOf(p)];
         call.draw();
         if (
           selected.some(
             (p) => p.state.definition.outlineWidthMode !== 'none' && p.state.definition.outlineWidthFactor > 0,
           )
         ) {
+          for (const p of standard) p.material = hide(p.material);
           for (const part of selected) {
             for (const key of ['base', 'emission', 'maps', 'uvt', 'factors'] as const)
               Object.assign(part.outline, { [key]: part.body[key] });

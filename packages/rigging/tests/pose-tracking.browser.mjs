@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { fileURLToPath } from 'node:url';
+process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
+await mkdir('test-results/pose-tracking', { recursive: true });
 const context = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
 const errors = [];
 context.page.on('pageerror', (e) => errors.push(e.message));
