@@ -56,29 +56,60 @@ export class Cyclic extends Loop {
   assert.deepEqual(reportAttachProblems(report), ['Missing', 'Cyclic']);
 });
 
+/** Every built entry module of a package, with its export name. */
+async function* entryModules(dir) {
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(`packages/${dir}/package.json`, 'utf8'));
+  } catch {
+    return;
+  }
+  for (const [entry, target] of Object.entries(manifest.exports ?? {})) {
+    const file = typeof target === 'string' ? target : target.import;
+    if (!file?.endsWith('.js')) continue;
+    yield [manifest, entry, await import(pathToFileURL(`packages/${dir}/${file}`).href)];
+  }
+}
+
+/** The class objects core and the stage export: frozen for 1.0, so exempt here and wherever a package re-exports them. */
+async function frozenClasses() {
+  const frozen = new Set();
+  for (const dir of ['core', 'stage'])
+    for await (const [, , module] of entryModules(dir))
+      for (const value of Object.values(module)) if (isClass(value)) frozen.add(value);
+  return frozen;
+}
+
 async function packageClasses() {
-  const found = new Map();
+  const found = new Map(),
+    frozen = await frozenClasses();
   for (const dir of (await readdir('packages')).sort()) {
     // core and the stage are frozen for 1.0; margoengine re-exports the stage.
     if (dir === 'core' || dir === 'stage' || dir === 'margoengine' || dir === 'shared') continue;
-    let manifest;
-    try {
-      manifest = JSON.parse(await readFile(`packages/${dir}/package.json`, 'utf8'));
-    } catch {
-      continue;
-    }
-    for (const [entry, target] of Object.entries(manifest.exports ?? {})) {
+    for await (const [manifest, entry, module] of entryModules(dir)) {
       // margoengine/<x> re-exports @margoengine/<x>, walked on its own.
       if (manifest.name === 'margoengine' && entry !== '.') continue;
-      const file = typeof target === 'string' ? target : target.import;
-      if (!file?.endsWith('.js')) continue;
-      const module = await import(pathToFileURL(`packages/${dir}/${file}`).href);
+      // A re-export of a core or stage class is the same frozen class object (game re-exports TransformStore, Stage
+      // and CADCameraControls); matched by identity, so a package's own class of the same name is still walked.
       for (const [name, value] of Object.entries(module))
-        if (isClass(value) && !found.has(value)) found.set(value, [`${manifest.name}${entry.slice(1)}`, name]);
+        if (isClass(value) && !frozen.has(value) && !found.has(value))
+          found.set(value, [`${manifest.name}${entry.slice(1)}`, name]);
     }
   }
   return found;
 }
+
+test('the frozen exemption covers re-exported core and stage classes by identity, not by name', async () => {
+  const frozen = await frozenClasses();
+  const core = await import(pathToFileURL('packages/core/dist/extension.js').href);
+  assert.ok(frozen.has(core.TransformStore), 'core TransformStore is frozen');
+  const game = await import(pathToFileURL('packages/game/dist/index.js').href);
+  assert.ok(frozen.has(game.Stage), 'game re-exports the frozen stage Stage object');
+  // A package class that only shares a frozen class's name is not exempt.
+  const lookalike = class Stage {};
+  assert.equal(frozen.has(lookalike), false);
+  assert.equal([...(await packageClasses()).keys()].some((value) => frozen.has(value)), false);
+});
 
 test('every package class follows the attach / dispose / Symbol.dispose conventions', async () => {
   const classes = await packageClasses();
