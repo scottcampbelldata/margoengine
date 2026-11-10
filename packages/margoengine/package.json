@@ -3806,6 +3806,10 @@
       "types": "./dist/water/query.d.ts",
       "import": "./dist/water/query.js"
     },
+    "./water/caustics": {
+      "types": "./dist/water/caustics.d.ts",
+      "import": "./dist/water/caustics.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

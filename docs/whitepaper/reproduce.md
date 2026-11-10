@@ -2786,3 +2786,24 @@ stale build requirement; it needs npm and tar, uses no network, and cleans its o
 Run `npm run measure:size` for the unchanged 25000 B core/stage limit.
 
 - Stats panels: build packages; run `node --test packages/stats/test/panels.test.js packages/stats/test/panel-gpu.test.js packages/stats/test/scene-owner.test.js`. Run the shared-lock Stats parity script above on the native GPU. It requests timestamp-query, renders 48 frames per backend, checks four histories and named compute/post pass samples, and saves test-results/stats-panels-hardware.png for visual inspection. Durations are observations only; there are no speed thresholds.
+
+
+Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-query.test.js after building packages; original synthetic tuple/lifecycle fixtures.
+
+
+## Batch 234 caustics acceptance
+
+Build water, then run `packages/water/test/caustics.browser.mjs` and
+`packages/water/test/caustics-energy.browser.mjs` using Node through the shared
+GPU lock, with and without `--compat`. Details: [record](../water-caustics.md).
+
+Also run `packages/water/test/caustics-project.browser.mjs` on each backend for
+the independent receiver planes. `caustics-preview.browser.mjs` retains NOAA
+NDBC station 46042's observation as wind input and renders enabled/disabled
+and animated frames without importing Underwater. The black-box comparison
+executes Evan Wallace's remote WebGL Water demo without reading source; see
+the work record for its URL, what was observed and remaining acceptance.
+Rebase onto browser-host repair 919fdc09e before the water gates. The original
+flow gate now completes on both backends at its unchanged bound. Run the fast
+gate and affected tests; full verify belongs to local CI and README work waits.
+See results/batch234-caustics-landing.json for all outcomes and runner corrections.

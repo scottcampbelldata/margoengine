@@ -1,0 +1,269 @@
+{
+  "status": "checkpoint, not accepted",
+  "commit": "321282ba3",
+  "causticsIndependent": true,
+  "underwaterAbsent": true,
+  "open": "native flow passed assertions but original Chromium process/stdio close exceeded 30000 ms; diagnostic pass is not a fix",
+  "results": {
+    "caustics-acceptance-gpu": [
+      {
+        "label": "caustics-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 54.8
+      },
+      {
+        "label": "caustics-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 45.4
+      },
+      {
+        "label": "caustics-energy-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 8.7
+      },
+      {
+        "label": "caustics-energy-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 14.6
+      },
+      {
+        "label": "preview",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 8.6
+      },
+      {
+        "label": "rival",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 13.9
+      },
+      {
+        "label": "query-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 20.5
+      },
+      {
+        "label": "query-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 21.5
+      },
+      {
+        "label": "fft-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 31.6
+      },
+      {
+        "label": "fft-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 49.4
+      },
+      {
+        "label": "flow-webgpu",
+        "ok": false,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 52.2
+      }
+    ],
+    "caustics-remaining-gpu": [
+      {
+        "label": "flow-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 21.6
+      },
+      {
+        "label": "surface-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 33.4
+      },
+      {
+        "label": "surface-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 34.6
+      },
+      {
+        "label": "coast-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 9.3
+      },
+      {
+        "label": "coast-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 13.8
+      },
+      {
+        "label": "stack-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 9.8
+      },
+      {
+        "label": "stack-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 21.7
+      },
+      {
+        "label": "horizon-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 6.3
+      },
+      {
+        "label": "horizon-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 6.8
+      },
+      {
+        "label": "still-webgpu",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 5.2
+      },
+      {
+        "label": "still-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 8.8
+      },
+      {
+        "label": "readme",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 19
+      },
+      {
+        "label": "preview-final",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 5.9
+      }
+    ],
+    "caustics-resume-verify": [
+      {
+        "label": "build",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 5.4
+      },
+      {
+        "label": "quality",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 131.9
+      },
+      {
+        "label": "units",
+        "ok": false,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 429.2
+      }
+    ],
+    "caustics-acceptance-sizes": {
+      "entries": {
+        "index": 20106,
+        "fft": 7498,
+        "query": 4463,
+        "caustics": 8961
+      },
+      "core": 23950
+    },
+    "caustics-resume-final": [
+      {
+        "label": "affected",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 19.1
+      },
+      {
+        "label": "api",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 10.5
+      }
+    ]
+  },
+  "nativeFlowDiagnostic": {
+    "ok": true,
+    "log": "test-results/batch234/caustics-flow-close-diagnostic.log",
+    "ownedPipesClosed": 4,
+    "closeCounts": [
+      5,
+      5
+    ],
+    "provesOriginalHangFixed": false
+  },
+  "repositoryUnits": {
+    "total": 14115,
+    "passed": 14094,
+    "failed": 21,
+    "causes": [
+      "preview missing from GPU inventory",
+      "workspace lock dependency metadata",
+      "stale generated LLM text"
+    ],
+    "affectedRepairTests": {
+      "passed": 176,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "fullVerify": {
+    "invocations": 1,
+    "firstFailure": "API quality: absent attached help fragment",
+    "resumedQuality": "pass",
+    "resumedApi": "pass",
+    "note": "No full verification rerun. Original native flow teardown still blocks acceptance."
+  },
+  "sizes": {
+    "water": 20106,
+    "fft": 7498,
+    "query": 4463,
+    "caustics": 8961,
+    "causticsCeiling": 9230,
+    "coreStage": 23950
+  }
+}

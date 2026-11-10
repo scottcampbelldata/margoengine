@@ -170,7 +170,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/quality API](https://margoengine.com/llms/api/quality.md): 5 entry points
 - [@margoengine/webgl2-compat API](https://margoengine.com/llms/api/webgl2-compat.md): 12 entry points
 - [@margoengine/worker API](https://margoengine.com/llms/api/worker.md): 4 entry points
-- [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 8 entry points
+- [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 9 entry points
 - [@margoengine/inspector API](https://margoengine.com/llms/api/inspector.md): 10 entry points
 - [@margoengine/gltf API](https://margoengine.com/llms/api/gltf.md): 7 entry points
 - [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 15 entry points
@@ -204,7 +204,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/labels API](https://margoengine.com/llms/api/labels.md): 3 entry points
 - [@margoengine/html API](https://margoengine.com/llms/api/html.md): 5 entry points
 - [@margoengine/video API](https://margoengine.com/llms/api/video.md): 6 entry points
-- [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 10 entry points
+- [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 11 entry points
 - [@margoengine/headless API](https://margoengine.com/llms/api/headless.md): 6 entry points
 - [@margoengine/staging API](https://margoengine.com/llms/api/staging.md): 4 entry points
 - [@margoengine/post API](https://margoengine.com/llms/api/post.md): 25 entry points
@@ -217,7 +217,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 21 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 9 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 18 entry points
-- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 3 entry points
+- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 4 entry points
 - [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 6 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 6 entry points
 - [@margoengine/road API](https://margoengine.com/llms/api/road.md): 7 entry points
@@ -225,7 +225,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 20 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 9 entry points
 - [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 14 entry points
-- [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 6 entry points
+- [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 7 entry points
 - [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 7 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 13 entry points
 - [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 9 entry points
@@ -275,6 +275,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Own 2D sustained support](https://margoengine.com/llms/docs/architecture/physics2d-support-proof.md): This note derives the correction to the contact support ceiling found on `47f81f909`. It concerns the owned Rust/Wasm kernel, not the…
 - [Benchmarking](https://margoengine.com/llms/docs/benchmarking.md): Margo has one benchmark tool: `npm run bench`. It measures bytes, startup, rendering, objects, kernel maths, glTF, loaders, assemblies…
 - [Clean room](https://margoengine.com/llms/docs/clean-room.md): Research compared before implementation: Diego Ongaro and John Ousterhout, *In Search of an Understandable Consensus Algorithm* (2014)…
+- [Core version compatibility](https://margoengine.com/llms/docs/core-version-guard.md): The guard is an approved core bug repair. A package cannot own the engine's identity or validate every plugin before core's registration…
 - [Content Security Policy](https://margoengine.com/llms/docs/csp.md): Core and stage compile the Rust transform kernel, so every Margo engine page under a strict CSP needs `'wasm-unsafe-eval'`. For a…
 - [Demo cold-load measurements](https://margoengine.com/llms/docs/demo-loading.md): Scope: all seven pages shipped by `scripts/build-site.js`, including both robot entry points. The phased startup and 180 ms effect…
 - [Deploying a Margo app](https://margoengine.com/llms/docs/deploying.md): A Margo app is static files: HTML, JavaScript, CSS, a few `.wasm` files and your assets. Any static host works. Three things decide…
@@ -315,6 +316,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was rewritten by feature group: 195 features, 169 COVERED, 5 PARTIAL, 10 MISSING, plus 11 NOT PLANNED by…
 - [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`), one row per feature group. It is for roadmap…
 - [Verification wiring repaired during size restoration](https://margoengine.com/llms/docs/verification-repairs.md): Finding 8's full verification exposed inherited integration defects at 5ec86fe7c:
+- [Batch 234 caustics](https://margoengine.com/llms/docs/water-caustics.md): The optional `@margoengine/water/caustics` entry provides refracted surface flux, world-space receiver projection, RGB absorption and…
 - [Batch 234: spectral ocean](https://margoengine.com/llms/docs/water-fft.md): Scope: job 1, optional `@margoengine/water/fft`. No core or stage source changes. The previous water root exported `Water` and its…
 - [Batch 234: wave queries](https://margoengine.com/llms/docs/water-query.md): Job 2: optional `@margoengine/water/query`. Core and stage are unchanged.
 - [WebGL2 package consolidation](https://margoengine.com/llms/docs/webgl-consolidation.md): The preview and the full compatibility device belong to one optional package, `@margoengine/webgl2-compat`. The root `install()` path runs…

@@ -182,6 +182,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document /stats/gl alias.
 - @margoengine/xr: document xr/ar-extra session negotiation, DOM overlay root ownership, current/legacy image targets, copied observations, mesh visualization and persistent anchor lifetime/abort cleanup.
 
+
 - @margoengine/ecs (batch 249 job 2): RelationQuery exact/wildcard terms, source filters, returned target ids/rows, products and mutation semantics.
 - margoengine (batch 249 job 2): generated ecs/relation-query alias.
 
@@ -226,3 +227,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/stats: document /panels attach and custom samples, four metric sources, defaults, units/averages/peaks, GPU pass names and async cadence, memory scope, null gaps, borrowed versus owned Stats and disposal.
 - margoengine: document /stats/panels alias.
+| @margoengine/water | Optional caustics entry, source-ready scheduling, receiver projection, shadows, limits and lifecycle | Batch 234 caustics |
+| margoengine | water/caustics optional facade | Batch 234 caustics |

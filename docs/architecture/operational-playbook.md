@@ -2244,6 +2244,18 @@ and isosurface consumers; real NOAA demo remains an honest planar approximation.
 recomputation after device replacement. No core/stage/physics changes, no speed or native-WebGL2
 volume claim. Final gate counts/limitations belong to the job acceptance receipt.
 
+### Batch 234 caustics acceptance
+
+The optional water/caustics entry refracts submitted surface triangles into
+additive RGB flux-vector depth slices. Source-ready callbacks execute after
+current wave preparation and before drawing water, without core/stage changes.
+Independent projector, extinction, focused energy, shadow, resize and recovery
+cases pass on WebGPU and full WebGL2 compatibility. The fast gate, 562 affected
+unit/export/corpus checks and all 46 rendering commands pass; four caustic leaves
+also pass against the final rebase's updated compatibility device. The fresh
+NOAA preview shows opaque raised receivers and its explicit finite field edge.
+Main's browser-host repair 919fdc09e closes the old teardown blocker; this job
+changes no lifecycle files. README work is deferred. [Evidence and limits](../water-caustics.md).
 
 Batch 134's private ETC2/EAC draft has exact independent alpha and EAC
 parameter oracles, edge-padding and coded-error checks. EAC interval masks

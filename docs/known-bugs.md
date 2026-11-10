@@ -1,5 +1,12 @@
 # Known bugs and unverified features
 
+### Fixed: umbrella indexes after the caustics rebase
+
+The merged workspace exports included optional entries absent from the
+umbrella manifest/facades. `node scripts/umbrella.mjs --check` and the binding
+identity test caught them. Regenerating the umbrella from the current exports
+repairs the indexes; `tests/umbrella.test.js` retains the class regression.
+
 ### Fixed: batch 256 synchronous host recovery deadline
 
 A synchronous Connection could complete recovery from inside status broadcast,
@@ -30,6 +37,50 @@ checks canvas focus, real editing, undo, clipboard and browser IME on both
 complete backends. Human screen-reader and mobile OS keyboard certification
 has not been performed. Image, forms and preview world-panel parity are
 separate batch 258 jobs and remain open until their own acceptance.
+
+### Historical: batch 234 flow gate awaited owned Chromium stdio close
+
+At `321282ba3`, `node scripts/gpu-lock.mjs run --owner=codex-batch234
+--wait-max=60 --max=3 -- node packages/water/test/flow.browser.mjs` passed all
+original flow assertions, then failed the unchanged 30000 ms teardown bound:
+`Chromium process/stdio close (95824)`. The browser root was gone when inspected
+after failure. The owning wait is in `scripts/lib/browser.mjs` after
+`stopOwned` and pipe destruction; its launch-latched ChildProcess `close`
+promise did not settle. The missing exit/pipe notification's deeper cause is
+not isolated, and load is not claimed as its cause. No timeout was raised.
+
+An instrumented diagnostic of the same real flow input passed, recording all
+four owned pipes closed and ChildProcess close counts 5/5. It does not prove
+the original hang fixed. The original failure and diagnostic are retained in
+`test-results/batch234/caustics-acceptance-flow-webgpu.log` and
+`caustics-flow-close-diagnostic.log`. Earlier batch-160 shutdown repairs below
+are retained; this is new evidence after those repairs. Main commit 919fdc09e moves the Playwright server into its owned host process,
+repairing the shutdown wait. The complete water gate passes on both backends after that rebase;
+no competing lifecycle change is made here.
+
+### Fixed in the caustics draft: concentrated half-float flux range
+
+The initial finite-footprint repair retained coverage but stored unscaled
+irradiance in additive rgba16float maps. A 2 x 2 m ideal source focused into a
+1024-square map exceeds the format's 65504 range. The new GPU total-flux bound
+scales accumulation and restores it during projection, preserving physical
+energy. `packages/water/test/caustics-energy.browser.mjs` checks 64 and 1024
+maps against an independent Fresnel-energy integral with an unchanged 0.005 bar.
+Both backends pass. No source intensity or image threshold was reduced.
+The receiver, visual and fast gates now pass. Research and explicit limits:
+[acceptance record](water-caustics.md).
+
+### Fixed in the caustics draft: boundary slice interpolation
+
+The initial emitter rejects a slice above any source vertex, so a flat -1 m
+interface sampled by -2 m and 0 m slices attenuates a valid -1.5 m receiver
+toward zero even with absorption disabled. The source-ready emitter now extends
+the straight bundle through virtual slices; physical wet/dry masking stays in
+the projector. The energy test's flat -1 m interface / 0 m slice is the
+regression. Both backends now pass with 0.000137425 relative flux error under
+the unchanged 0.005 bar; independent dry/above-water projector checks remain
+exact zero. Full package and visual acceptance now pass. See the
+[caustics record](water-caustics.md) for optics and retained failures.
 
 ### Fixed: batch 133 lazy asset package grouping
 
@@ -4224,3 +4275,4 @@ Dependent audio GPU validation is incomplete for the version-guard landing: the 
 WebGL2 compatibility SNORM storage defect: MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs fails at line 74 for rgba8snorm, with incomplete framebuffer status 0x8cd6. Cause: WebGL2 compatibility compute writes use a framebuffer for the native RGBA8_SNORM texture even though device/formats.ts correctly marks that format non-renderable. The format/compute code is unchanged by the guard. Needs a supported storage-write representation and exact normalized conversion in webgl2-compat; no shader assertions, tolerances or ceilings were weakened. Native checks and core/stage compatibility checks pass. Reproduced once on clean origin/main 2cff40372 with rebuilt packages (test-results/version-guard-resume/clean-main-snorm-leaf.log); this unchanged dependent GPU defect is outside the version-guard push gate under lane rule 23.
 
 Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
+- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.

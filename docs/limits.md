@@ -101,6 +101,26 @@ cover a measured shader compile plus margin, capped by the command's existing
 `--max` hard hold limit. It does not extend test deadlines. The lease records the
 chosen millisecond window so its independent monitor uses the same bound.
 
+Batch 234 independent caustics continuation: the optional entry is 8961 B
+min+gzip (8122 B at the initial checkpoint), ceiling 8378 -> 9230 B. The extra
+bytes add a GPU total-flux reduction that prevents concentrated half-float
+overflow without clipping energy. Splitting that reduction would duplicate
+source/capture ownership. Water root/FFT/query measure 20106/7498/4463 B.
+Core plus stage remains current main's 23950 B, below 25000 B; this job changes
+neither. Map normalization uses `4 * ceil(2 * segments ** 2 / 64)` extra bytes.
+Current acceptance and retained history: [caustics record](water-caustics.md).
+
+Historical initial caustics checkpoint: `@margoengine/water/caustics` measures 8122 B
+min+gzip (8378 B ceiling), absent before this optional entry. Its three RGB
+flux-vector maps cost `24 * resolution ** 2 * layers` bytes: 18 MiB at the
+256-square/12-slice defaults, plus captures and stack targets. Sides 32..2048,
+2..32 horizontal height slices, camera-centred map width 0.1..100000 m and
+explicit receiver heights -100000..100000 m. Subpixel beams use normalized
+pixel-aligned box footprints; resolved triangles keep their geometry. It is a
+single refractive-interface raster model with opaque depth receivers. Depthless
+transparent receivers and overturning volumes are outside it. These receiver, shadow, attenuation, extreme-focus, lifecycle and visual bars
+now pass; the following record preserves the earlier checkpoint status. [Research and current evidence](water-caustics.md).
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

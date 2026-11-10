@@ -18,7 +18,7 @@ import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shar
 export type { FogLike } from '../../shared/fog.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
-import { queryStates } from './query-state.js';
+import { queryStates, surfacePasses } from './query-state.js';
 import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
@@ -1074,6 +1074,13 @@ export class Water implements EnginePlugin {
       copy.end();
     }
     view.drawn = view.current * (this.coastal ? 2 : 1) + (this.coastal?.current ?? 0);
+    let changedColor = false;
+    const readyPasses = surfacePasses.get(this);
+    if (readyPasses) for (const entry of readyPasses) changedColor = !!entry.draw(c) || changedColor;
+    // A source-ready lighting pass updates the opaque target before refraction.
+    // The single-sample route owns a copy rather than the target's live view.
+    if (changedColor && this.captured && this.colorSource.texture === target?.resolvedColor)
+      c.encoder.copyTextureToTexture(this.colorSource, this.colorTarget, this.colorSize);
     const bind = view.groups[view.drawn];
     view.current = 1 - view.current;
     this.attachment.view = c.color;

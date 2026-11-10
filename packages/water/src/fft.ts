@@ -13,7 +13,7 @@ import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
 import { resolveMSAA } from '../../shared/msaa.js';
 import { oceanCompute, oceanSurface } from './fft-shaders.js';
-import { queryStates } from './query-state.js';
+import { queryStates, surfacePasses } from './query-state.js';
 import { unitLight } from '../../shared/unit-light.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -395,6 +395,8 @@ export class FFTOcean implements EnginePlugin {
     this.frame[34] = this.follow ? Math.round(c.camera.position[0] / cell) * cell : 0;
     this.frame[35] = this.follow ? Math.round(c.camera.position[2] / cell) * cell : 0;
     c.device.queue.writeBuffer(this.frameBuffer!, 0, this.frame);
+    const readyPasses = surfacePasses.get(this);
+    if (readyPasses) for (const entry of readyPasses) entry.draw(c);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
       depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },

@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 23,950 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,209 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -271,7 +271,7 @@ which stays for v1.0.
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 23,950 B | 59,152 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,209 B | 59,802 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -2690,6 +2690,26 @@ GPU lock idle reclamation defaults to three minutes. `MARGO_GPU_IDLE_MIN` may
 cover a measured shader compile plus margin, capped by the command's existing
 `--max` hard hold limit. It does not extend test deadlines. The lease records the
 chosen millisecond window so its independent monitor uses the same bound.
+
+Batch 234 independent caustics continuation: the optional entry is 8961 B
+min+gzip (8122 B at the initial checkpoint), ceiling 8378 -> 9230 B. The extra
+bytes add a GPU total-flux reduction that prevents concentrated half-float
+overflow without clipping energy. Splitting that reduction would duplicate
+source/capture ownership. Water root/FFT/query measure 20106/7498/4463 B.
+Core plus stage remains current main's 23950 B, below 25000 B; this job changes
+neither. Map normalization uses `4 * ceil(2 * segments ** 2 / 64)` extra bytes.
+Current acceptance and retained history: [caustics record](water-caustics.md).
+
+Historical initial caustics checkpoint: `@margoengine/water/caustics` measures 8122 B
+min+gzip (8378 B ceiling), absent before this optional entry. Its three RGB
+flux-vector maps cost `24 * resolution ** 2 * layers` bytes: 18 MiB at the
+256-square/12-slice defaults, plus captures and stack targets. Sides 32..2048,
+2..32 horizontal height slices, camera-centred map width 0.1..100000 m and
+explicit receiver heights -100000..100000 m. Subpixel beams use normalized
+pixel-aligned box footprints; resolved triangles keep their geometry. It is a
+single refractive-interface raster model with opaque depth receivers. Depthless
+transparent receivers and overturning volumes are outside it. These receiver, shadow, attenuation, extreme-focus, lifecycle and visual bars
+now pass; the following record preserves the earlier checkpoint status. [Research and current evidence](water-caustics.md).
 
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
@@ -6646,10 +6666,84 @@ retained. This fixes observation of the compatibility route's real command
 buffer, without runtime, API or size changes. Core plus stage remains 23,950 B.
 ### Batch 260 job 3: foreignObject resources
 New html/inline: 0 to 2,488 B min+gzip, ceiling 0 to 2,744 B. html/texture changes 4,571 to 4,669 B and texture-gl 6,238 to 6,334 B; both remain under their existing ceilings. Optional bytes keep resource preparation separate from raster upload while sharing one DOM copier, rather than duplicate form/style logic. The network deadline is 15,000 ms by default, integer 1 to 2,147,483,647 allowed; credentials are same-origin and cross-origin requests require CORS. URLs deduplicate within one snapshot, not across invalidations. The live tree is unchanged; the result is detached. Matching families include all face weights/styles and unicode ranges the stylesheet declares. Unreadable cross-origin sheets require CORS or explicit fontCSS; script-created FontFace sources require explicit fontCSS. Existing foreignObject capture limitations remain: pseudo-elements/shadow DOM and nested external resources inside SVG image files are not newly reconstructed. Already embedded data URLs and local SVG fragments are retained. No new runtime dependency, downloaded asset or core/stage byte change.
+## WFC grid assembly (batch 237)
+Optional wfc/assemble places up to 1,000,000 X-fast cells. Loaded glTF/glTF-pro templates remain caller-owned; static primitive ancestry, local TRS, shared materials and geometry, visibility and shadow flags are retained. Orthogonal 3x3 orientations include all socket cube rotations and reflections; spacing is positive and defaults to unit, origin to zero. No skin/morph animation cloning or glTF extension-specific runtime controllers. Mesh-store capacity and hierarchy limits still apply; allocation, invalid placement and cancellation roll back created handles. Hidden source roots produce hidden cloned roots; set clone visibility when using hidden templates. CPU transforms are float32 in core.
+Entry size: wfc/assemble 1,465 B min+gzip (new entry, previous 0 B); ceiling 1,721 B. Core + stage root remains 23,950 B. The entry owns placement and resource cleanup, with no runtime loader dependency.
+- XR performance controls: framebufferScale is set before session creation and must stay positive and finite when represented as WebIDL float. Unset preserves native recommended scale or compatibility installXR's default. fixedFoveation ranges 0..1 and reports the actual runtime value or null when unsupported; setters reject unsupported runtimes. Camera access requires camera-access plus browser permissions. Current Raw Camera Access exposes a borrowed WebGLTexture only on the compatibility XR device's GL context, valid inside the XR frame. Native WebGPU camera images are unsupported by that module. Never retain or delete the borrowed texture. No headset quality, camera accuracy or speed claim is made.
+
+- xr/performance: 0 to 1326 B gzip, ceiling 1582 B for the new optional foveation, scale and camera controls entry. Core + stage remains 23950 B.
+
+- Optional XR root: 8965 to 9060 B gzip; ceiling 8967 to 9332 B. Session scale validation/transport and the projectionLayer getter support xr/performance. Keeping this transport in XR avoids a duplicate session implementation; core + stage stays 23950 B.
+
+Core version compatibility: core 21584 -> 21775 B gzip (+191 B, reduced from the +238 B draft);
+core plus stage 23950 -> 24209 B gzip, below the unchanged 25000 B hard limit. Different module
+paths or exact package build versions reject with code `version` before plugin setup. Matching
+same-path imports pass. Structural stand-ins remain supported; custom plugins declare requirements.
+Scott's later 2026-11-09 ruling retains the core-only ratchet: strict build ceiling 21587 -> 21776 B
+(allows at most 21775 B); inclusive quality ceiling 21630 -> 21775 B. Each of the 25 failing optional
+ceilings gains exactly the final guard's 191 B, without further headroom. The two additional unit
+ceilings below receive the same 191 B allowance. No other ceilings change.
+The guard stays in core to protect engine identity before registry mutations; splitting package
+declarations would add imports without reducing the required exact build identity.
+[Design and research](core-version-guard.md), [machine-readable size record](whitepaper/results/core-version-guard-sizes.json).
+
+All values below are gzip bytes. The optional table includes every ceiling changed:
+
+| Entry | Measured before | Measured after | Ceiling before | Ceiling after |
+| --- | ---: | ---: | ---: | ---: |
+| `@margoengine/animation/interactivity` | 24787 | 24906 | 24902 | 25093 |
+| `@margoengine/animator/graph` | 8527 | 8597 | 8542 | 8733 |
+| `@margoengine/audio` | 7687 | 7762 | 7716 | 7907 |
+| `@margoengine/biomes/view` | 10454 | 10517 | 10454 | 10645 |
+| `@margoengine/clustered/area` | 10445 | 10526 | 10461 | 10652 |
+| `@margoengine/core` | 21584 | 21775 | 21630 | 21775 |
+| `@margoengine/creative` | 19172 | 19244 | 19177 | 19368 |
+| `@margoengine/environment/cube-camera` | 5688 | 5756 | 5691 | 5882 |
+| `@margoengine/lines` | 19635 | 19703 | 19671 | 19862 |
+| `@margoengine/physics2d` | 8169 | 8241 | 8199 | 8390 |
+| `@margoengine/post` | 42021 | 42105 | 42058 | 42249 |
+| `@margoengine/post/bloom` | 6978 | 7046 | 7005 | 7196 |
+| `@margoengine/post/fxaa` | 4667 | 4729 | 4699 | 4890 |
+| `@margoengine/post/smaa` | 6207 | 6276 | 6244 | 6435 |
+| `@margoengine/post/anamorphic` | 6523 | 6575 | 6551 | 6742 |
+| `@margoengine/post/blur` | 6183 | 6239 | 6203 | 6394 |
+| `@margoengine/post/lens` | 6862 | 6916 | 6887 | 7078 |
+| `@margoengine/scatter/tiles` | 3401 | 3479 | 3415 | 3606 |
+| `@margoengine/scenery/scenes` | 19197 | 19334 | 19213 | 19404 |
+| `@margoengine/sciviz/webgl2` | 4476 | 4527 | 4476 | 4667 |
+| `@margoengine/shader/effects` | 8300 | 8364 | 8306 | 8497 |
+| `@margoengine/taa/upscale` | 7112 | 7179 | 7112 | 7303 |
+| `@margoengine/terrain/stream` | 12050 | 12112 | 12100 | 12291 |
+| `@margoengine/text` | 16395 | 16494 | 16406 | 16597 |
+| `@margoengine/transitions/mask` | 5460 | 5536 | 5522 | 5713 |
+| `@margoengine/transitions/custom` | 5234 | 5305 | 5275 | 5466 |
+
+The same authorized 191 B allowance applies to these additional package unit ceilings. Shader
+minimal stays below 9000 B, its 60% ratio stays unchanged, and viewcube axes stays below 1200 B.
+
+| Unit entry | Measured before | Measured after | Ceiling before | Ceiling after |
+| --- | ---: | ---: | ---: | ---: |
+| `@margoengine/shader (whole-entry unit ceiling)` | 18489 | 18568 | 18500 | 18691 |
+| `@margoengine/viewcube (unit ceiling)` | 5130 | 5220 | 5150 | 5341 |
+
+After rebasing onto d0629f9c6, controls also exceeds its existing ceiling: its emitted guard adds 61 B (27469 -> 27530 B gzip). The controls ceiling alone gains the same authorized 191 B, 27517 -> 27708 B. This brings the failing optional entries to 26; no nonfailing ceiling is raised.
+
+Version-guard final rebase: XR measures 8965 B without emitter declarations and 9041 B with them; its 8967 B ceiling gains exactly 191 B to 9158 B. The optional allowance keeps build identity at attachment boundaries, without another import or duplicated version logic. Core/stage stay 24209 B.
+
+### Stats panels entry
+
+`@margoengine/stats/panels` provides StatsPanels, attach/sample/refresh/toJSON/dispose, with four chronological fixed Float64Array histories and a named GPU list. Defaults: samples 120 (2..4096), refreshMilliseconds 150 (16..60000), parent document.body; owned panel width 360 CSS pixels within the viewport. Options.stats borrows an already attached Stats without transferring its ownership. CPU milliseconds come from FramePhases work in the frame task, FPS from the rolling Stats interval, GPU from the latest completed asynchronous sample. GPU history therefore holds the latest valid result between readbacks, rather than pretending each frame has a fresh query. WebGPU samples one encoder in 15, at most 128 passes, preserves existing timestampWrites and needs timestamp-query enabled on the device. Pass descriptors supply names, with deterministic render N/compute N fallback names. WebGL2 uses the gl entry's limits and early-registration naming rules. Memory defaults to tracked WebGPU descriptor bytes created after attachment; without WebGPU, performance.memory.usedJSHeapSize is used only where exposed. Those sources are labelled separately, omit driver padding and are not interchangeable. A custom memory callback can supply another byte measurement, or null. Unsupported readings appear as gaps and unavailable text, never zero. Custom loops may supply PanelSample values directly. Sampling does not write DOM; refresh draws and labels the graphs. Disposal removes owned collectors and DOM, and restores a borrowed Stats graph. New entry: 9,895 B gzip, ceiling 10,192 B. Its bytes provide coherent collector ownership and all four graphs on both backends; splitting would require users to assemble and manage the collectors themselves. Root and core/stage are unchanged.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Fixed: umbrella indexes after the caustics rebase
+
+The merged workspace exports included optional entries absent from the
+umbrella manifest/facades. `node scripts/umbrella.mjs --check` and the binding
+identity test caught them. Regenerating the umbrella from the current exports
+repairs the indexes; `tests/umbrella.test.js` retains the class regression.
 
 ### Fixed: batch 256 synchronous host recovery deadline
 
@@ -6681,6 +6775,50 @@ checks canvas focus, real editing, undo, clipboard and browser IME on both
 complete backends. Human screen-reader and mobile OS keyboard certification
 has not been performed. Image, forms and preview world-panel parity are
 separate batch 258 jobs and remain open until their own acceptance.
+
+### Historical: batch 234 flow gate awaited owned Chromium stdio close
+
+At `321282ba3`, `node scripts/gpu-lock.mjs run --owner=codex-batch234
+--wait-max=60 --max=3 -- node packages/water/test/flow.browser.mjs` passed all
+original flow assertions, then failed the unchanged 30000 ms teardown bound:
+`Chromium process/stdio close (95824)`. The browser root was gone when inspected
+after failure. The owning wait is in `scripts/lib/browser.mjs` after
+`stopOwned` and pipe destruction; its launch-latched ChildProcess `close`
+promise did not settle. The missing exit/pipe notification's deeper cause is
+not isolated, and load is not claimed as its cause. No timeout was raised.
+
+An instrumented diagnostic of the same real flow input passed, recording all
+four owned pipes closed and ChildProcess close counts 5/5. It does not prove
+the original hang fixed. The original failure and diagnostic are retained in
+`test-results/batch234/caustics-acceptance-flow-webgpu.log` and
+`caustics-flow-close-diagnostic.log`. Earlier batch-160 shutdown repairs below
+are retained; this is new evidence after those repairs. Main commit 919fdc09e moves the Playwright server into its owned host process,
+repairing the shutdown wait. The complete water gate passes on both backends after that rebase;
+no competing lifecycle change is made here.
+
+### Fixed in the caustics draft: concentrated half-float flux range
+
+The initial finite-footprint repair retained coverage but stored unscaled
+irradiance in additive rgba16float maps. A 2 x 2 m ideal source focused into a
+1024-square map exceeds the format's 65504 range. The new GPU total-flux bound
+scales accumulation and restores it during projection, preserving physical
+energy. `packages/water/test/caustics-energy.browser.mjs` checks 64 and 1024
+maps against an independent Fresnel-energy integral with an unchanged 0.005 bar.
+Both backends pass. No source intensity or image threshold was reduced.
+The receiver, visual and fast gates now pass. Research and explicit limits:
+[acceptance record](water-caustics.md).
+
+### Fixed in the caustics draft: boundary slice interpolation
+
+The initial emitter rejects a slice above any source vertex, so a flat -1 m
+interface sampled by -2 m and 0 m slices attenuates a valid -1.5 m receiver
+toward zero even with absorption disabled. The source-ready emitter now extends
+the straight bundle through virtual slices; physical wet/dry masking stays in
+the projector. The energy test's flat -1 m interface / 0 m slice is the
+regression. Both backends now pass with 0.000137425 relative flux error under
+the unchanged 0.005 bar; independent dry/above-water projector checks remain
+exact zero. Full package and visual acceptance now pass. See the
+[caustics record](water-caustics.md) for optics and retained failures.
 
 ### Fixed: batch 133 lazy asset package grouping
 
@@ -10862,6 +11000,21 @@ Repro: start a decoded Audio, then manager.add(sound,{gain:()=>NaN}) throws for 
 
 Fixed immediately after batch 171 landing: a88cfd4fe contained unresolved boundaries in docs/api-surface.md after a native helper failed but its PowerShell caller continued. Authoritative api:update regenerates the summary; generated-metadata-conflicts.test.js fails on that published artifact and passes on the repair. No engine or atmosphere runtime source changed.
 
+
+Fixed core version skew: missing engine-local version/module identity checks allowed a plugin from
+a second install or a stale build to mutate core's ownership registries silently. The packed
+two-install and stale-build regressions now reject before plugin work; same-path matching imports
+pass. [Design, regression and size evidence](core-version-guard.md).
+
+GPU queue owner collision: start gpu-package-tests.mjs in two worktrees; both use owner check:gpu-packages, so gpu-admission.mjs sameLane treats them as one lane and the second can wait for the first entire suite chain despite free slots. Repro: parallel runner in lane-T queued from 02:01:58 UTC behind lane-P; no tests ran. Cause: the generic owner is used as a lane identity in addition to the distinct worktree identity. This guard landing uses the supported gpu-lock run CLI with explicit owner lane-T-version-guard and serial nested suites; repair default runner owners in the fix phase.
+
+Dependent audio GPU validation is incomplete for the version-guard landing: the shared GPU monitor reclaimed lane-T-version-guard at 2026-11-10T02:28:06.439Z after 211623 ms without GPU activity, while audio/scripts/test-browser.js awaited its browser evaluations before writing audio-browser.json. The suite produced no report and did not reach its own 10 min limit. Root cause of the uncompleted audio evaluation is unconfirmed; monitor evidence is in the local GPU idle record and test-results/version-guard-resume/gpu-lane-T.log. No timeout or idle threshold was raised.
+
+WebGL2 compatibility SNORM storage defect: MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs fails at line 74 for rgba8snorm, with incomplete framebuffer status 0x8cd6. Cause: WebGL2 compatibility compute writes use a framebuffer for the native RGBA8_SNORM texture even though device/formats.ts correctly marks that format non-renderable. The format/compute code is unchanged by the guard. Needs a supported storage-write representation and exact normalized conversion in webgl2-compat; no shader assertions, tolerances or ceilings were weakened. Native checks and core/stage compatibility checks pass. Reproduced once on clean origin/main 2cff40372 with rebuilt packages (test-results/version-guard-resume/clean-main-snorm-leaf.log); this unchanged dependent GPU defect is outside the version-guard push gate under lane rule 23.
+
+Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
+- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -10991,7 +11144,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 23,950 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,209 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.

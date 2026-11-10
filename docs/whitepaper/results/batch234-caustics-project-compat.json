@@ -1,0 +1,65 @@
+{
+  "rows": [
+    {
+      "name": "flat",
+      "worst": 0,
+      "probes": 3600,
+      "finite": true
+    },
+    {
+      "name": "tilted",
+      "worst": 0.000004885286924827259,
+      "probes": 3600,
+      "finite": true
+    },
+    {
+      "name": "raised",
+      "worst": 4.768371586472142e-8,
+      "probes": 3600,
+      "finite": true
+    },
+    {
+      "name": "dry",
+      "worst": 0,
+      "probes": 3600,
+      "finite": true
+    },
+    {
+      "name": "above",
+      "worst": 0,
+      "probes": 3600,
+      "finite": true
+    },
+    {
+      "name": "receiver-shadow",
+      "worst": 0,
+      "probes": 3600,
+      "finite": true
+    },
+    {
+      "name": "outside-height",
+      "worst": 0,
+      "probes": 3600,
+      "finite": true
+    }
+  ],
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "margo-webgl2",
+      "architecture": "webgl2",
+      "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true,
+    "compat": true
+  }
+}

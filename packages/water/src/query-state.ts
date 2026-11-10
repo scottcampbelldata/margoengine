@@ -1,5 +1,9 @@
 // Internal bridge: rendering owns the resources, the optional query entry owns all capture/query work.
 import type { CoastalFlow } from './coastal.js';
+import type { PassContext } from '@margoengine/core/extension';
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** Optional consumers run after current wave uploads and before the surface draw. */
+export const surfacePasses = new WeakMap<object, { order: number; draw(context: Context): boolean | void }[]>();
 export interface QueryState {
   kind: 'water' | 'fft';
   device: GPUDevice;

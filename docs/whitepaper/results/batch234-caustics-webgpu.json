@@ -1,0 +1,154 @@
+{
+  "layerWorst": [
+    0.00013462465802860368,
+    0.00013462465802860368,
+    0.00013462465802860368,
+    0.00013462465802860368
+  ],
+  "absorptionWorst": 0.00023199282495633966,
+  "shadowRows": [
+    {
+      "mode": 0,
+      "mapWorst": 0.00013462465802860368,
+      "receiverWorst": 0.00046864172548383154,
+      "receiverProbes": 21504
+    },
+    {
+      "mode": 1,
+      "mapWorst": 0.00013462465802860368,
+      "receiverWorst": 0.000220573195580831,
+      "receiverProbes": 21504
+    }
+  ],
+  "restoredSame": true,
+  "resized": [
+    160,
+    96
+  ],
+  "brightened": 22736,
+  "compositeWorst": 0.000220573195580831,
+  "disabledWorst": 0,
+  "changed": true,
+  "animatedMin": 0.8271484375,
+  "animatedMax": 1.2041015625,
+  "sourceAmplitude": 0.20000000298023224,
+  "probes": [
+    {
+      "x": 96,
+      "y": 64,
+      "p": [
+        0.06249999813735402,
+        -5.900001657754217,
+        0.0625
+      ],
+      "depth": 0.5009999871253967,
+      "before": 0.180908203125,
+      "after": 0.35791015625
+    },
+    {
+      "x": 96,
+      "y": 90,
+      "p": [
+        0.06249999813735402,
+        -5.900001657754217,
+        3.3125
+      ],
+      "depth": 0.5009999871253967,
+      "before": 0.180908203125,
+      "after": 0.35791015625
+    },
+    {
+      "x": 96,
+      "y": 110,
+      "p": [
+        0.06249999813735402,
+        -5.900001657754217,
+        5.8125
+      ],
+      "depth": 0.5009999871253967,
+      "before": 0.1810302734375,
+      "after": 0.3583984375
+    }
+  ],
+  "dimensions": [
+    98304,
+    98304,
+    160,
+    96
+  ],
+  "sourceTimesMatch": true,
+  "events": [
+    {
+      "sourceTime": 0.125,
+      "authoredTime": 0.125,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.125,
+      "authoredTime": 0.125,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.125,
+      "authoredTime": 0.125,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.125,
+      "authoredTime": 0.125,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.125,
+      "authoredTime": 0.125,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.25,
+      "authoredTime": 0.25,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.375,
+      "authoredTime": 0.375,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.5,
+      "authoredTime": 0.5,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.5,
+      "authoredTime": 0.5,
+      "mapsReady": true
+    },
+    {
+      "sourceTime": 0.5,
+      "authoredTime": 0.5,
+      "mapsReady": true
+    }
+  ],
+  "fftFinite": true,
+  "fftHasLight": true,
+  "fftFirstTime": 2,
+  "detachedCode": "state",
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  }
+}

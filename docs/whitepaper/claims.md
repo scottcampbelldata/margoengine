@@ -77,6 +77,17 @@ no human assistive-technology certification or measured rival speed claim.
 Research, rival inventories and the public-domain text source are recorded
 in clean-room.md. Reproduction commands are in reproduce.md.
 
+Batch 234 caustics: flat/oblique Fresnel flux, RGB extinction, entry and
+receiver shadows, seven independent projector cases, 64/1024-map point focus,
+virtual slices, source ordering, resize and restoration pass on WebGPU and full
+WebGL2 compatibility. Focus errors are 0.000004759 and 0.000149427 against the
+unchanged 0.005 energy bar. The NOAA preview and qualitative remote WebGL Water
+review show seabed/raised-receiver capability; no equal-input rival pixel parity
+is claimed. All affected fast gates pass after the browser-host repair, with
+the caustic compatibility cases passing again on the final main rebase.
+Explicit finite-field and opaque-receiver limits and the [acceptance record](../water-caustics.md)
+qualify this feature claim. No speed or untested backend claim.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

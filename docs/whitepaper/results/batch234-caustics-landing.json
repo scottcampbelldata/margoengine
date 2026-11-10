@@ -1,0 +1,405 @@
+{
+  "status": "accepted fast gate",
+  "sourceTrees": {
+    "water": "e79ee03fe6fb5839dacfd7259c0978537e53538c",
+    "core": "ca389f5bd0f0d52f2b5326d5b6b8b1c9f25a5a30",
+    "stage": "a30855726def9e3b3fa1fa367ef9b4d0b0fcf66b",
+    "post": "6d9c7816463b595c8aab1c5240a285eb5ae3e678",
+    "biomes": "fd9295eea5cced35a42d53e336b849100cde5c37",
+    "webgl2-compat": "ba8837110af9bc143740ef4653eaae2a6fe339f2"
+  },
+  "browserFix": "919fdc09e",
+  "unitTests": 520,
+  "exportAndCorpusTests": 41,
+  "cpuGates": [
+    "lint",
+    "hygiene",
+    "check:banned-terms",
+    "build:packages",
+    "api:check",
+    "quality"
+  ],
+  "gpu": [
+    {
+      "label": "water-caustics-project-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.2
+    },
+    {
+      "label": "water-caustics-energy-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.5
+    },
+    {
+      "label": "water-caustics-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10.9
+    },
+    {
+      "label": "water-query-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 19.2
+    },
+    {
+      "label": "water-fft-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10.6
+    },
+    {
+      "label": "water-flow-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 18.5
+    },
+    {
+      "label": "water-surface-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 21
+    },
+    {
+      "label": "water-coast-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 126.9
+    },
+    {
+      "label": "water-stack-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 36.2
+    },
+    {
+      "label": "water-horizon-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 7.8
+    },
+    {
+      "label": "water-still-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 15
+    },
+    {
+      "label": "biomes-browser-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 183.5
+    },
+    {
+      "label": "biomes-water-webgpu",
+      "ok": false,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.1
+    },
+    {
+      "label": "biomes-water-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 238.5
+    },
+    {
+      "label": "biomes-objects-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 40.2
+    },
+    {
+      "label": "biomes-shadows-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 39.2
+    },
+    {
+      "label": "biomes-flythrough-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 322.8
+    },
+    {
+      "label": "biomes-objects-frame-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 61.1
+    },
+    {
+      "label": "biomes-gpu-backend-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 142.5
+    },
+    {
+      "label": "biomes-gpu-backend-placement-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 106.1
+    },
+    {
+      "label": "biomes-prefetch-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 136
+    },
+    {
+      "label": "biomes-erosion-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 21
+    },
+    {
+      "label": "umbrella-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 31.2
+    },
+    {
+      "label": "water-caustics-project-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 23.8
+    },
+    {
+      "label": "water-caustics-energy-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 15.8
+    },
+    {
+      "label": "water-caustics-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 22.6
+    },
+    {
+      "label": "water-query-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 19.5
+    },
+    {
+      "label": "water-fft-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 23.1
+    },
+    {
+      "label": "water-flow-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 17.4
+    },
+    {
+      "label": "water-surface-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 6.6
+    },
+    {
+      "label": "water-coast-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 46.5
+    },
+    {
+      "label": "water-stack-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 40
+    },
+    {
+      "label": "water-horizon-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 33.6
+    },
+    {
+      "label": "water-still-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 204.2
+    },
+    {
+      "label": "biomes-browser-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 230.6
+    },
+    {
+      "label": "biomes-water-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 71.9
+    },
+    {
+      "label": "biomes-objects-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 99.2
+    },
+    {
+      "label": "biomes-shadows-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 257.4
+    },
+    {
+      "label": "biomes-flythrough-compat",
+      "ok": false,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 425.7
+    },
+    {
+      "label": "water-preview-webgpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 336.5
+    },
+    {
+      "label": "biomes-flythrough-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 726.6
+    },
+    {
+      "label": "biomes-objects-frame-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 59.5
+    },
+    {
+      "label": "biomes-gpu-backend-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 17.2
+    },
+    {
+      "label": "biomes-gpu-backend-placement-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 36.5
+    },
+    {
+      "label": "biomes-prefetch-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 48.4
+    },
+    {
+      "label": "biomes-erosion-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 5.3
+    },
+    {
+      "label": "umbrella-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 6
+    },
+    {
+      "label": "water-preview-compat",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 13.6
+    }
+  ],
+  "latestMainCompatibility": [
+    {
+      "leaf": "caustics-project",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.5
+    },
+    {
+      "leaf": "caustics-energy",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.9
+    },
+    {
+      "leaf": "caustics",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10.1
+    },
+    {
+      "leaf": "caustics-preview",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 5.3
+    }
+  ],
+  "invocationCorrections": [
+    "An unclassified Biomes water leaf required an explicit GPU rendering reason before startup.",
+    "The outer flythrough hold was corrected from six minutes to its existing fifteen-minute test limit. No test or assertion changed."
+  ],
+  "readme": "deferred in docs/work-lists/readme-owed.md",
+  "fullVerify": "local CI only",
+  "sizesGzip": {
+    "water": 20106,
+    "fft": 7498,
+    "query": 4463,
+    "caustics": 8961,
+    "coreAndStage": 23950
+  },
+  "speedClaim": false,
+  "upstreamSupplyChainFailure": "Existing main appends WebXR generic-hand credits outside the notices generator; preserve provenance. 41 of 42 supplementary export/corpus/supply-chain tests pass."
+}
