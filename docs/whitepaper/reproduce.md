@@ -2752,3 +2752,5 @@ Batch 253 trigger rumble: build packages/input, then node --test --test-timeout=
 ### XR skinned hands
 
 After build:packages run `node --test packages/xr/tests/hands.test.js` and the registered xr test:gpu:hands leaf through the shared GPU lock. The standard left/right GLBs and licence are in packages/xr/tests/fixtures/hands. The browser records pose-driven skin-buffer changes and stereo pixel changes for both XR routes and backends. Real Quest/Android runs remain required separately.
+
+Batch 254 sprites: after build:packages run node --test --test-timeout=60000 packages/audio/tests/sprites.test.js. Shared-lock node packages/audio/scripts/test-browser.js runs sprites-browser.js, using native canPlayType and a controlled 503 response followed by tests/fixtures/rain-foa.wav (CC BY 4.0, existing NOTICE). The report records exact candidate order, PCM error and energy for one-shot and loop bounds.

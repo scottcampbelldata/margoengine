@@ -70,6 +70,10 @@
     "./voices": {
       "types": "./dist/voice-manager.d.ts",
       "import": "./dist/voice-manager.js"
+    },
+    "./sprites": {
+      "types": "./dist/sprites.d.ts",
+      "import": "./dist/sprites.js"
     }
   },
   "files": [

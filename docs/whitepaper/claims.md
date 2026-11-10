@@ -3257,3 +3257,5 @@ Batch 253 trigger-rumble claim: independent native left/right trigger and strong
 ### XR skinned hands
 
 The optional xr/hands entry drives real glTF skins from the 25 named WebXR joints using Margo Animation. Named mapping preserves authored hierarchy; CPU tests cover tracking loss, source replacement, abort, restoration and scene lifetime. Standard MIT generic-hand assets provide real weighted meshes. Rendering checks cover both XR routes and backends. This establishes software behavior, not real-device proof.
+
+Batch 254 sprites: optional audio/sprites plays named shared-buffer intervals with independent overlap and loop bounds, and selects codec URL alternatives through canPlayType plus fetch/decode fallback. CPU tests cover immutable maps, bounds, overlap, cleanup, candidate ordering, exhausted failure causes and cancellation. Real browser Web Audio offline rendering checks named clip/loop PCM directly against the licensed recording and checks native capability probing plus a controlled HTTP failure before a working WAV. Device output and other browser codecs unmeasured.

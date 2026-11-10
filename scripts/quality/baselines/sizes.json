@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12414240,
+  "total": 12416004,
   "history": [
     {
       "date": "2026-10-24",
@@ -5693,6 +5693,11 @@
       "commit": "batch-268-hands",
       "reason": "New optional skinned hands entry, 0 to 2290 B gzip. Named joint mapping, borrowed-model ownership and lazy Animation integration; no core/stage growth.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-254",
+      "reason": "Sprites optional entry 0 -> 1508 B: named shared-buffer intervals plus ordered codec fallback; separate small facilities remain tree-shakable within the entry."
     }
   ],
   "items": {
@@ -6778,6 +6783,7 @@
     "@margoengine/inspector/textures": 4964,
     "@margoengine/stats/geometry": 1824,
     "@margoengine/input/haptics": 1201,
-    "@margoengine/xr/hands": 2546
+    "@margoengine/xr/hands": 2546,
+    "@margoengine/audio/sprites": 1764
   }
 }

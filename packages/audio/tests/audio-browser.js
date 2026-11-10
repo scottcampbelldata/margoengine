@@ -8,6 +8,7 @@ import { runAmbisonicTests } from './ambisonics-browser.js';
 import {runPanTests} from './pan-browser.js';
 import {runBinauralTests} from './binaural-browser.js';
 import {runVoiceManagerTests} from './voice-manager-browser.js';
+import {runSpriteTests} from './sprites-browser.js';
 import {
   AudioListener,
   Audio,
@@ -451,3 +452,4 @@ window.runAmbisonicTests = runAmbisonicTests;
 window.runPanTests = runPanTests;
 window.runBinauralTests = runBinauralTests;
 window.runVoiceManagerTests = runVoiceManagerTests;
+window.runSpriteTests = runSpriteTests;

@@ -51,6 +51,7 @@ try {
   report.pan = await page.evaluate(() => window.runPanTests());
   report.binaural = await page.evaluate(() => window.runBinauralTests());
   report.voices = await page.evaluate(() => window.runVoiceManagerTests());
+  report.sprites = await page.evaluate(() => window.runSpriteTests());
   assert.equal(await page.evaluate(() => window.prepareGesture()), 'suspended');
   await page.mouse.click(20, 20);
   assert.equal(await page.evaluate(() => window.checkGesture()), 'running');

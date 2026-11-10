@@ -5611,3 +5611,6 @@ backend repair. No core or stage code changes.
 ### 5. XR skinned hand ownership
 
 Tracked world poses are converted to glTF node locals after parent worlds are staged; all 25 joints map by name. Existing optional Animation handles skin deformation. Explicit per-scene subscription owners release frame hooks and players when their model scene closes, without relying on the engine's ambient scene. Real standard weighted profile assets exercise software behavior; headset proof remains absent.
+
+### Section 5 evidence: batch 254 optional audio parity
+The four audio entries are independently optional: pan 677 B, binaural 1809 B, voices 2117 B, sprites 1508 B minified gzip. Each new size budget records the 0 B prior entry and its measured cost. Core/stage source and the 25000 B combined gate are unchanged. The audio package browser suite renders existing scenes on WebGPU, native WebGL2 and compatibility WebGL2 while Web Audio offline PCM proves stereo balance, all 16 AmbiX modes through native HRTFs, virtual phase handoffs and named sprite boundaries/fallback. CPU tests cover transport and teardown; dependent CPU suites pass. Device output, listening quality and other browser codecs remain unmeasured; no timing benchmarks run during the build phase.
