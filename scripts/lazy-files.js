@@ -389,22 +389,6 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/exporters',
-    file: 'packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js',
-    label: 'draco-encoder/draco_encoder_wrapper.js',
-    kind: 'Draco encoder glue',
-    measure: 'file',
-    when: 'With the encoder worker above; `encoderPath` serves it from elsewhere',
-  },
-  {
-    package: '@margoengine/exporters',
-    file: 'packages/exporters/dist/draco-encoder/draco_encoder.wasm',
-    label: 'draco-encoder/draco_encoder.wasm',
-    kind: 'Wasm',
-    measure: 'file',
-    when: 'With the Draco encoder glue above',
-  },
-  {
-    package: '@margoengine/exporters',
     file: 'packages/exporters/dist/basis-encoder/basis_encoder.js',
     label: 'basis-encoder/basis_encoder.js',
     kind: 'Basis encoder glue',

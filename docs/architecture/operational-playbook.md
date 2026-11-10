@@ -6586,3 +6586,9 @@ Optional sciviz/geo-lod owns its quadtree, bounded cache, loading signals and re
 Sciviz browser commands launch through scripts/browser-root.mjs so every suite serves repository fixtures when invoked by npm from packages/sciviz. The package CPU regression executes the bootstrap from that directory and checks all browser commands. This corrects the calc/atmosphere 404 gate failure without changing shared browser lifecycle code.
 
 Review 2 (2026-11-10): UI browser driver CPU probes now invoke every driver from the package working directory and require repository-root resolution at openBrowser. This catches the launch-path class that hid seven UI GPU suites behind HTTP failures; GPU correctness remains checked on native WebGPU and compatibility.
+
+## Batch 136 encoder removal (section 5 supplement)
+
+The prebuilt Draco encoder is removed only after the 76-row no-worse ratio/error and independent-decoder proof. Package builds copy the single owned SIMD artifact; default Node/browser loading and shared native/compat render gates work without old vendor/dist folders. Supply-chain regeneration now retains existing asset-notice addenda and validates the generated inventory independently. Existing supply-chain tests plus the new retention regression protect both. Core plus stage remains 24,209 B; timing is still deferred. No rendering-backend code changed.
+
+Landing metadata check: the inherited gltf-pro audio entry had current API reports but a stale aggregate count and root gzip cell in docs/api-surface.md. Rebasing onto main's regenerated summary resolves it; api:update leaves no selected diff and api:check verifies the result. No API implementation or export changes belong to encoder removal.

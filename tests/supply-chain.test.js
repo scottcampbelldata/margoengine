@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { BUNDLED, publishedPackages } from '../scripts/supply-chain.mjs';
+import { BUNDLED, noticeAddenda, publishedPackages, render } from '../scripts/supply-chain.mjs';
 
 // Launch gate 11c: THIRD-PARTY-NOTICES.md is current and its rules hold, and every published tarball ships its
 // licence and notices and nothing else. The file lists come from npm's own npm-packlist (what `npm pack` uses), loaded
@@ -21,6 +21,21 @@ const npmRequire = npmRoot && createRequire(join(npmRoot, 'package.json'));
 const read = (path) => readFileSync(join(root, path), 'utf8').replace(/\r\n/g, '\n');
 const license = read('LICENSE'),
   notice = read('NOTICE');
+
+test('notice regeneration preserves appended asset credits and still replaces generated records', () => {
+  const credits = '\n## Existing sample attribution\nAuthor, source, licence and exact modification notice.\n';
+  const legacy =
+    'stale generated table\r\nuses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.\r\n' +
+    credits.replaceAll('\n', '\r\n');
+  assert.equal(noticeAddenda(legacy), credits);
+  const record = { rows: [], deps: [], scripts: [], deprecated: [], tally: {}, total: 0 };
+  const once = render(record, noticeAddenda(legacy));
+  assert.ok(once.endsWith(credits));
+  assert.doesNotMatch(once, /stale generated table/);
+  assert.equal(render(record, noticeAddenda(once)), once);
+  assert.equal(noticeAddenda(''), '');
+  assert.throws(() => noticeAddenda('unrecognized pre-existing notice'), /refusing to discard existing credits/);
+});
 
 test('LICENSE is the Apache License 2.0 and NOTICE names Margo Engine and its author', () => {
   assert.ok(

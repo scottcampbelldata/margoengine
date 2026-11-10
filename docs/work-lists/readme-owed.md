@@ -1043,3 +1043,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 181 job 1): document createFallbackFigure from /fallback, page-wide explicit WebGL2 installation, full-tier requirements, same-case CPU isosurfaces, ownership/cancellation/restore and ?backend=webgl2 for the three real-data demos; examples deferred.
 
 - @margoengine/ui (review 2): describe Select popup ownership when closing and reopening within one turn, including disposal of the current popup.
+
+- @margoengine/exporters (batch 136 removal): remove obsolete bundled-Draco-encoder instructions and document the owned lazy artifact and external custom encoderPath compatibility during the README phase.

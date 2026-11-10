@@ -52,8 +52,8 @@ await build({
     },
   },
 });
-// The prebuilt encoders. Each folder is CommonJS, because Node loads the Emscripten wrappers with require.
-for (const folder of ['draco-encoder', 'basis-encoder']) {
+// The remaining prebuilt Basis encoder is CommonJS for Node's Emscripten loader.
+for (const folder of ['basis-encoder']) {
   await mkdir(resolve(root, 'dist', folder), { recursive: true });
   for (const file of await readdir(resolve(root, 'vendor', folder)))
     await copyFile(resolve(root, 'vendor', folder, file), resolve(root, 'dist', folder, file));

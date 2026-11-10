@@ -4212,3 +4212,5 @@ dispatch and atomic publication on success, failure and cancellation. Existing p
 suites cover the shared renderer's remaining layers. The small native preview attacher is
 not the complete route. This is backend support and fixture parity, with the bound in
 limits.md, not universal numerical identity or a speed claim. Research: clean-room.md.
+
+Batch 136 removal: exporters ships no prebuilt third-party Draco encoder. The owned optional SIMD artifact remains lazy at 160,900 B raw / 59,962 B gzip, and the entry is 91,248 B gzip. Proof: default public compression with old vendor/dist directories absent, browser worker round-trip rendering on both backends and the committed 76-row replacement matrix. Third-party Basis encoder and decoder components retain their separate notices. Existing asset credits survive notice regeneration, covered by the supply-chain regression.

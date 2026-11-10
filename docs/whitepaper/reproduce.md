@@ -3667,3 +3667,5 @@ sciviz-stars.html and sciviz-wind.html with ?backend=webgl2 to force the complet
 Data sources and licences remain in examples/assets/sciviz/README.md; no new dataset or
 performance measurement is introduced. The scripts test correctness under a hard outer
 process-tree deadline and shared GPU admission, with no exclusive speed reservation.
+
+Batch 136 removal: build packages, then run exporters/draco-native.test.js and tests/supply-chain.test.js with a hard timeout. They require the owned Wasm, no old encoder vendor/dist directories, successful default compression, current generated notices, retained asset addenda and valid package file lists. scripts/lazy-files.js lists only the owned Draco encoder asset. Run the exporter browser script for native and --compat under separate shared GPU slots. The external-oracle parity command above remains available without bundling its opaque modules.

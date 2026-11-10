@@ -30,7 +30,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | --- | --- | --- | --- | --- | --- |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | Draco 3D full decoder (Google) | Apache-2.0 | dist/draco-full/draco_decoder.wasm, dist/draco-full/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
-| @margoengine/exporters | Draco 3D encoder (Google) | Apache-2.0 | dist/draco-encoder/draco_encoder.wasm, dist/draco-encoder/draco_encoder_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/exporters | Basis Universal encoder (Binomial) | Apache-2.0 | dist/basis-encoder/basis_encoder.wasm, dist/basis-encoder/basis_encoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | jxl-oxide JPEG XL decoder (Wonwoo Choi) | MIT OR Apache-2.0 | dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
@@ -60,9 +59,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     `jxl_oxide_wasm_bg.wasm` (sha256 `3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69`) and
     `jxl_oxide_wasm.js` (`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7`). The crates inside it are named in
     `dist/THIRD-PARTY-NOTICE.md`.
-  - Draco 1.5.7 encoder from https://github.com/google/draco/tree/1.5.7/javascript (checked 2026-11-06):
-    `draco_encoder.wasm` (sha256 `d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958`) and
-    `draco_encoder_wrapper.js` (`8434adecd1446459601763e499be3697546056bca90b286a538ae0483a00845a`).
   - Basis Universal v1_50_0_2 WebGL encoder from
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build (checked 2026-11-06):
     `basis_encoder.wasm` (`dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a`) and
@@ -103,7 +99,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/dof` | none | none | LICENSE, NOTICE |
 | `@margoengine/ecs` | none | none | LICENSE, NOTICE |
 | `@margoengine/environment` | none | none | LICENSE, NOTICE |
-| `@margoengine/exporters` | none | Draco 3D encoder (Apache-2.0); Basis Universal encoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| `@margoengine/exporters` | none | Basis Universal encoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | `@margoengine/fbx` | none | none | LICENSE, NOTICE |
 | `@margoengine/fsm` | none | none | LICENSE, NOTICE |
 | `@margoengine/geometry` | none | none | LICENSE, NOTICE |
@@ -285,6 +281,8 @@ install script only clears the macOS quarantine flag on its binary. `rhino3dm` a
 `test:real-files:runtimes` tool of `@margoengine/loaders` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.
 `aioquic` (BSD-3-Clause) is not in the lock: `packages/netcode/tests/webtransport-proof/server.py` uses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.
+
+<!-- Asset notice addenda: retained verbatim by scripts/supply-chain.mjs. -->
 
 
 

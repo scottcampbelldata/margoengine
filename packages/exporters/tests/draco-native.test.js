@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -223,6 +223,9 @@ test('position seams share a grid while every UV corner and exact weight survive
 });
 
 test('the default optional entry uses only the clean-room encoder asset', { timeout: 30000 }, async () => {
+  assert.ok(existsSync(new URL('../dist/draco-native-encoder.wasm', import.meta.url)));
+  assert.equal(existsSync(new URL('../vendor/draco-encoder', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../dist/draco-encoder', import.meta.url)), false);
   const glb = exportGLB({
     nodes: [
       {

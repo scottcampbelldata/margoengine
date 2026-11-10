@@ -4909,3 +4909,5 @@ Batch 186 composition follow-up: all three clustered list buffers plus rectangle
 Batch 180 job 1: no open defect found in the view/cache/height contract. XYZ source polar coverage, conservative visibility and native-preview refusal are recorded limits; geo-lod.test.js and geo-lod-browser.mjs cover this entry.
 
 GPU runner lane identity (observed during batch 180): simultaneous serial scripts/gpu-package-tests.mjs --no-build --only=<package> from separate worktrees both request owner check:gpu-packages. gpu-lock status showed lane check queued behind another worktree while 2 of 5 slots were free. Cause: the generic owner collapses independent lanes in admission. Use lane-specific outer gpu-lock run --owner=<lane> for direct runs; repair the runner identity in its owning tooling lane during the fix phase.
+
+Batch 136 removal landing blocker fixed: supply-chain regeneration previously replaced the whole notices file and discarded appended asset credits. Explicit retained addenda, legacy-boundary migration, unknown-boundary rejection and an idempotence/stale-generated-content regression preserve them. No remaining blocker in this scope.

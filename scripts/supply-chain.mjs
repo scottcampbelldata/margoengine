@@ -17,6 +17,20 @@ const root = resolve(import.meta.dirname, '..');
 const read = (path) => readFileSync(join(root, path), 'utf8');
 const json = (path) => JSON.parse(read(path));
 export const OUTPUT = 'THIRD-PARTY-NOTICES.md';
+const ADDENDA_MARKER = '<!-- Asset notice addenda: retained verbatim by scripts/supply-chain.mjs. -->';
+const LEGACY_END =
+  'uses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.\n';
+
+/** Keep separately authored asset credits without accepting stale generated records. */
+export function noticeAddenda(current) {
+  const text = current.replaceAll('\r\n', '\n');
+  if (!text) return '';
+  const marker = text.indexOf(ADDENDA_MARKER);
+  if (marker >= 0) return text.slice(marker + ADDENDA_MARKER.length).replace(/^\n/, '');
+  const end = text.indexOf(LEGACY_END);
+  if (end < 0) throw new Error('Cannot locate the generated notice boundary; refusing to discard existing credits');
+  return text.slice(end + LEGACY_END.length);
+}
 
 /** Licences any runtime dependency may carry without review. */
 const ALLOWED = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'Zlib', '0BSD']);
@@ -54,16 +68,6 @@ export const BUNDLED = [
     files: 'dist/draco-full/draco_decoder.wasm, dist/draco-full/draco_wasm_wrapper.js',
     source:
       'packages/decoders/vendor/draco-full: Draco 1.5.6 official full decoder, https://www.gstatic.com/draco/versioned/decoders/1.5.6/ (draco_decoder.wasm sha256 c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2, draco_wasm_wrapper.js sha256 e8049906ef3f8f75d3456c22a3f31bfdfe5b5b5bd09ccdec613b9e9a49d554d8), byte-identical',
-    modified: 'no',
-    notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
-  },
-  {
-    package: '@margoengine/exporters',
-    component: 'Draco 3D encoder (Google)',
-    licence: 'Apache-2.0',
-    files: 'dist/draco-encoder/draco_encoder.wasm, dist/draco-encoder/draco_encoder_wrapper.js',
-    source:
-      'packages/exporters/vendor/draco-encoder: Draco 1.5.7 official encoder, https://github.com/google/draco/tree/1.5.7/javascript, also in npm draco3d 1.5.7 as draco_encoder_nodejs.js (draco_encoder.wasm sha256 d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958, draco_encoder_wrapper.js sha256 8434adecd1446459601763e499be3697546056bca90b286a538ae0483a00845a), byte-identical',
     modified: 'no',
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
@@ -593,7 +597,7 @@ export function collect() {
 const cell = (s) => String(s).replaceAll('|', '\\|');
 
 /** THIRD-PARTY-NOTICES.md for a collected record. Deterministic: no dates, sorted lists. */
-export function render({ rows, deps, scripts, deprecated, tally, total }) {
+export function render({ rows, deps, scripts, deprecated, tally, total }, addenda = '') {
   const table = (head, body) =>
     [
       `| ${head.join(' | ')} |`,
@@ -663,9 +667,6 @@ ${table(
     \`jxl_oxide_wasm_bg.wasm\` (sha256 \`3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69\`) and
     \`jxl_oxide_wasm.js\` (\`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7\`). The crates inside it are named in
     \`dist/THIRD-PARTY-NOTICE.md\`.
-  - Draco 1.5.7 encoder from https://github.com/google/draco/tree/1.5.7/javascript (checked 2026-11-06):
-    \`draco_encoder.wasm\` (sha256 \`d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958\`) and
-    \`draco_encoder_wrapper.js\` (\`8434adecd1446459601763e499be3697546056bca90b286a538ae0483a00845a\`).
   - Basis Universal v1_50_0_2 WebGL encoder from
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build (checked 2026-11-06):
     \`basis_encoder.wasm\` (\`dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a\`) and
@@ -714,14 +715,14 @@ install script only clears the macOS quarantine flag on its binary. \`rhino3dm\`
 \`test:real-files:runtimes\` tool of \`@margoengine/loaders\` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with \`npm ci\`, which refuses a lockfile that does not match \`package.json\` and checks
 every tarball against its integrity hash.
 \`aioquic\` (BSD-3-Clause) is not in the lock: \`packages/netcode/tests/webtransport-proof/server.py\` uses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.
-`;
+${addenda ? `\n${ADDENDA_MARKER}\n${addenda}` : ''}`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const current = existsSync(join(root, OUTPUT)) ? read(OUTPUT).replaceAll('\r\n', '\n') : '';
   const record = collect(),
-    text = render(record);
+    text = render(record, noticeAddenda(current));
   if (process.argv.includes('--check')) {
-    const current = existsSync(join(root, OUTPUT)) ? read(OUTPUT).replaceAll('\r\n', '\n') : '';
     if (current !== text) record.problems.push(`${OUTPUT} is stale: run node scripts/supply-chain.mjs`);
     for (const p of record.problems) console.error(`supply-chain: ${p}`);
     process.exit(record.problems.length ? 1 : 0);
