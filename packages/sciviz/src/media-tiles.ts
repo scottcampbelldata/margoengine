@@ -1,6 +1,7 @@
 import { Camera } from '@margoengine/core';
 import type { EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import type { Figure } from '@margoengine/sciviz';
+import { paintOverlays, swatches, textRuns } from './export.js';
 import { clearColorValue } from '../../shared/clear-color.js';
 import { fault, rangeError } from '../../shared/errors.js';
 
@@ -124,9 +125,6 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
   let attached = false;
   try {
     await figure.ready();
-    // The overlay painter is the figure's lazily loaded export module (Figure.toPNG loads it the same way), so no
-    // module of this package imports it both ways (tests/dist-dynamic-imports.test.js).
-    const overlays = options.overlays === false ? undefined : await import('./export.js');
     signal?.throwIfAborted();
     const engine = figure.engine,
       device = engine.gpu;
@@ -142,8 +140,8 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
     const edge = Math.min(tileSize, device.limits.maxTextureDimension2D),
       layout = figure.exportLayout();
     figure.render();
-    const runs = overlays ? overlays.textRuns(layout.roots, origin) : [],
-      boxes = overlays ? overlays.swatches(layout.roots, origin) : [];
+    const runs = options.overlays === false ? [] : textRuns(layout.roots, origin),
+      boxes = options.overlays === false ? [] : swatches(layout.roots, origin);
     const source = engine.camera,
       aspect = cssWidth / cssHeight,
       base = new Float64Array(16);
@@ -264,13 +262,13 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
               if (alpha && alpha < 255)
                 for (let c = 0; c < 3; c++) pixels[p + c] = Math.min(255, Math.round((pixels[p + c] * 255) / alpha));
             }
-          if (overlays) {
+          if (options.overlays !== false) {
             const surface = new OffscreenCanvas(w, h),
               g = surface.getContext('2d')!;
             g.putImageData(new ImageData(pixels, w, h), 0, 0);
             g.translate(-x, -y);
             g.scale(width / (origin.width || cssWidth), height / (origin.height || cssHeight));
-            overlays.paintOverlays(g, runs, layout.bars, origin, 1, boxes);
+            paintOverlays(g, runs, layout.bars, origin, 1, boxes);
             pixels.set(g.getImageData(0, 0, w, h).data);
           }
           yield { x, y, width: w, height: h, pixels };

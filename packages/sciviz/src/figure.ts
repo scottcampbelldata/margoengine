@@ -1653,7 +1653,7 @@ export class Figure extends EventTarget {
    */
   async toPNG(options: PNGOptions = {}): Promise<Blob> {
     // Export code loads on first use.
-    const { paintOverlays, swatches, textRuns, captureGPU } = await import('./export.js');
+    const { paintOverlays, swatches, textRuns, captureGPU } = await import('./export-load.js');
     await this.ready();
     this.#check();
     const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
@@ -1688,7 +1688,7 @@ export class Figure extends EventTarget {
    * anything else is a fresh frame embedded as a PNG under the vector text (`vector: false` forces that).
    */
   async toSVG(options: SVGOptions = {}): Promise<string> {
-    const ex = await import('./export.js'),
+    const ex = await import('./export-load.js'),
       { base64, svgBars, svgSwatches, svgText, swatches, textRuns } = ex;
     await this.#pending;
     this.#check();
@@ -1730,7 +1730,7 @@ export class Figure extends EventTarget {
 
   // A 2D chart as SVG shapes: background, grid and frame, then rectangles, points and lines in drawing order, clipped
   // to the plot area.
-  #vectorSVG(width: number, height: number, { hex, escapeXML }: typeof import('./export.js')): string {
+  #vectorSVG(width: number, height: number, { hex, escapeXML }: typeof import('./export-load.js')): string {
     const m = this.#margin,
       { matrix } = this.#view(),
       p = { x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false },
