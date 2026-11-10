@@ -5623,3 +5623,6 @@ Both diffuse and specular use centre-map PCSS visibility. The sphere's filtering
 
 
 Batch 186 job 1 min+gzip: reconstructed prior shadows entry 11,522 B, current 11,791 B; ceiling 11,769 to 12,145 B. New /area-shapes 0 to 12,817 B, ceiling 13,202 B. The new entry reuses LTC and one shared caster pipeline rather than duplicating shading/lifecycle state. Core plus stage remains 24,209 B.
+Batch 191 post/stylize is one LDR pass: scanline/noise strengths 0..1 (defaults 0.15/0.03), scan density >0..8 cycles per row (0.5), scrolling -100..100 cycles/sec (0), monochrome noise true, uint32 seed 1, RGB bits 1..8 or tuple (8). Alpha is unchanged. Explicit time 0..10,000,000 seconds supports repeatable seeking; otherwise one engine-update clock serves all views. Shock waves accept screen UV or projected world centre, explicit radius or explode(), speed 0..100 (2), maxRadius >0..100 (1), half-width >0..10 (0.2) and amplitude 0..1 (0.05), all in view-height units. Behind-camera centres and waves past maxRadius are inactive. Displacement is confined to the annulus; outside it texels are unchanged when colour controls are off. No extra image target beyond PostStack.
+
+Batch 191 job 5: post/stylize 0 -> 6946 B min+gzip; core plus stage unchanged at 24,209 B.

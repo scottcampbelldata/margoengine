@@ -953,3 +953,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/vfx (batch 195 blocking manifest repair): recurring GPU command retains all parity cases; no public API/example change, README examples remain deferred.
 - @margoengine/vfx (batch 270 manifest correction): document separate test:gpu and test:gpu:parity commands and automatic CI discovery without duplicate execution; examples deferred.
+- @margoengine/post: document Stylize controls, explode and world/screen epicentres, explicit clocks, RGB bit counts, deterministic noise, scanline scrolling and LDR order.
+

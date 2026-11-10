@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13996098,
+  "total": 14003300,
   "history": [
     {
       "date": "2026-10-24",
@@ -7406,6 +7406,12 @@
       "commit": "batch-186",
       "reason": "Disk/sphere PCSS beside rectangle lights: shadows measured 11522 to 11791 B, new area-shapes 0 to 12817 B. Retains one shared caster pipeline and LTC ownership; splitting would duplicate lifecycle and shading state.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-191-job-5",
+      "reason": "New optional post/stylize: 0 to 6946 B gzip. A single LDR owner combines four independent controls and bounded backward sampling; splitting would duplicate input capture and lifecycle logic. Core plus stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8750,6 +8756,7 @@
     "@margoengine/staging/accumulate-ambient": 10723,
     "@margoengine/sciviz/volume-quality": 8765,
     "@margoengine/quality/demand": 1184,
-    "@margoengine/clustered/area-shapes": 13202
+    "@margoengine/clustered/area-shapes": 13202,
+    "@margoengine/post/stylize": 7202
   }
 }
