@@ -246,3 +246,11 @@ test('Timeline repeat loops from the start values, yoyo swings back, speed scale
   assert.throws(() => c.update(1), { code: 'state' });
   assert.deepEqual(zero, ['start']);
 });
+
+// Batch 132 audit: steps(n, true) used ceil(t n), so jump-start showed 0 at t = 0 and fell one step short on every
+// boundary; CSS Easing Level 1 takes floor(t n) + 1 (without the before flag).
+test('steps with jumpStart follows the CSS step easing algorithm at t = 0 and on every boundary', () => {
+  const start = T.steps(4, true);
+  assert.deepEqual([0, 0.01, 0.25, 0.5, 0.99, 1].map(start), [0.25, 0.25, 0.5, 0.75, 1, 1]);
+  assert.deepEqual([0, 0.25, 1].map(T.steps(4)), [0, 0.25, 1]);
+});

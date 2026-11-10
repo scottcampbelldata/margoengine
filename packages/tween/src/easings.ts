@@ -93,7 +93,7 @@ export const easeInOutBounce: Easing = inOut(easeInBounce);
 
 /**
  * CSS `cubic-bezier(x1, y1, x2, y2)` timing function (CSS Easing Functions Level 1). `x1` and `x2` must lie in [0, 1];
- * `y1` and `y2` may overshoot. Solved by Newton iterations with a bisection fallback, accurate to about 1e-6.
+ * `y1` and `y2` may overshoot. An input outside [0, 1] gives 0 or 1, where CSS extends the curve along its end tangents. Solved by Newton iterations with a bisection fallback, accurate to about 1e-6.
  * @throws RangeError when `x1` or `x2` is outside [0, 1] or any argument is not finite.
  */
 export function cubicBezier(x1: number, y1: number, x2: number, y2: number): Easing {
@@ -114,10 +114,18 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): Eas
 }
 
 /**
- * CSS `steps(count, jump-end)`-style staircase: `count` equal jumps, the first at the start when `jumpStart` is true.
+ * CSS `steps(count, jump-end)` staircase, or `steps(count, jump-start)` when `jumpStart` is true: `count` equal jumps,
+ * by the step easing algorithm of CSS Easing Functions Level 1 without the before flag (floor(t count), plus one for
+ * jump-start, kept in [0, count] while t is in [0, 1]). With `jumpStart` the first jump is at t = 0 itself, and each
+ * later one lands exactly on its boundary, as in CSS.
  * @throws RangeError when `count` is not a positive integer.
  */
 export function steps(count: number, jumpStart = false): Easing {
   if (!Number.isInteger(count) || count < 1) throw new RangeError('steps needs a positive integer count; use steps(4)');
-  return (t) => (jumpStart ? Math.min(1, Math.ceil(t * count) / count) : Math.min(1, Math.floor(t * count) / count));
+  return (t) => {
+    let step = Math.floor(t * count) + (jumpStart ? 1 : 0);
+    if (t >= 0 && step < 0) step = 0;
+    if (t <= 1 && step > count) step = count;
+    return step / count;
+  };
 }
