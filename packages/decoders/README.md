@@ -273,6 +273,8 @@ Four small synchronous readers, each its own entry and each written from its pub
   10-bit and shared-exponent formats pass through. 2D textures, cube maps and arrays of either; volume and 1D textures
   are refused. KTX padding rules (row, cube and mip) are followed, big-endian files are swapped, and key/value data
   is skipped, so `KTXorientation` is not applied and rows come out as stored.
+  KTX `COMPRESSED_RGB_S3TC_DXT1` (and its sRGB form) has no alpha, so `hasAlpha` is false: WebGPU samples a
+  three-colour block's black texel with alpha 0, which an opaque material must ignore.
 - `uploadTexture(device, file, {label?, usage?})` (on both `/dds` and `/ktx`) creates the GPUTexture and writes every
   level and layer. On a device without the feature (`texture-compression-bc`, `-etc2` or `-astc`) it throws
   `MargoError` `unsupported` naming the feature to request in `requestDevice`.

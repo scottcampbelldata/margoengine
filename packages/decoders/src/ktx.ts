@@ -64,7 +64,10 @@ const IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x31, 0x31, 0xbb, 0x0d, 0x0a, 
     ),
   },
   // RGB8 and SRGB8: three bytes per texel in the file, expanded to RGBA8.
-  RGB8: Record<number, string> = { 0x8051: 'rgba8unorm', 0x8c41: 'rgba8unorm-srgb' };
+  RGB8: Record<number, string> = { 0x8051: 'rgba8unorm', 0x8c41: 'rgba8unorm-srgb' },
+  // COMPRESSED_RGB_S3TC_DXT1 and its sRGB twin carry no alpha (EXT_texture_compression_s3tc): a three-colour block's
+  // fourth index is opaque black there, while bc1-rgba-unorm samples it with alpha 0, so the alpha must be ignored.
+  OPAQUE_BC1 = new Set([0x83f0, 0x8c4c]);
 
 const corrupt = (problem: string): Error =>
   decodeFailed(`KTX ${problem}; pass the complete bytes of a valid KTX 1 file`);
@@ -155,6 +158,6 @@ export function parseKTX(bytes: Uint8Array): TextureFile {
     ...(block[3] ? { feature: block[3] } : {}),
     target: 'ktx',
     srgb: format.endsWith('-srgb'),
-    hasAlpha: !expandRGB && /^(rgba|rgb10a2|bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format),
+    hasAlpha: !expandRGB && !OPAQUE_BC1.has(internal) && /^(rgba|rgb10a2|bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format),
   };
 }

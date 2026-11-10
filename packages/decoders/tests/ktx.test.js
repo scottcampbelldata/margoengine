@@ -106,6 +106,9 @@ test('KTX maps every compressed glInternalFormat, with feature, sRGB and every m
         }),
       );
       assert.deepEqual([file.format, file.feature, file.srgb], [format, feature, format.endsWith('-srgb')], label);
+      // The RGB DXT1 formats (0x83f0, 0x8c4c) have no alpha; the RGBA ones and the other alpha formats do.
+      const alpha = /^(bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format) && internal !== 0x83f0 && internal !== 0x8c4c;
+      assert.equal(file.hasAlpha, alpha, `${label} hasAlpha`);
       assert.deepEqual(
         file.mipmaps.map((m) => m.data),
         images.map(([data]) => data),
