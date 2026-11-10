@@ -73,3 +73,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/navmesh | wasm worker builders, returned work counts, separate asset hosting, abort/deadline, SIMD requirement and tiled runtime rebuild behavior | batch-252 job 4 |
 | margoengine | Generated navmesh/wasm alias | batch-252 job 4 |
+- @margoengine/controls: document /presentation product picking, springs, bounded rotation, snap-back/polar zoom, ScrollArea ownership, native/wheel/infinite scroll, helpers, Spline paths, mesh/camera targets, focus and cleanup; note the optional tween peer.
+- margoengine: document /controls/presentation alias.

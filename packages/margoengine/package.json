@@ -638,6 +638,10 @@
       "types": "./dist/controls/box-gizmo.d.ts",
       "import": "./dist/controls/box-gizmo.js"
     },
+    "./controls/presentation": {
+      "types": "./dist/controls/presentation.d.ts",
+      "import": "./dist/controls/presentation.js"
+    },
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
