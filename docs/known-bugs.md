@@ -4058,3 +4058,5 @@ No open defect from the globe suite. Radial altitude, perspective/reference-elli
 
 Batch 251 job 1: no open defect found in reference expansion; missing registrations,
 cycles and bounded expansion reject during construction (subtrees.test.js).
+
+Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.

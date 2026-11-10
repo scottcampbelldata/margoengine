@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12070780,
+  "total": 12081466,
   "history": [
     {
       "date": "2026-10-24",
@@ -5342,6 +5342,12 @@
       "commit": "batch-256",
       "reason": "New optional netcode/lobby: 4183 B gzip; no previous entry, full feature kept in one import. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "55e916e4a",
+      "grew": 3,
+      "reason": "Batch 171 job 5: optional netcdf absent to 3418 B, vtk absent to 5945 B; existing loaders/vtk-xml recorded 6788 to 7492 B for lazy intact datasets, raw range callback and exact integer diagnostics. Keep the single owner decoder instead of duplicating it; no split that complicates file ownership to save optional bytes. Core and stage source unchanged."
     }
   ],
   "items": {
@@ -5734,7 +5740,7 @@
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vdb": 6406,
     "@margoengine/loaders/vrml": 5087,
-    "@margoengine/loaders/vtk-xml": 6937,
+    "@margoengine/loaders/vtk-xml": 7748,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/loaders/xml": 1561,
     "@margoengine/lod": 14316,
@@ -6351,6 +6357,8 @@
     "@margoengine/tiles/style": 10057,
     "@margoengine/fsm/invoke": 3865,
     "@margoengine/navmesh/queries": 1865,
-    "@margoengine/netcode/lobby": 4439
+    "@margoengine/netcode/lobby": 4439,
+    "@margoengine/sciviz/netcdf": 3674,
+    "@margoengine/sciviz/vtk": 6201
   }
 }

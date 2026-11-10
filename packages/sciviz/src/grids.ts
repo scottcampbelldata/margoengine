@@ -4,7 +4,7 @@
 // plane crosses: the cell's edges that change side give the corners of one convex polygon (each cell is convex with
 // planar faces), ordered by angle about their centre in the plane and fanned into triangles, with point values
 // interpolated along the cut edges, so neighbouring cells meet without cracks. Both draw as triangle meshes coloured
-// through a colour map by the interpolated value, flat-lit. parseVtk reads legacy VTK files (versions to 4.2) into
+// through a colour map by the interpolated value, flat-lit. parseVtk reads legacy VTK files (versions to 5.1) into
 // this layout.
 import { invertMatrix } from '@margoengine/math/mat4';
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
@@ -353,13 +353,17 @@ const VTK_BYTES: Record<string, number> = {
   int: 4,
   float: 4,
   double: 8,
+  vtktypeint64: 8,
+  vtktypeuint64: 8,
+  vtktypeint32: 4,
+  vtktypeuint32: 4,
 };
 
 // A hexahedron's corner k is a voxel's corner VOXEL_TO_HEXAHEDRON[k]: a voxel numbers x fastest, then y, then z.
 const VOXEL_TO_HEXAHEDRON = [0, 1, 3, 2, 4, 5, 7, 6];
 
 /**
- * Reads a legacy VTK file (`.vtk`, versions 1.0 to 4.2, ASCII or big-endian BINARY) holding an UNSTRUCTURED_GRID, as
+ * Reads a legacy VTK file (`.vtk`, versions 1.0 to 5.1, ASCII or big-endian BINARY) holding an UNSTRUCTURED_GRID, as
  * set out in "VTK File Formats" (Kitware, VTK User's Guide): POINTS, CELLS with a point count before each cell,
  * CELL_TYPES, and POINT_DATA and CELL_DATA attributes. Tetrahedra, voxels (reordered to hexahedra), hexahedra, wedges
  * and pyramids are kept; other cells are counted in `skipped` with their cell data dropped. The first SCALARS of each
@@ -390,17 +394,13 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
   const count = (what: string): number => {
     const text = word(),
       n = Number(text);
-    if (!Number.isInteger(n) || n < 0) throw rangeError(`VTK ${what} must be a whole number, got ${text}`, 'sciviz');
+    if (!Number.isSafeInteger(n) || n < 0)
+      throw rangeError(`VTK ${what} must be a whole number, got ${text}`, 'sciviz');
     return n;
   };
   const version = /^# vtk DataFile Version (\d+)\.(\d+)/i.exec(line());
   if (!version)
     throw rangeError('Not a legacy VTK file: the first line must be "# vtk DataFile Version x.x"', 'sciviz');
-  if (Number(version[1]) >= 5)
-    throw rangeError(
-      `VTK legacy version ${version[1]}.${version[2]} (OFFSETS and CONNECTIVITY) is not read; versions up to 4.2 are`,
-      'sciviz',
-    );
   const title = line(),
     format = line().trim().toUpperCase();
   if (format !== 'ASCII' && format !== 'BINARY')
@@ -414,6 +414,8 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
   };
   // Reads n values of a data type: words in ASCII, big-endian bytes in BINARY.
   const values = (n: number, type: string): Float64Array => {
+    if (!Number.isSafeInteger(n) || n < 0 || n > bytes.length)
+      throw rangeError('VTK count exceeds file bound', 'sciviz');
     const out = new Float64Array(n);
     if (!binary) {
       for (let i = 0; i < n; i++) {
@@ -430,21 +432,29 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
     if (at + n * size > bytes.length) throw rangeError('VTK file ends early', 'sciviz');
     const view = new DataView(bytes.buffer, bytes.byteOffset + at, n * size),
       get =
-        type === 'float'
-          ? (o: number) => view.getFloat32(o)
-          : type === 'double'
-            ? (o: number) => view.getFloat64(o)
-            : type === 'int'
+        type === 'vtktypeint64'
+          ? (o: number) => Number(view.getBigInt64(o))
+          : type === 'vtktypeuint64'
+            ? (o: number) => Number(view.getBigUint64(o))
+            : type === 'vtktypeint32'
               ? (o: number) => view.getInt32(o)
-              : type === 'unsigned_int'
+              : type === 'vtktypeuint32'
                 ? (o: number) => view.getUint32(o)
-                : type === 'short'
-                  ? (o: number) => view.getInt16(o)
-                  : type === 'unsigned_short'
-                    ? (o: number) => view.getUint16(o)
-                    : type === 'char'
-                      ? (o: number) => view.getInt8(o)
-                      : (o: number) => view.getUint8(o);
+                : type === 'float'
+                  ? (o: number) => view.getFloat32(o)
+                  : type === 'double'
+                    ? (o: number) => view.getFloat64(o)
+                    : type === 'int'
+                      ? (o: number) => view.getInt32(o)
+                      : type === 'unsigned_int'
+                        ? (o: number) => view.getUint32(o)
+                        : type === 'short'
+                          ? (o: number) => view.getInt16(o)
+                          : type === 'unsigned_short'
+                            ? (o: number) => view.getUint16(o)
+                            : type === 'char'
+                              ? (o: number) => view.getInt8(o)
+                              : (o: number) => view.getUint8(o);
     for (let i = 0; i < n; i++) out[i] = get(i * size);
     at += n * size;
     return out;
@@ -455,12 +465,13 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
   if (kind !== 'UNSTRUCTURED_GRID') throw rangeError(`VTK DATASET ${kind} is not read; UNSTRUCTURED_GRID is`, 'sciviz');
   let points: Float64Array | undefined,
     list: Float64Array | undefined,
+    modernOffsets: Float64Array | undefined,
     types: Float64Array | undefined,
     cells = 0,
     attached: 'point' | 'cell' | undefined,
     attachedCount = 0;
-  const pointArrays: Record<string, Float64Array> = {},
-    cellArrays: Record<string, Float64Array> = {};
+  const pointArrays: Record<string, Float64Array> = Object.create(null),
+    cellArrays: Record<string, Float64Array> = Object.create(null);
   for (;;) {
     while (at < bytes.length && space(bytes[at])) at++;
     if (at >= bytes.length) break;
@@ -474,7 +485,27 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
       cells = count('CELLS count');
       const size = count('CELLS size');
       endLine();
-      list = values(size, 'int');
+      if (Number(version[1]) >= 5) {
+        if (cells < 1 || word().toUpperCase() !== 'OFFSETS')
+          throw rangeError('VTK 5.1 CELLS requires OFFSETS', 'sciviz');
+        const offsetType = typeName();
+        endLine();
+        modernOffsets = values(cells, offsetType);
+        if (word().toUpperCase() !== 'CONNECTIVITY') throw rangeError('VTK 5.1 CELLS requires CONNECTIVITY', 'sciviz');
+        const connectionType = typeName();
+        endLine();
+        list = values(size, connectionType);
+        cells--;
+        if (modernOffsets[0] !== 0 || modernOffsets[cells] !== list.length)
+          throw rangeError('VTK 5.1 offsets must span connectivity', 'sciviz');
+        for (let i = 0; i <= cells; i++)
+          if (
+            !Number.isSafeInteger(modernOffsets[i]) ||
+            modernOffsets[i] < 0 ||
+            (i > 0 && modernOffsets[i] < modernOffsets[i - 1])
+          )
+            throw rangeError('VTK 5.1 offsets must be increasing integers', 'sciviz');
+      } else list = values(size, 'int');
     } else if (key === 'CELL_TYPES') {
       if (count('CELL_TYPES count') !== cells) throw rangeError('VTK CELL_TYPES count differs from CELLS', 'sciviz');
       endLine();
@@ -485,6 +516,12 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
       const expected = attached === 'point' ? (points?.length ?? 0) / 3 : cells;
       if (attachedCount !== expected)
         throw rangeError(`VTK ${key} ${attachedCount} differs from the ${expected} ${attached}s`, 'sciviz');
+    } else if (key === 'METADATA') {
+      // VTK 5.1 metadata is text even in a binary file and ends at an empty line.
+      line();
+      while (at < bytes.length && line().trim()) {
+        /* skip metadata, not numeric arrays */
+      }
     } else if (!attached) {
       throw rangeError(`VTK keyword ${key} is not part of an UNSTRUCTURED_GRID`, 'sciviz');
     } else if (key === 'SCALARS') {
@@ -532,12 +569,16 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
       word();
       const arrays = count('FIELD array count');
       for (let a = 0; a < arrays; a++) {
-        word();
+        const name = word();
         const components = count('FIELD components'),
           tuples = count('FIELD tuples'),
           type = typeName();
         endLine();
-        values(components * tuples, type);
+        const data = values(components * tuples, type);
+        if (components > 0 && tuples === attachedCount) {
+          const first = Float64Array.from({ length: tuples }, (_, i) => data[i * components]);
+          (attached === 'point' ? pointArrays : cellArrays)[name] = first;
+        }
       }
     } else {
       throw rangeError(`VTK keyword ${key} is not read`, 'sciviz');
@@ -552,12 +593,14 @@ export function parseVtk(source: string | ArrayBuffer | ArrayBufferView): VtkGri
     keptTypes: number[] = [];
   let p = 0;
   for (let c = 0; c < cells; c++) {
-    const n = list[p],
+    const n = modernOffsets ? modernOffsets[c + 1] - modernOffsets[c] : list[p],
       type = types[c];
-    if (!(Number.isInteger(n) && n >= 0 && p + n < list.length))
+    if (!(Number.isSafeInteger(n) && n >= 0 && (modernOffsets ? p + n <= list.length : p + n < list.length)))
       throw rangeError(`VTK cell ${c} runs past the CELLS list`, 'sciviz');
-    const ids = list.subarray(p + 1, p + 1 + n);
-    p += 1 + n;
+    const ids = list.subarray(p + (modernOffsets ? 0 : 1), p + (modernOffsets ? 0 : 1) + n);
+    if (ids.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= points.length / 3))
+      throw rangeError(`VTK cell ${c} has an invalid point index`, 'sciviz');
+    p += (modernOffsets ? 0 : 1) + n;
     const voxel = type === 11;
     if (!voxel && !NODES[type]) continue;
     if (n !== (voxel ? 8 : NODES[type])) throw rangeError(`VTK cell ${c} of type ${type} has ${n} points`, 'sciviz');

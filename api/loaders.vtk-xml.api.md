@@ -8,9 +8,35 @@ export interface VTKField {
     values: Float32Array;
 }
 
+export interface VTKXMLArray {
+    readonly name: string;
+    readonly type: string;
+    readonly components: number;
+    read(signal?: AbortSignal): Promise<Float64Array>;
+}
+
+export interface VTKXMLDataset {
+    readonly type: string;
+    readonly attributes: Readonly<Record<string, string>>;
+    readonly pieces: readonly VTKXMLPiece[];
+}
+
+export interface VTKXMLDatasetOptions extends VTKXMLOptions {
+    maxBytes?: number;
+    readAppended?: (offset: number, length: number, signal?: AbortSignal) => Promise<Uint8Array>;
+}
+
 export interface VTKXMLOptions extends ParseLimits {
     surface?: 'outer' | 'all';
     signal?: AbortSignal;
+}
+
+export interface VTKXMLPiece {
+    readonly attributes: Readonly<Record<string, string>>;
+    readonly pointData: Readonly<Record<string, VTKXMLArray>>;
+    readonly cellData: Readonly<Record<string, VTKXMLArray>>;
+    readonly points?: VTKXMLArray;
+    readonly cells: Readonly<Record<string, VTKXMLArray>>;
 }
 
 export interface VTKXMLResult extends LoadedGeometry {
@@ -22,6 +48,8 @@ export interface VTKXMLResult extends LoadedGeometry {
     cellCount: number;
     warnings: string[];
 }
+
+export function openVTKXMLDataset(input: BinaryInput, options?: VTKXMLDatasetOptions): VTKXMLDataset;
 
 export function parseVTKXML(input: BinaryInput, options?: VTKXMLOptions): Promise<VTKXMLResult>;
 

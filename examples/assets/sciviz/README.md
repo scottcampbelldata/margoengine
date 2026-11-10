@@ -1,5 +1,15 @@
 # Real scientific demo data
 
+The **NOAA wind files** example uses `wind-classic.nc`, `wind-offset.nc`, `wind.vti`, `wind.vts`, `wind.vtu`
+and `wind.vtk`, all converted from the same pinned NOAA eastward-wind source below with netCDF4 1.7.5.1.post1
+and VTK 9.7.2 public writer APIs. They retain every native sample in January 1-8, 2024, 100 W to 90 W,
+20 N to 30 N, an 8 x 5 x 5 subset. No new source download or licence applies. `formats.json` pins each file,
+the original source, float32 sample hash, range and writer versions. VTK coordinates are sample indices:
+longitude index, latitude index, day index. The third axis is time, not altitude or a spatial wind volume.
+The VTK XML variants use zlib-compressed raw appended arrays; legacy uses 5.1 big-endian binary. Reproduce:
+`python scripts/prepare-sciviz-formats.py` after preparing the cached NOAA inputs, with numpy, netCDF4 and vtk.
+Only public writer APIs run; no external implementation source is read or copied.
+
 `sciviz-lic.html` reuses the exact `wind.bin` reduction and `wind.json` provenance below: NOAA PSL NCEP-NCAR
 Reanalysis 1 daily near-surface wind, January 1-8, 2024, US-government public domain. SHA-256:
 `e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd`.

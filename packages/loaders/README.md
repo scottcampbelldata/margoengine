@@ -1,5 +1,23 @@
 # @margoengine/loaders
 
+`@margoengine/loaders/vtk-xml` also exposes `openVTKXMLDataset` for lazy numeric arrays and intact volume
+topology in `.vtu`, `.vti`, `.vts` and `.vtp`. It shares every decoder with `parseVTKXML`; it does not construct
+or triangulate geometry. Metadata and arrays stay separated by piece. Array `read(signal?)` returns owned
+float64 values. `maxBytes` defaults to 256 MiB per decoded array. A `readAppended(offset, length, signal)`
+callback supplies raw binary bytes relative to the appended underscore, enabling range loading from an
+immutable file. Inline/base64 payloads must be in the supplied bytes. `signal` cancels all lazy reads.
+Unknown byte orders and integers beyond exact JavaScript number precision reject instead of silently corrupting data.
+
+```ts
+import { openVTKXMLDataset } from '@margoengine/loaders/vtk-xml';
+
+const bytes = new TextEncoder().encode(`<VTKFile type="ImageData"><ImageData WholeExtent="0 1 0 0 0 0">
+  <Piece Extent="0 1 0 0 0 0"><PointData><DataArray type="Float32" Name="wind">2 3</DataArray>
+  </PointData></Piece></ImageData></VTKFile>`);
+const dataset = openVTKXMLDataset(bytes);
+console.log(await dataset.pieces[0].pointData.wind.read());
+```
+
 Import `margoengine/loaders` from the `margoengine` package, or `@margoengine/loaders` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 PLY, STL, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).

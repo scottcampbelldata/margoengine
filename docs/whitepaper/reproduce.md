@@ -2498,3 +2498,13 @@ All fixtures are generated locally; no renderer, GPU, external assets or timings
 
 
 Batch 252 job 1: build packages, then run `node --test --test-timeout=120000 packages/navmesh/test/queries.test.js`. The clean-room record cites the clipping paper, triangulation paper and rival query contracts. Fixtures are generated analytically in the test and require no GPU or external assets.
+
+### Batch 171 climate and solver format correctness
+
+After building loaders and sciviz, run `node --test --test-timeout=120000 packages/sciviz/tests/climate-formats.test.js
+packages/loaders/tests/vtk-xml-dataset.test.js` (one shell line). Real-file hashes and all 200 measured values
+are checked against the same NOAA input converted by public netCDF4 and VTK writer APIs. Recreate with
+`python scripts/prepare-sciviz-formats.py`, after prepare-sciviz-data.py populates this worktree's cache.
+`node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=3 -- node packages/sciviz/tests/formats-browser.mjs`
+checks six format variants on WebGPU and the WebGL2 compatibility backend. Its JSON stays in
+`test-results/sciviz-fixes/formats-gpu.json`. No benchmark or timing-only assertion is run during the build phase.

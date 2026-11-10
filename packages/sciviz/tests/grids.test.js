@@ -300,7 +300,7 @@ test('parseVtk reads a legacy unstructured grid in ASCII and BINARY alike', () =
 
 test('parseVtk refuses what it does not read, naming it', () => {
   assert.throws(() => parseVtk('hello'), /first line/);
-  assert.throws(() => parseVtk('# vtk DataFile Version 5.1\nx\nASCII\nDATASET UNSTRUCTURED_GRID\n'), /5\.1/);
+  assert.throws(() => parseVtk('# vtk DataFile Version 5.1\nx\nASCII\nDATASET UNSTRUCTURED_GRID\n'), /needs POINTS/);
   assert.throws(() => parseVtk('# vtk DataFile Version 3.0\nx\nASCII\nDATASET POLYDATA\n'), /POLYDATA/);
   assert.throws(() => parseVtk('# vtk DataFile Version 3.0\nx\nHEX\n'), /ASCII or BINARY/);
   assert.throws(() => parseVtk('# vtk DataFile Version 3.0\nx\nBINARY\nDATASET UNSTRUCTURED_GRID\nPOINTS 1 long\n12345678'), /long/);

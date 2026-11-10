@@ -9,4 +9,5 @@ export const scientificPages = [
   'sciviz-moving-flow',
   'sciviz-lic',
   'sciviz-tubes',
+  'sciviz-formats',
 ];

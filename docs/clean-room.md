@@ -5146,3 +5146,48 @@ No asset demo or timing claim is added; generated trees are correctness fixtures
 Sources compared before implementation (2026-11-10): Mike Cyrus and Jay Beck, *Generalized two- and three-dimensional clipping* (1978), https://doi.org/10.1016/0097-8493(78)90021-3 (convex half-plane segment intervals); Douglas Demyen and Michael Buro, *Efficient Triangulation-Based Pathfinding* (2006), https://cdn.aaai.org/AAAI/2006/AAAI06-148.pdf (traversable portals versus constrained walls); Mikko Mononen and Recast Navigation contributors, *dtNavMeshQuery API reference* (2009-present), https://recastnav.com/classdtNavMeshQuery.html (raycast and local move contracts); Isaac Mason and contributors, *recast-navigation-js NavMeshQuery API reference* (accessed 2026-11-10), https://recast-navigation-js-docs.isaacmason.com/classes/index.NavMeshQuery.html (web rival contract). Only papers and published API descriptions were consulted, no implementation or companion source.
 
 Combined design: clip an XZ segment against convex polygon half-planes, then follow only connected ground portals at the exit parameter. Explore tied vertex exits so a zero-length polygon crossing is valid. Report the exact edge and outward normal. Local movement searches portals intersecting the disk with the requested segment as diameter and selects the closest point on the reachable polygons. Unlike the reference contract's unprojected move result, Margo projects onto the polygon plane. Filters, blocked polygons, partial tile portals and live rebuilds share the existing mesh graph. Synthetic corridors, ramps and floors are analytic test fixtures; no downloaded asset or new public demo. The private CAD kernel's package layout was inspected; these ground graph queries belong to navmesh, not the private CAD kernel.
+
+## Batch 171 job 5: climate and solver files
+
+Research before implementation compared classic array storage, parallel access descriptions, VTK dataset layouts,
+CF packing rules and HTTP byte ranges. Only specifications and descriptive/mathematical paper sections were read.
+No third-party reader, writer, engine or companion implementation source was inspected, adapted or copied.
+
+- Russ Rew and Glenn Davis (1990), *NetCDF: An Interface for Scientific Data Access*, IEEE CG&A,
+  https://doi.org/10.1109/38.56302. Bibliographic/design context, not an implementation source.
+- Jianwei Li, Wei-keng Liao, Alok Choudhary, Robert Ross, Rajeev Thakur, William Gropp and Rob Latham (2003),
+  *Parallel netCDF: A Scientific High-Performance I/O Interface*, https://arxiv.org/abs/cs/0306048,
+  sections 3.1-3.2 and Figure 1: separate inquiry from payload reads and distinguish contiguous variables from
+  interleaved record slabs. We combine that separation with bounded contiguous read runs, not MPI or its code.
+- Unidata (NetCDF Users Guide v1.2), *Appendix B. File Format Specifications*,
+  https://docs.unidata.ucar.edu/nug/current/file_format_specifications.html: authoritative CDF-1/2 grammar,
+  big-endian numeric types, record stride, four-byte padding and the sole-record no-padding exception.
+- Brian Eaton, Jonathan Gregory, Bob Drach, Karl Taylor, Steve Hankin et al. (CF Community, 2024),
+  *CF Metadata Conventions 1.12*, https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html,
+  sections 2.5.1 and 8.1: test missing/valid packed values before scale/offset. Coordinates and calendars remain
+  metadata; we do not infer spherical geometry from an arbitrary three-dimensional climate array.
+- Kitware, *VTK File Formats*, XML and Simple Legacy specifications (VTK documentation),
+  https://docs.vtk.org/en/latest/vtk_file_formats/vtkxml_file_format.html and
+  https://docs.vtk.org/en/latest/vtk_file_formats/vtk_legacy_file_format.html: piece extents, implicit image
+  topology, explicit structured points, connectivity and end offsets, field associations and array encodings.
+  The existing loaders/vtk-xml owns all decoding, extended with a lazy array interface, never a second reader.
+  VTK 5.1 OFFSETS/CONNECTIVITY and text metadata were additionally checked against actual VTK 9.7.2 output.
+- Roy Fielding, Mark Nottingham and Julian Reschke (2022), *HTTP Semantics*, RFC 9110,
+  https://www.rfc-editor.org/rfc/rfc9110.html#name-range: validate Content-Range and returned byte counts;
+  a server ignoring Range is accepted only inside the explicit whole-response bound.
+
+NetCDF-4 requires HDF5 object headers, indexes and filter semantics outside this job's practical classic reader;
+its documented rejection is allowed by the job text. HDF5 belongs to batch 175 engineering formats. No speed,
+Rust/Wasm or general solver-renderer parity claim. Black-box public netCDF4/VTK writer APIs generated six
+NOAA data files; the conversion script and hash manifest record provenance. Buffer views with nonzero offsets,
+legacy metadata/FIELD arrays and single-run base64 appended arrays have regression coverage.
+
+Integration metadata follows the existing repository owners, without a new parsing or test-runner algorithm.
+The format leaf uses the browser helper's free-port mode rather than sharing a merge-gate port. Primary source:
+Node.js contributors (2026), Net API, server.listen and server.address, https://nodejs.org/api/net.html.
+Linked diagnostics are registered in the existing error catalogue and generated help page. Compared with
+Mark Nottingham, Erik Wilde and Sanjay Dalal (2023), Problem Details for HTTP APIs, RFC 9457,
+https://www.rfc-editor.org/rfc/rfc9457.html, on human-readable documentation at problem-type URIs; this is
+an error-documentation convention, not a claim that the JavaScript errors are HTTP problem responses.
+Asset attribution is recorded in supply-chain.mjs and generated into THIRD-PARTY-NOTICES.md, never hand-appended.
+The existing errors-page, parallel-check and supply-chain tests failed before these corrections and validate them.

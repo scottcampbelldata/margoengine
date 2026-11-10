@@ -8,6 +8,69 @@ and colour space, selection linked to a histogram), and [Wind field](../../examp
 [Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
 Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
 
+## Climate and solver files
+
+`@margoengine/sciviz/netcdf` opens CDF-1 classic and CDF-2 64-bit-offset files without eagerly decoding variables.
+All six external types, fixed and interleaved record variables, UTF-8 text attributes, strided hyperslabs and the sole-record
+padding exception are supported. `read()` returns owned float64 samples, last dimension fastest. By default it
+maps `_FillValue`, `missing_value` and invalid packed values to NaN before applying CF `scale_factor` and
+`add_offset`; `unpack: false` returns external numeric values (char values are byte codes). Selection `start`,
+`count` and `stride` default to the whole variable. `volume()` reverses the selected non-singleton dimensions
+into x,y,z. Give physical bounds explicitly; the default is sample-index bounds, with singleton axes one unit wide.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { openNetCDF } from '@margoengine/sciviz/netcdf';
+
+using file = await openNetCDF(new URL('/examples/assets/sciviz/wind-classic.nc', location.href));
+const grid = await file.variables.uwnd.volume({ bounds: [0, 4, 0, 4, 0, 7] });
+using fig = await Figure.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+await fig.volume(grid.data, { dims: grid.dims, bounds: grid.bounds, range: [-11, 7] });
+await fig.ready();
+```
+
+`@margoengine/sciviz/vtk` adapts the existing `@margoengine/loaders/vtk-xml` reader, retaining topology and every
+numeric point/cell array lazily. `.vtu`, `.vti` and `.vts` support ASCII, inline binary and raw/base64 appended
+arrays, both byte orders, UInt32/64 headers and the owner's zlib, LZ4 and LZMA decoders. `dataset.pieces` exposes
+metadata and individually readable arrays, including components not selected for drawing. `grid(name)` returns
+the selected piece's unstructured volume cells or structured hexahedra; `volume(name)` returns ImageData,
+including nonzero extents and descending axes. Options default to `piece: 0`, `association: 'point'`,
+`component: 0`. Pieces remain separate, including overlapping/ghost boundaries. `parseVtk` is the existing
+legacy unstructured reader extended through 5.1, ASCII and big-endian binary, with OFFSETS/CONNECTIVITY,
+metadata and attached FIELD scalar arrays. Its existing scalar-first-component and supported-cell policy remains.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { openVTK } from '@margoengine/sciviz/vtk';
+import { gridLayer } from '@margoengine/sciviz/grids';
+
+using file = await openVTK(new URL('/examples/assets/sciviz/wind.vtu', location.href));
+const grid = await file.grid('uwnd');
+using fig = await Figure.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+gridLayer(fig, grid, { range: [-11, 7], colormap: 'viridis' });
+await fig.ready();
+```
+
+Both openers accept URL/string, bytes (snapshotted), or a `FileSource` with async `read(offset, length, signal)`.
+The source must remain immutable. HTTP Range is used for NetCDF hyperslabs and raw appended VTK arrays.
+Inline/base64 VTK needs its bounded file in memory. Servers ignoring Range are accepted only when their whole
+response fits `maxBytes`. The default 64 MiB bounds headers, single reads, decoded arrays and selections, not the
+remote file's total size. `signal` cancels the file lifetime; per-read `signal` cancels that read. `dispose()` and
+`Symbol.dispose` abort pending/future reads and are idempotent. Nothing loads on import beyond this entry's code.
+
+NetCDF-4/HDF5 is explicitly unsupported here: a reliable reader requires object headers, B-trees, chunk indexes
+and filter semantics, owned by the separate engineering-format job. Convert to classic with the format owner's
+tools. CDF-5, non-UTF-8 text metadata and indeterminate streaming record counts also reject. CF coordinate systems/calendars are retained
+as metadata, not guessed or reprojected. StructuredGrid drawing needs three non-singleton axes; oriented
+ImageData needs resampling before an axis-aligned volume. Other raw VTK cell types remain accessible but must
+match the existing grid renderer's supported types to draw. Integers outside exact JavaScript number precision
+reject. No HDF5, resampling, calendar or general VTK-renderer parity claim is made.
+
+The [NOAA wind files example](../../examples/sciviz-formats.html) compares all six writer-produced variants.
+Its third axis is daily time, never physical height. Hashes and writer versions are pinned in
+[formats.json](../../examples/assets/sciviz/formats.json). Tests cover analytical layouts plus exact cross-format
+agreement of all 200 NOAA samples. No speed claim or Rust/Wasm gain is asserted.
+
 Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Scientific visualisation for Margo Engine, WebGPU:

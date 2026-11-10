@@ -2943,3 +2943,14 @@ resolved traces and exercises nested/diamond reuse, missing names and cycles.
 ## Batch 252 job 1: ground queries
 
 `NavMeshQuery` in `@margoengine/navmesh/queries` covers the web rival's documented walkability ray and local surface movement behaviors. Evidence: `packages/navmesh/test/queries.test.js` checks exact hit fraction/edge/normal for both windings, connected corridors, vertex ties, blocking costs and filters, forbidden/off-mesh starts, off-mesh-link exclusion, wall sliding, sloped height projection and live tiled rebuilds. Contract comparison: Detour/recast-navigation-js expose a surface ray and constrained local movement with visited polygons; Margo supplies those results and a projected move height. This is a behavior comparison against published API contracts, not a runtime speed or universal navigation claim.
+
+### Batch 171 job 5: inspectable climate and solver input
+
+The optional sciviz/netcdf reader supports CDF-1/2 metadata and lazy hyperslabs; sciviz/vtk adapts the existing
+loaders/vtk-xml owner for .vtu/.vti/.vts arrays and intact topology, with existing codecs. Legacy grids extend to
+5.1 offsets/connectivity. Evidence: packages/sciviz/tests/climate-formats.test.js and
+packages/loaders/tests/vtk-xml-dataset.test.js, plus the format-owner-produced NOAA files hash-pinned by
+examples/assets/sciviz/formats.json. All 200 samples are compared exactly, not within a relaxed tolerance.
+Tests distinguish interleaved multi-record padding from sole-record byte/short packing and verify physical VTI
+extents, endian headers, compression, selected reads and cancellation. Research: docs/clean-room.md, batch 171 job 5.
+Limits, including explicit HDF5 rejection, are in docs/limits.md; no general HDF5/solver-renderer or speed claim.

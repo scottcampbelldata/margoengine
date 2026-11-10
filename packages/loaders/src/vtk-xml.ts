@@ -149,6 +149,7 @@ interface Context {
   appendedText?: string;
   maxBytes: number;
   signal?: AbortSignal;
+  readAppended?: (offset: number, length: number, signal?: AbortSignal) => Promise<Uint8Array>;
 }
 
 function headerInt(bytes: Uint8Array, index: number, context: Context): number {
@@ -213,8 +214,7 @@ function view(bytes: Uint8Array, type: string, little: boolean): Numbers {
   if (bytes.length % size) throw new LoaderError(F, 'syntax', `${bytes.length} bytes are not whole ${type} values`);
   const copy = new Uint8Array(bytes.length);
   copy.set(bytes);
-  if (little !== LITTLE)
-    for (let i = 0; i < copy.length; i += size) copy.subarray(i, i + size).reverse();
+  if (little !== LITTLE) for (let i = 0; i < copy.length; i += size) copy.subarray(i, i + size).reverse();
   const { buffer } = copy,
     count = copy.length / size;
   switch (type) {
@@ -237,7 +237,11 @@ function view(bytes: Uint8Array, type: string, little: boolean): Numbers {
     default: {
       const wide = type === 'Int64' ? new BigInt64Array(buffer, 0, count) : new BigUint64Array(buffer, 0, count),
         out = new Float64Array(count);
-      for (let i = 0; i < count; i++) out[i] = Number(wide[i]);
+      for (let i = 0; i < count; i++) {
+        out[i] = Number(wide[i]);
+        if (!Number.isSafeInteger(out[i]))
+          throw new LoaderError(F, 'range', '64-bit integer exceeds exact JavaScript number precision');
+      }
       return out;
     }
   }
@@ -259,22 +263,53 @@ function readAscii(text: string, type: string): Numbers {
 async function readArray(element: XMLElement, context: Context): Promise<Numbers> {
   const { type, format, offset } = element.attributes,
     name = element.attributes.Name ?? type;
-  if (!(type in SIZES)) throw new LoaderError(F, 'unsupported', `array "${String(name).slice(0, 32)}" has type ${String(type).slice(0, 32)}`);
+  if (!(type in SIZES))
+    throw new LoaderError(
+      F,
+      'unsupported',
+      `array "${String(name).slice(0, 32)}" has type ${String(type).slice(0, 32)}`,
+    );
   if ((format ?? 'ascii') === 'ascii') return readAscii(element.text, type);
   let source: Source;
   if (format === 'binary') {
     const text = element.text.replace(/\s+/g, ''),
       { width, compressor } = context;
     // Uncompressed writers differ: the size is its own base64 run, which ends in padding, or one run holds both.
-    if (!compressor && text[width === 8 ? 11 : 7] !== '=')
-      source = rawSource(decode64(text), 0);
+    if (!compressor && text[width === 8 ? 11 : 7] !== '=') source = rawSource(decode64(text), 0);
     else source = base64Source(text, 0);
   } else if (format === 'appended') {
     const start = Number(offset);
     if (!Number.isSafeInteger(start) || start < 0)
       throw new LoaderError(F, 'syntax', `array "${String(name).slice(0, 32)}" has a bad offset`);
-    if (context.appendedText !== undefined) source = base64Source(context.appendedText, start);
-    else if (context.appended) source = rawSource(context.appended, start);
+    if (context.readAppended) {
+      const read = async (at: number, count: number): Promise<Uint8Array> => {
+        if (!Number.isSafeInteger(count) || count < 0 || count > context.maxBytes)
+          throw new LoaderError(F, 'limit', 'appended array exceeds its byte bound');
+        throwIfAborted(context.signal, F);
+        const bytes = await context.readAppended!(at, count, context.signal);
+        throwIfAborted(context.signal, F);
+        if (bytes.length !== count) throw new LoaderError(F, 'truncated', 'appended array ends early');
+        return bytes;
+      };
+      const width = context.width;
+      let head = await read(start, (context.compressor ? 3 : 1) * width);
+      let length: number;
+      if (context.compressor) {
+        const blocks = headerInt(head, 0, context);
+        head = await read(start, (3 + blocks) * width);
+        length = head.length;
+        for (let i = 0; i < blocks; i++) length += headerInt(head, 3 + i, context);
+      } else length = width + headerInt(head, 0, context);
+      source = rawSource(await read(start, length), 0);
+    } else if (context.appendedText !== undefined) {
+      const text = context.appendedText,
+        width = context.width;
+      if (!context.compressor && text[start + (width === 8 ? 11 : 7)] !== '=') {
+        const header = decode64(text.slice(start, start + Math.ceil(width / 3) * 4));
+        const length = width + headerInt(header, 0, context);
+        source = rawSource(decode64(text.slice(start, start + Math.ceil(length / 3) * 4)), 0);
+      } else source = base64Source(text, start);
+    } else if (context.appended) source = rawSource(context.appended, start);
     else throw new LoaderError(F, 'syntax', 'an appended array needs an <AppendedData> element');
   } else throw new LoaderError(F, 'syntax', `unknown array format "${String(format).slice(0, 32)}"`);
   return view(await payload(source, context), type, context.little);
@@ -286,11 +321,42 @@ const arrays = (element: XMLElement | undefined): XMLElement[] =>
   element?.children.filter((candidate) => candidate.name === 'DataArray') ?? [];
 
 /** Corner lists of the faces of a volume cell, outward by VTK's ordering of its points. */
-const TETRA = [[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]];
-const HEXAHEDRON = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
-const VOXEL = [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [1, 3, 7, 5], [3, 2, 6, 7], [2, 0, 4, 6]];
-const WEDGE = [[0, 1, 2], [3, 5, 4], [0, 3, 4, 1], [1, 4, 5, 2], [2, 5, 3, 0]];
-const PYRAMID = [[0, 3, 2, 1], [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]];
+const TETRA = [
+  [0, 2, 1],
+  [0, 1, 3],
+  [1, 2, 3],
+  [0, 3, 2],
+];
+const HEXAHEDRON = [
+  [0, 3, 2, 1],
+  [4, 5, 6, 7],
+  [0, 1, 5, 4],
+  [1, 2, 6, 5],
+  [2, 3, 7, 6],
+  [3, 0, 4, 7],
+];
+const VOXEL = [
+  [0, 2, 3, 1],
+  [4, 5, 7, 6],
+  [0, 1, 5, 4],
+  [1, 3, 7, 5],
+  [3, 2, 6, 7],
+  [2, 0, 4, 6],
+];
+const WEDGE = [
+  [0, 1, 2],
+  [3, 5, 4],
+  [0, 3, 4, 1],
+  [1, 4, 5, 2],
+  [2, 5, 3, 0],
+];
+const PYRAMID = [
+  [0, 3, 2, 1],
+  [0, 1, 4],
+  [1, 2, 4],
+  [2, 3, 4],
+  [3, 0, 4],
+];
 function prism(sides: number): number[][] {
   const base = Array.from({ length: sides }, (_, i) => sides - 1 - i),
     top = Array.from({ length: sides }, (_, i) => sides + i),
@@ -367,7 +433,13 @@ class Builder {
   }
 }
 
-function polyCells(connectivity: Numbers, offsets: Numbers, points: number, each: (corners: number[], i: number) => void, builder: Builder): void {
+function polyCells(
+  connectivity: Numbers,
+  offsets: Numbers,
+  points: number,
+  each: (corners: number[], i: number) => void,
+  builder: Builder,
+): void {
   let start = 0;
   for (let i = 0; i < offsets.length; i++) {
     const end = offsets[i];
@@ -401,7 +473,11 @@ function gridCell(
     if (corners.length < volume.corners)
       throw new LoaderError(F, 'range', `cell ${cell} of type ${type} has ${corners.length} points`);
     if (type >= 21) builder.warnings.add('second-order cells are drawn from their corner points');
-    for (const face of volume.faces) builder.face(face.map((k) => corners[k]), cell);
+    for (const face of volume.faces)
+      builder.face(
+        face.map((k) => corners[k]),
+        cell,
+      );
     return;
   }
   switch (type) {
@@ -439,7 +515,8 @@ function gridCell(
       for (let f = 0; f < count; f++) {
         const size = stream[at++],
           face: number[] = [];
-        if (!(at + size <= stream.length)) throw new LoaderError(F, 'range', `polyhedron ${cell} runs past its faces array`);
+        if (!(at + size <= stream.length))
+          throw new LoaderError(F, 'range', `polyhedron ${cell} runs past its faces array`);
         for (let k = 0; k < size; k++) face.push(builder.check(stream[at++], points) + base);
         builder.face(face, cell);
       }
@@ -462,6 +539,123 @@ function splitAppended(bytes: Uint8Array): { xml: string; appended?: Uint8Array;
   if (/encoding\s*=\s*["']raw["']/.test(text.slice(tag, close))) return { xml, appended: bytes.subarray(mark + 1) };
   const end = text.indexOf('<', mark);
   return { xml, appendedText: text.slice(mark + 1, end < 0 ? text.length : end).replace(/\s+/g, '') };
+}
+
+/** Lazy numeric array, decoded by the same array reader as parseVTKXML. */
+export interface VTKXMLArray {
+  readonly name: string;
+  readonly type: string;
+  readonly components: number;
+  read(signal?: AbortSignal): Promise<Float64Array>;
+}
+
+/** One source piece, without triangulation or loss of its volume topology. */
+export interface VTKXMLPiece {
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly pointData: Readonly<Record<string, VTKXMLArray>>;
+  readonly cellData: Readonly<Record<string, VTKXMLArray>>;
+  readonly points?: VTKXMLArray;
+  readonly cells: Readonly<Record<string, VTKXMLArray>>;
+}
+
+/** The file metadata. Numeric payloads are read only on demand. */
+export interface VTKXMLDataset {
+  readonly type: string;
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly pieces: readonly VTKXMLPiece[];
+}
+
+/** Lazy dataset options. The appended callback is for raw binary offsets relative to the underscore. */
+export interface VTKXMLDatasetOptions extends VTKXMLOptions {
+  /** Maximum decoded array bytes. Default 256 MiB. */
+  maxBytes?: number;
+  readAppended?: (offset: number, length: number, signal?: AbortSignal) => Promise<Uint8Array>;
+}
+
+function xmlContext(bytes: Uint8Array, maxBytes: number, signal?: AbortSignal): { file: XMLElement; context: Context } {
+  throwIfAborted(signal, F);
+  const { xml, appended, appendedText } = splitAppended(bytes),
+    file = child(readXMLTree(xml, F), 'VTKFile');
+  if (!file) throw new LoaderError(F, 'header', 'no <VTKFile> element');
+  const { byte_order: order, header_type: headerType, compressor: named } = file.attributes;
+  if (order !== undefined && order !== 'LittleEndian' && order !== 'BigEndian')
+    throw new LoaderError(F, 'header', 'byte_order must be LittleEndian or BigEndian');
+  if (headerType !== undefined && headerType !== 'UInt32' && headerType !== 'UInt64')
+    throw new LoaderError(F, 'header', `unknown header_type "${headerType.slice(0, 32)}"`);
+  let compressor: Context['compressor'];
+  if (named === 'vtkZLibDataCompressor') compressor = 'zlib';
+  else if (named === 'vtkLZ4DataCompressor') compressor = 'lz4';
+  else if (named === 'vtkLZMADataCompressor') compressor = 'lzma';
+  else if (named) throw new LoaderError(F, 'unsupported', `compressor "${named.slice(0, 32)}" is not read`);
+  return {
+    file,
+    context: {
+      little: order !== 'BigEndian',
+      width: headerType === 'UInt64' ? 8 : 4,
+      compressor,
+      appended,
+      appendedText,
+      maxBytes,
+      signal,
+    },
+  };
+}
+
+/**
+ * Opens .vtu/.vti/.vts/.vtp metadata and lazy arrays. No geometry is discarded or tessellated.
+ * A raw-appended header may end after the underscore when readAppended supplies the remaining file.
+ * Inline and base64 arrays remain in the supplied input, while raw appended arrays can use HTTP Range.
+ */
+export function openVTKXMLDataset(input: BinaryInput, options: VTKXMLDatasetOptions = {}): VTKXMLDataset {
+  const maxBytes = options.maxBytes ?? 256 * 1024 * 1024;
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
+    throw new LoaderError(F, 'limit', 'maxBytes must be a positive safe integer');
+  const { file, context } = xmlContext(toBytes(input, F), maxBytes, options.signal),
+    type = file.attributes.type;
+  if (!['PolyData', 'UnstructuredGrid', 'ImageData', 'StructuredGrid'].includes(type))
+    throw new LoaderError(F, 'unsupported', `dataset type "${String(type).slice(0, 32)}" is not read`);
+  const dataset = child(file, type);
+  if (!dataset) throw new LoaderError(F, 'syntax', `no <${type}> element`);
+  context.readAppended = options.readAppended;
+  const entry = (array: XMLElement): VTKXMLArray => {
+    const components = Number(array.attributes.NumberOfComponents ?? 1);
+    if (!Number.isSafeInteger(components) || components < 1 || !(array.attributes.type in SIZES))
+      throw new LoaderError(F, 'syntax', 'invalid array components or type');
+    return {
+      name: array.attributes.Name ?? '',
+      type: array.attributes.type,
+      components,
+      async read(signal) {
+        const joined =
+          signal && context.signal ? AbortSignal.any([signal, context.signal]) : (signal ?? context.signal);
+        throwIfAborted(joined, F);
+        const values = await readArray(array, { ...context, signal: joined });
+        if (values.length * 8 > maxBytes) throw new LoaderError(F, 'limit', 'float64 array exceeds maxBytes');
+        throwIfAborted(joined, F);
+        return Float64Array.from(values);
+      },
+    };
+  };
+  const fields = (owner?: XMLElement): Record<string, VTKXMLArray> => {
+    const out: Record<string, VTKXMLArray> = Object.create(null);
+    for (const array of arrays(owner)) {
+      const value = entry(array);
+      if (Object.hasOwn(out, value.name)) throw new LoaderError(F, 'syntax', 'duplicate array name');
+      out[value.name] = value;
+    }
+    return out;
+  };
+  const pieces = dataset.children
+    .filter((p) => p.name === 'Piece')
+    .map((p) => ({
+      attributes: { ...p.attributes },
+      pointData: fields(child(p, 'PointData')),
+      cellData: fields(child(p, 'CellData')),
+      points: arrays(child(p, 'Points'))[0] ? entry(arrays(child(p, 'Points'))[0]) : undefined,
+      cells: fields(child(p, 'Cells')),
+    }));
+  if (!pieces.length) throw new LoaderError(F, 'syntax', 'dataset has no pieces');
+  return { type, attributes: { ...dataset.attributes }, pieces };
 }
 
 /**
@@ -496,28 +690,10 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
     { signal, surface = 'outer' } = options;
   throwIfAborted(signal, F);
   if (surface !== 'outer' && surface !== 'all') throw new LoaderError(F, 'range', 'surface must be "outer" or "all"');
-  const { xml, appended, appendedText } = splitAppended(bytes),
-    file = child(readXMLTree(xml, F), 'VTKFile');
-  if (!file) throw new LoaderError(F, 'header', 'no <VTKFile> element');
-  const { type, byte_order: order, header_type: headerType, compressor: named } = file.attributes;
+  const { file, context } = xmlContext(bytes, maxVertices * 128 + maxTriangles * 128, signal);
+  const { type } = file.attributes;
   if (type !== 'PolyData' && type !== 'UnstructuredGrid')
     throw new LoaderError(F, 'unsupported', `dataset type "${String(type).slice(0, 32)}" is not read`);
-  if (headerType !== undefined && headerType !== 'UInt32' && headerType !== 'UInt64')
-    throw new LoaderError(F, 'header', `unknown header_type "${headerType.slice(0, 32)}"`);
-  let compressor: Context['compressor'];
-  if (named === 'vtkZLibDataCompressor') compressor = 'zlib';
-  else if (named === 'vtkLZ4DataCompressor') compressor = 'lz4';
-  else if (named === 'vtkLZMADataCompressor') compressor = 'lzma';
-  else if (named) throw new LoaderError(F, 'unsupported', `compressor "${named.slice(0, 32)}" is not read`);
-  const context: Context = {
-    little: order !== 'BigEndian',
-    width: headerType === 'UInt64' ? 8 : 4,
-    compressor,
-    appended,
-    appendedText,
-    maxBytes: maxVertices * 128 + maxTriangles * 128,
-    signal,
-  };
   const dataset = child(file, type);
   if (!dataset) throw new LoaderError(F, 'syntax', `no <${type}> element`);
   const builder = new Builder(maxTriangles, surface === 'outer'),
@@ -544,7 +720,11 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
       if (!Number.isSafeInteger(components) || components < 1)
         throw new LoaderError(F, 'syntax', `array "${name.slice(0, 32)}" has a bad component count`);
       if (values.length !== expected * components)
-        throw new LoaderError(F, 'syntax', `array "${name.slice(0, 32)}" has ${values.length} values, expected ${expected * components}`);
+        throw new LoaderError(
+          F,
+          'syntax',
+          `array "${name.slice(0, 32)}" has ${values.length} values, expected ${expected * components}`,
+        );
       let entry = into.get(name);
       if (!entry) into.set(name, (entry = { components, parts: [] }));
       entry.parts.push(values);
@@ -566,7 +746,15 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
     normalsName ??= pointData?.attributes.Normals;
     uvsName ??= pointData?.attributes.TCoords;
     const scalars = pointData?.attributes.Scalars;
-    if (scalars && arrays(pointData).some((a) => a.attributes.Name === scalars && a.attributes.type === 'UInt8' && Number(a.attributes.NumberOfComponents) >= 3))
+    if (
+      scalars &&
+      arrays(pointData).some(
+        (a) =>
+          a.attributes.Name === scalars &&
+          a.attributes.type === 'UInt8' &&
+          Number(a.attributes.NumberOfComponents) >= 3,
+      )
+    )
       colorsName ??= scalars;
     await collect(pointData, pointArrays, points);
 
@@ -623,7 +811,10 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
   if (!base) throw new LoaderError(F, 'syntax', 'the file has no points');
   builder.finish();
 
-  const merge = (fields: Map<string, { components: number; parts: Numbers[] }>, count: number): Record<string, VTKField> => {
+  const merge = (
+    fields: Map<string, { components: number; parts: Numbers[] }>,
+    count: number,
+  ): Record<string, VTKField> => {
     const out: Record<string, VTKField> = Object.create(null);
     for (const [name, { components, parts }] of fields) {
       const values = new Float32Array(count * components);
@@ -634,7 +825,8 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
         values.set(part, at);
         at += part.length;
       }
-      if (at !== values.length) throw new LoaderError(F, 'syntax', `array "${name.slice(0, 32)}" is not in every piece`);
+      if (at !== values.length)
+        throw new LoaderError(F, 'syntax', `array "${name.slice(0, 32)}" is not in every piece`);
       out[name] = { components, values };
     }
     return out;

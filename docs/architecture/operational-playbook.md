@@ -5435,3 +5435,12 @@ root XR fixtures surface engine/GPU errors while waiting for frames, rather
 than waiting forever after XR ends on an error. Simulated stereo sessions are
 rendering/lifecycle evidence, not headset evidence; the dedicated compatibility
 XR test owns the XRWebGLLayer framebuffer comparison.
+
+### Batch 171 climate input evidence
+
+The optional formats layer reads CDF-1/2 hyperslabs and adapts the existing VTK XML decoder. Numeric data and
+intact volume topology feed the existing volume and grid renderers; core/stage, GPU maths and backend shaders
+are unchanged. Analytical byte-layout tests plus 200 pinned NOAA samples cover six owner-written files.
+The formats-browser leaf exercises both backends and compares identical-source image hashes by renderer kind.
+HDF5, oriented-image resampling and general solver rendering remain outside the claim; see docs/limits.md.
+No GPU lock is taken for parsing/building or CPU tests. Runtime rendering uses the lane's single shared slot.

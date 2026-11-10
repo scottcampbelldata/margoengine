@@ -2614,6 +2614,14 @@
       "types": "./dist/sciviz/tubes.d.ts",
       "import": "./dist/sciviz/tubes.js"
     },
+    "./sciviz/netcdf": {
+      "types": "./dist/sciviz/netcdf.d.ts",
+      "import": "./dist/sciviz/netcdf.js"
+    },
+    "./sciviz/vtk": {
+      "types": "./dist/sciviz/vtk.d.ts",
+      "import": "./dist/sciviz/vtk.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

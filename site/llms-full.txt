@@ -2590,6 +2590,30 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 256 lobby: `@margoengine/netcode/lobby` provides `LobbyRoom` and `RoomLobby`.
+List results contain room id/name, detached scalar metadata, connected clients,
+reserved/reconnecting seats and capacity. Name and metadata filters are exact;
+locked, full and private rooms are omitted. Reservations default to 15 seconds,
+accept 1..2147483647 integer milliseconds, and hold capacity through async auth.
+Join with `RoomsClient.joinById(roomId, { seatToken }, joinOptions)`. Join options
+come from the server reservation, and the token is consumed once after successful
+authentication. Cancellation/expiry/disposal free holds. Applications expose the
+lobby over their own authenticated HTTP API and protect tokens with TLS; holding
+a token grants its reserved join identity. Ordinary Room subclasses can be listed
+but require LobbyRoom to reserve. Entry gzip is 4,183 B (new entry, previously
+absent); its size ceiling is 4,439 B. Keeping the capacity-safe reservation and
+listing together avoids a second room wrapper. Core and stage are unchanged.
+
+Compatibility compute pipeline binding counts obey `device.limits` on every
+compute route. Explicit layouts count all compute-visible entries across groups,
+even unused entries; external textures consume four sampled-texture slots, one
+sampler and one uniform. Overflow is a validation error and async creation
+rejects with `GPUPipelineError`. The complete shader readback leaf, including
+validation and recovery, passes on native WebGPU and full compat. Lower-tier and
+other package gaps remain separately listed. Batch 273 failure 18 entry gzip:
+root 105,454 B, device 105,996 B, XR 105,896 B, tiers 105,955 B. Core + stage
+remain 23,950 B; no ceiling was increased.
+
 Verify's shadow archive store retains its 5 GiB cap and per-write oldest-first
 eviction. Windows reads fresh enumeration metadata through its system .NET
 runtime rather than individually statting every ordinary archive; a helper
@@ -6032,6 +6056,75 @@ to 1% of altitude and twice the horizon distance plus altitude; disable
 
 Entry measurement: controls/globe 0 to 3646 B min+gzip; ceiling 3902 B.
 
+### FSM event payload entry (batch 250 job 1)
+Optional fsm/events preserves data by reference for guards, enter/exit hooks, nested plans and EventTrace. Initial entry, goto and delays have undefined data. Update hooks retain the seconds argument. No payload serialization or cloning; caller owns payload lifetime. Root FSM, core and stage sources unchanged.
+
+Batch 250 job 1: fsm/events 0 to 2362 B min+gzip, ceiling 2618 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+### FSM completion (batch 250 job 2)
+Optional fsm/final adds FinalMachine with final:true leaves, done.state.parent and always:true transitions. Final leaves have no children, regions or outgoing transitions. A top-level final stops events and clock advancement; goto explicitly restarts. Eventless steps run before queued completions and between delays. Limits: 10,000 eventless/internal steps per stabilization and 100,000 timed firings per update produce coded state errors; break cycles or use shorter deltas. Internal NUL-prefixed event names are reserved. Completion events retain the causing payload. Existing ParallelRegions remain ordinary region machines; FinalMachine completion is local to its hierarchy.
+
+Batch 250 job 2: fsm/final 0 to 2825 B min+gzip, ceiling 3081 B. Optional runtime is not loaded by the FSM root or core/stage.
+### Tile styling (batch 239 job 1)
+
+`@margoengine/tiles/style` supplies `TilesStyle`: property expressions drive sRGB RGBA, show and pixel point size, with ordered conditions, defines and metadata expressions. The language supports scalar/vector math, comparisons, short circuiting, ternaries, arrays, property paths, interpolation, CSS colours and regular expressions. Expressions are limited to 65,536 characters, 4,096 tokens and 128 parser nesting levels. Wrong output types fail with a coded state error. No arbitrary host methods or JavaScript execution are allowed.
+
+`TilesStyle.decorate` is the renderer's optional `decorate` hook; it binds loaded b3dm batch IDs, pnts batch IDs and point semantics, i3dm instance IDs, and structural attribute/implicit feature tables. Direct model, instance and point bindings accept a property resolver, update without accumulating tint, and restore their saved authored data on disposal. Model bindings follow PBRModel.writeGeometry's existing restrictions on deformed/shared geometry. PBR colours multiply authored vertex colours in linear light; point colours replace the cloud's colour channel. Style alpha uses the existing blend path. Property textures and feature ID texture sampling belong to the later batch jobs, rather than being advertised here. No core or stage source changes.
+
+Entry size for batch 239 job 1: tiles/style is new, 0 to 9,755 B min+gzip; its recorded ceiling is 10,057 B. The interpreter, standard colour data and binding lifecycle remain one entry to avoid duplicated parser state or lifecycle code. Tiles root is 15,866 B and i3dm is 1,474 B, inside their existing ceilings. Core + stage remains 23,950 B. Authored CPU snapshots remain outside the existing GPU-only budget; the decorator adds only the new point colour/size GPU buffers, while model and instance buffers are already measured by their owners.
+
+### FSM invoked services (batch 250 job 3)
+Optional fsm/invoke adds state-scoped tasks with unique ids. Stable nonfinal states start tasks outermost first; transient states do not start work. Exit aborts before re-entry, including within one macrostep; common ancestors retain their tasks. done.invoke.id carries {output}; error.invoke.id carries {error}. Sync throws are errors. Old results are ignored by identity, never delivered into a newer state entry. invocations retains the latest record per id. settled resolves after delivery or cancellation and exposes handler failures as rejection. An abort cannot stop JavaScript that ignores its signal, but cancellation releases settled and suppresses its late result. Dispose or the optional external signal cancels all work and prevents new tasks/events. No actor spawning or message-receiving service protocol is claimed by this promise-task entry.
+
+
+Batch 250 job 3: fsm/invoke 0 to 3609 B min+gzip, ceiling 3865 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+### Batch 273 XR canvas transitions
+
+Compatibility canvas output modes persist across XR/desktop device replacement.
+A bitmaprenderer receiving a page-backed XR source needs one reusable 2D
+offscreen copy; 2D outputs accept either source directly. No extra copy is added
+to the ordinary offscreen-to-bitmap route. These are simulated XR sessions on
+real GPU devices, not physical headset results. Core/stage source is unchanged.
+Measured min+gzip: compatibility root 105,568 B, device 105,626 B, XR 105,420 B,
+tiers 105,323 B. Existing optional ceilings pass. Core plus stage is 23,950 B.
+## Behavior subtree references (batch 251)
+
+The optional `behavior/subtrees` entry measures 5,207 B min+gzip (previously absent),
+with the generated umbrella alias 64 B external. No existing size ceiling changes.
+Expansion is bounded by 256 levels and 100,000 visited reference/node occurrences.
+Registrations are explicit objects; only reachable registrations are validated.
+References expand before execution, with occurrence-specific state, paths and labels.
+The runtime document stores the expanded form; retain the original input to edit
+reference names. No automatic blackboard remapping or dynamic hot replacement.
+Core + stage remains 23,950 B gzip, below 25,000 B.
+
+
+Batch 252 job 1: `@margoengine/navmesh/queries` provides `NavMeshQuery.raycast` and `moveAlongSurface`. Rays ignore destination Y, return t in [0,1], an outward XZ unit normal, the hit polygon edge and connected visited corridor; t=1 and a null edge mean no hit. An off-mesh or forbidden start returns null. Optional startPolygon selects the ground layer on a shared edge. Movement is local: only portals intersecting the segment-diameter disk are expanded. Use small controller steps on a mesh already eroded for the controller radius. Both queries project result Y onto the reached polygon plane, honor area filters and never take off-mesh links. Tile polygon ids expire on rebuild. No new core/stage feature or GPU work.
+
+Batch 252 job 1 measured entry sizes: @margoengine/navmesh/queries: 1609 B gzip (ceiling 0 -> 1865 B); @margoengine/navmesh/tiles: 14857 B gzip (ceiling 15113 -> 15113 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+
+### Batch 171 climate and solver formats
+
+Optional sciviz/netcdf and sciviz/vtk, with the existing loaders/vtk-xml owner extended for lazy datasets.
+CDF-1/2 only; NetCDF-4/HDF5, CDF-5, non-UTF-8 text metadata and indeterminate streaming record counts explicitly reject. All six classic
+external types and strided hyperslabs; numeric results are float64. CF missing/valid-range tests precede packing.
+Default maxBytes 64 MiB for sciviz headers, per-read bytes and output arrays; remote total file size is independent.
+NetCDF volume axes are the selected non-singleton dimensions reversed; bounds are indices unless supplied.
+Raw appended VTK arrays and NetCDF selections use ranges. Inline/base64 VTK must fit the file bound; HTTP 200
+fallback must fit it too. Immutable sources required. No automatic CF coordinate/calendar interpretation.
+VTK pieces stay separate. ImageData volume rejects non-identity Direction pending resampling; singleton axes
+are one spacing wide. StructuredGrid volume-cell conversion requires three non-singleton axes. Raw dataset
+arrays retain other topology; drawing follows the existing grids renderer's cell limits. Legacy 5.1 retains the
+existing unstructured scalar-first-component/supported-volume-cell policy. Unsafe 64-bit integers reject.
+No new core or stage code, no speed measurement, no published performance number. NOAA's third data axis is
+8 daily samples, not altitude. See packages/sciviz/README.md and examples/assets/sciviz/formats.json.
+
+Job 5 gzip entry sizes: sciviz/netcdf absent -> 3418 B (ceiling 3674); sciviz/vtk absent -> 5945 B
+(ceiling 6201); loaders/vtk-xml recorded 6788 -> 7492 B (ceiling 7748). The added optional bytes preserve
+one authoritative decoder, lazy intact topology and bounded ranges. Splitting again would complicate ownership
+and duplicate decoding. Core plus stage measures 23950 B, below 25000, unchanged by this job.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6448,11 +6541,9 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
   rasterization/orientation divergences still need numeric root-cause proof.
 
-- `react/test:browser`: `test-scene-browser.js:115` rejects the XR preparation
-  snapshot because neither `xrReady` nor an error containing `WebXR is unavailable`
-  is present. This is the full compatibility run, not the small preview.
-  Investigate the fixture's native-WebGPU XR assumptions and the actual
-  compatibility preparation error before changing its assertion or route.
+- Fixed `react/test:browser` XR preparation: the supported compatibility XR
+  route is installed by the fixture; its complete canonical compatibility suite
+  now passes, including simulated stereo pixels, controllers and teardown.
 
 The serial continuation preserves each completed result and resumes only
 unfinished suites. Additional full-layer failures are evidence for batch 273,
@@ -6471,9 +6562,11 @@ passes. The following additional failures remain with batch 273:
 - `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
   prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
   The awaited operation after that marker remains unisolated.
-- `shader/test:gpu`: noise and earlier readback cases pass; the validation case
-  lacks the expected `failed` error. Its assertion's undefined message masks the
-  mismatch with `ERR_INVALID_ARG_TYPE` at `readback-check.mjs:67`.
+- Resolved failure 18, shader readback: compatibility compute pipelines did not
+  enforce advertised binding limits. Resource counts now reject overflow before
+  either compute route runs; asynchronous pipeline errors also avoid assigning
+  DOMException's read-only name. Five regressions and the unchanged full readback
+  leaf pass on native WebGPU and full compat, including validation and recovery.
 - `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
   4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
   those timing values are not accepted evidence during the build phase.
@@ -6501,9 +6594,11 @@ passes. The following additional failures remain with batch 273:
   compatShim loads/replaces it, so the synthetic delay does not wrap the later
   CompatDevice. Repro: voxel's slow-compile script with that environment;
   apply/observe the delay on the actual device in a separate harness repair.
-- `root/modern:test:xr:browser`: XR refuses the full layer until `installXR()`
-  supplies its route; the generic forced-backend fixture does not install it.
-  Review that setup together with the React XR preparation failure above.
+- Fixed `root/modern:test:xr:browser`: simulated bindings identify the selected
+  device and compatibility canvas presentation keeps its output context mode
+  when reconfigured between page-backed XR and offscreen devices. Root native
+  and compatibility stereo, package pass, depth and AR checks pass unchanged.
+  Regression: `packages/webgl2-compat/test/canvas-present.test.js`.
 
 All process-tree bounds and numerical assertions remain unchanged. Logs are
 preserved in lane-S's `.lane/compat-*.log` and `.lane/scope-compat-*.log`; the
@@ -10090,6 +10185,11 @@ bounds are explicit API limits, documented in the controls README.
 
 No open defect from the globe suite. Radial altitude, perspective/reference-ellipsoid navigation and sky-drag behavior are explicit limits in the controls README.
 
+Batch 251 job 1: no open defect found in reference expansion; missing registrations,
+cycles and bounded expansion reject during construction (subtrees.test.js).
+
+Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -10911,6 +11011,24 @@ Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R),
 === @margoengine/loaders (packages/loaders/README.md) ===
 
 # @margoengine/loaders
+
+`@margoengine/loaders/vtk-xml` also exposes `openVTKXMLDataset` for lazy numeric arrays and intact volume
+topology in `.vtu`, `.vti`, `.vts` and `.vtp`. It shares every decoder with `parseVTKXML`; it does not construct
+or triangulate geometry. Metadata and arrays stay separated by piece. Array `read(signal?)` returns owned
+float64 values. `maxBytes` defaults to 256 MiB per decoded array. A `readAppended(offset, length, signal)`
+callback supplies raw binary bytes relative to the appended underscore, enabling range loading from an
+immutable file. Inline/base64 payloads must be in the supplied bytes. `signal` cancels all lazy reads.
+Unknown byte orders and integers beyond exact JavaScript number precision reject instead of silently corrupting data.
+
+```ts
+import { openVTKXMLDataset } from '@margoengine/loaders/vtk-xml';
+
+const bytes = new TextEncoder().encode(`<VTKFile type="ImageData"><ImageData WholeExtent="0 1 0 0 0 0">
+  <Piece Extent="0 1 0 0 0 0"><PointData><DataArray type="Float32" Name="wind">2 3</DataArray>
+  </PointData></Piece></ImageData></VTKFile>`);
+const dataset = openVTKXMLDataset(bytes);
+console.log(await dataset.pieces[0].pointData.wind.read());
+```
 
 Import `margoengine/loaders` from the `margoengine` package, or `@margoengine/loaders` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
@@ -16706,59 +16824,63 @@ and colour space, selection linked to a histogram), and [Wind field](../../examp
 [Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
 Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
 
-Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+## Climate and solver files
 
-Scientific visualisation for Margo Engine, WebGPU:
-
-- **Volume rendering:** transfer functions, gradient lighting, clip planes, slices, and isosurfaces extracted by
-  marching cubes on the GPU.
-- **Scatter plots:** millions of points with level of detail.
-- **Surface and line plots:** with axes, nice-number ticks, labels and colour bars.
-- **Colour maps:** perceptual maps computed from their published definitions.
-
-Layers read `@margoengine/compute` GPU arrays in place, so data computed on the GPU is drawn without a trip to the
-CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
-compute packages load with `import()` only when a figure uses them.
-
-## Line integral convolution
-
-`@margoengine/sciviz/lic` creates a dense GPU LIC image from a regular 2D vector field or a planar slice
-through a 3D field. Noise and image resolution are independent of the input grid. Bidirectional midpoint
-streamline integration convolves deterministic bilinear noise, renormalizing at boundaries and missing data.
-The GPU retains the image between changes; orbiting the camera does not regenerate it. WebGPU and the real
-WebGL2 compatibility backend work; the native `sciviz/webgl2` driver does not yet support this entry.
+`@margoengine/sciviz/netcdf` opens CDF-1 classic and CDF-2 64-bit-offset files without eagerly decoding variables.
+All six external types, fixed and interleaved record variables, UTF-8 text attributes, strided hyperslabs and the sole-record
+padding exception are supported. `read()` returns owned float64 samples, last dimension fastest. By default it
+maps `_FillValue`, `missing_value` and invalid packed values to NaN before applying CF `scale_factor` and
+`add_offset`; `unpack: false` returns external numeric values (char values are byte codes). Selection `start`,
+`count` and `stride` default to the whole variable. `volume()` reverses the selected non-singleton dimensions
+into x,y,z. Give physical bounds explicitly; the default is sample-index bounds, with singleton axes one unit wide.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';
-import { lic } from '@margoengine/sciviz/lic';
+import { openNetCDF } from '@margoengine/sciviz/netcdf';
 
-const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
-using fig = await Figure.create(canvas, { axes: false, controls: false });
-const layer = await lic(fig, {
-  dims: [2, 2, 1], bounds: [-2, 2, -1, 1, 0, 0],
-  u: new Float32Array([1, 1, 1, 1]), v: new Float32Array([0, 0, 0, 0]),
-}, { seed: 171, animated: true, resolution: [128, 64] });
-layer.setPhase(1); // Radians, explicit: drawing never advances the animation.
+using file = await openNetCDF(new URL('/examples/assets/sciviz/wind-classic.nc', location.href));
+const grid = await file.variables.uwnd.volume({ bounds: [0, 4, 0, 4, 0, 7] });
+using fig = await Figure.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+await fig.volume(grid.data, { dims: grid.dims, bounds: grid.bounds, range: [-11, 7] });
 await fig.ready();
-fig.engine.render();
-const luminance = await layer.readIntensity({ signal: AbortSignal.timeout(30000) });
-console.log(luminance.length); // 8192, x fastest; NaN marks missing texels.
 ```
 
-Options and defaults: `resolution: [256,256]` (each dimension 8..2048), `steps: 20` (1..128 each way),
-`step: 0.5` (0.1..1 image texels), `seed: 0` (uint32), `contrast: 3` (0..10 about luminance 0.5),
-`coloured: true`, `colormap: 'aurora'`, `opacity: 1` (0..1), `animated: false`, `phase: 0` radians and no `signal`.
-`scalar` defaults to the magnitude of the interpolated full vector, with `range` spanning finite node speeds;
-provide one scalar per field node to colour another quantity. `range` defaults to its finite extent, expanded
-by max(1, abs(value)*1e-6) for a constant field, or [0,1] for an entirely missing field. The image luminance and
-scalar colour multiply in linear light. Static grayscale LIC is orientation-free; animation uses a Hann window
-with three phase-shifted ripples over its support to show direction. Phase is a visual cue, not physical time.
+`@margoengine/sciviz/vtk` adapts the existing `@margoengine/loaders/vtk-xml` reader, retaining topology and every
+numeric point/cell array lazily. `.vtu`, `.vti` and `.vts` support ASCII, inline binary and raw/base64 appended
+arrays, both byte orders, UInt32/64 headers and the owner's zlib, LZ4 and LZMA decoders. `dataset.pieces` exposes
+metadata and individually readable arrays, including components not selected for drawing. `grid(name)` returns
+the selected piece's unstructured volume cells or structured hexahedra; `volume(name)` returns ImageData,
+including nonzero extents and descending axes. Options default to `piece: 0`, `association: 'point'`,
+`component: 0`. Pieces remain separate, including overlapping/ghost boundaries. `parseVtk` is the existing
+legacy unstructured reader extended through 5.1, ASCII and big-endian binary, with OFFSETS/CONNECTIVITY,
+metadata and attached FIELD scalar arrays. Its existing scalar-first-component and supported-cell policy remains.
 
-`slice: { origin, axisU, axisV }` describes a parallelogram in field data units. Default: the full x/y plane at
-the lowest z. Its edges may be oblique or non-orthogonal; the inverse Gram matrix projects the interpolated
-3D velocity into slice coordinates. Only tangential motion is convolved; the default colour still gives full
-3D speed. Outside-field and weighted NaN nodes mask texels rather than bridging holes; zero flow retains noise.
-This entry does not claim arbitrary triangle-surface LIC, volume LIC, or physical unsteady texture advection.
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { openVTK } from '@margoengine/sciviz/vtk';
+import { gridLayer } from '@margoengine/sciviz/grids';
+
+using file = await openVTK(new URL('/examples/assets/sciviz/wind.vtu', location.href));
+const grid = await file.grid('uwnd');
+using fig = await Figure.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+gridLayer(fig, grid, { range: [-11, 7], colormap: 'viridis' });
+await fig.ready();
+```
+
+Both openers accept URL/string, bytes (snapshotted), or a `FileSource` with async `read(offset, length, signal)`.
+The source must remain immutable. HTTP Range is used for NetCDF hyperslabs and raw appended VTK arrays.
+Inline/base64 VTK needs its bounded file in memory. Servers ignoring Range are accepted only when their whole
+response fits `maxBytes`. The default 64 MiB bounds headers, single reads, decoded arrays and selections, not the
+remote file's total size. `signal` cancels the file lifetime; per-read `signal` cancels that read. `dispose()` and
+`Symbol.dispose` abort pending/future reads and are idempotent. Nothing loads on import beyond this entry's code.
+
+NetCDF-4/HDF5 is explicitly unsupported here: a reliable reader requires object headers, B-trees, chunk indexes
+and filter semantics, owned by the separate engineering-format job. Convert to classic with the format owner's
+tools. CDF-5, non-UTF-8 text metadata and indeterminate streaming record counts also reject. CF coordinate systems/calendars are retained
+as metadata, not guessed or reprojected. StructuredGrid drawing needs three non-singleton axes; oriented
+ImageData needs resampling before an axis-aligned volume. Other raw VTK cell types remain accessible but must
+match the existing grid renderer's supported types to draw. Integers outside exact JavaScript number precision
+reject. No HDF5, resampling, calendar or general VTK-renderer parity claim is made.
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 

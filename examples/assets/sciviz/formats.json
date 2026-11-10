@@ -1,0 +1,35 @@
+{
+  "source": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.dailyavgs/surface/uwnd.sig995.2024.nc",
+  "sourceSHA256": "d6e65f8dee2ea1c8b193d252cd468031c6f6553c3f9544170fabad17a9848f8e",
+  "licence": "US-government public domain, NOAA PSL",
+  "selection": "January 1-8 2024, 100 W to 90 W, 20 N to 30 N, native 2.5 degree samples",
+  "shape": [
+    8,
+    5,
+    5
+  ],
+  "axes": [
+    "day",
+    "latitude",
+    "longitude"
+  ],
+  "vtkCoordinates": "sample indices, x=longitude index, y=latitude index, z=day index, not altitude",
+  "writers": {
+    "netCDF4": "1.7.5.1.post1",
+    "vtk": "9.7.2"
+  },
+  "range": [
+    -10.32499885559082,
+    6.42500114440918
+  ],
+  "first": 1.2999999523162842,
+  "valuesSHA256": "528fe76c83968390e7418c6198aedf202673d67a5be736a4a9d578139ca84eb5",
+  "files": {
+    "wind-classic.nc": "1bdfb66dc788095208155e2f917d92d340a46700d0b155ec2904b690fa78ae99",
+    "wind-offset.nc": "5bd659220a3dffd6742f990a2d2a120adbc560df63b6585479e18df5c78539bd",
+    "wind.vti": "33ec49632ee3700880fffaf8c08e328604ffdc93276e0b5dca0444ff311cce0d",
+    "wind.vts": "87f8037b0227db716ba83900a1a139317008e41f690b4b5f0f1a0ba54e139ce0",
+    "wind.vtu": "5a1a3975950a78912eef6b93e6947942914808bd21862d8ac436a729f619d0cb",
+    "wind.vtk": "efc3e3a28ece3d1591eeab06d1a93f22d592e71647c8a3338ce0587e53c34f0e"
+  }
+}

@@ -3513,3 +3513,24 @@ Core + stage remains 23,950 B gzip, below 25,000 B.
 Batch 252 job 1: `@margoengine/navmesh/queries` provides `NavMeshQuery.raycast` and `moveAlongSurface`. Rays ignore destination Y, return t in [0,1], an outward XZ unit normal, the hit polygon edge and connected visited corridor; t=1 and a null edge mean no hit. An off-mesh or forbidden start returns null. Optional startPolygon selects the ground layer on a shared edge. Movement is local: only portals intersecting the segment-diameter disk are expanded. Use small controller steps on a mesh already eroded for the controller radius. Both queries project result Y onto the reached polygon plane, honor area filters and never take off-mesh links. Tile polygon ids expire on rebuild. No new core/stage feature or GPU work.
 
 Batch 252 job 1 measured entry sizes: @margoengine/navmesh/queries: 1609 B gzip (ceiling 0 -> 1865 B); @margoengine/navmesh/tiles: 14857 B gzip (ceiling 15113 -> 15113 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+
+### Batch 171 climate and solver formats
+
+Optional sciviz/netcdf and sciviz/vtk, with the existing loaders/vtk-xml owner extended for lazy datasets.
+CDF-1/2 only; NetCDF-4/HDF5, CDF-5, non-UTF-8 text metadata and indeterminate streaming record counts explicitly reject. All six classic
+external types and strided hyperslabs; numeric results are float64. CF missing/valid-range tests precede packing.
+Default maxBytes 64 MiB for sciviz headers, per-read bytes and output arrays; remote total file size is independent.
+NetCDF volume axes are the selected non-singleton dimensions reversed; bounds are indices unless supplied.
+Raw appended VTK arrays and NetCDF selections use ranges. Inline/base64 VTK must fit the file bound; HTTP 200
+fallback must fit it too. Immutable sources required. No automatic CF coordinate/calendar interpretation.
+VTK pieces stay separate. ImageData volume rejects non-identity Direction pending resampling; singleton axes
+are one spacing wide. StructuredGrid volume-cell conversion requires three non-singleton axes. Raw dataset
+arrays retain other topology; drawing follows the existing grids renderer's cell limits. Legacy 5.1 retains the
+existing unstructured scalar-first-component/supported-volume-cell policy. Unsafe 64-bit integers reject.
+No new core or stage code, no speed measurement, no published performance number. NOAA's third data axis is
+8 daily samples, not altitude. See packages/sciviz/README.md and examples/assets/sciviz/formats.json.
+
+Job 5 gzip entry sizes: sciviz/netcdf absent -> 3418 B (ceiling 3674); sciviz/vtk absent -> 5945 B
+(ceiling 6201); loaders/vtk-xml recorded 6788 -> 7492 B (ceiling 7748). The added optional bytes preserve
+one authoritative decoder, lazy intact topology and bounded ranges. Splitting again would complicate ownership
+and duplicate decoding. Core plus stage measures 23950 B, below 25000, unchanged by this job.

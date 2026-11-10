@@ -1,0 +1,451 @@
+{
+  "status": "DONE",
+  "branch": "batch-171-formats",
+  "job": 5,
+  "feature": "Classic climate and solver formats",
+  "sourceBase": "020ed463f",
+  "cpu": {
+    "affectedCasesPassing": 734,
+    "initialInvocationIssue": "mtl-vectors needs --experimental-test-module-mocks; its four cases pass with the required flag",
+    "finalNetCDFCasesPassing": 20
+  },
+  "gpu": {
+    "newFormats": [
+      {
+        "compat": false,
+        "images": {
+          "classic": {
+            "lit": 15724,
+            "hash": 2093334888,
+            "layers": 1
+          },
+          "offset": {
+            "lit": 15724,
+            "hash": 2093334888,
+            "layers": 1
+          },
+          "vti": {
+            "lit": 15724,
+            "hash": 2093334888,
+            "layers": 1
+          },
+          "vts": {
+            "lit": 64015,
+            "hash": -567384616,
+            "layers": 1
+          },
+          "vtu": {
+            "lit": 64015,
+            "hash": -567384616,
+            "layers": 1
+          },
+          "legacy": {
+            "lit": 64015,
+            "hash": -567384616,
+            "layers": 1
+          }
+        },
+        "hardware": {
+          "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "webgpu": {
+            "vendor": "nvidia",
+            "architecture": "ampere",
+            "device": "",
+            "description": "",
+            "fallback": false
+          },
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+          "browserName": "chromium",
+          "browserVersion": "157.0.4341.42",
+          "requestedChannel": "msedge",
+          "launchArgs": [],
+          "powerPreference": "high-performance",
+          "hostPlatform": "win32",
+          "headless": true
+        }
+      },
+      {
+        "compat": true,
+        "images": {
+          "classic": {
+            "lit": 15724,
+            "hash": 632767173,
+            "layers": 1
+          },
+          "offset": {
+            "lit": 15724,
+            "hash": 632767173,
+            "layers": 1
+          },
+          "vti": {
+            "lit": 15724,
+            "hash": 632767173,
+            "layers": 1
+          },
+          "vts": {
+            "lit": 64015,
+            "hash": -1351116584,
+            "layers": 1
+          },
+          "vtu": {
+            "lit": 64015,
+            "hash": -1351116584,
+            "layers": 1
+          },
+          "legacy": {
+            "lit": 64015,
+            "hash": -1351116584,
+            "layers": 1
+          }
+        },
+        "hardware": {
+          "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "webgpu": {
+            "vendor": "margo-webgl2",
+            "architecture": "webgl2",
+            "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "fallback": false
+          },
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+          "browserName": "chromium",
+          "browserVersion": "157.0.4341.42",
+          "requestedChannel": "msedge",
+          "launchArgs": [],
+          "powerPreference": "high-performance",
+          "hostPlatform": "win32",
+          "headless": true,
+          "compat": true
+        }
+      }
+    ],
+    "rootChecks": 30,
+    "bricksChecks": 13,
+    "entries": 16,
+    "restoration": 6,
+    "existingDemoLayoutBackendChecks": 40,
+    "nativeWebGL2Cases": 8,
+    "loaders": "both browser scripts passed"
+  },
+  "readme": {
+    "passed": 57,
+    "node": 15,
+    "browser": 42,
+    "knownListAdditions": 0
+  },
+  "lint": "PASS",
+  "hygiene": "PASS",
+  "quality": "API, duplicates, tests and clean-room passed; optional size ceilings recorded",
+  "sizesGzip": {
+    "netcdf": 3418,
+    "vtk": 5945,
+    "loaderVTKXML": 7492,
+    "coreStage": 23950
+  },
+  "fullVerify": {
+    "runs": 1,
+    "status": "FAILED",
+    "hardLimitSeconds": 2400,
+    "elapsedSeconds": 1291.6,
+    "timedOut": false,
+    "tests": 14253,
+    "passed": 14250,
+    "failed": 3,
+    "log": "test-results/sciviz-fixes/formats-final-verify.log",
+    "failures": [
+      "errors-page: 13 literal format diagnostics absent from the linked catalogue",
+      "parallel-check: formats-browser shared reserved merge-suite port 5297",
+      "supply-chain: a hand-appended notice differed from generator output"
+    ],
+    "otherChains": "all passed, including build, API, quality, sizes, documentation, README types and both sandboxes",
+    "sourceBase": "2c1b94730"
+  },
+  "remaining": "No remaining format feature work. Historical verify attempts above are retained as historical evidence, not rerun or required by the current landing policy.",
+  "previousInterruptedAttempt": {
+    "runs": 1,
+    "status": "INTERRUPTED",
+    "phase": "completed stage-1 package build, no remaining descendants, parent did not advance",
+    "log": "test-results/sciviz-fixes/lic-formats-verify.log",
+    "terminatedOwnedPID": 37000,
+    "elapsedSeconds": 330.3,
+    "rootCause": "Coordinator ruling: post-build result-cache eviction can take minutes; the 330.3-second interruption did not establish a hang."
+  },
+  "integrationRepairs": {
+    "errors": "register unchanged messages and regenerate help; existing errors-page checks pass",
+    "port": "use the existing free-port browser mode; existing parallel-check tests pass",
+    "notices": "put provenance in the supply-chain generator and regenerate notices",
+    "focusedCPU": "27 cases pass: 24 errors-page/parallel-check plus 3 supply-chain",
+    "fullVerifyRerun": false,
+    "quality": "sizes, API and clean-room pass after regeneration; lint and hygiene pass",
+    "formatGPU": "six variants on each backend pass through free-port mode; exact image hashes unchanged",
+    "gpuLog": "test-results/sciviz-fixes/formats-free-port-gpu.log"
+  },
+  "integrationBase": "82950198d3df9e0c3ac4eb2ad682009e5346703c",
+  "landingPolicy": "The requested one verify ran before main changed AGENTS.md. Latest main forbids lane verifies and defers README work; the final landing uses the fast gate, with existing functional CPU/GPU/README evidence retained.",
+  "fastGate": {
+    "policy": "No verify or README work. Changed package CPU/GPU and dependent CPU; local CI owns full verify.",
+    "build": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 26.5
+    },
+    "checks": [
+      {
+        "name": "api-update",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 55
+      },
+      {
+        "name": "lint",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 3.1
+      },
+      {
+        "name": "hygiene",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 19.1
+      },
+      {
+        "name": "banned",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 46.4
+      },
+      {
+        "name": "api",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 19.8
+      },
+      {
+        "name": "quality",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 45.8
+      }
+    ],
+    "initialCPU": {
+      "tests": 734,
+      "pass": 713,
+      "fail": 21,
+      "cause": "Missing sciviz dist Wasm after root build; restored with the package-owned copy-fallback.mjs step. No implementation failure."
+    },
+    "affectedCPUClosure": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 11.8
+    },
+    "dependentCPU": {
+      "tests": 478,
+      "initialFailure": "Generated controls/globe alias from main was stale; regenerated with scripts/umbrella.mjs. React and USDZ functional tests passed."
+    },
+    "metadata": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 92.4
+    },
+    "integration": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 63.5
+    },
+    "gpu": [
+      {
+        "name": "root",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 133.8
+      },
+      {
+        "name": "bricks",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 239.4
+      },
+      {
+        "name": "entries",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 55.7
+      },
+      {
+        "name": "restoration",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 30.6
+      },
+      {
+        "name": "demos",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 133.9
+      },
+      {
+        "name": "webgl2",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 82
+      },
+      {
+        "name": "formats",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 31
+      },
+      {
+        "name": "loaders",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 31.4
+      },
+      {
+        "name": "loader-render",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 34.2
+      }
+    ],
+    "rebased": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 141.9
+    },
+    "finalGPU": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 139.6
+    },
+    "extraDependentGPU": [
+      {
+        "name": "root-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 14.4
+      },
+      {
+        "name": "react-test-scene-browser.js-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 11.1
+      },
+      {
+        "name": "react-test-scene-browser.js-true",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 11.6
+      },
+      {
+        "name": "react-test-after-scene-browser.js-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 4.8
+      },
+      {
+        "name": "react-test-after-scene-browser.js-true",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 6.8
+      },
+      {
+        "name": "react-test-extras-browser.js-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 10
+      },
+      {
+        "name": "react-test-extras-browser.js-true",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 10.3
+      },
+      {
+        "name": "react-test-tags-browser.js-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 8.6
+      },
+      {
+        "name": "react-test-tags-browser.js-true",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 8.9
+      },
+      {
+        "name": "react-test-bindings-browser.mjs-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 10.7
+      },
+      {
+        "name": "react-test-bindings-browser.mjs-true",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 9.5
+      },
+      {
+        "name": "react-test-instances-browser.mjs-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 5.3
+      },
+      {
+        "name": "react-test-instances-browser.mjs-true",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 4
+      },
+      {
+        "name": "usdz-false",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 4.6
+      },
+      {
+        "name": "usdz-true",
+        "ok": false,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 2.7
+      }
+    ],
+    "extraDependentFailure": "USDZ RiggedFigure animation on compatibility does not move; unrelated to changed vtk-xml. Recorded in known-bugs under rule 21. Main 896ebf844 limits GPU gates to changed packages."
+  }
+}
