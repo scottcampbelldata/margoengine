@@ -1,5 +1,7 @@
 # Known bugs and unverified features
 
+- Batch 234 outside-scope finding at 2ed6fd460: `node --test tests/modern-extension-suite.test.js` fails three inventory assertions because tracked `packages/stage/test/gpu/viewer-extras-check.mjs` is not named by stage's GPU scripts or the planner. Cause: missing stage test registration, not water. Rule 21 leaves the stage-owner repair for the fix phase; all water leaves are registered and pass both backends.
+
 
 
 Batch 186 job 1: disk/sphere shadows use the existing centre-map PCSS approximation and guard band (limits.md); no exact extended-emitter visibility claim. Native WebGPU and full WebGL2 production-shader visibility checks pass.
@@ -95,7 +97,7 @@ the unchanged 0.005 bar; independent dry/above-water projector checks remain
 exact zero. Full package and visual acceptance now pass. See the
 [caustics record](water-caustics.md) for optics and retained failures.
 
-### PARKED: batch 234 job 3 underwater reflection artifact
+### Historical: batch 234 job 3 underwater reflection artifact
 
 The underwater implementation is retained on `batch-234` and
 `batch-234-checkpoint-6e16c0d72`, not accepted or landed. Repro in that retained
@@ -117,6 +119,8 @@ and sampled radiance. No fourth speculative tracing round or acceptance claim.
 List 3 batch 66 job 5 then built water/underwater fresh on main without the screen traces (fog, absorption, waterline and shafts only); the underside reflection remains open in finish-later.md.
 The independent caustics job landed as `3369f2e4f`; the retained underwater
 branches above must not be deleted. This note accompanies batch 213 job 1.
+
+Batch 234 continuation on 2026-11-10 completes the missing underside in the newer main implementation. It replaces the rejected distance-march/binary-depth-crossing strategy with exact pixel-edge traversal and locally reconstructed depth-plane intersections. The independent analytic test initially exposed skipped corner texels and float32 cracks at exact texel boundaries; supercover visits and a relative arithmetic envelope fix those causes. Regression: underwater-optics.browser.mjs covers 1,026 rays including oblique planes and holes. underwater.browser.mjs independently checks every submitted FFT underside pixel against dielectric Fresnel and catches first-frame self-intersections if the opaque depth snapshot is replaced with FFT's later surface depth. The original parked branch remains historical, not reintroduced. Finite screen capture and multi-view limitations remain listed in docs/limits.md.
 
 ### Fixed: batch 133 lazy asset package grouping
 

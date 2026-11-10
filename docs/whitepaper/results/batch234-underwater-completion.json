@@ -1,0 +1,331 @@
+{
+  "date": "2026-11-10",
+  "job": "234.3",
+  "native": {
+    "before": [
+      0.1690673828125,
+      0.1690673828125,
+      0.1690673828125
+    ],
+    "after": [
+      0.0069427490234375,
+      0.07293701171875,
+      0.1158447265625
+    ],
+    "extinction": [
+      0.0005993616613209547,
+      0.0007008890781932212,
+      0.00004661892481514995
+    ],
+    "aboveWorst": 0,
+    "lineRow": 41.829749584198,
+    "unchangedAbove": 0,
+    "changedBelow": 85,
+    "belowRows": 85,
+    "finite": true,
+    "litMin": 0.184814453125,
+    "litMax": 0.43798828125,
+    "shaftGain": 0.016357421875,
+    "disabledWorst": 0,
+    "fftFinite": true,
+    "fftChanged": true,
+    "detachedCode": "state",
+    "windowPixels": 8766,
+    "tirPixels": 15174,
+    "undersideError": 0.0004881723081721079,
+    "restoredWorst": 0,
+    "fftOpticalPixels": 24576,
+    "fftOpticalError": 0.0004883583623298549,
+    "matchedIndexError": 0.0001953125000000444,
+    "environmentError": 0.00048828125,
+    "single": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    }
+  },
+  "compat": {
+    "before": [
+      0.1690673828125,
+      0.1690673828125,
+      0.1690673828125
+    ],
+    "after": [
+      0.0069427490234375,
+      0.07293701171875,
+      0.1158447265625
+    ],
+    "extinction": [
+      0.0005993616613209547,
+      0.0007008890781932212,
+      0.00004661892481514995
+    ],
+    "aboveWorst": 0,
+    "lineRow": 41.829749584198,
+    "unchangedAbove": 0,
+    "changedBelow": 85,
+    "belowRows": 85,
+    "finite": true,
+    "litMin": 0.184814453125,
+    "litMax": 0.43798828125,
+    "shaftGain": 0.016357421875,
+    "disabledWorst": 0,
+    "fftFinite": true,
+    "fftChanged": true,
+    "detachedCode": "state",
+    "windowPixels": 8766,
+    "tirPixels": 15174,
+    "undersideError": 0.0004881723081721079,
+    "restoredWorst": 0,
+    "fftOpticalPixels": 24576,
+    "fftOpticalError": 0.0004883368881489769,
+    "matchedIndexError": 0.0001953125000000444,
+    "environmentError": 0.00048828125,
+    "single": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    }
+  },
+  "singleNative": {
+    "before": [
+      0.1690673828125,
+      0.1690673828125,
+      0.1690673828125
+    ],
+    "after": [
+      0.0069427490234375,
+      0.07293701171875,
+      0.1158447265625
+    ],
+    "extinction": [
+      0.0005993616613209547,
+      0.0007008890781932212,
+      0.00004661892481514995
+    ],
+    "aboveWorst": 0,
+    "lineRow": 41.829749584198,
+    "unchangedAbove": 0,
+    "changedBelow": 85,
+    "belowRows": 85,
+    "finite": true,
+    "litMin": 0.184814453125,
+    "litMax": 0.43798828125,
+    "shaftGain": 0.016357421875,
+    "disabledWorst": 0,
+    "fftFinite": true,
+    "fftChanged": true,
+    "detachedCode": "state",
+    "windowPixels": 8766,
+    "tirPixels": 15174,
+    "undersideError": 0.0004881723081721079,
+    "restoredWorst": 0,
+    "fftOpticalPixels": 24576,
+    "fftOpticalError": 0.0004883583623298549,
+    "matchedIndexError": 0.0001953125000000444,
+    "environmentError": 0.00048828125,
+    "single": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    }
+  },
+  "singleCompat": {
+    "before": [
+      0.1690673828125,
+      0.1690673828125,
+      0.1690673828125
+    ],
+    "after": [
+      0.0069427490234375,
+      0.07293701171875,
+      0.1158447265625
+    ],
+    "extinction": [
+      0.0005993616613209547,
+      0.0007008890781932212,
+      0.00004661892481514995
+    ],
+    "aboveWorst": 0,
+    "lineRow": 41.829749584198,
+    "unchangedAbove": 0,
+    "changedBelow": 85,
+    "belowRows": 85,
+    "finite": true,
+    "litMin": 0.184814453125,
+    "litMax": 0.43798828125,
+    "shaftGain": 0.016357421875,
+    "disabledWorst": 0,
+    "fftFinite": true,
+    "fftChanged": true,
+    "detachedCode": "state",
+    "windowPixels": 8766,
+    "tirPixels": 15174,
+    "undersideError": 0.0004881723081721079,
+    "restoredWorst": 0,
+    "fftOpticalPixels": 24576,
+    "fftOpticalError": 0.0004883368881489769,
+    "matchedIndexError": 0.0001953125000000444,
+    "environmentError": 0.00048828125,
+    "single": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    }
+  },
+  "traceNative": {
+    "reports": [
+      {
+        "sx": 0,
+        "sy": 0,
+        "hole": false,
+        "rays": 297,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.0000014960684069365016,
+        "pixelError": 1
+      },
+      {
+        "sx": 0.35,
+        "sy": -0.2,
+        "hole": false,
+        "rays": 297,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.000005684467287991879,
+        "pixelError": 1
+      },
+      {
+        "sx": -0.4,
+        "sy": 0.3,
+        "hole": false,
+        "rays": 297,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.000004509038558531131,
+        "pixelError": 1
+      },
+      {
+        "sx": 0.2,
+        "sy": 0.1,
+        "hole": true,
+        "rays": 135,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.00000378014494728518,
+        "pixelError": 0.9999980926513672
+      }
+    ]
+  },
+  "traceCompat": {
+    "reports": [
+      {
+        "sx": 0,
+        "sy": 0,
+        "hole": false,
+        "rays": 297,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.0000014960684069365016,
+        "pixelError": 1
+      },
+      {
+        "sx": 0.35,
+        "sy": -0.2,
+        "hole": false,
+        "rays": 297,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.000005684467287991879,
+        "pixelError": 1
+      },
+      {
+        "sx": -0.4,
+        "sy": 0.3,
+        "hole": false,
+        "rays": 297,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.000004509038558531131,
+        "pixelError": 1
+      },
+      {
+        "sx": 0.2,
+        "sy": 0.1,
+        "hole": true,
+        "rays": 135,
+        "missing": 0,
+        "falseHits": 0,
+        "distanceError": 0.00000378014494728518,
+        "pixelError": 0.9999980926513672
+      }
+    ]
+  },
+  "sizes": {
+    "sourceBefore": 6888,
+    "sourceAfter": 9219,
+    "installedEntry": 9274,
+    "ceilingBefore": 7161,
+    "ceilingAfter": 9553,
+    "coreStage": 24209
+  },
+  "scope": "Original analytic fixtures; finite screen-space capture, no speed claim"
+}

@@ -3777,6 +3777,8 @@ Build packages, run `node --test packages/inspector/test/shaders.test.js`, then 
 ### List 3 batch 66 job 5: underwater view
 
 Build packages. CPU: node --test packages/water/test/underwater.test.js. GPU: node packages/water/test/underwater.browser.mjs, then again with --compat after the script path; results land in test-results/water-underwater-<mode>.json.
+
+Batch 234.3: after build:packages, run water's test:gpu leaves through node scripts/gpu-lock.mjs run --owner=codex-batch234 --wait-max=60 --max=3 -- node packages/water/test/underwater.browser.mjs, again with --single, and node packages/water/test/underwater-optics.browser.mjs. Repeat each with --compat after the script path. Both renderer modes record local water-underwater[-optics]-<mode>[-single].json evidence. The optics test builds synthetic sloped depth planes, independently intersects 1,026 rays in world space and compares exact hit availability, distance and texel colour. The scene test records HDR around the production stage and independently computes dielectric reflection/transmission for every fully covered flat and FFT surface pixel; the existing absorption/waterline/shaft checks remain unchanged. Run underwater-preview.browser.mjs with the same shared lock on each backend for NOAA wind-driven below/split/animated screenshots under test-results/batch234. Real wind data source and licence are in packages/water/test/data/README.md. No timing step or exclusive lock.
 ### Batch 107 job 3
 Build packages, run `node --test packages/inspector/test/remote.test.js` (starts the relay on 127.0.0.1 and talks to it with Node fetch), then under the shared GPU lock `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:remote`.
 

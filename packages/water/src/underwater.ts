@@ -19,9 +19,10 @@ import type { FFTOcean } from './fft.js';
 import { queryStates } from './query-state.js';
 import { surfacePass } from './surface-pass.js';
 import { SurfaceCapture } from './surface-capture.js';
+import { underwaterOptics } from './underwater-optics.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Live settings except surface and resolution, which are copied. Coefficients are per metre, linear RGB. */
@@ -50,6 +51,16 @@ export interface UnderwaterOptions {
   waterline?: number;
   /** Water refractive index, 1..2. Default 1.333. */
   refractiveIndex?: number;
+  /** Screen trace samples per reflection/refraction ray, integer 1..2048. Default 512. */
+  raySteps?: number;
+  /** Depth reconstruction tolerance in metres, 0.001..10. Default 0.05, plus the local texel footprint. */
+  thickness?: number;
+  /** Borrowed sampleable single-sample rgba16float equirectangular sky. Default the sky gradient. */
+  environment?: () => GPUTexture | undefined;
+  /** Linear horizon radiance, three channels in 0..100. Default [0.38, 0.53, 0.67]. */
+  skyHorizon?: readonly [number, number, number];
+  /** Linear zenith radiance, three channels in 0..100. Default [0.045, 0.16, 0.34]. */
+  skyZenith?: readonly [number, number, number];
   /** False passes the scene through unchanged. Default true. */
   enabled?: boolean;
 }
@@ -61,7 +72,11 @@ const shader = (encode: boolean) => `${fullscreen}${encode ? displayShader : ''}
 @group(0) @binding(3) var mask:texture_2d<f32>;
 @group(0) @binding(4) var field:texture_2d<f32>;
 @group(0) @binding(5) var probe:texture_2d<f32>;
+@group(0) @binding(6) var opaque:texture_2d<f32>;
+@group(0) @binding(7) var environment:texture_2d<f32>;
+@group(0) @binding(8) var skySampler:sampler;
 fn unproject(xy:vec2f,d:f32)->vec3f {let p=mat4x4f(u[4],u[5],u[6],u[7])*vec4f(xy,d,1);return p.xyz/p.w;}
+${underwaterOptics}
 fn cell(xz:vec2f)->vec2i {let r=u[18].x;return vec2i(floor(((xz-u[8].xz)/u[12].w*0.5+0.5)*r));}
 fn surfaceAt(p:vec2i)->vec4f {let r=i32(u[18].x);if(any(p<vec2i(0))||any(p>=vec2i(r))){return vec4f(0);}return textureLoad(field,p,0);}
 // Refracted propagation direction (pointing down) of sunlight through a surface with normal n.
@@ -90,7 +105,20 @@ fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663
  if(side<0.0){
   let d=textureLoad(depth,p,0);let far=unproject(xy,max(d,0.000001));let ray=normalize(far-near);
   var span=select(u[19].y,distance(near,far),d>0.0);
-  let hit=textureLoad(mask,p,0);if(dot(hit.xyz,hit.xyz)>0.5){span=min(span,max(0.0,abs(hit.w)-distance(u[8].xyz,near)));}
+  let hit=textureLoad(mask,p,0);let hitSpan=max(0.0,abs(hit.w)-distance(u[8].xyz,near));
+  if(dot(hit.xyz,hit.xyz)>0.5&&hit.w<0.0&&hitSpan<span){
+   span=hitSpan;let point=near+ray*span;let n=-normalize(hit.xyz);
+   let cosine=clamp(dot(-ray,n),0.0,1.0);let f=dielectric(cosine,u[19].w);
+   let reflected=trace(point+n*0.001,reflect(ray,n));
+   let k=u[16].xyz+u[17].xyz;
+   // The reflected path stays in water. Unavailable off-screen geometry tends
+   // to the same ambient medium used by the volume, rather than reflecting sky.
+   var reflection=u[15].rgb*u[17].rgb/max(k,vec3f(1e-6));
+   if(reflected.w>=0.0){let t=exp(-k*reflected.w);reflection=reflected.rgb*t+reflection*(vec3f(1)-t);}
+   var transmission=vec3f(0);
+   if(f<1.0){let r=refract(ray,n,u[19].w);let sample=trace(point-n*0.001,r);transmission=select(sky(r),sample.rgb,sample.w>=0.0);}
+   rgb=mix(transmission,reflection,f);
+  }
   let a=u[16].xyz;let b=u[17].xyz;let k=a+b;let view=exp(-k*span);
   let sun=u[13].xyz*u[13].w;let down=refracted(vec3f(0,1,0));let cosine=max(0.0,u[12].y);
   let fresnel=1.0-(0.02+0.98*pow(1.0-cosine,5.0));
@@ -109,7 +137,7 @@ fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663
   // Past the march the in-scatter of a constant source at the last depth integrates in closed form.
   let z=max(0.0,probed.w-(near+ray*march).y);
   let tail=b*(u[20].x*fresnel*phase*sun*exp(-k*z/max(-down.y,0.05))+ambient*exp(-k*z))*(exp(-k*march)-view)/max(k,vec3f(1e-6));
-  rgb=now.rgb*view+light+tail;
+  rgb=rgb*view+light+tail;
  }
  let band=select(0.0,1.0-smoothstep(0.0,u[19].x,abs(side)/px),u[19].x>0.0);
  rgb=mix(rgb,rgb*vec3f(0.35,0.5,0.55),band);
@@ -134,6 +162,11 @@ export class Underwater implements EnginePlugin {
   private depths: GPUTexture[] = [];
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private prepared?: GPUCommandEncoder;
+  private opaque?: GPUTexture;
+  private opaqueDepth?: GPUTexture;
+  private sampler?: GPUSampler;
+  private environment?: GPUTexture;
+  private depthCopy?: GPURenderPipeline;
 
   constructor(readonly options: UnderwaterOptions) {
     this.validate();
@@ -160,6 +193,8 @@ export class Underwater implements EnginePlugin {
       ['resolution', 16, 1024, true],
       ['waterline', 0, 64, false],
       ['refractiveIndex', 1, 2, false],
+      ['raySteps', 1, 2048, true],
+      ['thickness', 0.001, 10, false],
     ] as const) {
       const value = o[name];
       if (
@@ -173,7 +208,7 @@ export class Underwater implements EnginePlugin {
     }
     if (o.resolution !== undefined && o.resolution & (o.resolution - 1))
       throw rangeError('Underwater resolution must be a power of two; use 16, 32, ... 1024', 'geometry');
-    for (const name of ['absorption', 'scattering'] as const) {
+    for (const name of ['absorption', 'scattering', 'skyHorizon', 'skyZenith'] as const) {
       const value = o[name];
       if (
         value !== undefined &&
@@ -183,6 +218,8 @@ export class Underwater implements EnginePlugin {
     }
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw fault('state', 'Underwater enabled must be true or false');
+    if (o.environment !== undefined && typeof o.environment !== 'function')
+      throw fault('state', 'Underwater environment must be a function returning a sampleable sky texture');
   }
   private joinStack(host: StackHost): StackStage {
     if (this.disposed) throw fault('disposed', 'Underwater is disposed; create another Underwater');
@@ -199,6 +236,7 @@ export class Underwater implements EnginePlugin {
     if (!engine.gpu) throw fault('unsupported', 'Underwater requires WebGPU or full WebGL2 compatibility', 'webgpu');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 384, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.sampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat' });
     // After caustics (order 0): the probe and mask read the same submitted surface.
     this.removePass = surfacePass(this.surface, 1, (c) => this.probe(c));
   }
@@ -214,6 +252,12 @@ export class Underwater implements EnginePlugin {
       this.targets.push(c.device.createTexture({ size: [width, height], format: 'rgba32float', usage }));
       this.depths.push(c.device.createTexture({ size: [width, height], format: 'depth32float', usage }));
     }
+    this.opaque = c.device.createTexture({
+      size: [c.width, c.height],
+      format: this.host!.target!.resolvedColor.format,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    this.opaqueDepth = c.device.createTexture({ size: [c.width, c.height], format: 'depth32float', usage });
   }
   private probe(c: Context): boolean {
     this.validate();
@@ -229,6 +273,55 @@ export class Underwater implements EnginePlugin {
     this.prepared = c.encoder;
     if (o.enabled === false) return false;
     this.textures(c);
+    // Snapshot current opaque colour and depth before either Water or FFT draws.
+    // In particular FFT writes scene depth, so the composite cannot use its later resolve.
+    const target = this.host!.target!;
+    target.resolve(c.encoder);
+    c.encoder.copyTextureToTexture({ texture: target.resolvedColor }, { texture: this.opaque! }, [c.width, c.height]);
+    if (target.samples === 4) target.copyDepth(c.encoder, this.opaqueDepth!.createView(), 1, 'depth32float');
+    else {
+      if (!this.depthCopy) {
+        const module = c.device.createShaderModule({
+          code: `${fullscreen}
+@group(0) @binding(0) var source:texture_depth_2d;
+@fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {return textureLoad(source,vec2i(p.xy),0);}`,
+        });
+        this.depthCopy = c.device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint: 'fragment', targets: [] },
+          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'always' },
+        });
+      }
+      const pass = c.encoder.beginRenderPass({
+        colorAttachments: [],
+        depthStencilAttachment: {
+          view: this.opaqueDepth!.createView(),
+          depthLoadOp: viewLoadOp(c, 'clear'),
+          depthStoreOp: 'store',
+          depthClearValue: 0,
+        },
+      });
+      pass.setPipeline(this.depthCopy);
+      pass.setBindGroup(
+        0,
+        group(c.device, this.depthCopy, [target.resolvedDepth.createView({ aspect: 'depth-only' })]),
+      );
+      applyView(pass, c);
+      pass.draw(3);
+      pass.end();
+    }
+    this.environment = o.environment?.();
+    const environment = this.environment;
+    if (
+      environment &&
+      (environment.format !== 'rgba16float' ||
+        environment.sampleCount !== 1 ||
+        environment.dimension !== '2d' ||
+        environment.depthOrArrayLayers !== 1 ||
+        !(environment.usage & GPUTextureUsage.TEXTURE_BINDING))
+    )
+      throw fault('state', 'Underwater environment needs a sampleable single-sample 2D rgba16float sky texture');
     const v = this.values,
       light = this.engine!.lighting;
     v.fill(0);
@@ -247,6 +340,9 @@ export class Underwater implements EnginePlugin {
     v[72] = this.resolution;
     v.set([o.waterline ?? 2, o.maxDistance ?? 200, o.shaftDistance ?? 40, o.refractiveIndex ?? 1.333], 76);
     v.set([o.shafts ?? 1, 1, 0, 0], 80);
+    v.set([o.raySteps ?? 512, o.thickness ?? 0.05, 0, 0], 84);
+    v.set([...(o.skyHorizon ?? [0.38, 0.53, 0.67]), 0], 88);
+    v.set([...(o.skyZenith ?? [0.045, 0.16, 0.34]), environment ? 1 : 0], 92);
     c.device.queue.writeBuffer(this.uniform!, 0, v);
     this.capture.draw(c, this.surface, this.uniform!, this.targets, this.depths);
     return false;
@@ -267,7 +363,7 @@ export class Underwater implements EnginePlugin {
       if (!this.targets.length) this.textures(c);
       c.device.queue.writeBuffer(this.uniform!, 324, this.values, 81, 1);
     }
-    const depth = this.host!.depthTexture!;
+    const depth = this.opaqueDepth!;
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: output.view, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
     });
@@ -279,6 +375,9 @@ export class Underwater implements EnginePlugin {
         input,
         depth.createView({ aspect: 'depth-only' }),
         ...this.targets.map((t) => t.createView()),
+        this.opaque!.createView(),
+        (this.environment ?? this.opaque!).createView(),
+        this.sampler!,
       ]),
     );
     applyView(pass, c);
@@ -289,6 +388,10 @@ export class Underwater implements EnginePlugin {
     for (const texture of [...this.targets, ...this.depths]) texture.destroy();
     this.targets = [];
     this.depths = [];
+    this.opaque?.destroy();
+    this.opaqueDepth?.destroy();
+    this.opaque = this.opaqueDepth = undefined;
+    this.environment = undefined;
   }
   private release(): void {
     this.removePass?.();
@@ -298,6 +401,7 @@ export class Underwater implements EnginePlugin {
     this.uniform?.destroy();
     this.uniform = undefined;
     this.pipelines.clear();
+    this.depthCopy = undefined;
     this.prepared = undefined;
   }
   onDeviceRestored(engine: Engine): void {

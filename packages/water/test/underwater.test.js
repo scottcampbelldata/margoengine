@@ -18,15 +18,24 @@ test('underwater validates its surface and medium settings before allocating GPU
       resolution: [8, 48, 2048, 64.5],
       waterline: [-1, 65],
       refractiveIndex: [0.99, 2.01],
+      raySteps: [0, 2.5, 2049],
+      thickness: [0, 10.1, NaN],
       absorption: [[-1, 0, 0], [0, NaN, 0], [0, 0], [101, 0, 0], 'red'],
       scattering: [
         [0, 0, -0.1],
         [0, 0],
       ],
+      skyHorizon: [
+        [-1, 0, 0],
+        [0, NaN, 0],
+        [1, 2],
+      ],
+      skyZenith: [[0, 0, 101], 'blue'],
     }))
       for (const value of values)
         assert.throws(() => new Underwater({ surface, [key]: value }), RangeError, `${key}: ${value}`);
     assert.throws(() => new Underwater({ surface, enabled: 1 }), { code: 'state' });
+    assert.throws(() => new Underwater({ surface, environment: {} }), { code: 'state' });
     // Typed arrays are accepted channel lists.
     new Underwater({ surface, absorption: new Float32Array([0.1, 0.2, 0.3]) }).dispose();
     const effect = new Underwater({ surface });

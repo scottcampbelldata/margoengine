@@ -13,18 +13,20 @@ browser.page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 try {
-  const result = await browser.page.evaluate(async () => {
+  const result = await browser.page.evaluate(async (single) => {
     const { EngineKernel, box, PbrMaterial } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { FFTOcean } = await import('/packages/water/dist/fft.js');
     const { Underwater } = await import('/packages/water/dist/underwater.js');
     const { PostStack } = await import('/packages/post/dist/stack.js');
+    const { invertMatrixStable } = await import('/packages/math/dist/mat4.js');
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:192px;height:128px';
     document.body.replaceChildren(canvas);
     const engine = await EngineKernel.create(canvas, {
       backend: 'webgpu',
       capacity: 4,
+      exactSize: single ? [192, 128] : undefined,
       camera: { position: [0, -3, 0], target: [0, -3, -10], near: 0.1, far: 100 },
     });
     const d = engine.gpu;
@@ -176,17 +178,154 @@ try {
       litMax = Math.max(litMax, lit.data[i + 2]);
       shaftGain = Math.max(shaftGain, lit.data[i + 2] - ambientOnly.data[i + 2]);
     }
+    // Exact dielectric underside: a constant sky gives (1-F)*sky within Snell's
+    // window and zero beyond it in an empty, non-scattering medium. Compare
+    // every fully covered pixel against independently reconstructed world rays.
+    water.setWaveHeight(0);
+    engine.camera.position = [0, -3, 0];
+    engine.camera.target = [0, 1, -5];
+    options.absorption = [0, 0, 0];
+    options.scattering = [0, 0, 0];
+    options.waterline = 0;
+    options.skyHorizon = options.skyZenith = [0.8, 0.4, 0.2];
+    const [, underside] = await frame();
+    const inverse = new Float32Array(16);
+    invertMatrixStable(engine.camera.matrix, inverse, new Float64Array(52));
+    const unproject = (x, y, z) => {
+      const v = [(x / underside.width) * 2 - 1, 1 - (y / underside.height) * 2, z, 1];
+      const p = [0, 1, 2, 3].map((r) => v.reduce((sum, value, c) => sum + inverse[c * 4 + r] * value, 0));
+      return p.slice(0, 3).map((value) => value / p[3]);
+    };
+    let windowPixels = 0,
+      tirPixels = 0,
+      undersideError = 0;
+    for (let y = 1; y < underside.height - 1; y++)
+      for (let x = 1; x < underside.width - 1; x++) {
+        const near = unproject(x + 0.5, y + 0.5, 1),
+          far = unproject(x + 0.5, y + 0.5, 0.000001);
+        const v = far.map((value, k) => value - near[k]),
+          length = Math.hypot(...v),
+          ray = v.map((value) => value / length);
+        if (ray[1] <= 0) continue;
+        const t = -near[1] / ray[1];
+        const p = near.map((value, k) => value + ray[k] * t);
+        // Keep a full raster footprint away from the finite patch boundary.
+        if (t < 0 || Math.abs(p[0]) > 35 || Math.abs(p[2]) > 35) continue;
+        const c = ray[1],
+          sin2 = 1.333 ** 2 * (1 - c * c);
+        let fresnel = 1;
+        if (sin2 < 1) {
+          const ct = Math.sqrt(1 - sin2);
+          fresnel = 0.5 * ((1.333 * c - ct) / (1.333 * c + ct)) ** 2 + 0.5 * ((c - 1.333 * ct) / (c + 1.333 * ct)) ** 2;
+          windowPixels++;
+        } else tirPixels++;
+        const actual = at(underside, x, y);
+        for (let k = 0; k < 3; k++)
+          undersideError = Math.max(undersideError, Math.abs(actual[k] - options.skyHorizon[k] * (1 - fresnel)));
+      }
+    // Resize and rebuild resources on restoration; the optical boundary is unchanged.
+    underwater.onDeviceRestored(engine);
+    const restoredWorst = worst([underside, (await frame())[1]]);
+    options.refractiveIndex = 1;
+    const [, matchedIndex] = await frame();
+    let matchedIndexError = 0;
+    for (let y = 0; y < matchedIndex.height / 2; y++)
+      for (let x = 0; x < matchedIndex.width; x++)
+        for (let k = 0; k < 3; k++)
+          matchedIndexError = Math.max(matchedIndexError, Math.abs(at(matchedIndex, x, y)[k] - options.skyHorizon[k]));
+    options.refractiveIndex = 1.333;
+    // Borrowed environment is read live and must replace the fallback gradient.
+    const environment = d.createTexture({ size: [1, 1], format: 'rgba16float', usage: 6 });
+    d.queue.writeTexture(
+      { texture: environment },
+      new Uint16Array([0x3400, 0x3800, 0x3c00, 0x3c00]),
+      { bytesPerRow: 8 },
+      [1, 1],
+    );
+    options.environment = () => environment;
+    const [, environmentFrame] = await frame();
+    let environmentError = 0;
+    for (let y = 1; y < underside.height - 1; y++)
+      for (let x = 1; x < underside.width - 1; x++) {
+        // Baseline already checked against Fresnel: reuse its transmission fraction.
+        const baseline = at(underside, x, y),
+          actual = at(environmentFrame, x, y);
+        for (let k = 0; k < 3; k++)
+          environmentError = Math.max(
+            environmentError,
+            Math.abs(actual[k] - (baseline[k] / options.skyHorizon[k]) * [0.25, 0.5, 1][k]),
+          );
+      }
+    options.environment = undefined;
+    environment.destroy();
     // 6. An FFT ocean drives the same stage.
     stack.dispose();
     underwater.dispose();
     water.dispose();
+    marker.dispose();
+    engine.camera.position = [0, -8, 0];
+    engine.camera.target = [0, 0, -8];
     const ocean = FFTOcean.attach(engine, { resolution: 64, cascades: [{ length: 64 }] });
-    const fft = new Underwater({ surface: ocean });
+    const fft = new Underwater({
+      surface: ocean,
+      absorption: [0, 0, 0],
+      scattering: [0, 0, 0],
+      waterline: 0,
+      skyHorizon: [0.8, 0.4, 0.2],
+      skyZenith: [0.8, 0.4, 0.2],
+    });
     stack = PostStack.attach(engine, [recorder('in2'), fft, recorder('out2')]);
     const fftFrame = await frame();
     let fftFinite = true;
     for (const v of fftFrame[1].data) if (!Number.isFinite(v)) fftFinite = false;
     const fftChanged = worst(fftFrame) > 1e-3;
+    // The exact submitted spectral normals define an independent per-pixel
+    // dielectric oracle. This catches first-frame depth self-hits and FFT bands.
+    const maskBuffer = d.createBuffer({ size: fftFrame[1].width * fftFrame[1].height * 16, usage: 132 });
+    const encoder = d.createCommandEncoder(),
+      maskPass = encoder.beginComputePass();
+    maskPass.setPipeline(recordPipeline);
+    maskPass.setBindGroup(
+      0,
+      d.createBindGroup({
+        layout: recordPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: fft.targets[0].createView() },
+          { binding: 1, resource: { buffer: maskBuffer } },
+        ],
+      }),
+    );
+    maskPass.dispatchWorkgroups(Math.ceil(fftFrame[1].width / 8), Math.ceil(fftFrame[1].height / 8));
+    maskPass.end();
+    d.queue.submit([encoder.finish()]);
+    const maskData = (await read({ buffer: maskBuffer, size: [fftFrame[1].width, fftFrame[1].height] })).data;
+    invertMatrixStable(engine.camera.matrix, inverse, new Float64Array(52));
+    let fftOpticalPixels = 0,
+      fftOpticalError = 0;
+    for (let y = 0; y < fftFrame[1].height; y++)
+      for (let x = 0; x < fftFrame[1].width; x++) {
+        const i = (y * fftFrame[1].width + x) * 4,
+          n = Array.from(maskData.subarray(i, i + 3));
+        if (maskData[i + 3] >= 0 || Math.hypot(...n) < 0.5) continue;
+        const near = unproject(x + 0.5, y + 0.5, 1),
+          far = unproject(x + 0.5, y + 0.5, 0.000001),
+          v = far.map((p, k) => p - near[k]),
+          length = Math.hypot(...v);
+        const cosine = Math.max(0, Math.min(1, v.reduce((s, p, k) => s + p * n[k], 0) / length / Math.hypot(...n)));
+        const sin2 = 1.333 ** 2 * (1 - cosine * cosine);
+        let fresnel = 1;
+        if (sin2 < 1) {
+          const ct = Math.sqrt(1 - sin2);
+          fresnel =
+            0.5 * ((1.333 * cosine - ct) / (1.333 * cosine + ct)) ** 2 +
+            0.5 * ((cosine - 1.333 * ct) / (cosine + 1.333 * ct)) ** 2;
+        }
+        const actual = at(fftFrame[1], x, y);
+        for (let k = 0; k < 3; k++)
+          fftOpticalError = Math.max(fftOpticalError, Math.abs(actual[k] - [0.8, 0.4, 0.2][k] * (1 - fresnel)));
+        fftOpticalPixels++;
+      }
+    maskBuffer.destroy();
     let detachedCode;
     try {
       new Underwater({ surface: {} });
@@ -211,9 +350,18 @@ try {
       fftFinite,
       fftChanged,
       detachedCode,
+      windowPixels,
+      tirPixels,
+      undersideError,
+      restoredWorst,
+      fftOpticalPixels,
+      fftOpticalError,
+      matchedIndexError,
+      environmentError,
+      single,
       validation: validation?.message,
     };
-  });
+  }, process.argv.includes('--single'));
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);
   assert.equal(result.validation, undefined);
@@ -235,9 +383,17 @@ try {
   assert.equal(result.fftFinite, true);
   assert.equal(result.fftChanged, true);
   assert.equal(result.detachedCode, 'state');
+  assert.ok(result.windowPixels > 1000, `Snell window coverage ${result.windowPixels}`);
+  assert.ok(result.tirPixels > 1000, `total internal reflection coverage ${result.tirPixels}`);
+  assert.ok(result.undersideError < 0.002, `dielectric underside ${result.undersideError}`);
+  assert.equal(result.restoredWorst, 0);
+  assert.ok(result.fftOpticalPixels > 1000, `FFT underside coverage ${result.fftOpticalPixels}`);
+  assert.ok(result.fftOpticalError < 0.002, `FFT dielectric underside ${result.fftOpticalError}`);
+  assert.ok(result.matchedIndexError < 0.001, `matched IOR ${result.matchedIndexError}`);
+  assert.ok(result.environmentError < 0.002, `borrowed environment ${result.environmentError}`);
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-underwater-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-underwater-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}${result.single ? '-single' : ''}.json`,
     JSON.stringify({ ...result, hardware: browser.hardware }, null, 2),
   );
 } finally {

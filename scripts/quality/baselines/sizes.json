@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15171885,
+  "total": 15174277,
   "history": [
     {
       "date": "2026-10-24",
@@ -7852,6 +7852,12 @@
       "commit": "88665f01b",
       "reason": "R5 tiles review fixes: shared data URI decoder and FLOAT feature IDs in the features entry (9837 to 9968 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-234-underwater",
+      "reason": "Underwater source gzip 6888 to 9219 B; installed entry 9274 B, ceiling 7161 to 9553 B. Exact underside Fresnel, TIR and Snell transmission, robust pixel-grid depth-plane traces and current opaque snapshots complete the optional entry. A split duplicates source capture ownership. Core plus stage 24209 B unchanged; no speed claim.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9106,7 +9112,7 @@
     "@margoengine/water/ripples": 3940,
     "@margoengine/water/rivers": 3338,
     "@margoengine/water/scatter": 2320,
-    "@margoengine/water/underwater": 7161,
+    "@margoengine/water/underwater": 9553,
     "@margoengine/weather": 5230,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/cover": 1795,

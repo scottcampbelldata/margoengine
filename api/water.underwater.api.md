@@ -31,6 +31,11 @@ export interface UnderwaterOptions {
     resolution?: number;
     waterline?: number;
     refractiveIndex?: number;
+    raySteps?: number;
+    thickness?: number;
+    environment?: () => GPUTexture | undefined;
+    skyHorizon?: readonly [number, number, number];
+    skyZenith?: readonly [number, number, number];
     enabled?: boolean;
 }
 
