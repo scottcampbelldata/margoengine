@@ -3204,3 +3204,10 @@ and the remaining prediction/transform/quantization cross product remain open.
 ## Batch 163 job 1: identical points frame uploads (2026-11-10)
 
 `perf(points): reuse identical frame uniform uploads` retains the last 144 camera bytes for the GPU buffer. The static-frame regression reduces 101 queue writes to one (14,544 to 144 bytes) with identical uniform bytes and remaining commands. Pixel comparisons use the forced-upload negative control on both backends. This is a work count, not a measured frame-time win; timing pending the quiet rerun. See [sources, limits and commands](bp-163-workcounts.md).
+
+### Batch 159 correctness preflight (2026-11-10)
+
+The matrix has a one-call correctness path separate from deferred speed runs.
+Native API counts and task outputs are retained without timing samples or ledger
+updates. Six initial calls passed on Margo and both black-box reference backends.
+No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.md).

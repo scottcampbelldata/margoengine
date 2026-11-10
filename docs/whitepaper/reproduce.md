@@ -3949,3 +3949,9 @@ After npm run build:packages, run the four CPU files and the two GPU commands li
 ### Review 5 refused HDR restoration
 
 Build packages and run the DOF/post CPU suites, then the registered DOF test:gpu:restore-tier under the shared GPU lock. [Exact commands, ten cases and limitations](../review5-effect-restoration.md). Existing package GPU suites still run on native WebGPU and WebGL2.
+
+### Batch 159 matrix preflight
+
+Run the one-call matrix before the quiet refresh. [Exact commands, output schema,
+hard limits and research](parity-preflight.md). It does not enable the speed phase
+or add timings to the historical ledger.

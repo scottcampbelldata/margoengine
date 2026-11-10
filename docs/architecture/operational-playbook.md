@@ -7248,3 +7248,10 @@ Animation updates derived attenuation and optical depth as well as tint and hook
 DOF, Bloom, SSAO and PostStack dispose and detach on failed restoration setup, preserving the original coded refusal for engine.onError. Disposed children ignore stale callbacks. Ten actual full/half-float to masked-LDR device replacements cover default/temporal DOF, Bloom, SSAO and a GTAO/DOF/Bloom stack; each gives one coded error and three later clean frames. Physical lower-tier GPUs remain unproven. [Methods, lifetime research and reproduction](../review5-effect-restoration.md). Core and stage are unchanged.
 
 Review5 SSGI compatibility evidence (2026-11-10): the bounded raw-target investigation locates the first backend difference in the ray-trace target; captured scene/material/Hi-Z/prefilter targets match. Diagnostic finite nonzero ray normalization differs at f32 precision across ANGLE backends, without proving the repeat-render cause. Scott accepts the identical-command D3D11-only case as recorded below Margo; original tests remain unchanged. See [methods and limits](../review5-ssgi-angle.md).
+
+### Matrix correctness preflight (batch 159, 2026-11-10)
+
+Section 5 evidence: the parity harness now has a correctness-only single-call path,
+with native API work counts and outputs kept apart from timing and speed verdicts.
+The initial two-case, three-engine check passed six calls. Full-matrix readiness
+and quiet timings are separate remaining work. [Method and sources](../whitepaper/parity-preflight.md).

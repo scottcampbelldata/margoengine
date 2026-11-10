@@ -7,6 +7,7 @@
 // every engine shows the same camera path and motion per frame whatever its frame rate). marks.createMs (engine or
 // device creation) and marks.buildMs (scene build or model load) are the engine's to fill.
 import { SCENES, sceneParams } from './catalog.js';
+import { workCounter } from '../lib/work-count.js';
 
 const q = new URLSearchParams(location.search),
   numeric = (v) => (v !== '' && Number.isFinite(Number(v)) ? Number(v) : v);
@@ -26,6 +27,8 @@ export const options = {
   // The folder the scenes' models load from (the repository's examples/assets when the CLI serves the page).
   assets: String(passed.assets ?? '/examples/assets/'),
   dump: q.has('dump'),
+  // Correctness-only matrix preflight: one full task or frame, without timing phases.
+  smoke: passed.smoke === 1,
 };
 const harnessKeys = new Set([...Object.keys(options), 'run']);
 export const params = sceneParams(
@@ -96,7 +99,7 @@ if (globalThis.GPUAdapter) {
   const request = GPUAdapter.prototype.requestDevice;
   GPUAdapter.prototype.requestDevice = async function (d = {}) {
     const features = [...(d.requiredFeatures ?? [])];
-    if (this.features.has('timestamp-query') && !features.includes('timestamp-query'))
+    if (!options.smoke && this.features.has('timestamp-query') && !features.includes('timestamp-query'))
       d = { ...d, requiredFeatures: [...features, 'timestamp-query'] };
     return (device = await request.call(this, d));
   };
@@ -311,8 +314,31 @@ export async function run(create) {
       marks = {};
     let frame = 0;
     const next = () => frame++ / 60;
+    const counter = options.smoke ? workCounter() : null;
     const data = await SCENES[options.scene].data(params, { assets: options.assets });
     const app = await create(canvas, { scene: options.scene, params, data }, marks);
+    if (options.smoke) {
+      const setup = counter.snapshot();
+      counter.reset();
+      if (SCENES[options.scene].kind === 'task') await app.task(0);
+      else {
+        app.render(0);
+        await app.idle();
+      }
+      window.result = {
+        engine: options.engine,
+        scene: options.scene,
+        params,
+        smoke: true,
+        calls: 1,
+        work: { setup, call: counter.snapshot() },
+        output: (await app.output?.()) ?? null,
+        info: app.info?.() ?? {},
+        errors: result.errors,
+      };
+      counter.restore();
+      return;
+    }
     if (SCENES[options.scene].kind === 'task') {
       Object.assign(result, { createMs: marks.createMs, buildMs: marks.buildMs });
       await runTask(app, result);
