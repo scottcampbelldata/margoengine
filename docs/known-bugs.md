@@ -4380,3 +4380,11 @@ Batch 220 job 2: the requested scalar interpolants/keyed-curve gap is implemente
 Batch 220 umbrella generation also supplies missing exporter aliases for entries already present on main: optimize-extra during the initial gate and splats during the final rebase. Cause: its exports map had not been regenerated into the umbrella; tests/umbrella.test.js requires exact generator agreement and now passes all eight checks. No exporter implementation changed.
 
 Fixed during batch 220 landing: inspector/gl imported the compatibility preview registry/compiler and declared its package as a peer, violating packages/webgl2-compat/test/isolation.test.js. Native canvas access and locally owned fixed overlay compilation remove both edges. packages/inspector/test/gl.test.js covers registry independence, failed compile/link cleanup and state restoration; isolation tests pass unchanged.
+
+Batch 258 job 4 closes preview GL's missing world-panel drawing in the optional world-gl entry; real pixels, depth, back faces, removal, mouse rays and foreign-state restoration are covered. Context-loss/XR hardware stress and oblique-filter polish remain certification follow-ups in private finish-later.
+
+Separate preview screen-UI follow-up: bind a PIXEL_UNPACK_BUFFER or non-default UNPACK_ROW_LENGTH before a new UiRenderer glyph upload; the existing screen path assumes unpack defaults in GlAtlas. Its owner must isolate that pass in the fix phase. The new world pass isolates and restores those states and its foreign-state regression passes.
+
+Batch 258 landing: existing image GPU fixture sampled two frames before the documented lazy preview painter finished loading. It now waits for the first submitted UI draw before exact pixel/cache assertions.
+
+Batch 258 generated-page landing blocker: newly inherited MCP live-relay literals were absent from the shared error catalog. The catalog now names all 15 existing messages; the existing errors-page literal-coverage regression proves the repair, with no MCP runtime change.

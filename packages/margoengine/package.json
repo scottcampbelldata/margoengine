@@ -3514,6 +3514,10 @@
       "types": "./dist/ui/forms.d.ts",
       "import": "./dist/ui/forms.js"
     },
+    "./ui/world-gl": {
+      "types": "./dist/ui/world-gl.d.ts",
+      "import": "./dist/ui/world-gl.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

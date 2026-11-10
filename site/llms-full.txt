@@ -6887,6 +6887,34 @@ Batch 172 pipeline entry: 1830 B gzip (new, previously absent), ceiling 2086 B; 
 - Inspector `/tools`: application cameras are registered explicitly; live glTF model cameras are discovered automatically. Switching preserves the engine camera object and disposal restores its original pose/projection. Screenshots serialize the canvas only, excluding DOM overlays, and default to PNG with a 10000 ms timeout. Browser recording uses video/record, defaults to WebM/30 fps and retains the encoded file in memory until stop. glTF export defaults to scene GLB; selected loaded models use the full model exporter and attached animation clips. Exporter, video and glTF camera code load only on their respective actions. Origin/codec constraints remain the browser APIs' constraints.
 
 - Batch 263 job 3 entry: inspector/tools 3,184 B min+gzip, ceiling 3,440 B. Video, exporter and loaded-camera dependencies are lazy. Core/stage bytes added: zero.
+Animation disposal removes the actual scene registration, including inherited
+SkinnedCrowd cleanup. GeometryCachePlayer captures the loading scene before the
+first read and releases its external signal subscription on failure or disposal.
+These package fixes do not claim a complete owner-lifetime audit.
+
+Terminal VATCrowd, SkinnedCrowd, AnimationLOD, MorphWeightPlayer and
+GLTFInteractivity reattachment rejects with code disposed before registration.
+Five package-local regressions cover these terminal transitions.
+
+Animation owner fixes optional bytes: vat 8413 -> 8543 B gzip, ceiling 8512 -> 8800 B; instanced-skin 9501 -> 9647 B gzip, ceiling 9634 -> 9937 B. These bytes enforce terminal disposal and explicit scene ownership; splitting the guards would duplicate lifecycle state. The final rebased build measures core + stage at 24209 B, including the upstream version guard; this animation job changes neither package.
+
+Batch 220 job 2: @margoengine/math/curve is CPU-only and optional. Curve accepts [time,value] pairs or flat pairs, defaults to smoothstep, sorts keys and replaces duplicate times. Keys/get/closest return copies; closest ties choose the later key, empty closest returns null. Empty curves evaluate to 0 and one-key curves are constant. type is linear/step/smoothstep/cubic, also exported as CURVE_LINEAR/CURVE_STEP/CURVE_SMOOTHSTEP/CURVE_SPLINE string constants. Cubic tension defaults to 0.5, with derivatives scaled by 2*tension; zero flattens derivatives. Input times/values/options must be finite. Sampled Interpolant data must have strictly increasing times and one sampleSize tuple per time. LinearInterpolant, StepInterpolant/DiscreteInterpolant, SmoothstepInterpolant and CubicInterpolant clamp outside the key range and reuse a result array (default Float64Array). Cubic endpoints default to natural zero second derivative before optional tangentScale (default 1); flat and wrap endpoint derivative policies are available. Wrap is a tangent policy, not repeated time evaluation, and periodic data should repeat its endpoint value. Cubic interpolation may overshoot; quantizeClamped explicitly bounds sampled output. CurveSet supports channel count, channel arrays and variadic flat keys; add/remove/clear/clearKeys and clone preserve independent channel ownership. Sample tables are Float32Array, precision >=2 with endpoints included, sample-major channels; Curve.quantize defaults to 0..1 and accepts a custom interval. Reusable typed buffers must fit all channels. No GPU work, I/O, global state or import side effects. math/curve adds 2403 B gzip, ceiling 2659 B; its coherent interpolation/editing surface avoids multiple modules and duplicate validation. Existing math root/per-type entries and core + stage 24209 B remain unchanged.
+
+Batch 220 inspector isolation repair: GL capture/debug obtains the existing native WebGL2 canvas context without a compatibility-package import or peer dependency. Overlay shaders are owned locally; allocation/compile/link failures release created objects and remain coded failures. inspector/gl grows 4504 to 4742 B gzip, within the existing 4760 B ceiling; the bytes remove the forbidden backend dependency and preserve shader diagnostics/cleanup. Core + stage remains 24209 B.
+## Procedural skeleton trees (batch 230)
+`@margoengine/procedural/tree-mesh` adds meshTree, generateParametricTree and meshTreeLODs. TreeSkeleton from /trees is accepted directly. Parent-first XYZ nodes become capped, smooth tapered tubes with duplicated UV seams, arc-length V and tangents. Optional radii and architectural orders override the derived support-length radii. Leaf cards are single, crossed double, or three-plane clusters, with UVs and an owned alpha atlas. Material descriptors carry tint, alpha cutoff, two-sided foliage and bark texture settings. Default seed 1, species oak, recursive levels 2; seven species are available. All per-order defaults and bounds are in the emitted API comments.
+Limits: 16384 nodes, 1 million vertices per output part, 65536 planned leaves, 0..4 recursive orders, 1..64 axial sections, 3..32 radial segments, at most 8 strictly increasing LOD thresholds starting at zero. Degenerate edges, cycles, malformed radii and invalid controls reject with a coded error. Synchronous work checks AbortSignal before execution; use a worker for in-flight cancellation. Root-only skeletons produce empty meshes. Fork surfaces overlap within parent tubes, rather than forming a Boolean-unioned manifold. Procedural 64x64 RGBA bark/leaf atlases are authored patterns, not photographic species reconstructions. Mesh LOD preserves branch endpoints and forks; leaf thinning is deterministic and card enlargement is caller controlled. No core or stage changes, no frame-time generator, no speed claim.
+Entry size: tree-mesh is 4420 bytes min+gzip (previously absent, 0 bytes). Its optional size ceiling is 4676 bytes; the bytes contain geometry, validation, presets and material atlases, and splitting them would duplicate settings or add asynchronous boundaries to synchronous meshing.
+
+
+
+## Batch 258 preview GL world panels
+
+Import WorldPanels and WorldPanel from ui/world-gl for one world-panel renderer supporting both native backends. GlWorldPanels is also exported explicitly. On WebGPU and complete compatibility it delegates to the original renderer; preview GL uses framebuffer UI textures, mipmaps, depth testing, non-depth-writing quads and readable double-sided UVs. Existing options/defaults, rays and controller methods are preserved. Use Engine.create with the preview webglRenderer fallback for an explicit webgl2 backend.
+
+Panel dimensions and pixel ratio obey the existing WorldPanel contract and MAX_TEXTURE_SIZE. Panel UIs retain their own CSS dimensions. Raw GL retains the preview renderer's encoded-space UI compositing and baseline trilinear filtering; full compatibility retains the WebGPU colour/filter path. Removing or disposing a renderer frees its panel framebuffers, textures, painters and program; panel Ui objects remain caller-owned. Restore hooks recreate context resources, but hardware context-loss/XR stress certification and anisotropy tuning remain fix-phase follow-ups. No speed claim is made.
+
+Batch 258 job 4 sizes: world-gl 0 to 7300 B min+gzip, ceiling 7556 B. UI root record 32141 to 32387 B includes inherited dependency growth. Current core + stage measures 24209 B (59802 B raw), below 25000 B; this job changes no core or stage source. The optional entry owns framebuffer, caller-state and lifecycle integration; splitting would duplicate that ownership.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -11081,7 +11109,7 @@ Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the 
 Batch 255 job 4: no open defect found in authenticated safe storage. Replay under the same physical key and caller-controlled key secrecy are explicit integrity-model limits in docs/limits.md, not claims of rollback protection or encryption.
 `scripts/gpu-package-tests.mjs --serial` labels shared leases `check:gpu-packages`, so sameLane serializes unrelated worktrees with that owner; repro: queue serial suites in two lanes. Workaround for this lane: wrap the real GPU suite with gpu-lock run --owner=codex-batch197; leave shared scheduler repair for the fix phase.
 
-React test:browser:bindings and test:browser:instances scripts assume repository-root cwd in scripts/browser.js startDevServer, but their package commands run in packages/react and request /packages/react/tests/*.html, producing HTTP 404. Repro: run the package scripts; both scripts pass from the repository root on WebGPU and --compat. Fix phase: correct owning package commands and add a cwd regression.
+Fixed with animation landing: React bindings/instances browser scripts now select repository-root cwd. The package-cwd CPU regression covers every React browser leaf; native/compat GPU checks retain their assertions.
 Batch 251 job 3: the exact plateau-mean fixture exposed naive-sum rounding.
 Compensated normalized accumulation fixes the cause; the unchanged analytical
 fixture now passes. No open defect found by fuzzy.test.js.
@@ -11242,6 +11270,44 @@ The same baseline merge lost water 20817 B (batch-225), XR 9158 B (version-guard
 
 The final dependent umbrella test also found the already-landed exporters/materials entry absent from the generated umbrella map. Regenerate with scripts/umbrella.mjs, preserving the sciviz pipeline facade; tests/umbrella.test.js exercises both current generation and binding identity. No exporter source changes.
 - Outside batch 263: video/record can resolve a header-only WebM when stopped before Chromium encodes its first frame. Repro: record a native WebGPU canvas at 30 fps, render 12 requestAnimationFrame ticks, then stop; observed 110-byte video/webm;codecs=vp8, decoder rejects DEMUXER_ERROR_COULD_NOT_OPEN. Cause: recordCanvas validates only nonzero Blob size, which also accepts container headers. A 1.2-second recording decodes correctly on WebGPU and preview WebGL2. Fix phase should add first-encoded-frame readiness or structural stream validation in video/record with a short-recording regression.
+### Animation scene ownership repaired
+
+Animation plugins now detach by registered identity, preserving same-name plugins
+in other scenes. GeometryCachePlayer retains its originating scene through the
+first asynchronous read and releases the external abort listener on failure or
+disposal. Package-local scene-owner regressions exercise every affected class
+and factory without the parked owner-lifetime harness.
+
+Disposed crowds, LOD, morph and interactivity controllers now reject subsequent
+setup, preventing a new registration that idempotent disposal could not release.
+
+### Fixed: dependent React bindings browser working directory
+
+The package bindings GPU script used npm's package working directory as the
+Vite root, so `/packages/react/tests/bindings-browser.html` answered an HTTP
+error before any assertion ran. It now selects the repository root like the
+adjacent React browser suites. `packages/react/tests/browser-working-directory.test.js`
+reproduces the package invocation with a mocked browser entry and no GPU.
+
+Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-browser.mjs --compat fails frame40 particle bytes (397093820 vs 3932506386), with identical 110 live particles and picture 396217175; lane R batch 215 reproduced it on clean main. LOD also reaches its 600-second hard limit on clean origin/main b47fdef13, with that commit fully built before the run: `node scripts/gpu-lock.mjs run --owner=lane-P-animation-baseline --gpu=16384-pick-grid-readback --wait-max=60 --max=10 -- node packages/lod/test/imposter-check.mjs main-animation-baseline --compat` exits 124 in the unchanged 16384-pick grid (test-results/animation-clean-main-lod-compat.log). Compatibility mapAsync waits on device.idle(), then polls readback/query readiness through nested 1 ms timers; browser timer nesting/clamping compounds serial pick waits. This is a source-level candidate cause, not a GPU-proved repair. Neither dependent GPU issue is caused by the animation ownership change; both wait for the owning packages in the fix phase.
+
+GPU runner registration on clean origin/main b47fdef13: `node scripts/gpu-package-tests.mjs --plan --select=animation/test:gpu` rejects MCP assets-browser/live-browser, WebGL2 Firefox support and worker browser-matrix leaves as unregistered. This animation job changes none of their registrations; owning packages must register or classify those leaves in the fix phase.
+
+Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.
+
+Batch 220 job 2: the requested scalar interpolants/keyed-curve gap is implemented in math/curve; no open defect found by its analytic and ownership tests. Cubic overshoot and clamped time evaluation are explicit contracts in limits, not monotonic or periodic interpolation claims.
+
+Batch 220 umbrella generation also supplies missing exporter aliases for entries already present on main: optimize-extra during the initial gate and splats during the final rebase. Cause: its exports map had not been regenerated into the umbrella; tests/umbrella.test.js requires exact generator agreement and now passes all eight checks. No exporter implementation changed.
+
+Fixed during batch 220 landing: inspector/gl imported the compatibility preview registry/compiler and declared its package as a peer, violating packages/webgl2-compat/test/isolation.test.js. Native canvas access and locally owned fixed overlay compilation remove both edges. packages/inspector/test/gl.test.js covers registry independence, failed compile/link cleanup and state restoration; isolation tests pass unchanged.
+
+Batch 258 job 4 closes preview GL's missing world-panel drawing in the optional world-gl entry; real pixels, depth, back faces, removal, mouse rays and foreign-state restoration are covered. Context-loss/XR hardware stress and oblique-filter polish remain certification follow-ups in private finish-later.
+
+Separate preview screen-UI follow-up: bind a PIXEL_UNPACK_BUFFER or non-default UNPACK_ROW_LENGTH before a new UiRenderer glyph upload; the existing screen path assumes unpack defaults in GlAtlas. Its owner must isolate that pass in the fix phase. The new world pass isolates and restores those states and its foreign-state regression passes.
+
+Batch 258 landing: existing image GPU fixture sampled two frames before the documented lazy preview painter finished loading. It now waits for the first submitted UI draw before exact pixel/cache assertions.
+
+Batch 258 generated-page landing blocker: newly inherited MCP live-relay literals were absent from the shared error catalog. The catalog now names all 15 existing messages; the existing errors-page literal-coverage regression proves the repair, with no MCP runtime change.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

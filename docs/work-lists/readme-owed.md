@@ -323,3 +323,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/inspector (batch 220 landing repair): document native-context capture/overlay ownership, removal of the compatibility-package peer dependency and coded shader failure cleanup.
 - @margoengine/procedural (batch 230 tree-mesh): meshTree, generateParametricTree, meshTreeLODs, parameter defaults, material atlases and integration with /trees and /lod; examples deferred.
 - margoengine (batch 230 tree-mesh): generated procedural/tree-mesh alias; examples deferred.
+
+
+
+| @margoengine/ui | world-gl entry, backend fallback setup, WorldPanels alias, inherited options/rays, resource lifetime and preview differences. | batch-258 job 4 |
+| margoengine | ui/world-gl alias and world-panel setup. | batch-258 job 4 |

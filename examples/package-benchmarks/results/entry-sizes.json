@@ -3,8 +3,8 @@
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 59152,
-    "gzip": 23950,
+    "raw": 59802,
+    "gzip": 24209,
     "limit": 25000
   },
   "packages": {
@@ -3316,16 +3316,16 @@
     },
     "@margoengine/ui": {
       ".": {
-        "raw": 99979,
-        "gzip": 32141
+        "raw": 100418,
+        "gzip": 32387
       },
       "./react": {
-        "raw": 101901,
-        "gzip": 32306
+        "raw": 102341,
+        "gzip": 32537
       },
       "./world": {
-        "raw": 26024,
-        "gzip": 9197
+        "raw": 26220,
+        "gzip": 9272
       },
       "./input": {
         "raw": 11810,
@@ -3342,6 +3342,10 @@
       "./forms": {
         "raw": 9498,
         "gzip": 3492
+      },
+      "./world-gl": {
+        "raw": 19835,
+        "gzip": 7300
       }
     },
     "@margoengine/usdz": {

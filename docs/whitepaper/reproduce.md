@@ -2912,3 +2912,8 @@ Batch 220 job 2: build packages and run node --test --test-timeout=120000 packag
 
 Batch 220 inspector repair: build inspector, run node --test --test-timeout=120000 packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js; run packages/inspector/test/gl-browser.mjs with and without --compat under a shared GPU lock. No isolation assertion is weakened.
 Batch 230 tree meshing: build packages, then `node --test packages/procedural/test/tree-mesh.test.js`; render with `node scripts/gpu-lock.mjs run --owner=tree-mesh-proof --max=3 --wait-max=60 -- node packages/procedural/test/tree-mesh-browser.mjs`. Synthetic analytical and seeded fixtures, no timing assertions, no external model needed. Package GPU gate additionally retains all previous procedural backend checks.
+
+
+
+### Batch 258 preview GL world panels
+After build:packages run node --test --test-timeout=120000 packages/ui/tests/world-gl.test.js. Under a shared GPU slot run node packages/ui/tests/world-gl-browser.mjs, then the same command with --compat. Each invocation runs preview GL and the native WebGPU API path; the preview adds the foreign-state probe. The driver also sends real canvas clicks through the camera ray. Existing world tests stay unchanged. No benchmark is involved.

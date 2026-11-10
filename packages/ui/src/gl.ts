@@ -266,8 +266,13 @@ export class GlUiPainter {
     if (floats) gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, floats);
   }
 
-  /** Draw `list` over the frame in the default framebuffer, `width` by `height` pixels. */
-  draw(list: DrawList, width: number, height: number): void {
+  /** Draw `list` into `framebuffer` (default: canvas), `width` by `height` pixels. */
+  draw(
+    list: Pick<DrawList, 'commands' | 'version'>,
+    width: number,
+    height: number,
+    framebuffer: WebGLFramebuffer | null = null,
+  ): void {
     const gl = this.gl,
       batch = this.batch,
       stats = this.stats;
@@ -286,7 +291,7 @@ export class GlUiPainter {
     if (!batch.runs.length) return;
     const depth = gl.isEnabled(gl.DEPTH_TEST),
       cull = gl.isEnabled(gl.CULL_FACE);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.viewport(0, 0, width, height);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);

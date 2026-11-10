@@ -304,7 +304,7 @@ export class UiBatch {
   private color?: GlyphPages;
 
   /** Turn the draw list into rect and glyph instances and the runs that draw them. */
-  build(list: DrawList, sdf: GlyphPages, color: GlyphPages): void {
+  build(list: Pick<DrawList, 'commands'>, sdf: GlyphPages, color: GlyphPages): void {
     this.sdf = sdf;
     this.color = color;
     this.runs.length = 0;

@@ -53,6 +53,10 @@
     "./forms": {
       "types": "./dist/forms.d.ts",
       "import": "./dist/forms.js"
+    },
+    "./world-gl": {
+      "types": "./dist/world-gl.d.ts",
+      "import": "./dist/world-gl.js"
     }
   },
   "files": [
@@ -85,6 +89,7 @@
     "test:browser:world": "npm run build && node tests/world-browser.mjs",
     "test:browser:input": "npm run build && node tests/text-input-browser.mjs",
     "test:browser:image": "npm run build && node tests/image-browser.mjs",
-    "test:browser:forms": "npm run build && node tests/forms-browser.mjs"
+    "test:browser:forms": "npm run build && node tests/forms-browser.mjs",
+    "test:browser:world-gl": "npm run build && node tests/world-gl-browser.mjs"
   }
 }

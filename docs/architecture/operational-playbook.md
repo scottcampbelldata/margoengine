@@ -1,5 +1,9 @@
 # Engine architecture and quality reference
 
+## Batch 258 preview GL world panels (section 5 supplement)
+
+The optional ui/world-gl entry draws flat world panels on core's preview GL backend, using GlUiPainter into a framebuffer and an owned quad pass. It retains ordinary WorldPanel objects, existing ray/controller behavior and the original WebGPU implementation. Textures are repainted only when the UI draw-list version changes, with a complete mip chain. The pass restores program/VAO/buffer, framebuffer, viewport/scissor, colour/depth/blend state, texture/sampler bindings and pixel-unpack state. A foreign-state browser probe preserves real pixels and exact restoration, with no GL or GPU validation errors. Removal/re-addition releases and rebuilds panel resources. Native and complete compatibility each exercise both backend choices. Hardware XR, context-loss stress and oblique-filter polish remain unclaimed follow-ups. No benchmark was run; core and stage source is untouched.
+
 ## Batch 258 forms evidence (section 5 supplement)
 
 The forms entry composes existing UI widgets, native text input and the normal GPU draw list. It adds no core or stage code. CPU regressions cover disabled choices, one tab stop per choice strip, content ownership, exact colour values, native hex editing, modal reconciliation and native versus div key activation. The browser gate exercises pointer, keyboard, gamepad commands and actual accessibility-tree attributes on native WebGPU and complete compatibility. The shared mirror now defers native DOM focus until a canvas pointer press ends. Existing UI, input, image, world and dependent React GPU suites remain the compatibility gate; no benchmark is run.

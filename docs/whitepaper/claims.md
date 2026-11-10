@@ -3414,3 +3414,8 @@ not claim a complete engine-wide lifetime audit or any speed improvement.
 - Batch 220 inspector boundary repair: optional GL inspection uses the native context without loading the compatibility layer. Unchanged isolation.test.js passes; inspector gl.test.js proves registry-independent capture and resource/state cleanup after shader compilation/link failures. Existing GL browser checks retain exact restored pixels and captured draw/shader assertions.
 ## Batch 230 tree meshing
 Claim: /trees skeletons can become complete seeded bark/foliage meshes without importing a generator or renderer into core/stage. Proof: packages/procedural/test/tree-mesh.test.js verifies analytical taper normals, outward winding, seam duplication, arc UVs, all architectural field families, seven deterministic species, atlas alpha, flat shading, /trees interoperability, descending LOD triangle counts, validation and cancellation. packages/procedural/test/tree-mesh-browser.mjs rasterizes the indexed bark on WebGPU and WebGL2 and checks visible output and LOD reduction. Parameter-family parity is mapped to the public EZ-Tree documentation in docs/clean-room.md; no visual equivalence or biological reconstruction claim is made.
+
+
+
+### Preview GL world UI (batch 258 job 4)
+Optional ui/world-gl adds actual world-panel drawing on preview WebGL2 while preserving the existing native WebGPU renderer and public panel identity. world-gl.test.js verifies API/lifecycle reuse; world-gl-browser.mjs checks pixels, depth, double-sided rendering, cache reuse, resource rebuilding, mouse rays and exact foreign GL state restoration. Both standard and --compat invocations pass. No claim of hardware XR certification or timing parity is made.

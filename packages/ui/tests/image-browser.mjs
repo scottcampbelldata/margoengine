@@ -9,6 +9,12 @@ try {
   for (const preview of [false, true]) {
     if (preview) await page.goto(page.url().split('?')[0] + '?preview');
     await page.waitForFunction(() => window.imageTest);
+    // Preview loads its painter lazily. Wait for a submitted UI draw, rather than assuming two frames load it.
+    await page.waitForFunction(() => {
+      const t = window.imageTest;
+      t.engine.render(0);
+      return t.renderer.stats.drawCalls > 0;
+    });
     const data = await page.evaluate(async () => {
       const t = window.imageTest;
       await t.frame();
