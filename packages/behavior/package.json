@@ -75,6 +75,10 @@
     "./fuzzy": {
       "types": "./dist/fuzzy.d.ts",
       "import": "./dist/fuzzy.js"
+    },
+    "./text": {
+      "types": "./dist/text.d.ts",
+      "import": "./dist/text.js"
     }
   },
   "files": [

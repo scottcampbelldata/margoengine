@@ -202,6 +202,10 @@
       "types": "./dist/behavior/fuzzy.d.ts",
       "import": "./dist/behavior/fuzzy.js"
     },
+    "./behavior/text": {
+      "types": "./dist/behavior/text.d.ts",
+      "import": "./dist/behavior/text.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

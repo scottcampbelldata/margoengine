@@ -4109,3 +4109,6 @@ React test:browser:bindings and test:browser:instances scripts assume repository
 Batch 251 job 3: the exact plateau-mean fixture exposed naive-sum rounding.
 Compensated normalized accumulation fixes the cause; the unchanged analytical
 fixture now passes. No open defect found by fuzzy.test.js.
+
+Batch 251 job 4: no open text-format defect found in all-node, reference,
+200 generated round-trip, syntax-location and bounded-input tests (text.test.js).

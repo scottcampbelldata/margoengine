@@ -3712,3 +3712,17 @@ Native extensions in urn:margoengine:fsm:1 are enabled by default on export and 
 Input/output limit: 1 MiB UTF-8; 10,000 XML elements; 128 XML nesting levels; export preflight limits native region nesting to 64 and rejects cycles. Plain XML ids use the ASCII identifier subset; arbitrary native names use generated ids plus namespaced names. XML 1.0 forbidden characters reject. Shared region definition objects are valid; cycles are not.
 
 Batch 250 job 5: fsm/scxml 0 to 4970 B min+gzip, ceiling 5226 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+## Behavior tree text (batch 251)
+
+New behavior/text: 3,751 B min+gzip, previously absent; umbrella alias 60 B external.
+No existing ceiling raised. Syntax is type(key=JSON,...) with optional brace-delimited
+children and an optional tree wrapper. Utility children use option(score=JSON)
+wrappers, each containing one child. Values are JSON strings, numbers, booleans,
+null or arrays; node validation constrains the actual allowed fields. Whitespace,
+line comments (# or //) and block comments are accepted outside string literals.
+There is one root; maximum source length is 8,388,608 UTF-16 code units, depth 256,
+100,000 syntax nodes including option wrappers. Reference expansion has its own
+existing size/depth bounds. Subtree registrations are supplied externally, without
+globals. The printer retains semantic fields and references; comments, whitespace
+and input key order are not preserved. No MDSL import compatibility or editor.

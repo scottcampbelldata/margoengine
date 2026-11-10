@@ -5473,3 +5473,24 @@ singleton and true sampled mean-of-max outputs. No copied code, downloaded asset
 demo, timing claim or assertion of truth-preserving logical deduction.
 ## Batch 250 job 5: SCXML document conversion
 Compared before implementation: David Harel, *Statecharts: A Visual Formalism for Complex Systems* (1987), https://doi.org/10.1016/0167-6423(87)90035-9; David Harel, Amir Pnueli, Jeanette P. Schmidt and Rivi Sherman, *On the Formal Semantics of Statecharts* (1987), https://lics.siglog.org/1987/HarelPnueliSchmidtS-OntheFormalSemantic.html; Jim Barnett et al., *State Chart XML: State Machine Notation for Control Abstraction*, W3C Recommendation (2015), https://www.w3.org/TR/scxml/ (state/parallel/initial/history/transition structure and expressible configuration); Tim Bray, Jean Paoli, C. M. Sperberg-McQueen, Eve Maler and Francois Yergeau, *Extensible Markup Language 1.0, Fifth Edition* (2008), https://www.w3.org/TR/xml/ (well-formedness and characters); Tim Bray, Dave Hollander, Andrew Layman, Richard Tobin and Henry S. Thompson, *Namespaces in XML 1.0, Third Edition* (2009), https://www.w3.org/TR/xml-names/ (namespace identity). Combined clean-room design uses a supplied standards XML DOM parser, maps only expressible document constructs, rejects executable expressions and unsupported nodes, and preserves native-only fields in a separate namespace. No XML parser or rival implementation copied or read. Native extensions are explicitly not generic SCXML execution semantics. All statechart fixtures are authored in the tests.
+
+## Batch 251 job 4: behavior tree text
+
+Research compared before implementation: Bryan Ford, *Parsing Expression Grammars:
+A Recognition-Based Syntactic Foundation* (2004),
+https://pdos.csail.mit.edu/~baford/packrat/popl04/ (deterministic recognition);
+Tim Bray, *The JavaScript Object Notation (JSON) Data Interchange Format*, RFC 8259
+(2017), https://www.rfc-editor.org/rfc/rfc8259 (attribute values and escaping);
+Colledanchise and Ogren (2018), cited above (tree structure); Nik Korn,
+*Mistreevous MDSL public documentation* (accessed 2026-11-10),
+https://github.com/nikkorn/mistreevous (text/JSON trees and comments). Public
+syntax descriptions only, no parser source or companion implementation read.
+
+The clean-room grammar uses type(key=JSON,...) attributes, brace-delimited child
+nodes, utility option(score=JSON) wrappers and an optional tree wrapper. A bounded
+recursive recognizer reports line/column syntax errors, then delegates semantic
+and registered-reference checks to the existing validators. Printing canonicalizes
+field order without expanding references. Tests cover every Margo node, optional
+fields, escaping, comments, malformed input, resource bounds and 200 generated
+round trips. This is Margo syntax, not a claim of MDSL file compatibility. No demo
+assets or timing claims are introduced.
