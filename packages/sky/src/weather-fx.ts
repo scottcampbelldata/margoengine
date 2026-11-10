@@ -498,7 +498,7 @@ export class WeatherFX implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     if (this.options.weather.occlusion === this.occlusion) this.options.weather.occlusion = undefined;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;
   }

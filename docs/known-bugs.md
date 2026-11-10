@@ -5602,3 +5602,18 @@ as unsupported by the light loader.
   without checking the first chunk. Input: a PNG whose first chunk is renamed `aHDR` with a matching CRC. Wrong output:
   decoded as if it were IHDR, where the PNG specification (5.6) requires IHDR first. Regression
   packages/headless/tests/audit-132.test.js.
+
+## Batch 132 audit: sky (fixed and open)
+
+- Fixed: `dispose()` of `Sky` (base.ts:662), `AerialPerspective`, `AstroSky`, `HillaireSky`, `LightShafts`,
+  `VolumetricClouds`, `Weather` and `WeatherFX` called `engine.removePlugin(this.name)`, which acts on the active scene.
+  Input: `engine.createScene('other').use(sky); sky.dispose()`. Wrong output: the plugin stayed in `other.plugins`.
+  Regressions packages/sky/test/audit-132.test.js.
+- Open (source check, Scott's call): packages/sky/src/atmosphere-luts.ts:42 `mieAbsorption: 0.00444` /km, cited as
+  Hillaire 2020 Table 1, which prints sigma_ma = 4.40e-6 /m. With sigma_ms = 3.996 a single-scattering albedo of 0.9
+  (Bruneton 2017) gives absorption 0.444e-6 /m and extinction 4.44e-6 /m, so the table's 4.40 looks like the extinction
+  with a typo and the code's 4.44 like the extinction taken as absorption: Mie extinction comes out 8.436e-6 /m, about
+  1.9x. Changing it changes every Hillaire sky and aerial picture, and test/aerial.test.js:92 pins 0.00444.
+- Open (Mac bug, M6, MARGO_COMPAT=1): `node packages/sky/test/browser-check.mjs` fails at "meadow 4x frame 1 scene vs
+  narrow: differing 2, max 0.0009765625" every run, also on the source before the dispose fix; native passes. The full
+  `Sky` and the base entry with only meadow's features differ by one half-float ulp in two pixels; root cause not found.

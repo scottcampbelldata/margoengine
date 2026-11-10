@@ -659,7 +659,7 @@ export class Sky implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     for (const release of [...this.targets.values()]) release();
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;
   }
