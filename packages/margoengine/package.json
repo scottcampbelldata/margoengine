@@ -878,6 +878,14 @@
       "types": "./dist/cutscene/nested-editor.d.ts",
       "import": "./dist/cutscene/nested-editor.js"
     },
+    "./decoders/zstd": {
+      "types": "./dist/decoders/zstd.d.ts",
+      "import": "./dist/decoders/zstd.js"
+    },
+    "./decoders/lz4": {
+      "types": "./dist/decoders/lz4.d.ts",
+      "import": "./dist/decoders/lz4.js"
+    },
     "./decoders/jpeg": {
       "types": "./dist/decoders/jpeg.d.ts",
       "import": "./dist/decoders/jpeg.js"

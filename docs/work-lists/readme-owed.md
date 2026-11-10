@@ -842,3 +842,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/creative and margoengine (batch 271 job 2): document /planet-atmosphere OrbitAtmosphere defaults, world/km conversion, sky peer, physical background vs textured Planet surface, depth, restoration, observer/medium limits and both GPU backends; examples deferred.
 - @margoengine/video (batch 269 job 3): document /demux openDemuxedVideo, complete fragment+init input, AVC fragments, WebM VP8/VP9/AV1, buffered index/GOP memory, exact seek/step, signals, frame closure and unsupported encryption/transforms; examples deferred.
 - margoengine (batch 269 job 3): document video/demux alias; examples deferred.
+
+
+- @margoengine/decoders: document /zstd decompressZstd and /lz4 decodeLZ4/decodeLZ4Block, byte-buffer stream input, limits, cancellation, checksums and external dictionaries.
+- margoengine: document generated decoders/zstd and decoders/lz4 optional facades.

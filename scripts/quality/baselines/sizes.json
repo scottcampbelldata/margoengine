@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13744000,
+  "total": 13751722,
   "history": [
     {
       "date": "2026-10-24",
@@ -7203,6 +7203,12 @@
       "commit": "911de66c4",
       "reason": "Batch 269 buffered fragment and WebM index entry, shared exact decoder ownership, optional-only size growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "3c5174547",
+      "reason": "batch203-new-standalone-zstd-and-lz4-entries",
+      "grew": 2
     }
   ],
   "items": {
@@ -8506,6 +8512,8 @@
     "@margoengine/tonemap/hue": 2421,
     "@margoengine/creative/planet-atmosphere": 3377,
     "margoengine/creative/planet-atmosphere": 329,
-    "@margoengine/video/demux": 6445
+    "@margoengine/video/demux": 6445,
+    "@margoengine/decoders/zstd": 5305,
+    "@margoengine/decoders/lz4": 2417
   }
 }

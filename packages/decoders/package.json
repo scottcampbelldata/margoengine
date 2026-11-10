@@ -36,6 +36,14 @@
   },
   "sideEffects": false,
   "exports": {
+    "./zstd": {
+      "types": "./dist/zstd.d.ts",
+      "import": "./dist/zstd.js"
+    },
+    "./lz4": {
+      "types": "./dist/lz4.d.ts",
+      "import": "./dist/lz4.js"
+    },
     "./jpeg": {
       "types": "./dist/jpeg.d.ts",
       "import": "./dist/jpeg.js"
