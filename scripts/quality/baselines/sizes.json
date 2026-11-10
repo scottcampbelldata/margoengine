@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14257319,
+  "total": 14265795,
   "history": [
     {
       "date": "2026-10-24",
@@ -7543,6 +7543,11 @@
       "commit": "aa3e347da",
       "reason": "Batch 201 optional audio entry: draft emitter readers, safe byte/PCM/source budgets, weighted playback and animation synchronization. Audio peer stays external and caller-owned. Core and stage unchanged; measured figures in docs/limits.md.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch173-job5",
+      "reason": "Batch 173 job 5: optional sciviz/curvilinear absent to 8220 B min+gzip, ceiling 8476 B. Direct trilinear inverse mapping with a spatial cell tree, exact nonuniform spherical inverse, shared scalar classification, masked support, curved coordinate slices and outline belong to one mapped-domain lifecycle. Splitting duplicates topology and GPU resource ownership. Core + stage remains 24209 B."
     }
   ],
   "items": {
@@ -8909,6 +8914,7 @@
     "@margoengine/quality/knobs": 2437,
     "@margoengine/environment/exr-codecs": 1729,
     "@margoengine/environment dist/workers/exr-codecs.js": 1835,
-    "@margoengine/gltf-pro/audio": 4973
+    "@margoengine/gltf-pro/audio": 4973,
+    "@margoengine/sciviz/curvilinear": 8476
   }
 }

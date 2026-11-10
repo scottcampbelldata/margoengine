@@ -420,3 +420,5 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 - Batch 175 job 1, sciviz/omezarr: quiet-machine chunk/decode/load timings and Rust/Wasm comparison remain deferred. Current proof is exact lossless output, one chunk for a teravoxel one-sample ROI, and 131072 output bytes per real region; retain all original scenes and budgets.
 
 - Batch 274 job 3, compute/cpu-wasm: quiet-machine paired JavaScript/Rust timings for fused expressions, reductions/scans, stable sorting, matmul, FFT, signal convolution, sparse and Philox. Preserve identical outputs, all sizes and scenes. Deterministic proof already counts actual SIMD groups; bridge allocation/copy costs are included in the later end-to-end timings. No timing bar was weakened or run in this build phase.
+
+- Batch 173 job 5: quiet-machine mapped-volume throughput across radar curvilinear cells and thin spherical ocean shells; retain original data, inverse tolerance, 4096-segment coverage and identical classifier/output. No timing proof during build phase.

@@ -1030,3 +1030,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/exporters (batch 136 proof): document the four-setting corpus, prediction-degree and circular-normal candidate selection, bounded RAW alphabet and scoped no-worse ratio/error evidence during the README phase.
+- @margoengine/sciviz: document /curvilinear, structured and spherical node order/units/seams, shared source classifiers, physical referenceStep, index slices/outlines, masking, lifecycle, NOAA demo and accuracy limits.
+
+- margoengine: document generated /sciviz/curvilinear alias alongside the optional scientific volume entries.

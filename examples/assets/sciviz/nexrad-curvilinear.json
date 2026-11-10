@@ -1,0 +1,23 @@
+{
+  "source": "https://unidata-nexrad-level2.s3.amazonaws.com/2013/05/20/KTLX/KTLX20130520_201643_V06.gz",
+  "title": "KTLX 20 May 2013 20:16:43 UTC reflectivity (dBZ)",
+  "dims": [
+    51,
+    31,
+    6
+  ],
+  "sweeps": [
+    1,
+    3,
+    5,
+    7,
+    8,
+    9
+  ],
+  "pointsSHA256": "dc3a02ec0dee2b1d658303bc9bd9bdad5e13c6d9f561874c125b5bf5fd614ff4",
+  "processing": "Nearest measured radials at 3 degree stride, exact measured azimuth/elevation per node, range 10..110 km stride 2 km. Scale/offset read per radial; below threshold and range folded gates are NaN. Straight rays, no atmospheric refraction or earth-curvature correction.",
+  "license": "Public domain, US Federal Government NOAA data; modified subset, no endorsement.",
+  "originalSHA256": "772e01b154a5c966982a6d0aa2fc78bc64f08a9b77165b74dc02d7aa5aa69275",
+  "dataSHA256": "4b36d9057bead247f1a8a654b0bc9a00bc2f1cf819a1c25732e35b30fbb02152",
+  "finite": 5124
+}

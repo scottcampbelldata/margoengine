@@ -3454,6 +3454,10 @@
       "types": "./dist/sciviz/omezarr.d.ts",
       "import": "./dist/sciviz/omezarr.js"
     },
+    "./sciviz/curvilinear": {
+      "types": "./dist/sciviz/curvilinear.d.ts",
+      "import": "./dist/sciviz/curvilinear.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

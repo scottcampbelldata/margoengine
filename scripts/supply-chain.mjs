@@ -151,6 +151,14 @@ const ASSETS = [
     'Batch 267 redistributes a 3.9 MB subset of standard CC0 asset-proof data only in packages/mcp/tests/fixtures; test data is excluded by the package files whitelist. packages/mcp/tests/assets-prepare.mjs obtains standard glTF Sample Assets metadata, Triangle.gltf/Triangle.bin (Marco Hutter, 2017, CC0-1.0), Poly Haven WoodenTable_02, venice_sunset, aerial_rocks_04 (CC0-1.0, https://polyhaven.com/license), and an ambientCG bricks material (CC0-1.0, https://docs.ambientcg.com/license/). Original URLs, authors, licence URLs and original download inventories are recorded in packages/mcp/tests/fixtures/index.json; each distributed file has its byte count and SHA-256. Optional network refresh records the complete downloads under ignored test-results/mcp-assets-proof. No external implementation code is included. ## NASA TMR flat-plate solution data (batch 172 pipeline demo)',
   ],
   [
+    'examples/assets/sciviz/nexrad-curvilinear.json',
+    'NOAA NEXRAD Level II KTLX20130520_201643_V06.gz, US Federal Government public-domain radar observations, https://unidata-nexrad-level2.s3.amazonaws.com/2013/05/20/KTLX/KTLX20130520_201643_V06.gz . Clean-room offline Message 31 preparation in scripts/prepare-sciviz-mapped.py retains actual measured ray geometry, six distinct elevations, 3-degree radial stride and 2-km gate stride from 10 to 110 km. Invalid gates remain NaN. Modified demo data only, no endorsement; original/subset/point SHA256 in the JSON. No decoder or other implementation copied.',
+  ],
+  [
+    'examples/assets/sciviz/woa23-shell.json',
+    'NOAA World Ocean Atlas 2023 1991-2020 annual analysed temperature, https://www.ncei.noaa.gov/data/oceans/woa/WOA23/DATA/temperature/csv/decav91C0/1.00/woa23_decav91C0_t00an01.csv.gz , R. A. Locarnini et al., https://doi.org/10.25923/54bh-1613 . US Federal Government public-domain data. Modified five-degree/11-depth demo subset, duplicated longitude seam and unchanged temperature values with NaN land/missing masks. Display shell thickness exaggerated 231.67x; no NOAA endorsement. Source and output SHA256 recorded beside the binary. No implementation copied.',
+  ],
+  [
     'examples/assets/sciviz/pipeline/source.json',
     'File: examples/assets/sciviz/pipeline/cf-plate.dat. NASA Turbulence Modeling Resource, SA flat plate, CFL3D and FUN3D surface skin-friction solutions. Source: https://tmbwg.github.io/turbmodels/FlatPlate/SA/cf_plate.dat ; description https://tmbwg.github.io/turbmodels/flatplate_sa.html . US government public-domain data under NASA media usage guidance, https://www.nasa.gov/nasa-brand-center/images-and-media/ . Original bytes retained; source.json records SHA-256 and zone counts. Demo selects the 447 FUN3D samples. No NASA endorsement is implied.',
   ],

@@ -60,7 +60,10 @@ for (const compat of [false, true]) {
       for (const shape of ['arrow', 'cone', 'sphere', 'cube', 'line', custom]) {
         await demo.show(shape, 20, 'vector');
         const image = await pixels(demo.windFigure);
-        check(image.lit > 20, `glyph ${typeof shape === 'string' ? shape : 'custom'} pixels`);
+        check(
+          image.lit > 20,
+          `glyph ${typeof shape === 'string' ? shape : 'custom'} pixels ${JSON.stringify({ image, canvas: [document.querySelector('#wind').width, document.querySelector('#wind').height], stats: demo.windFigure.engine.stats, shapes })}`,
+        );
         check(demo.windFigure.engine.stats.drawCalls === 1, 'one instanced draw per shape');
         shapes.push({ shape: typeof shape === 'string' ? shape : 'custom', ...image });
       }
