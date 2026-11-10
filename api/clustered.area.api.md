@@ -8,6 +8,7 @@ import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extens
 
 export interface AreaLightOptions {
     lights: Clustered;
+    maxLights?: number;
 }
 
 export { AreaLightShadow } from "@margoengine/math";
@@ -20,6 +21,7 @@ export interface AreaLightTexture {
 export class AreaLights implements EnginePlugin, ClusteredArea {
     readonly name = "clustered:area";
     readonly lights: Clustered;
+    readonly maxLights: number;
     constructor(options: AreaLightOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: AreaLightOptions): AreaLights;
@@ -38,6 +40,8 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
 }
 
 export const MAX_AREA_LIGHTS = 64;
+
+export const MAX_AREA_LIGHTS_LIMIT = 1024;
 
 export const MAX_AREA_SHADOWS = 4;
 
@@ -62,6 +66,7 @@ class Clustered implements EnginePlugin {
     readonly name = "clustered";
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
+    readonly maxLights: number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -146,6 +151,7 @@ interface ClusteredLobes {
 interface ClusteredOptions {
     grid?: readonly [number, number, number];
     shadows?: LocalShadowOptions;
+    maxLights?: number;
 }
 
 interface ClusteredReceiver {

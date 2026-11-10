@@ -80,7 +80,17 @@ export interface ClusteredOptions {
   grid?: readonly [number, number, number];
   /** Integrated shadow maps for lights with a `shadow` (and `addShadowCaster`). Omitted: none. */
   shadows?: LocalShadowOptions;
+  /**
+   * Most point and spot lights `setLights` takes, an integer from 1 to {@link MAX_CLUSTERED_LIGHTS}. Default 1,024. The
+   * light buffer grows in pages of 1,024 lights as lists need them, so a high cap costs nothing until used. Each cluster
+   * still lists at most 1,024 lights, and culling tests every light per cluster, so its cost grows with the count.
+   */
+  maxLights?: number;
 }
+/** The highest `ClusteredOptions.maxLights`. */
+export const MAX_CLUSTERED_LIGHTS = 65536;
+/** Lights per page of the light buffer. */
+const LIGHT_PAGE = 1024;
 /** The `Clustered.shadow` hook (`LocalShadows` from `@margoengine/clustered/shadows`): WGSL defining `clusterShadow`, and its bindings. */
 export interface ClusteredShadow {
   /** WGSL declarations in bind group `group`. */
@@ -152,8 +162,8 @@ export interface ClusteredReceiver {
   addLighting(effect: ClusteredLighting): () => void;
 }
 /**
- * Clustered forward GGX lighting for up to 1,024 point and spot lights: a compute pass bins lights into view-space
- * clusters, and fragments evaluate only their cluster's list. Core meshes receive it automatically; add gltf-pro
+ * Clustered forward GGX lighting for up to 1,024 point and spot lights (`maxLights` raises it to 65,536): a compute
+ * pass bins lights into view-space clusters, and fragments evaluate only their cluster's list. Core meshes receive it automatically; add gltf-pro
  * models, materials meshes or terrain with `lights.add(receiver)`. Optional integrated shadow maps (`shadows`) and
  * hooks for area, directional, IES and projector lights. `Clustered.attach(engine, options)`, then
  * `lights.setLights([...])`. WebGPU only.
@@ -192,9 +202,12 @@ export class Clustered implements EnginePlugin {
   }))(this);
   private readonly values = new Float32Array(32);
   private readonly ints = new Uint32Array(this.values.buffer);
-  private readonly data = new Float32Array(1024 * 16);
+  /** Most lights `setLights` takes (`ClusteredOptions.maxLights`). */
+  readonly maxLights: number;
+  /** 16 floats per light, in pages of {@link LIGHT_PAGE} lights. */
+  private data = new Float32Array(LIGHT_PAGE * 16);
   /** Per light: LocalShadows map width, height, near and far from a castShadow light's `shadow`, 0 where unset. */
-  private readonly shadowCameras = new Float32Array(1024 * 4);
+  private shadowCameras = new Float32Array(LIGHT_PAGE * 4);
   private lightCount = 0;
   private dirty = true;
   private disposed = false;
@@ -317,6 +330,10 @@ export class Clustered implements EnginePlugin {
         'Invalid cluster grid; pass [x, y, z] integers from 1 to 128 whose product is at most 32768',
       );
     this.grid = [...grid] as [number, number, number];
+    const maxLights = options.maxLights ?? LIGHT_PAGE;
+    if (!Number.isInteger(maxLights) || maxLights < 1 || maxLights > MAX_CLUSTERED_LIGHTS)
+      throw new RangeError('Invalid maxLights; pass an integer from 1 to 65,536');
+    this.maxLights = maxLights;
     if (options.shadows !== undefined) this.localShadows = new LocalShadowMaps(options.shadows);
   }
   get owner(): Engine | undefined {
@@ -328,8 +345,10 @@ export class Clustered implements EnginePlugin {
     return effect;
   }
   setLights(lights: readonly (PointLight | SpotLight)[]): this {
-    if (this.disposed || !Array.isArray(lights) || lights.length > 1024)
-      throw new RangeError('Expected at most 1,024 lights');
+    if (this.disposed || !Array.isArray(lights) || lights.length > this.maxLights)
+      throw new RangeError(
+        `Expected at most ${this.maxLights.toLocaleString('en-US')} lights; raise ClusteredOptions.maxLights (up to 65,536)`,
+      );
     for (const light of lights) {
       finiteVector(light.position, 3, 'Light position');
       finiteVector(light.color ?? [1, 1, 1], 3, 'Light color');
@@ -415,6 +434,16 @@ export class Clustered implements EnginePlugin {
       throw new RangeError(
         'Light shadows require ClusteredOptions.shadows; for LocalShadows, give a castShadow light a shadow of resolution, near and far',
       );
+    // Whole pages: the CPU copies grow here, the GPU buffer in the next frame.
+    const pages = Math.max(1, Math.ceil(lights.length / LIGHT_PAGE));
+    if (this.data.length < pages * LIGHT_PAGE * 16) {
+      const data = new Float32Array(pages * LIGHT_PAGE * 16),
+        cameras = new Float32Array(pages * LIGHT_PAGE * 4);
+      data.set(this.data);
+      cameras.set(this.shadowCameras);
+      this.data = data;
+      this.shadowCameras = cameras;
+    }
     let shadows = 0;
     lights.forEach((light, i) => {
       const offset = i * 16,
@@ -598,23 +627,31 @@ export class Clustered implements EnginePlugin {
     const buffer = (size: number, usage: number) =>
       this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
     this.uniform = buffer(128, GPUBufferUsage.UNIFORM);
-    this.lights = buffer(this.data.byteLength, GPUBufferUsage.STORAGE);
     this.counts = buffer(count * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indices = buffer(bytes, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.pipeline = this.device.createComputePipeline({
       layout: 'auto',
       compute: { module: this.device.createShaderModule({ code: cullingShader }), entryPoint: 'main' },
     });
-    this.entries = this.lightEntries = [this.uniform, this.lights, this.counts, this.indices].map((buffer, i) => ({
+    this.dirty = true;
+    if (this.localShadows) this.localShadows.setup(engine);
+    this.page();
+  }
+  /** (Re)creates the light buffer at the CPU copy's page count, then the bindings that name it. */
+  private page(): void {
+    const size = this.data.byteLength,
+      limits = this.device!.limits;
+    if (size > limits.maxStorageBufferBindingSize || size > limits.maxBufferSize)
+      throw new RangeError('The light list exceeds the device storage buffer limit; use fewer lights');
+    this.lights?.destroy();
+    this.lights = this.device!.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.entries = this.lightEntries = [this.uniform!, this.lights, this.counts!, this.indices!].map((buffer, i) => ({
       binding: i + 4,
       resource: { buffer },
     }));
-    this.group = this.device.createBindGroup({ layout: this.pipeline.getBindGroupLayout(0), entries: this.entries });
+    this.group = this.device!.createBindGroup({ layout: this.pipeline!.getBindGroupLayout(0), entries: this.entries });
+    if (this.localShadows) this.entries = [...this.entries, ...this.localShadows.bindings()];
     this.dirty = true;
-    if (this.localShadows) {
-      this.localShadows.setup(engine);
-      this.entries = [...this.entries, ...this.localShadows.bindings()];
-    }
   }
   registerPasses(graph: FrameGraph): void {
     if (this.localShadows)
@@ -641,6 +678,7 @@ export class Clustered implements EnginePlugin {
             this.receivers.delete(receiver);
           }
         if (this.dirty) {
+          if (this.lights!.size < this.data.byteLength) this.page();
           if (this.lightCount)
             c.device.queue.writeBuffer(
               this.lights!,

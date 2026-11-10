@@ -17,8 +17,14 @@ export type { AreaLightShadow, RectAreaLight } from '@margoengine/math';
 export interface AreaLightOptions {
   /** The clustered lighting whose light loop also evaluates the area lights (core meshes and every `lights.add()` receiver). */
   lights: Clustered;
+  /**
+   * Most area lights {@link AreaLights.setLights} takes, an integer from 1 to {@link MAX_AREA_LIGHTS_LIMIT}. Default
+   * {@link MAX_AREA_LIGHTS}. Every lit fragment evaluates every area light (they are not clustered), so the cost of a
+   * frame grows with the count.
+   */
+  maxLights?: number;
 }
-/** Area lights per {@link AreaLights.setLights} call. */
+/** Area lights per {@link AreaLights.setLights} call by default. */
 export const MAX_AREA_LIGHTS = 64;
 /**
  * The `AreaLights.texture` hook (`AreaLightTextures` from `@margoengine/clustered/area-texture`): WGSL defining
@@ -28,9 +34,11 @@ export interface AreaLightTexture {
   declarations(group: number): string;
   bindings(): GPUBindGroupEntry[];
 }
+/** The highest `AreaLightOptions.maxLights`. */
+export const MAX_AREA_LIGHTS_LIMIT = 1024;
 const LIGHT_FLOATS = 16,
   HEADER = 4,
-  LUT_OFFSET = (HEADER + MAX_AREA_LIGHTS * LIGHT_FLOATS) * 4;
+  lutOffset = (max: number) => (HEADER + max * LIGHT_FLOATS) * 4;
 // One storage buffer, no textures: a count, the lights (centre + twoSided, half-width and half-height vectors, radiance) and the
 // LTC table as pack2x16float pairs, three u32 per cell, filtered bilinearly by hand (environment's BRDF LUT does the same).
 // Each light integrates the quad, clipped to the horizon, under the GGX LTC (specular) and the cosine (diffuse).
@@ -38,14 +46,14 @@ const LIGHT_FLOATS = 16,
 // LTC: Heitz, Dupuy, Hill & Neubelt 2016; Fresnel split f0 x magnitude + (1 - f0) x fresnel: Hill & Heitz 2016 course
 // notes. Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a published engine
 // standard.
-const sampling = (group: number, shadow?: string, texture?: AreaLightTexture) => {
+const sampling = (group: number, max: number, shadow?: string, texture?: AreaLightTexture) => {
   const radiance = shadow ? 'radiance' : 'light.color.rgb',
     lit = (m: string) => (texture ? `${radiance}*clusterAreaTexture(j,${m},c,r,u,side)` : radiance);
   return (
     (texture ? texture.declarations(group) : '') +
     /* wgsl */ `
 struct AreaLight {center:vec4f,right:vec4f,up:vec4f,color:vec4f}
-struct AreaLightData {count:vec4u,lights:array<AreaLight,${MAX_AREA_LIGHTS}>,lut:array<u32>}
+struct AreaLightData {count:vec4u,lights:array<AreaLight,${max}>,lut:array<u32>}
 @group(${group}) @binding(17) var<storage,read> areaLights:AreaLightData;
 ${ltcPolygonWgsl('area')}fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughness:f32,metal:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
   let st=vec2f(clamp(roughness,0.045,1.0),sqrt(1-nv))*${ltcSize - 1}.0;let t1=vec4f(areaLut(st,0u),areaLut(st,1u));let t2=areaLut(st,2u);
@@ -72,7 +80,7 @@ ${ltcPolygonWgsl('area')}fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,n
  * (no cluster culling: the lights have no range). Lights with `castShadow` are shadowed by `LocalShadows` (cube faces,
  * PCSS penumbrae scaled by the light's size). Without lights it adds nothing to the shaders or the GPU work.
  * @throws TypeError without the Clustered lights or for a malformed `castShadow` or `shadow`; RangeError for an invalid
- * light or shadow setting, more than `MAX_AREA_LIGHTS` lights or more than `MAX_AREA_SHADOWS` castShadow lights.
+ * light or shadow setting, more than `maxLights` lights or more than `MAX_AREA_SHADOWS` castShadow lights.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class AreaLights implements EnginePlugin, ClusteredArea {
@@ -82,8 +90,10 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   private device?: GPUDevice;
   private buffer?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
-  private readonly data = new Float32Array(HEADER + MAX_AREA_LIGHTS * LIGHT_FLOATS);
-  private readonly count = new Uint32Array(this.data.buffer, 0, 1);
+  /** Most area lights `setLights` takes (`AreaLightOptions.maxLights`). */
+  readonly maxLights: number;
+  private readonly data: Float32Array;
+  private readonly count: Uint32Array;
   private listValue: readonly RectAreaLight[] = Object.freeze([]);
   private textureHook?: AreaLightTexture;
   /** `entries` and the texture hook's, joined (rebuilt when either array changes). */
@@ -95,6 +105,12 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     if (!options?.lights || typeof options.lights.setLights !== 'function')
       throw new TypeError('AreaLights needs the Clustered lights');
     this.lights = options.lights;
+    const max = options.maxLights ?? MAX_AREA_LIGHTS;
+    if (!Number.isInteger(max) || max < 1 || max > MAX_AREA_LIGHTS_LIMIT)
+      throw new RangeError(`Invalid area maxLights; pass an integer from 1 to ${MAX_AREA_LIGHTS_LIMIT}`);
+    this.maxLights = max;
+    this.data = new Float32Array(HEADER + max * LIGHT_FLOATS);
+    this.count = new Uint32Array(this.data.buffer, 0, 1);
   }
   get owner(): Engine | undefined {
     return this.engine;
@@ -109,12 +125,12 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     return this.listValue;
   }
   /**
-   * Replaces the area lights (at most {@link MAX_AREA_LIGHTS}, {@link MAX_AREA_SHADOWS} of them with `castShadow`);
+   * Replaces the area lights (at most `maxLights`, {@link MAX_AREA_SHADOWS} of them with `castShadow`);
    * validates every entry before changing anything. An empty list removes the shader code.
    */
   setLights(lights: readonly RectAreaLight[]): this {
-    if (this.disposed || !Array.isArray(lights) || lights.length > MAX_AREA_LIGHTS)
-      throw new RangeError(`Expected at most ${MAX_AREA_LIGHTS} area lights`);
+    if (this.disposed || !Array.isArray(lights) || lights.length > this.maxLights)
+      throw new RangeError(`Expected at most ${this.maxLights} area lights; raise AreaLightOptions.maxLights`);
     const shadows: AreaShadowLight[] = [];
     const packed = lights.map((light, index) => {
       finiteVector(light.position, 3, 'Area light position');
@@ -142,6 +158,11 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
       if (light.castShadow !== undefined && typeof light.castShadow !== 'boolean')
         throw new TypeError('Area light castShadow must be a boolean');
       if (light.castShadow) {
+        // LocalShadows keeps shadow data for the first MAX_AREA_LIGHTS entries of the list only.
+        if (index >= MAX_AREA_LIGHTS)
+          throw new RangeError(
+            `Only the first ${MAX_AREA_LIGHTS} area lights may cast shadows; move castShadow lights to the front`,
+          );
         if (shadows.length === MAX_AREA_SHADOWS)
           throw new RangeError(
             `At most ${MAX_AREA_SHADOWS} area lights may cast shadows; set castShadow false on the others`,
@@ -191,7 +212,7 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   }
   /** @internal ClusteredArea: WGSL defining `clusterAreaLighting`; `shadow` multiplies each light (a `*` factor in `j`). */
   declarations(group: number, shadow?: string): string {
-    return sampling(group, shadow, this.textureHook);
+    return sampling(group, this.maxLights, shadow, this.textureHook);
   }
   /** @internal ClusteredArea: binding 17 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
@@ -220,10 +241,10 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     if (active && !this.buffer) {
       const table = ltcTable(),
         buffer = (this.buffer = this.device!.createBuffer({
-          size: LUT_OFFSET + table.byteLength,
+          size: lutOffset(this.maxLights) + table.byteLength,
           usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }));
-      this.device!.queue.writeBuffer(buffer, LUT_OFFSET, table as Uint16Array<ArrayBuffer>);
+      this.device!.queue.writeBuffer(buffer, lutOffset(this.maxLights), table as Uint16Array<ArrayBuffer>);
       this.entries = [{ binding: 17, resource: { buffer } }];
       this.dirty = true;
     }

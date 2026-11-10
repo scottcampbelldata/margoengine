@@ -453,6 +453,41 @@ try {
       { ratios },
     );
   }
+  {
+    // Raised caps: 1,500 point lights (one page past 1,024) and 100 area lights, all far below the floor but one
+    // each over the origin, at index 1,400 and 80. The probe sees exactly those: lights past the old caps are culled,
+    // uploaded and shaded.
+    await call('camera', [0, 8, 8]);
+    const far = (i) => ({ position: [i % 40, -50, Math.floor(i / 40)], range: 1, intensity: 1 }),
+      lamp = { position: [0, 1, 0], range: 3, intensity: 3 },
+      points = Array.from({ length: 1500 }, (_, i) => (i === 1400 ? lamp : far(i))),
+      rect = { direction: [0, -1, 0], width: 0.5, height: 0.5, intensity: 0 },
+      areas = Array.from({ length: 100 }, (_, i) =>
+        i === 80 ? { ...rect, position: [0, 1, 0], intensity: 2 } : { ...rect, position: [i, -50, 0] },
+      ),
+      probe = [[0, 0, 0, 0, 1, 0]],
+      sum = (rgb) => rgb[0] + rgb[1] + rgb[2],
+      lit = async (config) => {
+        await call('scene', { meshes: ['floor'], local: false, ...config });
+        await call('render', 1);
+        return sum((await call('probe', probe))[0]);
+      };
+    const both = await lit({ maxLights: 1500, areaMaxLights: 100, points, areas }),
+      compiled = await call('compile'),
+      pointOnly = await lit({ maxLights: 1500, points }),
+      areaOnly = await lit({ areaMaxLights: 100, points: [], areas }),
+      none = await lit({ maxLights: 1500, points: points.map((p, i) => (i === 1400 ? far(i) : p)) });
+    check(
+      'raised caps compile: 1,500 point lights, 100 area lights',
+      !compiled.core.length && !compiled.probe.length,
+      compiled,
+    );
+    check(
+      'raised caps: light 1,400 and area light 80 light the origin, and only they do',
+      pointOnly > 0 && areaOnly > 0 && Math.abs(both - pointOnly - areaOnly) <= 1e-4 * both && none < 1e-6,
+      { both, pointOnly, areaOnly, none },
+    );
+  }
   check('no page errors', pageErrors.length === 0, { pageErrors });
   const fixtureErrors = await page.evaluate(() => window.clusteredShadowFixture.errors);
   check('no GPU validation or engine errors', fixtureErrors.length === 0, { fixtureErrors });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14571465,
+  "total": 14571921,
   "history": [
     {
       "date": "2026-10-24",
@@ -7793,6 +7793,12 @@
       "commit": "f11511163",
       "reason": "K2 native glass per-surface copy and linear compositing: gltf-pro 78058 to 79666 B, model 58923 to 60402 B, progressive 86739 to 88346 B, worker 78581 to 80160 B gzip. Keep shared synchronous capture lifecycle together; splitting creates a package cycle or async draw gap. Preserve every upstream budget. Core and stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "861df30d9",
+      "reason": "clustered: raised light caps (maxLights, paged light buffer), batch 53 job 2",
+      "grew": 1
     }
   ],
   "items": {
@@ -7937,7 +7943,7 @@
     "@margoengine/cinematic/noise": 1612,
     "@margoengine/cinematic/ortho": 3133,
     "@margoengine/cinematic/physical-lens": 845,
-    "@margoengine/clustered": 14448,
+    "@margoengine/clustered": 14904,
     "@margoengine/clustered/area": 11229,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 3962,

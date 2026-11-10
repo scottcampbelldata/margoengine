@@ -173,6 +173,7 @@ interface DeviceDraws {
 }
 
 interface DrawDerivation {
+    nativeGlass?: boolean;
     frame: DrawFrame;
     source: MaterialExtension | undefined;
     instances: PBRInstances | BatchKind | undefined;

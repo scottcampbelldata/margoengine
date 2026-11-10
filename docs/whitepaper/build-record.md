@@ -3701,6 +3701,48 @@ docs/work-lists/readme-owed.md.
 - **Known limits:** docs/limits.md LIM-645, LIM-646, LIM-648, LIM-650, LIM-653 and LIM-654 and the other jobs' sections;
   area and directional lights are not layered, core meshes are on layer 0 only.
 
+## Batch 53: clustered part 2
+
+Two optional jobs for `@margoengine/clustered`, built on the M6 Mac mini (WebGPU on Metal) in lane E, with no core or
+stage source changes. Neither existed on main: the package had no contact shadows per light and fixed caps of 1,024
+point and spot lights and 64 area lights. Rows left unfinished are in docs/work-lists/finish-later.md under 53.x; README
+examples owed are in docs/work-lists/readme-owed.md.
+
+| # | Job | Status | Commit | Entry | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Contact hardening (contact shadows per local light) | DONE | f11511163 | clustered/contact | contact.test.js, clustered-shadow-gpu-check.js (LIM-655) |
+| 2 | Raised light caps | DONE | this commit | clustered (`maxLights`), clustered/area | light-caps.test.js, clustered-shadow-gpu-check.js (LIM-656) |
+
+- **Built from:** McGuire and Mara 2014 (screen-space ray march, JCGT 3(4)) and Jimenez 2014 (contact shadows, SIGGRAPH
+  course) for job 1, the same method as `@margoengine/post` ContactShadows applied per light in the clustered loop; papers
+  not reread for this job. Job 2 is Margo-own engineering of the existing clustered layout (Olsson, Billeter and
+  Assarsson 2012 already cited). Clean-room rows C21 and C22 (C19 and C20 were taken on main by batch 52).
+- **Job 1:** `ContactLights` (`Clustered.contact`, lit-group binding 145, one storage buffer: header with
+  view-projection, inverse, size, march settings and 1,024 per-light strengths, then the previous frame's depth). The
+  factor multiplies each point and spot light in the shadowed loop only; receivers without `receiveShadow` skip it.
+  Binding 145 was free on main (clustered holds 141 to 143 and 150 to 155; bindings.test.js passes).
+- **Job 2:** `ClusteredOptions.maxLights` (1 to 65,536, default 1,024) grows the CPU copies and the GPU light buffer in
+  pages of 1,024 lights and rebinds on growth; a default scene keeps one 64 KiB page and its exact bindings and WGSL.
+  `AreaLightOptions.maxLights` (1 to 1,024, default 64) sizes the area light array; merged with main's textured area
+  lights (52.5), whose images reach the first 64 lights only.
+- **Bugs fixed:** job 1's GPU check found two on Metal: the contact buffer was 4,260 bytes against a minimum binding size
+  of 4,272 (now rounded to the struct's 16-byte alignment), and a buffer replaced mid-frame was destroyed before the
+  submit that still read it (now destroyed on the next frame); regressions in contact.test.js. Job 1 also fixed four
+  bare `throw new Error` in inspector/src/remote.ts that failed the quality api gate on main. Job 2: area lights past
+  index 63 read light 63's shadow (WGSL clamps an out-of-range index); now `setLights` refuses castShadow past index 63
+  and `clusterAreaShadow` returns 1 for `j>=64`; regression in light-caps.test.js.
+- **Proved:** CPU tests of the package; GPU checks on Metal in `scripts/clustered-shadow-gpu-check.js`: floor points just
+  past a 0.1-high pebble lose a low light at contact strength 1 while lit-side, beside and far points keep it exactly;
+  with 1,500 point lights and 100 area lights, light 1,400 and area light 80 light a probed point and nothing else does.
+- **Not proved (finish-later.md):** the check's point on the pebble's top also loses the light (self-shadowing, the
+  0.01 bias below one depth texel's step at the 45-degree view), so that check fails; the check's local shadow-off
+  baseline predates main's LTC and textured-light changes and fails its six comparisons until regenerated.
+- **Limits and unmeasured:** Apple Mac mini (Metal) only; not timed. Contact uses the first view's depth only and trails a
+  moving caster by one frame; culling tests every light per cluster; area lights are not clustered and only the first 64
+  may cast shadows; IES, projector and contact per-light settings stop at index 1,024 (docs/limits.md LIM-655, LIM-656).
+- **Docs per job:** clustered README prose (examples owed, docs/work-lists/readme-owed.md), operational playbook,
+  limits, claims, clean-room; job 1 also docs/shader-contracts.md (binding 145).
+
 ## Batch 54: lightmap
 
 Eight jobs in `@margoengine/lightmap`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes F, J and K, each in

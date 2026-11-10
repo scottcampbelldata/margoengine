@@ -220,8 +220,9 @@ export class LocalShadowMaps {
   }
   /** Validate and stage the entire replacement before changing any live light state. */
   configure(lights: readonly ShadowLight[]): void {
-    if (this.disposed || !Array.isArray(lights) || lights.length > 1024)
-      throw new RangeError('Expected at most 1,024 lights');
+    // Clustered.setLights checks its own maxLights first.
+    if (this.disposed || !Array.isArray(lights) || lights.length > 65536)
+      throw new RangeError('Expected at most 65,536 lights');
     const values = new Float32Array(this.values.length),
       cameras = new Float32Array(this.cameras.length),
       viewports = new Uint32Array(this.maxLights * 12),

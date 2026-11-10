@@ -873,6 +873,7 @@
     "imports": "import { Clustered } from '@margoengine/clustered';",
     "exports": [
       "Clustered",
+      "MAX_CLUSTERED_LIGHTS",
       "clusteredSampling"
     ],
     "category": "Rendering and lighting"

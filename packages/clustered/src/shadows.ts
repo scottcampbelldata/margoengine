@@ -270,7 +270,7 @@ const areaShadow = /* wgsl */ `fn localAreaVisibility(j:u32,position:vec3f,n:vec
   for(var i=0u;i<24u;i++){let o=localShadowTap(i,24u)*radius;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
   return lit/24.0;
 }
-fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {return localAreaVisibility(j,position,n,c,r,u,false);}
+fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {if(j>=64u){return 1.0;}return localAreaVisibility(j,position,n,c,r,u,false);}
 fn clusterShapeShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {return localAreaVisibility(j+64u,position,n,c,r,u,sphere);}
 `;
 // Point or spot light slot k with a shadow radius R (soft[2k]: R / (2 tan) per UV axis at unit depth, guard band;

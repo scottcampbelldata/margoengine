@@ -67,6 +67,7 @@ class Clustered implements EnginePlugin {
     readonly name = "clustered";
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
+    readonly maxLights: number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -151,6 +152,7 @@ interface ClusteredLobes {
 interface ClusteredOptions {
     grid?: readonly [number, number, number];
     shadows?: LocalShadowOptions;
+    maxLights?: number;
 }
 
 interface ClusteredReceiver {

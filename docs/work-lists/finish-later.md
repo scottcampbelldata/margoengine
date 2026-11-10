@@ -81,3 +81,7 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 53.1 | clustered | A moving caster's contact trails it by one frame (previous-frame depth); no motion-vector reprojection |
 | 53.1 | clustered | GPU check (scripts/clustered-shadow-gpu-check.js) fails 'contact: points on the light side, beside, far away and on top keep it exactly' on Metal: the point on the pebble's top gets factor 0 (ratios [1,1,1,0]); likely self-shadowing where one depth texel's step at the 45-degree view exceeds the 0.01 normal bias; needs a slope-scaled or texel-footprint bias |
 | 53.1 | clustered | GPU check's shadow-off baseline (test-results/clustered-shadow/baseline.json, local) predates main's LTC and textured-light shader changes; regenerate it with --baseline on main before comparing |
+| 53.2 | clustered | Culling tests every light per cluster: no coarse pre-cull (per-tile or BVH) for tens of thousands of lights; not timed at those counts |
+| 53.2 | clustered | Area lights are not clustered: a range or per-cluster list for many area lights; only the first 64 may cast shadows |
+| 53.2 | clustered | IES, projector and contact per-light settings stop at index 1,024 |
+| 53.2 | clustered | area-texture images reach only the first 64 area lights (its MAX_LIGHTS); lights past 64 under a raised AreaLightOptions.maxLights draw untextured |

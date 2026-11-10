@@ -23,6 +23,7 @@ export class Clustered implements EnginePlugin {
     readonly name = "clustered";
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
+    readonly maxLights: number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -107,6 +108,7 @@ export interface ClusteredLobes {
 export interface ClusteredOptions {
     grid?: readonly [number, number, number];
     shadows?: LocalShadowOptions;
+    maxLights?: number;
 }
 
 export interface ClusteredReceiver {
@@ -214,6 +216,8 @@ export interface LocalShadowSource {
     disposed?: boolean;
     drawShadow?: unknown;
 }
+
+export const MAX_CLUSTERED_LIGHTS = 65536;
 
 export interface PointLight {
     position: Vec3;

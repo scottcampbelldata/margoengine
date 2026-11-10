@@ -53,6 +53,7 @@ export function areaTextureLevels(width: number, height: number): number;
 
 interface AreaLightOptions {
     lights: Clustered;
+    maxLights?: number;
 }
 
 interface AreaLightTexture {
@@ -63,6 +64,7 @@ interface AreaLightTexture {
 class AreaLights implements EnginePlugin, ClusteredArea {
     readonly name = "clustered:area";
     readonly lights: Clustered;
+    readonly maxLights: number;
     constructor(options: AreaLightOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: AreaLightOptions): AreaLights;
@@ -97,6 +99,7 @@ class Clustered implements EnginePlugin {
     readonly name = "clustered";
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
+    readonly maxLights: number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -181,6 +184,7 @@ interface ClusteredLobes {
 interface ClusteredOptions {
     grid?: readonly [number, number, number];
     shadows?: LocalShadowOptions;
+    maxLights?: number;
 }
 
 interface ClusteredReceiver {

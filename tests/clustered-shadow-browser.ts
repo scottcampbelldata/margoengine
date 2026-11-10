@@ -41,6 +41,9 @@ type Config = {
   terrain?: boolean;
   /** ContactLights options (besides `lights`): contact shadows on the point lights, from the shared scene depth. */
   contact?: Record<string, unknown>;
+  /** ClusteredOptions.maxLights and AreaLightOptions.maxLights. */
+  maxLights?: number;
+  areaMaxLights?: number;
 };
 const canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, {
@@ -113,7 +116,7 @@ function scene(config: Config) {
   shapes = undefined;
   terrain = areas = suns = local = undefined;
   for (const [name, m] of Object.entries(meshes)) m.visible = config.meshes.includes(name);
-  lights = Clustered.attach(engine, { grid: [4, 4, 4] });
+  lights = Clustered.attach(engine, { grid: [4, 4, 4], maxLights: config.maxLights });
   lights.setLights((config.points ?? []) as never);
   if (config.local !== false) {
     local = config.atlas
@@ -134,7 +137,8 @@ function scene(config: Config) {
     local?.add(terrain);
   }
   if (config.suns) (suns = DirectionalLights.attach(engine, { lights })).setLights(config.suns as never);
-  if (config.areas) (areas = AreaLights.attach(engine, { lights })).setLights(config.areas as never);
+  if (config.areas)
+    (areas = AreaLights.attach(engine, { lights, maxLights: config.areaMaxLights })).setLights(config.areas as never);
   if (config.shapes) (shapes = AreaShapes.attach(engine, { lights })).setLights(config.shapes as never);
   if (config.cubes || config.projectors) {
     cookies = CubeProjectorLights.attach(engine, { lights });

@@ -444,6 +444,15 @@ bindings of a shadow-enabled effect; the default second argument is false.
 
 `dispose()`/`destroy()` releases resources and receiver hooks. Device restoration recreates buffers and reuploads the light list. The package stays separate from core, stage and PBR assets.
 
+## Many lights
+
+`ClusteredOptions.maxLights` raises the point and spot light cap from 1,024 to as many as 65,536 for city and
+stadium scenes; the light buffer grows in pages of 1,024 lights (64 KiB each) only as `setLights` lists need them.
+Each cluster still lists at most 1,024 lights, and culling tests every light per cluster, so a frame's culling cost
+grows with the count. `AreaLightOptions.maxLights` raises the area light cap from 64 to as many as 1,024; area lights
+are not clustered, so every lit fragment evaluates every one, and only the first 64 may cast shadows. IES, projector
+and contact settings cover the first 1,024 point and spot lights.
+
 ## Contact shadows
 
 `ContactLights` (`@margoengine/clustered/contact`) grounds small details under point and spot lights: each lit
