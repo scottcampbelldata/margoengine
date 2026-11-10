@@ -1,0 +1,143 @@
+[
+  {
+    "name": "sphereGeometry",
+    "args": [
+      1,
+      64,
+      32
+    ],
+    "sha256": "870d858e738031ef1c649e59b5f6fcc7390e259997bf0c31db76a3318b01796c"
+  },
+  {
+    "name": "sphereGeometry",
+    "args": [
+      0,
+      3,
+      2
+    ],
+    "sha256": "1f2704351a3a5a57198d9c4152032e953a5d92ee7b59c2c55061599dda34e473"
+  },
+  {
+    "name": "sphereGeometry",
+    "args": [
+      -2,
+      9,
+      7,
+      -0.3,
+      3.2,
+      0.2,
+      2.4
+    ],
+    "sha256": "74624379a8772842f55426d7c5d4e351bc0f8ffe73841928c2433ccb81f1f87b"
+  },
+  {
+    "name": "cylinderGeometry",
+    "args": [
+      1,
+      1,
+      1,
+      64,
+      8
+    ],
+    "sha256": "22c8f35ddccefe2ee50812296e93fdbf6284f9695b4bbead37b5685579cdc03c"
+  },
+  {
+    "name": "cylinderGeometry",
+    "args": [
+      0,
+      1,
+      2,
+      9,
+      4
+    ],
+    "sha256": "423d6cc7fa8dd41fd4a63f59615041943a37da55419bdecf7883a4b6759671ad"
+  },
+  {
+    "name": "cylinderGeometry",
+    "args": [
+      2,
+      0,
+      0,
+      7,
+      3,
+      false,
+      -0.7,
+      2.3
+    ],
+    "sha256": "3612165be1b0c493bae8d008d8bbc776cb81a56a1caf7c91b4fbb4f9055f055f"
+  },
+  {
+    "name": "cylinderGeometry",
+    "args": [
+      0,
+      0,
+      0,
+      1,
+      1,
+      true
+    ],
+    "sha256": "674d1e9b63b0454727e6e34420422cb903188412a2a4d398d05c2c10d580227e"
+  },
+  {
+    "name": "capsuleGeometry",
+    "args": [
+      0.5,
+      1,
+      16,
+      32
+    ],
+    "sha256": "efb0648cdf6995cade94b2c902655d307d31d5ab66f67f28a16c76daaedac833"
+  },
+  {
+    "name": "capsuleGeometry",
+    "args": [
+      0,
+      -1,
+      1,
+      3
+    ],
+    "sha256": "2bdf7dd76981972ee38f1134bdd0e1d21d90b4a891debcedf98999ffc26fba4b"
+  },
+  {
+    "name": "capsuleGeometry",
+    "args": [
+      2,
+      0,
+      5,
+      7,
+      3
+    ],
+    "sha256": "6eb8900ec25a98e7f81257de650d3755e4c381b20a66b39998807c0e56d806eb"
+  },
+  {
+    "name": "torusGeometry",
+    "args": [
+      1,
+      0.4,
+      32,
+      64
+    ],
+    "sha256": "49f39fc12981df07d3ac01c15326cbec9e35345a1392992f10d88f325e8885f3"
+  },
+  {
+    "name": "torusGeometry",
+    "args": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "sha256": "fb038aacd54a7cbc2d20e41753a80df8ab361aa08baf6958f7d79be35a92df7c"
+  },
+  {
+    "name": "torusGeometry",
+    "args": [
+      -1,
+      0.5,
+      7,
+      9,
+      -2.3
+    ],
+    "sha256": "e52f60e494163c308832ac86f69b6eda3085bc32803535a4626b1155f6a8a086"
+  }
+]

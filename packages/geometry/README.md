@@ -14,6 +14,16 @@ opacity. Tangents must be present; occlusion callbacks must return finite 0..1.
 Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities.
 Box-only consumers drop the internal lattice helper used by the other grid primitives; their vertices, indices, UVs and groups remain unchanged.
 
+Sphere, cylinder, capsule and torus builders reuse angular columns within each call. They retain no cache between calls.
+For CPU-only generation, import the primitives entry; no renderer is required:
+
+```ts
+import {sphereGeometry, cylinderGeometry, capsuleGeometry, torusGeometry} from '@margoengine/geometry/primitives';
+const shapes = [sphereGeometry(1, 64, 32), cylinderGeometry(1, 1, 1, 64, 8),
+  capsuleGeometry(0.5, 1, 16, 32), torusGeometry(1, 0.4, 32, 64)];
+console.log(shapes.map(shape => shape.indices.length / 3));
+```
+
 Build from source with `npm run build` in `packages/geometry`.
 
 ```ts

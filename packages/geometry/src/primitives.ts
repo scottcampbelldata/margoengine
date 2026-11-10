@@ -7,6 +7,18 @@ const TAU = Math.PI * 2;
 /** Segment counts: non-finite throws before any work; finite values are floored and raised to `min`. */
 const count = (value: number, min: number): number => Math.max(min, Math.floor(finiteNumber(value)));
 
+// Evaluate each angular column once per call, retaining Float64 and the original operand order.
+function angles(segments: number, length: number, start?: number): Float64Array {
+  const out = new Float64Array((segments + 1) * 2);
+  for (let c = 0; c <= segments; c++) {
+    const offset = (c / segments) * length,
+      a = start === undefined ? offset : start + offset;
+    out[c * 2] = Math.sin(a);
+    out[c * 2 + 1] = Math.cos(a);
+  }
+  return out;
+}
+
 // Which triangle of a lattice quad to leave out: none, the one on the quad's lower row, or the one on its upper row.
 // Lower and upper rows collapse to a point at a cone apex or a sphere pole.
 const BOTH = 0,
@@ -205,7 +217,8 @@ export function cylinderGeometry(
 ): GeometryData {
   const cols = count(radialSegments, 1),
     rows = count(heightSegments, 1),
-    mesh = new Mesh();
+    mesh = new Mesh(),
+    angular = angles(cols, thetaLength, thetaStart);
   // Side normal in the (radial, y) plane: the profile runs (radiusTop - radiusBottom, height), so (height, rb - rt)
   // points out. A flat side (height 0) with equal radii has no slope: use the horizontal radial direction.
   const slope = radiusBottom - radiusTop,
@@ -217,9 +230,8 @@ export function cylinderGeometry(
       rad = radiusBottom + (radiusTop - radiusBottom) * t,
       y = (t - 0.5) * height;
     for (let c = 0; c <= cols; c++) {
-      const a = thetaStart + (c / cols) * thetaLength,
-        s = Math.sin(a),
-        k = Math.cos(a);
+      const s = angular[c * 2],
+        k = angular[c * 2 + 1];
       // + 0 keeps a flat side's normal free of -0.
       mesh.add(rad * s, y, rad * k, nr * s + 0, ny, nr * k + 0, c / cols, t);
     }
@@ -240,9 +252,8 @@ export function cylinderGeometry(
     for (let c = 0; c < cols; c++) mesh.add(0, y, 0, 0, sign, 0, 0.5, 0.5);
     const rim = mesh.size;
     for (let c = 0; c <= cols; c++) {
-      const a = thetaStart + (c / cols) * thetaLength,
-        s = Math.sin(a),
-        k = Math.cos(a);
+      const s = angular[c * 2],
+        k = angular[c * 2 + 1];
       mesh.add(rad * s, y, rad * k, 0, sign, 0, 0.5 + s / 2, 0.5 - (sign * k) / 2);
     }
     for (let c = 0; c < cols; c++)
@@ -289,6 +300,7 @@ export function sphereGeometry(
   const cols = count(widthSegments, 3),
     rows = count(heightSegments, 2),
     mesh = new Mesh(),
+    angular = angles(cols, phiLength, phiStart),
     top = thetaStart === 0,
     bottom = thetaStart + thetaLength >= Math.PI;
   // Lattice rows go upward (v from the bottom of the band), so azimuth x up points outward.
@@ -300,9 +312,8 @@ export function sphereGeometry(
       shift = r === rows && top ? 0.5 / cols : r === 0 && bottom ? -0.5 / cols : 0;
     for (let c = 0; c <= cols; c++) {
       const u = c / cols,
-        phi = phiStart + u * phiLength,
-        x = -Math.cos(phi) * st,
-        z = Math.sin(phi) * st;
+        x = -angular[c * 2 + 1] * st,
+        z = angular[c * 2] * st;
       mesh.add(radius * x, radius * ct, radius * z, x, ct, z, u + shift, 1 - v);
     }
   }
@@ -332,7 +343,8 @@ export function capsuleGeometry(
     half = h / 2,
     total = Math.PI * radius + h,
     on = radius === 0 ? 0 : 1,
-    mesh = new Mesh();
+    mesh = new Mesh(),
+    angular = angles(cols, TAU);
   // The profile from the bottom pole up: radial distance, height, profile normal (radial, y) and arc length.
   const profile: number[][] = [];
   for (let k = 0; k <= caps; k++) {
@@ -353,9 +365,8 @@ export function capsuleGeometry(
   profile.forEach(([rad, y, nr, ny, arc], r) => {
     const shift = r === 0 ? -0.5 / cols : r === rows ? 0.5 / cols : 0;
     for (let c = 0; c <= cols; c++) {
-      const phi = (c / cols) * TAU,
-        x = -Math.cos(phi),
-        z = Math.sin(phi);
+      const x = -angular[c * 2 + 1],
+        z = angular[c * 2];
       mesh.add(rad * x, y, rad * z, nr * x * on, ny * on, nr * z * on, c / cols + shift, total > 0 ? arc / total : 0);
     }
   });
@@ -377,15 +388,15 @@ export function torusGeometry(
 ): GeometryData {
   const around = count(radialSegments, 1),
     along = count(tubularSegments, 1),
-    mesh = new Mesh();
+    mesh = new Mesh(),
+    angular = angles(along, arc);
   for (let j = 0; j <= around; j++) {
     const v = (j / around) * TAU,
       cv = Math.cos(v),
       sv = Math.sin(v);
     for (let i = 0; i <= along; i++) {
-      const u = (i / along) * arc,
-        cu = Math.cos(u),
-        su = Math.sin(u),
+      const cu = angular[i * 2 + 1],
+        su = angular[i * 2],
         reach = radius + tube * cv;
       mesh.add(reach * cu, reach * su, tube * sv, cv * cu, cv * su, sv, i / along, j / around);
     }

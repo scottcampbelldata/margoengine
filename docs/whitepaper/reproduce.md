@@ -3959,3 +3959,7 @@ Build packages and run the DOF/post CPU suites, then the registered DOF test:gpu
 Run the one-call matrix before the quiet refresh. [Exact commands, output schema,
 hard limits and research](parity-preflight.md). It does not enable the speed phase
 or add timings to the historical ledger.
+
+### Batch 162 geometry, math and raycast work counts
+
+[Work-count methods](batch-162-workcounts.md) give the unchanged scenes, deterministic assertions, parent byte checks, trade-offs and sources. Build with npm run build:packages, then run node --test --test-timeout=120000 packages/geometry/tests/primitive-workcount.test.js for primitive columns. Timing pending the quiet rerun; do not enable the deferred speed suite for this evidence.

@@ -90,7 +90,7 @@ fetched for the scene.
 | 3.3 | ArrayCamera | faster | faster | `boxes-10000-views4` |  |
 | 3.4 | CubeCamera (dynamic environment maps) | faster | faster | `p-cube-camera` |  |
 | 3.5 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | Margo missing | Margo missing |  | Margo missing (stereo and anaglyph cameras are a documented limit) |
-| 4.1 | Built-in primitives (Box, Capsule, Circle, Cone, Cylinder, polyhedra, Plane, Rin | slower | slower | `p-primitives` |  |
+| 4.1 | Built-in primitives (Box, Capsule, Circle, Cone, Cylinder, polyhedra, Plane, Rin | slower | slower | `p-primitives` | Cause: repeated angular-column sin/cos per profile row. Fixed in `perf(geometry): reuse primitive angular columns` (Batch 162 job 1); 12,452 to 654 calls for the four affected scene primitives, identical geometry bytes. Temporary Float64 tables, no retained cache. [Proof and research](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun. |
 | 4.2 | Shape, Path, curves, Extrude, Lathe, Tube | slower | slower | `p-extrude` |  |
 | 4.3 | EdgesGeometry, WireframeGeometry | faster | faster | `p-edges` |  |
 | 4.4 | BufferGeometry custom attributes (uv, uv1, color, tangent) on drawable meshes | slower | faster | `p-attributes` |  |

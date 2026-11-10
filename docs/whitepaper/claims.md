@@ -4684,3 +4684,7 @@ Ten actual device-replacement cases on RTX A6000 with masked full/half-float to 
 ### Asset-cache delayed hit bookkeeping (2026-11-10)
 
 Delayed hit bookkeeping preserves eviction and replacement outcomes. Evidence: all four regressions in packages/cache/test/stale-touch.test.js fail on the parent; packages/cache/test/stale-touch.js supplies the identical race proof to packages/cache/scripts/test-browser.js on real IndexedDB. They verify exact retained byte/file counts, byte-budget eviction after reloading a file, the old in-flight response and the replacement's body, ETag and content type. Reproduce after build with node --test packages/cache/test/stale-touch.test.js and npm run test:browser --workspace @margoengine/cache. Sources: docs/clean-room.md, Asset-cache delayed hit bookkeeping.
+
+### Batch 162 primitive operation count (2026-11-10)
+
+The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.

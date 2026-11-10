@@ -3219,3 +3219,7 @@ The matrix has a one-call correctness path separate from deferred speed runs.
 Native API counts and task outputs are retained without timing samples or ledger
 updates. Six initial calls passed on Margo and both black-box reference backends.
 No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.md).
+
+### Batch 162 job 1: primitive angular columns (2026-11-10)
+
+`perf(geometry): reuse primitive angular columns` removes repeated trigonometric evaluations: 12,452 to 654 sin/cos calls for the sphere, capped cylinder, capsule and torus in one p-primitives iteration. Every geometry byte and group matches 13 parent snapshots. Per-call Float64 table trade-off and research: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun; no benchmark run or speed ratio claimed.
