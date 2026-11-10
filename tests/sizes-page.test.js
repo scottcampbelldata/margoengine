@@ -189,7 +189,7 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
     paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|worker/i.test(path)),
     [],
   );
-  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf-pro (addGLTF)', 'Model'])
+  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (addGLTF)', 'Model'])
     assert.equal(network.files.filter((file) => file.role === role).length, 1, role);
   assert.ok(
     network.files.every((file) => file.role),
@@ -197,7 +197,7 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
   );
   const graph = sceneGraph(network.buildManifest);
   const required = new Set(['index.html', 'model.glb', ...graph.entry, ...graph.gltf]);
-  assert.deepEqual([...paths].sort(), [...required].sort(), 'exactly the selected PBR static request graph');
+  assert.deepEqual([...paths].sort(), [...required].sort(), 'exactly the routed basic glTF static request graph');
   const deferred = [...graph.emittedFiles].filter((path) => !required.has(path));
   assert.deepEqual(
     network.notFetched.map((file) => file.path).sort(),
