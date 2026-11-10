@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13631297,
+  "total": 13651263,
   "history": [
     {
       "date": "2026-10-24",
@@ -7098,6 +7098,11 @@
       "commit": "856e8f21d",
       "reason": "Batch 201 optional spec-gloss conversion after texture filtering preserves independent UVs and avoids lossy texture baking; core and stage unchanged. Sizes in docs/limits.md.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-242",
+      "reason": "New optional voxel-net/rooms: absent (0 B) -> 19384 B gzip; includes lazily loaded independent authoritative servers and existing shard ticket signing. Splitting the lobby from its world factory would add configuration without reducing world bytes."
     }
   ],
   "items": {
@@ -8382,6 +8387,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/voxel-net/rooms": 19966
   }
 }

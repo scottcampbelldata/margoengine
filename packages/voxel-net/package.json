@@ -62,6 +62,10 @@
     "./sql-store": {
       "types": "./dist/sql-store.d.ts",
       "import": "./dist/sql-store.js"
+    },
+    "./rooms": {
+      "types": "./dist/rooms.d.ts",
+      "import": "./dist/rooms.js"
     }
   },
   "files": [

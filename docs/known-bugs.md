@@ -4718,3 +4718,8 @@ Batch 222 job 3 gate repair: the inherited API summary omitted pixel/follow and 
 Batch 222 job 3 outline fixture repair: a cold compatibility compute import can hold submitted selection work while a synchronous capture sees a blank canvas (including the unchanged mesh outline). CompatQueue.hold/drain correctly orders that work. The fixture now awaits queue.onSubmittedWorkDone for each state, then renders/captures in one task; all original outline pixel assertions remain. This fixes test synchronization, without changing rendering or shutdown support.
 
 Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. The extra physical-composition compatibility run reproduces the already recorded 16 texture units limit when all material maps, shadows, clustered storage and IBL are composed. The new spec/gloss fixture uses neither this worst-case composition nor additional sampler bindings; the existing source fixture is unchanged and its owning compatibility follow-up remains under rule 21.
+
+
+- Batch 242 inventory: node scripts/gpu-package-tests.mjs --only=voxel-net --list fails before filtering because cameras panorama/stereo, splats lod-sog and weather parity browser drivers are not registered in the plan at this main revision; package script discovery and browser-driver inventory disagree. Outside voxel-net; voxel-net has no GPU scripts or rendering.
+
+- Voxel-net /rooms: reconnecting with a consumed room URL gets 1008, because its single-use admission nonce is removed when the player joins. The parked player retains capacity until the server resume timeout; obtain a new lobby reservation after it expires. Follow-up is resume-aware room authorization and separate account identity from seat identity.

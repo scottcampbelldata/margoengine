@@ -4410,6 +4410,10 @@
       "types": "./dist/voxel-net/sql-store.d.ts",
       "import": "./dist/voxel-net/sql-store.js"
     },
+    "./voxel-net/rooms": {
+      "types": "./dist/voxel-net/rooms.d.ts",
+      "import": "./dist/voxel-net/rooms.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

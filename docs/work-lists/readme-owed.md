@@ -789,3 +789,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/cameras (batch 198 job 1): document that pole detection follows camera world up and that projection.up must be nonparallel to the view axis.
 - @margoengine/gltf-pro (batch 201 job 1): document automatic async spec/gloss loading, explicit synchronous specGlossMaterials, the linear CPU conversion helper, independent texture UVs/transforms and the metal/rough approximation limits; add runnable examples in the README phase.
 - margoengine (batch 201 job 1): include the generated gltf-pro/spec-gloss alias in import guidance during the README phase.
+
+
+- @margoengine/voxel-net: document /rooms VoxelLobby creation, room lists and join codes, reserved capacity, signed shard ticket URLs, authentication identities, joinOrCreate and async disposal.
+
+- margoengine: document generated voxel-net/rooms alias alongside the owning optional entry.

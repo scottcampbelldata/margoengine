@@ -3974,3 +3974,6 @@ The optional viewcube/up entry provides Z-up and arbitrary orthonormal frame nav
 Batch 201 spec/gloss claim: legacy required/optional materials load through an optional reader, preserving texture routing and ancillary material data. Proof: packages/gltf-pro/tests/spec-gloss.test.js and scripts/test-spec-gloss-browser.mjs. The three real-GPU endpoint controls are bit exact on both backends; the openly licensed Khronos two-bottle asset loads with four primitives. Conversion into metal/rough is approximate for coloured dielectrics as specified in limits; no claim of arbitrary BRDF identity or speed.
 
 Batch 201 real-asset comparison: the standard file's two independently authored bottles, rendered individually at the same transform, differ by mean 0.04697 (WebGPU) and 0.04622 (compatibility WebGL2) out of 255 per RGBA channel at 128x128, with a maximum edge/texel difference of 32. The fixture requires mean below one channel unit. This quantifies the documented conversion approximation; it is not a timing result. The three analytic endpoints remain bit exact.
+
+
+- Batch 242 job 1: optional voxel-net/rooms provides isolated same-process worlds, lobby snapshots, join codes, atomic reserved capacity and single-use shard tickets. Proof: packages/voxel-net/tests/rooms.test.js; scope and defaults: docs/limits.md. No distributed matchmaking or speed claim.
