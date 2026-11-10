@@ -9351,6 +9351,9 @@ or package source/size change. Evidence and reproduction:
 
 The game test page composes 13 optional packages on native WebGPU and full WebGL2. Four RGBA probes and five scene draws survive an actual device destruction/replacement unchanged. Teardown leaves zero tracked live device allocations, meshes, plugins, physics bodies and crowd agents. The silent audio source is exercised without an acoustic-quality claim. This is one deterministic scene, not every option or every package pair. Reproduction and instrumentation limits: [everything scenes](integration-everything.md).
 
+### TAA reset phase (2026-11-10)
+TAA reset restarts its eight Halton samples and discards history for the named view or every view. Motion frame identity remains monotonic until device recreation. This proves identical initial sample projections after reset and restoration, not identical shader arithmetic across backends. See [reset evidence](taa-reset.md).
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -14582,6 +14585,38 @@ move out (or lower `near`) only when `distance - radius < near`.
 The shader uses the separable Smith G of the 2021 revision of glTF 2.0 Appendix B; the current revision gives the
 height-correlated form (Heitz 2014). The clean-room record now says which revision (P46). Moving to the
 height-correlated form changes WebGL, gltf-pro and core pixels together and is Scott's call.
+
+## Batch 132 audit: stage (read-only package; findings for Scott)
+
+Base dab36e5f9, M6 Mac mini. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
+MARGO_COMPAT=1), `test:gpu:gltf`, `test:gpu:lights` and `test:gpu:viewer-extras` (both modes inside) pass on Metal.
+
+### Open: stage `addScene` and `addLights` remove each other's clustered lights
+
+Repro: `addLights(stage, [{type: 'point', position: [0, 1, 0], range: 5}])`, then `addScene` of a document with one
+point light: `lights.clustered.list` holds only the scene's light. The other order: `addScene`, then `addLights`, then
+`scene.dispose()`: the list is empty, the `addLights` light is gone.
+Cause: packages/stage/src/scene.ts `hold()` keeps its own set of scene lists and calls `setLights` with that set alone,
+while packages/stage/src/lights.ts `contribute()` appends to the current list. The README says two scenes add up and
+each dispose takes its own. Fix to build: `hold()` appends its own lights to `list.list` and removes only its own, as
+`contribute()` does.
+
+### Open: stage scene camera ignores the entity's up and throws looking straight down
+
+Repro: `addScene` of a floor plus `{id: 'top', transform: {position: [0, 10, 0]}, components: {camera: {target: [0, 0,
+0]}}}`: every frame throws `Vertical camera`. With a -90 degree X rotation instead of a target it renders only because
+the forward vector rounds to `[0, -1, -2.2e-16]`, so the roll is arbitrary; any camera entity rolled about its view
+axis renders unrolled.
+Cause: packages/stage/src/scene.ts builds `cameras` from position and target only and never sets `camera.up` from the
+entity's world +Y. Fix to build: store the entity's world up with each camera and assign it with the switch.
+
+### Open: stage `CADCameraControls` orbit and pan assume Y up
+
+Repro: a camera with `up: [0, 0, 1]` at `[3, -5, 2]`: `pan(-0.1, 0)` moves at cos 0.476 to the screen's right instead
+of along it; `orbit(0.3, 0)` from `[0, -5, 2]` changes the height along Z from 2 to 1.911.
+Cause: packages/stage/src/controls.ts `orbit` and `pan` work in Y-up spherical coordinates and read `camera.up` only for
+a view along Y. The README does not say Y up. Fix to build: build the orbit frame from `camera.up` (or document Y up
+and refuse another up).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
