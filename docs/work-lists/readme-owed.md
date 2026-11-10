@@ -476,3 +476,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 207 job 2): document blender/lightmap and lightmap/imported aliases.
 - @margoengine/geometry (batch 219 job 3): teapot size/resolution, part and proportion options, patch UVs/material groups, model attribution and geometric/numerical limits; examples deferred.
 - margoengine (batch 219 job 3): generated geometry/teapot optional alias; examples deferred.
+
+
+
+| @margoengine/tilemap | objects: ObjectTileMap, images keyed by source, ordered tile/object/image layers, buildMapQuads, anchors, flips, repeat, runtime edits and lifecycle | batch-246 job 1 |
+| margoengine | Generated tilemap/objects alias | batch-246 job 1 |

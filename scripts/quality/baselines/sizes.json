@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12992231,
+  "total": 12999525,
   "history": [
     {
       "date": "2026-10-24",
@@ -6486,6 +6486,12 @@
       "commit": "batch-219-job3",
       "reason": "New optional geometry/teapot: 0 -> 2339 B min+gzip, ceiling 2595 B. Historic model data and a shared derivative patch evaluator support independent parts/proportions; splitting parts would duplicate the same evaluator. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-246-job-1",
+      "reason": "New optional tilemap/objects: 0 to 7038 B; ordered layer quads, per-image sources and instanced exact-texel drawing share one lifecycle.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7685,6 +7691,7 @@
     "leak @margoengine/lightmap/imported -> @margoengine/materials": 1,
     "leak @margoengine/lightmap/imported -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/lightmap -> @margoengine/materials": 1,
-    "@margoengine/geometry/teapot": 2595
+    "@margoengine/geometry/teapot": 2595,
+    "@margoengine/tilemap/objects": 7294
   }
 }

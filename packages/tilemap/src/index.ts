@@ -108,6 +108,18 @@ export interface MapTileset {
   readonly tileCount: number;
   /** Tiles per row of the atlas; 0 for image collections. */
   readonly columns: number;
+  /** Tile-object anchor. Default bottom left, or bottom on isometric maps. */
+  readonly objectAlignment?:
+    | 'unspecified'
+    | 'topleft'
+    | 'top'
+    | 'topright'
+    | 'left'
+    | 'center'
+    | 'right'
+    | 'bottomleft'
+    | 'bottom'
+    | 'bottomright';
   /** Pixels between tiles in the atlas. Default 0. */
   readonly spacing?: number;
   /** Pixels around the atlas edge. Default 0. */
@@ -159,6 +171,9 @@ export interface MapObject {
   readonly visible?: boolean;
   /** Global tile id (with flip bits) for a tile object. */
   readonly gid?: number;
+  /** Tile-object display size in map pixels. Default the tile image's size. */
+  readonly width?: number;
+  readonly height?: number;
   /** Outline for non-tile objects. Its own `x`/`y` are 0 here: the object carries the position. */
   readonly shape?: MapShape;
   readonly properties?: Properties;
@@ -167,11 +182,22 @@ export interface MapObject {
 /** A layer of objects. */
 export interface ObjectLayer extends LayerBase {
   readonly type: 'object';
+  /** Default topdown: stable ascending object y. Index keeps the stored order. */
+  readonly drawOrder?: 'topdown' | 'index';
   readonly objects: readonly MapObject[];
 }
 
-/** A tile layer or an object layer. */
-export type MapLayer = TileLayer | ObjectLayer;
+/** An image placed in map pixels, optionally repeated along either axis. */
+export interface ImageLayer extends LayerBase {
+  readonly type: 'image';
+  readonly image: { readonly source: string; readonly width?: number; readonly height?: number };
+  /** Default false for each axis. */
+  readonly repeatX?: boolean;
+  readonly repeatY?: boolean;
+}
+
+/** Layers in painter order. */
+export type MapLayer = TileLayer | ObjectLayer | ImageLayer;
 
 /** How cells sit on screen, as Tiled names it. */
 export type MapOrientation = 'orthogonal' | 'isometric' | 'staggered' | 'hexagonal';
@@ -183,6 +209,8 @@ export interface TileMapData {
   readonly height: number;
   /** Default `'orthogonal'`. */
   readonly orientation?: MapOrientation;
+  /** Orthogonal cell order. Default right-down. */
+  readonly renderOrder?: 'right-down' | 'right-up' | 'left-down' | 'left-up';
   /** Staggered and hexagonal maps: rows (`'y'`, default) or columns (`'x'`) are pushed half a cell. */
   readonly staggerAxis?: 'x' | 'y';
   /** Staggered and hexagonal maps: which rows or columns are pushed. Default `'odd'`. */
@@ -317,7 +345,11 @@ export function validateTileMap(map: TileMapData): void {
         );
     } else if (layer.type === 'object') {
       if (!Array.isArray(layer.objects)) throw new TypeError(`layer "${layer.name}" objects must be an array.`);
+    } else if (layer.type === 'image') {
+      if (!layer.image?.source) throw new TypeError(`layer "${layer.name}" needs an image source; pass its path.`);
     } else
-      throw new TypeError(`layer "${(layer as { name?: string }).name}" has an unknown type; use 'tile' or 'object'.`);
+      throw new TypeError(
+        `layer "${(layer as { name?: string }).name}" has an unknown type; use 'tile', 'object' or 'image'.`,
+      );
   }
 }

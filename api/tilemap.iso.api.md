@@ -71,6 +71,17 @@ export function visibleCells(map: MapGrid, layer: Pick<TileLayer, 'width' | 'hei
 
 // Not exported from this entry, but used by the exports above:
 
+interface ImageLayer extends LayerBase {
+    readonly type: 'image';
+    readonly image: {
+        readonly source: string;
+        readonly width?: number;
+        readonly height?: number;
+    };
+    readonly repeatX?: boolean;
+    readonly repeatY?: boolean;
+}
+
 interface LayerBase {
     readonly name: string;
     readonly id?: number;
@@ -82,7 +93,7 @@ interface LayerBase {
     readonly properties?: Properties;
 }
 
-type MapLayer = TileLayer | ObjectLayer;
+type MapLayer = TileLayer | ObjectLayer | ImageLayer;
 
 interface MapObject {
     readonly id: number;
@@ -93,6 +104,8 @@ interface MapObject {
     readonly rotation?: number;
     readonly visible?: boolean;
     readonly gid?: number;
+    readonly width?: number;
+    readonly height?: number;
     readonly shape?: MapShape;
     readonly properties?: Properties;
 }
@@ -138,6 +151,7 @@ interface MapTileset {
     readonly tileHeight: number;
     readonly tileCount: number;
     readonly columns: number;
+    readonly objectAlignment?: 'unspecified' | 'topleft' | 'top' | 'topright' | 'left' | 'center' | 'right' | 'bottomleft' | 'bottom' | 'bottomright';
     readonly spacing?: number;
     readonly margin?: number;
     readonly tileOffset?: Vec2;
@@ -152,6 +166,7 @@ interface MapTileset {
 
 interface ObjectLayer extends LayerBase {
     readonly type: 'object';
+    readonly drawOrder?: 'topdown' | 'index';
     readonly objects: readonly MapObject[];
 }
 
@@ -200,6 +215,7 @@ interface TileMapData {
     readonly width: number;
     readonly height: number;
     readonly orientation?: MapOrientation;
+    readonly renderOrder?: 'right-down' | 'right-up' | 'left-down' | 'left-up';
     readonly staggerAxis?: 'x' | 'y';
     readonly staggerIndex?: 'odd' | 'even';
     readonly hexSideLength?: number;

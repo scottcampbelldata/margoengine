@@ -31,6 +31,17 @@ export const FLIP_V = 1073741824;
 
 export const GID_MASK = 268435455;
 
+export interface ImageLayer extends LayerBase {
+    readonly type: 'image';
+    readonly image: {
+        readonly source: string;
+        readonly width?: number;
+        readonly height?: number;
+    };
+    readonly repeatX?: boolean;
+    readonly repeatY?: boolean;
+}
+
 export interface LayerBase {
     readonly name: string;
     readonly id?: number;
@@ -42,7 +53,7 @@ export interface LayerBase {
     readonly properties?: Properties;
 }
 
-export type MapLayer = TileLayer | ObjectLayer;
+export type MapLayer = TileLayer | ObjectLayer | ImageLayer;
 
 export interface MapObject {
     readonly id: number;
@@ -53,6 +64,8 @@ export interface MapObject {
     readonly rotation?: number;
     readonly visible?: boolean;
     readonly gid?: number;
+    readonly width?: number;
+    readonly height?: number;
     readonly shape?: MapShape;
     readonly properties?: Properties;
 }
@@ -98,6 +111,7 @@ export interface MapTileset {
     readonly tileHeight: number;
     readonly tileCount: number;
     readonly columns: number;
+    readonly objectAlignment?: 'unspecified' | 'topleft' | 'top' | 'topright' | 'left' | 'center' | 'right' | 'bottomleft' | 'bottom' | 'bottomright';
     readonly spacing?: number;
     readonly margin?: number;
     readonly tileOffset?: Vec2;
@@ -112,6 +126,7 @@ export interface MapTileset {
 
 export interface ObjectLayer extends LayerBase {
     readonly type: 'object';
+    readonly drawOrder?: 'topdown' | 'index';
     readonly objects: readonly MapObject[];
 }
 
@@ -183,6 +198,7 @@ export interface TileMapData {
     readonly width: number;
     readonly height: number;
     readonly orientation?: MapOrientation;
+    readonly renderOrder?: 'right-down' | 'right-up' | 'left-down' | 'left-up';
     readonly staggerAxis?: 'x' | 'y';
     readonly staggerIndex?: 'odd' | 'even';
     readonly hexSideLength?: number;
