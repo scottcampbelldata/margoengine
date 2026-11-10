@@ -123,3 +123,4 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 132 | headless | Batch 132 headless audit, partial: read video.ts, video-mux.ts (MP4 and WebM muxing against ISO/IEC 14496-12 and the Matroska spec), formats.ts and the capture paths line by line |
 | 132 | sky | Batch 132 sky audit, partial: Mac compat bug in browser-check meadow 4x full vs narrow (1 ulp, 2 pixels; dump both variants' WGSL and compare); read the Preetham, Bruneton, cloud, weather, astro, shafts and aerial code against their papers |
 | 132 | viewcube | Batch 132 viewcube audit, partial: read the cube geometry, hit testing, fit and up-axis code line by line |
+| 132 | audio | Batch 132 audio audit, partial: read ambisonics.ts (ACN/SN3D order and rotation), binaural.ts, occlusion.ts, music.ts, voices.ts, voice-manager.ts and zones.ts line by line |
