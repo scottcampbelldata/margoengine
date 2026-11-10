@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13309183,
+  "total": 13309738,
   "history": [
     {
       "date": "2026-10-24",
@@ -6775,6 +6775,12 @@
       "commit": "batch-227-job3",
       "reason": "New optional debug/arc entry 9549 B gzip with 9836 B ceiling. Uses existing batched renderer and Line picking; root, stroke, texture, core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c1fd9ad4d",
+      "reason": "lightmap/probes: new entry, irradiance probes baked from the lightmap scene (batch 54 job 7)",
+      "grew": 2
     }
   ],
   "items": {
@@ -6786,7 +6792,7 @@
     "@margoengine/animation/instanced-skin": 9937,
     "@margoengine/animation/interactivity": 25733,
     "@margoengine/animation/lod": 2768,
-    "@margoengine/animation/mixer": 5061,
+    "@margoengine/animation/mixer": 5048,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/playback": 2073,
     "@margoengine/animation/point-cache": 1241,
@@ -6874,6 +6880,7 @@
     "@margoengine/blender/lightmap": 4892,
     "@margoengine/blender/live": 4953,
     "@margoengine/blender/meshopt": 8560,
+    "@margoengine/blender/nodes": 10406,
     "@margoengine/blender/objects": 5201,
     "@margoengine/blender/pbr-ext": 12556,
     "@margoengine/bvh": 23398,
@@ -6914,6 +6921,7 @@
     "@margoengine/cinematic/group": 2101,
     "@margoengine/cinematic/lens": 1269,
     "@margoengine/cinematic/noise": 1612,
+    "@margoengine/cinematic/physical-lens": 845,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10652,
     "@margoengine/clustered/budget": 723,
@@ -7194,6 +7202,7 @@
     "@margoengine/kinematics-constraints/swept": 9491,
     "@margoengine/labels": 5806,
     "@margoengine/labels/callouts": 1603,
+    "@margoengine/labels/callouts-route": 2706,
     "@margoengine/labels/cluster": 1771,
     "@margoengine/labels/declutter": 1512,
     "@margoengine/labels/distance": 1260,
@@ -7211,9 +7220,11 @@
     "@margoengine/lightmap/gpu": 7965,
     "@margoengine/lightmap/imported": 1535,
     "@margoengine/lightmap/mesh": 3272,
+    "@margoengine/lightmap/probes": 3273,
     "@margoengine/lightmap/refracted": 7846,
     "@margoengine/lines": 20524,
     "@margoengine/lines/batch": 6519,
+    "@margoengine/lines/debug": 9836,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
     "@margoengine/lines/pick": 6245,
@@ -7923,6 +7934,7 @@
     "leak @margoengine/blender/lightmap -> @margoengine/materials": 1,
     "leak @margoengine/blender/live -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/meshopt -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender/nodes -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/pbr-ext -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,
@@ -7950,6 +7962,7 @@
     "leak @margoengine/lightmap/imported -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/lightmap/imported -> @margoengine/materials": 1,
     "leak @margoengine/lightmap/mesh -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/lightmap/probes -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/refracted -> @margoengine/bvh/tree": 1,
     "leak @margoengine/loaders/las -> @margoengine/points/las": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/gltf-pro/model": 1,
@@ -8003,12 +8016,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/cinematic/physical-lens": 845,
-    "@margoengine/blender/nodes": 10406,
-    "leak @margoengine/blender/nodes -> @margoengine/gltf-pro/model": 1,
-    "@margoengine/labels/callouts-route": 2706,
-    "margoengine/labels/callouts-route": 2706,
-    "@margoengine/lines/debug": 9836
+    "margoengine/web": 577
   }
 }

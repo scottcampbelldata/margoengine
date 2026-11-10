@@ -902,7 +902,7 @@
     "package": "@margoengine/lightmap",
     "version": "1.0.0",
     "published": false,
-    "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted).",
+    "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "lightmap",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/lightmap@1.0.0",

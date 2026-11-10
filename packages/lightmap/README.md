@@ -137,6 +137,14 @@ console.log(done.samples);
 - **Results.** `read()` averages, dilates and encodes like `bakeMeshLightmap`. `passes` counts the passes run.
   Dispose the baker (`using`, or `[Symbol.dispose]()`) to free its buffers, texture and tree.
 
+## Probes for moving objects: `@margoengine/lightmap/probes`
+
+`bakeLightProbes({ volume, room, lights })` bakes a box of irradiance probes (one at each cell centre of
+`volume.counts`) from the same lights and geometry as a mesh bake, so characters match the baked room. Each probe is
+order-3 spherical harmonics (27 floats, `SH3` layout) of the shadowed direct lights plus gather rays that read the
+room's baked lightmap where they hit it (`albedo * irradiance / pi`) and the ambient lights where they escape.
+`probeIrradiance(grid, position, normal)` reads the irradiance trilinearly, in the same units as a physical lightmap.
+
 ## More light: `@margoengine/lightmap/global`
 
 `bakeGlobalLightmap(quads, options)` takes every `bakeLightmap` option and adds:

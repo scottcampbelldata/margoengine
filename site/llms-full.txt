@@ -350,7 +350,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/environment`](packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
+| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/weather`](packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
@@ -6035,6 +6035,15 @@ approximate under a normal map (exact for one light plus ambient). Ambient light
 the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
 quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
 
+## Lightmap irradiance probes (batch 54)
+
+`bakeLightProbes` (`@margoengine/lightmap/probes`) bakes on the CPU, at most 64 probes per axis (262,144) and 67,108,864
+rays, 16 to 16,384 gather rays per probe. Each probe is order-3 SH, so a strong light rings: a delta light gives about
+6% of its irradiance straight behind it and 9% at 90 degrees, and `probeIrradiance` clamps below 0. The room's light
+reaches probes only through its lightmap (one mesh), so one bounce beyond the lightmap; occluders reflect nothing;
+emissive surfaces and area lights are not sampled. Probes have no visibility weighting (light can leak through thin
+walls between probes), and `@margoengine/environment`'s `LightProbes` cannot load the baked coefficients yet.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.
@@ -7596,6 +7605,33 @@ Readback entry size evidence (batch 222, same library build settings against the
 occluder, diffuse only; no emissive surfaces, area lights, glass or textures in the path. Ambient lights add their
 irradiance at every path vertex, unoccluded in physical radiometry. The live `texture` is undilated (empty texels stay
 0); `read()` dilates. Lights are point, spot, directional and ambient only. Texel finding runs on the CPU first.
+
+
+
+### Cinematic physical lens
+cinematic/physical-lens is optional: new entry 0 to 589 B minified gzip, budget 845 B. Core plus stage stays 24209 B. Defaults: 50 mm, 36 mm sensor on the longer image axis, f/2.8, focus 5 metres, aspect 16/9. Horizontal and vertical sensor fits are explicit alternatives. Settings must be finite and positive, focus beyond the focal length. Stage update writes FOV and preserves tracked focus; apply sends the focus, f-number and sensor settings to DOF, with focal length converted to metres. Call apply after brain update with its final focusDistance. Exposure and shutter belong to cameras/physical. DOF retains its existing 1-32 pixel radius limit and screen-space occlusion limitations; this entry adds no pass.
+
+
+
+## Batch 207 job 4: live Blender node graphs
+blender/nodes is a new optional entry; entry size and ceiling are recorded with the job's size evidence below. Core and stage are untouched. Export live_nodes defaults false. When true, reachable unsupported nodes or surface lobes fail by material/node name, with the existing baked export available by disabling live_nodes. No silent baking in the live path.
+Supports Value/RGB, reroutes, Math (41 scalar operations including safe divide/power/log domains), MixRGB and Mix (Float/Vector/RGBA, 19 color blend modes), Color Ramp (2..32 stops, Constant/Linear/Ease/Cardinal/B-spline, RGB/HSV/HSL and four hue directions), Noise (1D..4D, Fac/Color, fractional detail 0..15, normalized fBM, multifractal, ridged, hybrid and hetero terrain, roughness/lacunarity/distortion/offset/gain), UV/Generated/Object/Normal coordinates and RGB/XYZ separate/combine. Principled live inputs: base, alpha, metalness, roughness, emission/color strength and IOR. Other shader types, groups, images, arbitrary mapping/vector nodes, custom object coordinate sources and physical surface lobes are outside this entry's common-graph row and reject explicitly. This entry does not replace the existing baked or extended-material entries.
+Limits: 256 live output nodes, 1024 vec4 parameters (16 KiB), 3601 animation frames, 262144 parameter samples, file limit 256 MiB. Original metadata is cloned, cycles/forward links and shader-injection enums reject. seek(seconds) clamps to the sampled scene range without looping; per-frame samples interpolate linearly. Runtime set overrides remain through seek until reset. Blender frame/subframe and images/mesh counts are restored during export. Coordinate conversion preserves Blender Z-up, UV bottom-left and scene units. Ramp stop positions/colors remain paired and sort live when they cross.
+Noise uses Margo's independent hash and gradient field, rather than Blender's private stochastic ordering: the procedural field and animation controls remain live, but exact noise texels are an accepted difference. Per-frame sampling also approximates subframe curves between samples. No speed, bandlimiting or full Blender material equivalence claim. Both are recorded for later quality work rather than hiding the difference.
+
+
+Batch 207 job 4 size evidence: blender/nodes 0 to 10102 gzip bytes; ceiling 10406 B. These optional bytes keep the validated compiler, controls, animation and shader families together. A split would duplicate validation or add asynchronous graph boundaries. Blender root 4397 B; core plus stage 24209 B, unchanged.
+
+### Batch 261 routed callouts
+Optional labels/callouts-route reorders label slots and draws crossing-free angled elbows in a shared SVG. Default auto side, 16 px gap, 4 px padding, 8 px margin, currentColor, 1 px stroke, overflow true. Both sides, coincident sources, scaled nonzero boxes, still-frame caching and disposal are covered. Pure routeCalloutLeaders requires distinct port heights in one column and a bend column strictly between sources and ports. Labels may extend outside the viewport with overflow enabled; overflow false rejects insufficient space. Worst-case comparison work is O(n squared log n); total leader-length optimization, obstacle avoidance and multi-sided optimization are additional objectives. See [routing contract and proof](labels-callouts-route.md). No speed claim.
+
+Batch 261 job 4 entry size: callouts-route 0 -> 2450 B min+gzip, ceiling 2706 B. Core/stage remain 24,209 B.
+
+GPU label finish-phase limits: CSS borders currently enter the outer-rectangle sizing calculation, and aborting during Font.load waits for that shared load to settle. Repros and causes are in docs/known-bugs.md; both are tracked for the fix phase under lane rules 21/22.
+
+### Immediate debug and arc lines (batch 227 job 3)
+@margoengine/lines/debug exports DebugLines, ArcLine and arcPositions. DebugLines drawLine/drawLines/drawArc queue for the next rendered frame and clear on the following rendered frame, including zero delta. Picks never consume queued commands; extra views/targets reuse the active frame. Equal width/depth styles share one LineBatch draw (subject to device buffer splits), with endpoint colour gradients. Default width 1 CSS px, colour white, depthTest true; maximum queued segments defaults to 1,000,000 and is configurable up to 67,108,864. Debug segments retain the batch renderer's square ends and have no picking, dashes or joins. Persistent ArcLine uses ordinary Line materials and picking.
+Arc coordinates are XYZ in engine units. Default 64 segments, permitted 2..8192; planar midpoint height defaults to chord length/4, up +Y and tilt 0 radians. Great-circle arcs default to height 0 and center [0,0,0], interpolate endpoint radii linearly, and use radial midpoint height. Coincident directions and antipodes are deterministic; an endpoint at the center rejects. These are spherical paths, not ellipsoid/geographic projections. Endpoint float32 positions are exact copies. Entry gzip 9,549 B, ceiling 9,836 B; other line entries and core plus stage (24,209 B) are unchanged. No speed measurement or claim.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -12155,6 +12191,20 @@ The former crossfade-only live composition gap is closed for all four built-ins,
 Fixed for this landing: compatibility render pipelines accepted explicit layouts missing statically used resources, and async validation also emitted uncaptured errors. render.ts now checks the reflected resource interface and routes async failure only to rejection. device.test.js and compute-limits.test.js retain the regressions. The global WGSL corpus also lacked labels shaders already on main; a scoped real-GPU recording refresh now covers it for the owning package CPU gate. Recorded labels shader ownership is identified by exact equality to packages/labels/src/gpu-shader.ts.
 Batch 213 landing correction: the job 2 local rebase helper took maxima for unrelated size ceilings, restoring eight older limits and six stale umbrella keys. Job 3 restores the incoming main limits and removes those stale keys; the helper now applies only the job delta to incoming main, with a three-way check. No runtime, test or tolerance was changed for this correction.
 - Build gate concurrency finding (batch 222): running quality while React's subpath tests create and remove packages/react/tests/.subpaths-* can make quality's untracked-file snapshot read a deleted orbit-cube.js (ENOENT). Source: repoFiles includes temporary test outputs that disappear before cleanRoomGate reads them. Repro: run those CPU tests concurrently with quality; serialize the gates during the build phase. Owning quality scanner cleanup waits for the fix phase.
+
+
+Batch 216 job 1: no open physical-lens defect found. Invalid constructor settings, live edits and tracked focus reject before camera/DOF output writes; physical-lens.test.js covers this contract.
+
+
+
+- Batch 207 live-node quality follow-up: Noise uses an independent Margo hash/gradient ordering, so the same Blender settings produce different stochastic texels; socket curves are sampled per frame and interpolate linearly between samples. Reproduce by comparing the nodes fixture with Cycles noise or seeking halfway between non-linear keys. All requested node families and live controls are built; exact stochastic and subframe curve matching remain finish-phase quality work (also in private/handoffs/finish-later.md).
+
+### Batch 261 routed callouts
+No open correctness defect identified. The planar assignment replaces independent crossing-prone source/slot connections; a two-point fixture proves label reordering. Independent segment intersection/overlap checks cover integer, fractional, collinear, coincident, enormous and subnormal inputs. Browser tests check SVG-to-DOM endpoints and stable-frame writes on both native rendering backends.
+
+### Labels GPU finish-phase edge cases (batch 261)
+- In-flight font cancellation: start GPULabelLayer.create with a Font whose load promise is pending, then abort its signal. Creation stays pending until Font.load resolves because cancellation is checked only before/after loading. Make the caller's wait abortable while retaining shared font loading in the fix phase.
+- Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

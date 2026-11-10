@@ -1746,6 +1746,10 @@
       "types": "./dist/lightmap/gpu.d.ts",
       "import": "./dist/lightmap/gpu.js"
     },
+    "./lightmap/probes": {
+      "types": "./dist/lightmap/probes.d.ts",
+      "import": "./dist/lightmap/probes.js"
+    },
     "./lines": {
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"
@@ -1777,6 +1781,10 @@
     "./lines/texture": {
       "types": "./dist/lines/texture.d.ts",
       "import": "./dist/lines/texture.js"
+    },
+    "./lines/debug": {
+      "types": "./dist/lines/debug.d.ts",
+      "import": "./dist/lines/debug.js"
     },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
@@ -4477,10 +4485,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./lines/debug": {
-      "types": "./dist/lines/debug.d.ts",
-      "import": "./dist/lines/debug.js"
     }
   },
   "dependencies": {

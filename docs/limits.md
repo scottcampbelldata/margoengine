@@ -3445,6 +3445,15 @@ approximate under a normal map (exact for one light plus ambient). Ambient light
 the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
 quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
 
+## Lightmap irradiance probes (batch 54)
+
+`bakeLightProbes` (`@margoengine/lightmap/probes`) bakes on the CPU, at most 64 probes per axis (262,144) and 67,108,864
+rays, 16 to 16,384 gather rays per probe. Each probe is order-3 SH, so a strong light rings: a delta light gives about
+6% of its irradiance straight behind it and 9% at 90 degrees, and `probeIrradiance` clamps below 0. The room's light
+reaches probes only through its lightmap (one mesh), so one bounce beyond the lightmap; occluders reflect nothing;
+emissive surfaces and area lights are not sampled. Probes have no visibility weighting (light can leak through thin
+walls between probes), and `@margoengine/environment`'s `LightProbes` cannot load the baked coefficients yet.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.
