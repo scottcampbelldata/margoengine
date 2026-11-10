@@ -2981,3 +2981,6 @@ MachineView draws active hierarchy paths, parallel region paths, remembered stat
 ### Save OPFS atomic replacement (batch 255 job 3)
 
 The optional save/opfs adapter supports binary/empty values, sorted keys, namespace isolation and path-safe Unicode keys. A write commits through the File System Standard's temporary-file close swap. Proof: packages/save/tests/opfs.test.js injects open, write and close faults and precommit aborts while checking exact previous bytes and hidden placeholders. packages/save/tests/browser/safe-check.mjs checks real OPFS persistence across reload and aborted temporary writes. No cross-key, cross-tab ordering, physical power-loss or performance claim is made.
+### Batch 197 orbit collision
+
+The optional controls/collide entry retracts orbit/map cameras before selected triangle blockers, retains input distance and extends after clearance. Evidence: packages/controls/tests/collide.test.js covers moving blockers, off-centre corner hits, filters, transforms, input, final-pose events, query failure and disposal; collide-browser.js checks visible target pixels and restored distance on WebGPU and WebGL2. Five samples do not claim continuous swept-volume coverage.

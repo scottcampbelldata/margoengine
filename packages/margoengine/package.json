@@ -622,6 +622,10 @@
       "types": "./dist/controls/globe.d.ts",
       "import": "./dist/controls/globe.js"
     },
+    "./controls/collide": {
+      "types": "./dist/controls/collide.d.ts",
+      "import": "./dist/controls/collide.js"
+    },
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
