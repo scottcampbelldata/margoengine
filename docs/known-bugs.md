@@ -531,9 +531,8 @@ passes. The following additional failures remain with batch 273:
 - Fixed `scatter/test:browser:shadow-cull`: observe the selected route's actual
   GPU-written command buffer. The original complete native and compatibility
   driver passes depth, frame and count assertions. Regression: shadow-cull-fixture.test.js.
-- `scenery/test:gpu`: the noon scene reads black ground, then compares zero to
-  zero and reports `noon ground NaN of noon on screen`. Trace the presented scene
-  and capture readiness; the lighting preset checks before it pass.
+- `scenery/test:gpu`: resolved capture race. The fixture now waits for compatibility submitted work, preserving native submit-task capture. All original native/compatibility scene, HDR, stars and aurora checks pass at1x/4x; presented-frame.test.js regresses the actual capture order.
+
 - `selection/test:browser`: picking and pick-many finish; `models.browser.mjs`
   prints `occlusion ok` and does not finish before the unchanged 60 s body bound.
   The awaited operation after that marker remains unisolated.

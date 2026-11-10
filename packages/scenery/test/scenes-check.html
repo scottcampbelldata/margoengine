@@ -6,6 +6,7 @@ import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {sceneSamples} from '/packages/core/dist/quality.js';
 import {PresetScene,scenePresetNames} from '/packages/scenery/dist/scenes.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const canvas=document.querySelector('canvas');
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,0],target:[0,0,0.5],fov:20,near:0.5,far:200000}}),device=engine.gpu,errors=[];
@@ -30,7 +31,10 @@ const plugins=()=>engine.plugins?.size??null;
 // One frame as displayed: 8-bit sRGB, read the way a screenshot is.
 async function frame(){
  const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
- engine.render({delta:0});g.drawImage(canvas,0,0);
+ engine.render({delta:0});
+ // Native snapshots belong to the submit task; compatibility may await its lazy CPU runtime.
+ if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();
+ g.drawImage(canvas,0,0);
  const d=g.getImageData(0,0,c.width,c.height).data,w=c.width;
  return (x,y)=>[d[(y*w+x)*4],d[(y*w+x)*4+1],d[(y*w+x)*4+2]];
 }

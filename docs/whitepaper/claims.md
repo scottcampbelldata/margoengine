@@ -3335,6 +3335,7 @@ Batch 249 job 3: ecs/reactive maintains component query matches by affected-enti
 
 ### Batch 273 Firefox compatibility evidence
 Shipped Firefox159.0.1 on Windows executes all46 feature/compute cases against native Chromium reference data with original tolerances, all733 recorded render pipelines and477 compute dispatches. One intentionally over-limit compute pipeline must reject with the correct validation error. Full, forced16F and forcedLDR numeric device checks, the scoped10-scene package-tier grid and destroy-after-submit checks pass. Default Firefox native WebGPU adapter acquisition returns null; canonical drivers requiring that native baseline remain failed/refused. This is scoped compatibility evidence, not full package or physical lower-tier certification. Complete case data and limitations: results/batch-273-firefox-matrix.json.
+<<<<<<< HEAD
 ## Batch 237: cubic overlapping synthesis
 Every returned N-cube window is learned from the voxel sample, including all-axis periodic boundaries. Tests check N=2 and N=3 output-window membership, all 256 fully pinned binary cubes, pin preservation, copied samples, invalid inputs, contradictory odd periodic volumes, rotation/reflection cardinalities and deterministic seed replay. Native WebGPU and the WebGL2 compatibility browser routes solve the same pinned 4-cube checkerboard while rendering. No speed, global playability or unbiased distribution claim.
 
@@ -3365,3 +3366,8 @@ Batch 267 job 2: asset tools search all three official catalogues, reject non-CC
 ## Batch 237: hexagonal WFC
 Six-neighbor hex layouts and eight-neighbor prisms preserve reciprocal topology on all five coordinate layouts, including even-parity periodic seams and mask holes. CPU tests compare tiny graphs against exhaustive assignments, verify all side transforms geometrically, and check 19-cell masked hex boards, copy ownership, seeded replay, pins and contradiction/abort behavior. Both rendering routes also solve and validate every side and vertical edge of a periodic odd-r 6x6x2 prism.
 >>>>>>> 2500884a9 (feat(wfc): solve hex planes and prisms with socket orientations)
+=======
+
+### Batch273 scenery scene capture
+All original scenery correctness checks pass on native WebGPU and compatibility: four displayed presets, HDR fog transmittance, switching/disposal, stars and aurora, at1x and4x. A test-only compatibility queue barrier replaces a premature canvas read; native capture remains in the submit task. No runtime rendering, tolerances, sample counts or work grids change. Regression: packages/scenery/test/presented-frame.test.js.
+>>>>>>> 68ad4f497 (fix(scenery): capture compatibility scenes after submitted work)

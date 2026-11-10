@@ -5705,3 +5705,7 @@ Optional exporter optimization uses accessor-backed `EXT_mesh_gpu_instancing` TR
 
 ### Section 5 evidence: batch 267 asset wiring
 mcp/assets performs only bounded network/filesystem preparation; no GPU lock during real downloads. mcp/assets-page lazily delegates GPU loading to existing gltf-pro/environment/materials APIs. Both backends exercise real CC0 scene assets; GPU pipeline readiness uses completion state. No new GPU maths, core/stage feature or benchmark.
+
+
+#### 5. Batch273 scenery capture evidence
+The scene-preset fixture preserves native synchronous drawImage capture after render and waits for the actual compatibility queue completion before its capture. This repairs an observation race with lazy compute preparation rather than changing scene output. The complete native scenery suite and complete compatibility suite pass every original preset, fog, stars and aurora assertion at4x and1x; the final compatibility scenes leaf separately confirms the conditional barrier. Two actual-fixture unit cases preserve each backend's scheduling contract.
