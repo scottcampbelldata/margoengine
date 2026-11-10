@@ -76,6 +76,18 @@ test('float literals parse back to the same f32', () => {
   assert.equal(glslFloat(-0), '-0.0');
 });
 
+test('the largest f32 prints as a decimal at or below it, so a strict GLSL parser does not overflow it (R5)', () => {
+  // '3.4028235e+38' (the shortest round trip) is above FLT_MAX as a decimal: ANGLE on Metal read it as infinity, and
+  // scatter/interact's overflow guard (vec3f(3.4028234663852886e38) - abs(m)) then skipped every cell whose sign
+  // differed from the interactor's (scatter test:browser:interact under --compat: stamp off by 0.976).
+  const max = 3.4028234663852886e38;
+  for (const v of [max, -max]) {
+    const text = glslFloat(v);
+    assert.ok(Math.abs(Number(text)) <= max, text);
+    assert.equal(Math.fround(Number(text)), v, text);
+  }
+});
+
 test('integer division and remainder go through helpers that follow WGSL; constant unsigned divisors stay direct', () => {
   const glsl = frag(
     '@group(0) @binding(0) var<uniform> u: vec4i;',

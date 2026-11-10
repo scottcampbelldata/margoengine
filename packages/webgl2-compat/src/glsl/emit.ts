@@ -200,6 +200,8 @@ export function encodeName(name: string): string {
 
 const SWIZZLE = 'xyzw';
 
+const F32_MAX = 3.4028234663852886e38;
+
 /** GLSL text of an f32 value that parses back to the same f32. */
 export function floatLiteral(v: number): string {
   if (Object.is(v, -0)) return '-0.0';
@@ -214,6 +216,10 @@ export function floatLiteral(v: number): string {
         break;
       }
     }
+  // The shortest text of the largest f32 (3.4028235e+38) lies above it: a compiler that parses the exact decimal
+  // (ANGLE) overflows it to infinity, and Metal's fast math then folds comparisons against it either way. Keep the
+  // largest magnitude's text below it; it still rounds to that f32.
+  if (Math.abs(f) === F32_MAX) text = f < 0 ? '-3.40282346e+38' : '3.40282346e+38';
   if (!/[.e]/.test(text)) text += '.0';
   else if (/^-?\d+e/.test(text)) text = text.replace('e', '.0e');
   return text;
