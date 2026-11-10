@@ -5,6 +5,7 @@ import { parseLottie } from '@margoengine/loaders/lottie';
 import { parsePLY } from '@margoengine/loaders/ply';
 import { parseOFF } from '@margoengine/loaders/off';
 import { parseVTKLegacy } from '@margoengine/loaders/vtk-legacy';
+import { parseGeoJSON } from '@margoengine/loaders/geo';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -60,6 +61,37 @@ window.runLoaderTests = async () => {
   engine.render();
   vtkScene.dispose();
   checks.push('Legacy VTK vertex/line topology and cell data survive surface rendering');
+  const geo = parseGeoJSON({
+    type: 'Feature',
+    properties: { name: 'parcel' },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0],
+        ],
+        [
+          [0.25, 0.25],
+          [0.25, 0.75],
+          [0.75, 0.75],
+          [0.75, 0.25],
+          [0.25, 0.25],
+        ],
+      ],
+    },
+  });
+  assert(
+    geo.polygons[0].rings.length === 2 && geo.mesh.indices.length === 24,
+    'geospatial polygon holes survive tessellation',
+  );
+  const geoScene = createMeshes(engine, geo.mesh);
+  engine.render();
+  geoScene.dispose();
+  checks.push('Geospatial polygon holes and feature groups render through createMeshes');
   const result = await load('/tests/fixtures/face_colors.3mf', parse3MF, { maxBytes: 1 << 20 });
   assert(result.groups.length === 5, `expected 5 color groups, got ${result.groups.length}`);
   checks.push('load() + parse3MF in the browser (DecompressionStream deflate-raw)');

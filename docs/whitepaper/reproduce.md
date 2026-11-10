@@ -3093,3 +3093,6 @@ Batch 206 PointInstancer: build packages, run node --test --test-timeout=120000 
 
 ### Batch 199 glow and fill
 After building packages, run `node scripts/gpu-lock.mjs run --owner=selection-highlight --wait-max=60 --max=2 -- node packages/selection/test/highlight.browser.mjs`, then repeat with `--compat`. The existing attributed Khronos Box provides the selected mesh. Checks require a magenta interior fill, unchanged centre for outer-only glow, no outside contribution for inner-only glow, exact finite radius support and byte-identical beauty output when fully occluded. Run highlight.test.js for no JFA dispatch, default-algorithm mask-only support, bind/view reuse, style failures and restore/disposal. The ordinary picking/model/xray package suite also runs after the Selection mask hook change.
+
+### Batch 202 geospatial vectors
+Build loaders and run `node --test --test-timeout=120000 packages/loaders/tests/geo.test.js`. Natural Earth is the already-noticed public-domain fixture; spec-derived binary writers independently construct Shapefile, dBASE and MVT records. Shared-lock loader browser tests run native and --compat, including a polygon with a hole and its feature group. Source-double comparisons use result.positions; result.mesh is the existing float32 render contract.

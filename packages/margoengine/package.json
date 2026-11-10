@@ -4257,6 +4257,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./loaders/geo": {
+      "types": "./dist/loaders/geo.d.ts",
+      "import": "./dist/loaders/geo.js"
     }
   },
   "dependencies": {

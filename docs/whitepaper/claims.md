@@ -3614,3 +3614,6 @@ Batch 206: optional USD PointInstancer expansion shares prototype geometry, pres
 
 ### Selection glow/fill (batch 199 job 4)
 The optional highlight entry adds independently styled translucent surface fill and inner/outer soft glow from visible selected pixels. Two half-float separable passes preserve small halo values; mask-only rendering performs no JFA compute or distance-field allocation. Proof: packages/selection/test/highlight.test.js and highlight.browser.mjs on native and full compatibility, with fill, inner/outer separation, radius support, full-occlusion equality, resource reuse and restore/disposal checks. No speed number is claimed.
+
+### Mixed geospatial vectors (batch 202)
+All five requested format families produce point/line/polygon primitives with inspectable feature attributes. `packages/loaders/tests/geo.test.js` proves holes by exact area, multipart and mixed feature ownership, original double coordinates, Shapefile Z/M/dBASE alignment, GPX segment boundaries, KML nested placemarks, MVT 64-bit IDs/commands and hostile binary rejection. It also reads all 127 Natural Earth land features. The browser fixture renders a holed parcel through the existing mesh helper on each backend. No speed or map-style-renderer parity claim is made.

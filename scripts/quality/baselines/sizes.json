@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12942545,
+  "total": 12951705,
   "history": [
     {
       "date": "2026-10-24",
@@ -6439,6 +6439,12 @@
       "commit": "batch-199-job-4",
       "reason": "Optional selection/highlight absent -> 13082 B gzip, ceiling 13475 B. Shared current-pose mask plus separable R16F Gaussian and straight-alpha fill stay together; splitting would duplicate masks and GPU resource ownership. Root 21464 -> 21514 B and xray 12322 -> 12374 B remain under existing ceilings. Core + stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-202",
+      "reason": "Optional loader entries loaders:geo, selection:area preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
+      "grew": 4
     }
   ],
   "items": {
@@ -7605,7 +7611,7 @@
     "@margoengine/loaders/vtk-legacy": 6592,
     "margoengine/loaders/vtk-legacy": 321,
     "margoengine/selection/hit-details": 324,
-    "@margoengine/selection/area": 15719,
+    "@margoengine/selection/area": 15746,
     "@margoengine/animation/playback": 2073,
     "leak @margoengine/animation/playback -> @margoengine/gltf-pro/model": 1,
     "@margoengine/blender/objects": 5201,
@@ -7622,6 +7628,9 @@
     "@margoengine/headless/null": 2977,
     "@margoengine/sciviz/clip": 5396,
     "@margoengine/usdz/instancer": 2451,
-    "@margoengine/selection/highlight": 13475
+    "@margoengine/selection/highlight": 13475,
+    "@margoengine/loaders/geo": 8502,
+    "margoengine/loaders/geo": 314,
+    "margoengine/selection/area": 317
   }
 }

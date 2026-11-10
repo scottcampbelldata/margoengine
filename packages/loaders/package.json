@@ -166,6 +166,10 @@
     "./vtk-legacy": {
       "types": "./dist/vtk-legacy.d.ts",
       "import": "./dist/vtk-legacy.js"
+    },
+    "./geo": {
+      "types": "./dist/geo.d.ts",
+      "import": "./dist/geo.js"
     }
   },
   "files": [
