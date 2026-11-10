@@ -4189,16 +4189,15 @@ adapters install fallback, and both unchanged isolation assertions pass. See
 The brief's separate full-tier compatibility failures remain in scope;
 the voxel-pathtracer D3D11 hang has a separate owner and was not investigated here.
 
-### Batch 273 tooling observation: verify import from eval
+### Fixed 2026-11-10: verify plan import from eval and stdin
 
-Repro: node --input-type=module -e "import('./scripts/verify.mjs')".
-The exported verify plan cannot be imported from an eval entry: its final CLI
-guard passes undefined process.argv[1] to pathToFileURL. The same import from a
-normal .mjs file works. Root cause is scripts/verify.mjs's unguarded CLI-entry
-comparison, outside this package lane's edit scope. The batch resumes verify's
-exported unit-test command from an owned .mjs runner with the same work and bounds.
-The tooling owner should guard the missing argument and add an eval-import
-regression; no exception is suppressed here.
+Repro: node --input-type=module -e "import('./scripts/verify.mjs')", or import
+from stdin. Both launch modes omit process.argv[1], which the CLI guard passed
+to pathToFileURL. Check that a CLI filename exists before converting it. The
+real child-process regressions in tests/verify-import.test.js fail in both
+modes on the parent and pass with the repair; an eval argument remains a
+passing control. Imports expose the plan without starting checks. No verify
+run, check list, deadline or public package API changes.
 
 Lane G has a local guard repair with failing-parent eval/stdin regressions,
 but it is not on main: its expanded dependent preview-contract.test.js still

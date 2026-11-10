@@ -113,6 +113,22 @@ https://dom.spec.whatwg.org/#interface-eventtarget (listener identity and remova
 These support retaining the session lifetime; Margo's existing sceneOf identity
 lookup supplies registration ownership. No external implementation was read.
 
+### Section 5 evidence: importable local CI plan
+
+The verify CLI guard checks for an entry filename before calling pathToFileURL.
+Node eval and stdin imports can now inspect the exported plan without running
+checks. tests/verify-import.test.js executes all three import modes in bounded
+children; eval and stdin fail on the parent with ERR_INVALID_ARG_TYPE, while
+eval with an argument is a control. No full verify was run by lane G.
+
+Clean-room standards compared: Node.js contributors, *Process* (process.argv),
+*Command-line API* (--eval and stdin), and *URL* (pathToFileURL), 2026,
+https://nodejs.org/api/process.html#processargv,
+https://nodejs.org/api/cli.html and
+https://nodejs.org/api/url.html#urlpathtofileurlpath-options.
+The launch contract permits an absent script filename, while URL conversion
+requires a string. No implementation source from another repository was read.
+
 #### Section 5 evidence addition: batch 179 provenance
 The optional entry observes only opted-in spec figures and preserves successful mutations, property assignments and removals. Replaying restores the baseline, executes recorded operations with resource/GPU argument ownership, then restores the final portable state. A regression preserves saved IDs after removed resources and allocates future IDs without collision. Temporary replay GPU arrays release with the figure. Container tests preserve PNG image bytes exactly, validate CRCs and bounded inflation, and verify namespaced SVG and Unicode PDF records. Demo browser evidence covers native WebGPU and the WebGL2 compatibility layer; no rendering mathematics or backend implementation changes.
 
