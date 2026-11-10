@@ -1413,7 +1413,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   out of order drew nothing for a frame or two until 2026-10-31 ([known-bugs.md](../known-bugs.md#fixed-2026-10-31)).
 - **Second run (main `b92998d6`, 2026-10-28, not committed):** of 43 package GPU suites, 42 were started, one at a time;
   38 passed. The text suite failed "Emoji not drawn in color": the server has no colour emoji font, and the test relies
-  on one from the system ([known-bugs.md](../known-bugs.md#text-the-colour-emoji-check-needs-a-colour-emoji-font-on-the-machine)).
+  on one from the system ([known-bugs.md](../known-bugs.md#fixed-the-text-colour-emoji-check-supplies-its-own-font)).
   The voxel, voxel path tracer and root browser suites were stopped by the heat watchdog at 82 C before they finished.
   **Those three have not been run on Linux;** they count as neither passes nor failures.
 - **Why one at a time:** the server reached 94 to 96 C during a full `npm run verify` on 2026-10-27, so it runs no
