@@ -313,3 +313,14 @@ Source: Ryan Holmes's data-only mirror, http://www.holmes3d.net/graphics/teapot/
 
 ## OpenStreetMap road correctness fixture (batch 233)
 packages/road/test/fixtures/osm-times-square.osm contains six real Times Square road ways and their referenced node coordinates, downloaded from https://api.openstreetmap.org/api/0.6/map?bbox=-73.986,40.757,-73.984,40.759 on 2026-11-10. Copyright OpenStreetMap contributors, Open Database License 1.0: https://opendatacommons.org/licenses/odbl/1-0/ and https://www.openstreetmap.org/copyright . Selection/provenance in osm-source.json. Editing-user metadata omitted; all selected way tags retained. Used as standard geographic test data, not code from another repository.
+
+### Scenery lunar map fixture
+
+`packages/scenery/test/assets/lunar-albedo.jpg`: NASA Scientific Visualization
+Studio, Ernie Wright / Noah Petro, CGI Moon Kit (2019), LROC WAC Hapke-normalized
+mosaic with LOLA polar fill, unmodified 1024 x 512 sRGB JPEG.
+Source: https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_1k.jpg
+Record: https://svs.gsfc.nasa.gov/4720/
+Public-use NASA imagery under https://www.nasa.gov/nasa-brand-center/images-and-media/;
+credit NASA's Scientific Visualization Studio. This standard data asset is the
+AGENTS.md sample-data exception; it is not code from another repository.

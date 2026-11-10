@@ -6755,3 +6755,33 @@ Compared Galin et al. (2010) parameterised terrain-aware bridge/tunnel classific
 Research compared Chris Green, Improved Alpha-Tested Magnification for Vector Textures and Special Effects (2007), https://cdn.akamai.steamstatic.com/apps/valve/2007/SIGGRAPH2007_AlphaTestedMagnification.pdf; Kevin Mote, Fast Point-Feature Label Placement for Dynamic Visualizations (2007), https://arxiv.org/abs/1209.5765; Yasemin Ozkan Aydin and Kemal Leblebicioglu, A Fast and Practical Grid Based Algorithm for Point-Feature Label Placement Problem (2017), https://arxiv.org/abs/1712.05936; and W3C GPU for the Web Working Group, WebGPU (2026), https://www.w3.org/TR/webgpu/. Green supplies sampled-distance coverage; Mote's trellis motivates local collision candidates, while the grid-first placement paper offers an alternative placement objective. Margo combines its existing SDF generator with priority-ordered exact rectangle checks in a viewport-clipped grid, not the papers' complete placement optimizers. One instanced stream and one texture array span all labels and pages. Public behavior comparison: deck.gl contributors, TextLayer (2026), https://deck.gl/docs/api-reference/layers/text-layer, for screen pixel units, SDF and instanced glyphs. No rival or companion source read, copied or adapted. Synthetic tests are authored controls; no demo or downloaded asset added. GPU tests prove the requested one-draw 100k and constant-size behavior on all three rendering paths, without claiming complete TextLayer API equivalence.
 
 Batch 206 API-index repair research: Ecma International, ECMA-262 13th edition (2022), Module Namespace Exotic Objects, https://ecma-international.org/wp-content/uploads/ECMA-262_13th_edition_june_2022.pdf, specifies that exported bindings include indirect export-star bindings. Danny Dig and Ralph Johnson, The Role of Refactorings in API Evolution (2005), https://dig.cs.illinois.edu/papers/API_Evolution.pdf, motivates checking published API records against the evolving modules rather than trusting manual edits. Compared the module-export contract with the API-evolution evidence; the added test proves only summary/table self-consistency, while the existing full compiled-declaration check proves the row contents. No companion code was read.
+
+
+
+## Batch 232 textured moon (2026-11-10)
+
+Clean-room implementation in `packages/scenery/src/moon.ts`, with no rival code read.
+Sources compared: P. K. Seidelmann et al., *Report of the IAU/IAG Working Group on
+cartographic coordinates and rotational elements: 2006* (2007),
+https://doi.org/10.1007/s10569-007-9072-y; Ernie Wright and Noah Petro,
+*CGI Moon Kit* (NASA SVS, 2019, updated 2026), https://svs.gsfc.nasa.gov/4720/;
+Rodrigo Luger, Eric Agol, Fran Bartolic and Daniel Foreman-Mackey,
+*Analytic Light Curves in Reflected Light: Phase Curves, Occultations, and
+Non-Lambertian Scattering for Spherical Planets and Moons* (2021),
+https://arxiv.org/abs/2103.06275; Peter Thejll et al., *On the colour of the dark
+side of the Moon* (2014), https://arxiv.org/abs/1401.1994.
+The mean Earth/polar axis convention fixes the centre at longitude/latitude 0;
+NASA supplies north-first, zero-centred equirectangular data. Spherical ray
+intersection supplies the terminator, Lambert illumination supplies sunlight and
+the complementary Earth phase, and a modest blue earthlight tint follows Thejll's
+qualitative observation. This is a visual model, not a calibrated lunar BRDF or
+ephemeris: no libration, terrain relief, atmospheric extinction or eclipses.
+The caller supplies lunar direction and north in world coordinates. Orientation
+is independent of camera roll. No internet or global state is touched on import.
+
+Batch 232 fixture lifecycle follows W3C GPU for the Web Working Group,
+*WebGPU*, 2026-10-20 Candidate Recommendation Draft, sections 3.5.1-3.5.2,
+https://www.w3.org/TR/webgpu/: explicitly dispose devices/resources for predictable
+release, rather than relying on page navigation and garbage collection.
+The scenery fixture runner now disposes every engine in a finally block before
+navigation/close. fixture-lifecycle.test.js retains that ownership regression.

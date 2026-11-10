@@ -34,16 +34,24 @@ class Backdrop {
   private bind?: GPUBindGroup;
   private key = '';
   private code = '';
+  private resources?: GPUBindGroupEntry[];
 
   /** Writes `values` to `uniform` and draws the quad with `code` (entry points `vertex` and `fragment`). */
-  draw(c: Context, code: string, uniform: GPUBuffer, values: Float32Array<ArrayBuffer>): void {
+  draw(
+    c: Context,
+    code: string,
+    uniform: GPUBuffer,
+    values: Float32Array<ArrayBuffer>,
+    entries: GPUBindGroupEntry[],
+    blend: GPUBlendState,
+  ): void {
     const key = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil?.format;
     if (this.key !== key || this.code !== code) {
       const module = c.device.createShaderModule({ code });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: additive }] },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend }] },
         multisample: c.descriptor.multisample,
         depthStencil: {
           format: c.descriptor.depthStencil!.format,
@@ -55,9 +63,11 @@ class Backdrop {
       this.key = key;
       this.code = code;
     }
+    if (entries.length && entries !== this.resources) this.bind = undefined;
+    this.resources = entries;
     this.bind ??= c.device.createBindGroup({
       layout: this.pipeline!.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: uniform } }],
+      entries: [{ binding: 0, resource: { buffer: uniform } }, ...entries],
     });
     c.device.queue.writeBuffer(uniform, 0, values);
     this.presentation.colorAttachments[0].view = c.color;
@@ -73,6 +83,7 @@ class Backdrop {
   /** Forgets the pipeline and bind group (after the device is lost or the uniform buffer is replaced). */
   release(): void {
     this.pipeline = this.bind = undefined;
+    this.resources = undefined;
     this.key = this.code = '';
   }
 }
@@ -96,7 +107,13 @@ export abstract class SkyLayer implements EnginePlugin {
     private readonly order: number,
     protected readonly values: Float32Array<ArrayBuffer>,
     private readonly code: string,
+    private readonly blend: GPUBlendState = additive,
   ) {}
+
+  /** Optional sampled resources supplied by a textured layer. */
+  protected bindings(_c: Context): GPUBindGroupEntry[] {
+    return [];
+  }
 
   /** Fills this frame's uniform values; false draws nothing. */
   protected abstract frame(c: Context): boolean;
@@ -135,7 +152,7 @@ export abstract class SkyLayer implements EnginePlugin {
     v.set(this.inverse, 0);
     v[v.length - 2] = 2 / width;
     v[v.length - 1] = 2 / tall;
-    this.backdrop.draw(c, this.code, this.uniform!, v);
+    this.backdrop.draw(c, this.code, this.uniform!, v, this.bindings(c), this.blend);
   }
 
   private release(): void {

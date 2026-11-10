@@ -2966,6 +2966,10 @@
       "types": "./dist/scenery/aurora.d.ts",
       "import": "./dist/scenery/aurora.js"
     },
+    "./scenery/moon": {
+      "types": "./dist/scenery/moon.d.ts",
+      "import": "./dist/scenery/moon.js"
+    },
     "./sciviz": {
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"

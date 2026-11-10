@@ -2213,6 +2213,14 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 232 lunar GPU maths: `scenery/moon` uses ray/sphere intersection at the far
+plane with read-only reversed-Z depth, sRGB texture decoding, world-space lunar
+north and a Lambert terminator plus complementary Earth phase. CPU and GPU
+regressions cover lifecycle, orientation, phases and occlusion at 1x/4x sampling.
+It uses the same optional backdrop on native WebGPU and full WebGL2 compatibility;
+core and stage are unchanged. It makes no calibrated lunar photometry claim.
+
+
 Batch 209 GIF: shared exporter palette/codec CPU correctness includes LZW dictionary growth, transparent frames, async cancellation and centisecond rounding. gif-gpu.mjs renders through native WebGPU and full WebGL2 compatibility and independently decodes every frame; three-frame fixture error is zero. Existing exporter capture-browser checks pass on both paths. This changes no render math or core/stage code.
 
 Batch 207 meshopt: section-exact round trips cover seven file variants, plus bounded corrupt-stream and expansion-bomb rejection. Both backends compare all pixels of original and compressed static/animated draws. Existing codecs and GPU layouts are unchanged; no throughput/latency proof is claimed during the speed deferral.

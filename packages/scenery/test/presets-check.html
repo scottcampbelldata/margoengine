@@ -38,7 +38,7 @@ async function look(sky){
  sky.options.sunDirection=d;
  return {ground:g,sky:s,wall:w};
 }
-window.check={samples:sceneSamples,
+window.check={dispose:()=>engine.dispose(),samples:sceneSamples,
  async run(changes={}){
   device.pushErrorScope('validation');const out={};
   for(const name of dayPresetNames){

@@ -3170,3 +3170,12 @@ After build: node --test --test-timeout=120000 packages/road/test/structures.tes
 Build packages, then run node --test --test-timeout=120000 packages/labels/tests/*.test.js. Run node scripts/gpu-lock.mjs run --owner=labels-gpu --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js. The labels-browser.json report contains three rendering paths, near/far pixel extents, 100,000 glyphs/one draw and coincident grid work counts. No timing assertions or benchmarks.
 
 API-index aggregate regression (batch 206): node --test --test-timeout=60000 tests/api-report-scope.test.js checks that all table rows, including margoengine, agree with the committed package/entry/export totals. npm run api:check validates the full compiled declarations and every row. A summary merge omitting the umbrella reports 97 packages and fails the regression; canonical generation reports 98 for this tree. This is a records-consistency check, not a compatibility certification.
+
+
+
+Scenery moon: build packages, then run
+`node --test --test-timeout=120000 packages/scenery/test/moon.test.js` and
+`node scripts/gpu-lock.mjs run --owner=moon-proof --max=4 --wait-max=60 -- node packages/scenery/test/moon-gpu.mjs`.
+Repeat the GPU command with `--compat` after `moon-gpu.mjs` for full WebGL2.
+The fixture checks 1x/4x MSAA, real map variation, synthetic north/east landmarks,
+full/quarter/new phases, earthshine, deterministic frames and mesh occlusion.

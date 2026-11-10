@@ -45,7 +45,7 @@ const expected=(x,y)=>{
  return out;
 };
 const aim=(elevation,fov)=>{engine.camera.fov=fov;engine.camera.target=[0,Math.sin(elevation*rad),-Math.cos(elevation*rad)];};
-window.check={samples:sceneSamples,
+window.check={dispose:()=>engine.dispose(),samples:sceneSamples,
  async run(){
   device.pushErrorScope('validation');
   const out={};

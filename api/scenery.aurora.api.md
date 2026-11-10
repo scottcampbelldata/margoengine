@@ -59,7 +59,8 @@ type Context = Extract<PassContext, {
 abstract class SkyLayer implements EnginePlugin {
     protected readonly values: Float32Array<ArrayBuffer>;
     abstract readonly name: string;
-    protected constructor(label: string, order: number, values: Float32Array<ArrayBuffer>, code: string);
+    protected constructor(label: string, order: number, values: Float32Array<ArrayBuffer>, code: string, blend?: GPUBlendState);
+    protected bindings(_c: Context): GPUBindGroupEntry[];
     protected abstract frame(c: Context): boolean;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

@@ -47,7 +47,7 @@ async function look(scene){
  const d=(a,c)=>a.reduce((s,x,i)=>s+Math.abs(x-c[i]),0);
  return {ground:g,block:b,clear,full,transmittance:d(b,full)/d(clear,full)};
 }
-window.check={samples:sceneSamples,
+window.check={dispose:()=>engine.dispose(),samples:sceneSamples,
  async run(){
   device.pushErrorScope('validation');const out={},before=plugins();
   for(const name of scenePresetNames){

@@ -523,3 +523,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/labels (batch 261 job 1): document optional GPU layer creation, collections, CSS sizing, grid priorities, atlas limits, cancellation and disposal; README examples deferred.
 - margoengine (batch 261 job 1): document labels/gpu alias; README examples deferred.
+
+
+
+- @margoengine/scenery (batch 232): document /moon, lunar map loading and AbortSignal, world north, phase-dependent earthshine, map replacement and disposal.

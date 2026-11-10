@@ -4499,3 +4499,9 @@ Batch 246 job 2 closes the importer gaps for skipped image layers, text and temp
 No open correctness defect identified in this entry. Browser evidence includes shader validation, 100k batching, constant pixel extents, culling and disposal on WebGPU, native WebGL2 and compatibility WebGL2. Incremental upload work is recorded privately for the finish phase.
 ### Batch 206 API summary repair
 The post-push full API check caught an incorrect merge of the generated summary: the aggregate omitted the unscoped margoengine row (97 instead of 98 packages) and retained upstream stale table cells. The initial corrected snapshot has 98 packages, 1073 entries and 9741 names; current totals are generated in api-surface.md. tests/api-report-scope.test.js now checks table totals including the umbrella; the existing full API check remains authoritative for each row. This is a fix forward for the generated index, with no runtime or API implementation change.
+
+
+Batch 232 moon: no open defect found in the new lunar layer. CPU regression covers
+texture replacement/restoration/disposal, malformed inputs and aborted fetch;
+`packages/scenery/test/moon-gpu.mjs` proves phase, earthshine, map orientation and
+depth masking. The visual approximations are listed in docs/limits.md.

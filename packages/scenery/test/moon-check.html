@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Textured Moon GPU proof</title><style>canvas{width:128px;height:128px}</style></head><body><canvas width="128" height="128"></canvas><script type="module">
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Moon,loadMoonAlbedo} from '/packages/scenery/dist/moon.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,0],target:[0,0,-1],fov:40,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();engine.scene.background='#000000';device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const albedo=await loadMoonAlbedo('/packages/scenery/test/assets/lunar-albedo.jpg');
+const moon=Moon.attach(engine,{albedo,angularRadius:12,sunDirection:[0,0,1],earthshine:0});
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function frame(){
+ engine.render({delta:0});await device.queue.onSubmittedWorkDone();
+ const texture=post.sceneTexture,bytes=128*128*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));pass.dispatchWorkgroups(16,16);pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const at=(f,x,y,c=0)=>f[(y*128+x)*4+c],sum=f=>f.reduce((s,v,i)=>s+(i%4===3?0:v),0);
+window.check={samples:sceneSamples,async run(){
+ device.pushErrorScope('validation');await waitForPipelines(frame);
+ const full=await frame(),again=await frame();
+ moon.options.sunDirection=[1,0,0];const quarter=await frame();
+ moon.options.sunDirection=[0,0,-1];const dark=await frame();moon.options.earthshine=0.04;const earth=await frame();
+ // Synthetic landmarks verify north/east orientation independently of NASA's map content.
+ const data=new Uint8Array(64*32*4);for(let y=0;y<32;y++)for(let x=0;x<64;x++){const p=(y*64+x)*4;data[p]=x<32?255:0;data[p+1]=y<16?255:0;data[p+2]=64;data[p+3]=255;}
+ moon.options.albedo={width:64,height:32,data};moon.options.sunDirection=[0,0,1];moon.options.earthshine=0;
+ const orient=await frame();
+ moon.options.north=[0,-1,0];const rotated=await frame();
+ moon.options.north=[0,1,0];moon.options.albedo=albedo;
+ const mesh=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:'#000000',roughness:1})).setPosition([0,0,-3]);await waitForPipelines(frame);const hidden=await frame();moon.options.intensity=0;const hiddenOff=await frame();mesh.dispose();
+ const out={full:sum(full),quarter:sum(quarter),dark:sum(dark),earth:sum(earth),same:Math.max(...full.map((v,i)=>Math.abs(v-again[i]))),textureRange:[at(full,55,60),at(full,75,60)],orientation:{west:at(orient,50,64),east:at(orient,78,64),north:at(orient,64,50,1),south:at(orient,64,78,1),rotatedEast:at(rotated,78,64),rotatedSouth:at(rotated,64,78,1)},hidden:at(hidden,64,64)-at(hiddenOff,64,64),outside:at(full,0,0),errors,error:(await device.popErrorScope())?.message??null};
+ moon.dispose();engine.dispose();return out;
+}};window.ready=true;
+</script></body></html>

@@ -152,7 +152,11 @@ try {
       await page.goto(`${origin}/packages/scenery/test/${name}-check.html${samples === 1 ? '?samples=1' : ''}`);
       await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
       assert.equal(await page.evaluate(() => window.check.samples()), samples);
-      report.results[`${name} ${samples}x`] = await checks[name](page, samples);
+      try {
+        report.results[`${name} ${samples}x`] = await checks[name](page, samples);
+      } finally {
+        await page.evaluate(() => window.check.dispose());
+      }
     }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

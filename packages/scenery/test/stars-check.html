@@ -47,7 +47,7 @@ const expected=(x,y)=>{
  return 200*10**(-0.4*20.5)/(Math.PI/648000)**2*omega*milkyWayBrightness(l,b)*(3-0.16*warm);
 };
 const aim=(d,fov)=>{engine.camera.fov=fov;engine.camera.target=d;};
-window.check={samples:sceneSamples,
+window.check={dispose:()=>engine.dispose(),samples:sceneSamples,
  async run(){
   device.pushErrorScope('validation');
   const out={};

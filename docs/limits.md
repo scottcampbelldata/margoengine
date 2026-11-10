@@ -4822,3 +4822,25 @@ road/structures generates closed bridge decks, terrain-founded paired piers, dou
 Optional labels/gpu: one overlay draw for all visible SDF/color glyphs; 80 B of instance data per glyph. Default 1024-square RGBA atlas pages, at most 32 pages, also bounded by device texture and buffer limits. Full pages reject explicitly. Distance-independent CSS sizing, priority grid decluttering, viewport/scissor and restoration work on WebGPU, native WebGL2 and compatibility WebGL2. CPU packing/upload happens each frame; no terrain depth occlusion or speed claim. See [GPU labels](labels-gpu.md).
 
 Batch 261 job 1 entry size: labels/gpu 0 B (absent) -> 5778 B min+gzip, dependencies external. The new optional entry ceiling is 6034 B; one portable plugin retains both backend paths. Core plus stage is 24,209 B after the full package build.
+
+
+
+### Batch 232 textured moon
+
+`@margoengine/scenery/moon` requires a north-first, east-right, longitude-zero-centred
+RGBA8 sRGB equirectangular map. Default radius 0.2725 degrees; range (0, 30].
+Intensity 0 to 1000, default 1; full-Earth earthshine 0 to 1, default 0.001,
+scaled by Earth's complementary Lambert phase. Libration is deliberately zero.
+World direction defaults -Z, lunar north +Y, Sun +X; north must not parallel the
+Moon direction. Supply astronomical directions for a particular place/time.
+No elevation, eclipses, lunar BRDF calibration or atmospheric attenuation.
+Map bytes are retained for device restoration; replace the map object to upload
+changes. The map is owned by the caller; uploaded GPU textures are owned/disposed
+by the plugin. Native WebGPU and full WebGL2 compatibility are supported; the small
+preview refuses setup. The data download helper requires browser image APIs.
+
+Batch 232 entry sizes (min+gzip, bare dependencies external): new /moon 3,975 B
+(previously absent), /stars 4,744 B, /aurora 5,773 B. The new lunar ceiling is
+4,231 B including the standard 256 B headroom. One entry keeps loading, texture
+ownership, orientation and lighting together without another loading boundary.
+Core plus stage root is unchanged at 24,209 B.

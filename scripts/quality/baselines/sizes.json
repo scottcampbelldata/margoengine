@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13089875,
+  "total": 13094106,
   "history": [
     {
       "date": "2026-10-24",
@@ -6573,6 +6573,12 @@
       "commit": "batch-261",
       "reason": "New optional labels/gpu entry, absent (0 B) before, 5778 B gzip after; one instanced SDF/color batch, priority-grid layout and native WebGL2 support. Split backend entries would complicate one portable plugin and lose the single entry contract. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "81738add5",
+      "reason": "batch232-new-optional-textured-moon",
+      "grew": 1
     }
   ],
   "items": {
@@ -7773,6 +7779,7 @@
     "@margoengine/animator/layers": 10436,
     "@margoengine/road/structures": 3908,
     "@margoengine/labels/gpu": 6034,
-    "margoengine/labels/gpu": 6034
+    "margoengine/labels/gpu": 6034,
+    "@margoengine/scenery/moon": 4231
   }
 }

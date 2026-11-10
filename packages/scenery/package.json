@@ -26,7 +26,7 @@
   "scripts": {
     "test": "node --test ../../tests/deep-render-scenery.test.js test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/scenery/test/scenery-check.mjs"
+    "test:gpu": "cd ../.. && node packages/scenery/test/scenery-check.mjs && node packages/scenery/test/moon-gpu.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -53,6 +53,10 @@
     "./aurora": {
       "types": "./dist/aurora.d.ts",
       "import": "./dist/aurora.js"
+    },
+    "./moon": {
+      "types": "./dist/moon.d.ts",
+      "import": "./dist/moon.js"
     }
   },
   "files": [
