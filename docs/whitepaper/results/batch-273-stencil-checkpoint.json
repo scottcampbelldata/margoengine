@@ -116,5 +116,41 @@
   "openSuites": "23/26; 5, 6 and 10 closed after landing",
   "research": "docs/clean-room.md#batch-273-compatibility-failure-10-stencil-reference-repair",
   "sizeCeilings": "unchanged",
-  "speed": "No speed runs or claims"
+  "speed": "No speed runs or claims",
+  "integration": {
+    "base": "70f726965",
+    "build": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 14.4
+    },
+    "api": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 20.8
+    },
+    "apiCount": "901 entries / 8718 exports",
+    "size": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 1.7
+    },
+    "entryGzip": {
+      "index": 105186,
+      "device": 105232,
+      "xr": 105035,
+      "tiers": 104920
+    },
+    "affectedUnits": "712/713 passed; only stale generated llms-full.txt failed. Regenerated after combined build; all 9 guide tests pass. No assertion changed.",
+    "guide": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.8
+    },
+    "deviceGpu": "Queued; pending final acceptance"
+  }
 }

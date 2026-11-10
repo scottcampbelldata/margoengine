@@ -1,0 +1,543 @@
+{
+  "base": "2a74c14e3",
+  "scope": "Failure 9 remains open; state probe only",
+  "canonical": [
+    "4x live positive to zero restores every old-path pixel: max linear channel error 0.000244140625 > 0"
+  ],
+  "focused": "4x and 1x unchanged-zero and positive/reset sequences exact, but this omits prior full-grid state",
+  "diagnostic": [
+    {
+      "name": "live unchanged zero exact",
+      "samples": 4,
+      "max": 0,
+      "mean": 0,
+      "changed": 0,
+      "first": [],
+      "tolerance": 0
+    },
+    {
+      "name": "live 0 to positive updates the existing surface",
+      "samples": 4,
+      "max": 0.3115234375,
+      "mean": 0.06784371376037597,
+      "changed": 31993,
+      "first": [
+        {
+          "index": 0,
+          "a": 0.389404296875,
+          "b": 0.3525390625
+        },
+        {
+          "index": 2,
+          "a": 0.01300048828125,
+          "b": 0.01309967041015625
+        },
+        {
+          "index": 3,
+          "a": 0.40185546875,
+          "b": 0.380126953125
+        },
+        {
+          "index": 5,
+          "a": 0.01300048828125,
+          "b": 0.01372528076171875
+        },
+        {
+          "index": 6,
+          "a": 0.391357421875,
+          "b": 0.397705078125
+        },
+        {
+          "index": 8,
+          "a": 0.01387786865234375,
+          "b": 0.0175323486328125
+        },
+        {
+          "index": 9,
+          "a": 0.3662109375,
+          "b": 0.39794921875
+        },
+        {
+          "index": 11,
+          "a": 0.0178680419921875,
+          "b": 0.0263824462890625
+        },
+        {
+          "index": 12,
+          "a": 0.32763671875,
+          "b": 0.38037109375
+        },
+        {
+          "index": 14,
+          "a": 0.026336669921875,
+          "b": 0.042816162109375
+        },
+        {
+          "index": 15,
+          "a": 0.280029296875,
+          "b": 0.349853515625
+        },
+        {
+          "index": 17,
+          "a": 0.04150390625,
+          "b": 0.07012939453125
+        },
+        {
+          "index": 18,
+          "a": 0.226806640625,
+          "b": 0.306640625
+        },
+        {
+          "index": 20,
+          "a": 0.06768798828125,
+          "b": 0.108642578125
+        },
+        {
+          "index": 21,
+          "a": 0.1751708984375,
+          "b": 0.257080078125
+        },
+        {
+          "index": 23,
+          "a": 0.10479736328125,
+          "b": 0.1614990234375
+        },
+        {
+          "index": 24,
+          "a": 0.129150390625,
+          "b": 0.204833984375
+        },
+        {
+          "index": 26,
+          "a": 0.153564453125,
+          "b": 0.22412109375
+        },
+        {
+          "index": 27,
+          "a": 0.09088134765625,
+          "b": 0.1561279296875
+        },
+        {
+          "index": 29,
+          "a": 0.213623046875,
+          "b": 0.29150390625
+        },
+        {
+          "index": 30,
+          "a": 0.062164306640625,
+          "b": 0.11444091796875
+        },
+        {
+          "index": 32,
+          "a": 0.279541015625,
+          "b": 0.3564453125
+        },
+        {
+          "index": 33,
+          "a": 0.041259765625,
+          "b": 0.0799560546875
+        },
+        {
+          "index": 35,
+          "a": 0.34423828125,
+          "b": 0.411376953125
+        },
+        {
+          "index": 36,
+          "a": 0.0270233154296875,
+          "b": 0.054534912109375
+        },
+        {
+          "index": 38,
+          "a": 0.403564453125,
+          "b": 0.443603515625
+        },
+        {
+          "index": 39,
+          "a": 0.0188446044921875,
+          "b": 0.036376953125
+        },
+        {
+          "index": 41,
+          "a": 0.438720703125,
+          "b": 0.455078125
+        },
+        {
+          "index": 42,
+          "a": 0.01464080810546875,
+          "b": 0.0245361328125
+        },
+        {
+          "index": 44,
+          "a": 0.45361328125,
+          "b": 0.435791015625
+        }
+      ],
+      "minimum": 0.01
+    },
+    {
+      "name": "live positive to zero restores every old-path pixel",
+      "samples": 4,
+      "max": 0,
+      "mean": 0,
+      "changed": 0,
+      "first": [],
+      "tolerance": 0
+    },
+    {
+      "name": "live assignment matches constructor dispersion",
+      "samples": 4,
+      "max": 0.000244140625,
+      "mean": 1.3192494710286458e-8,
+      "changed": 7,
+      "first": [
+        {
+          "index": 1111,
+          "a": 0.304931640625,
+          "b": 0.3046875
+        },
+        {
+          "index": 1592,
+          "a": 0.0134735107421875,
+          "b": 0.01346588134765625
+        },
+        {
+          "index": 15391,
+          "a": 0.031524658203125,
+          "b": 0.031494140625
+        },
+        {
+          "index": 35999,
+          "a": 0.09722900390625,
+          "b": 0.0972900390625
+        },
+        {
+          "index": 38549,
+          "a": 0.0280914306640625,
+          "b": 0.028076171875
+        },
+        {
+          "index": 42047,
+          "a": 0.043212890625,
+          "b": 0.043182373046875
+        },
+        {
+          "index": 46006,
+          "a": 0.25439453125,
+          "b": 0.254638671875
+        }
+      ],
+      "tolerance": 0
+    },
+    {
+      "name": "live unchanged zero exact",
+      "samples": 1,
+      "max": 0,
+      "mean": 0,
+      "changed": 0,
+      "first": [],
+      "tolerance": 0
+    },
+    {
+      "name": "live 0 to positive updates the existing surface",
+      "samples": 1,
+      "max": 0.3115234375,
+      "mean": 0.06784370088577271,
+      "changed": 31990,
+      "first": [
+        {
+          "index": 0,
+          "a": 0.389404296875,
+          "b": 0.3525390625
+        },
+        {
+          "index": 2,
+          "a": 0.01300048828125,
+          "b": 0.01309967041015625
+        },
+        {
+          "index": 3,
+          "a": 0.40185546875,
+          "b": 0.380126953125
+        },
+        {
+          "index": 5,
+          "a": 0.01300048828125,
+          "b": 0.01372528076171875
+        },
+        {
+          "index": 6,
+          "a": 0.391357421875,
+          "b": 0.397705078125
+        },
+        {
+          "index": 8,
+          "a": 0.01387786865234375,
+          "b": 0.0175323486328125
+        },
+        {
+          "index": 9,
+          "a": 0.3662109375,
+          "b": 0.39794921875
+        },
+        {
+          "index": 11,
+          "a": 0.0178680419921875,
+          "b": 0.0263824462890625
+        },
+        {
+          "index": 12,
+          "a": 0.32763671875,
+          "b": 0.38037109375
+        },
+        {
+          "index": 14,
+          "a": 0.026336669921875,
+          "b": 0.042816162109375
+        },
+        {
+          "index": 15,
+          "a": 0.280029296875,
+          "b": 0.349853515625
+        },
+        {
+          "index": 17,
+          "a": 0.04150390625,
+          "b": 0.07012939453125
+        },
+        {
+          "index": 18,
+          "a": 0.226806640625,
+          "b": 0.306640625
+        },
+        {
+          "index": 20,
+          "a": 0.06768798828125,
+          "b": 0.108642578125
+        },
+        {
+          "index": 21,
+          "a": 0.1751708984375,
+          "b": 0.257080078125
+        },
+        {
+          "index": 23,
+          "a": 0.10479736328125,
+          "b": 0.1614990234375
+        },
+        {
+          "index": 24,
+          "a": 0.129150390625,
+          "b": 0.204833984375
+        },
+        {
+          "index": 26,
+          "a": 0.153564453125,
+          "b": 0.22412109375
+        },
+        {
+          "index": 27,
+          "a": 0.09088134765625,
+          "b": 0.1561279296875
+        },
+        {
+          "index": 29,
+          "a": 0.213623046875,
+          "b": 0.29150390625
+        },
+        {
+          "index": 30,
+          "a": 0.062164306640625,
+          "b": 0.11444091796875
+        },
+        {
+          "index": 32,
+          "a": 0.279541015625,
+          "b": 0.3564453125
+        },
+        {
+          "index": 33,
+          "a": 0.041259765625,
+          "b": 0.0799560546875
+        },
+        {
+          "index": 35,
+          "a": 0.34423828125,
+          "b": 0.411376953125
+        },
+        {
+          "index": 36,
+          "a": 0.0270233154296875,
+          "b": 0.054534912109375
+        },
+        {
+          "index": 38,
+          "a": 0.403564453125,
+          "b": 0.443603515625
+        },
+        {
+          "index": 39,
+          "a": 0.0188446044921875,
+          "b": 0.036376953125
+        },
+        {
+          "index": 41,
+          "a": 0.438720703125,
+          "b": 0.455078125
+        },
+        {
+          "index": 42,
+          "a": 0.01464080810546875,
+          "b": 0.0245361328125
+        },
+        {
+          "index": 44,
+          "a": 0.45361328125,
+          "b": 0.435791015625
+        }
+      ],
+      "minimum": 0.01
+    },
+    {
+      "name": "live positive to zero restores every old-path pixel",
+      "samples": 1,
+      "max": 0,
+      "mean": 0,
+      "changed": 0,
+      "first": [],
+      "tolerance": 0
+    },
+    {
+      "name": "live assignment matches constructor dispersion",
+      "samples": 1,
+      "max": 0,
+      "mean": 0,
+      "changed": 0,
+      "first": [],
+      "tolerance": 0
+    }
+  ],
+  "writes": [
+    {
+      "label": "live-zero",
+      "writes": [
+        {
+          "offset": 0,
+          "length": 320
+        },
+        {
+          "offset": 0,
+          "length": 320
+        },
+        {
+          "offset": 0,
+          "length": 128
+        },
+        {
+          "offset": 64,
+          "length": 2164
+        },
+        {
+          "offset": 0,
+          "length": 16
+        },
+        {
+          "offset": 1088,
+          "length": 796
+        },
+        {
+          "offset": 0,
+          "length": 64
+        }
+      ]
+    },
+    {
+      "label": "live-unchanged-zero",
+      "writes": [
+        {
+          "offset": 0,
+          "length": 128
+        },
+        {
+          "offset": 0,
+          "length": 64
+        }
+      ]
+    },
+    {
+      "label": "live-positive",
+      "writes": [
+        {
+          "offset": 0,
+          "length": 128
+        },
+        {
+          "offset": 1436,
+          "length": 4,
+          "float": 8
+        },
+        {
+          "offset": 0,
+          "length": 64
+        }
+      ]
+    },
+    {
+      "label": "live-zero-again",
+      "writes": [
+        {
+          "offset": 0,
+          "length": 128
+        },
+        {
+          "offset": 1436,
+          "length": 4,
+          "float": 0
+        },
+        {
+          "offset": 0,
+          "length": 64
+        }
+      ]
+    },
+    {
+      "label": "live-constructor-reference",
+      "writes": [
+        {
+          "offset": 0,
+          "length": 320
+        },
+        {
+          "offset": 0,
+          "length": 320
+        },
+        {
+          "offset": 0,
+          "length": 128
+        },
+        {
+          "offset": 64,
+          "length": 2164
+        },
+        {
+          "offset": 0,
+          "length": 16
+        },
+        {
+          "offset": 1088,
+          "length": 796
+        },
+        {
+          "offset": 0,
+          "length": 64
+        }
+      ]
+    }
+  ],
+  "observation": "Inserting an unchanged-zero frame moves the sole 4x mismatch from reset (10 HDR channels) to live-versus-constructor (7 channels), max 0.000244140625. Actual COPY_WRITE_BUFFER writes include dispersion 8 then 0 at byte 1436. No uniform replay or driver cause established; no tolerance or shader changes.",
+  "research": [
+    "Khronos KHR_materials_dispersion 2024 https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_dispersion/README.md",
+    "Bruce Walter, Stephen R. Marschner, Hongsong Li, Kenneth E. Torrance, Microfacet Models for Refraction through Rough Surfaces, 2007, https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf",
+    "Jon Leech (editor), Khronos OpenGL ES 3.2, 2022, https://registry.khronos.org/OpenGL/specs/es/3.2/es_spec_3.2.pdf"
+  ]
+}

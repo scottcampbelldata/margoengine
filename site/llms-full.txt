@@ -6235,6 +6235,13 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   cause is not isolated between uniform replay and multisample rendering;
   neither a driver cause nor acceptable numerical drift is proven. Failure 9
   stays open; no tolerance, shader math, sample grid or resource work is changed.
+  The current full grid reproduces the same failure after the stencil repair.
+  A focused zero/unchanged/positive/reset sequence is exact. In the complete
+  grid, inserting an unchanged-zero frame makes reset exact but moves the sole
+  4x failure to live-versus-constructor (7 HDR channels, same maximum error).
+  Recorded COPY_WRITE_BUFFER writes include dispersion 8 then 0 at byte 1436;
+  these input bytes do not prove actual uniform binding/readback correctness.
+  Receipt: whitepaper/results/batch-273-dispersion-state-checkpoint.json.
 - `materials/test:gpu:render-state`: failure 10 repaired in the optional device.
   The earlier signed polygon-offset clamp repair is retained. Dynamic stencil
   references now use the target's low eight bits before GL's signed clamp;

@@ -5170,3 +5170,12 @@ hygiene, all 160 compat units, 199 materials units, both full 616-check GPU grid
 and 14 executable README examples pass. Historical failed README setup and
 negative regression receipts remain retained. Core/stage is 23,950 B after the
 upstream unit-light repair; no core/stage runtime edit belongs to this fix.
+
+The latest-main stencil integration rebuilds on 70f726965 (optional Draco and
+the package-owned textured-light writer), preserving both shared-doc additions.
+API matches 901 entries/8718 exports; core/stage remains 23950 B. The combined
+713-test affected run passes 712 and finds only a stale generated llms-full.txt.
+Regenerating after the combined build passes all nine guide checks. Optional
+entry sizes are unchanged from the stencil measurement. The original full
+verify passed 14170/14170; it was invoked once, not replayed after this rebase.
+Final compat device GPU acceptance is retained in the stencil receipt.

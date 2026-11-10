@@ -4232,6 +4232,25 @@ orchestration: JSON.stringify traverses device.queue.device before any caller
 comparison can finish. Receipt: test-results/batch-273-dispersion-before.log.
 This is a fixture failure, not evidence of a rendering mismatch.
 
+### Batch 273 dispersion state probe continuation
+
+Before probing, compared Khronos Group, KHR_materials_dispersion (2024),
+https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_dispersion/README.md
+(zero strength and RGB IOR spread); Bruce Walter, Stephen R. Marschner,
+Hongsong Li and Kenneth E. Torrance, Microfacet Models for Refraction through
+Rough Surfaces (2007), https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
+(refraction and the roughness distribution); and Jon Leech (editor), Khronos
+OpenGL ES 3.2 (2022), https://registry.khronos.org/OpenGL/specs/es/3.2/es_spec_3.2.pdf
+(buffer updates and multisample resolve). The physical refraction model gives
+no reason for a zero reset to differ from the same material at zero. Queue
+write inputs alone cannot prove draw binding state. Preserve exact HDR bounds
+and compare unchanged frames as well as value changes. The complete canonical
+grid reproduces the 4x failure; a full diagnostic grid with one extra unchanged
+frame moves the mismatch to live-versus-constructor instead. Recorded writes
+include strength 8 then 0 at byte 1436. No runtime repair or cause attribution
+is claimed; see the dispersion-state-checkpoint.json receipt. No companion
+code or rival implementation was read.
+
 ### Batch 273 compatibility failure 10: stencil reference repair
 
 Compared W3C GPU for the Web Working Group, WebGPU (2026),
