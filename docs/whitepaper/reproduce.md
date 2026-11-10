@@ -2917,3 +2917,5 @@ Batch 230 tree meshing: build packages, then `node --test packages/procedural/te
 
 ### Batch 258 preview GL world panels
 After build:packages run node --test --test-timeout=120000 packages/ui/tests/world-gl.test.js. Under a shared GPU slot run node packages/ui/tests/world-gl-browser.mjs, then the same command with --compat. Each invocation runs preview GL and the native WebGPU API path; the preview adds the foreign-state probe. The driver also sends real canvas clicks through the camera ray. Existing world tests stay unchanged. No benchmark is involved.
+### Batch 226 graph
+Build packages, then run node --test --test-timeout=120000 packages/scene/tests/graph.test.js. Rendering: node scripts/gpu-lock.mjs run --owner=scene-graph --max=4 --wait-max=60 -- node packages/scene/tests/graph-browser.mjs; repeat with --compat appended. Results go to test-results/batch226/graph-*.json. No benchmark or README execution.

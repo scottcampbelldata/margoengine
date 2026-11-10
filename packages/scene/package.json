@@ -27,7 +27,8 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js scene",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "node tests/graph-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -42,6 +43,10 @@
     "./mesh": {
       "types": "./dist/mesh.d.ts",
       "import": "./dist/mesh.js"
+    },
+    "./graph": {
+      "types": "./dist/graph.d.ts",
+      "import": "./dist/graph.js"
     }
   },
   "files": [

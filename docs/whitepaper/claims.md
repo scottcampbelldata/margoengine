@@ -3419,3 +3419,5 @@ Claim: /trees skeletons can become complete seeded bark/foliage meshes without i
 
 ### Preview GL world UI (batch 258 job 4)
 Optional ui/world-gl adds actual world-panel drawing on preview WebGL2 while preserving the existing native WebGPU renderer and public panel identity. world-gl.test.js verifies API/lifecycle reuse; world-gl-browser.mjs checks pixels, depth, double-sided rendering, cache reuse, resource rebuilding, mouse rays and exact foreign GL state restoration. Both standard and --compat invocations pass. No claim of hardware XR certification or timing parity is made.
+### Batch 226 job 1: hierarchy operations
+The optional scene/graph entry supplies the complete requested search, attach, point conversion, axis and traversal row. Evidence: packages/scene/tests/graph.test.js independent affine/kernel oracles, exact all-pixel equality before/after attach in graph-browser.mjs on native WebGPU and WebGL2 compatibility. No speed claim or arbitrary-shear TRS claim.

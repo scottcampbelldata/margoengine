@@ -2766,6 +2766,10 @@
       "types": "./dist/scene/mesh.d.ts",
       "import": "./dist/scene/mesh.js"
     },
+    "./scene/graph": {
+      "types": "./dist/scene/graph.d.ts",
+      "import": "./dist/scene/graph.js"
+    },
     "./scenery": {
       "types": "./dist/scenery.d.ts",
       "import": "./dist/scenery.js"

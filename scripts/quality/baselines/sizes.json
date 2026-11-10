@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12606720,
+  "total": 12609288,
   "history": [
     {
       "date": "2026-10-24",
@@ -6226,6 +6226,12 @@
       "commit": "0d80e463b",
       "reason": "Optional ui/world-gl 0 to 7300 B gzip, ceiling 7556 B; recorded UI root 32141 to 32387 B including inherited dependency growth. Framebuffer UI and depth-tested mipmapped panels reuse existing panel identity and GPU rendering; a split would duplicate ownership/state handling. Current inherited core+stage measures 24209 B, no core/stage source changes.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-226",
+      "reason": "Batch 226 graph: new optional entries {\"@margoengine/scene/graph\":1998,\"margoengine/scene/graph\":58} B gzip, each ceiling measured +256 B. Complete atomic TRS attach, hierarchy search and axis operations justify bytes; splitting would duplicate validation and affine ownership. Core plus stage remains 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7349,6 +7355,8 @@
     "@margoengine/math/curve": 2659,
     "@margoengine/procedural/tree-mesh": 4676,
     "@margoengine/ui/world-gl": 7556,
-    "leak @margoengine/ui/world-gl -> @margoengine/text": 1
+    "leak @margoengine/ui/world-gl -> @margoengine/text": 1,
+    "@margoengine/scene/graph": 2254,
+    "margoengine/scene/graph": 314
   }
 }

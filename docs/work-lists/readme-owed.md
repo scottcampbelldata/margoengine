@@ -328,3 +328,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/ui | world-gl entry, backend fallback setup, WorldPanels alias, inherited options/rays, resource lifetime and preview differences. | batch-258 job 4 |
 | margoengine | ui/world-gl alias and world-panel setup. | batch-258 job 4 |
+- @margoengine/scene (batch 226 graph): document /graph search, atomic attach and shear limits, coordinate outputs, axis units and traversal, with examples in the README phase.
+- margoengine (batch 226 graph): document generated scene/graph alias in the README phase.

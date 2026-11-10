@@ -4388,3 +4388,5 @@ Separate preview screen-UI follow-up: bind a PIXEL_UNPACK_BUFFER or non-default 
 Batch 258 landing: existing image GPU fixture sampled two frames before the documented lazy preview painter finished loading. It now waits for the first submitted UI draw before exact pixel/cache assertions.
 
 Batch 258 generated-page landing blocker: newly inherited MCP live-relay literals were absent from the shared error catalog. The catalog now names all 15 existing messages; the existing errors-page literal-coverage regression proves the repair, with no MCP runtime change.
+### Batch 226 graph
+No open defect found in the requested row. Unrepresentable local shear is an explicit documented TRS limit and rejects before mutation.
