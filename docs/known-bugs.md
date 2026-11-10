@@ -5510,15 +5510,17 @@ kept cluster its place) and `copy`; the kept clusters sit in cluster order every
 assertion in meshlets-check.mjs (each step redraws and compares A with its last frame to the byte; 21 pixels on the old
 kernel) and "the cluster cull keeps clusters in cluster order" in packages/culling/test/meshlets.test.js.
 
-Open, Scott's call (M6, 4x MSAA): meshlets-check still fails at step 0 against core, 69 pixels off by 1 level, all on
+Closed, Scott approved (2026-11-10, comparing without MSAA): meshlets-check failed at step 0 against core, 69 pixels off by 1 level, all on
 the ball's silhouette, now the same count every run. It is not the cull: on the M6 core's own MSAA frame changes with the
 primitive stream. A probe page drew the ball with core twice: the same 36,864 triangles in cluster order instead of index
 order differed by 75 pixels; only the cone-kept 25,447 triangles in index order (every dropped one back facing by at
 least 4.5 degrees, checked in double precision) differed by 14; with `exactSize` (no MSAA) all three cases are 0. So no
 cluster cull can match core to the byte under MSAA on this GPU (the scatter entry above saw the same M6 MSAA order
-dependence). The check's 0-pixel requirement was not relaxed; options are comparing without MSAA, or keeping the input
-triangle order and accepting the remaining 14 pixels. On `MARGO_COMPAT=1` the check also fails at step 0 ("clusters drop
-triangles (0)"): the WebGL2 layer draws the whole mesh by design, and the check has no compat branch. The `parts-check.mjs`
+dependence). Now A and B are made with `exactSize` (no MSAA) and match core at 0 pixels on every step; the 0-pixel
+requirement is unchanged. The frame-repeat check still runs under MSAA: a third engine R is A with the default 4x MSAA,
+and each step redraws and compares both A and R to the byte. On `MARGO_COMPAT=1` the check failed at step 0 ("clusters
+drop triangles (0)"): the WebGL2 layer draws the whole mesh by design. It now has a compat branch: the frame must still
+match core and repeat, and "clusters drop triangles" is skipped with a printed note. Both runs pass on the M6. The `parts-check.mjs`
 shadows step 2 1-pixel failure is the open entry above (CulledParts back-culled pipeline under shadows, Scott's call); it
 stops `test:gpu` before the later scripts, which pass when run one by one.
 

@@ -1,5 +1,7 @@
 // Browser side of meshlets-check.mjs: one bumpy ball as a MeshletMesh (A) and as a core mesh (B). Their frames must match, and
-// the clusters must drop triangles that face away or leave the view.
+// the clusters must drop triangles that face away or leave the view. A and B draw without MSAA (`exactSize`): on the M6
+// core's own 4x MSAA frame changes with the primitive stream (see meshlets-check.mjs). R is A again with MSAA, drawn only
+// so the frame-repeat check still sees every MSAA edge.
 import { box, Engine, Geometry, PbrMaterial } from '../../../core/dist/index.js';
 import { MeshletMesh } from '../../dist/meshlets.js';
 import { Shadows } from '../../../shadows/dist/index.js';
@@ -30,13 +32,21 @@ function ball() {
     }
   return new Geometry(positions, normals, indices);
 }
-let a, b, mesh, core, geometry;
+let a, b, r, mesh, again, core, geometry;
+// A and B single-sampled at the canvas's CSS size (the page runs at device pixel ratio 1); R keeps the default MSAA.
+const exact = { camera, exactSize: [480, 320] },
+  create = async () => {
+    a = await Engine.create(document.getElementById('a'), exact);
+    b = await Engine.create(document.getElementById('b'), exact);
+    r = await Engine.create(document.getElementById('r'), { camera });
+    for (const e of [a, b, r]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
+  };
 const draw = async () => {
-  for (const e of [a, b]) e.render({ culling: false });
-  await Promise.all([a, b].map((e) => e.gpu.queue.onSubmittedWorkDone()));
+  for (const e of [a, b, r]) e.render({ culling: false });
+  await Promise.all([a, b, r].map((e) => e.gpu.queue.onSubmittedWorkDone()));
 };
 const look = (position, target = [0, 0, 0]) => {
-  for (const e of [a, b]) {
+  for (const e of [a, b, r]) {
     e.camera.position = position;
     e.camera.target = target;
   }
@@ -46,16 +56,16 @@ const place = (m) => {
   core.setScale([m[0], m[5], m[10]]);
   b.render({ culling: false });
   mesh.setTransform(0, 0, core.matrix);
+  again.setTransform(0, 0, core.matrix);
 };
 async function setup() {
-  a = await Engine.create(document.getElementById('a'), { camera });
-  b = await Engine.create(document.getElementById('b'), { camera });
-  for (const e of [a, b]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
+  await create();
   geometry = ball();
   const material = new PbrMaterial({ color: '#58a860', roughness: 0.5, doubleSided: false });
   core = b.createMesh().setGeometry(geometry).setMaterial(material);
   b.render({ culling: false });
   mesh = MeshletMesh.attach(a, [{ geometry, material, transforms: new Float32Array(core.matrix) }]);
+  again = MeshletMesh.attach(r, [{ geometry, material, transforms: new Float32Array(core.matrix) }]);
 }
 const steps = [
   ['whole ball: the far side drops', () => {}],
@@ -74,8 +84,8 @@ async function step(i) {
 // Three balls as parts of one MeshletMesh, one of them mirrored, against three core meshes.
 const spot = (x, z, flip = 1) => [flip, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, z, 1];
 const fresh = async () => {
-  for (const e of [a, b]) e.dispose();
-  for (const id of ['a', 'b']) {
+  for (const e of [a, b, r]) e.dispose();
+  for (const id of ['a', 'b', 'r']) {
     const old = document.getElementById(id),
       next = document.createElement('canvas');
     next.id = id;
@@ -83,9 +93,7 @@ const fresh = async () => {
     next.height = old.height;
     old.replaceWith(next);
   }
-  a = await Engine.create(document.getElementById('a'), { camera });
-  b = await Engine.create(document.getElementById('b'), { camera });
-  for (const e of [a, b]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
+  await create();
 };
 async function instances() {
   await fresh();
@@ -93,6 +101,7 @@ async function instances() {
     places = [spot(-4, 0), spot(0, -2), spot(4, 0)],
     transforms = new Float32Array(places.flat());
   mesh = MeshletMesh.attach(a, [{ geometry, material, transforms }]);
+  again = MeshletMesh.attach(r, [{ geometry, material, transforms }]);
   for (const m of places) b.createMesh().setGeometry(geometry).setMaterial(material).setPosition([m[12], m[13], m[14]]);
   look([0, 2, 11]);
   await draw();
@@ -119,6 +128,8 @@ async function occlusion() {
     first = wall(a);
   b.createMesh().setGeometry(geometry).setMaterial(material);
   wall(b);
+  again = MeshletMesh.attach(r, [{ geometry, material, transforms }], { culling: 'occlusion' });
+  again.addOccluder(wall(r));
   look([0, 0, 7]);
   await draw();
   await draw();
@@ -145,12 +156,15 @@ async function shadowed() {
     near = spot(0, 0),
     far = spot(30, 0);
   mesh = MeshletMesh.attach(a, [{ geometry, material, transforms: new Float32Array([...near, ...far]) }]);
+  again = MeshletMesh.attach(r, [{ geometry, material, transforms: new Float32Array([...near, ...far]) }]);
   const ball = b.createMesh().setGeometry(geometry).setMaterial(material),
     other = b.createMesh().setGeometry(geometry).setMaterial(material).setPosition([30, 0, 0]);
   floor(a);
   floor(b);
+  floor(r);
   const sa = Shadows.attach(a, { resolution: 1024, filter: 'hard', distance: 20, cascades: 1 }),
     sb = Shadows.attach(b, { resolution: 1024, filter: 'hard', distance: 20, cascades: 1 });
+  Shadows.attach(r, { resolution: 1024, filter: 'hard', distance: 20, cascades: 1 }).add(again);
   sa.add(mesh);
   sb.add(ball);
   sb.add(other);

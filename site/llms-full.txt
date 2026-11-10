@@ -9456,11 +9456,21 @@ The optional environment/prefiltered encoder refuses KTX2 key/value data above 4
 
 The optional cache/eviction index coalesces removals in the same object-store transaction: each key is counted once, and byte/file totals are read and written once for the batch. AssetCache.delete(url) removes all Vary representations and associated records while preserving unrelated entries and exact usage. Repeated deletion does not subtract absent entries. Public interfaces and cache schema/version are unchanged. Evidence: packages/cache/test/eviction.test.js and the real IndexedDB evictionVariants browser case.
 
+Live volume materials (review5, 2026-11-10): attenuation edits invalidate parsed optical-depth caches per channel; replacing the array invalidates all channels. Equal numeric assignments are not observable, so replacing an underflowed zero with explicit opacity requires array replacement or explicit infinite optical depth. Pointer animation retains authored logarithmic precision. Exact slab evidence and the unchanged mesh-slab/range limitations are documented in live-volume-materials.md.
+
+### Range-cache response transit age (2026-11-10)
+
+RangeCache includes elapsed request time together with the Age header when calculating the freshness deadline after a miss or a 304 response. For max-age=10, Age=3 and a four-second request, three seconds of freshness remain when the response arrives; Age=8 with the same transit is already expired. The controlled-clock regression checks the next cache session revalidates in both cases. Existing once-per-instance checking and offline fallback policies are unchanged; this is clock correctness, not a speed result. No public API or schema change.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
 
+Lane B controls README (2026-11-10): strict TypeScript rejects a Spline passed directly as PathControls ControlPath because packages/splines/src/index.ts annotates at/tangent/atDistance as typeof output; declaration emission makes the defaulted output parameter optional, so the public return type includes undefined although every call returns an array. Repro: new PathControls(engine, new Spline([[0,0,0],[1,1,1]])) with strict checking of built declarations. The README uses explicit caller-owned output buffers through a ControlPath adapter; repair the owning splines return declarations with a consumer type regression in the fix phase.
+
 Lane B README runtime gate (2026-11-10): concurrent check:readme-run commands in distinct worktrees serialize as one lane because scripts/run-readme-examples.mjs passes the constant owner check-readme-run and scripts/support/gpu-admission.mjs sameLane compares owner-derived lane names across worktrees. Repro: start the full local CI README runner, then a narrowed runner elsewhere while another GPU slot is free. Run a narrowed command under scripts/gpu-lock.mjs run --owner=lane-B-readme so nested locking retains a real lane identity; fix the runner owner at its owning lane in the fix phase.
+
+Review 5 outside-scope finding (2026-11-10): start a glTF material at KHR_materials_transmission.transmissionFactor 0 and animate that factor to 1 with KHR_animation_pointer. Parsing reserves tint/attenuation only for an initially positive factor, and pointer tint() skips a material without tint, so the zero-to-transmitting transition has no native transmission tint. Cause: load-time transmission resource/derived-state reservation. Build-phase rules defer this separate transition gap to the fix phase.
 
 Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/check-example-types.test.js` fails its cameras-scoped expectation because cameras now reaches 14 packages, above the unchanged 12-package full-run threshold; the planner correctly selects all projects but the fixture expects a named subset. Outside the API-record classification job; reconcile the fixture in the fix phase without weakening closure coverage.
 
@@ -14896,7 +14906,7 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
   the stored copy answers.
 - Stale copies are served on any non-200 answer and on a timeout, also for `no-cache` and `must-revalidate` files
   (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play, but not in limits.md.
-- RangeCache freshness ignores the request's round trip (`freshUntil(headers, now)` without `sent`).
+- Fixed, lane S (2026-11-10): RangeCache captures request start time for a miss and a 304 revalidation and passes it to the existing RFC 9111 freshness calculation. Age plus transit now consumes the correct lifetime. Two controlled-clock regressions in packages/cache/test/freshness.test.js fail on the parent and cover both partly consumed and entirely expired responses without real waits or speed assertions.
 - Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
   duplicated; decoded.ts uses `max-age=3153600000`, past the 2^31 cap of RFC 9111 1.2.2; Vary name records are never
   evicted; 27 throws carry no help link.
@@ -14966,15 +14976,17 @@ kept cluster its place) and `copy`; the kept clusters sit in cluster order every
 assertion in meshlets-check.mjs (each step redraws and compares A with its last frame to the byte; 21 pixels on the old
 kernel) and "the cluster cull keeps clusters in cluster order" in packages/culling/test/meshlets.test.js.
 
-Open, Scott's call (M6, 4x MSAA): meshlets-check still fails at step 0 against core, 69 pixels off by 1 level, all on
+Closed, Scott approved (2026-11-10, comparing without MSAA): meshlets-check failed at step 0 against core, 69 pixels off by 1 level, all on
 the ball's silhouette, now the same count every run. It is not the cull: on the M6 core's own MSAA frame changes with the
 primitive stream. A probe page drew the ball with core twice: the same 36,864 triangles in cluster order instead of index
 order differed by 75 pixels; only the cone-kept 25,447 triangles in index order (every dropped one back facing by at
 least 4.5 degrees, checked in double precision) differed by 14; with `exactSize` (no MSAA) all three cases are 0. So no
 cluster cull can match core to the byte under MSAA on this GPU (the scatter entry above saw the same M6 MSAA order
-dependence). The check's 0-pixel requirement was not relaxed; options are comparing without MSAA, or keeping the input
-triangle order and accepting the remaining 14 pixels. On `MARGO_COMPAT=1` the check also fails at step 0 ("clusters drop
-triangles (0)"): the WebGL2 layer draws the whole mesh by design, and the check has no compat branch. The `parts-check.mjs`
+dependence). Now A and B are made with `exactSize` (no MSAA) and match core at 0 pixels on every step; the 0-pixel
+requirement is unchanged. The frame-repeat check still runs under MSAA: a third engine R is A with the default 4x MSAA,
+and each step redraws and compares both A and R to the byte. On `MARGO_COMPAT=1` the check failed at step 0 ("clusters
+drop triangles (0)"): the WebGL2 layer draws the whole mesh by design. It now has a compat branch: the frame must still
+match core and repeat, and "clusters drop triangles" is skipped with a printed note. Both runs pass on the M6. The `parts-check.mjs`
 shadows step 2 1-pixel failure is the open entry above (CulledParts back-culled pipeline under shadows, Scott's call); it
 stops `test:gpu` before the later scripts, which pass when run one by one.
 
