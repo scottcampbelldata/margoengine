@@ -130,3 +130,49 @@ catcher pixels, atomic replacement/recovery, cancellation and device restore.
 No numerical rival image match or measured speed claim is made.
 
 Job 3 measured evidence: caustics 5447 B gzip, new ceiling 5703 B; core plus stage remains 24209 B. Both GPU backends: water-plane error 1.1102537200713414e-6, glass-slab error 3.41796862812771e-7, sphere peak 6.079856872558594, 1346 visible catcher pixels, zero retained/restored-map error. A live emission-height edit that intersects the product rejects before encoding, including float32 height rounding. No existing optional ceiling raised.
+
+## Curved backdrop and named photographic rigs
+
+`@margoengine/staging/backdrop` exports `Backdrop`, `backdropGeometry`,
+`stagingLights` and `stagingLighting`. The backdrop is a real core PBR mesh:
+a straight floor, a quarter-circle bend and a vertical wall with analytic
+smooth normals. Default width 8, depth 5, height 4, radius 1 and 32 bend
+segments; dimensions are .001..1e4, radius is positive below depth/height and
+segments is an integer 2..256. The inside faces +Y on the floor and +Z on the
+wall. Material defaults to matte grey #b8b8b8, roughness 1 and metalness 0;
+material options override these values. Transform or replace the material
+through backdrop.mesh. Dispose or using releases the mesh, and engine disposal
+owns it too. backdropGeometry is a standalone reusable Geometry builder.
+
+stagingLights returns fresh descriptors for portrait, rembrandt (default),
+upfront or soft, ready for environment/studio. Portrait has an elevated key,
+fill and rim. Rembrandt has a stronger high side key and much weaker opposite
+fill. Upfront is centred with symmetric side fills. Soft has larger angular
+sources and gentler key/fill ratios. These are original artistic presets for a
+subject facing a +Z camera, not copied numerical presets or a guarantee of a
+particular facial highlight on arbitrary geometry.
+
+stagingLighting lazily builds the existing procedural studio HDR and calls
+EnvironmentLighting.load. Image width defaults to 256; the remaining settings
+and AbortSignal are forwarded to the existing environment API. The returned
+lighting owns both lighting and environment; dispose it to replace a preset.
+Call lighting.add(model) for gltf-pro shading. Other preset descriptors can be
+edited before passing them to studio for custom rigs. No new lighting shader,
+core option, camera fitting or auto-centering policy is introduced.
+
+The finite backdrop has open sides/top and is Y-up in local coordinates;
+rotate the ordinary mesh to reorient it. Environment lighting is distant,
+without light-distance parallax, product self-shadowing or local softbox
+shadow maps. Existing contact/ambient receivers can be added separately. Core
+mesh rendering includes device restoration. Named studio lighting supports
+WebGPU and full compatibility; native preview follows environment's explicit
+unsupported refusal. The requested curved-backdrop and four-name rig row is
+covered, not all unrelated Stage camera/shadow conveniences.
+
+CPU proof checks the circular equation, tangent-end normals, unit normals,
+winding, bounded geometry counts, copied preset arrays and disposal. GPU proof
+renders the actual licensed textured FlightHelmet in all four rigs, compares
+visible differences, removes the backdrop to prove its pixels, replaces the
+actual device and requires identical output on both backends.
+
+Job 4 measured entry: backdrop 1332 B gzip, new ceiling 1588 B; core plus stage unchanged at 24209 B. On both GPU backends, all rigs differ visibly, backdrop removal changes 43965 pixel components and the restored image matches exactly. Positive bend radii that collapse adjacent rows in float32 reject with guidance instead of generating zero-area strips; the underflow regression is in backdrop.test.js.

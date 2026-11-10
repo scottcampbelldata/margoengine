@@ -3619,3 +3619,6 @@ Batch 191 job 6: node --test --test-timeout=120000 packages/post/test/curvature.
 
 ## Batch 178 vector publication
 After build:packages, run node --test --test-timeout=90000 packages/sciviz/tests/export-vector.test.js, then node scripts/gpu-lock.mjs run --owner=vector-publication --wait-max=60 --max=5 -- node packages/sciviz/tests/export-vector-browser.mjs. The latter runs native WebGPU and WebGL2 compatibility and records test-results/sciviz-export-vector.json. Open examples/sciviz-export-vector.html to inspect/download paths for the OpenNeuro threshold surface and the full NASA TMR scalar surface; source/licence/hashes remain in the existing asset JSON records. No timing measurement is part of these checks.
+
+## Batch 272 job 4: backdrop and preset studio lighting
+After build:packages run node --test --test-timeout=120000 packages/staging/test/*.test.js and node scripts/gpu-lock.mjs run --owner=staging-backdrop --max=4 --wait-max=60 -- node packages/staging/test/backdrop-browser.mjs. Both backends reuse FlightHelmet mobile from the existing licensed fixtures. Compare four named rig pictures, require >1000 changed backdrop pixel components after removal, exact restored output and detached owned mesh/environment. Report: test-results/staging-backdrop.json. No timing assertions or new data download.

@@ -999,3 +999,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 178 job 1): document /export-vector, scene/layer snapshots, BSP ordering, colour facets, explicit raster fallback, budgets and appearance limits; examples deferred.
 - margoengine (batch 178 job 1): document generated sciviz/export-vector and post/curvature aliases; examples deferred.
+
+- @margoengine/staging (batch 272 job 4): document Backdrop/backdropGeometry dimensions, mesh orientation/material/ownership and stagingLights/stagingLighting presets, forwarded environment options/cancellation and limitations; examples deferred.
+- margoengine (batch 272 job 4): document staging/backdrop forwarding; examples deferred.

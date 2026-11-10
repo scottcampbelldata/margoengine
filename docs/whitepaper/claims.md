@@ -4164,3 +4164,6 @@ Batch 191 job 6: post/curvature independently brightens convex normal gradients 
 
 ## Batch 178 vector publication
 The optional sciviz/export-vector entry writes depth-ordered paths for height fields, committed isosurfaces, grid triangle meshes, lines and point markers, resolving intersecting depth cycles by BSP splitting. CPU analytic oracles and native/compatibility real-data SVG/readback tests provide the proof; exact numerical/appearance limits and raster fallback are stated in ../sciviz-vector-export.md. Plotly's documented 3D SVG route embeds rasters (https://plotly.com/javascript/static-image-export/); this is a vector-output capability comparison, not a speed or GPU appearance-parity claim.
+
+## Batch 272 job 4: curved product backdrop and lighting presets
+staging/backdrop provides a smooth real-mesh cyclorama plus original portrait/rembrandt/upfront/soft softbox rigs through the existing environment renderer. CPU proof: backdrop.test.js. GPU proof: backdrop-browser.mjs, licensed textured FlightHelmet, all four distinct presets, actual backdrop pixels, exact restored image and disposal on both backends. Scope: docs/staging-parity.md. No numerical rival-image or speed claim.

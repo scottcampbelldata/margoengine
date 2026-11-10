@@ -3834,6 +3834,10 @@
       "types": "./dist/staging/caustics.d.ts",
       "import": "./dist/staging/caustics.js"
     },
+    "./staging/backdrop": {
+      "types": "./dist/staging/backdrop.d.ts",
+      "import": "./dist/staging/backdrop.js"
+    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"

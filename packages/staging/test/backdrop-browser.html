@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Cyclorama presets</title><canvas width="128" height="128" style="width:128px;height:128px"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Backdrop,stagingLighting} from '/packages/staging/dist/backdrop.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+let engine,backdrop,model,lighting;const errors=[];
+const watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const frame=async()=>{engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();};
+window.check={
+ async init(compat){
+  if(compat)await(await import('/packages/webgl2-compat/dist/index.js')).install({force:true});
+  engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,.5,1.5],target:[0,.32,0]},clearColor:'#050505'});watch();
+  backdrop=Backdrop.attach(engine,{width:3,depth:3,height:2,radius:.5});
+  model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb',{signal:AbortSignal.timeout(30000)});
+  await frame();return model.primitives.length;
+ },
+ async preset(name){lighting?.dispose();lighting=await stagingLighting(engine,name,{width:64,size:32,samples:16,signal:AbortSignal.timeout(30000)});lighting.add(model);await waitForPipelines(frame);return {name,mesh:backdrop.mesh.geometry.indices.length};},
+ async restore(){const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();await waitForPipelines(frame,{ready:()=>lighting.environment.device===engine.gpu});return engine.gpu!==old;},
+ async hideBackdrop(){backdrop.mesh.visible=false;await frame();},
+ async dispose(){lighting?.dispose();backdrop.dispose();backdrop.dispose();model.dispose();await frame();let meshDisposed=false;try{backdrop.mesh.check();}catch(e){meshDisposed=/disposed/i.test(e.message);}const detached=lighting.environment.disposed&&meshDisposed;engine.dispose();return {errors,detached};},
+};window.ready=true;
+</script>
