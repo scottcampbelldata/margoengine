@@ -4521,6 +4521,14 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./culling/depth": {
+      "types": "./dist/culling/depth.d.ts",
+      "import": "./dist/culling/depth.js"
+    },
+    "./scatter/occlusion": {
+      "types": "./dist/scatter/occlusion.d.ts",
+      "import": "./dist/scatter/occlusion.js"
     }
   },
   "dependencies": {

@@ -53,6 +53,10 @@
     "./surface": {
       "types": "./dist/surface.d.ts",
       "import": "./dist/surface.js"
+    },
+    "./occlusion": {
+      "types": "./dist/occlusion.d.ts",
+      "import": "./dist/occlusion.js"
     }
   },
   "files": [
@@ -67,7 +71,8 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/lod": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0"
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/culling": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/lod": {
@@ -77,6 +82,9 @@
       "optional": true
     },
     "@margoengine/geometry": {
+      "optional": true
+    },
+    "@margoengine/culling": {
       "optional": true
     }
   },
@@ -98,6 +106,7 @@
     "test:browser:imposter": "cd ../.. && node packages/scatter/test/imposter.browser.mjs",
     "prepack": "npm run build",
     "test:browser:textured": "cd ../.. && node packages/scatter/test/textured.browser.mjs",
-    "test:browser:surface": "cd ../.. && node packages/scatter/test/surface.browser.mjs"
+    "test:browser:surface": "cd ../.. && node packages/scatter/test/surface.browser.mjs",
+    "test:browser:occlusion": "cd ../.. && node packages/scatter/test/occlusion.browser.mjs"
   }
 }

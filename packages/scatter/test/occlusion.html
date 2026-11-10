@@ -1,0 +1,47 @@
+<!doctype html><html><meta charset="utf-8"><title>Scatter Hi-Z correctness</title>
+<style>body{margin:0}canvas{width:192px;height:192px;display:block}</style><body>
+<script type="module">
+import {Engine,Camera,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {OccludedScatter} from '/packages/scatter/dist/occlusion.js';
+import {teapotGeometry} from '/packages/geometry/dist/teapot.js';
+import {toGeometry} from '/packages/geometry/dist/index.js';
+import {Terrain} from '/packages/terrain/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+// Real data: Martin Newell's Utah Teapot (1975), geometry/teapot clean-room data and THIRD-PARTY-NOTICES.md.
+let engine,scatter,canvas,wall;
+const errors=[];
+window.check={
+ async show({enabled=true,samples=1,step=0}={}){
+  engine?.dispose();canvas?.remove();globalThis.margoLow=samples===1?1:undefined;
+  canvas=document.body.appendChild(document.createElement('canvas'));
+  if(step===4){canvas.style.width='213px';canvas.style.height='157px';}
+  engine=await Engine.create(canvas,{backend:'webgpu',preserveDrawingBuffer:true,camera:{position:[0,4,20],target:[0,0,0],near:0.1,far:150}});
+  engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));engine.onError=e=>errors.push(String(e));
+  engine.lighting.direction.set([1,1,0.3,3]);
+  wall=engine.createMesh().setGeometry(box(12,7,0.5)).setMaterial(new PbrMaterial({color:'#aabbcc',doubleSided:true})).setPosition([0,2,5]);
+  const floor=engine.createMesh().setGeometry(box(40,0.1,40)).setMaterial(new PbrMaterial({color:'#bbbbbb'})).setPosition([0,-0.5,0]);
+  let terrain;
+  if(step===7){
+   wall.setPosition([30,2,5]);
+   terrain=Terrain.attach(engine,{resolution:32,levels:2,cellSize:1,origin:[-20,-20],size:[40,40],heightScale:7,
+    layers:Array.from({length:4},()=>({height:[-20,100],slope:[0,1],scale:0.3})),
+    textures:d=>{const heights=new Float32Array(32*32);for(let z=0;z<32;z++)for(let x=0;x<32;x++)heights[z*32+x]=Math.abs(-20+x*40/31)<7&&Math.abs(-20+z*40/31-5)<3?1:0;
+     const heightmap=d.createTexture({size:[32,32],format:'r32float',usage:6});d.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:128},[32,32]);
+     const layers=d.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});d.queue.writeTexture({texture:layers},new Uint8Array([80,110,60,255,80,110,60,255,80,110,60,255,80,110,60,255]),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);return{heightmap,layers};}});
+  }
+  const g=toGeometry(teapotGeometry(0.25,3));
+  scatter=OccludedScatter.attach(engine,[g,g,g],{count:100,area:[16,12],center:[0,0,-1],scale:[1,1],lod:[12,35,80],lodFade:0,material:new PbrMaterial({color:'#1d8e39'}),wind:[1,0,0.15]});
+  scatter.addOccluder(terrain??wall);scatter.enabled=enabled;
+  const shadows=Shadows.attach(engine,{resolution:256,cascades:1,distance:50});shadows.add(scatter);
+  if(step===1)wall.setPosition([30,2,5]);
+  if(step===2){engine.camera.position=[17,3,10];engine.camera.target=[0,0,0];}
+  if(step===3){engine.camera.position=[0,0,1];engine.camera.target=[0,0,-10];}
+  if(step===5)engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/(10*aspect);out[5]=0.1;out[10]=1/149.9;out[14]=150/149.9;out[15]=1;};
+  if(step===6)await engine.rebootDevice();
+  await waitForPipelines(async()=>{engine.render({delta:0,...(step===8?{views:[{camera:engine.camera,viewport:[0,0,0.5,1]},{camera:new Camera({position:[17,3,10],target:[0,0,0]}),viewport:[0.5,0,0.5,0.6]}]}:{})});await engine.gpu.queue.onSubmittedWorkDone();});
+  const read=async buffer=>{const b=engine.gpu.createBuffer({size:60,usage:1|8});const e=engine.gpu.createCommandEncoder();e.copyBufferToBuffer(buffer,0,b,0,60);engine.gpu.queue.submit([e.finish()]);await b.mapAsync(1);const a=new Uint32Array(b.getMappedRange()).slice();b.unmap();b.destroy();return a[1]+a[6]+a[11];};
+  return {errors:errors.splice(0),colour:await read(scatter.colourCommands()),shadows:await read(scatter.commands)};
+ }
+};window.ready=true;
+</script></body></html>

@@ -3293,6 +3293,8 @@ After build:packages, run node --experimental-test-module-mocks --test --test-ti
 
 ## Batch 212 job 1: stereo controls
 Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch212 --wait-max=60 --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
+=======
+>>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
 
 
 
@@ -3303,3 +3305,6 @@ Build packages, then run node --test --test-timeout=120000 packages/cutscene/tes
 ### Batch 200 light glTF scenes
 After npm run build:packages, run npm test --workspace @margoengine/gltf. The two meshless tests in packages/gltf/test/scene-data.test.js fail with the old no-renderable guard and pass with sceneExtras opting into allowEmptyScene. They create JSON and a JSON-only GLB locally and verify every loader and rollback with a headless engine. For the existing texture path run node scripts/gpu-lock.mjs run --owner=codex-batch200 --max=4 --wait-max=60 -- node scripts/test-gltf-browser.mjs, then the same command with --compat. Both exercise actual GPU rendering. Size reproduction: import bundleBytes from scripts/measure-size.js, gzipSync each packages/gltf/dist/{index,scene-data,textured}.js bundle; npm run measure:size checks the combined core/stage limit. These are correctness and byte-count checks, not speed benchmarks.
 Batch 248 job 1: build packages, then `node --test --test-timeout=240000 packages/text/tests/fit.test.js`; run `node scripts/gpu-lock.mjs run --owner=codex-batch248 --max=8 --wait-max=60 -- node packages/text/scripts/test-browser.js`, then the same with `--compat` after test-browser.js. Existing Source Sans 3 font data is SIL OFL 1.1 (packages/text/tests/fixtures/fonts/NOTICE.md). No benchmark or timing assertion.
+### Batch 231 scatter Hi-Z
+After build:packages, run `node packages/scatter/test/occlusion.browser.mjs` and the same with `--compat`, each in a shared GPU slot. It renders the licensed Utah Teapot geometry behind building/terrain occluders, compares exact pixels against disabled culling, reads colour/shadow indirect counts and exercises camera/projection changes, near-plane, odd sizes, restore and multiple views. CPU: `node --test packages/culling/test/depth.test.js packages/scatter/test/occlusion.test.js`. No timing assertion or benchmark.
+>>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)

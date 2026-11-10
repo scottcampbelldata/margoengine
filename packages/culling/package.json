@@ -61,6 +61,10 @@
     "./sort": {
       "types": "./dist/sort.d.ts",
       "import": "./dist/sort.js"
+    },
+    "./depth": {
+      "types": "./dist/depth.d.ts",
+      "import": "./dist/depth.js"
     }
   },
   "files": [

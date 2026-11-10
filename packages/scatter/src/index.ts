@@ -658,7 +658,9 @@ export class Scatter implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        (this.disposed ? 'Scatter is disposed; create a new Scatter' : 'Scatter requires WebGPU; attach a new Scatter to a WebGPU engine') +
+        (this.disposed
+          ? 'Scatter is disposed; create a new Scatter'
+          : 'Scatter requires WebGPU; attach a new Scatter to a WebGPU engine') +
           '; see https://margoengine.com/errors#scatter',
       );
     const d = engine.gpu;
@@ -993,15 +995,17 @@ export class Scatter implements EnginePlugin {
     }
     let groups = this.renderGroups.get(pipeline);
     if (!groups) {
-      groups = this.instances.map((buffer, ring) => {
+      groups = this.colourInstances().map((buffer, ring) => {
         const count = this.route ? [this.route.ringCount(ring)] : [];
         return lit
           ? c.device.createBindGroup({
               layout: pipeline!.getBindGroupLayout(1),
-              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map((resource, binding) => ({
-                binding,
-                resource,
-              })),
+              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map(
+                (resource, binding) => ({
+                  binding,
+                  resource,
+                }),
+              ),
             })
           : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count, ...this.poseEntries()]);
       });
@@ -1027,10 +1031,17 @@ export class Scatter implements EnginePlugin {
       pass.setVertexBuffer(0, this.vertices[i]);
       pass.setIndexBuffer(this.indices[i], 'uint32');
       if (this.route) pass.drawIndexed(this.geometries[i].indices.length, this.ringCapacity());
-      else pass.drawIndexedIndirect(this.commands!, i * 20);
+      else pass.drawIndexedIndirect(this.colourCommands(), i * 20);
     }
     pass.end();
     this.drawn(c);
+  }
+  /** Colour-only rings; optional occlusion keeps the shadow rings untouched. */
+  protected colourInstances(): GPUBuffer[] {
+    return this.instances;
+  }
+  protected colourCommands(): GPUBuffer {
+    return this.commands!;
   }
   /** Whether the colour pass draws LOD ring `ring` (0 near, 1 middle, 2 far) with its mesh; a subclass that draws a ring its own way returns false (the shadow passes still draw it). */
   protected drawsRing(_ring: number): boolean {

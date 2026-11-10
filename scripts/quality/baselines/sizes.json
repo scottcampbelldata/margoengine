@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13378630,
+  "total": 13386649,
   "history": [
     {
       "date": "2026-10-24",
@@ -6852,6 +6852,12 @@
       "commit": "7ec92dd59",
       "reason": "Batch 248 job 1: new optional text/fit, root rendering clip support and empty-layout caret safety. Measurements recorded in docs/limits.md. Optional root ceiling 16597 to 17109 B; fit ceiling 10636 B. Shared rendering avoids a second renderer; core plus stage remains 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "ac902a65b",
+      "reason": "Batch 231: culling/depth 0 to 6064 B, scatter/occlusion 0 to 1177 B. Scatter root measures 19262 B (previous ceiling 19252, new ceiling 19518). Shared depth and separate colour/shadow rings preserve casters; splitting would duplicate state. Core/stage 24209 B unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -7612,7 +7618,7 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 5741,
-    "@margoengine/scatter": 19252,
+    "@margoengine/scatter": 19518,
     "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/paint": 1507,
@@ -8096,6 +8102,8 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/text/fit": 10636
+    "@margoengine/text/fit": 10636,
+    "@margoengine/culling/depth": 6320,
+    "@margoengine/scatter/occlusion": 1433
   }
 }

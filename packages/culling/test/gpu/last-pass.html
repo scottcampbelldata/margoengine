@@ -5,12 +5,14 @@
 import {Engine,PbrMaterial,box as coreBox} from '/packages/core/dist/index.js';
 import {Material,createInstancedMesh} from '/packages/materials/dist/index.js';
 import {boxGeometry} from '/packages/geometry/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {CulledInstances} from '/packages/culling/dist/index.js';
 const query=new URLSearchParams(location.search),scene=query.get('scene'),canvas=document.querySelector('canvas'),errors=[];
 let passes=0;
-const begin=GPUCommandEncoder.prototype.beginRenderPass;
-GPUCommandEncoder.prototype.beginRenderPass=function(d){if(d.colorAttachments.length)passes++;return begin.call(this,d);};
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[4,3.5,7],target:[0,0,0],fov:50}});engine.stop();
+// Instrument the actual device encoder; the compatibility layer does not use native GPUCommandEncoder.prototype.
+const create=engine.gpu.createCommandEncoder.bind(engine.gpu);
+engine.gpu.createCommandEncoder=(...args)=>{const encoder=create(...args),begin=encoder.beginRenderPass.bind(encoder);encoder.beginRenderPass=d=>{if(d.colorAttachments.length)passes++;return begin(d);};return encoder;};
 engine.gpu.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
 const box=boxGeometry(0.7,0.7,0.7),at=(i)=>[1,0,0,0,0,1,0,0,0,0,1,0,(i%6)-2.5,Math.floor(i/6)-1.5,0,1];
 const instanced=(material)=>{const mesh=createInstancedMesh(engine,box,material,24);for(let i=0;i<24;i++)mesh.instances.setMatrixAt(i,at(i));};
@@ -21,6 +23,6 @@ if(scene==='culled'){const transforms=new Float32Array(24*16);for(let i=0;i<24;i
 const add=(name,order)=>engine.use({name,setup(){},registerPasses(graph){graph.add({name,order,execute(){}});}});
 if(scene==='before')add('before',-1);
 if(query.get('old')){add('gap',0.5);add('tail',1e9);}
-for(let i=0;i<3;i++){passes=0;engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}
+await waitForPipelines(async()=>{passes=0;engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});
 window.errors=errors;window.passes=passes;window.ready=true;
 </script></body></html>

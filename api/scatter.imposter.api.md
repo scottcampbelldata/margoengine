@@ -75,6 +75,8 @@ class Scatter implements EnginePlugin {
         buffer: GPUBuffer;
     }[];
     protected beforeDistribute(_c: ScatterPassContext, _terrain: GPUTexture): void;
+    protected colourInstances(): GPUBuffer[];
+    protected colourCommands(): GPUBuffer;
     protected drawsRing(_ring: number): boolean;
     protected drawn(_c: ScatterPassContext): void;
     prepareShadow({ context, matrices, cascades }: {

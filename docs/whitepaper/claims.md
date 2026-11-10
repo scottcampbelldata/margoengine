@@ -3844,3 +3844,14 @@ cutscene/curve-editor provides numeric key graphs with editable Bezier controls,
 sceneExtras accepts glTF scenes without mesh geometry, returning selected-scene camera/light data through the same Model lifecycle. Regression proof covers JSON/GLB, sync/async/URL/auto imports, placement, scene filtering, cleanup and malformed data without geometry resources. This matches the named camera/light-only import row; it does not automatically install cameras or lights. The existing textured render path passes its base colour, cut-out, shadow, instance, picking and device-restore checks on native WebGPU and the shared WebGL2 compatibility layer. Both runs produce texel RGB [97,27,155], cut-out background [6,159,45], five expected shadow pixels and no GPU/page errors. No rival source, speed measurement or claim of full PBR feature parity.
 ### Batch 248 job 1: optional text overflow and fit
 `text/fit` supplies maxLines, measured ellipsis, local clip rectangles and bounded auto-fit sizing. The combined behavior covers the documented PlayCanvas auto-fit/line-limit and Troika clip-rectangle controls for this row; this is feature coverage, not a claim of identical browser font metrics. Proof: packages/text/tests/fit.test.js checks widths, size bounds, paragraphs, RTL logical suffix, graphemes, impossible markers and layout invalidation. The text browser suite checks clipping of all three style layers and complete-source fitting on both backends.
+=======
+=======
+## Batch 212 job 1: stereo controls
+Optional mixer/stereo matches the documented equal-power pan and normalized mid/side width behaviour. Proof: stereo.test.js checks ownership and atomic setters; browser.js checks 25 pan/width combinations against independent equations in OfflineAudioContext beside WebGPU and WebGL2. No performance or listening-quality claim.
+=======
+
+### Batch 231 job 3: conservative scatter Hi-Z
+OccludedScatter removes camera-hidden instances from colour indirect draws without removing shadow casters. Proof: packages/scatter/test/occlusion.browser.mjs compares exact final pixels against disabled occlusion, asserts unchanged shadow counts and smaller colour counts on native WebGPU and full WebGL2 at 1x/4x MSAA. The wall scene drops 100 colour instances to 42 while retaining 100 shadow instances. Conservative bounds may keep visible candidates; there is no percentage or speed claim for arbitrary scenes.
+>>>>>>> 5657dbe29 (feat(scatter): cull colour instances with shared Hi-Z depth)
+>>>>>>> 28bc61377 (feat(scatter): cull colour instances with shared Hi-Z depth)
+>>>>>>> 654098cc1 (feat(scatter): cull colour instances with shared Hi-Z depth)
