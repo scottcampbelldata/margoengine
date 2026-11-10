@@ -795,3 +795,38 @@ test('capture lists every plugin in attach order with its pass count and onPreUp
   assert.match(panel.textContent, /Plugins \(5\)/);
   assert.match(panel.textContent, /slow.*default.*2.*2/);
 });
+
+// Batch 132 audit: the engine's removePlugin acts on the active scene. A debugger living in another scene must leave
+// that scene on dispose and must not remove the active scene's same-name plugin.
+test('dispose removes the debugger from its own scene, not the active scene', async (t) => {
+  const gpu = fakeGPU(t);
+  const engine = await EngineKernel.create(gpu.canvas, { capacity: 4, backend: 'webgpu' });
+  t.after(() => engine.dispose());
+  const other = engine.createScene('other'),
+    debug = new FrameDebugger({ parent: null }),
+    sentinel = { name: debug.name, setup() {} };
+  other.use(debug);
+  engine.use(sentinel);
+  debug.dispose();
+  assert.equal(engine.plugins.get(debug.name), sentinel, 'the active scene lost its own plugin');
+  assert.equal(other.plugins.size, 0, 'the disposed debugger stayed in its scene');
+});
+
+// Batch 132 audit: WebGPU stores each compressed mip level in whole blocks (physical miplevel-specific extent).
+test('texture size estimate counts whole compression blocks on small mips and odd ASTC footprints', () => {
+  const tex = (format, width, height, mipLevelCount) => ({
+    width,
+    height,
+    depthOrArrayLayers: 1,
+    mipLevelCount,
+    sampleCount: 1,
+    dimension: '2d',
+    format,
+  });
+  // 4x4, 2x2 and 1x1 levels: one 8-byte BC1 block each (texel counting gave 11).
+  assert.equal(textureBytes(tex('bc1-rgba-unorm', 4, 4, 3)), 24);
+  // 8x8 at 6x6 blocks: 2 x 2 blocks of 16 bytes (texel counting gave 29).
+  assert.equal(textureBytes(tex('astc-6x6-unorm', 8, 8, 1)), 64);
+  // 256x256 BC7 with its full chain: 4096 + 1024 + 256 + 64 + 16 + 4 + 1 + 1 + 1 blocks of 16 bytes.
+  assert.equal(textureBytes(tex('bc7-rgba-unorm', 256, 256, 9)), 5463 * 16);
+});

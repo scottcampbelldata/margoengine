@@ -336,7 +336,8 @@ export class AnimationPanel implements EnginePlugin {
     this.options.signal?.removeEventListener('abort', this.abort);
     this.overlay.remove();
     this.element.remove();
-    this.runtime.removePlugin(this.name);
+    // removePlugin on the engine acts on the active scene; leave the scene that holds this panel.
+    this.runtime.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

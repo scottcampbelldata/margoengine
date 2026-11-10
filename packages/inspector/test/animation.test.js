@@ -127,3 +127,28 @@ test('model disposal removes only that model; abort releases panel', async (t) =
   controller.abort();
   assert.equal(other.element.isConnected, false);
 });
+
+// Batch 132 audit: the engine's removePlugin acts on the active scene. A panel living in another scene must leave
+// that scene on dispose and must not remove the active scene's same-name plugin.
+test('dispose removes the panel from its own scene, not the active scene', async () => {
+  const dom = new JSDOM('<body><canvas width="400" height="300"></canvas></body>'),
+    engine = new Engine(
+      dom.window.document.querySelector('canvas'),
+      await TransformStore.create(16),
+      { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
+      undefined,
+      null,
+    );
+  try {
+    const other = engine.createScene('other'),
+      panel = new AnimationPanel(engine, { parent: dom.window.document.body }),
+      sentinel = { name: panel.name, setup() {} };
+    other.use(panel);
+    engine.use(sentinel);
+    panel.dispose();
+    assert.equal(engine.plugins.get(panel.name), sentinel, 'the active scene lost its own plugin');
+    assert.equal(other.plugins.size, 0, 'the disposed panel stayed in its scene');
+  } finally {
+    engine.dispose();
+  }
+});

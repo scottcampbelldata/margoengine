@@ -301,15 +301,24 @@ export function texelBytes(format: string): number {
   return plain ? (plain[1].length * Number(plain[2])) / 8 : 4;
 }
 
-/** Estimated bytes of a texture: every mip level, layer and sample. */
+/**
+ * Estimated bytes of a texture: every mip level, layer and sample. A compressed level is stored in whole blocks (the
+ * WebGPU specification's physical miplevel-specific texture extent rounds each level up to the block size), so a 2x2
+ * or 1x1 mip of a 4x4-block format still takes a whole block.
+ */
 export function textureBytes(texture: GPUTexture): number {
-  let texels = 0;
+  const astc = /^astc-(\d+)x(\d+)/.exec(texture.format),
+    [bw, bh] = astc ? [Number(astc[1]), Number(astc[2])] : /^(bc|etc2|eac)/.test(texture.format) ? [4, 4] : [1, 1];
+  let blocks = 0;
   for (let level = 0; level < texture.mipLevelCount; level++) {
     const depth =
       texture.dimension === '3d' ? Math.max(1, texture.depthOrArrayLayers >> level) : texture.depthOrArrayLayers;
-    texels += Math.max(1, texture.width >> level) * Math.max(1, texture.height >> level) * depth;
+    blocks +=
+      Math.ceil(Math.max(1, texture.width >> level) / bw) *
+      Math.ceil(Math.max(1, texture.height >> level) / bh) *
+      depth;
   }
-  return Math.ceil(texels * texelBytes(texture.format) * texture.sampleCount);
+  return Math.ceil(blocks * bw * bh * texelBytes(texture.format) * texture.sampleCount);
 }
 
 function describeTexture(texture: GPUTexture): TextureReport {
@@ -544,7 +553,8 @@ export class FrameDebugger implements EnginePlugin {
     pending?.disarm();
     pending?.reject(new Error('FrameDebugger disposed'));
     this.untrack();
-    this.engine?.removePlugin(this.name);
+    // removePlugin on the engine acts on the active scene; leave the scene that holds this debugger.
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     this.panel?.dispose();
   }
