@@ -93,6 +93,29 @@ async function offsetDevice(withClamp) {
   return { device, gl, calls, requested, apply };
 }
 
+test('indexed replay detaches the old element binding before selecting a replacement, and caches unchanged draws', async () => {
+  const { device, gl } = await offsetDevice(false), calls = [];
+  gl.ELEMENT_ARRAY_BUFFER = 0x8893;
+  gl.bindBuffer = (...args) => calls.push(['bind', ...args]);
+  gl.drawElementsInstanced = (...args) => calls.push(['draw', ...args]);
+  const pipeline = { mode: 1, cache: { element: -1 } },
+    a = { id: 1, element: {} }, b = { id: 2, element: {} },
+    replay = device.replayer;
+  replay.ready = () => pipeline;
+  try {
+    for (const buffer of [a, a, b, b, a]) {
+      replay.pass = { index: { buffer, type: 0x1405, offset: 4, size: 4 } };
+      replay.drawIndexed(10, 2, 1, 0, 0);
+    }
+    const draw = ['draw', 1, 10, 0x1405, 8, 2];
+    assert.deepEqual(calls, [
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, null], ['bind', gl.ELEMENT_ARRAY_BUFFER, a.element], draw, draw,
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, null], ['bind', gl.ELEMENT_ARRAY_BUFFER, b.element], draw, draw,
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, null], ['bind', gl.ELEMENT_ARRAY_BUFFER, a.element], draw,
+    ]);
+  } finally { device.destroy(); }
+});
+
 test('stencil replay masks uint32 references before GL signed clamping and caches both faces by effective value', async () => {
   const { device, gl, calls } = await offsetDevice(false);
   const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth-stencil' } } } } } };

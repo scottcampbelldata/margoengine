@@ -16,7 +16,7 @@ function check(name, actual, expected) {
 }
 try {
   await mkdir(output, { recursive: true });
-  browser = await openBrowser({ startPath: '/tests/material-wireframe.html', port: 5221 });
+  browser = await openBrowser({ startPath: '/tests/material-wireframe.html', port: 'free' });
   report.hardware = browser.hardware;
   assert.equal(browser.hardware.webgpu?.fallback, false, 'Physical GPU required');
   const page = browser.page,
@@ -38,7 +38,7 @@ try {
   for (samples of [4, 1]) {
     if (samples === 1) {
       await page.evaluate(() => window.wireframeFixture.dispose());
-      await page.goto('http://127.0.0.1:5221/tests/material-wireframe.html?samples=1');
+      await page.goto(new URL('/tests/material-wireframe.html?samples=1', page.url()).href);
       await page.waitForFunction(() => window.wireframeFixture);
     }
     const reference = await render('explicit-lines', { reference: true }),
@@ -55,6 +55,16 @@ try {
       wire.image.row.count <= (samples === 1 ? 1 : 2),
       true,
     );
+    // Replacing disposed 12-index reference buffers with 10-index edge buffers used to retain reference storage
+    // on ANGLE D3D11. Alternating allocations exposes both the missing edge and duplicate-edge alpha failure.
+    for (const mirror of [false, true])
+      for (let round = 0; round < 3; round++) {
+        const options = { mirror, material: { transparent: true, opacity: 0.5, depthWrite: false } },
+          label = `replacement-${mirror ? 'mirrored' : 'plain'}-${round}`,
+          expected = await render(label + '-explicit', { ...options, reference: true, deduplicated: true }),
+          actual = await render(label + '-wireframe', options);
+        check(label + ' preserves exactly one copy of every edge after buffer replacement', actual.image.hash, expected.image.hash);
+      }
     // Each edge draws once, so a blended surface compares with a line list holding each edge once.
     for (const [label, options, list] of [
       ['native', { native: true }],

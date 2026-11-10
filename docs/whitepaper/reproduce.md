@@ -4139,3 +4139,7 @@ Batch 164 fog: [full command-tape and real-GPU commands, preserved workloads and
 Batch 164 screen effects: [descriptor work count and preserved passes](batch-164-workcounts.md#row-1319-screen-effect-passes).
 
 Batch 164 Tonemap and velocity: [capture resolve work count and the velocity-only row](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
+=======
+### Materials compatibility index replacement
+
+After building packages, run scripts/material-wireframe-gpu-check.js with and without --compat under the shared GPU lock. Both cover 1x and 4x, repeated transparent/mirrored replacements and exact hashes. The raw /tests/material-index-rebind-raw.html dev-server page exposes indexRebindRaw(false) and indexRebindRaw(true), returning all eight draws and exact uploaded-byte comparisons. The original may be correct on unaffected drivers; the detached path must remain exact. The capture SHA-256, observed failing indices and source comparison are in materials-compat-hunt.md.

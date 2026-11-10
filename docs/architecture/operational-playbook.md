@@ -7411,3 +7411,7 @@ Section 5, batch 164 fog: four full command tapes match the parent byte for byte
 Section 5, batch 164 screen effects: NodePass reuses one render pass descriptor per pass; full command tapes match the parent at 1x and 4x. The separate display-precision passes remain by design. [Evidence](../whitepaper/batch-164-workcounts.md#row-1319-screen-effect-passes).
 
 Section 5, batch 164 Tonemap: `SceneTarget.resolve(encoder, final, depth)` lets a final resolve skip the 1x depth copy when its caller reads none; Tonemap uses it, one depth pass fewer per 4x frame with the rest of the tape identical. The separate colour resolve pass remains while core's scene pass is frozen. [Evidence](../whitepaper/batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
+=======
+### Section 5 evidence addendum: materials wireframe index replacement
+
+The optional WebGL2 backend detaches a VAO element buffer before binding a different one. Raw GL replay on ANGLE D3D11 reproduced retired reference indices in a correctly bound replacement, with zero GL errors; detaching repairs exact bytes without a GPU wait. The CPU replay regression checks changed and unchanged bindings; the canonical material wireframe gate adds repeated transparent/mirrored replacements at 1x and 4x and passes 285 checks on each backend. Dispersion remains unproven despite two passing full compat runs. See docs/whitepaper/materials-compat-hunt.md. No core/stage or shader math change.

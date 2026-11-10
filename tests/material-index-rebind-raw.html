@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Raw WebGL2 index replacement regression</title>
+<script type="module">
+// Margo-made GL command capture, without engine imports at replay. The gzip retains every original upload byte.
+// Replacing readback payloads with zeros changes the reproduction; do not minimize by substituting data.
+const response = await fetch('/docs/whitepaper/results/materials-index-rebind-raw.json.gz');
+if (!response.ok) throw new Error('Raw index replay fixture could not load');
+const payload = await response.arrayBuffer(), bytes = new Uint8Array(payload);
+// Vite serves .json.gz with Content-Encoding; a plain static server may serve the compressed bytes directly.
+const text = bytes[0] === 31 && bytes[1] === 139
+  ? await new Response(new Blob([payload]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+  : new TextDecoder().decode(payload);
+const trace = JSON.parse(text);
+window.indexRebindRaw = (detach) => {
+  const gl = new OffscreenCanvas(320, 240).getContext('webgl2');
+  if (!gl) throw new Error('Raw index replay requires WebGL2');
+  for (const name of ['EXT_color_buffer_float', 'EXT_clip_control', 'OES_draw_buffers_indexed',
+    'EXT_depth_clamp', 'EXT_polygon_offset_clamp', 'EXT_texture_filter_anisotropic',
+    'OES_texture_float_linear', 'EXT_float_blend']) gl.getExtension(name);
+  const objects = new Map(), contents = new Map(), draws = [];
+  let element = null, vao = null;
+  const decode = (value) => {
+    if (!value || typeof value !== 'object') return value;
+    if (value.id) return objects.get(value.id);
+    if (value.type) {
+      const bytes = Uint8Array.from(value.bytes);
+      return value.type === 'ArrayBuffer' ? bytes.buffer : new globalThis[value.type](bytes.buffer);
+    }
+    return value.map(decode);
+  };
+  try {
+    for (const [step, command] of trace.entries()) {
+      if (command.ext !== undefined) {
+        gl.getExtension('EXT_clip_control')[command.name](...command.args);
+        continue;
+      }
+      const args = command.args.map(decode);
+      if (command.name === 'bindVertexArray') vao = args[0];
+      if (command.name === 'bindBuffer' && args[0] === gl.ELEMENT_ARRAY_BUFFER) {
+        element = args[1];
+        if (detach && vao) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+      }
+      if (command.name === 'bufferData' && args[0] === gl.ELEMENT_ARRAY_BUFFER)
+        contents.set(element, new Uint8Array(args[1]));
+      if (command.name === 'bufferSubData' && args[0] === gl.ELEMENT_ARRAY_BUFFER)
+        contents.get(element).set(args[2], args[1]);
+      const result = gl[command.name](...args);
+      if (command.result?.id) objects.set(command.result.id, result);
+      if (command.name !== 'drawElementsInstanced') continue;
+      const actual = new Uint8Array(gl.getBufferParameter(gl.ELEMENT_ARRAY_BUFFER, gl.BUFFER_SIZE));
+      gl.getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, actual);
+      const expected = contents.get(gl.getParameter(gl.ELEMENT_ARRAY_BUFFER_BINDING));
+      draws.push({ step, count: args[1], equal: actual.every((byte, i) => byte === expected[i]),
+        indices: Array.from(new Uint32Array(actual.buffer)), error: gl.getError() });
+    }
+    return { draws, error: gl.getError() };
+  } finally {
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }
+};
+</script>

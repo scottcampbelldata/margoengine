@@ -888,6 +888,13 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   exact. This is state-dependent, with the uniform-binding versus multisample
   replay/resolve cause unresolved. Resume in the fix phase with a full-grid
   draw-binding and resolved-attachment trace; do not change the exact bound.
+  Materials hunt continuation: two complete compat grids and 48 focused resets
+  were exact; the third full grid reproduced the 4x reset error 0.000244140625.
+  A full-prefix synchronous attachment trace was exact, so its extra readbacks
+  may perturb the failing state. Cause remains uniform replay versus multisample
+  rendering, unisolated. Next capture and replay the failing sequence without
+  blocking reads, retaining every upload and readback payload byte. Evidence:
+  whitepaper/materials-compat-hunt.md. PARKED at the five-round cap.
 - `materials/test:gpu:render-state`: failure 10 repaired in the optional device.
   The earlier signed polygon-offset clamp repair is retained. Dynamic stencil
   references now use the target's low eight bits before GL's signed clamp;
@@ -896,11 +903,13 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   at 4x and 1x. No assertion or tolerance changed. Durable receipt:
   whitepaper/results/batch-273-stencil-checkpoint.json. Remaining batch failures
   are still open; this does not establish whole-package parity.
-- `materials/test:gpu:wireframe`: the current-main compatibility sweep passes
-  all 249 checks and 60 captures. A second control using the bitmap upload from
-  before c06603fef also passes, excluding that repair as its explanation.
-  The earlier mirrored/reference and duplicate-edge failure is not reproduced;
-  its precise fixing change remains unidentified, so it is not claimed closed.
+
+- `materials/test:gpu:wireframe` is repaired: ANGLE D3D11 sometimes retained a
+  retired index buffer's storage after binding its replacement on a draw VAO.
+  Detaching the old element binding first preserves the uploaded bytes. Raw GL
+  replay reproduces the defect without engine imports; CPU replacement/cache
+  regression and the expanded 285-check native/compat wireframe grids pass.
+  See whitepaper/materials-compat-hunt.md for proof and reproduction.
 - Resolved `materials/test:gpu:normal-map` by c06603fef (bitmap orientation).
   The unchanged complete compatibility suite passes, including derived,
   authored/mirrored frames, lobes and export round trips. Replacing only the

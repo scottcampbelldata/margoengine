@@ -1880,6 +1880,7 @@ export class Replayer {
       // Unbind first: on Chromium (Metal, under load) a new index buffer bound to a vertex array that last held a
       // since-deleted index buffer kept drawing the deleted buffer's indices ("Vertex buffer is not big enough for
       // the draw call", sciviz glyphs drew nothing), and binding another buffer in between cleared it.
+      // Raw GL replay also reproduces stale retired indices on ANGLE D3D11; detach preserves replacement bytes.
       this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
       this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index.buffer.element);
       p.cache.element = index.buffer.id;

@@ -4837,3 +4837,7 @@ Batch 164 froxel preparation removes grid serialization with four byte-identical
 Batch 164 screen effects: `NodePass` reuses one render pass descriptor per pass, 3 instead of 30 in a 10-frame three-effect story, with byte-identical full GPU-command tapes against the parent. Operation count only. [Scope and reproduction](batch-164-workcounts.md#row-1319-screen-effect-passes).
 
 Batch 164 Tonemap: the final 4x capture resolve skips a depth copy that nothing reads, one render pass and one draw fewer per frame, with every other GPU command identical. Operation count only. [Scope and reproduction](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
+=======
+### Materials wireframe index replacement correctness (2026-11-10)
+
+On the tested NVIDIA RTX A6000 / ANGLE D3D11, detaching the prior VAO element binding before replacement eliminates stale retired index bytes. Proof: raw engine-free replay, a CPU replay regression that fails before the change, and the expanded exact native/compat 285-check wireframe grids. Evidence and reproduction: materials-compat-hunt.md. No speed claim; dispersion is still open.

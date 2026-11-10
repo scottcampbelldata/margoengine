@@ -6842,3 +6842,7 @@ a `compat:` note. On WebGPU nothing changed. All nine pass on the M6 Mac mini on
 | oit `vfx-check` | as above | the coded refusal on each of 40 'exact' builds; every other mode as on WebGPU; the remover check through OIT | the ExactOIT picture comparisons |
 | oit `real-check` | as above | the coded refusal per model; moments and blending take their parts; the particles run through OIT, compared with OIT's own run | "ExactOIT takes its BLEND parts", distances to the exact picture, "moments stay closer to exact" |
 | staging `browser-check` | The layer offers no `timestamp-query` (webgl2-compat src/device/render.ts) | every pixel assertion; the timing call returns null; no record is written | the contact-shadow timing rows |
+=======
+### Materials wireframe compatibility replacement
+
+ANGLE D3D11 can retain retired index storage across a VAO element-buffer replacement. The optional backend detaches the old element binding before selecting a different buffer; unchanged draws retain their cache hits. Exact indices and pixels are preserved, with no GPU wait or changed resource count. Raw replay and 285-check native/compat 1x/4x material grids are documented in whitepaper/materials-compat-hunt.md. This closes wireframe replacement failures, not the historical dispersion reset defect.
