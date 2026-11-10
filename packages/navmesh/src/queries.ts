@@ -1,10 +1,48 @@
 // Clean-room convex clipping and local portal searches. Sources: docs/clean-room.md, batch 252.
 import type { NavFilter, NavMesh, NavSurface, Vec3 } from './index.js';
+import { createRandom } from '@margoengine/math/mathutils';
+import { MargoError } from '@margoengine/math/errors';
 import type { TiledNavMesh } from './tiles.js';
 import { CorridorSearch, checkFilter, copy, cross, point, routeThrough, type NavRoute } from './search.js';
 
 /** Meshes supported by the optional surface queries. Tile polygon ids are valid only until a rebuild. */
 export type QueryMesh = NavMesh | TiledNavMesh;
+
+/** Query construction settings. */
+export interface NavMeshQueryOptions {
+  /** Seed of this query's independent random stream. Default 0. Must be a 32-bit integer. */
+  seed?: number;
+}
+
+/** Settings for uniform surface sampling. */
+export interface NavSampleOptions extends NavQueryOptions {
+  /** One-shot seed instead of advancing the query's stream. Default use the stream. */
+  seed?: number;
+  /** Maximum rejection proposals for a strict-radius sample. Default 65536, positive integer. */
+  maxSamples?: number;
+}
+
+/** A sampled point and its current polygon. */
+export interface NavRandomPoint {
+  /** Uniform surface-area sample. */
+  point: Vec3;
+  /** Polygon containing the point. */
+  polygon: number;
+}
+
+/** Nearest reachable wall within a search radius. */
+export interface NavWallHit {
+  /** XZ distance, equal to the search radius when no wall was found. */
+  distance: number;
+  /** Surface point on the wall, or null without a wall in range. */
+  position: Vec3 | null;
+  /** Unit XZ direction from wall to center; inward wall normal at zero distance, zero without a hit. */
+  normal: Vec3;
+  /** Wall segment endpoints after subtracting open portal intervals, or null. */
+  edge: readonly [Vec3, Vec3] | null;
+  /** Polygon containing the wall, or -1 without a hit. */
+  polygon: number;
+}
 
 /** Shared query settings. */
 export interface NavQueryOptions {
@@ -68,13 +106,42 @@ const corridor = (parent: Map<number, number>, last: number): number[] => {
   return path.reverse();
 };
 
-/** Optional walkability and controller queries on ordinary and tiled navmeshes. No off-mesh jumps are taken. */
+const checkSeed = (seed: number) => {
+  if (!Number.isInteger(seed) || seed < -2147483648 || seed > 4294967295)
+    throw new RangeError('Seed must be a 32-bit integer; pass a value from -2147483648 to 4294967295.');
+  return seed;
+};
+const checkRadius = (radius: number) => {
+  if (!(radius >= 0)) throw new RangeError('Radius must be nonnegative; pass 0 or more, or Infinity.');
+};
+/** Clip a convex surface polygon to the radius bounding square, retaining interpolated heights. */
+function squareClip(vertices: readonly Vec3[], center: Vec3, radius: number): readonly Vec3[] {
+  let result = [...vertices];
+  for (const axis of [0, 2])
+    for (const sign of [-1, 1]) {
+      const before = result;
+      result = [];
+      for (let i = 0; i < before.length; i++) {
+        const a = before[i],
+          b = before[(i + 1) % before.length],
+          da = radius - sign * (a[axis] - center[axis]),
+          db = radius - sign * (b[axis] - center[axis]);
+        if (da >= 0) result.push(a);
+        if (da >= 0 !== db >= 0) result.push(interpolate(a, b, da / (da - db)));
+      }
+    }
+  return result;
+}
+
+/** Optional routes, walkability, wall and sampling queries on ordinary and tiled navmeshes. */
 export class NavMeshQuery implements NavSurface {
   /** Surface queried live, including its area costs and rebuilt tiles. */
   readonly mesh: QueryMesh;
+  private readonly random: () => number;
   /** Creates queries without copying polygons or changing the mesh. */
-  constructor(mesh: QueryMesh) {
+  constructor(mesh: QueryMesh, options: NavMeshQueryOptions = {}) {
     this.mesh = mesh;
+    this.random = createRandom(checkSeed(options.seed ?? 0));
   }
   /** Live surface revision, allowing a Crowd to replan partial routes after a change. */
   get version(): number {
@@ -156,6 +223,167 @@ export class NavMeshQuery implements NavSurface {
   /** Crowd hook: preserve an unsnapped goal so an outside destination stays flagged partial. */
   partialRoute(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null {
     return this.route(start, end, filter);
+  }
+  private ids(): number[] {
+    const mesh = this.mesh;
+    return 'vertices' in mesh
+      ? Array.from({ length: mesh.polygonCount }, (_, i) => i)
+      : mesh.graph().owners.flatMap((owner, i) => (owner ? [i] : []));
+  }
+  private region(center: Vec3, radius: number, options: NavQueryOptions): number[] {
+    const from = this.start(center, center, options);
+    if (from < 0) return [];
+    const queue = [from],
+      seen = new Set(queue);
+    for (let at = 0; at < queue.length; at++)
+      for (const link of this.mesh.polygonLinks(queue[at])) {
+        if (link.offMesh !== undefined || seen.has(link.to) || !this.allowed(link.to, options.filter)) continue;
+        if (squared(center, onSegment(center, link.left, link.right)) > radius * radius) continue;
+        seen.add(link.to);
+        queue.push(link.to);
+      }
+    return queue;
+  }
+  /**
+   * Uniform surface-area sample across all allowed polygons, including disconnected islands. Null if none are allowed.
+   * @throws RangeError for an invalid filter or seed; use costs >= 1 and a 32-bit integer seed.
+   */
+  randomPoint(options: NavSampleOptions = {}): NavRandomPoint | null {
+    if (options.filter) checkFilter(options.filter);
+    return this.sample(
+      this.ids().filter((p) => this.allowed(p, options.filter)),
+      options,
+    );
+  }
+  /**
+   * Uniform surface-area sample strictly inside the XZ radius and the connected ground portal neighborhood.
+   * No off-mesh links. Radius zero returns the start on its plane. Null without an allowed start.
+   * @throws RangeError for invalid points, radius, filter, seed or maxSamples; use finite points and valid nonnegative bounds.
+   * @throws MargoError `failed` if rejection proposals exhaust maxSamples; increase maxSamples for a grazing intersection.
+   */
+  randomPointAroundCircle(center: Vec3, radius: number, options: NavSampleOptions = {}): NavRandomPoint | null {
+    checkRadius(radius);
+    const ids = this.region(center, radius, options);
+    if (!ids.length) return null;
+    if (radius === 0) return { point: this.project(ids[0], center), polygon: ids[0] };
+    return this.sample(ids, options, Number.isFinite(radius) ? { center, radius } : undefined);
+  }
+  private sample(
+    ids: number[],
+    options: NavSampleOptions,
+    disk?: { center: Vec3; radius: number },
+  ): NavRandomPoint | null {
+    const random = options.seed === undefined ? this.random : createRandom(checkSeed(options.seed)),
+      max = options.maxSamples ?? 65536,
+      triangles: { a: Vec3; b: Vec3; c: Vec3; polygon: number; sum: number }[] = [];
+    if (!Number.isInteger(max) || max < 1 || max > 10000000)
+      throw new RangeError('maxSamples must be an integer from 1 to 10000000; pass a bounded proposal count.');
+    let sum = 0;
+    for (const polygon of ids) {
+      const vertices = disk ? squareClip(this.vertices(polygon), disk.center, disk.radius) : this.vertices(polygon);
+      for (let i = 1; i + 1 < vertices.length; i++) {
+        const a = vertices[0],
+          b = vertices[i],
+          c = vertices[i + 1],
+          ux = b[0] - a[0],
+          uy = b[1] - a[1],
+          uz = b[2] - a[2],
+          vx = c[0] - a[0],
+          vy = c[1] - a[1],
+          vz = c[2] - a[2],
+          area = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+        if (area > 0) triangles.push({ a, b, c, polygon, sum: (sum += area) });
+      }
+    }
+    if (!triangles.length) return null;
+    for (let proposal = 0; proposal < max; proposal++) {
+      const pick = random() * sum;
+      let low = 0,
+        high = triangles.length - 1;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (pick < triangles[mid].sum) high = mid;
+        else low = mid + 1;
+      }
+      const { a, b, c, polygon } = triangles[low],
+        root = Math.sqrt(random()),
+        v = random(),
+        p: Vec3 = [
+          a[0] * (1 - root) + root * ((1 - v) * b[0] + v * c[0]),
+          a[1] * (1 - root) + root * ((1 - v) * b[1] + v * c[1]),
+          a[2] * (1 - root) + root * ((1 - v) * b[2] + v * c[2]),
+        ];
+      if (!disk || squared(p, disk.center) <= disk.radius ** 2) return { point: p, polygon };
+    }
+    throw new MargoError(
+      'failed',
+      'Surface sampling exhausted maxSamples; increase the proposal bound for a grazing circle intersection.',
+    );
+  }
+  /** Open portals are subintervals of edges, especially at tile seams. Their complement is the wall. */
+  private walls(p: number, filter?: NavFilter): (readonly [Vec3, Vec3])[] {
+    const v = this.vertices(p),
+      walls: (readonly [Vec3, Vec3])[] = [];
+    for (let i = 0; i < v.length; i++) {
+      const a = v[i],
+        b = v[(i + 1) % v.length],
+        dx = b[0] - a[0],
+        dz = b[2] - a[2],
+        length = dx * dx + dz * dz,
+        parameter = (q: Vec3) => ((q[0] - a[0]) * dx + (q[2] - a[2]) * dz) / length,
+        intervals: [number, number][] = [];
+      for (const link of this.mesh.polygonLinks(p)) {
+        if (link.offMesh !== undefined || !this.allowed(link.to, filter)) continue;
+        if (
+          Math.abs(cross(a, b, link.left)) > EPS * Math.sqrt(length) ||
+          Math.abs(cross(a, b, link.right)) > EPS * Math.sqrt(length)
+        )
+          continue;
+        const l = parameter(link.left),
+          r = parameter(link.right),
+          low = Math.max(0, Math.min(l, r)),
+          high = Math.min(1, Math.max(l, r));
+        if (low < high) intervals.push([low, high]);
+      }
+      intervals.sort((a, b) => a[0] - b[0]);
+      let end = 0;
+      for (const [low, high] of intervals) {
+        if (low > end) walls.push([interpolate(a, b, end), interpolate(a, b, low)]);
+        end = Math.max(end, high);
+      }
+      if (end < 1) walls.push([interpolate(a, b, end), copy(b)]);
+    }
+    return walls;
+  }
+  /**
+   * Finds the nearest wall in the connected ground neighborhood, treating forbidden portals as walls.
+   * @throws RangeError for invalid center, radius, filter or startPolygon; use finite points and nonnegative bounds.
+   */
+  distanceToWall(center: Vec3, maxRadius = Infinity, options: NavQueryOptions = {}): NavWallHit | null {
+    checkRadius(maxRadius);
+    const ids = this.region(center, maxRadius, options);
+    if (!ids.length) return null;
+    let best: NavWallHit = { distance: maxRadius, position: null, normal: [0, 0, 0], edge: null, polygon: -1 };
+    for (const p of ids)
+      for (const edge of this.walls(p, options.filter)) {
+        const q = onSegment(center, edge[0], edge[1]),
+          d = Math.sqrt(squared(center, q));
+        if (d > best.distance || (d === best.distance && best.position)) continue;
+        const v = this.vertices(p),
+          sign = Math.sign(cross(v[0], v[1], v[2])),
+          length = Math.sqrt(squared(edge[0], edge[1]));
+        best = {
+          distance: d,
+          position: this.project(p, q),
+          polygon: p,
+          edge,
+          normal:
+            d > 0
+              ? [(center[0] - q[0]) / d, 0, (center[2] - q[2]) / d]
+              : [(-sign * (edge[1][2] - edge[0][2])) / length, 0, (sign * (edge[1][0] - edge[0][0])) / length],
+        };
+      }
+    return best;
   }
   private vertices(p: number): readonly Vec3[] {
     const mesh = this.mesh;

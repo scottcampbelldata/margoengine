@@ -7,7 +7,7 @@ import { Vec3 } from "@margoengine/core";
 
 export class NavMeshQuery implements NavSurface {
     readonly mesh: QueryMesh;
-    constructor(mesh: QueryMesh);
+    constructor(mesh: QueryMesh, options?: NavMeshQueryOptions);
     get version(): number;
     locate(position: Vec3): number;
     closestPoint(position: Vec3): {
@@ -19,8 +19,15 @@ export class NavMeshQuery implements NavSurface {
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null;
     path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
     partialRoute(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null;
+    randomPoint(options?: NavSampleOptions): NavRandomPoint | null;
+    randomPointAroundCircle(center: Vec3, radius: number, options?: NavSampleOptions): NavRandomPoint | null;
+    distanceToWall(center: Vec3, maxRadius?: number, options?: NavQueryOptions): NavWallHit | null;
     raycast(start: Vec3, end: Vec3, options?: NavQueryOptions): NavRaycastHit | null;
     moveAlongSurface(start: Vec3, end: Vec3, options?: NavQueryOptions): NavMoveResult | null;
+}
+
+export interface NavMeshQueryOptions {
+    seed?: number;
 }
 
 export interface NavMoveResult {
@@ -39,6 +46,11 @@ export interface NavQueryOptions {
     startPolygon?: number;
 }
 
+export interface NavRandomPoint {
+    point: Vec3;
+    polygon: number;
+}
+
 export interface NavRaycastHit {
     hit: boolean;
     t: number;
@@ -47,6 +59,19 @@ export interface NavRaycastHit {
     edge: readonly [Vec3, Vec3] | null;
     polygon: number;
     visited: number[];
+}
+
+export interface NavSampleOptions extends NavQueryOptions {
+    seed?: number;
+    maxSamples?: number;
+}
+
+export interface NavWallHit {
+    distance: number;
+    position: Vec3 | null;
+    normal: Vec3;
+    edge: readonly [Vec3, Vec3] | null;
+    polygon: number;
 }
 
 export type QueryMesh = NavMesh | TiledNavMesh;

@@ -3026,3 +3026,7 @@ save/signed binds format, physical key and complete generation/payload frame wit
 ### Batch 197 bounding-box editing
 
 The optional BoxGizmo provides eight corner scale and twelve edge rotation handles on both rendering backends. CPU evidence in packages/controls/tests/box-gizmo.test.js covers exact transformed bounds, snapping, opposite-corner/centre pivots, nonuniform parents, all three local rotation axes, pointer capture, cancellation and cleanup. The matching browser fixture checks cyan/yellow handle pixels, overlay triangles, scale and edge rotation on WebGPU/WebGL2. This is a mesh-bounds editor, with no hierarchy or deformed-mesh bounds claim.
+
+## Batch 252 job 3: surface sampling and walls
+
+`packages/navmesh/test/sampling.test.js` proves reproducible random streams, the 1:9 area frequency on unequal islands, triangle centroids, slope surface-area weighting, strict-radius support and disk second moments, disconnected-floor exclusion, filters, exact wall distances/normals and partially open tile seam intervals. These match the published web navigation query behaviors; strict radius support and projected heights are explicit Margo guarantees. Distribution checks use fixed seeds and analytic expectations, not timed performance assertions.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12130907,
+  "total": 12132265,
   "history": [
     {
       "date": "2026-10-24",
@@ -5426,6 +5426,12 @@
       "commit": "batch-197",
       "reason": "New optional controls/box-gizmo: 0 to 6586 B min+gzip, ceiling 6842 B. Includes wireframe, 20 handles, parent-aware transforms and both backends through the existing overlay; core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "4198a3e7e",
+      "reason": "Batch 252 job 3: @margoengine/navmesh/queries: 4473 B gzip (ceiling 3371 -> 4729 B). Optional navigation behavior retains one shared implementation; splitting would duplicate graph traversal and controller ownership. Core/stage source unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5902,7 +5908,7 @@
     "@margoengine/navmesh/debug": 1755,
     "@margoengine/navmesh/hierarchy": 4250,
     "@margoengine/navmesh/links": 4288,
-    "@margoengine/navmesh/queries": 3371,
+    "@margoengine/navmesh/queries": 4729,
     "@margoengine/navmesh/tiles": 15113,
     "@margoengine/navmesh/volume": 4975,
     "@margoengine/navmesh/voxel": 16031,

@@ -59,3 +59,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated save/signed alias | batch-255 job 4 |
 - @margoengine/controls: document /box-gizmo attach, handles, uniform/per-axis corner scaling, pivots, edge rotation, snapping, cancellation, bounds refresh and cleanup.
 - margoengine: document the generated /controls/box-gizmo alias.
+
+| @margoengine/navmesh | queries seeded randomPoint, strict randomPointAroundCircle, rejection bound, distanceToWall and partial seam intervals | batch-252 job 3 |

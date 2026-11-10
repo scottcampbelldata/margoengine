@@ -2578,3 +2578,5 @@ Build packages, then run node --test --test-timeout=120000 packages/save/tests/s
 ### Batch 197 BoxGizmo
 
 After build:packages, run node --test --test-timeout=30000 packages/controls/tests/box-gizmo.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js box-gizmo. Read packages/controls/test-results/box-gizmo-browser.json for both backend pixel and transform checks.
+
+Batch 252 job 3: build, then `node --test --test-timeout=120000 packages/navmesh/test/sampling.test.js`. The fixed seeded samples test analytic surface areas, triangle centroids and E[r^2]=R^2/2 for a uniform disk. The tiled test uses exact segment and corner distances before and after a rebuild. No GPU or downloaded model is needed.
