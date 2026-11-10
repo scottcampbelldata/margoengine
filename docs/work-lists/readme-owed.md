@@ -1155,3 +1155,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/materials (review 3 M1): document Transmission and TransmissionLayers disposal in their owning scene, including nested captures.
 
 - @margoengine/sciviz (review 3 material gate): use the common package browser launcher for the engineering reader route in the README phase.
+- @margoengine/sciviz (batch 178 job 3): document /export-media sizing, alpha, tiled ownership, DPI, ZIP/video timeline restoration, provenance and limits; examples deferred.
+- @margoengine/lines (batch 178 job 3): document /tiles full-image line construction, removable camera state and subpixel capture grid; examples deferred.
+- @margoengine/headless (batch 178 job 3): document video provenance and maxBytes payload budget; examples deferred.
+- margoengine (batch 178 job 3): document generated sciviz/export-media and lines/tiles aliases; examples deferred.

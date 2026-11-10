@@ -1935,6 +1935,10 @@
       "types": "./dist/lines/debug.d.ts",
       "import": "./dist/lines/debug.js"
     },
+    "./lines/tiles": {
+      "types": "./dist/lines/tiles.d.ts",
+      "import": "./dist/lines/tiles.js"
+    },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
       "import": "./dist/loaders/ply.js"
@@ -3550,6 +3554,10 @@
     "./sciviz/spec": {
       "types": "./dist/sciviz/spec.d.ts",
       "import": "./dist/sciviz/spec.js"
+    },
+    "./sciviz/export-media": {
+      "types": "./dist/sciviz/export-media.d.ts",
+      "import": "./dist/sciviz/export-media.js"
     },
     "./selection": {
       "types": "./dist/selection.d.ts",

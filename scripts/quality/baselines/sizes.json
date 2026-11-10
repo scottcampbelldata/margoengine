@@ -7648,6 +7648,12 @@
       "commit": "batch-179",
       "reason": "New optional sciviz/spec 0 to 24979 B gzip, ceiling 25645 B. sciviz/link 4544 to 5170 B, ceiling 4800 to 5335 B, for portable shared brushes and undo/redo state. Ordered recipes, exact numerical inputs, timeline, hashes and lazy layer codecs retain one schema; splitting moves serialization ownership to applications without removing feature bytes. Core/stage unchanged at 24209 B. Fusion labels 6529 to 6565 B, ceiling 6548 to 6821 B, for recording complete volume-source recipes; splitting would force callers to manually register one native layer kind or duplicate its state. Rebased sciviz/parcoords 8860 to 9276 B, ceiling 9126 to 9555 B: its shared SelectionStore retains portable brush/history state. Splitting that state from the linked controller would duplicate store ownership or change row identity; preserve the full optional API.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch178-job3",
+      "reason": "Batch 178 job 3: media entry 0 -> 6994 B, lines/tiles 0 -> 409 B, lines/batch 6263 -> 6592 B, lines/pick 5989 -> 6465 B, headless/video 7031 -> 7297 B gzip. Real tiled publication, full-image line construction and provenance retain one lifetime and frame-layout contract; splitting would duplicate GPU state and file writers. Core + stage unchanged at 24209 B.",
+      "grew": 5
     }
   ],
   "items": {
@@ -8052,7 +8058,7 @@
     "@margoengine/headless/null": 2977,
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,
-    "@margoengine/headless/video": 7287,
+    "@margoengine/headless/video": 7553,
     "@margoengine/html": 7487,
     "@margoengine/html/blend": 3303,
     "@margoengine/html/inline": 2744,
@@ -8113,11 +8119,11 @@
     "@margoengine/lightmap/probes": 3273,
     "@margoengine/lightmap/refracted": 9015,
     "@margoengine/lines": 20524,
-    "@margoengine/lines/batch": 6519,
+    "@margoengine/lines/batch": 6848,
     "@margoengine/lines/debug": 9836,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
-    "@margoengine/lines/pick": 6245,
+    "@margoengine/lines/pick": 6721,
     "@margoengine/lines/stroke": 4663,
     "@margoengine/lines/texture": 6617,
     "@margoengine/lines/trail": 5451,
@@ -9039,7 +9045,9 @@
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/geo-vector": 26691,
     "@margoengine/stage/lights": 1957,
-    "@margoengine/sciviz/spec": 25645
+    "@margoengine/sciviz/spec": 25645,
+    "@margoengine/lines/tiles": 665,
+    "@margoengine/sciviz/export-media": 7250
   },
-  "total": 14555099
+  "total": 14564085
 }

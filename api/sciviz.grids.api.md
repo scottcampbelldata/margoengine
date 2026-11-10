@@ -292,6 +292,13 @@ class Figure extends EventTarget {
     histogram(values: DataSource, options?: HistogramLayerOptions): Promise<RectsLayer>;
     heatmap(values: DataSource, options?: HeatmapLayerOptions): Promise<RectsLayer>;
     vectorAxes(): readonly Line[];
+    exportLayout(): {
+        roots: Element[];
+        bars: {
+            bar: HTMLElement;
+            map: Colormap;
+        }[];
+    };
     toPNG(options?: PNGOptions): Promise<Blob>;
     toSVG(options?: SVGOptions): Promise<string>;
     timeline(times: ArrayLike<number>, frame: TimelineFrame, options?: TimelineOptions): Timeline;

@@ -6,6 +6,8 @@
 import { Camera, Engine } from "@margoengine/core";
 
 export interface EncodeVideoOptions {
+    provenance?: Readonly<Record<string, unknown>>;
+    maxBytes?: number;
     format?: 'webm' | 'mp4';
     fps?: number;
     codec?: string;
@@ -70,7 +72,7 @@ export interface WebCodecsBinding {
     AudioDecoder?: typeof AudioDecoder;
 }
 
-export function encodeVideo(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { format, fps, codec, bitrate, keyFrameInterval, audio, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;
+export function encodeVideo(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { format, fps, codec, bitrate, keyFrameInterval, audio, provenance, maxBytes, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;
 
 export function imageSequence(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { prefix, digits }?: ImageSequenceOptions): AsyncGenerator<SequenceFile, void, void>;
 

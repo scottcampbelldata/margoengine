@@ -109,7 +109,7 @@ export class Lines implements EnginePlugin {
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
   private frameBuffer?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
-  private readonly frameData = new Float32Array(24);
+  private readonly frameData = new Float32Array(28);
   /** This frame's lines in draw order: depth-tested writers, depth-tested, on-top writers, on-top. */
   private readonly drawLists: Array<Array<[Line, Resources]>> = [[], [], [], []];
   /** This frame's lines with solid triangles: depth-tested, on-top. */
@@ -189,7 +189,7 @@ export class Lines implements EnginePlugin {
       buffer: { type: 'uniform', minBindingSize: size },
     });
     const frame = device.createBindGroupLayout({
-      entries: [uniform(96, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
+      entries: [uniform(112, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
     });
     const style = device.createBindGroupLayout({
       entries: [
@@ -200,7 +200,7 @@ export class Lines implements EnginePlugin {
     });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
     this.module(0);
-    this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.frameBuffer = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.frameGroup = device.createBindGroup({
       layout: frame,
       entries: [{ binding: 0, resource: { buffer: this.frameBuffer } }],

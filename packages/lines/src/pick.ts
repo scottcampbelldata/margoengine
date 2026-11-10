@@ -101,7 +101,7 @@ export class LinePicking {
   private entries: Entry[] = [];
   private readonly standIns = new Map<Line, Mesh>();
   private readonly owners = new Map<Mesh, Line>();
-  private readonly frameData = new Float32Array(24);
+  private readonly frameData = new Float32Array(28);
   private remove?: () => void;
 
   /**
@@ -125,7 +125,7 @@ export class LinePicking {
 
   private resources(device: GPUDevice, layouts: NonNullable<Lines['layouts']>): Gpu {
     if (this.gpu?.device === device) return this.gpu;
-    const frame = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+    const frame = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
       baseLayout = device.createBindGroupLayout({
         entries: [
           {

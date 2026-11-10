@@ -1,6 +1,7 @@
 /** Column-major 4x4 helpers only lines uses; shared ones come from `@margoengine/math/mat4`. */
 import type { Mat4 } from '@margoengine/math';
 import type { Camera } from '@margoengine/core';
+import { lineTiles } from './tile-state.js';
 
 export type { Mat4 };
 
@@ -20,7 +21,14 @@ export function fillFrame(
   viewHeight: number,
   encode: number,
 ): void {
-  const m = camera.matrix;
+  const tile = matrix === camera.matrix ? lineTiles.get(camera) : undefined;
+  if (tile) {
+    matrix = tile.matrix;
+    ratio *= tile.fullWidth / width;
+    width = tile.fullWidth;
+    height = viewHeight = tile.fullHeight;
+  }
+  const m = tile ? tile.matrix : camera.matrix;
   data.set(matrix, 0);
   data[16] = width;
   data[17] = height;
@@ -31,6 +39,19 @@ export function fillFrame(
       ? (0.5 * viewHeight) / Math.tan((camera.fov * Math.PI) / 360)
       : 0.5 * viewHeight * Math.hypot(m[1], m[5], m[9]);
   data[20] = encode;
+  data[21] = tile ? 1 : 0;
+  if (data.length >= 28)
+    data.set(
+      tile
+        ? [
+            tile.fullWidth / tile.width,
+            tile.fullHeight / tile.height,
+            (tile.fullWidth - 2 * tile.x - tile.width) / tile.width,
+            (2 * tile.y + tile.height - tile.fullHeight) / tile.height,
+          ]
+        : [1, 1, 0, 0],
+      24,
+    );
 }
 
 /** Writes M * (x, y, z, 1) divided by w into out at offset. */

@@ -1446,6 +1446,12 @@ export class Figure extends EventTarget {
     return this.#axes?.publicationLines() ?? [];
   }
 
+  /** @internal Layout owned by this figure, for optional raster publication exporters. */
+  exportLayout(): { roots: Element[]; bars: { bar: HTMLElement; map: Colormap }[] } {
+    this.#check();
+    return { roots: this.#overlayRoots(), bars: [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap })) };
+  }
+
   #overlayRoots(): Element[] {
     return [
       ...publicationLabels(this),

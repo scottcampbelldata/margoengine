@@ -14,9 +14,15 @@
     <button id="play" type="button">Play</button>
     <label>Day <input id="day" type="range" min="0" max="7" step="1" value="0"><output id="date">2024-01-01</output></label>
     <button id="export" type="button">Save PNG</button>
+    <label>Media size <select id="media-size"><option value="2">2x screen</option><option value="print">180 x 100 mm, 300 dpi</option></select></label>
+    <label><input id="media-alpha" type="checkbox">Transparent</label>
+    <button type="button" data-media="png">PNG poster</button><button type="button" data-media="webp">WebP</button>
+    <button type="button" data-media="zip">Image ZIP</button><button type="button" data-media="webm">WebM</button><button type="button" data-media="mp4">MP4</button>
+    <button id="media-cancel" type="button" disabled>Cancel export</button>
   </div>
   <div class="view"><canvas id="viewport" aria-label="North Atlantic wind streamlines and arrows"></canvas></div>
   <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
+  <p id="media-status" role="status">Publication exports include the NOAA source record. Video uses two frames per second.</p>
   <footer>NCEP-NCAR Reanalysis 1 data provided by <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. Public domain. Near-surface 0.995 sigma winds on the native 2.5 degree grid, 100 W to 20 E, 20 N to 65 N. Equirectangular projection centred at 42.5 N. Colour and arrow length show speed in m/s; directions follow the projection. <a href="./assets/sciviz/README.md">Data preparation</a>.</footer>
   <script type="module">
     import { needsWebGPU } from './needs-webgpu.js';

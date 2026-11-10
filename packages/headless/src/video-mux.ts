@@ -13,6 +13,8 @@ export interface VideoSample {
 
 /** What a container records about the stream. */
 export interface VideoTrack {
+  /** JSON provenance carried by the containing file. Default none. */
+  provenance?: Readonly<Record<string, unknown>>;
   codec: string;
   width: number;
   height: number;
@@ -247,7 +249,21 @@ export function muxWebM(track: VideoTrack, samples: readonly VideoSample[], soun
       points.push(element(0xbb, unsigned(0xb3, group.time), element(0xb7, unsigned(0xf7, 1), unsigned(0xf1, at))));
     at += clusters[i].length;
   });
-  const segment = [seekHead(start, start + info.length, at), info, tracks, ...clusters, element(CUES, ...points)],
+  const tags = track.provenance
+    ? element(
+        0x1254c367,
+        element(
+          0x7373,
+          element(0x63c0),
+          element(
+            0x67c8,
+            element(0x45a3, text('MARGO_PROVENANCE')),
+            element(0x4487, text(JSON.stringify(track.provenance))),
+          ),
+        ),
+      )
+    : new Uint8Array(0);
+  const segment = [seekHead(start, start + info.length, at), info, tracks, ...clusters, element(CUES, ...points), tags],
     size = bigEndian(
       segment.reduce((sum, part) => sum + part.length, 0),
       8,
@@ -490,6 +506,7 @@ export function muxMP4(track: VideoTrack, samples: readonly VideoSample[], sound
     moov = (position: number) =>
       box(
         'moov',
+        ...(track.provenance ? [box('udta', box('marg', text(JSON.stringify(track.provenance))))] : []),
         fullBox(
           'mvhd',
           0,

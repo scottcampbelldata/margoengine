@@ -1,0 +1,69 @@
+{
+  "job": "batch178-job3",
+  "backends": [
+    {
+      "compat": false,
+      "largest": 0,
+      "changed": 0,
+      "lit": 31905,
+      "highWidth": 8209,
+      "tileCount": 17,
+      "maxEdge": 512,
+      "videos": [
+        {
+          "format": "webm",
+          "bytes": 26628,
+          "duration": 1.5
+        },
+        {
+          "format": "mp4",
+          "bytes": 23243,
+          "duration": 1.5
+        }
+      ],
+      "pngBytes": 114035,
+      "webpBytes": 68076,
+      "zipBytes": 228164,
+      "comparison": {
+        "changed": 0,
+        "hot": 0,
+        "mean": 0,
+        "max": 0
+      }
+    },
+    {
+      "compat": true,
+      "largest": 0,
+      "changed": 0,
+      "lit": 31904,
+      "highWidth": 8209,
+      "tileCount": 17,
+      "maxEdge": 512,
+      "videos": [
+        {
+          "format": "webm",
+          "bytes": 26667,
+          "duration": 1.5
+        },
+        {
+          "format": "mp4",
+          "bytes": 23277,
+          "duration": 1.5
+        }
+      ],
+      "pngBytes": 114022,
+      "webpBytes": 68078,
+      "zipBytes": 228135,
+      "comparison": {
+        "changed": 0,
+        "hot": 0,
+        "mean": 0,
+        "max": 0
+      }
+    }
+  ],
+  "coreStageGzip": 24209,
+  "cpuTests": 1754,
+  "source": "NOAA PSL NCEP-NCAR Reanalysis 1, public domain",
+  "method": "Actual off-axis targets, no complete GPU image; browser decoding and seeking of WebM/MP4; independent ZIP loader; exact tiled/full NOAA pixels."
+}

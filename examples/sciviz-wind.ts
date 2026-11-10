@@ -98,6 +98,60 @@ try {
     void timeline.seek(Number(element<HTMLInputElement>('day').value)).catch(fail);
   });
   exportButton(figure, 'north-atlantic-wind');
+  let exportAbort: AbortController | undefined;
+  const cancel = element<HTMLButtonElement>('media-cancel');
+  cancel.addEventListener('click', () => exportAbort?.abort(new DOMException('Export cancelled', 'AbortError')));
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-media]'))
+    button.addEventListener('click', () => {
+      void (async () => {
+        const { exportImage, exportImageSequence, exportVideo } = await import('@margoengine/sciviz/export-media');
+        const format = button.dataset.media!,
+          status = element('media-status');
+        exportAbort = new AbortController();
+        cancel.disabled = false;
+        for (const control of document.querySelectorAll<HTMLButtonElement>('[data-media]')) control.disabled = true;
+        status.textContent = 'Exporting NOAA wind fields...';
+        try {
+          const size =
+            element<HTMLSelectElement>('media-size').value === 'print'
+              ? { size: { width: 180, height: 100, unit: 'mm' as const }, dpi: 300 }
+              : { scale: 2 };
+          const options = {
+            ...size,
+            transparent: element<HTMLInputElement>('media-alpha').checked,
+            fps: 2,
+            signal: exportAbort.signal,
+            provenance: {
+              source: 'NOAA PSL NCEP-NCAR Reanalysis 1',
+              url: 'https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html',
+              license: 'Public domain',
+              variable: '0.995 sigma daily u/v wind',
+              dates: '2024-01-01/2024-01-08',
+              units: 'm/s',
+            },
+          };
+          const blob =
+            format === 'zip'
+              ? await exportImageSequence(figure, timeline, options)
+              : format === 'webm' || format === 'mp4'
+                ? await exportVideo(figure, timeline, { ...options, format })
+                : await exportImage(figure, { ...options, format: format as 'png' | 'webp' });
+          const url = URL.createObjectURL(blob),
+            link = document.createElement('a');
+          link.href = url;
+          link.download = `noaa-wind.${format}`;
+          link.click();
+          URL.revokeObjectURL(url);
+          status.textContent = `Saved ${format.toUpperCase()} with source provenance.`;
+        } catch (error) {
+          status.textContent = `Export ended: ${(error as Error).message}`;
+        } finally {
+          cancel.disabled = true;
+          exportAbort = undefined;
+          for (const control of document.querySelectorAll<HTMLButtonElement>('[data-media]')) control.disabled = false;
+        }
+      })();
+    });
   element('viewport').dataset.ready = 'true';
 } catch (error) {
   fail(error);

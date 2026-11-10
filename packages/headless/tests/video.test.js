@@ -12,7 +12,11 @@ import { encodeWithFFmpeg, ffmpegArguments } from '../dist/ffmpeg.js';
 const until = async (ready) => {
   while (!ready()) await new Promise((done) => setImmediate(done));
 };
-const frame = (width = 4, height = 2, value = 9) => ({ width, height, data: new Uint8Array(width * height * 4).fill(value) });
+const frame = (width = 4, height = 2, value = 9) => ({
+  width,
+  height,
+  data: new Uint8Array(width * height * 4).fill(value),
+});
 const frames = (count, width, height) => Array.from({ length: count }, (_, i) => frame(width, height, i));
 
 /** WebCodecs stand-in. Each encoded frame becomes a chunk holding its first byte. */
@@ -139,6 +143,35 @@ const number = (bytes, { start, end }) => bytes.subarray(start, end).reduce((val
 const inside = (bytes, parent, id) => readElements(bytes, parent.start, parent.end).filter((e) => e.id === id);
 const webmSegment = (bytes) => readElements(bytes).find((e) => e.id === 0x18538067);
 
+test('publication provenance is structured metadata in both containers and the encoded payload budget releases the codec', async () => {
+  const record = { source: 'NOAA PSL', hash: 'sha256:123', units: 'm/s', title: 'Wind σ' },
+    json = JSON.stringify(record);
+  for (const format of ['webm', 'mp4']) {
+    const { webCodecs, log } = fakeCodecs({ description: new Uint8Array([1, 66, 0, 30, 255, 225, 0, 0]) });
+    const file = await encodeVideo(frames(4), {
+      format,
+      codec: format === 'webm' ? 'vp8' : 'avc1.42001e',
+      webCodecs,
+      provenance: record,
+    });
+    const bytes = file.bytes;
+    if (format === 'mp4') {
+      const metadata = path(bytes, 'moov', 'udta', 'marg');
+      assert.deepEqual(JSON.parse(new TextDecoder().decode(bytes.subarray(metadata.start, metadata.end))), record);
+    } else {
+      const [tags] = inside(bytes, webmSegment(bytes), 0x1254c367),
+        [tag] = inside(bytes, tags, 0x7373),
+        [simple] = inside(bytes, tag, 0x67c8);
+      const [value] = inside(bytes, simple, 0x4487);
+      assert.equal(new TextDecoder().decode(bytes.subarray(value.start, value.end)), json);
+    }
+    assert.equal(log.closed, true);
+    const limited = fakeCodecs();
+    await assert.rejects(encodeVideo(frames(4), { webCodecs: limited.webCodecs, maxBytes: 2 }), /exceeds maxBytes/);
+    assert.equal(limited.log.closed, true);
+  }
+});
+
 test('renderFrames steps its own clock and reads each frame', async () => {
   const canvas = createHeadlessCanvas({ width: 2, height: 2 }),
     renders = [],
@@ -234,7 +267,7 @@ test('imageSequence names frames in order and gives real PNG files', async () =>
   assert.deepEqual([...png.subarray(1, 4)], [0x50, 0x4e, 0x47]);
   const idat = Buffer.from(png).indexOf('IDAT'),
     rows = inflateSync(Buffer.from(png.subarray(idat + 4, idat + 4 + u32At(png, idat - 4))));
-  assert.equal(rows[1], 1, 'the frame\'s value');
+  assert.equal(rows[1], 1, "the frame's value");
   const defaults = await imageSequence(frames(1)).next();
   assert.equal(defaults.value.name, 'frame_0000.png');
 });
@@ -266,7 +299,10 @@ test('encodeVideo writes a WebM a parser can walk: times, key frames, cues and s
 
   const [ebml] = readElements(bytes);
   assert.equal(ebml.id, 0x1a45dfa3);
-  assert.equal(new TextDecoder().decode(bytes.subarray(inside(bytes, ebml, 0x4282)[0].start, inside(bytes, ebml, 0x4282)[0].end)), 'webm');
+  assert.equal(
+    new TextDecoder().decode(bytes.subarray(inside(bytes, ebml, 0x4282)[0].start, inside(bytes, ebml, 0x4282)[0].end)),
+    'webm',
+  );
   const segment = webmSegment(bytes),
     [info] = inside(bytes, segment, 0x1549a966),
     [tracks] = inside(bytes, segment, 0x1654ae6b),
@@ -279,7 +315,10 @@ test('encodeVideo writes a WebM a parser can walk: times, key frames, cues and s
   assert.equal(number(bytes, inside(bytes, info, 0x2ad7b1)[0]), 1_000_000);
   const duration = inside(bytes, info, 0x4489)[0];
   assert.equal(new DataView(bytes.buffer, bytes.byteOffset + duration.start).getFloat64(0), 500);
-  assert.equal(new TextDecoder().decode(bytes.subarray(inside(bytes, entry, 0x86)[0].start, inside(bytes, entry, 0x86)[0].end)), 'V_VP9');
+  assert.equal(
+    new TextDecoder().decode(bytes.subarray(inside(bytes, entry, 0x86)[0].start, inside(bytes, entry, 0x86)[0].end)),
+    'V_VP9',
+  );
   assert.equal(number(bytes, inside(bytes, entry, 0x23e383)[0]), 100_000_000);
   assert.equal(number(bytes, inside(bytes, videoBox, 0xb0)[0]), 4);
   assert.equal(number(bytes, inside(bytes, videoBox, 0xba)[0]), 2);
@@ -295,7 +334,7 @@ test('encodeVideo writes a WebM a parser can walk: times, key frames, cues and s
       const offset = new DataView(bytes.buffer, bytes.byteOffset + block.start + 1).getInt16(0);
       times.push(base + offset);
       assert.equal(bytes[block.start + 3], i === 0 ? 0x80 : 0);
-      assert.equal(bytes[block.start + 4], times.length - 1, 'the frame\'s payload, in order');
+      assert.equal(bytes[block.start + 4], times.length - 1, "the frame's payload, in order");
     });
   }
   assert.deepEqual(times, [0, 100, 200, 300, 400]);
@@ -326,12 +365,19 @@ test('a WebM stream longer than a block offset reaches splits its cluster', asyn
     clusters = inside(bytes, webmSegment(bytes), 0x1f43b675);
   assert.equal(clusters.length, 2);
   assert.equal(number(bytes, inside(bytes, clusters[1], 0xe7)[0]), 31_000);
-  assert.equal(inside(bytes, inside(bytes, webmSegment(bytes), 0x1c53bb6b)[0], 0xbb).length, 1, 'cues name key frames only');
+  assert.equal(
+    inside(bytes, inside(bytes, webmSegment(bytes), 0x1c53bb6b)[0], 0xbb).length,
+    1,
+    'cues name key frames only',
+  );
 });
 
 test('encodeVideo writes an MP4 with moov first, whose tables find every sample', async () => {
   const description = Uint8Array.of(1, 0x64, 0, 0x33, 0xff),
-    { webCodecs, log } = fakeCodecs({ description, colorSpace: { primaries: 'bt709', matrix: 'bt709', fullRange: true } }),
+    { webCodecs, log } = fakeCodecs({
+      description,
+      colorSpace: { primaries: 'bt709', matrix: 'bt709', fullRange: true },
+    }),
     video = await encodeVideo(frames(5), { format: 'mp4', fps: 10, keyFrameInterval: 0.2, webCodecs }),
     { bytes } = video;
   assert.equal(log.configs[0].codec, 'avc1.640033');
@@ -366,7 +412,10 @@ test('encodeVideo writes an MP4 with moov first, whose tables find every sample'
     stsz = child(bytes, stbl, 'stsz'),
     co64 = child(bytes, stbl, 'co64');
   assert.equal(child(bytes, stbl, 'ctts'), undefined, 'frames in order need no offsets');
-  assert.deepEqual([u32At(bytes, stts.start + 4), u32At(bytes, stts.start + 8), u32At(bytes, stts.start + 12)], [1, 5, 1000]);
+  assert.deepEqual(
+    [u32At(bytes, stts.start + 4), u32At(bytes, stts.start + 8), u32At(bytes, stts.start + 12)],
+    [1, 5, 1000],
+  );
   assert.deepEqual(
     [1, 2, 3].map((i) => u32At(bytes, stss.start + 4 + i * 4)),
     [1, 3, 5],
@@ -443,7 +492,10 @@ test('encodeVideo refuses what it cannot encode', async () => {
   for (const options of [{ fps: 0 }, { keyFrameInterval: 0 }, { bitrate: -1 }])
     await assert.rejects(encodeVideo(frames(1), { ...options, webCodecs }), RangeError);
   await assert.rejects(encodeVideo([frame(4, 2), frame(2, 2)], { webCodecs }), /one size/);
-  await assert.rejects(encodeVideo([{ width: 4, height: 2, data: new Uint8Array(3) }], { webCodecs }), /match its size/);
+  await assert.rejects(
+    encodeVideo([{ width: 4, height: 2, data: new Uint8Array(3) }], { webCodecs }),
+    /match its size/,
+  );
   await assert.rejects(encodeVideo(frames(1), { format: 'mp4', webCodecs }), { code: 'failed' }, 'no avcC, no MP4');
 });
 
@@ -497,12 +549,28 @@ test('abort rejects with its reason at every stage, and closes the encoder', asy
 test('ffmpegArguments picks the codec from the file name, and tags BT.709', () => {
   const webm = ffmpegArguments(640, 360, { output: 'a.WEBM', fps: 24 }),
     mp4 = ffmpegArguments(640, 360, { output: 'a.mp4' });
-  assert.deepEqual(webm.slice(0, 11), ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', '640x360', '-r', '24', '-i', 'pipe:0']);
+  assert.deepEqual(webm.slice(0, 11), [
+    '-y',
+    '-f',
+    'rawvideo',
+    '-pix_fmt',
+    'rgba',
+    '-s',
+    '640x360',
+    '-r',
+    '24',
+    '-i',
+    'pipe:0',
+  ]);
   assert.ok(webm.includes('libvpx-vp9') && !webm.includes('libx264'));
   assert.ok(mp4.includes('libx264') && mp4.includes('+faststart'));
   assert.equal(mp4[10 - 2], '30');
   assert.ok(mp4.includes('scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'));
-  assert.deepEqual(ffmpegArguments(2, 2, { output: 'x.mkv', args: ['-c:v', 'ffv1'] }).slice(-3), ['-c:v', 'ffv1', 'x.mkv']);
+  assert.deepEqual(ffmpegArguments(2, 2, { output: 'x.mkv', args: ['-c:v', 'ffv1'] }).slice(-3), [
+    '-c:v',
+    'ffv1',
+    'x.mkv',
+  ]);
 });
 
 // A program that stands in for ffmpeg: copies standard input to the last argument, or exits as told.
@@ -535,7 +603,7 @@ test('encodeWithFFmpeg pipes every frame, in order, to the program', async () =>
   }
 });
 
-test('encodeWithFFmpeg reports a failed run with ffmpeg\'s words, a missing program, and empty or mixed input', async () => {
+test("encodeWithFFmpeg reports a failed run with ffmpeg's words, a missing program, and empty or mixed input", async () => {
   const folder = await mkdtemp(join(tmpdir(), 'margo-ffmpeg-'));
   process.env.MARGO_STAND_IN = 'fail';
   try {

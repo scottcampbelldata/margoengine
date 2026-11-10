@@ -339,7 +339,7 @@ test('world-unit widths match the projection under perspective and orthographic 
       }),
     );
     const frame = new Float32Array(
-      new Uint8Array(Buffer.from(log.find((entry) => entry[0] === 'writeBuffer' && entry[3].length === 192)[3], 'hex'))
+      new Uint8Array(Buffer.from(log.find((entry) => entry[0] === 'writeBuffer' && entry[3].length === 224)[3], 'hex'))
         .buffer,
     );
     return frame[19] / (m[11] * z + m[15]);

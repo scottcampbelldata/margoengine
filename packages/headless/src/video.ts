@@ -120,6 +120,10 @@ export interface VideoAudio {
 
 /** Options of {@link encodeVideo}. */
 export interface EncodeVideoOptions {
+  /** JSON provenance embedded in WebM tags or an MP4 user-data box. Default none. */
+  provenance?: Readonly<Record<string, unknown>>;
+  /** Maximum retained encoded video payload bytes. Default 512 MiB. Audio is separately owned. */
+  maxBytes?: number;
   /** Container. Default `'webm'`. */
   format?: 'webm' | 'mp4';
   /** Frames per second. Default 30. */
@@ -377,12 +381,16 @@ export async function encodeVideo(
     bitrate,
     keyFrameInterval = 2,
     audio,
+    provenance,
+    maxBytes = 512 * 1024 * 1024,
     webCodecs = globalThis as unknown as WebCodecsBinding,
     signal,
   }: EncodeVideoOptions = {},
 ): Promise<EncodedVideo> {
   if (format !== 'webm' && format !== 'mp4') throw typeError('Video format: webm or mp4', 'headless');
   checkFps(fps);
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
+    throw rangeError('maxBytes must be a positive safe integer', 'headless');
   if (!(keyFrameInterval > 0) || !Number.isFinite(keyFrameInterval))
     throw rangeError('Invalid keyFrameInterval', 'headless');
   if (bitrate !== undefined && (!(bitrate > 0) || !Number.isFinite(bitrate)))
@@ -401,7 +409,8 @@ export async function encodeVideo(
     failure: unknown,
     failed = false,
     wake = () => {},
-    count = 0;
+    count = 0,
+    encodedBytes = 0;
   const live = () => {
       signal?.throwIfAborted();
       if (failed) throw failure;
@@ -426,6 +435,13 @@ export async function encodeVideo(
         live();
         encoder = new Encoder({
           output(chunk, metadata) {
+            encodedBytes += chunk.byteLength;
+            if (encodedBytes > maxBytes) {
+              failure = rangeError('Encoded video exceeds maxBytes', 'headless');
+              failed = true;
+              wake();
+              return;
+            }
             const bytes = new Uint8Array(chunk.byteLength);
             chunk.copyTo(bytes);
             samples.push({
@@ -478,7 +494,7 @@ export async function encodeVideo(
   const { codec: used, width, height } = config!;
   if (used.startsWith('avc1') && !description)
     throw fault('failed', 'The encoder gave no H.264 description', 'headless');
-  const track = { codec: used, width, height, fps, description, colorSpace },
+  const track = { codec: used, width, height, fps, description, colorSpace, provenance },
     sound = audio ? await encodeSound(audio, format, webCodecs, signal) : undefined;
   return {
     bytes: (format === 'webm'

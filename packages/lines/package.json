@@ -66,6 +66,10 @@
     "./debug": {
       "types": "./dist/debug.d.ts",
       "import": "./dist/debug.js"
+    },
+    "./tiles": {
+      "types": "./dist/tiles.d.ts",
+      "import": "./dist/tiles.js"
     }
   },
   "files": [

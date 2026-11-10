@@ -239,6 +239,10 @@
     "./spec": {
       "types": "./dist/spec.d.ts",
       "import": "./dist/spec.js"
+    },
+    "./export-media": {
+      "types": "./dist/export-media.d.ts",
+      "import": "./dist/export-media.js"
     }
   },
   "files": [
@@ -267,7 +271,8 @@
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/terrain": "^1.0.0",
     "@margoengine/tiles": "^1.0.0",
-    "@margoengine/webgl2-compat": "^1.0.0"
+    "@margoengine/webgl2-compat": "^1.0.0",
+    "@margoengine/headless": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
@@ -293,6 +298,7 @@
     "test:browser:parcoords": "node scripts/browser-root.mjs tests/parcoords-browser.mjs",
     "test:browser:monitor": "node scripts/browser-root.mjs tests/monitor-browser.mjs",
     "limits": "node scripts/browser-root.mjs tests/limits-browser.mjs",
-    "test:browser:limits": "node scripts/browser-root.mjs tests/limits-browser.mjs && node scripts/browser-root.mjs tests/limits-browser.mjs --backend=webgl2 --output=test-results/sciviz-limits-webgl2.json"
+    "test:browser:limits": "node scripts/browser-root.mjs tests/limits-browser.mjs && node scripts/browser-root.mjs tests/limits-browser.mjs --backend=webgl2 --output=test-results/sciviz-limits-webgl2.json",
+    "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs"
   }
 }

@@ -2,6 +2,14 @@ import { MargoError } from '@margoengine/math/errors';
 import { BLOCK, FAN } from './geometry.js';
 import { fogWgsl } from '../../shared/fog.js';
 
+/** @internal Capture vertices share one subpixel grid before applying a tile's integer pixel translation. */
+export const tileClipWGSL = /* wgsl */ `fn captureClip(c:vec4f)->vec4f{
+  if(frame.extra.y<0.5){return c;}
+  let pixel=round(c.xy/c.w*0.5*frame.viewport.xy*256.0)/256.0;
+  let translated=pixel+frame.tile.zw*frame.viewport.xy/(2.0*frame.tile.xy);
+  return vec4f(translated*2.0*frame.tile.xy/frame.viewport.xy*c.w,c.zw);
+}`;
+
 /** The fragment's cut by clipping planes, shared with the pick shader. */
 export const clipCut = /* wgsl */ `let clipCount=style.flags.w&0xffffu;var clipBehind=0u;
   for(var p=0u;p<clipCount;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){clipBehind++;}}
@@ -12,7 +20,8 @@ export const lineShader: string = /* wgsl */ `
 const FAN:u32=${FAN}u;
 const BLOCK:u32=${BLOCK}u;
 const PI:f32=3.14159265;
-struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f}
+struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f,tile:vec4f}
+${tileClipWGSL}
 struct Style{model:mat4x4f,color:vec4f,a:vec4f,b:vec4f,flags:vec4u,planes:array<vec4f,6>}
 @group(0) @binding(0) var<uniform> frame:Frame;
 @group(1) @binding(0) var<uniform> style:Style;
@@ -157,6 +166,7 @@ fn fanCorner(k:u32,start:vec2f,sweep:f32,hwG:f32,atB:bool)->Corner{
   // The centre line's world point: each end of the quad takes its segment end, so fragments interpolate along it.
   let wa=style.model*vec4f(points[ia].xyz,1.0);let wb=style.model*vec4f(points[ib].xyz,1.0);
   o.world=mix(wa.xyz/wa.w,wb.xyz/wb.w,select(ta,tb,cr.atB));
+  o.clip=captureClip(o.clip);
   return o;
 }
 
@@ -193,7 +203,10 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
  */
 export const phasedShader = (code: string, phase: number): string =>
   phase
-    ? code.replace('let alpha=i.color.a*cover;', `if(cover${phase === 1 ? '<' : '>='}0.5){discard;}let alpha=i.color.a*cover;`)
+    ? code.replace(
+        'let alpha=i.color.a*cover;',
+        `if(cover${phase === 1 ? '<' : '>='}0.5){discard;}let alpha=i.color.a*cover;`,
+      )
     : code;
 
 /**
@@ -209,6 +222,7 @@ export const filledShader = (code: string): string =>
   o.clip=frame.viewProj*w;
   o.color=vec4f(style.color.rgb,style.color.a*p.w);
   o.edge=vec4f(0.0,1.0,-1e4,-1e4);o.dist=0.0;o.world=w.xyz/w.w;
+  o.clip=captureClip(o.clip);
   return o;
 }
 `;
@@ -256,6 +270,7 @@ export const ribbonShader = (code: string, picking = false): string =>
   if((style.flags.z&64u)!=0u){tint=colors[k];}
   o.color=tint*style.color;
   o.world=w;${picking ? 'o.segment=ii;' : ''}
+  o.clip=captureClip(o.clip);
   return o;
 }
 `;

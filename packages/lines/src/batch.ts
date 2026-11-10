@@ -11,6 +11,7 @@ import { parseColor, type ColorInput } from './color.js';
 import { fillFrame, finiteArray, identity, type Mat4 } from './math.js';
 import { alphaBlend, attachableMesh, overlayPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
+import { tileClipWGSL } from './shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -22,7 +23,8 @@ export const MAX_BATCH_SEGMENTS = 2 ** 26;
 const STYLE_BYTES = 96;
 
 const batchShader = /* wgsl */ `
-struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f}
+struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f,tile:vec4f}
+${tileClipWGSL}
 struct Style{model:mat4x4f,color:vec4f,a:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 @group(1) @binding(0) var<uniform> style:Style;
@@ -59,6 +61,7 @@ fn halfWidth(c:vec4f)->f32{
   let c=select(mix(i.colorA,i.colorB,ta),mix(i.colorA,i.colorB,tb),atB);
   let fade=select(1.0,min(1.0,2.0*raw),aa>0.0);
   o.color=vec4f(linear(c.rgb)*style.color.rgb,c.a*style.color.a*fade);
+  o.clip=captureClip(o.clip);
   return o;
 }
 @fragment fn fragment(i:Out)->@location(0) vec4f{
@@ -333,7 +336,7 @@ export class LineBatches implements EnginePlugin {
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
   private frameBuffer?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
-  private readonly frameData = new Float32Array(24);
+  private readonly frameData = new Float32Array(28);
   private readonly descriptor = overlayPass();
 
   /** Same as `engine.use(new LineBatches(...))`; returns the plugin. */
@@ -380,11 +383,11 @@ export class LineBatches implements EnginePlugin {
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform', minBindingSize: size },
       }),
-      frame = device.createBindGroupLayout({ entries: [uniform(96)] }),
+      frame = device.createBindGroupLayout({ entries: [uniform(112)] }),
       style = device.createBindGroupLayout({ entries: [uniform(STYLE_BYTES)] });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
     this.module = device.createShaderModule({ code: batchShader });
-    this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.frameBuffer = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.frameGroup = device.createBindGroup({
       layout: frame,
       entries: [{ binding: 0, resource: { buffer: this.frameBuffer } }],
