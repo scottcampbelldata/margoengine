@@ -290,6 +290,25 @@ its internal draws are outside drawCalls and geometry totals. This counter is no
 measurement of unique geometry, visibility or GPU vertex-cache work. Dispose it to
 restore its device/context wrappers, remove its overlay row and detach the plugin.
 
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {Stats} from '@margoengine/stats';
+import {GeometryStats} from '@margoengine/stats/geometry';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const stats = Stats.attach(engine);
+const geometry = GeometryStats.attach(engine);
+geometry.view(stats);
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+engine.render();
+const report = geometry.toJSON();
+if (report.triangles !== 12) throw new Error('Expected one submitted box');
+console.log(report);
+geometry.dispose(); stats.dispose(); engine.dispose(); canvas.remove();
+```
+
 ## Asynchronous native WebGL2 timing
 
 Import `GLStats` from `@margoengine/stats/gl` or `margoengine/stats/gl`. Attach it before
@@ -318,6 +337,22 @@ Null means unavailable, rather than zero GPU work. Pending queries retain the la
 completed timing. After context restoration, track the restored context again to
 reacquire its extension. Disposal restores owned wrappers, deletes owned queries,
 removes the optional overlay row and detaches the plugin.
+
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {GLStats} from '@margoengine/stats/gl';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
+const timing = GLStats.attach(engine); // Before optional pass plugins.
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+engine.render();
+await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+timing.poll(); // Read only results already available; pending samples stay null.
+console.log(timing.supported, timing.toJSON());
+timing.dispose(); engine.dispose(); canvas.remove();
+```
 
 ## Four metric histories
 
@@ -354,3 +389,19 @@ from DOM/canvas work; `refresh()` redraws immediately, alongside the refresh tim
 Disposal removes histories, timer, owned phase/timing/memory trackers and the panels
 plugin. A borrowed Stats remains alive and its original graph display is restored;
 an owned Stats is disposed with the panels. Engine disposal performs this cleanup too.
+
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Stats} from '@margoengine/stats';
+import {StatsPanels} from '@margoengine/stats/panels';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const stats = Stats.attach(engine);
+const panels = StatsPanels.attach(engine, {stats, samples: 120});
+engine.render();
+console.log(panels.toJSON());
+panels.dispose(); // Borrowed stats remains attached.
+stats.dispose(); engine.dispose(); canvas.remove();
+```

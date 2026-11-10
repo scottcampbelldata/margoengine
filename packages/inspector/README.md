@@ -121,6 +121,24 @@ function. Call `panel.refresh()` after application writes: there is no polling t
 `panel.undo()` and `panel.redo()` use its history. Dispose bindings or the whole panel
 when finished; aborting the supplied signal disposes the panel and its folders.
 
+
+```ts
+import {TweakPanel} from '@margoengine/inspector/tweak';
+const settings = {speed: 1, enabled: true, color: '#ff8800', position: [0, 1, 0], mode: 'solid', reset: () => console.log('reset')};
+const panel = new TweakPanel({title: 'Preview'});
+const folder = panel.addFolder('Appearance');
+const speed = panel.add(settings, 'speed', {min: 0, max: 4, step: 0.1});
+panel.add(settings, 'enabled');
+folder.addColor(settings, 'color');
+folder.add(settings, 'position', {kind: 'vector'});
+folder.add(settings, 'mode', {options: ['solid', 'wire']});
+panel.add(settings, 'reset');
+speed.setValue(2);
+panel.undo(); panel.redo();
+console.log(settings.speed); // 2
+panel.dispose(); // At application teardown; leave attached to edit interactively.
+```
+
 ## Selection gizmos
 
 Attach `InspectorGizmo` after its Inspector is attached to the same engine. The gizmo
@@ -137,6 +155,24 @@ space, +/- change size and Escape cancels a drag. `keyboard: false` leaves keybo
 handling to the application. Disposal removes listeners, toolbar and controls, restores
 the canvas tabindex and camera control state, and detaches the owned plugin. An abort
 signal, engine disposal or removal of a connected inspector also releases the gizmo.
+
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {Inspector} from '@margoengine/inspector';
+import {InspectorGizmo} from '@margoengine/inspector/gizmo';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const mesh = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+const inspector = Inspector.attach(engine);
+const gizmo = InspectorGizmo.attach(engine, inspector);
+inspector.select(mesh);
+gizmo.sync();
+engine.render();
+// Keep these attached for interactive dragging, then release in this order.
+gizmo.dispose(); inspector.dispose(); engine.dispose(); canvas.remove();
+```
 
 ## Create, delete, duplicate and reparent
 
@@ -165,6 +201,28 @@ Deletion retains original handles for undo, hides the subtree and removes its dr
 geometry. Deleted handles are finally disposed when their last retaining history entry
 is discarded. Editor disposal removes its UI, input and owned lights while keeping
 scene meshes and shared history usable. The supplied signal also disposes it.
+
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Inspector} from '@margoengine/inspector';
+import {SceneEditor} from '@margoengine/inspector/edit';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const inspector = Inspector.attach(engine);
+const editor = SceneEditor.attach(engine, inspector);
+const parent = editor.createPrimitive('box');
+const child = editor.createPrimitive('sphere', parent);
+const copy = editor.duplicate(child);
+editor.reparent(copy, null);
+editor.delete(copy);
+inspector.undo(); // Restores the same retained handle.
+const light = editor.createLight('ambient');
+editor.setLight(light, {intensity: 0.5});
+console.log(editor.light(light));
+editor.dispose(); inspector.dispose(); engine.dispose(); canvas.remove();
+```
 
 ## Texture capture and previews
 
@@ -196,6 +254,25 @@ GPU work. Disposing the viewer cancels its preview but keeps the capture alive. 
 or aborting the capture removes its owned wrappers and metadata without destroying
 application textures. Keep both handles and dispose each owner explicitly.
 
+
+```ts
+import {Engine} from '@margoengine/core';
+import {TextureCapture, TextureViewer} from '@margoengine/inspector/textures';
+const capture = TextureCapture.start(); // Before engine/device/texture creation.
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const device = engine.gpu!; // This example requires WebGPU.
+const texture = device.createTexture({size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING});
+device.queue.writeTexture({texture}, new Uint8Array([255, 128, 0, 255]), {bytesPerRow: 4}, [1, 1]);
+const id = capture.register(device, texture);
+const viewer = TextureViewer.attach(capture);
+await viewer.select(id, {channel: 'rgba', mip: 0, layer: 0});
+const preview = await capture.preview(id);
+console.log(preview.width, preview.height);
+viewer.dispose(); capture.dispose(); texture.destroy(); engine.dispose(); canvas.remove();
+```
+
 ## Animation playback and skeletons
 
 `AnimationPanel.attach(engine, players, options)` accepts live Animation players from
@@ -216,6 +293,26 @@ state for a live model, without disposing the player or model. Model disposal re
 its controls. Panel disposal, engine disposal or its abort signal releases all models,
 helpers and DOM.
 
+Serve the repository root so the included Fox GLB is available at the URL below.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {Animation} from '@margoengine/animation';
+import {AnimationPanel} from '@margoengine/inspector/animation';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/examples/assets/khronos/Fox/Fox.glb');
+const player = Animation.attach(model);
+const panel = AnimationPanel.attach(engine, [player]);
+panel.set(player, 0, {playing: false, time: 0.5, weight: 1});
+console.log(panel.state(player, 0));
+engine.render();
+panel.remove(player); // Returns clock/pose ownership to the player.
+panel.dispose(); player.dispose(); model.dispose(); engine.dispose(); canvas.remove();
+```
+
 ## Native WebGL2 preview inspection
 
 The root Inspector's debug overlays are WebGPU-only. For an engine using the WebGL2
@@ -234,6 +331,21 @@ cancels capture; panel disposal cancels its own pending capture. Temporary captu
 wrappers are removed on success or failure. GPU costs are null when timer queries are
 unsupported or disjoint; a null value is not zero cost. Context loss disables overlays;
 dispose and reattach after restoring the context.
+
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {GLInspector} from '@margoengine/inspector/gl';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+const panel = GLInspector.attach(engine);
+panel.setDebug('bounds', true);
+const report = await panel.capture({render: true, timeout: 5000});
+console.log(report);
+panel.dispose(); engine.dispose(); canvas.remove();
+```
 
 ## Cameras, screenshots, recordings and glTF
 
@@ -260,6 +372,22 @@ through the model exporter. Screenshot, recording and export accept operation si
 the panel's signal disposes the tools. Disposal restores the original camera, aborts
 pending work, disposes recording, revokes owned download URLs and removes the panel.
 Loaded-camera projection support is imported only when selecting a loaded camera.
+
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {CameraTools} from '@margoengine/inspector/tools';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+const tools = CameraTools.attach(engine);
+await tools.select('default');
+const png = await tools.screenshot({type: 'image/png'});
+const glb = await tools.exportGLTF();
+console.log(png.size, glb);
+tools.dispose(); engine.dispose(); canvas.remove();
+```
 
 ## Edit other packages' objects
 
@@ -334,6 +462,26 @@ An unchanged edit may return ok with zero modules. Zero observed modules do not 
 GPU compilation; keep the target visible and rendering for that evidence. Dispose the editor
 to remove its timer, listeners and panel; meshes and their materials remain app-owned.
 
+A standalone WebGPU edit with a visible mesh:
+
+```ts
+import {Engine} from '@margoengine/core';
+import {boxGeometry} from '@margoengine/geometry';
+import {WgslMaterial, createMesh} from '@margoengine/materials';
+import {ShaderEditor, recompileShader} from '@margoengine/inspector/shaders';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {backend: 'webgpu', camera: {position: [2, 2, 3], target: [0, 0, 0]}});
+const wgsl = 'fn shade(i: Out, s: Surface) -> Surface { var o = s; o.base = vec4f(0.2, 0.6, 0.9, 1.0); return o; }';
+const mesh = createMesh(engine, boxGeometry(1, 1, 1), new WgslMaterial({wgsl}));
+const editor = ShaderEditor.attach(engine, {meshes: [mesh], live: false});
+engine.start(); // The edit must render to compile its pipelines.
+const result = await recompileShader(mesh, wgsl.replace('0.2, 0.6, 0.9', '0.9, 0.4, 0.2'), {device: engine.gpu, history: editor.history});
+if (!result.ok || result.modules === 0) throw new Error(JSON.stringify(result));
+console.log(result.diagnostics);
+editor.history.undo();
+editor.dispose(); engine.dispose(); canvas.remove();
+```
+
 ## Remote inspection
 
 `margoengine/inspector/remote` inspects a scene running on a phone or headset from a desktop browser. The page on the
@@ -369,6 +517,38 @@ readiness rather than sleeping for a guessed duration. The package's
 machine; it does not prove phone/headset hardware behavior. `test:browser:shaders`
 checks real compiler diagnostics, rollback and panel undo on WebGPU. Native preview
 coverage is in `test:browser:gl` and `test:browser:gl:compat`.
+
+This local browser example uses the same protocol without a server:
+
+```ts
+import {Engine} from '@margoengine/core';
+import {RemoteTarget, RemoteInspector, channelTransport} from '@margoengine/inspector/remote';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 320;
+const engine = await Engine.create(canvas);
+const channel = new MessageChannel();
+const targetTransport = channelTransport(channel.port1);
+const viewerTransport = channelTransport(channel.port2);
+const target = RemoteTarget.attach(engine, {transport: targetTransport, token: 'local-development'});
+const viewer = new RemoteInspector({transport: viewerTransport, token: 'local-development', parent: null});
+await viewer.connect(); // Scene delivery, with no guessed sleep.
+console.log(viewer.objects);
+await viewer.set('light:sun', 'intensity', 2);
+await viewer.undo();
+viewer.dispose(); target.dispose();
+targetTransport.close?.(); viewerTransport.close?.();
+channel.port1.close(); channel.port2.close();
+engine.dispose(); canvas.remove();
+```
+
+The relay runs separately in Node, never in a browser bundle:
+
+```ts
+import {createRemoteRelay} from '@margoengine/inspector/remote-relay';
+const relay = await createRemoteRelay({host: '127.0.0.1'});
+console.log(relay.url, relay.token); // Supply both privately to the two development pages.
+await relay.close(); // On development server shutdown.
+```
 
 ## Plugin and pass view
 

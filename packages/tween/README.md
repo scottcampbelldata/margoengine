@@ -46,6 +46,26 @@ settled run creates a fresh finished promise; save or await the promise for that
 An already-aborted signal also cancels a replay. Playback callbacks run during update,
 not during seek. Cancelling pauses the timeline and leaves sampled values in place.
 
+
+```ts
+import {AsyncTween, AsyncTimeline} from '@margoengine/tween/async';
+const target = {x: 0};
+const driver = new AsyncTween();
+const task = driver.to(target, 'x', 10, {duration: 1});
+driver.update(1); // Application clock, seconds. Await alone does not advance it.
+await task;
+if (target.x !== 10) throw new Error('Tween did not finish');
+const timeline = new AsyncTimeline().to(target, 'x', 20, {duration: 1}).play();
+timeline.update(1);
+await timeline.finished;
+const controller = new AbortController();
+const cancelled = driver.to(target, 'x', 30, {duration: 1, signal: controller.signal});
+const observed = cancelled.finished.catch(reason => console.log(reason.name));
+controller.abort();
+await observed;
+driver.clear();
+```
+
 ## Multiple properties and keyframes
 
 The `props` entry's `to(target, values, options)`, `from(target, values, options)` and
@@ -69,6 +89,21 @@ cancel and Symbol.dispose. Its speed defaults to 1 and accepts finite nonnegativ
 values; zero freezes the clock. Advance it with update even when awaiting completion.
 Options include the async timing options and AbortSignal. Cancellation rejects the
 completion promise and leaves current property values intact.
+
+
+```ts
+import {to, from, fromTo, keyframes} from '@margoengine/tween/props';
+const target = {x: 0, y: 0};
+const move = to(target, {x: '+=4', y: [0, 2, 0]}, {duration: 1});
+move.update(1); await move.finished;
+const reveal = from(target, {x: -2}, {duration: 1});
+reveal.update(1); await reveal.finished;
+const reset = fromTo(target, {x: 0}, {x: 8}, {duration: 1});
+reset.update(1); await reset.finished;
+const sequence = keyframes(target, [{values: {x: 0}, offset: 0}, {values: {x: 6}, offset: 0.5}, {values: {x: 10}, offset: 1}], {duration: 2});
+sequence.update(2); await sequence.finished;
+if (target.x !== 10) throw new Error('Keyframes did not finish');
+```
 
 ## Mixed clips and nested timelines
 
@@ -96,6 +131,25 @@ captured when a clip is first sampled. Replay renews finished and the repeat bud
 Abort or cancel rejects completion and stops the hierarchy, preserving values;
 cancellation propagates between parent and child. Disposal cancels and detaches children.
 
+
+```ts
+import {Timeline} from '@margoengine/tween/timeline';
+const target = {x: 0};
+const color = [1, 0, 0];
+const child = new Timeline().to(target, 'x', 4, {duration: 1});
+const parent = new Timeline()
+  .label('start')
+  .add(child, 'start')
+  .array(color, [0, 0, 1], {duration: 1, at: 'start'})
+  .call(() => console.log('complete'));
+parent.seek(0.5); // Samples values, without firing the callback.
+parent.seek(0).play();
+parent.update(parent.totalDuration);
+await parent.finished;
+console.log(target.x, color);
+parent.remove(child);
+```
+
 ## A control world for target ownership
 
 Construct `TweenControl` from `/control` to keep a target/key registry without globals.
@@ -115,6 +169,23 @@ Call only `world.update(deltaSeconds)` for registered work. Operation speed and 
 world's timeScale multiply; both default to 1 and allow finite nonnegative values.
 Zero freezes time, including delay. Work created from callbacks starts on the next
 update. Disposal cancels the world's remaining operations without resetting targets.
+
+
+```ts
+import {TweenControl} from '@margoengine/tween/control';
+const target = {x: 0, y: 0};
+const world = new TweenControl();
+const first = world.to(target, {x: 4, y: 8}, {duration: 1});
+const second = world.to(target, {x: 10}, {duration: 1}); // Replaces only first's x.
+world.update(1);
+await Promise.all([first.finished, second.finished]);
+if (target.x !== 10 || target.y !== 8) throw new Error('Overwrite lost a property');
+const interrupted = world.to(target, {x: 20}, {duration: 1});
+const observed = interrupted.finished.catch(reason => console.log(reason.name));
+world.killTweensOf(target, ['x']);
+await observed;
+world.dispose();
+```
 
 ## Pin a scrolling section and snap
 
@@ -141,6 +212,24 @@ onUpdate runs after each sample; timeline playback callbacks do not fire on seek
 Disposal or signal abort removes listeners, animation frames and spacer and restores
 the pin's original inline style and DOM position. The timeline remains caller-owned
 and paused, without automatically resuming its prior clock.
+
+
+```ts
+import {Timeline} from '@margoengine/tween/timeline';
+import {pinTimeline, scrollSnapPoint} from '@margoengine/tween/scroll-pin';
+const section = document.body.appendChild(document.createElement('section'));
+section.textContent = 'Scroll through the pinned section';
+section.style.height = '100vh';
+const camera = {height: 10};
+const timeline = new Timeline().label('start').to(camera, 'height', 2, {duration: 1}).label('end');
+const controller = new AbortController();
+const link = pinTimeline(timeline, {pin: section, distance: 1000, snap: 'labels', signal: controller.signal});
+link.refresh();
+console.log(link.progress, scrollSnapPoint(0.8, [0, 0.5, 1], 1));
+// At page teardown; keep the link alive while the user scrolls.
+controller.abort();
+section.remove();
+```
 
 ## Release velocity and inertia
 
@@ -178,6 +267,19 @@ timeline.update(1 / 60);
 ```
 
 Times are seconds. delay, onComplete, zero-duration tracks and cancellation are supported. A new track for the same object/property cancels the old one. Callback-created tracks begin next update; clear cancels all tracks. Completed/cancelled tracks compact in place. Track creation and callbacks can allocate; the in-place stepping above does not cover them. Targets are numeric writable properties; for colours, quaternions and paths use `array`, `path` or `custom` (below). CSS strings are not parsed.
+
+
+```ts
+import {VelocityTracker, inertia} from '@margoengine/tween/inertia';
+const tracker = new VelocityTracker();
+tracker.sample(0, 0); tracker.sample(10, 0.05);
+const target = {x: 10};
+const release = inertia(target, 'x', {velocity: tracker, releaseTime: 0.05, resistance: 6, end: [0, 50, 100], min: 0, max: 100});
+release.update(10); // Simulate to maxDuration without a wall-clock timer.
+await release.finished;
+if (target.x !== 50) throw new Error('Unexpected snap endpoint');
+console.log(target.x, tracker.velocityAt(1)); // 50, 0 (idle pointer).
+```
 
 ## Repeat, yoyo, easings, springs, timelines, colours, paths
 
