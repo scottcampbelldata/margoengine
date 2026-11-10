@@ -7559,6 +7559,12 @@
       "commit": "batch-177-job3",
       "reason": "New optional sciviz/charts-extra: 0 -> 7292 B gzip. Complete specialised vector charts, scales and layered/squarified layouts stay together; splitting would duplicate vector helpers and complicate composition. Core + stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b3e5e8f7d",
+      "reason": "Batch 274 job 4: new optional compute/nn-extra, 0 to 20860 B gzip; ceiling 21486 B. Differentiable norms, grouped transposed convolution, recurrent layers and interpolation share Tensor ownership and existing primitives. Splitting would duplicate these helpers. Existing nn 19137 to 18873 B; core plus stage unchanged 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8929,7 +8935,8 @@
     "@margoengine/sciviz/curvilinear": 8476,
     "@margoengine/clustered/cube-projector": 4716,
     "@margoengine/sciviz/geo-lod": 7517,
-    "@margoengine/sciviz/charts-extra": 7548
+    "@margoengine/sciviz/charts-extra": 7548,
+    "@margoengine/compute/nn-extra": 21486
   },
-  "total": 14285576
+  "total": 14307062
 }

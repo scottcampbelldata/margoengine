@@ -4224,3 +4224,7 @@ Batch 136 removal: exporters ships no prebuilt third-party Draco encoder. The ow
 ## Batch 177 job 3: specialised chart coverage
 
 sciviz/charts-extra implements every specialised chart family named in batch 177 job 3, each with vector axes/scales and SVG export. Evidence: packages/sciviz/tests/charts-extra.test.js checks numerical placement, wind count conservation, hierarchy area conservation, nonoverlap, weighted layered ports, cycles, missing days and leap years; charts-extra-browser.mjs renders the 13 NOAA/EIA SVGs in both browser backend modes, checks visible ink/no raster/download and a 390 px layout. This claims chart families and the named static layout behavior, not all options of a rival or performance parity. No speed measurement.
+
+### Batch 274 job 4: missing NN layer family
+
+Claim: compute/nn-extra supplies differentiable BatchNorm/GroupNorm, grouped/dilated ConvTranspose2d, stacked/bidirectional LSTM/GRU with explicit/masked states, and 1D/2D/3D interpolation. Proof: nn-extra-cases.js has 38 analytic/gradient/persistence checks shared by all four numerical routes; nn-extra.test.js adds input finite differences, shape validation and exact live-buffer accounting. nn-extra-browser.mjs runs the same cases on WebGPU and compatibility. CPU tests retain all previous nn assertions. Convention and storage limits are in docs/limits.md; no serialization equivalence to a rival or elapsed-time claim is made.

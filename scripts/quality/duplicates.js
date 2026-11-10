@@ -21,7 +21,10 @@ export const FAMILIES = {
   'gltf-accessor':
     /(?:5126|getFloat32)[\s\S]{0,80}(?:5125|getUint32)[\s\S]{0,80}(?:5123|getUint16)[\s\S]{0,80}(?:getInt16|getUint8)/, // glTF component read: shared/accessor.js
   'hidden-ancestor': /for \(\s*(?:let )?[^;{]*;[^;{]*;[^{]*?parents(?:\?\.)?\[[\s\S]{0,240}?\.hidden\[/, // visibility walk up store.parents: shared/visibility.js
-  'ggx-ndf': /\(\s*[\w.]*\s*-\s*1(?:\.0?)?\s*\)\s*\+\s*1(?:\.0?)?\b/, // GGX D term denominator nh*nh*(a2 - 1) + 1
+  // The squared cosine factor is part of the signature. A generic scale*(extent-1)+1
+  // also describes convolution output geometry and is not evidence of a GGX copy.
+  'ggx-ndf':
+    /(?:\b([\w.]+)\s*\*\s*\1|\bpow\s*\(\s*[\w.]+\s*,\s*2(?:\.0?)?\s*\))\s*\*\s*\(\s*[\w.]+\s*-\s*1(?:\.0?)?\s*\)\s*\+\s*1(?:\.0?)?\b/,
   'hex-colour': /\/\^#\??\(?\[0-9a-f/i, // '#rgb' / '#rrggbb' parsing regex: math/color
   'partial-view': /\[0\] !== 0 \|\| [\w.]+\[1\] !== 0 \|\| [\w.]+\[2\] !== [\w.]*width/, // full-view test of a view rectangle: core renderer
 };

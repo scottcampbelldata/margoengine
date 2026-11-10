@@ -3670,3 +3670,9 @@ process-tree deadline and shared GPU admission, with no exclusive speed reservat
 
 Batch 136 removal: build packages, then run exporters/draco-native.test.js and tests/supply-chain.test.js with a hard timeout. They require the owned Wasm, no old encoder vendor/dist directories, successful default compression, current generated notices, retained asset addenda and valid package file lists. scripts/lazy-files.js lists only the owned Draco encoder asset. Run the exporter browser script for native and --compat under separate shared GPU slots. The external-oracle parity command above remains available without bundling its opaque modules.
 Batch 177 job 3: build packages, run node --test --test-timeout=60000 packages/sciviz/tests/charts-extra.test.js, then node scripts/gpu-lock.mjs run --owner=sciviz-charts-extra --wait-max=60 --max=3 -- node packages/sciviz/tests/charts-extra-browser.mjs. Open examples/sciviz-charts-extra.html for the 13 charts and downloads. Data provenance is examples/assets/sciviz/charts-extra/source.json; prepare.py re-downloads government data with bounded network waits. EIA revisions can change source hashes, so committed JSON is the proof fixture.
+
+### Batch 274 job 4: NN-extra reproduction
+
+After npm run build:packages, run node --test --test-timeout=120000 packages/compute/tests/nn.test.js packages/compute/tests/nn-extra.test.js. This covers JavaScript and Rust SIMD CPU contexts, independent finite differences and allocation accounting. Run node scripts/gpu-lock.mjs run --owner=nn-extra-proof --wait-max=60 --max=3 -- node packages/compute/tests/nn-extra-browser.mjs for 38 cases each on WebGPU and compatibility. The transpose oracle scatters input taps, independently of the implementation's output gather. All tests are correctness-only.
+
+The NN-extra landing detector regression runs with node --test --test-timeout=120000 tests/quality-gate.test.js; retain both positive GGX and negative convolution-geometry cases.

@@ -15,7 +15,7 @@
 import { rangeError, typeError } from '../../shared/errors.js';
 import { GpuArray } from './array.js';
 import type { ComputeContext } from './context.js';
-import { Operand, where } from './expr.js';
+import { type Operand, where } from './expr.js';
 import { matmul } from './linalg.js';
 import { Random } from './random.js';
 
@@ -153,7 +153,10 @@ export class Tensor {
    */
   backward(seed?: GpuArray): void {
     if (!this.requiresGrad)
-      throw typeError('backward needs a tensor that depends on a parameter; none of its inputs requires a gradient', 'compute');
+      throw typeError(
+        'backward needs a tensor that depends on a parameter; none of its inputs requires a gradient',
+        'compute',
+      );
     if (!seed && this.value.size !== 1)
       throw rangeError(`backward of ${this.value.size} elements needs a seed; reduce to one value first`, 'compute');
     const order: Tensor[] = [],
@@ -404,8 +407,17 @@ export class Tensor {
       c = Math.sqrt(2 / Math.PI),
       t = x.add(x.mul(x).mul(x).mul(0.044715)).mul(c).tanh();
     return this.#map(x.mul(0.5).mul(t.add(1)).eval(), (g) => {
-      const inner = x.square().mul(3 * 0.044715).add(1).mul(c);
-      return g.mul(t.add(1).mul(0.5).add(x.mul(0.5).mul(t.square().neg().add(1)).mul(inner)));
+      const inner = x
+        .square()
+        .mul(3 * 0.044715)
+        .add(1)
+        .mul(c);
+      return g.mul(
+        t
+          .add(1)
+          .mul(0.5)
+          .add(x.mul(0.5).mul(t.square().neg().add(1)).mul(inner)),
+      );
     });
   }
 
@@ -486,14 +498,21 @@ export function crossEntropy(logits: Tensor, labels: GpuArray): Tensor {
     hot = ids.reshape(rows, 1).eq(line.reshape(1, classes)).astype('f32').eval();
   line.dispose();
   ids.dispose();
-  return logp.mul(constant(hot)).sum().mul(-1 / rows);
+  return logp
+    .mul(constant(hot))
+    .sum()
+    .mul(-1 / rows);
 }
 
 /** Zeroes each element with probability `p` and scales the rest by 1 / (1 - p). */
 export function dropout(x: Tensor, p: number, rng: Random): Tensor {
   if (!(p >= 0 && p < 1)) throw rangeError(`dropout p must be in [0, 1), got ${p}`, 'compute');
   const noise = rng.uniform(x.shape as number[]),
-    mask = noise.ge(p).astype('f32').mul(1 / (1 - p)).eval();
+    mask = noise
+      .ge(p)
+      .astype('f32')
+      .mul(1 / (1 - p))
+      .eval();
   noise.dispose();
   return x.mul(constant(mask));
 }
@@ -514,7 +533,10 @@ type Pair = readonly [number, number];
 const pair = (v: number | Pair, name: string, least: number): Pair => {
   const out = typeof v === 'number' ? ([v, v] as const) : v;
   if (out.length !== 2 || !out.every((d) => Number.isInteger(d) && d >= least))
-    throw rangeError(`${name} must be a whole number of at least ${least}, or two of them, got ${String(v)}`, 'compute');
+    throw rangeError(
+      `${name} must be a whole number of at least ${least}, or two of them, got ${String(v)}`,
+      'compute',
+    );
   return out;
 };
 
@@ -535,7 +557,10 @@ function unfolding(gpu: ComputeContext, channels: number, h: number, w: number, 
   const outH = Math.floor((h + 2 * ph - dh * (kh - 1) - 1) / sh) + 1,
     outW = Math.floor((w + 2 * pw - dw * (kw - 1) - 1) / sw) + 1;
   if (outH < 1 || outW < 1)
-    throw rangeError(`A ${kh} x ${kw} window does not fit a ${h} x ${w} input; lower the kernel or add padding`, 'compute');
+    throw rangeError(
+      `A ${kh} x ${kw} window does not fit a ${h} x ${w} input; lower the kernel or add padding`,
+      'compute',
+    );
   const positions = outH * outW,
     taps = channels * kh * kw,
     size = channels * h * w,
@@ -610,12 +635,7 @@ export interface AttentionOptions {
  * softmax(q k^T / sqrt(d)) v over the last two dimensions: q is [..., t, d], k and v [..., s, d]. The score matrix
  * [..., t, s] is held in memory, so memory grows with t times s.
  */
-export function scaledDotProductAttention(
-  q: Tensor,
-  k: Tensor,
-  v: Tensor,
-  options: AttentionOptions = {},
-): Tensor {
+export function scaledDotProductAttention(q: Tensor, k: Tensor, v: Tensor, options: AttentionOptions = {}): Tensor {
   const d = q.shape[q.ndim - 1],
     last = [...k.shape.keys()],
     axes = [...last.slice(0, -2), last[last.length - 1], last[last.length - 2]];
@@ -694,10 +714,19 @@ export abstract class Module {
     }
   }
 
-  /** The parameters' values by name, to save and hand to `loadStateDict`. */
+  /** The parameters and each child module's saved state, by dotted name. */
   async stateDict(): Promise<Record<string, Float32Array>> {
     const out: Record<string, Float32Array> = {};
-    for (const [name, p] of this.namedParameters()) out[name] = (await p.value.read()) as Float32Array;
+    const visit = async (name: string, value: unknown): Promise<void> => {
+      if (value instanceof Tensor) {
+        if (value.requiresGrad) out[name] = (await value.value.read()) as Float32Array;
+      } else if (value instanceof Module) {
+        for (const [key, data] of Object.entries(await value.stateDict())) out[`${name}.${key}`] = data;
+      } else if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) await visit(`${name}.${i}`, value[i]);
+      }
+    };
+    for (const [name, value] of Object.entries(this)) await visit(name, value);
     return out;
   }
 
@@ -708,8 +737,18 @@ export abstract class Module {
       if (!data) throw rangeError(`State has no parameter ${name}`, 'compute');
       if (data.length !== p.value.size)
         throw rangeError(`State's ${name} has ${data.length} values; the parameter has ${p.value.size}`, 'compute');
-      p.value.write(data);
     }
+    const visit = (name: string, value: unknown): void => {
+      if (value instanceof Tensor) {
+        if (value.requiresGrad) value.value.write(state[name]);
+      } else if (value instanceof Module) {
+        const nested: Record<string, ArrayLike<number>> = {};
+        for (const [key, data] of Object.entries(state))
+          if (key.startsWith(`${name}.`)) nested[key.slice(name.length + 1)] = data;
+        value.loadStateDict(nested);
+      } else if (Array.isArray(value)) value.forEach((item, i) => visit(`${name}.${i}`, item));
+    };
+    for (const [name, value] of Object.entries(this)) visit(name, value);
   }
 
   /** Frees the parameters, their gradients and the layer's tables. */
@@ -787,8 +826,7 @@ class Tables {
     return u;
   }
   dispose(): void {
-    for (const u of this.#made.values())
-      for (const a of [u.table, u.valid, u.inverse, u.inverseValid]) a?.dispose();
+    for (const u of this.#made.values()) for (const a of [u.table, u.valid, u.inverse, u.inverseValid]) a?.dispose();
     this.#made.clear();
   }
 }
@@ -1053,16 +1091,22 @@ export class Embedding extends Module {
       dim = w.shape[1],
       flat = ids.value.reshape(ids.value.size),
       rows = gpu.take(w.value, flat, { axis: 0 });
-    return Tensor.made(w, rows.reshape(...ids.shape, dim), [w], (g) => {
-      // Ids repeat, so rows add atomically: the order of float additions is the GPU's.
-      const sum = gpu.zeros(w.shape),
-        ints = flat.astype('i32').eval(),
-        line = gpu.arange(0, dim, 1, 'i32'),
-        offsets = ints.reshape(flat.size, 1).mul(dim).add(line).eval();
-      gpu.scatter(sum, offsets, g, { op: 'add' });
-      for (const a of [ints, line, offsets]) a.dispose();
-      Tensor.give(w, sum);
-    }, [rows]);
+    return Tensor.made(
+      w,
+      rows.reshape(...ids.shape, dim),
+      [w],
+      (g) => {
+        // Ids repeat, so rows add atomically: the order of float additions is the GPU's.
+        const sum = gpu.zeros(w.shape),
+          ints = flat.astype('i32').eval(),
+          line = gpu.arange(0, dim, 1, 'i32'),
+          offsets = ints.reshape(flat.size, 1).mul(dim).add(line).eval();
+        gpu.scatter(sum, offsets, g, { op: 'add' });
+        for (const a of [ints, line, offsets]) a.dispose();
+        Tensor.give(w, sum);
+      },
+      [rows],
+    );
   }
 }
 
@@ -1252,7 +1296,17 @@ export class Adam extends Optimizer {
       const [m, v] = moments;
       assign(m, m.mul(b1).add(g.mul(1 - b1)));
       assign(v, v.mul(b2).add(g.square().mul(1 - b2)));
-      assign(p.value, this.start(p).sub(m.mul(this.lr / c1).div(v.mul(1 / c2).sqrt().add(this.#eps))));
+      assign(
+        p.value,
+        this.start(p).sub(
+          m.mul(this.lr / c1).div(
+            v
+              .mul(1 / c2)
+              .sqrt()
+              .add(this.#eps),
+          ),
+        ),
+      );
     }
   }
 

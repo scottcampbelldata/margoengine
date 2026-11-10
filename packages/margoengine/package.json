@@ -702,6 +702,10 @@
       "types": "./dist/compute/cpu-wasm.d.ts",
       "import": "./dist/compute/cpu-wasm.js"
     },
+    "./compute/nn-extra": {
+      "types": "./dist/compute/nn-extra.d.ts",
+      "import": "./dist/compute/nn-extra.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"

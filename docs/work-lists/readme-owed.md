@@ -1050,3 +1050,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - Tooling (API lock Day 0): document report coverage, locked/watch rollout and one-shot approved breaks in the README phase; examples deferred.
 - @margoengine/sciviz (batch 177 job 3): document /charts-extra families, own scales/layouts, SVG exports, data conventions, bounds and NOAA/EIA demo; copy-paste examples owed in README phase.
 - margoengine (batch 177 job 3): document sciviz/charts-extra optional alias in README phase.
+
+- @margoengine/compute (batch 274 job 4): document /nn-extra, all defaults/layouts, train/eval and nested normalization state, grouped transpose/output size, recurrent run states/lengths/gradients, upsampling modes/coordinates, and table/tape storage. Add examples only in the README phase.
+
+- margoengine (batch 274 job 4): document the generated compute/nn-extra subpath in the README phase.

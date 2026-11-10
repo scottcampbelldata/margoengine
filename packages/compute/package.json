@@ -87,6 +87,10 @@
     "./cpu-wasm": {
       "types": "./dist/cpu-wasm.d.ts",
       "import": "./dist/cpu-wasm.js"
+    },
+    "./nn-extra": {
+      "types": "./dist/nn-extra.d.ts",
+      "import": "./dist/nn-extra.js"
     }
   },
   "files": [
@@ -118,6 +122,7 @@
     "test:browser:decomp": "cd ../.. && node packages/compute/tests/decomp-browser.mjs",
     "build:decomp": "node scripts/build-decomp.mjs",
     "build:cpu-wasm": "node scripts/build-cpu.mjs",
-    "test:browser:cpu-wasm": "cd ../.. && node packages/compute/tests/cpu-wasm-browser.mjs"
+    "test:browser:cpu-wasm": "cd ../.. && node packages/compute/tests/cpu-wasm-browser.mjs",
+    "test:browser:nn-extra": "cd ../.. && node packages/compute/tests/nn-extra-browser.mjs"
   }
 }

@@ -187,6 +187,21 @@ test('family signatures match the known copies', () => {
   assert.ok(FAMILIES['partial-view'].test('r[0] !== 0 || r[1] !== 0 || r[2] !== c.width'));
 });
 
+test('GGX family requires the squared-cosine term and excludes convolution output geometry', () => {
+  for (const code of [
+    'let denominator = cosine * cosine * (alphaSquared - 1) + 1;',
+    'let denominator = pow(cosine, 2.0) * (alphaSquared - 1.0) + 1.0;',
+    'let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));',
+  ])
+    assert.ok(FAMILIES['ggx-ndf'].test(code), code);
+  for (const code of [
+    '(h - 1) * sh - 2 * ph + dh * (kh - 1) + 1',
+    '(w - 1) * sw - 2 * pw + dw * (kw - 1) + 1',
+    '(a + 2) * t * t * t - (a + 3) * t * t + 1',
+  ])
+    assert.equal(FAMILIES['ggx-ndf'].test(code), false, code);
+});
+
 test('reexports distinguish package boundaries from shared name prefixes', () => {
   const root = mkdtempSync(join(tmpdir(), 'quality-prefix-'));
   assert.ok(root.startsWith(join(tmpdir(), 'quality-prefix-')));
