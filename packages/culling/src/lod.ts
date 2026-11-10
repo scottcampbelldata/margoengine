@@ -366,7 +366,7 @@ export class LodInstances implements EnginePlugin {
     const engine = this.engine;
     this.release();
     if (engine) {
-      engine.removePlugin(this.name);
+      engine.sceneOf(this)?.removePlugin(this.name);
       if (!engine.disposed) for (const level of this.levels) engine.release(level.own);
     }
     this.engine = this.device = undefined;

@@ -834,7 +834,7 @@ export class DynamicInstances implements EnginePlugin {
     const engine = this.engine;
     this.release();
     if (engine) {
-      engine.removePlugin(this.name);
+      engine.sceneOf(this)?.removePlugin(this.name);
       if (!engine.disposed) engine.release(this.own);
     }
     this.engine = this.device = undefined;

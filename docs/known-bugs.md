@@ -5488,3 +5488,25 @@ steps keeps x[0] === x[1]); Reynolds 1987 gives no direction for a zero offset, 
 row-order independence `flock` promises. `avoidObstacles` scales its push by `1 + (reach - along) / reach` and
 `min(1, clearance / radius + 0.5)`, Margo's own heuristic with no source or measurement behind the 0.5.
 
+## Batch 132 audit: culling (fixed and open)
+
+Fixed with regressions in `packages/culling/test/audit-132.test.js` (all 7 fail on the code before the fix):
+`CulledInstances`, `DynamicInstances`, `LodInstances`, `CulledMeshes`, `CulledModels`, `FrontToBack` and
+`WebGL2Culling` `dispose()` called `engine.removePlugin(this.name)`, which acts on the active scene; a plugin used by a
+second scene released its buffers and stayed registered there, its pass drawing a disposed plugin. They now leave
+through `engine.sceneOf(this)`.
+
+Open, found by the Mac sweep (M6, Chromium WebGPU on Metal), not fixed: `MeshletMesh` frames are not deterministic.
+`node packages/culling/test/gpu/meshlets-check.mjs` fails at step 0 ("whole ball: the far side drops") with 69 to 77
+pixels off core by 1 to 3 levels, a different count each run. Redrawing engine A with nothing changed differs from its
+own last frame by 22 to 33 pixels at step 0 and 5 to 15 at the later steps, while core's frames repeat to the byte.
+No pixel is missing or extra (every differing pixel is ball in both frames), and the count stays with
+`maxTriangles: 1` (one triangle per cluster), so the cluster tests are not dropping visible triangles. Cause: the cull
+kernel reserves each kept cluster's room with `atomicAdd` on the part's index count (meshlets.ts clusterShader), so the
+order of clusters in `kept`, and with it the draw order, changes from frame to frame; where two front faces of the
+rippled ball tie in depth under `greater-equal`, the last drawn wins. Core draws in index order. To close it, the kept
+list needs a stable order (a prefix sum over the clusters' keep flags per part, Blelloch 1990, instead of the atomic
+reservation). The check's 0-pixel requirement was not relaxed. The `parts-check.mjs` shadows step 2 1-pixel failure is
+the open entry above (CulledParts back-culled pipeline under shadows, Scott's call); it stops `test:gpu` before the
+later scripts, which pass when run one by one.
+

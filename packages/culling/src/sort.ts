@@ -379,7 +379,7 @@ export class FrontToBack implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.restore();
     this.sorter.dispose();
     this.models.clear();
