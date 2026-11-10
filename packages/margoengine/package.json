@@ -4278,6 +4278,10 @@
       "types": "./dist/video/demux.d.ts",
       "import": "./dist/video/demux.js"
     },
+    "./video/playback": {
+      "types": "./dist/video/playback.d.ts",
+      "import": "./dist/video/playback.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"

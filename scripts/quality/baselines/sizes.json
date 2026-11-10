@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13842997,
+  "total": 13844722,
   "history": [
     {
       "date": "2026-10-24",
@@ -7262,6 +7262,12 @@
       "commit": "batch-271-grass",
       "reason": "New optional terrain-grass composition: 0 to 1651 B gzip plus generated alias. Reuses scatter height/density/interaction and adds a retained world colour raster; splitting would separate one creation contract.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "0298bf691",
+      "reason": "Batch 269 adds native playback lifecycle, readiness, cancellation and policy fallback in one optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -8579,6 +8585,7 @@
     "@margoengine/sciviz/cinematic": 6262,
     "@margoengine/voxel-net/server-runtimes": 20060,
     "@margoengine/creative/grass-terrain": 1907,
-    "margoengine/creative/grass-terrain": 325
+    "margoengine/creative/grass-terrain": 325,
+    "@margoengine/video/playback": 1725
   }
 }

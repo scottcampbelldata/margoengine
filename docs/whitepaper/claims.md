@@ -4055,3 +4055,5 @@ The optional sciviz/cinematic entry provides independently enabled spherical loc
 
 
 Batch 271 job 3: creative/grass-terrain composes scatter's existing height, density, wind, LOD and sphere interaction with world-mapped bilinear colour. Analytic GPU readback checks root height/density, colour response, bending/recovery and replacement-device equality on both backends. This is a functional claim, not a speed or every-device claim.
+### Batch 269: playback preparation
+The optional video/playback entry offers muted autoplay, policy-only click fallback, native poster URL, separate ready/started promises, cancellation and disposal. Unit tests prove immediate gesture-preserving native invocation, coalesced plays, late errors, decoded-frame readiness, signal cancellation, timeout and caller ownership. The real CC0 WebM browser check exercises muted start, both ordinary texture map roles, and native audible-autoplay refusal followed by a trusted click under Chromium's document-user-activation-required policy. No claim that every browser permits muted autoplay or that a poster URL is origin-clean.
