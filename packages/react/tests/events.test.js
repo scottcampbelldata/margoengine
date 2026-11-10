@@ -212,3 +212,21 @@ test('a handlers record seen at several meshes fires once, as its owner', async 
   assert.equal(hasPointerHandlers({ onWheel() {} }), true);
   s.detach();
 });
+
+test('a bordered canvas picks and reports x/y from the padding box, as engine.pick measures it', async () => {
+  // Batch 132 audit: coordinates came from the border box, so a CSS border shifted every pick by its width.
+  const s = scene(),
+    leaf = s.mesh(),
+    picked = [],
+    seen = [];
+  Object.defineProperty(s.element, 'clientLeft', { value: 7 });
+  Object.defineProperty(s.element, 'clientTop', { value: 3 });
+  s.element.getBoundingClientRect = () => ({ left: 100, top: 50 });
+  s.engine.pick = async (x, y) => (picked.push([x, y]), leaf);
+  s.on(leaf, { onPointerDown: (event) => seen.push([event.x, event.y]) });
+  s.element.dispatchEvent(Object.assign(new window.MouseEvent('pointerdown', { clientX: 120, clientY: 60, button: 0 })));
+  await s.settle();
+  assert.deepEqual(picked, [[13, 7]]);
+  assert.deepEqual(seen, [[13, 7]]);
+  s.detach();
+});

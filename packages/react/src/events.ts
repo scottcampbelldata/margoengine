@@ -121,9 +121,14 @@ export function attachPointerEvents(
     }
     return list;
   };
+  // engine.pick and the handlers' x/y are relative to the padding box (the box clientWidth measures), while
+  // getBoundingClientRect is the border box (CSSOM View), so the border widths come off.
   const coordinates = (event: MouseEvent) => {
     const bounds = element.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    return {
+      x: event.clientX - bounds.left - (element.clientLeft || 0),
+      y: event.clientY - bounds.top - (element.clientTop || 0),
+    };
   };
   const pointerOf = (event: MouseEvent) => ('pointerId' in event ? (event as PointerEvent).pointerId : 1);
   /** Calls `kind` on each entry of `list` in order, stopping after a handler that stops propagation. */
