@@ -360,6 +360,18 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   readonly lights: Clustered;
   /** Last frame: layers re-rendered, caster draws, frames that re-rendered nothing. */
   readonly stats = { layers: 0, draws: 0, cacheHits: 0 };
+  /** @internal Optional atlas storage, implemented by the shadow-atlas entry. */
+  protected get atlasMode(): boolean { return false; }
+  /** @internal Optional per-frame map planning before camera matrices are built. */
+  protected prepare(_context: Context): void {}
+  /** @internal Optional per-light resolution policy. */
+  protected mapResolution(_kind: string, _index: number, width: number, height: number): readonly [number, number] {
+    return [width, height];
+  }
+  /** @internal Publish map placements; true invalidates all cached faces. */
+  protected placeMaps(_context: Context, _layers: number): boolean { return false; }
+  /** @internal Pixel origin of an atlas face. */
+  protected mapOrigin(_layer: number): readonly [number, number] { return [0, 0]; }
   private engine?: Engine;
   private device?: GPUDevice;
   private frame?: GPUBuffer;
@@ -558,12 +570,12 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     const size = this.options.resolution ?? 512;
     this.layers = layers;
     this.map = this.device!.createTexture({
-      size: [size, size, layers],
+      size: [size, size, this.atlasMode ? 1 : layers],
       format: 'depth32float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     this.layerViews = Array.from({ length: layers }, (_, baseArrayLayer) =>
-      this.map!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
+      this.map!.createView({ dimension: '2d', baseArrayLayer: this.atlasMode ? 0 : baseArrayLayer, arrayLayerCount: 1 }),
     );
     if (layers > this.cameraLayers) {
       this.cameras!.destroy();
@@ -618,6 +630,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   }
   private render(c: Context): void {
     this.validate();
+    this.prepare(c);
     const o = this.options,
       size = o.resolution ?? 512,
       max = o.maxLights ?? 4,
@@ -669,8 +682,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const point = data[at + 13] < 0.5 || hemisphere(data[at + 11]),
         base = bases[slot],
         c = j * 4,
-        width = cameras[c] || size,
-        height = cameras[c + 1] || size,
+        dimensions = this.atlasMode ? this.mapResolution('point', j, cameras[c] || size, cameras[c + 1] || size) : undefined,
+        width = dimensions?.[0] ?? (cameras[c] || size),
+        height = dimensions?.[1] ?? (cameras[c + 1] || size),
         range = cameras[c + 3] || data[at + 3],
         near = cameras[c + 2] || range * 1e-3,
         s = slot * SLOT_FLOATS;
@@ -679,6 +693,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           `A castShadow light's shadow.resolution exceeds LocalShadows resolution ${size}; lower it or raise resolution`,
         );
       let same = slots[s + 11] === base && slots[s + 10] === (point ? 1 : 0);
+      const smaller = width !== size || height !== size;
+      if (this.viewports[base * 2] !== (smaller ? width : 0) || this.viewports[base * 2 + 1] !== (smaller ? height : 0)) same = false;
       for (let k = 0; k < 8; k++) if (slots[s + k] !== data[at + (k < 4 ? k : k + 4)]) same = false;
       if (slots[s + 8] !== size) same = false;
       for (let k = 0; k < 4; k++) if (slots[s + 12 + k] !== cameras[c + k]) same = false;
@@ -821,6 +837,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       // Layers out of use now hold stale depth for whichever directional or area light takes them next.
       this.signatures.fill(NaN, layers * SIGNATURE);
     }
+    if (this.placeMaps(c, layers)) this.dirtyLayers.fill(1, 0, layers);
     this.changed = false;
     this.stats.layers = this.stats.draws = 0;
     let any = false;
@@ -829,6 +846,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.stats.cacheHits++;
       return;
     }
+    if (this.atlasMode) this.dirtyLayers.fill(1, 0, layers);
     // The view matches the buffer: the point and spot layers, or every layer once directional or area maps grew it.
     const upload = this.matrices.subarray(0, this.cameraLayers * 64) as Float32Array<ArrayBuffer>;
     c.device.queue.writeBuffer(this.cameras!, 0, upload, 0, layers * 64);
@@ -850,12 +868,17 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.dirtyLayers[l] = 0;
       this.stats.layers++;
       this.depthAttachment.view = this.layerViews[l];
+      this.depthAttachment.depthLoadOp = this.atlasMode && l > 0 ? 'load' : 'clear';
       const pass = c.encoder.beginRenderPass(this.depthPass);
       this.offset[0] = l * 256;
       frustumPlanes(this.matrices, l * 64, planes);
       try {
         const width = this.viewports[l * 2];
-        if (width) pass.setViewport(0, 0, width, this.viewports[l * 2 + 1], 0, 1);
+        if (width) {
+          const [x, y] = this.mapOrigin(l), height = this.viewports[l * 2 + 1];
+          pass.setViewport(x, y, width, height, 0, 1);
+          if (this.atlasMode) pass.setScissorRect(x, y, width, height);
+        }
         pass.setBindGroup(0, this.cameraGroup!, this.offset);
         for (const d of list) {
           // Only casters whose bounds reach this map's frustum (light range and face, cascade or spot cone).
@@ -897,8 +920,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const light = suns[s],
         f = light.direction,
         [x, y] = lightBasis(f),
-        width = light.width || size,
-        height = light.height || size,
+        dimensions = this.atlasMode ? this.mapResolution('directional', light.index, light.width || size, light.height || size) : undefined,
+        width = dimensions?.[0] ?? (light.width || size),
+        height = dimensions?.[1] ?? (light.height || size),
         base = this.sunBases[s],
         scaled = width !== size || height !== size;
       fits(width, height, size, 'directional');
@@ -929,8 +953,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     }
     for (let s = 0; s < areaCount; s++) {
       const light = areas[s],
-        width = light.width || size,
-        height = light.height || size,
+        dimensions = this.atlasMode ? this.mapResolution('area', light.index, light.width || size, light.height || size) : undefined,
+        width = dimensions?.[0] ?? (light.width || size),
+        height = dimensions?.[1] ?? (light.height || size),
         base = this.areaBases[s],
         scaled = width !== size || height !== size,
         { normal: n, right: r, up: u } = light,

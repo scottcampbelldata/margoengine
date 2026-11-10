@@ -8,6 +8,7 @@ import { LocalShadows } from '../packages/clustered/dist/shadows.js';
 import { DirectionalLights } from '../packages/clustered/dist/directional.js';
 import { AreaLights } from '../packages/clustered/dist/area.js';
 import { AreaShapes } from '../packages/clustered/dist/area-shapes.js';
+import { ShadowAtlas } from '../packages/clustered/dist/shadow-atlas.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -26,6 +27,7 @@ type Config = {
   suns?: Light[];
   areas?: Light[];
   shapes?: Light[];
+  atlas?: boolean;
   meshes: string[];
 };
 const canvas = document.querySelector('canvas')!,
@@ -73,7 +75,9 @@ function scene(config: Config) {
   lights = Clustered.attach(engine, { grid: [4, 4, 4] });
   lights.setLights((config.points ?? []) as never);
   if (config.local !== false) {
-    local = LocalShadows.attach(engine, { lights, resolution: 512, ...(config.local ?? {}) });
+    local = config.atlas
+      ? ShadowAtlas.attach(engine, { lights, resolution: 512, minResolution: 32, maxResolution: 128, ...(config.local ?? {}) })
+      : LocalShadows.attach(engine, { lights, resolution: 512, ...(config.local ?? {}) });
     for (const name of config.meshes) local.add(meshes[name]);
   }
   if (config.suns) (suns = DirectionalLights.attach(engine, { lights })).setLights(config.suns as never);
@@ -94,7 +98,7 @@ async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   return result!;
 }
 const kinds: Record<number, GPUBindGroupLayoutEntry> = {};
-for (const binding of [4, 14]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
+for (const binding of [4, 14, 155]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
 for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150])
   kinds[binding] = { binding, visibility: 0, buffer: { type: 'read-only-storage' } };
 for (const binding of [15, 29])

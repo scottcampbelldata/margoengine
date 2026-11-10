@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14127127,
+  "total": 14141575,
   "history": [
     {
       "date": "2026-10-24",
@@ -7465,6 +7465,12 @@
       "commit": "0d91c9875",
       "reason": "Batch174-job1:new-optional-sciviz/link-from-0-to-4544B-min-gzip-ceiling-4800B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-186-job2",
+      "reason": "New optional screen-sized shadow atlas, 0 to 14027 B min+gzip. Reuses complete LocalShadows caster ownership; splitting would duplicate lifecycle and filtering. Shadows 11791 to 12052 B within its ceiling.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8818,6 +8824,7 @@
     "@margoengine/sciviz/contour2d": 4058,
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/staging/caustics": 5703,
-    "@margoengine/sciviz/link": 4800
+    "@margoengine/sciviz/link": 4800,
+    "@margoengine/clustered/shadow-atlas": 14448
   }
 }

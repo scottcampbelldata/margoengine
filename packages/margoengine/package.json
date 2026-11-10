@@ -4925,6 +4925,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./clustered/shadow-atlas": {
+      "types": "./dist/clustered/shadow-atlas.d.ts",
+      "import": "./dist/clustered/shadow-atlas.js"
     }
   },
   "dependencies": {

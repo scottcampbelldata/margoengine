@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface LocalShadowOptions {
     lights: Clustered;
@@ -59,6 +59,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         draws: number;
         cacheHits: number;
     };
+    protected get atlasMode(): boolean;
+    protected prepare(_context: Context): void;
+    protected mapResolution(_kind: string, _index: number, width: number, height: number): readonly [number, number];
+    protected placeMaps(_context: Context, _layers: number): boolean;
+    protected mapOrigin(_layer: number): readonly [number, number];
     constructor(options: LocalShadowOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: LocalShadowOptions): LocalShadows;
@@ -201,6 +206,10 @@ interface ClusteredStochastic {
     lighting(cell: string, head: string, radiance: string, visibility: string, shadowed: string): string;
     bindings(): GPUBindGroupEntry[];
 }
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 interface DirectionalShadowLight {
     readonly index: number;

@@ -987,3 +987,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 174 job 1): document SelectionStore, bindSelection, row/group keys, resolve/empty semantics, modifier operations, events, history, mask ownership, disposal and the real-data linked stars demo in the README phase.
 - margoengine (batch 174 job 1): document generated sciviz/link alias in the README phase.
 - @margoengine/vfx (batch 174 landing repair): no API change; retain documentation of the recurring GPU parity command during the README phase.
+
+- @margoengine/clustered (batch 186 job 2): document ShadowAtlas, camera-driven point/spot resolution, shared directional/area maps, square guarded tiles, budgets, defaults and full-atlas redraw policy; examples deferred.
+- margoengine (batch 186 job 2): document clustered/shadow-atlas forwarding entry; examples deferred.

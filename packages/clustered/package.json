@@ -34,7 +34,8 @@
     "test:gpu:orthographic": "cd ../.. && node scripts/orthographic-gpu-check.js",
     "test:gpu:shapes": "cd ../.. && node scripts/shape-lights-gpu-check.js",
     "test:gpu:stochastic": "cd ../.. && node scripts/stochastic-lights-gpu-check.js",
-    "test:gpu:area-shapes": "cd ../.. && node scripts/clustered-area-shapes-gpu.mjs"
+    "test:gpu:area-shapes": "cd ../.. && node scripts/clustered-area-shapes-gpu.mjs",
+    "test:gpu:atlas": "cd ../.. && node scripts/clustered-shadow-atlas-gpu.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -89,6 +90,10 @@
     "./area-shapes": {
       "types": "./dist/area-shapes.d.ts",
       "import": "./dist/area-shapes.js"
+    },
+    "./shadow-atlas": {
+      "types": "./dist/shadow-atlas.d.ts",
+      "import": "./dist/shadow-atlas.js"
     }
   },
   "files": [
