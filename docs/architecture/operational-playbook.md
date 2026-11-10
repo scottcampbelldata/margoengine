@@ -6000,3 +6000,9 @@ so later queue writes cannot replace earlier views' records before submission.
 No engine hooks, rendering backends or frozen core/stage code were added. CPU
 rasterization uses inner coverage and reversed-Z far bounds; seam and clipping
 uncertainty retain extra geometry. CPU costs are not yet speed-phase evidence.
+
+
+
+
+### 5. Batch 243 learned reconstruction ownership
+The denoise-ml entry is independent of the mesh/PBR feature work. One optional compute pipeline reads lazy feature-local weights, packed RGB color/albedo/normal, coverage and a small uniform, writing owned packed RGB. There is no RGB-to-RGBA staging loop or shared engine feature. Weights/pipeline follow device identity; per-request storage/readback buffers are released in finally. An internal abort lifetime combines with caller cancellation so queued work and pending readback settle on disposal. Readiness/readback errors retain their cause under coded errors. CPU regression proof covers the Float32 upper-color boundary, invalid guides/limits/options, cancellation, disposal, device replacement and native error wrapping. Native and compatibility compute results agree with the same WGSL CPU evaluation, preserve constants/coverage and improve independent synthetic and licensed Box noisy input.

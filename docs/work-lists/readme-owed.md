@@ -434,3 +434,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/decoders (batch 205 BMP): document parseBMP formats, maxPixels, alpha and unsupported compression; examples deferred.
 - @margoengine/decoders (batch 205 texture-rgba): document the raw texture conversion entry; examples deferred.
 - margoengine (batch 205): document generated fbx/textures, decoders/bmp and decoders/texture-rgba aliases; examples deferred.
+
+
+
+
+
+- @margoengine/voxel-pathtracer (batch 243 job 4): document DenoiseML creation, required renderImage AOVs, cancellation/disposal, device replacement, numeric limits and clean-room training/holdout evidence; examples deferred by rule 20.
+- margoengine (batch 243 job 4): generated voxel-pathtracer/denoise-ml alias; README work deferred by rule 20.

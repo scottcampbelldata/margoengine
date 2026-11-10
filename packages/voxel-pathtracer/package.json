@@ -62,6 +62,10 @@
     "./mesh-pbr": {
       "types": "./dist/mesh-pbr.d.ts",
       "import": "./dist/mesh-pbr.js"
+    },
+    "./denoise-ml": {
+      "types": "./dist/denoise-ml.d.ts",
+      "import": "./dist/denoise-ml.js"
     }
   },
   "files": [
@@ -105,7 +109,8 @@
     "test:gpu:history-taps": "cd ../.. && node packages/voxel-pathtracer/tests/history-taps-browser.mjs",
     "test:gpu:mesh-attributes": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-attributes-browser.mjs",
     "test:gpu:mesh-instances": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs",
-    "test:gpu:mesh-pbr": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs"
+    "test:gpu:mesh-pbr": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs",
+    "test:gpu:denoise-ml": "cd ../.. && node packages/voxel-pathtracer/tests/denoise-ml-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -126,7 +131,8 @@
       "test:gpu:history-taps": 6,
       "test:gpu:mesh-attributes": 4,
       "test:gpu:mesh-instances": 7,
-      "test:gpu:mesh-pbr": 5
+      "test:gpu:mesh-pbr": 5,
+      "test:gpu:denoise-ml": 3
     }
   },
   "peerDependenciesMeta": {

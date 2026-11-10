@@ -1,0 +1,30 @@
+{
+  "architecture": [
+    10,
+    16,
+    8,
+    1
+  ],
+  "trainingSeed": 24301,
+  "validationSeed": 24302,
+  "trainingPatches": 24000,
+  "validationPatches": 4000,
+  "steps": 800,
+  "noisePowerLogRange": [
+    -8,
+    0
+  ],
+  "loss": "variance-balanced normalized MSE, 0.001 floor",
+  "before": {
+    "rawMSE": 0.05577634274959564,
+    "networkMSE": 987.9005126953125
+  },
+  "after": {
+    "rawMSE": 0.05577634274959564,
+    "networkMSE": 0.051644306629896164
+  },
+  "numpyVersion": "2.5.4",
+  "parameters": 321,
+  "weightSHA256": "e359a8593bfc2132db8571fa486c7ccb364b676e84ce69ac04f57e4522a0c360",
+  "ownership": "Margo authored synthetic patches and training; no imported weights or data"
+}

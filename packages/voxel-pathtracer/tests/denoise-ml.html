@@ -1,0 +1,34 @@
+<!doctype html><html><meta charset="utf-8"><title>Learned denoiser compute oracle</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {DenoiseML} from '/packages/voxel-pathtracer/dist/denoise-ml.js';
+import {MeshPathTracer} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+window.run=async(compat=false,fixture)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[1.8,1.4,2.5],target:[0,0,0]}});
+ const errors=[],messages=[],reports=[];const watch=()=>{const device=engineRuntime(engine).gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));const create=device.createShaderModule.bind(device);device.createShaderModule=d=>{const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(v=>v.type==='error').map(v=>v.message))));return m;};};watch();
+ const make=(width,height)=>{const count=width*height,color=new Float32Array(count*3),albedo=new Float32Array(count*3).fill(.5),normal=new Float32Array(count*3);for(let i=0;i<count;i++){color.set([4,2,1],i*3);normal[i*3+2]=1;}return {width,height,color,albedo,normal,alpha:new Float32Array(count).fill(.25),samples:4};};
+ const serial=image=>Object.fromEntries(Object.entries(image).map(([key,value])=>[key,ArrayBuffer.isView(value)?Array.from(value):value]));
+ const decode=image=>({...image,color:new Float32Array(image.color),albedo:new Float32Array(image.albedo),normal:new Float32Array(image.normal),...(image.depth?{depth:new Float32Array(image.depth)}:{}),...(image.instance?{instance:new Int32Array(image.instance)}:{}),...(image.palette?{palette:new Uint8Array(image.palette)}:{}),...(image.alpha?{alpha:new Float32Array(image.alpha)}:{})});
+ const mse=(a,b)=>a.reduce((sum,v,i)=>sum+(v-b[i])**2,0)/a.length;
+ const d=await DenoiseML.create(engine,{signal:AbortSignal.timeout(120000)});
+ try{
+  const constant=make(9,3),unchanged=constant.color.slice(),result=await d.denoise(constant,{signal:AbortSignal.timeout(120000)});
+  const constantError=Math.max(...result.color.map((v,i)=>Math.abs(v-unchanged[i]))),alphaPreserved=result.alpha.every((v,i)=>v===constant.alpha[i]);
+  const synthetic=make(16,16);let state=243099;const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/2**32;};for(let i=0;i<synthetic.color.length;i++)synthetic.color[i]=.5+random();
+  const syntheticResult=await d.denoise(synthetic,{signal:AbortSignal.timeout(120000)}),syntheticMSE={raw:mse(synthetic.color,new Float32Array(synthetic.color.length).fill(1)),network:mse(syntheticResult.color,new Float32Array(synthetic.color.length).fill(1))};
+  if(!fixture){
+   const model=await loadGLTF(engine,'/packages/gltf-pro/tests/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});engine.render();const parts=await model.readPickingGeometry();model.dispose();
+   const meshes=parts.map((part,index)=>{const positions=new Float32Array(part.vertices.length/20*3),m=part.matrix;for(let i=0;i<part.vertices.length/20;i++){const at=i*20,x=part.vertices[at],y=part.vertices[at+1],z=part.vertices[at+2];for(let a=0;a<3;a++)positions[i*3+a]=m[a]*x+m[4+a]*y+m[8+a]*z+m[12+a];}return {id:'box'+index,material:1,positions,indices:part.indices};});
+   meshes.push({id:'floor',material:2,positions:new Float32Array([-3,-.51,-3,3,-.51,-3,3,-.51,3,-3,-.51,3]),indices:new Uint32Array([0,2,1,0,3,2])});
+   const scene={revision:1,models:[],instances:[],materials:[{id:1,type:'diffuse',color:[.65,.3,.12]},{id:2,type:'diffuse',color:[.65,.65,.65]}],meshes,environment:{ground:false,sunIntensity:0,skyIntensity:.02},lights:[{position:[0,2,1],direction:[0,-1,0],width:1,height:1,intensity:8,opaque:false}]};
+   const tracer=await MeshPathTracer.create(engine,{scene,denoise:false,maxBounces:4});
+   try{await tracer.ready;console.log('ml phase raw Box trace');const raw=await tracer.renderImage({width:16,height:16,samples:4,seed:24371,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});console.log('ml phase reference Box trace');const reference=await tracer.renderImage({width:16,height:16,samples:512,seed:24372,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});fixture={raw:serial(raw),reference:Array.from(reference.color),asset:'Khronos metadata Box.gltf, repository licensed fixture',referenceSamples:512};}finally{tracer.dispose();}
+  }
+  const real=decode(fixture.raw),realResult=await d.denoise(real,{signal:AbortSignal.timeout(120000)}),realMSE={raw:mse(real.color,fixture.reference),network:mse(realResult.color,fixture.reference)};
+  const old=engineRuntime(engine).gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();const restored=await d.denoise(constant,{signal:AbortSignal.timeout(120000)});const replacement=engineRuntime(engine).gpu!==old&&restored.color.every(Number.isFinite);
+  await Promise.all(reports);return {constantError,alphaPreserved,syntheticMSE,synthetic:serial(synthetic),syntheticOutput:Array.from(syntheticResult.color),realMSE,realOutput:Array.from(realResult.color),replacement,errors,messages,fixture};
+ }finally{d.dispose();engine.dispose();}
+};window.ready=true;
+</script></html>

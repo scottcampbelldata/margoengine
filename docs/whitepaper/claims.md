@@ -3596,3 +3596,11 @@ embedded and fetched versions of all four formats, including BC1 DDS; tests hook
 both orders and rejection of recognized damaged input. `packages/decoders/tests/bmp.test.js` checks
 row direction/padding, indexed pixels, RGB/alpha masks, OS/2, RLE escapes and invalid bounds.
 This proves the requested format routing; it makes no claim of arbitrary vendor extensions.
+
+
+
+
+
+### Batch 243 clean-room learned denoising
+DenoiseML evaluates a clean-room trained 321-parameter albedo/normal-guided kernel-prediction network in WebGPU compute. No downloaded weights or external inference runtime are required. Final independent synthetic validation normalized MSE is 0.0516443066 versus raw 0.0557763427. Native GPU synthetic-plane MSE is 0.0656393536 versus raw 0.0836865911; the independently rendered licensed Box holdout is 0.0001771820 versus raw 0.0002043207 against a 512-spp reference. Compatibility uses the same raw image/AOVs and reaches 0.0001771820. Maximum GPU/CPU output difference is 3.5762786865234375e-7 (synthetic) and 5.960464477539063e-8 (Box), below unchanged 1e-4. Constant HDR/coverage and real replacement-device reconstruction pass on both backends, with no validation or shader errors. These examples establish the feature and measured improvements for these inputs, not blanket superiority over other denoisers.
+Receipt: results/batch243-denoise-ml-20261109.json; package tests/fixtures/denoise-ml-training.json records the training parameters and Float32 weight SHA-256.

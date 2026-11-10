@@ -4636,3 +4636,12 @@ are opaque. JPEG/PNG-in-BMP, OS/2 v2 compression and embedded colour-profile tra
 The texture-rgba decoder entry shares the existing textureFileToRGBA implementation with decoders/image, without container/transcoder imports. BMP and texture bridge defaults do not add a core/stage feature.
 
 Batch 205 min+gzip entry sizes: fbx/textures 586 B (new, ceiling 751 B), decoders/bmp 1,518 B (new, ceiling 1,774 B), decoders/texture-rgba 4,446 B (new, ceiling 4,702 B). The FBX worker grows from 83,143 B (ceiling 85,638 B) to 97,769 B (ceiling 100,703 B), buying all four image decoders in the classic worker. Splitting classic-worker codec delivery would add a second asset loader/protocol for this small optional feature. Core plus stage remains 16,769 B.
+
+
+
+
+
+### Batch 243 optional learned denoiser
+`voxel-pathtracer/denoise-ml` exposes DenoiseML.create(engine, {signal}), denoise(image, {signal}), whenIdle, dispose and Symbol.dispose. It requires an engine WebGPU compute device (the existing WebGL2 compatibility device is supported), finite RGB Float32 color/albedo/normal guides from renderImage with aovs:true, positive integer dimensions totaling at most 16,777,216 pixels, positive samples and optional coverage in [0,1]. Color is nonnegative through the Float32 representation of 1e16, albedo [0,1], normal components [-1,1]. Device binding/buffer/grid limits apply in addition. Device changes rebuild weights and the pipeline; each request snapshots every input AOV, owns its output and preserves alpha, albedo, normal, depth, instance and palette arrays. Cancellation rejects queued/active waits promptly and disposal releases owned buffers. GPU failures use coded failed errors with their platform cause.
+The 321-parameter, two-hidden-layer network predicts a single 3x3 positive reconstruction kernel; it is spatial, with no temporal history, downloaded weights or external inference runtime. Input guides are required. HDR normalization and softmax preserve finite constant fields and bound reconstructed RGB by observed neighbor radiance. Synthetic training and the licensed Box holdout are narrow correctness/quality evidence, not a claim of universal image-quality superiority.
+The new entry measures 6,767 B min+gzip (ceiling 7,023 B), previously absent. Root/core/stage gain no code. Core plus stage is 24,209 B on this main base, unchanged by the entry and below 25,000 B. The difference from earlier 23,950 B batch records is the upstream version guard. No speed or wall-clock claim is made.

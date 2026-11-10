@@ -6571,3 +6571,12 @@ bitfield and RLE forms; file buffers and dimensions are checked before allocatio
 tests compare every texel of embedded and external images, test PBR hook ordering and damaged input.
 Tests use original standard-layout fixtures and the existing independently authored FBX scene.
 No external asset or implementation file was added. No new demo is introduced.
+
+
+
+
+
+### Batch 243 learned denoiser (2026-11-09)
+Research compared: Steve Bako et al., *Kernel-Predicting Convolutional Networks for Denoising Monte Carlo Renderings* (2017), https://jannovak.info/publications/KPCN/index.html; Thijs Vogels et al., *Denoising with Kernel Prediction and Asymmetric Loss Functions* (2018), https://jannovak.info/publications/KPAL/index.html; Jaakko Lehtinen et al., *Noise2Noise: Learning Image Restoration without Clean Data* (2018), https://proceedings.mlr.press/v80/lehtinen18a.html. No companion code, foreign model or training dataset was used.
+A repository-authored 10->16->8->1 MLP scores nine neighbors, followed by positive normalized kernel reconstruction. Inputs are spatial offset, HDR-normalized color difference and variance, albedo difference, normal agreement, tone-mapped center/neighbor luminance, coverage difference, inverse square-root sample count and radius conditioning. Supervised targets come from authored analytic patch families with albedo/normal boundaries, lighting changes, highlights and coverage. Independent training/validation seeds are 24301/24302, 24000/4000 patches, 800 Adam steps. Variance is augmented independently of sample count with log noise power [-8,0]; variance-balanced normalized MSE prevents over-blurring low-variance MIS/area-light input. This repaired an observed real-image regression: the original fixed-variance training increased the Box holdout MSE from 0.0002043207 to 0.0003075558. Balanced training lowers it to 0.0001771820, under the same strict improvement assertion. Training script, final weight hash, NumPy version and validation report are retained in the package tests.
+The GPU holdout reuses the unmodified Khronos metadata Box fixture (CC-BY-4.0, The Khronos Group), already recorded in THIRD-PARTY-NOTICES.md and packages/gltf-pro/tests/fixtures/metadata/NOTICE.md. Its scene/camera/light/sample seeds are absent from training. Compatibility reconstructs exactly the same native-produced raw image and AOVs, avoiding a second renderer as an uncontrolled input difference.

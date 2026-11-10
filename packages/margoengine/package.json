@@ -4034,6 +4034,10 @@
       "types": "./dist/voxel-pathtracer/mesh-pbr.d.ts",
       "import": "./dist/voxel-pathtracer/mesh-pbr.js"
     },
+    "./voxel-pathtracer/denoise-ml": {
+      "types": "./dist/voxel-pathtracer/denoise-ml.d.ts",
+      "import": "./dist/voxel-pathtracer/denoise-ml.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"
