@@ -4763,3 +4763,5 @@ Batch 270 job 3: no new open defects identified in the five birth shapes; unifor
 
 ## Batch 185 job 3
 The post/compute graph editor gap is built in shader/editor-pass. No open defect was found in its bounded expression, save/load and hot-reload contract. The source/target registry and floating-point resource requirements are explicit limits, not serialized GPU state.
+
+- Batch 193 job 2: no open defect found in Grade/HueGrade cube export. Finite-grid interpolation and display-linear domain are documented limits; spatial and other Tonemap effects are outside the exported Grade.

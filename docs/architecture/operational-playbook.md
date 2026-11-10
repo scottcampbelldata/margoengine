@@ -2227,6 +2227,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 193 export-cube: the CPU bake evaluates the live Grade uniform snapshot, including both stages of curve lookup. Five grade configurations compare against native and full-compatibility WGSL at 729 lattice nodes within 0.000003 (packages/tonemap/tests/export-cube-browser.mjs). No GPU readback or new rendering pass is needed by the exporter. Off-lattice interpolation error depends on the authored grade and export resolution; no general bound is claimed.
+
 Batch 240 job 2 reuses core geometry batching and frustum culling for optional voxel object blocks, with no backend or core change. Exact CPU/GPU instance and draw counts cover two visible and one distant loaded placement, plus node graph/source lifetime, edits, streaming and disposal.
 
 

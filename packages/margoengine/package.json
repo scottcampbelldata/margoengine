@@ -3950,6 +3950,10 @@
       "types": "./dist/tonemap/hue.d.ts",
       "import": "./dist/tonemap/hue.js"
     },
+    "./tonemap/export-cube": {
+      "types": "./dist/tonemap/export-cube.d.ts",
+      "import": "./dist/tonemap/export-cube.js"
+    },
     "./toon": {
       "types": "./dist/toon.d.ts",
       "import": "./dist/toon.js"

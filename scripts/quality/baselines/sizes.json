@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13808478,
+  "total": 13809885,
   "history": [
     {
       "date": "2026-10-24",
@@ -7233,6 +7233,12 @@
       "commit": "57d8d3296",
       "reason": "New optional post/selective-bloom: 0 to 9423 B gzip. Reuses full bloom with mask extraction and HDR recomposition; splitting duplicates ownership. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c99a9a8f0",
+      "reason": "Batch 193 adds optional grade cube export: absent to 1151 B min+gzip; pure CPU snapshot serialization with no core or stage growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -8544,6 +8550,7 @@
     "@margoengine/shader/editor-pass": 34097,
     "leak @margoengine/shader/editor-pass -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/shader/editor-pass -> @margoengine/materials": 1,
-    "@margoengine/post/selective-bloom": 9706
+    "@margoengine/post/selective-bloom": 9706,
+    "@margoengine/tonemap/export-cube": 1407
   }
 }

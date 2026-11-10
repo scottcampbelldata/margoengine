@@ -92,7 +92,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4, `./animate` 8, `./extrude` 16, `./fit` 6, `./selection` 2, `./curve` 7 | 86 |  | 16,395 |
 | @margoengine/tilemap | `.` 44, `./autotile` 18, `./ldtk` 8, `./tiled` 6, `./iso` 13, `./hex` 17, `./path` 9, `./fov` 11, `./objects` 5, `./plane` 2 | 174 |  | 7,303 |
 | @margoengine/tiles | `./properties` 8, `./imagery` 18, `./style` 6, `.` 83, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11, `./features` 7, `./fade` 3 | 194 |  | 15,813 |
-| @margoengine/tonemap | `.` 9, `./grade` 5, `./custom` 2, `./local` 2, `./hue` 3 | 12 |  | 12,490 |
+| @margoengine/tonemap | `.` 9, `./grade` 5, `./custom` 2, `./local` 2, `./hue` 3, `./export-cube` 2 | 18 |  | 12,490 |
 | @margoengine/toon | `.` 2, `./models` 4, `./screen-outline` 5, `./hatch` 3 | 8 |  | 1,430 |
 | @margoengine/transitions | `./mask` 2, `./custom` 2, `.` 2, `./live` 3, `./presets` 6, `./glsl` 5 | 17 |  | 4,496 |
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6, `./async` 6, `./props` 8, `./timeline` 3, `./control` 3, `./scroll-pin` 6, `./inertia` 5 | 34 |  | 5,503 |
