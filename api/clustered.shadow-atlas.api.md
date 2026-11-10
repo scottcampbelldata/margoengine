@@ -203,6 +203,13 @@ interface LocalLightShadow {
     radius?: number;
 }
 
+interface LocalShadowDraw {
+    readonly context: Context;
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly layer: number;
+}
+
 interface LocalShadowOptions {
     resolution?: number;
     maxLights?: number;
@@ -281,7 +288,8 @@ interface LocalShadowSource {
 }
 
 interface LocalShadowSource {
-    readonly shadowPrimitives: readonly LocalShadowPrimitive[];
+    readonly shadowPrimitives?: readonly LocalShadowPrimitive[];
+    drawLocalShadow?(draw: LocalShadowDraw): void;
     readonly shadowVersion?: number;
     readonly disposed?: boolean;
 }

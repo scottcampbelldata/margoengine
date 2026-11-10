@@ -141,6 +141,9 @@ interface Ring {
   shadowUniforms: GPUBuffer[];
   shadowGroups: GPUBindGroup[];
   shadowValues: Float32Array;
+  /** Per local shadow layer (clustered `LocalShadows`), created on first use. */
+  localUniforms: GPUBuffer[];
+  localGroups: GPUBindGroup[];
 }
 interface LightingGroup {
   device: GPUDevice;
@@ -171,6 +174,10 @@ export class Terrain implements EnginePlugin {
   private sampler?: GPUSampler;
   private layout?: GPUBindGroupLayout;
   private shadowPipeline?: GPURenderPipeline;
+  /** Reversed-depth variant of the shadow pipeline for local light maps, built on first use. */
+  private localShadowPipeline?: GPURenderPipeline;
+  private shadowModule?: GPUShaderModule;
+  private ringGroup?: (buffer: GPUBuffer) => GPUBindGroup;
   private occluder?: { samples: number; pipeline: GPURenderPipeline };
   private rings: Ring[] = [];
   private pipelines = new Map<string, GPURenderPipeline>();
@@ -397,6 +404,7 @@ export class Terrain implements EnginePlugin {
           ...resources.map((resource, i) => ({ binding: i + 1, resource })),
         ],
       });
+    this.ringGroup = group;
     for (let i = 0; i < (this.options.levels ?? 6); i++) {
       const uniform = this.device.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
         shadowUniforms: GPUBuffer[] = [];
@@ -407,6 +415,8 @@ export class Terrain implements EnginePlugin {
         shadowUniforms,
         shadowGroups: [],
         shadowValues: new Float32Array(44),
+        localUniforms: [],
+        localGroups: [],
       };
       this.rings.push(r);
       r.group = group(uniform);
@@ -420,6 +430,7 @@ export class Terrain implements EnginePlugin {
     const module = this.device.createShaderModule({
       code: this.clip(terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`),
     });
+    this.shadowModule = module;
     this.shadowPipeline = this.device.createRenderPipeline({
       layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
       vertex: {
@@ -773,6 +784,56 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       pass.drawIndexed(i ? this.ringCount : this.centerCount);
     }
   }
+  /**
+   * Casts the terrain into a point, spot, directional or area light's map of clustered `LocalShadows` (pass the
+   * terrain to `LocalShadows.add`). Reversed depth (`greater`), one uniform set per ring and layer, made on first use.
+   */
+  drawLocalShadow({
+    context,
+    pass,
+    matrix,
+    layer,
+  }: {
+    context: TerrainPassContext;
+    pass: GPURenderPassEncoder;
+    matrix: Float32Array;
+    layer: number;
+  }): void {
+    if (this.disposed || !this.shadowModule || !this.ringGroup) return;
+    if (!Number.isInteger(layer) || layer < 0)
+      throw new RangeError('Invalid local shadow layer; pass the integer layer index LocalShadows gives');
+    const device = context.device;
+    const module = this.shadowModule;
+    this.localShadowPipeline ??= device.createRenderPipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [this.layout!] }),
+      vertex: {
+        module,
+        entryPoint: 'vertex',
+        buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+      },
+      fragment: { module, entryPoint: 'outside', targets: [] },
+      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+    });
+    pass.setPipeline(this.localShadowPipeline);
+    pass.setVertexBuffer(0, this.vertex!);
+    for (let i = 0; i < this.rings.length; i++) {
+      const r = this.rings[i];
+      let buffer = r.localUniforms[layer];
+      if (!buffer) {
+        buffer = r.localUniforms[layer] = device.createBuffer({
+          size: 176,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        r.localGroups[layer] = this.ringGroup(buffer);
+      }
+      r.shadowValues.set(r.values);
+      r.shadowValues.set(matrix);
+      device.queue.writeBuffer(buffer, 0, r.shadowValues as Float32Array<ArrayBuffer>);
+      pass.setBindGroup(0, r.localGroups[layer]);
+      pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
+      pass.drawIndexed(i ? this.ringCount : this.centerCount);
+    }
+  }
   private release(): void {
     for (const texture of new Set(
       this.textures
@@ -788,14 +849,15 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     ))
       texture?.destroy();
     for (const buffer of [this.vertex, this.center, this.ring, this.rules]) buffer?.destroy();
-    for (const r of this.rings) for (const buffer of [r.uniform, ...r.shadowUniforms]) buffer.destroy();
+    for (const r of this.rings)
+      for (const buffer of [r.uniform, ...r.shadowUniforms, ...r.localUniforms]) buffer?.destroy();
     this.textures = undefined;
     this.vertex = this.center = this.ring = this.rules = undefined;
     this.rings = [];
     this.pipelines.clear();
     this.occluder = undefined;
     this.lightingGroups.clear();
-    this.shadowPipeline = undefined;
+    this.shadowPipeline = this.localShadowPipeline = this.shadowModule = this.ringGroup = undefined;
     this.layout = undefined;
     this.sampler = undefined;
   }

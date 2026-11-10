@@ -6,6 +6,13 @@
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
+export interface LocalShadowDraw {
+    readonly context: Context;
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly layer: number;
+}
+
 export interface LocalShadowOptions {
     lights: Clustered;
     maxLights?: number;
@@ -45,7 +52,8 @@ export interface LocalShadowPrimitive {
 }
 
 export interface LocalShadowSource {
-    readonly shadowPrimitives: readonly LocalShadowPrimitive[];
+    readonly shadowPrimitives?: readonly LocalShadowPrimitive[];
+    drawLocalShadow?(draw: LocalShadowDraw): void;
     readonly shadowVersion?: number;
     readonly disposed?: boolean;
 }

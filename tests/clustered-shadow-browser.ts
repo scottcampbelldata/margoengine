@@ -11,6 +11,7 @@ import { AreaShapes } from '../packages/clustered/dist/area-shapes.js';
 import { ShadowAtlas } from '../packages/clustered/dist/shadow-atlas.js';
 import { CubeProjectorLights } from '../packages/clustered/dist/cube-projector.js';
 import { StochasticLights } from '../packages/clustered/dist/stochastic.js';
+import { Terrain } from '../packages/terrain/dist/index.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -21,6 +22,7 @@ declare const GPUBufferUsage: {
 };
 declare const GPUMapMode: { READ: number };
 declare const GPUShaderStage: { COMPUTE: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
 type Light = Record<string, unknown>;
 type Config = {
@@ -34,6 +36,8 @@ type Config = {
   projectors?: unknown[];
   stochastic?: boolean;
   meshes: string[];
+  /** Clipmap terrain over x, z in -4..4: flat at y 0 with a ridge 2 high over |x| < 0.5, a LocalShadows caster. */
+  terrain?: boolean;
 };
 const canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, {
@@ -63,10 +67,32 @@ mesh('ceiling', [8, 0.1, 8], [0, 6.05, 0]); // bottom at y = 6
 mesh('topBar', [1, 0.05, 6], [0, 4.5, 0]);
 let lights: Clustered | undefined, local: LocalShadows | undefined, suns: DirectionalLights | undefined;
 let areas: AreaLights | undefined,
+  terrain: Terrain | undefined,
   shader = '';
 let shapes: AreaShapes | undefined;
 let cookies: CubeProjectorLights | undefined;
 let stochastic: StochasticLights | undefined;
+const ridge = new Float32Array(64 * 64).map((_, i) => (Math.abs(((i % 64) + 0.5) / 8 - 4) < 0.5 ? 2 : 0));
+function terrainTextures(gpu: GPUDevice) {
+  const heightmap = gpu.createTexture({
+      size: [64, 64],
+      format: 'r32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    }),
+    layers = gpu.createTexture({
+      size: [1, 1, 4],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+  gpu.queue.writeTexture({ texture: heightmap }, ridge, { bytesPerRow: 256 }, [64, 64]);
+  gpu.queue.writeTexture(
+    { texture: layers },
+    new Uint8Array(16).fill(200),
+    { bytesPerRow: 4, rowsPerImage: 1 },
+    [1, 1, 4],
+  );
+  return { heightmap, layers };
+}
 engine.frameGraph.add({
   name: 'clustered-shadow:capture',
   order: -2.5,
@@ -75,11 +101,11 @@ engine.frameGraph.add({
   },
 });
 function scene(config: Config) {
-  for (const plugin of [stochastic, cookies, shapes, areas, suns, local, lights]) plugin?.dispose();
+  for (const plugin of [stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
   stochastic = undefined;
   cookies = undefined;
   shapes = undefined;
-  areas = suns = local = undefined;
+  terrain = areas = suns = local = undefined;
   for (const [name, m] of Object.entries(meshes)) m.visible = config.meshes.includes(name);
   lights = Clustered.attach(engine, { grid: [4, 4, 4] });
   lights.setLights((config.points ?? []) as never);
@@ -88,6 +114,18 @@ function scene(config: Config) {
       ? ShadowAtlas.attach(engine, { lights, resolution: 512, minResolution: 32, maxResolution: 128, ...(config.local ?? {}) })
       : LocalShadows.attach(engine, { lights, resolution: 512, ...(config.local ?? {}) });
     for (const name of config.meshes) local.add(meshes[name]);
+  }
+  if (config.terrain) {
+    terrain = Terrain.attach(engine, {
+      textures: terrainTextures,
+      layers: Array.from({ length: 4 }, () => ({ height: [-10, 10] as const, slope: [0, 1] as const, scale: 1 })),
+      origin: [-4, -4],
+      size: [8, 8],
+      heightScale: 1,
+      cellSize: 0.0625,
+      levels: 4,
+    });
+    local?.add(terrain);
   }
   if (config.suns) (suns = DirectionalLights.attach(engine, { lights })).setLights(config.suns as never);
   if (config.areas) (areas = AreaLights.attach(engine, { lights })).setLights(config.areas as never);
@@ -227,7 +265,7 @@ async function messages(code: string): Promise<string[]> {
     cookies!.setCubes(entries as never);
   },
   dispose() {
-    for (const plugin of [cookies, shapes, areas, suns, local, lights]) plugin?.dispose();
+    for (const plugin of [stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
     engine.dispose();
   },
 };

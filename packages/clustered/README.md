@@ -413,7 +413,7 @@ honor alpha, vertex alpha, UV0/UV1 and texture transforms; blended PBR primitive
 are excluded. Hidden ancestors and disposed sources stop casting. Register a
 model with both `addShadowCaster(model)` and `add(model)` when it also receives
 local lighting. Custom-only `drawShadow()` sources such as clipmap terrain are
-not local shadow casters in this version; terrain can receive the shadows.
+not casters of these integrated maps; add them to `LocalShadows`, which calls their `drawLocalShadow`.
 
 Local depth passes run before clustered culling and main shading, redraw active
 faces each frame, and use a fixed 3×3 comparison filter (`LocalShadows` lights with a `shadow.radius` filter by PCSS, above). Shadows multiply only

@@ -342,6 +342,33 @@ try {
     );
     check('two-sided area light renders six cube faces', bothRendered.stats.layers === 6, bothRendered.stats);
     await capture('area-two-sided');
+    // Terrain as a local caster (drawLocalShadow): a ridge 2 high over |x| < 0.5 shadows the ground behind it from a
+    // spot and a point light at (-3, 1.5, 0); the line over its near top edge rises, so all of x > 0.5 is in shadow.
+    await call('camera', [0.5, 6, 0.5]);
+    const ground = [];
+    for (let x = -2.5; x <= 3.5; x += 0.25) ground.push([x, 0, 0, 0, 1, 0]);
+    const behindRidge = (p) => (p[0] <= -0.9 ? 1 : p[0] >= 0.9 ? 0 : undefined);
+    const lamps = {
+      spot: { position: [-3, 1.5, 0], direction: [0.958, -0.287, 0], outerAngle: 1.3, range: 12, intensity: 3 },
+      point: { position: [-3, 1.5, 0], range: 12, intensity: 3 },
+    };
+    for (const [kind, lamp] of Object.entries(lamps)) {
+      const caster = { meshes: [], terrain: true, points: [{ ...lamp, castShadow: true }] },
+        { values, rendered } = await visibility(caster, ground);
+      expect(
+        `terrain casts into a ${kind} light's map: ground behind the ridge 0, in front 1`,
+        ground,
+        values,
+        behindRidge,
+      );
+      check(
+        `terrain ${kind} caster draws once per layer`,
+        rendered.stats.draws === (kind === 'point' ? 6 : 1),
+        rendered.stats,
+      );
+      await capture(`terrain-${kind}`);
+    }
+    await call('camera', [0, 8, 8]);
     // Everything at once: two shadowed directional lights, two shadowed area lights and a shadowed point light.
     await call('scene', {
       meshes: ['floor', 'block'],

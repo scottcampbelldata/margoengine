@@ -62,3 +62,5 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 67.2 | @margoengine/water | Scatter: a real thickness (depth to the bottom or a baked map) instead of the height proxy; point and spot lights; scatter in the SSR capture and the reflector; GPU time not measured. |
 | 107.3 | @margoengine/inspector | Remote inspection: drive a real phone or headset browser against the relay, reconnect a dropped relay stream, and edit the remote hierarchy (transforms, visibility) as the local Inspector does. |
 | 51.3 | environment | Fog multiple scattering: spread into shadowed froxels, clustered lights, a check against a reference renderer, and a re-read of Hillaire 2020 sec. 5.5 in full; GPU cost not timed. |
+| 52.2 | clustered | Integrated maps (`ClusteredOptions.shadows`) still reject `drawShadow` sources; only `LocalShadows` takes the `drawLocalShadow` hook |
+| 52.2 | clustered | Hook sources (`drawLocalShadow`) are not culled by bounds: every re-rendered layer calls the hook |

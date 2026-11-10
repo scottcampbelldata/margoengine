@@ -97,10 +97,33 @@ export interface LocalShadowPrimitive {
    */
   bounds?: ArrayLike<number>;
 }
-/** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf-pro model or materials mesh. */
+/** What a caster's `drawLocalShadow` receives for one shadow map layer. Borrowed: use it synchronously. */
+export interface LocalShadowDraw {
+  /** The frame's WebGPU pass context (device and encoder). */
+  readonly context: Context;
+  /** The open depth pass of this layer: a `depth32float` attachment with no colour target, cleared to 0. */
+  readonly pass: GPURenderPassEncoder;
+  /**
+   * World to clip matrix of this layer (column major). Depth is reversed: near maps to 1 and far to 0, so a caster
+   * pipeline needs `depthCompare: 'greater'` (or 'greater-equal').
+   */
+  readonly matrix: Float32Array;
+  /**
+   * Index of the layer (0 up). A caster that writes per-draw uniforms keeps one set per layer, since every layer's
+   * writes land before the encoder runs.
+   */
+  readonly layer: number;
+}
+/** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf-pro model, materials mesh or terrain. */
 export interface LocalShadowSource {
   /** Casters drawn into each shadowed light's maps. */
-  readonly shadowPrimitives: readonly LocalShadowPrimitive[];
+  readonly shadowPrimitives?: readonly LocalShadowPrimitive[];
+  /**
+   * A custom caster's draw hook (terrain and other `drawShadow` sources): called once per shadow map layer re-rendered
+   * this frame, after the primitives, and not culled by bounds. Such a source re-renders every map every frame unless
+   * it also gives `shadowVersion`, which then re-renders them only when it changes.
+   */
+  drawLocalShadow?(draw: LocalShadowDraw): void;
   /** Bumped when the casters change, so cached maps re-render. */
   readonly shadowVersion?: number;
   /** True once disposed; such a source is rejected, or dropped once added. */
@@ -432,6 +455,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private pipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
   private sources: Source[] = [];
+  /** This frame's sources with a `drawLocalShadow` hook. */
+  private hooks: LocalShadowSource[] = [];
   /** The frame with the directional and area data; `values` is its point and spot part, uploaded alone otherwise. */
   private readonly all = new Float32Array(SOFT_FLOATS);
   private readonly values = this.all.subarray(0, FRAME_FLOATS);
@@ -518,8 +543,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.engine,
       'Shadow caster',
     );
-    if (!('id' in runtime) && !('shadowPrimitives' in runtime))
-      throw new TypeError('Invalid shadow caster; add a core mesh or a model with shadowPrimitives');
+    if (!('id' in runtime) && !('shadowPrimitives' in runtime) && typeof runtime.drawLocalShadow !== 'function')
+      throw new TypeError(
+        'Invalid shadow caster; add a core mesh, a model with shadowPrimitives or a source with drawLocalShadow',
+      );
     if (this.sources.some((r) => r.source === runtime))
       throw new MargoError('attached', 'Duplicate shadow caster; add each caster once');
     const r: Source = { source: runtime, dynamic };
@@ -838,8 +865,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       everything = this.changed;
     touched.length = 0;
     for (const records of this.draws.values()) for (const d of records.values()) d.seen = false;
-    const list = this.list;
-    list.length = 0;
+    const list = this.list,
+      hooks = this.hooks;
+    list.length = hooks.length = 0;
     for (let i = this.sources.length - 1; i >= 0; i--) {
       const r = this.sources[i];
       if (
@@ -864,7 +892,12 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         p.bounds = node.geometry!.bounds;
         primitives = r.mesh;
       } else {
-        primitives = r.source.shadowPrimitives;
+        primitives = r.source.shadowPrimitives ?? [];
+        if (typeof r.source.drawLocalShadow === 'function') {
+          hooks.push(r.source);
+          // Terrain rings follow the camera: without a version a hook source re-renders every frame.
+          if (r.source.shadowVersion === undefined) casters = true;
+        }
         if (r.version !== r.source.shadowVersion) {
           r.version = r.source.shadowVersion;
           casters = everything = true;
@@ -1003,6 +1036,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
             pass.setVertexBuffer(1, p.instances.upload(c.device));
             pass.drawIndexed(p.count, p.instances.count);
           } else pass.drawIndexed(p.count);
+          this.stats.draws++;
+        }
+        // Hooks set their own pipeline and groups, so they draw last.
+        for (const h of hooks) {
+          h.drawLocalShadow!({ context: c, pass, matrix: this.matrices.subarray(l * 64, l * 64 + 16), layer: l });
           this.stats.draws++;
         }
       } catch (error) {

@@ -841,3 +841,66 @@ test('local shadows: a point or spot shadow radius turns on PCSS; radius 0 uploa
     lights.dispose();
   }
 });
+
+test('local shadows: a drawLocalShadow source (terrain) draws into every re-rendered layer in reversed depth', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 2, resolution: 64 });
+  const point = { position: [0, 3, 0], range: 10, castShadow: true },
+    spot = { position: [4, 3, 0], range: 10, direction: [0, -1, 0], outerAngle: 0.6, castShadow: true };
+  lights.setLights([point, spot]);
+  const calls = [];
+  const hook = (into) => (d) => into.push({ layer: d.layer, matrix: Float32Array.from(d.matrix), pass: d.pass });
+  const ground = { drawLocalShadow: hook(calls) };
+  assert.throws(() => shadows.add({}), TypeError, 'a source needs primitives or a hook');
+  const remove = shadows.add(ground);
+  h.frame();
+  assert.equal(h.passes.length, 7);
+  assert.deepEqual(
+    calls.map((c) => c.layer),
+    [0, 1, 2, 3, 4, 5, 6],
+  );
+  assert.equal(new Set(calls.map((c) => c.pass)).size, 7, 'each call gets its layer pass');
+  // The spot layer (6) looks down from y = 3: nearer points get greater depth, all inside 0..1.
+  const m = calls[6].matrix;
+  const clip = (p) => {
+    const v = [0, 1, 2, 3].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
+    return v[2] / v[3];
+  };
+  const near = clip([4, 2, 0]),
+    far = clip([4, -5, 0]);
+  assert.ok(near > far && near < 1 && far > 0, `reversed depth: ${near} > ${far}`);
+  calls.length = 0;
+  h.frame();
+  assert.equal(h.passes.length, 7, 'without shadowVersion a hook source re-renders every frame');
+  assert.equal(calls.length, 7);
+  remove();
+  h.frame();
+  calls.length = 0;
+  h.frame();
+  assert.equal(h.passes.length, 0, 'removed: maps cache again');
+  const versioned = [],
+    hill = { drawLocalShadow: hook(versioned), shadowVersion: 1 };
+  shadows.add(hill);
+  h.frame();
+  assert.equal(versioned.length, 7);
+  h.frame();
+  assert.equal(h.passes.length, 0, 'a versioned hook source caches');
+  hill.shadowVersion = 2;
+  h.frame();
+  assert.equal(versioned.length, 14);
+  // A hook draws after the source primitives in the same pass.
+  const box = caster(h.engine),
+    order = [];
+  shadows.add(box);
+  const passHook = { drawLocalShadow: () => order.push(h.drawn.length) };
+  shadows.add(passHook);
+  h.frame();
+  assert.ok(order.length === 7 && order.every((n, i) => n === i + 1), 'primitives draw before hooks');
+  hill.disposed = true;
+  versioned.length = 0;
+  h.frame();
+  assert.equal(versioned.length, 0, 'a disposed hook source is dropped');
+  shadows.dispose();
+  lights.dispose();
+});

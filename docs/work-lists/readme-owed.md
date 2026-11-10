@@ -1200,3 +1200,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/inspector | remote: createRemoteRelay with host 0.0.0.0, RemoteTarget.attach on the phone page, RemoteInspector.connect on the desktop page, set, undo, capture | batch-107 job 3 |
 
 - @margoengine/environment (batch 51 job 3): volumetric, a runnable `multipleScattering` example (attach with a distance, switch back to 0 live).
+
+| @margoengine/clustered | shadows: copy-paste example of `LocalShadows.add(terrain)` and the `drawLocalShadow({context, pass, matrix, layer})` hook (reversed depth, per-layer uniforms, every-frame redraw without `shadowVersion`) | batch-52 job 2 |
+| @margoengine/terrain | Shadows: `drawLocalShadow` casting into clustered `LocalShadows` point, spot, directional and area maps | batch-52 job 2 |

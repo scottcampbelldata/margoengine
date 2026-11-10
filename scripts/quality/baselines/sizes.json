@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14531184,
+  "total": 14532038,
   "history": [
     {
       "date": "2026-10-24",
@@ -7739,6 +7739,12 @@
       "commit": "aada605f2",
       "reason": "batch 107 job 3: new entries @margoengine/inspector/remote and @margoengine/inspector/remote-relay",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "9f5e8b30d",
+      "reason": "clustered/shadows and terrain/stream: drawLocalShadow hook and terrain local shadow caster, batch 52 job 2",
+      "grew": 2
     }
   ],
   "items": {
@@ -7895,7 +7901,7 @@
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
     "@margoengine/clustered/shadow-atlas": 15938,
-    "@margoengine/clustered/shadows": 12954,
+    "@margoengine/clustered/shadows": 13386,
     "@margoengine/clustered/shapes": 12255,
     "@margoengine/clustered/stochastic": 2513,
     "@margoengine/clustered/units": 1089,
@@ -8777,7 +8783,7 @@
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/rvt": 6595,
     "@margoengine/terrain/sculpt": 4873,
-    "@margoengine/terrain/stream": 12291,
+    "@margoengine/terrain/stream": 12713,
     "@margoengine/text": 17109,
     "@margoengine/text/animate": 11783,
     "@margoengine/text/curve": 10802,
