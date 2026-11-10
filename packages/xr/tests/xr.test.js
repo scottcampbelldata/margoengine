@@ -270,6 +270,34 @@ async function fixture(t) {
   };
 }
 
+for (const secondary of [false, true])
+  for (const remove of [false, true])
+    test(`XR ${secondary ? 'secondary' : 'default'} ${remove ? 'owner removal' : 'direct disposal'} releases only its owner`, async (t) => {
+      const f = await fixture(t), scene = secondary ? f.engine.createScene('xr-owner') : f.engine.scene;
+      // Exercise the actual plugin lifetime independently of the asynchronous device factory.
+      const xr = new XR(f.device);
+      scene.use(xr);
+      let primaryDisposals = 0;
+      const primary = { name: xr.name, setup() {}, dispose() { primaryDisposals++; } };
+      if (secondary) f.engine.use(primary);
+      await xr.requestSession('inline');
+      assert.equal(f.engine.sceneOf(xr), scene);
+      if (remove) scene.removePlugin(xr.name);
+      else xr.dispose();
+      xr.dispose();
+      assert.equal(f.engine.sceneOf(xr) === undefined, true, 'disposed XR remains registered');
+      assert.equal(scene.plugins.size, 0);
+      assert.equal(primaryDisposals, 0);
+      if (secondary) assert.equal(f.engine.plugins.get(xr.name), primary);
+      assert.equal(f.device.destroyed, 1);
+      assert.equal(f.session.ended, 1);
+      assert.equal(f.session.handles.size, 0);
+      scene.use({ name: xr.name, setup() {} });
+      xr.dispose();
+      assert.equal(scene.plugins.has(xr.name), true, 'old XR removed its replacement');
+      assert.deepEqual(f.errors, []);
+    });
+
 test('manual XR frame rendering keeps both tracked eyes and suppresses only the automatic draw', async (t) => {
   const f = await fixture(t), xr = await XR.create(f.engine);
   assert.throws(() => xr.renderFrame(), (error) => error.code === 'state');

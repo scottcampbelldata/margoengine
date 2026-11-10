@@ -510,7 +510,7 @@ export class XR implements EnginePlugin {
     // The engine's own device stays with the engine.
     if (this.route === 'separate') this.device.destroy();
     if (session) void session.end().catch((error) => this.engine.onError(error));
-    if (this.engine?.hasPlugin(this.name)) this.engine.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   /** Same as {@link XR.dispose}, for `using`. */
   declare [Symbol.dispose]: () => void;

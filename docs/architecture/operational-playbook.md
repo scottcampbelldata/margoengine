@@ -1,5 +1,23 @@
 
 
+### Section 5 evidence: XR manager registration cleanup
+
+XR.dispose resolves sceneOf(this) before removing its registration. It retains
+the existing session end, animation cancellation, listener release and separate
+device ownership. Four real-engine cases in packages/xr/tests/xr.test.js cover
+direct and owner-driven disposal in default/secondary scenes, active inline
+sessions, same-name isolation and replacement; the secondary direct case fails
+before the fix. The package source guard prevents active-scene detachment.
+The five package GPU scripts and modern:test:xr:browser pass, including native
+and compatibility stereo paths. Physical headset acceptance remains separate.
+
+Clean-room standards compared: W3C Immersive Web Working Group, *WebXR Device
+API*, 2026, https://www.w3.org/TR/webxr/ (session end and frame cancellation);
+WHATWG contributors, *DOM Living Standard*, 2026,
+https://dom.spec.whatwg.org/#interface-eventtarget (listener identity and removal).
+These support retaining the session lifetime; Margo's existing sceneOf identity
+lookup supplies registration ownership. No external implementation was read.
+
 #### Section 5 evidence addition: batch 179 provenance
 The optional entry observes only opted-in spec figures and preserves successful mutations, property assignments and removals. Replaying restores the baseline, executes recorded operations with resource/GPU argument ownership, then restores the final portable state. A regression preserves saved IDs after removed resources and allocates future IDs without collision. Temporary replay GPU arrays release with the figure. Container tests preserve PNG image bytes exactly, validate CRCs and bounded inflation, and verify namespaced SVG and Unicode PDF records. Demo browser evidence covers native WebGPU and the WebGL2 compatibility layer; no rendering mathematics or backend implementation changes.
 

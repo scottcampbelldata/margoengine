@@ -1363,6 +1363,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document the generated /sciviz/workers alias after the build phase.
 - @margoengine/viz: document the generated /sciviz/workers alias after the build phase.
 
+- @margoengine/xr (lane G known-bugs sweep): document manager disposal in secondary scenes and same-name plugin isolation.
+
 - Integration J2 tooling: document the generated C2 Works with matrix and composition runner after all adapters land; README examples and Works with generation wait for the README phase.
 
 - @margoengine/sciviz, batch 176 job 5: document /tensor symmetric layouts, CPU/GPU eigensystems and ownership, ellipsoid/superquadric glyphs, FA/direction colour, Euler/FACT tracking, hyperstreamlines and explicitly ordinary linear least-squares DWI fitting with all defaults and precision/coordinate limits.

@@ -3867,9 +3867,9 @@ wait, retry, weakened assertion or runtime engine change is involved.
 
 Stats closing acceptance: the collected verify on the current-main stats rebase completes with 13,864 of 13,881 repository tests passing, 17 failures and zero skips. Missing ComputeFrame GPU-script wiring, a fixed-frame workload classification and a pre-initialization planner test reference cause those failures. The repairs pass all 244 checks in the complete failed test files plus compute units and the new gate regression. The complete compute GPU suite, strengthened owner proof on both backends and all 21 compute README examples also pass. Every other verify step passed; no second full verify or fresh all-green full-run claim is made. The original process disappeared without a result, so its incomplete log is retained without a pass claim. The single replacement finished within its 40-minute bound. The real-GPU stats script passes, including eight owner cases, two shader modules and zero compilation errors; all eight runtime README examples pass. Stats source is unchanged by the exporter/documentation-only rebase. Lint and hygiene pass with 120 existing lint warnings; entry ceilings are unchanged. [Durable receipt](whitepaper/results/batch-56-stats-owner-20261109.json). The wider owner audit remains open.
 
-### Open: Save factory ignores secondary restore target
+### Fixed in b4bb08a45: Save factory secondary restore target
 
-Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}}) when the type's synchronous attach calls engine.use(plugin). applyPlugins calls attach outside target scene setup, so the factory registers in default; rollback removes by name from secondary instead. A same-name default plugin makes the restore reject before state loads. Nine real-engine cases retain three passing default controls and six secondary failures, covering success, immediate load failure and a later binding failure. The lane retains save-owner-regression-red.log and the regression draft; a package repair is next.
+Repro: restoreScene(engine, saved, {scene: secondary, plugins: {factory: {type}}}) when the type's synchronous attach calls engine.use(plugin). The factory previously ran outside target setup and rollback removed by name from the wrong scene. Commit b4bb08a45 invokes factories in target setup and rolls back by identity. Lane G reran packages/save/tests/scene-owner.test.js on current main: all 16 cases pass, including secondary/default-name isolation and attach/load/later-failure rollback. See the full fixed note below.
 
 Capture root-cause update from the coordinator: the red capture regression is owned by core lighting's uniform-only light-direction normalization under GPU load. The core repair waits for Scott's approval. The red regression and its package wiring stay off main; the exact-zero assertions remain unchanged.
 
@@ -3966,18 +3966,14 @@ changes 4608 out-of-scissor components; the repaired four owner cases change
 zero and each draws exactly 512 red pixels. The caller's frame stays alive.
 [Video receipt](whitepaper/results/batch-56-video-owner-20261109.json).
 
-### Open: Animation registration cleanup still uses the active scene
+### Fixed in 8e91c547e: Animation registration cleanup
 
-The next package owner audit is Animation. Source inspection confirms that
-Animation.dispose (packages/animation/src/index.ts) calls model.root.engine.removePlugin
-without sceneOf(this). With a live model, register a new Animation on a secondary
-scene, then call animation.dispose outside dispatch: the active default registry
-is queried and the secondary registration remains. The model disposal callback
-reaches that same cleanup. The package's other class, factory and inheritance
-candidates still need their own runtime proofs; VATCrowd.dispose contains no
-detachment at all. The package is explicitly pending in the finite ledger.
-No Animation source was edited in this continuation; reproduce and fix its own
-registration/factory paths with regression and complete package gates next.
+Animation.dispose previously removed by name from the active default scene,
+leaving its secondary registration behind. Commit 8e91c547e repairs Animation,
+its model-disposal callback and the other package owners, including VATCrowd.
+Lane G reran packages/animation/tests/scene-owner.test.js on current main:
+all 19 cases pass, covering 16 constructor/factory owners, same-name default
+isolation, asynchronous cache cancellation and disposal during initial loading.
 
 ### Browser shutdown recurrence: reproduced PID-wait defect repaired (2026-11-09)
 
@@ -4142,12 +4138,18 @@ Instances, texture hooks, frame priorities and adaptive performance remain separ
 
 Open outside job 1: render Grid inside Scene name="hud" and draw only that scene with RenderView; the grid is missing there because packages/react/src/lines.tsx Grid attaches with engine.use instead of the enclosing world.use. Recorded under lane-efficiency rule 6; the new Line binding uses its owning Scene.
 
-### XR manager secondary-scene disposal
+### Fixed 2026-11-10: XR manager secondary-scene disposal
 
 Register XR on a secondary scene, then dispose outside dispatch: XR.dispose
-checks/removes the active scene by name (packages/xr/src/index.ts), leaving its
-secondary registration behind or removing a same-name default plugin. This
-pre-existing owner repair is outside batch 268 pointer scope and remains open.
+checked the active default registry by name, removed a same-name default plugin
+and left its own registration behind. Resolve the manager's actual scene with
+sceneOf(this) before removal. Four real-engine tests in xr.test.js cover direct
+disposal and owner removal in default/secondary scenes, an active inline session,
+one-time device/session cleanup and safe replacement. The secondary direct case
+fails on the parent. scene-owner-source.test.js guards this class of detachment.
+All 134 XR CPU cases, six selected XR GPU suites and the fresh 1,470-case
+changed-package/dependent CPU run pass with no skips. No headset acceptance
+claim is added.
 
 ### README browser shutdown observation
 
