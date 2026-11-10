@@ -63,6 +63,8 @@ export interface DrawDerivation {
   effect: { entries: GPUBindGroupEntry[]; group: GPUBindGroup } | undefined;
   tintEffect: { entries: GPUBindGroupEntry[]; group: GPUBindGroup } | undefined;
   mappedTint: boolean;
+  /** @internal Whether it was derived for all-white instanced vertices (index.ts `whiteDraw`): part of its context. */
+  white?: boolean;
   /** False when the finished shader reads the model rows itself, so instanced batches cannot draw it. */
   modelFree: boolean;
   /** True when the finished shader reads the base colour only as the vertex colour's factor (index.ts `tintableCode`). */

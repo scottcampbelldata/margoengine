@@ -2921,6 +2921,27 @@ The Box2D browser goal remains unmet. Quiet release reruns remain required; no a
 - **Timing:** pending the quiet rerun (`npm run bench -- dynamic --engines=margo,three-webgpu`; batch 166 job 3 added
   the `dynamic-upload` and `dynamic-cpu` cases, smoke-run once at 10,000 and 250,000 with no errors, no number read).
 
+### 114. createInstancedMesh: the vertex stage fetches what it reads (batch 166 job 2, 2026-11-10)
+
+- **Counted before** (50,000 static boxes, `createInstancedMesh` with a bare `Material`, one frame on the recorder
+  device): each vertex invocation fetched 48 bytes of the 80-byte vertex (position, normal and colour, three `float32x4`
+  reads) and 96 bytes of instance data (six attributes): 144 bytes, against 120 for `CulledInstances` (two `float32x3`
+  vertex reads and the same 96-byte record).
+- **Three cuts, each exact by construction** (`perf(gltf-pro)` instanced vertex fetch cuts): a geometry whose every
+  vertex colour is (1, 1, 1, 1) (what a mesh without colours packs) reads the constant `vec4f(1)` in the instanced
+  vertex stage instead of the colour input (`1 * x` is exact); the instance layout drops the UV row the trimmed shader
+  no longer declares (same stride); locations read only as `xyz` are fetched as `float32x3`, the w the shader never reads
+  taking WebGPU's default.
+- **Counted after** (`packages/gltf-pro/tests/vertex-inputs.test.js`): 24 bytes of vertex (two `float32x3`) and 80 of
+  instance (five attributes) = 104 bytes a vertex invocation, below `CulledInstances`' 120. Varying scalars unchanged
+  (11), no function-scope arrays. A repacked 24-byte vertex stream was judged and rejected: it duplicates buffers and
+  must be rebuilt on a material swap, for no fetch saving beyond the `float32x3` reads.
+- **Same output:** `packages/materials/test/vertex-inputs-browser.mjs` takes the scene and the 50,000-box frame with
+  the cuts on and switched off in the served build: 0 pixels differ on native WebGPU and on the WebGL2 layer. The
+  layer's ANGLE D3D11 run first showed every box black in some loads; that was a defect below Margo, triggered by the
+  layer's canvas present, and is fixed in webgl2-compat (known-bugs.md, "ANGLE D3D11 flipped blit").
+- **Timing:** pending the quiet rerun (re-measure item 34).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -3029,6 +3050,7 @@ These entries lack a recorded number, a named machine or a quiet run:
 
 32. Exact 2D frame preparation (entry 112): quiet paired/browser reruns; deterministic work reduction and loaded paired advantage do not establish release speed or Box2D parity.
 33. DynamicInstances moving boxes (entry 113): `npm run bench -- dynamic --engines=margo,three-webgpu`, read with the Margo-only `dynamic-upload` (rows uploaded every frame, no CPU maths, GPU bound) and `dynamic-cpu` (CPU maths, no upload) cases beside the moving and still ones, which separates GPU clocks from the 12 MB copy at 250,000.
+34. createInstancedMesh at 50,000 boxes (entry 114): the boxes-vs-threejs 50,000 scene (`docs/whitepaper/reproduce.md`), Margo `createInstancedMesh` and `CulledInstances` against three's WebGPU `InstancedMesh`, GPU time per frame.
 
 ### Batch 69: local WFC heap and SIMD selection
 

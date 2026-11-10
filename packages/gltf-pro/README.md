@@ -193,7 +193,9 @@ Synchronous `parseGLTF` also accepts already decoded `GLTFImage` blueprints.
 
 `KHR_texture_transform` supports offset, rotation, scale, and the overriding UV set
 on all five PBR maps. UV0 and UV1 already share the fixed 80-byte vertex layout. A draw fetches only the parts of that vertex its finished shader reads, so a material with no maps
-reads position, normal and, while `vertexColors` is on, colour. Nothing to set.
+reads position, normal and, while `vertexColors` is on, colour. Instanced draws (`createInstancedMesh`) fetch less again:
+position and normal as three floats, no instance UV row when no map reads it, and no colour when every vertex colour
+is white (the shader reads the constant 1, the same value). Nothing to set.
 Nonidentity transforms append affine rows to group 3 alongside any caller material
 factors. Identity transforms and ordinary UV0 materials retain the exact original
 shader, 400-byte frame, and groups 0/1. Normal maps derive their tangent frame from

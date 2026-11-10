@@ -2322,6 +2322,9 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   [whitepaper/reproduce.md](whitepaper/reproduce.md), Margo `createInstancedMesh` against three's WebGPU build run in its own
   folder.
 - **Fixed part:** gltf-pro fetches and passes only what the finished shader reads (0.615 to 0.546 ms, perf-history entry 50).
+  Batch 166 job 2 counted the vertex stage against `CulledInstances` and cut the rest: 144 to 104 bytes a vertex
+  invocation (no colour fetch for all-white vertices, no unread instance UV row, position and normal as three floats),
+  against 120 for `CulledInstances`; identical pixels (perf-history entry 114). Timing pending the quiet rerun.
 - **Ruled out in a raw WebGPU pass:** all within one 0.0655 ms timer quantum: vertex stride 80 against 32 bytes, instance
   stride 96 against 64, uint16 against uint32 indices, instance data from storage against attributes.
 - **Ruled out in the real bench, by rewriting the shader at `createShaderModule`:** the `f.model` multiply, the normal cross
@@ -2332,8 +2335,8 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   (0.547 ms), the outputs between the stages (0.546 ms), texture reads and the node x instance matrix product. The first of
   these came before the fetch trimming and covers the shader's cost as it stood then.
 - **Still untested:** the cost of fragment lighting as the shader stands today; how many boxes the culled path really draws,
-  which decides whether 0.305 ms compares like with like; the instance attribute count (6 against 2 in the culled pipeline);
-  and `DynamicInstances` on a moving frame.
+  which decides whether 0.305 ms compares like with like; the instance attribute count (now 5, 80 bytes fetched, against
+  the culled pipeline's six attributes over the same 96-byte record); and `DynamicInstances` on a moving frame.
 - **Needed to close:** a GPU-alone run of those four, starting with reading back the rewritten shader, then the fix in the
   package that owns the cause, or a measured reason recorded as an accepted difference.
 

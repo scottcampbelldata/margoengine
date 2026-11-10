@@ -1,17 +1,22 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Materials vertex inputs</title><style>body{margin:0;background:#000}canvas{width:512px;height:384px;display:block}</style></head><body><canvas width="512" height="384" aria-label="Boxes"></canvas>
 <script type="module">
-// Materials with no maps drawn alone, instanced, mirrored, with vertex colours and beside a textured mesh.
+// Materials with no maps drawn alone, instanced, mirrored, with vertex colours and beside a textured mesh; or ?bench.
 // vertex-inputs-browser.mjs takes this page's frame with gltf-pro's input trimming on and off.
 import {Engine} from '/packages/core/dist/index.js';
 import {Material,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
 import {boxGeometry} from '/packages/geometry/dist/index.js';
-const canvas=document.querySelector('canvas'),errors=[],fetched=[];
-const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[4,3.5,7],target:[0,0,0],fov:50}});engine.stop();
+const canvas=document.querySelector('canvas'),errors=[],fetched=[],bench=location.search.includes('bench');
+// ?bench: the createInstancedMesh row of the speed matrix, 50,000 boxes with per-instance colours (batch 166 job 2).
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:bench?{position:[40,30,60],target:[0,0,0],fov:50,near:0.1,far:500}:{position:[4,3.5,7],target:[0,0,0],fov:50}});engine.stop();
 // Observe the device receiving these pipelines: the full compatibility device has its own prototype.
 const create=engine.gpu.createRenderPipeline;
 engine.gpu.createRenderPipeline=function(d){const n=d.vertex.buffers?.[0]?.attributes?.length;if(d.vertex.buffers?.[0]?.arrayStride===80)fetched.push(n);return create.call(this,d);};
 engine.gpu.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
 const turn=(x,y,z,a,s=1)=>{const c=Math.cos(a)*s,n=Math.sin(a)*s;return [c,0,-n,0,0,s,0,0,n,0,c,0,x,y,z,1];};
+if(bench){const n=50000,s=37,boxes=createInstancedMesh(engine,boxGeometry(0.5,0.5,0.5),new Material({color:'#ffffff',roughness:0.5,metalness:0.1,side:'front'}),n);
+for(let i=0;i<n;i++)boxes.instances.setMatrixAt(i,[1,0,0,0,0,1,0,0,0,0,1,0,(i%s)-s/2,Math.floor(i/s/s)-18,(Math.floor(i/s)%s)-s/2,1]).setColorAt(i,[((i*7)%16)/16,0.5,0.5]);
+for(let i=0;i<3;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}
+window.errors=errors;window.fetched=fetched;window.ready=true;}else{
 const box=boxGeometry(0.7,0.7,0.7);
 const plain=createInstancedMesh(engine,box,new Material({color:'#ffffff',roughness:0.4,side:'front'}),24);
 const off=createInstancedMesh(engine,box,new Material({color:'#ddeeff',roughness:0.7,vertexColors:false,side:'front'}),6);
@@ -24,5 +29,5 @@ const painted=createMesh(engine,{...box,colors},new Material({roughness:0.5}));p
 const texture=new Texture({data:new Uint8Array([255,40,40,255,40,255,40,255,40,40,255,255,255,255,40,255]),width:2,height:2},{magFilter:'nearest',minFilter:'nearest'});
 const mapped=createMesh(engine,box,new Material({map:texture,roughness:0.5}));mapped.root.setPosition([2.4,1.8,1]);
 for(let i=0;i<3;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}
-window.errors=errors;window.fetched=fetched;window.ready=true;
+window.errors=errors;window.fetched=fetched;window.ready=true;}
 </script></body></html>

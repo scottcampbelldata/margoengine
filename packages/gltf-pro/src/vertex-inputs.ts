@@ -8,6 +8,8 @@ export interface VertexInputs {
   readonly code: string;
   /** The vertex locations it reads, ascending. */
   readonly locations: readonly number[];
+  /** Those of `locations` whose `xyz` alone it reads: a three-float fetch fills them, w taking WebGPU's default 1. */
+  readonly narrow: readonly number[];
 }
 
 const ALL: readonly number[] = [0, 1, 2, 3, 4];
@@ -70,16 +72,67 @@ export function laterUVShader(code: string): string {
   );
 }
 
-/** Trims finished shader `source` to the vertex inputs it reads. Called once per pipeline built. */
-export function vertexInputs(source: string): VertexInputs {
-  const unchanged = { code: source, locations: ALL };
+/**
+ * True when every vertex of `vertices` (80-byte PBR, 20 floats a vertex) from vertex `start` on, `count` of them, has
+ * the colour (1, 1, 1, 1): what a primitive without COLOR_0 packs. Stops at the first other colour.
+ */
+export function whiteColours(vertices: Float32Array, start = 0, count = vertices.length / 20 - start): boolean {
+  for (let i = start * 20 + 16, end = (start + count) * 20; i < end; i += 20)
+    if (vertices[i] !== 1 || vertices[i + 1] !== 1 || vertices[i + 2] !== 1 || vertices[i + 3] !== 1) return false;
+  return true;
+}
+
+/** Vertex buffer slot 0: the 80-byte vertex, one attribute per location `inputs` reads, three floats where xyz do. */
+export function vertexLayout(inputs: VertexInputs): GPUVertexBufferLayout {
+  return {
+    arrayStride: 80,
+    attributes: inputs.locations.map((location) => ({
+      shaderLocation: location,
+      offset: location * 16,
+      format: inputs.narrow.includes(location) ? 'float32x3' : 'float32x4',
+    })),
+  };
+}
+
+const instanceLayouts = new WeakMap<GPUVertexBufferLayout, Map<string, GPUVertexBufferLayout>>();
+/**
+ * Instance buffer `layout` less the attributes finished shader `code` does not declare in its `Instance` struct (the
+ * UV row `vertexInputs` drops with the UVs): the same stride, nothing fetched that no input reads. One object per
+ * layout and kept set.
+ */
+export function instanceInputs(code: string, layout: GPUVertexBufferLayout): GPUVertexBufferLayout {
+  const declared = /\bstruct Instance \{([^}]*)\}/.exec(code);
+  if (!declared) return layout;
+  const used = new Set([...declared[1].matchAll(/@location\((\d+)\)/g)].map((field) => +field[1])),
+    attributes = [...layout.attributes].filter((a) => used.has(a.shaderLocation));
+  if (attributes.length === [...layout.attributes].length) return layout;
+  const key = attributes.map((a) => a.shaderLocation).join();
+  let kept = instanceLayouts.get(layout);
+  if (!kept) instanceLayouts.set(layout, (kept = new Map()));
+  let out = kept.get(key);
+  if (!out) kept.set(key, (out = { ...layout, attributes }));
+  return out;
+}
+
+/**
+ * Trims finished shader `source` to the vertex inputs it reads. Called once per pipeline built. `white`: every vertex
+ * of the drawn buffer has colour (1, 1, 1, 1) (`whiteColours`), so the vertex stage reads that constant in place of
+ * the colour input: the same value, without the 16-byte fetch.
+ */
+export function vertexInputs(source: string, white = false): VertexInputs {
+  const unchanged = { code: source, locations: ALL, narrow: [] };
   if (!/\bstruct Input \{/.test(source) || source.split(':Input').length !== 2) return unchanged;
   if (Math.min(...stage(source)) < 0) return unchanged;
   let code = dropOutput(dropOutput(dropFlatFrame(source), 'tangent'), 'uv');
   const [start, end] = stage(code),
-    body = code.slice(code.indexOf(')->Out {', start), end);
+    open = code.indexOf(')->Out {', start);
+  let body = code.slice(open, end);
   // `i` handed on whole could read anything.
   if (/\bi\b(?!\.)/.test(body)) return unchanged;
+  if (white && /\bi\.color\b/.test(body)) {
+    body = body.replace(/\bi\.color\b/g, 'vec4f(1)');
+    code = code.slice(0, open) + body + code.slice(end);
+  }
   // The instance's UV row goes with the output it fed.
   if (!body.includes('k.uvt')) code = code.replace(', @location(10) uvt:vec4f}', '}');
   const declared = /struct Input \{([^}]*)\}/.exec(code)!,
@@ -93,5 +146,12 @@ export function vertexInputs(source: string): VertexInputs {
         ? code.replace(declared[1], [...kept, ...declared[1].matchAll(/@builtin\(\w+\) \w+:\w+/g)].map((field) => field[0]).join(', '))
         : code,
     locations: kept.map((field) => +field[1]),
+    // Every read of the input takes `.xyz` (position's w is 1 and normal's 0 in the buffer; neither is read).
+    narrow: kept
+      .filter(([, , name]) => {
+        const reads = body.match(new RegExp(`\\bi\\.${name}\\b(\\.\\w+)?`, 'g'))!;
+        return reads.every((read) => read.endsWith('.xyz'));
+      })
+      .map((field) => +field[1]),
   };
 }

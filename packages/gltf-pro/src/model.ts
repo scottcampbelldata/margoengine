@@ -44,7 +44,15 @@ import {
   type RowsState,
 } from './draw-batch.js';
 import { rowsPerBinding, rowsShader } from './instanced-shader.js';
-import { laterUVLayout, laterUVShader, laterUVSlot, vertexInputs } from './vertex-inputs.js';
+import {
+  instanceInputs,
+  laterUVLayout,
+  laterUVShader,
+  laterUVSlot,
+  vertexInputs,
+  vertexLayout,
+  whiteColours,
+} from './vertex-inputs.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
@@ -346,6 +354,7 @@ function findDerivation(
   inst: object | undefined,
   topology: GPUPrimitiveTopology | undefined,
   sign: number,
+  white: boolean,
 ): DrawDerivation | undefined {
   if (list)
     for (let i = 0; i < list.length; i++) {
@@ -354,6 +363,7 @@ function findDerivation(
         value.frame === frame &&
         value.source === source &&
         value.instances === inst &&
+        !!value.white === white &&
         value.topology === topology &&
         value.sign === sign &&
         value.extension === undefined
@@ -374,8 +384,9 @@ function steadyDerivation(
   topology: GPUPrimitiveTopology | undefined,
   sign: number,
   m: PBRMaterial,
+  white = false,
 ): DrawDerivation | undefined {
-  const found = findDerivation(list, frame, source, inst, topology, sign),
+  const found = findDerivation(list, frame, source, inst, topology, sign, white),
     shading = m.shading;
   if (found || !list || !shading || frame.lighting.length || source || m.extension) return found;
   const version = shading.version;
@@ -389,6 +400,7 @@ function steadyDerivation(
       value.shading === shading &&
       value.source === source &&
       value.instances === inst &&
+      !!value.white === white &&
       value.topology === topology &&
       value.sign === sign &&
       value.extension === undefined &&
@@ -1176,6 +1188,14 @@ function preparedPrimitive(
     targetNames: [],
   };
 }
+/**
+ * Vertex buffers whose every colour is (1, 1, 1, 1), set where gltf-pro writes them from CPU data (`whiteColours`):
+ * an instanced draw of one reads that constant in place of the colour input (`vertexInputs`). A buffer missing here
+ * draws as ever.
+ */
+const whiteVertices = new WeakMap<GPUBuffer, boolean>();
+/** Whether an instanced draw of `r` may read the white constant: its own, undeformed vertices are all white. */
+const whiteDraw = (r: DrawResource): boolean => !r.primitive.deformed && whiteVertices.get(r.vertex) === true;
 interface DrawResource {
   primitive: PBRPrimitive;
   device: GPUDevice;
@@ -2494,6 +2514,7 @@ export class PBRModel implements EnginePlugin {
       // A shared primitive uploads its source's arrays, so the cache hands both the same pair again after a restore.
       const from = this.bufferSources?.get(p) ?? p;
       r.vertex = upload(from.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
+      if (!whiteVertices.has(r.vertex)) whiteVertices.set(r.vertex, whiteColours(from.vertices));
       r.index = upload(from.indices, GPUBufferUsage.INDEX);
       if (from.uvs) r.uvs = upload(from.uvs, GPUBufferUsage.VERTEX);
       p.buffers = { vertex: r.vertex, index: r.index };
@@ -2657,13 +2678,21 @@ export class PBRModel implements EnginePlugin {
       const i = list.indexOf(r.primitive);
       if (i < 0) continue;
       const p = r.primitive,
-        g = geometry[i];
+        g = geometry[i],
+        old = r.vertex;
       r.vertex = place(
         r,
         r.vertex,
         g.vertices,
         GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
         range && [range.start * 20, range.count * 20],
+      );
+      // A range written in place keeps the rest of the buffer: still white only if it was and the range is.
+      whiteVertices.set(
+        r.vertex,
+        range && r.vertex === old
+          ? whiteVertices.get(old) === true && whiteColours(g.vertices, range.start, range.count)
+          : whiteColours(g.vertices),
       );
       r.index = place(r, r.index, g.indices, GPUBufferUsage.INDEX, range && [0, 0]);
       if (g.uvs) {
@@ -3776,7 +3805,7 @@ export class PBRModel implements EnginePlugin {
           );
         // Another primitive with this material record already derived the shader, pipeline and uniform rows for this
         // call or run: reuse them (draw-memo.ts). Material extensions keep per-resource state and derive their own.
-        let d = steadyDerivation(draws.derivations.get(m), frame, source, inst, topology, sign, m);
+        let d = steadyDerivation(draws.derivations.get(m), frame, source, inst, topology, sign, m, !!inst && whiteDraw(r));
         const hit = d !== undefined;
         const batching = !!run && mode === 'beauty';
         if (!d)
@@ -4001,12 +4030,14 @@ export class PBRModel implements EnginePlugin {
   ): DrawDerivation {
     let list = draws.derivations.get(m),
       at = -1;
+    const white = !!inst && whiteDraw(r);
     if (list)
       for (let i = 0; i < list.length; i++) {
         const value = list[i];
         if (
           value.source === source &&
           value.instances === inst &&
+          !!value.white === white &&
           value.topology === topology &&
           value.sign === sign &&
           sameFrame(value.frame, frame)
@@ -4030,6 +4061,7 @@ export class PBRModel implements EnginePlugin {
       inst,
       build,
     );
+    d.white = white;
     if (!list) draws.derivations.set(m, (list = []));
     if (at < 0) {
       if (list.length < derivationLimit) list.length++;
@@ -4140,7 +4172,7 @@ export class PBRModel implements EnginePlugin {
       const kind = batchKind(d.sign < 0),
         draws = deviceDraws(device),
         derived =
-          steadyDerivation(draws.derivations.get(m), frame, p.extension, kind, topology, 1, m) ??
+          steadyDerivation(draws.derivations.get(m), frame, p.extension, kind, topology, 1, m, whiteDraw(r)) ??
           this.derivation(
             draws,
             m,
@@ -4305,7 +4337,7 @@ export class PBRModel implements EnginePlugin {
       kind = batchKind(d.sign < 0, true),
       draws = deviceDraws(device),
       derived =
-        steadyDerivation(draws.derivations.get(m), frame, p.extension, kind, topology, 1, m) ??
+        steadyDerivation(draws.derivations.get(m), frame, p.extension, kind, topology, 1, m, whiteDraw(r)) ??
         this.derivation(draws, m, frame, p.extension, topology, 1, c, 'beauty', scratch, r, wireframe, undefined, kind),
       pipeline = derived.pipeline;
     if (!derived.modelFree || !this.rowsFit(batch, derived, kind, scratch, draws)) {
@@ -4412,7 +4444,7 @@ export class PBRModel implements EnginePlugin {
         p = r.primitive,
         m = p.material,
         own =
-          steadyDerivation(draws.derivations.get(m), lead.frame, p.extension, kind, topology, 1, m) ??
+          steadyDerivation(draws.derivations.get(m), lead.frame, p.extension, kind, topology, 1, m, whiteDraw(r)) ??
           model.derivation(
             draws,
             m,
@@ -4468,7 +4500,7 @@ export class PBRModel implements EnginePlugin {
       const model = batch.models[i];
       if (model.disposed) return false;
       const own =
-        steadyDerivation(draws.derivations.get(m), batch.d.frame, p.extension, kind, topology, 1, m) ??
+        steadyDerivation(draws.derivations.get(m), batch.d.frame, p.extension, kind, topology, 1, m, whiteDraw(r)) ??
         model.derivation(
           draws,
           m,
@@ -4904,7 +4936,9 @@ export class PBRModel implements EnginePlugin {
         state?.blend === undefined,
       stateKey = renderStateKey(state) + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
       samples = c.descriptor.multisample?.count,
-      depthFormat = c.descriptor.depthStencil!.format;
+      depthFormat = c.descriptor.depthStencil!.format,
+      // An instanced draw of all-white vertices reads the constant, not the colour input (the derivation is per white).
+      white = !!inst && whiteDraw(r);
     const key =
       mode +
       ':' +
@@ -4925,7 +4959,7 @@ export class PBRModel implements EnginePlugin {
       ':' +
       mask +
       stateKey +
-      (inst ? ':i' + face + ':' + objectId(inst.layout) : '') +
+      (inst ? ':i' + face + ':' + objectId(inst.layout) + (white ? 'w' : '') : '') +
       (topology ? ':' + topology : '') +
       (laterUV ? ':uv' : '') +
       (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind : '') +
@@ -4935,7 +4969,7 @@ export class PBRModel implements EnginePlugin {
     // bindings: the batch draws with its instanced variant (see `build`).
     if (!pipeline && build) {
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
-      const inputs = vertexInputs(code),
+      const inputs = vertexInputs(code, white),
         module = c.device.createShaderModule({
           code: markedClipDistances(laterUV ? laterUVShader(inputs.code) : inputs.code),
         }),
@@ -4946,15 +4980,8 @@ export class PBRModel implements EnginePlugin {
           module,
           entryPoint: 'vertex',
           buffers: [
-            {
-              arrayStride: 80,
-              attributes: inputs.locations.map((location) => ({
-                shaderLocation: location,
-                offset: location * 16,
-                format: 'float32x4' as const,
-              })),
-            },
-            ...(inst ? [inst.layout] : laterUV ? [null] : []),
+            vertexLayout(inputs),
+            ...(inst ? [instanceInputs(inputs.code, inst.layout)] : laterUV ? [null] : []),
             ...(laterUV ? [laterUVLayout] : []),
           ],
         },

@@ -1,6 +1,8 @@
 // Real-GPU regression test: gltf-pro's vertex input trimming (src/vertex-inputs.ts) draws the same pixels. The page is
 // taken twice, as built and with the trimming switched off in the served gltf-pro build. The two must match bit for
-// bit, and the frame must not be empty.
+// bit, and the frame must not be empty. The trimming covers the inputs the shader reads, the colour fetch of all-white
+// instanced vertices, three-float position and normal reads and the unread instance UV row (batch 166 job 2). The
+// ?bench page is the 50,000-box createInstancedMesh frame of the speed matrix.
 // Run from the repository root after `npm run build:packages`: node packages/materials/test/vertex-inputs-browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -10,8 +12,9 @@ import { decodePNG } from '../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const release = await acquire({ owner: 'materials-vertex-inputs' });
-async function run(compat) {
-  const context = await openBrowser({ startPath: '/packages/materials/test/vertex-inputs.html', port: 5281, compat }),
+async function run(compat, bench) {
+  const page0 = '/packages/materials/test/vertex-inputs.html' + (bench ? '?bench' : ''),
+    context = await openBrowser({ startPath: page0, port: 5281, compat }),
     { page } = context,
     pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -42,7 +45,8 @@ async function run(compat) {
     const { image: trimmed, fetched } = await frame();
     off = true;
     const { image: whole, fetched: all } = await frame();
-    assert.ok(fetched.includes(2) && fetched.includes(3) && fetched.includes(5), `inputs fetched: ${fetched}`);
+    if (bench) assert.ok(fetched.length && fetched.every((n) => n === 2), `inputs fetched: ${fetched}`);
+    else assert.ok(fetched.includes(2) && fetched.includes(3) && fetched.includes(5), `inputs fetched: ${fetched}`);
     assert.ok(all.length && all.every((n) => n === 5), `inputs fetched with the trimming off: ${all}`);
     assert.ok(patched > 0, 'the served build was not switched');
     assert.deepEqual(pageErrors, []);
@@ -58,15 +62,19 @@ async function run(compat) {
     }
     assert.ok(lit > 5000, `the frame is nearly empty (${lit} lit pixels)`);
     assert.equal(differing, 0, `${differing} pixels differ with the trimming off`);
-    console.log(`ok - ${compat ? 'compat' : 'native'}: ${lit} lit pixels, none differ with the vertex inputs trimmed`);
+    console.log(
+      `ok - ${compat ? 'compat' : 'native'}${bench ? ' 50,000 boxes' : ''}: ${lit} lit pixels, none differ with the vertex inputs trimmed`,
+    );
   } finally {
     await context.close();
   }
 }
 try {
   // check:merge runs this leaf through the package GPU suite. Keep both device implementations covered.
-  await run(false);
-  await run(true);
+  for (const bench of [false, true]) {
+    await run(false, bench);
+    await run(true, bench);
+  }
 } finally {
   release();
 }
