@@ -7789,7 +7789,11 @@ Batch 172 job 3: optional sciviz/clip supplies scalar/plane/box/sampled-sphere c
 
 Sciviz threshold components (2026-11-10): `thresholdGrid` tests a component index, the Euclidean magnitude (the default for arrays wider than one) or all/any components against an inclusive range; one end may be infinite for a one-sided threshold. Magnitude is computed in f64 from the stored tuple, so a range edge equal to an irrational length needs a tolerance chosen by the caller. NaN never passes and is never a bound. Evidence: packages/sciviz/tests/clip.test.js.
 
+Sciviz MinIP (2026-11-10): `mode: 'minip'` takes the smallest finite sample of each ray; colour and opacity come from the transfer function at that value. It covers the Volume, bricked, AMR, curvilinear, tetrahedral and quality volumes; the CPU fallback renderer keeps its own path and is not covered. Evidence: packages/sciviz/tests/volume-modes-browser.mjs, packages/sciviz/tests/minip-kinds-browser.mjs, packages/sciviz/tests/bricks-browser.js.
+
 Sciviz connectivity (2026-11-10): `connectivityGrid` in sciviz/clip joins cells through any shared point (no face or edge adjacency mode) with union-find, then keeps all, the largest, listed, point- or cell-seeded or closest-point regions. Region IDs follow cell count (descending by default, or ascending) or lowest cell ID; equal sizes order by lowest cell ID. Scalar connectivity tests point scalars only. Inputs are bounded by the clip entry limits (imageGrid 1,000,000 samples). Evidence: packages/sciviz/tests/clip.test.js.
+
+Sciviz multi-volume (2026-11-10): sciviz/multivolume draws 1 to 4 channels, each 2 to 2048 samples an axis, as r16float textures (about 3 significant digits after range normalisation), with one 256-entry transfer row per channel, no lighting, clip planes, scene-depth occlusion or 2D classification, and no drawing while the camera is inside the union box (back faces are culled). At most 2048 steps a ray, at the finest channel's voxel divided by quality. Evidence: packages/sciviz/tests/multivolume-browser.mjs.
 
 Batch 172 job 3 size: sciviz/clip 0 to 5140 B min+gzip, new ceiling 5396 B. A shared owner for cut geometry, tuple interpolation, provenance and the four pipeline operations avoids duplicated array/topology code. Core + stage remains 24209 B under 25000 B. CPU gate: 505 affected sciviz/react/umbrella tests pass, including 11 clip cases. No timing claim.
 Batch 206 PointInstancer: /instancer expands a selected time into ordinary glTF nodes sharing prototype meshes. Default added-node ceiling 100000, override maxNodes. Optional timeCode selects a stage pose; this entry does not turn point arrays into playback channels. OpenUSD 26.11 oracle: five time codes, masks, prototype transforms and nonuniform scale within 1e-5. No wall-clock claims. Core/stage unchanged.
@@ -9586,6 +9590,7 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | weather `PrecipitationCover` | WebGPU-only | Refuses in its own setup before touching the capture; two unit fixtures gained `gpu: {}` (assertions unchanged) | `packages/weather/tests/cover.test.js` |
 | html `HTMLBlend`, `HTMLTextureGL`, `HTMLTexture` | Preview route | None: routes added to `previewRoutes` (1 backend test each); plain `HTMLTexture` still refuses and its subclass draws | `packages/html/test/html-browser.js` (pixels on WebGL2 preview and WebGPU), `test/texture.test.js` |
 | inspector `GLInspector` | Preview route | None: route added (3 backend tests) | `packages/inspector/test/gl-browser.mjs` (preview overlay pixels), `test/gl.test.js` |
+| labels `GPULabelLayer` | Preview route | None: route added (1 backend test) | `packages/labels/tests/gpu-browser.js` (pixels on WebGPU, preview and compat) |
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -11757,8 +11762,6 @@ Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-
 feature that a web rival or desktop tool documents, with no export, README section or test in `@margoengine/sciviz`.
 Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
 
-- **No MinIP volume mode.** VTK.js documents minimum intensity projection; sciviz volumes offer composite and MIP.
-- **No multi-component or general multi-volume compositing.** Label maps fuse over one scalar volume only.
 - **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
 - **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
   for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.
@@ -22159,7 +22162,8 @@ in the root installation guide, rather than the unrelated registry package.
 
 - [Analysis and scientific datasets](docs/analysis.md): pipeline, contour, clip, probe,
   calculator, glyphs, normalized datasets and scientific file readers.
-- [Scientific volumes](docs/volumes.md): transfer functions, categorical fusion,
+- [Scientific volumes](docs/volumes.md): transfer functions, MIP and MinIP, multi-volume and multi-component
+  mixing (`/multivolume`), categorical fusion,
   cinematic and quality wrappers, mapped/tetrahedral/AMR volumes and atmosphere.
 - [Charts and linked data](docs/charts.md): selections, tables, queries, statistics,
   formatting, streaming and publication.
