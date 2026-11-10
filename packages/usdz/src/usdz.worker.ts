@@ -12,8 +12,9 @@ import { animation } from './anim.js';
 import { subdivision } from './subdiv.js';
 import { lights } from './lux.js';
 import { materialX } from './materialx.js';
+import { pointInstancers } from './instancer.js';
 
-const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation, subdiv: subdivision, lux: lights, materialx: materialX };
+const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation, subdiv: subdivision, lux: lights, materialx: materialX, instancer: pointInstancers };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {
     ...sent,

@@ -3694,6 +3694,10 @@
       "types": "./dist/usdz/materialx.d.ts",
       "import": "./dist/usdz/materialx.js"
     },
+    "./usdz/instancer": {
+      "types": "./dist/usdz/instancer.d.ts",
+      "import": "./dist/usdz/instancer.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

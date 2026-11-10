@@ -4,11 +4,56 @@ import { join } from 'node:path';
 import { openBrowser } from './browser.js';
 
 const data = Array.from(await readFile('test-results/usdz-textured.usdz'));
-const browser = await openBrowser({ startPath: '/examples/usdz-loader/' });
+const browser = await openBrowser({ startPath: '/examples/usdz-loader/', port: 'free' });
 try {
   const page = browser.page,
     errors = [];
   page.on('pageerror', (error) => errors.push(String(error)));
+  const scatter = await page.evaluate(async () => {
+    const { Engine } = await import('/packages/core/dist/index.js');
+    const { parseUSDA } = await import('/packages/usdz/dist/index.js');
+    const { pointInstancers } = await import('/packages/usdz/dist/instancer.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      capacity: 32,
+      camera: { position: [0, 0, 6], target: [0, 0, 0] },
+    });
+    try {
+      const asset = parseUSDA(
+        `#usda 1.0
+(metersPerUnit = 1 upAxis = "Y")
+def PointInstancer "Scatter" {
+ rel prototypes = </Scatter/Prop>
+ int[] protoIndices = [0,0]
+ point3f[] positions = [(-1,0,0),(1,0,0)]
+ def Mesh "Prop" {
+  uniform token subdivisionScheme = "none"
+  int[] faceVertexCounts = [3]
+  int[] faceVertexIndices = [0,1,2]
+  point3f[] points = [(-0.5,-0.5,0),(0.5,-0.5,0),(0,0.5,0)]
+ }
+}`,
+        { extensions: [pointInstancers()] },
+      );
+      const model = await asset.create(engine);
+      engine.render({ culling: false });
+      const image = canvas.toDataURL();
+      model.destroy();
+      engine.render({ culling: false });
+      return {
+        sharedMeshes: asset.document.meshes.length,
+        instances: asset.document.nodes.filter((n) => n.extras?.usdInstanceId !== undefined).length,
+        changed: image !== canvas.toDataURL(),
+      };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  });
+  assert.deepEqual(scatter, { sharedMeshes: 1, instances: 2, changed: true });
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Sample loaded'));
   const result = await page.evaluate(async (data) => {
     const { Engine } = await import('/packages/core/dist/index.js'),
@@ -148,14 +193,15 @@ try {
         model = await asset.create(engine),
         animation = Animation.attach(model);
       animation.play(asset.document.animations[0].name);
-      const frame = (time) => {
+      const frame = async (time) => {
         animation.seek(time);
         engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
         return canvas.toDataURL();
       };
-      const first = frame(0),
-        later = frame(0.7),
-        again = frame(0);
+      const first = await frame(0),
+        later = await frame(0.7),
+        again = await frame(0);
       animation.dispose?.();
       model.destroy();
       return { moved: first !== later, repeats: first === again, gpuErrors };

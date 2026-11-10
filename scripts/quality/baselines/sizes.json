@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12926619,
+  "total": 12929070,
   "history": [
     {
       "date": "2026-10-24",
@@ -6427,6 +6427,12 @@
       "commit": "2a95672cd",
       "reason": "Batch 172 job 3: new optional sciviz/clip entry 0 to 5140 B min+gzip, ceiling 5396 B. Complete cut-cell interpolation, tuple/provenance retention, clip shapes/complements, crinkle, threshold, structured/curvilinear subsets and pipeline adapter belong together. Splitting would duplicate array and topology ownership. Core + stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-206",
+      "reason": "usdz/instancer new optional entry: 0 -> 2229 B gzip for shared-node scatter expansion; no core/stage change",
+      "grew": 1
     }
   ],
   "items": {
@@ -7608,6 +7614,7 @@
     "@margoengine/decoders/texture-rgba": 4702,
     "@margoengine/voxel-pathtracer/denoise-ml": 7023,
     "@margoengine/headless/null": 2977,
-    "@margoengine/sciviz/clip": 5396
+    "@margoengine/sciviz/clip": 5396,
+    "@margoengine/usdz/instancer": 2451
   }
 }

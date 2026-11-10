@@ -4465,3 +4465,7 @@ Batch 207 object actions: generated dependency-graph instances still use export-
 Batch 205 gate observation: `node scripts/gpu-package-tests.mjs --no-build --only=decoders` fails during plan construction because packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs are not registered in the runner; direct changed-package commands cover this job. Owning runner registration waits for its lane/fix phase.
 
 Fixed within batch 205: FBX previously selected only the first image hook, so an image converter later in extensions was unreachable. The reader now tries registered converters in order; packages/fbx/test/textures.test.js covers PBR plus textures in either order.
+
+Batch 206 PointInstancer build: no open static-expansion defect in the schema oracle and array/budget tests. Playback channels for vectorized instance arrays are outside the static expansion entry.
+
+Batch 206 capture regression: scripts/modern-usdz-tests.js used to read the rigged frame before the compatibility queue had loaded compute and replayed its commands, yielding identical images. Each animation capture now awaits queue.onSubmittedWorkDone, without extra renders, retries or altered assertions. The existing three-pose check fails before this change and passes on WebGL2 after it; native WebGPU also passes. The USD suite uses a free port so a different suite cannot occupy its dev server port.

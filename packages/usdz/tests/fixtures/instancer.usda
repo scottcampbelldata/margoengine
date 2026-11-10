@@ -1,0 +1,33 @@
+#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+    timeCodesPerSecond = 24
+)
+def PointInstancer "Scatter" (
+    inactiveIds = [30]
+)
+{
+    rel prototypes = </Scatter/Prop>
+    int[] protoIndices = [0, 0, 0]
+    int64[] ids = [10, 20, 30]
+    int64[] invisibleIds = [20]
+    point3f[] positions.timeSamples = {
+        0: [(0, 0, 0), (4, 0, 0), (8, 0, 0)],
+        24: [(24, 0, 0), (28, 0, 0), (32, 0, 0)]
+    }
+    quatf[] orientationsf.timeSamples = {
+        0: [(1, 0, 0, 0), (1, 0, 0, 0), (1, 0, 0, 0)],
+        24: [(0.70710678, 0, 0, 0.70710678), (1, 0, 0, 0), (1, 0, 0, 0)]
+    }
+    float3[] scales = [(2, 3, 4), (1, 1, 1), (1, 1, 1)]
+    def Mesh "Prop"
+    {
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+    }
+}
