@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>MCP live correctness fixture</title>
+<canvas width="128" height="128"></canvas><script type="module">
+import { createStage } from '/packages/stage/dist/index.js';
+import { LivePageBridge } from '/packages/mcp/dist/live.js';
+import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
+let stage, bridge;
+window.liveSetup = async (backend, endpoint, token) => {
+  bridge?.dispose(); stage?.dispose();
+  const old = document.querySelector('canvas'), canvas = old.cloneNode(); old.replaceWith(canvas);
+  stage = await createStage(canvas, { backend, fallback: webglRenderer, autoStart: false, controls: false });
+  const mesh = stage.box({ color: '#84d6bd' });
+  stage.fit(); stage.engine.render();
+  bridge = new LivePageBridge({ enabled: true, endpoint, token, objects: { settings: { exposure: 1 } } });
+  stage.engine.use(bridge);
+  window.liveFixture = { stage, bridge, mesh };
+  return stage.engine.backend;
+};
+</script></html>

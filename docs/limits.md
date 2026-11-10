@@ -3946,3 +3946,10 @@ New html/texture-gl entry: 0 to 6,238 B min+gzip, ceiling 0 to 6,494 B. It inclu
 - XR locomotion: smooth translation defaults to 2 m/s, yaw to pi/2 rad/s, radial dead zone 0.15, thumbstick axes 2/3, delta cap 0.1 s. Comfort defaults to a 90-degree angular opening, 0.2 rad feather, 0.15 s exponential response. Reattach after each immersive session. This does not establish clinical sickness reduction; physical-device proof remains blocked by unavailable Quest/Android hardware.
 
 - xr/locomotion: 0 to 3134 B gzip, ceiling 3390 B for the new optional movement and stereo comfort entry. Core + stage remains 23950 B.
+
+| Optional entry | Limits (batch 267 job 1) |
+| --- | --- |
+| `@margoengine/mcp/live` | Explicit enabled:true, one connected dev page, inspector-exposed numeric/boolean/three-vector properties; error ring 100 by default, maximum 1000, messages truncated at 4000 characters; PNG maximum 12 MB. App supplies addAsset for its loaders. |
+| `@margoengine/mcp/live-host` | Loopback-only authenticated HTTP relay; exact browser origin allow list; 64 pending commands, 30 s deadline (100 ms to 300 s); 20 s polling; 17 MB response-body cap. Abort cancels queued commands and waits, not edits already performed by a page. No evaluation or production activation. |
+
+Batch 267 job 1: mcp/live 2348 B gzip (new, ceiling 2604 B), mcp/live-host 1523 B (new, ceiling 1779 B). Separate browser and Node entries avoid Node builtins in page bundles; their cohesive relay and operation dispatch justify these optional bytes. Core plus stage remains 23950 B.

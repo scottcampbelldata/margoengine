@@ -22,6 +22,14 @@
   "author": "Scott Campbell",
   "type": "module",
   "sideEffects": false,
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/inspector": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/core": { "optional": true },
+    "@margoengine/inspector": { "optional": true }
+  },
   "bin": {
     "margoengine-mcp": "./bin/margoengine-mcp.js"
   },
@@ -41,6 +49,14 @@
     "./render": {
       "types": "./dist/render.d.ts",
       "import": "./dist/render.js"
+    },
+    "./live": {
+      "types": "./dist/live.d.ts",
+      "import": "./dist/live.js"
+    },
+    "./live-host": {
+      "types": "./dist/live-host.d.ts",
+      "import": "./dist/live-host.js"
     },
     "./resources": {
       "types": "./dist/resources.d.ts",

@@ -5563,3 +5563,6 @@ HTMLTextureGL in html/texture-gl shares rasterization and interaction with HTMLT
 ### 5. XR locomotion eye overlays
 
 The optional XR package now provides an eye callback after scene/depth rendering and before submission on its separate and engine routes. The comfort overlay uses each projection and viewport with load/store blending and no depth writes. CPU coverage proves stable view indices, ordering, unsubscribe and disposal during a callback; a stereo pixel comparison exercises both backends/routes/eyes. Physical headset evidence remains absent. No core or stage changes or speed claims accompany this feature.
+
+### Section 5 evidence: batch 267 live inspection
+Optional mcp/live and mcp/live-host add a development-only page/Node boundary without core or stage changes. Inspector owns property discovery/validation. Canvas capture renders then uses origin-clean PNG serialization; WebGPU and compatibility each pass scene/edit/pixel/error tool proof in packages/mcp/tests/live-browser.mjs. Uncaught page/rejection/GPU errors feed a bounded ring. The host binds loopback and validates bearer, Host and exact Origin. No server-side evaluation or production auto-activation. GPU test uses a shared slot only during browser execution.

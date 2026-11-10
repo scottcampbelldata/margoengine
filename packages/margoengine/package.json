@@ -158,6 +158,10 @@
       "types": "./dist/audio/pan.d.ts",
       "import": "./dist/audio/pan.js"
     },
+    "./audio/binaural": {
+      "types": "./dist/audio/binaural.d.ts",
+      "import": "./dist/audio/binaural.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
@@ -1718,6 +1722,10 @@
       "types": "./dist/materials/stochastic.d.ts",
       "import": "./dist/materials/stochastic.js"
     },
+    "./materials/serialization": {
+      "types": "./dist/materials/serialization.d.ts",
+      "import": "./dist/materials/serialization.js"
+    },
     "./math": {
       "types": "./dist/math.d.ts",
       "import": "./dist/math.js"
@@ -1861,6 +1869,14 @@
     "./mcp/render": {
       "types": "./dist/mcp/render.d.ts",
       "import": "./dist/mcp/render.js"
+    },
+    "./mcp/live": {
+      "types": "./dist/mcp/live.d.ts",
+      "import": "./dist/mcp/live.js"
+    },
+    "./mcp/live-host": {
+      "types": "./dist/mcp/live-host.d.ts",
+      "import": "./dist/mcp/live-host.js"
     },
     "./mcp/resources": {
       "types": "./dist/mcp/resources.d.ts",
@@ -2602,6 +2618,14 @@
       "types": "./dist/save/signed.d.ts",
       "import": "./dist/save/signed.js"
     },
+    "./save/scene-state": {
+      "types": "./dist/save/scene-state.d.ts",
+      "import": "./dist/save/scene-state.js"
+    },
+    "./save/materials": {
+      "types": "./dist/save/materials.d.ts",
+      "import": "./dist/save/materials.js"
+    },
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"
@@ -2793,6 +2817,10 @@
     "./shader/subgroups": {
       "types": "./dist/shader/subgroups.d.ts",
       "import": "./dist/shader/subgroups.js"
+    },
+    "./shader/serialization": {
+      "types": "./dist/shader/serialization.d.ts",
+      "import": "./dist/shader/serialization.js"
     },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
@@ -3870,6 +3898,10 @@
       "types": "./dist/xr/pointer.d.ts",
       "import": "./dist/xr/pointer.js"
     },
+    "./xr/locomotion": {
+      "types": "./dist/xr/locomotion.d.ts",
+      "import": "./dist/xr/locomotion.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
@@ -3881,10 +3913,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./xr/locomotion": {
-      "types": "./dist/xr/locomotion.d.ts",
-      "import": "./dist/xr/locomotion.js"
     }
   },
   "dependencies": {

@@ -3210,3 +3210,5 @@ The optional html/texture-gl entry draws the existing live HTML textures on nati
 ### XR smooth movement evidence
 
 The optional xr/locomotion entry adds planar smooth motion, smooth yaw and a movement-driven per-eye angular vignette. Proof: packages/xr/tests/locomotion.test.js covers axis mapping, dead zones, speed, frame delta, teleport, lost input and session/abort cleanup; packages/xr/tests/locomotion.browser.mjs compares both eyes, both XR routes and native WebGPU with the WebGL2 bridge. These checks establish rendering and input behavior, not sickness mitigation or headset validation.
+
+Batch 267 job 1: optional MCP live bridge lists a running engine scene and package properties, validates edits through inspector/packages, returns canvas PNG as native MCP image content and reads bounded errors. CPU proof: packages/mcp/tests/live.test.js. Real rendered scene/edit/capture and authenticated browser relay proof on WebGPU and WebGL2 compatibility: packages/mcp/tests/live-browser.mjs. This is functional coverage of the batch row, not a security audit or performance comparison.

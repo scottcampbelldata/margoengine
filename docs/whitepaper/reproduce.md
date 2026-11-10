@@ -2709,3 +2709,5 @@ Build packages, then run `node scripts/gpu-lock.mjs run --owner=html-check --max
 ### XR smooth movement and comfort
 
 Build packages, run `node --test packages/xr/tests/locomotion.test.js packages/xr/tests/xr.test.js`, then run `node scripts/gpu-lock.mjs run --owner=lane-P-xr --wait-max=60 --max=3 -- node packages/xr/tests/locomotion.browser.mjs`. The stereo check uses the existing licensed Khronos/Cesium Box fixture and writes test-results/xr-locomotion-browser.json. It covers native/compat, engine/separate routes and both eye textures. Quest/Android evidence is still required separately.
+
+Batch 267 job 1: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/live.test.js; GPU proof: node scripts/gpu-lock.mjs run --owner=live-proof --max=4 --wait-max=60 -- node packages/mcp/tests/live-browser.mjs. Both backends list the scene, hide its mesh through inspector setters, assert the PNG changes, read a diagnostic and receive native MCP image content.

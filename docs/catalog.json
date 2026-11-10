@@ -2826,9 +2826,9 @@
     "version": "1.0.0",
     "published": false,
     "description": "A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies.",
-    "requirements": "See the package guide for requirements",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "mcp model context protocol ai claude cursor copilot llms",
-    "install": "npm install @margoengine/mcp@1.0.0",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/mcp@1.0.0",
     "imports": "import { createMargoServer } from '@margoengine/mcp';",
     "exports": [
       "INSTRUCTIONS",
