@@ -84,6 +84,9 @@ test('camera, layer, order and ambient errors retain field-specific guidance', (
       backend: 'webgpu',
       frameGraph: { add(frame) { execute = frame.execute; } },
       removePlugin() {},
+      sceneOf() {
+        return this;
+      },
     });
     diagnostic(() => execute({ backend: 'webgpu' }), 'ambient color', '#rrggbb');
     pass.dispose();
