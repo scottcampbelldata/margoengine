@@ -1,5 +1,9 @@
 # Known bugs and unverified features
 
+Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/check-example-types.test.js` fails its cameras-scoped expectation because cameras now reaches 14 packages, above the unchanged 12-package full-run threshold; the planner correctly selects all projects but the fixture expects a named subset. Outside the API-record classification job; reconcile the fixture in the fix phase without weakening closure coverage.
+
+Lane B gate sweep (2026-11-10): `node --test --test-timeout=120000 tests/no-private-paths.test.js` finds 12 tracked files with references to excluded local paths (clean-room, known-bugs, limits, sciviz-a11y, whitepaper claims/reproduce/atmosphere result, netcode lobby test, accessibility audit, two sciviz preparation scripts and llms-full). Cause: producers committed machine-local evidence pointers unavailable in a clone; replace at the owning producers in the fix phase. No classification or assertion change.
+
 Batch 180 job 3 geo-time: no open correctness defect found in the implemented trajectory, WMTS time or SGP4 paths. Quantized trail fading and rebuilt primitives on seek are documented limits; efficient in-place updates remain quality work. All 29 published orbital cases and both rendering backends are covered.
 
 

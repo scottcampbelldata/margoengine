@@ -58,6 +58,8 @@ test('each class places the files it is meant for, checked in order', () => {
       'private/x.txt',
       '.claude/settings.json',
       'api/dof.api.md',
+      'api/lock.json',
+      'api/breaks.json',
       'benchmarks/records/x.json',
       '.github/workflows/ci.yml',
       'public/favicon.ico',
@@ -67,7 +69,7 @@ test('each class places the files it is meant for, checked in order', () => {
       '.gitattributes',
       '.editorconfig',
     ],
-    unknown: ['mystery/x.bin', 'public/app.js', 'Makefile'],
+    unknown: ['mystery/x.bin', 'public/app.js', 'Makefile', 'api/unknown.json'],
   };
   assert.deepEqual(Object.keys(cases).sort(), Object.keys(CLASSES).sort(), 'every class has cases here');
   for (const [expected, files] of Object.entries(cases))

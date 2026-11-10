@@ -7037,6 +7037,12 @@ Scientific reader sessions own dedicated workers through worker/rpc. Transfer li
 
 check:gpu-packages ROOT includes test:composition:browser. Generated page imports register the composition footprint in affected-gpu.mjs. One shared GPU slot runs both backends and 1x/4x MSAA; no timing assertions. Generator drift and binary tuple coverage have CPU regressions.
 
+API record file classes: api/lock.json and api/breaks.json are explicitly inert
+for GPU selection, with mandatory api:check unchanged. tests/file-classes.test.js
+covers both records, unknown API JSON rejection and every tracked path;
+tests/check-merge-affected.test.js covers downstream planning. Research and
+reproduction are recorded in docs/conventions.md under API lock.
+
 ### Section 5 evidence: C2 composition J2
 
 The initial executable set covers post/FXAA, TAA, DOF and Tonemap (six positive pairs). Four material probes, two background probes, core drawCalls, validation scopes and rejection/error collectors provide value evidence. The 24-member generator proves 276 positive pairs and all four presence states on the CPU; remaining GPU adapters are still missing. No C1 fixture shape or lifetime harness changes. Research, reproduction and limits: docs/integration-composition.md.

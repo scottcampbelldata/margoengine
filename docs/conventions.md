@@ -188,6 +188,19 @@ only suggest shrinking. `--summary` prints the biggest offenders; `--details` wr
 
 ## API lock
 
+`api/lock.json` and `api/breaks.json` are explicitly inert file-class records for GPU
+selection, alongside API snapshots. Their contents still pass mandatory `api:check`.
+Unknown API JSON paths remain unclassified and fail `tests/file-classes.test.js`;
+that test also checks every tracked path and both named records. Reproduce with
+`node --test --test-timeout=120000 tests/file-classes.test.js tests/check-merge-affected.test.js`.
+Clean-room basis: D. Richard Kuhn, Raghu N. Kacker and Yu Lei, *Practical
+Combinatorial Testing*, NIST SP 800-142 (2010),
+https://csrc.nist.gov/pubs/sp/800/142/final, for independent input-space coverage;
+and the Git project, *git-ls-files* (2026), https://git-scm.com/docs/git-ls-files,
+for the authoritative tracked inventory. Compared a broad API-directory exception
+with named records; named records preserve rejection of unknown inputs.
+
+
 Run `npm run api:check` after the final rebase. New or extended APIs need `npm run api:update` output in
 the same commit. Never edit `api/*.api.md` or `api/lock.json` by hand. Exports maps define coverage: every
 non-alias entry needs a TypeScript report with no unresolved exports. Missing manifests/exports require an

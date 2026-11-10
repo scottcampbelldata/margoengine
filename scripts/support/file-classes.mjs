@@ -97,6 +97,7 @@ const INERT = [
   /^site\//,
   /^private\//,
   /^api\/[\w.-]+\.api\.md$/,
+  /^api\/(lock|breaks)\.json$/,
   /^benchmarks\//,
   /^\.github\//,
   /^\.claude\//,
