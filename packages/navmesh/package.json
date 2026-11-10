@@ -69,6 +69,10 @@
     "./wasm": {
       "types": "./dist/wasm.d.ts",
       "import": "./dist/wasm.js"
+    },
+    "./obstacles": {
+      "types": "./dist/obstacles.d.ts",
+      "import": "./dist/obstacles.js"
     }
   },
   "files": [

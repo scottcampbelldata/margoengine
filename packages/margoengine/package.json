@@ -1942,6 +1942,10 @@
       "types": "./dist/navmesh/wasm.d.ts",
       "import": "./dist/navmesh/wasm.js"
     },
+    "./navmesh/obstacles": {
+      "types": "./dist/navmesh/obstacles.d.ts",
+      "import": "./dist/navmesh/obstacles.js"
+    },
     "./net": {
       "types": "./dist/net.d.ts",
       "import": "./dist/net.js"

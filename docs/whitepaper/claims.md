@@ -3124,3 +3124,8 @@ Proof: packages/inspector/test/tweak.test.js plus native browser input over a
 rendering WebGPU engine and WebGL2 preview engine in parity-browser.mjs, plus
 the same WebGPU path forced through WebGL2 compatibility with --compat.
 No speed result is claimed.
+
+
+## Batch 252 job 5: shaped tile obstacles
+
+The optional obstacle entry supports the web tile-cache row's upright cylinders and Y-rotated boxes alongside existing axis boxes. packages/navmesh/test/obstacles.test.js compares every tile mesh byte-for-byte against independent brute cell-center masks for cylinders and box headings 0, +/-pi/2, pi, 0.37 and -2.1. It checks open footprint AABB corners, moving between shape kinds, removal, ordinary-box interoperability, vertical exclusion, untouched tiles, subcell empty masks, atomic invalid replacements and disposal. The near-quarter-turn test fails with inverse-coefficient division and passes with monotone integer searches. No speed claim is made.

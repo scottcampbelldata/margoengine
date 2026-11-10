@@ -3806,3 +3806,8 @@ allow RGB(A), alpha is retained, float or byte RGB is explicit. CSS colour synta
 beyond #rrggbb is not part of this binding contract. Application writes need
 refresh(); arbitrary action buttons need a supplied inverse to be undoable.
 An input gesture commits on change/blur or panel.undo(), and Escape cancels it.
+
+
+Batch 252 job 5: @margoengine/navmesh/obstacles exports ObstacleNavMesh, a TiledNavMesh subclass with addCylinderObstacle(baseCenter,radius,height), addBoxObstacle(center,halfExtents,yRadians=0), and add/move/removeObstacle shape overloads. Cylinder dimensions and box half extents must be finite and positive; rotations are right-handed about +Y. Shapes use the same voxel-center inclusion, vertical climb allowance, radius erosion, deferred tile update queue and world lattice as ordinary boxes. New shape handles are negative numbers; axis-box ids retain their existing meaning, and move retains the supplied handle. Empty subcell masks remain movable/removable. Shapes are limited to 1,000,000 candidate rows and safe finite lattice coordinates. Baked tiled geometry retains the carved cell runs through the existing codec; grouped shape handles belong to the live optional subclass and are not serialized as analytic shape objects. Footprints are rasterized at the chosen cs, as the reference tile-cache behavior is voxel based.
+
+Batch 252 job 5 measured entry sizes: @margoengine/navmesh/obstacles: 1558 B gzip (ceiling 0 -> 1814 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.

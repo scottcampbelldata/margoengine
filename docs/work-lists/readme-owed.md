@@ -94,3 +94,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated input/vector alias | batch-253 job 1 |
 | @margoengine/inspector | Standalone tweak bindings, folders, colours, vectors, enums, buttons and gesture undo. | Batch 262 job 1 |
 | margoengine | Optional inspector/tweak import and shared history usage. | Batch 262 job 1 |
+
+| @margoengine/navmesh | obstacles ObstacleNavMesh, cylinder/rotated-box shapes, world dimensions, grouped handles, moves, deferred rebuilds and baked cell-run semantics | batch-252 job 5 |
+| margoengine | Generated navmesh/obstacles alias | batch-252 job 5 |

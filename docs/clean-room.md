@@ -5614,3 +5614,10 @@ adds shared linear undo for all edits, with explicit inverses for arbitrary acti
 No rival implementation or companion source was read, imported or adapted.
 The demo is an original procedural box and authored parameter values; no external
 data asset or third-party media licence is involved.
+
+
+## Batch 252 job 5: cylinder and rotated-box carving
+
+Sources compared before implementation: Paul Heckbert, *Concave Polygon Scan Conversion* (1990), Graphics Gems pp. 87-91, https://publications.ri.cmu.edu/concave-polygon-scan-conversion; Juan Pineda, *A Parallel Algorithm for Polygon Rasterization* (1988), https://people.csail.mit.edu/ericchan/bib/pdf/p17-pineda.pdf; Mikko Mononen and Recast Navigation contributors, *dtTileCache API reference* (2009-present), https://recastnav.com/classdtTileCache.html. Compared scanline spans, exact edge predicates and the web rival's upright cylinder/Y-rotated-box contracts. Only published descriptions/papers were read, no companion or rival implementation.
+
+Combined design: the optional ObstacleNavMesh subclass maps each shape onto exact center-sampled horizontal runs of the existing voxel lattice, then delegates carving, vertical limits, erosion, tile invalidation and bounded rebuilds to ./tiles. A cylinder uses its circle predicate; a rotated box uses inverse right-handed Y coordinates. Each row's accepted integer interval is found by monotone predicate searches, avoiding ill-conditioned division by nearly zero trigonometric coefficients at quarter turns. A one-cell candidate ring covers bounding-box rounding, while the original predicate alone selects the final cells. No tolerance is relaxed and there is no scan over every footprint cell. Groups keep one public id across moves and removal; input validation completes before mutation. The test's independent brute cell masks produce byte-identical tile meshes, including exact quarter-turn regressions. Analytic fixtures only; no public asset demo or speed claim.

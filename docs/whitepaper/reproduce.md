@@ -2643,3 +2643,6 @@ packages/inspector/test/parity-browser.mjs (one command line). It drives native
 controls and undo over real WebGPU and WebGL2 preview draws; repeat that command
 with --compat appended for the WebGL2 compatibility layer. README coverage is tracked in docs/work-lists/readme-owed.md. Entry bytes use bundleBytes
 from scripts/measure-size.js and gzipSync, with bare imports external.
+
+
+Batch 252 job 5: after building, run node --test --test-timeout=120000 packages/navmesh/test/obstacles.test.js. The independent reference classifies all 64x64 cell centers using circle/inverse-rotation equations and builds ordinary box masks; encoded tile polygons must match exactly without tolerances.
