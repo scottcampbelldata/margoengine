@@ -3631,6 +3631,10 @@
       "types": "./dist/sciviz/annotate.d.ts",
       "import": "./dist/sciviz/annotate.js"
     },
+    "./sciviz/provenance": {
+      "types": "./dist/sciviz/provenance.d.ts",
+      "import": "./dist/sciviz/provenance.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

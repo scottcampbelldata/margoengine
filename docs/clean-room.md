@@ -1,5 +1,11 @@
 # Clean room
 
+### Batch 179 provenance and API trace (2026-11-10)
+
+Build-record generator correction: compared Git Project contributors, gitattributes end-of-line conversion (2026), https://git-scm.com/docs/gitattributes , with Reproducible Builds contributors, Stable order for inputs (2026), https://reproducible-builds.org/docs/stable-inputs/ , and the survey below. Compare semantic LF text while retaining an equivalent CRLF checkout byte-for-byte. The isolated generator regression covers exact file identity and resolved versions, with no timing assertion and no Git configuration change.
+Compared Juliana Freire, David Koop, Emanuele Santos and Claudio T. Silva, Provenance for Computational Tasks: A Survey (2008), https://www.sci.utah.edu/~csilva/papers/cise2008a.pdf ; Luc Moreau and Paolo Missier (editors), PROV-DM: The PROV Data Model (W3C Recommendation, 2013), https://www.w3.org/TR/prov-dm/ ; W3C PNG Working Group, Portable Network Graphics Specification, Third Edition (2025), https://www.w3.org/TR/png-3/ ; W3C SVG Working Group, SVG 2 Document Structure, metadata (2018), https://www.w3.org/TR/SVG2/struct.html#MetadataElement ; and Adobe Systems / ISO, ISO 32000-1:2008, Document management, Portable document format, section 14.3 (2008), https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf . The survey separates reusable task descriptions from execution history. Combine the portable figure spec and hashed data entities with successful operation history, exact build-resolved package versions and available browser/device agents. Preserve resource identifiers through restore so history and references name the same entities. PNG uses compressed UTF-8 iTXt and the existing Margo CRC32; SVG uses namespaced metadata and textContent; PDF reuses Margo's Unicode information-dictionary writer. No companion code, rival source or other-repository file was read or copied. No new data assets; existing demo source/licence records are unchanged.
+
+
 ### Batch 187: opaque lightmap visibility
 
 Research compared James T. Kajiya, The Rendering Equation (SIGGRAPH, 1986),

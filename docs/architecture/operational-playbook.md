@@ -1,5 +1,9 @@
 
 
+#### Section 5 evidence addition: batch 179 provenance
+The optional entry observes only opted-in spec figures and preserves successful mutations, property assignments and removals. Replaying restores the baseline, executes recorded operations with resource/GPU argument ownership, then restores the final portable state. A regression preserves saved IDs after removed resources and allocates future IDs without collision. Temporary replay GPU arrays release with the figure. Container tests preserve PNG image bytes exactly, validate CRCs and bounded inflation, and verify namespaced SVG and Unicode PDF records. Demo browser evidence covers native WebGPU and the WebGL2 compatibility layer; no rendering mathematics or backend implementation changes.
+
+
 ### Section 5 evidence: native display glass, fixes K2 job 1
 
 The internal materials native-glass adapter owns the scene capture, snapshots and transfer-function shader. gltf-pro acquires it for native transmissive models and copies the current scene before each primitive, after settling the renderer's deferred clear and closing the preceding draw pass. The shader decodes both stored light contributions, multiplies the linear transmission share (including the existing Fresnel, coat, sheen and Beer terms), adds, then encodes. Native HDR blending is unchanged. Shared capture ownership ends with the last model; resize and device restoration rebuild its resources. Core and stage are unchanged.

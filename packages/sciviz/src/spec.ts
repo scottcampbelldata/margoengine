@@ -15,6 +15,7 @@ import {
 } from './spec-values.js';
 import { annotationControllers } from './annotation-state.js';
 import { attachSpecRecorder } from './spec-hooks.js';
+import { emitFigureCall } from './spec-call-hooks.js';
 import { isGpuArray } from './layer.js';
 export { loadSpecData, specHash } from './spec-values.js';
 export type { SpecDataURL, SpecDType, SpecIOOptions, SpecValue } from './spec-values.js';
@@ -127,6 +128,10 @@ const canvases = new WeakMap<HTMLCanvasElement, Figure>();
 /** Look up an opted-in figure on a canvas without retaining detached canvases. */
 export function recordedFigure(canvas: HTMLCanvasElement): Figure | undefined {
   return canvases.get(canvas);
+}
+/** Snapshot of recorded resource identities for optional replay and application integrations. */
+export function recordedResources(figure: Figure): ReadonlyMap<object, string> {
+  return new Map(records.get(figure)?.refs);
 }
 const methods = [
   'scatter',
@@ -285,6 +290,7 @@ function observe(
       existing.kind = kind;
       existing.args = args.map((arg) => snapshotInput(arg, state.refs));
       existing.codec = codec;
+      emitFigureCall(figure, { type: 'recipe', object, id: existing.id, method: kind, args: existing.args });
     }
     return object;
   }
@@ -324,6 +330,12 @@ function observe(
               (old) => old.method !== method || (method === 'setLabels' && old.args[0] !== a[0]),
             );
           recipe.updates.push({ method, args: a.map((arg) => snapshotInput(arg, state.refs)) });
+          emitFigureCall(figure, {
+            type: 'call',
+            object,
+            method,
+            args: recipe.updates[recipe.updates.length - 1].args,
+          });
         };
         if (result instanceof Promise) {
           const pending = result.then(async (value) => {
@@ -344,6 +356,7 @@ function observe(
     const slice = (target.slice as (...a: unknown[]) => object).bind(object);
     target.slice = (...a: unknown[]) => observe(figure, state, 'slice', [object, ...a], slice(...a));
   }
+  emitFigureCall(figure, { type: 'create', object, id: recipe.id, method: kind, args: savedArgs });
   return object;
 }
 
@@ -468,6 +481,7 @@ function portable(base: BaseFigure, options: FigureOptions): Figure {
         }
       selection = value;
       state.selection = value;
+      emitFigureCall(figure, { type: 'call', object: figure, method: 'setSelection', args: [value, options] });
       if (options.emit === false) return;
       clearingSelection = value === undefined;
       try {
@@ -660,6 +674,31 @@ export function validateFigureSpec(input: unknown): asserts input is FigureSpec 
     throw typeError('Invalid timeline; supply one frame per finite time', 'sciviz');
 }
 
+/** Create one declared resource through its native factory or an explicit application codec. */
+export async function createFigureResource(
+  figure: Figure,
+  kind: string,
+  args: readonly unknown[],
+  options: FigureLoadOptions = {},
+): Promise<object> {
+  options.signal?.throwIfAborted();
+  if (methods.includes(kind as (typeof methods)[number])) {
+    const input = [...args];
+    if (kind === 'isosurface') input[2] = { ...(input[2] as object), signal: options.signal };
+    return await (figure[kind as (typeof methods)[number]] as (...a: unknown[]) => object)(...input);
+  }
+  if (kind === 'slice') {
+    const [volume, ...rest] = args as readonly [{ slice: (...a: unknown[]) => object }, ...unknown[]];
+    if (!volume || typeof volume.slice !== 'function')
+      throw typeError('Slice needs an earlier volume; correct the resource order', 'sciviz');
+    return volume.slice(...rest);
+  }
+  const codec = options.codecs?.[kind] ?? (await builtinCodec(kind));
+  if (!codec) throw fault('unsupported', `Unknown recipe ${kind}; provide its codec explicitly`, 'sciviz');
+  const object = await codec.create(figure, args, options.signal);
+  return observe(figure, records.get(figure)!, kind, [...args], object, codec);
+}
+
 async function populate(figure: Figure, spec: FigureSpec, options: FigureLoadOptions): Promise<void> {
   const state = records.get(figure)!;
   const io = new ValueIO(options, async (data, shape, dtype) => {
@@ -682,20 +721,15 @@ async function populate(figure: Figure, spec: FigureSpec, options: FigureLoadOpt
     io.check();
     const args = (await io.decode(resource.args, refs)) as unknown[];
     if (!Array.isArray(args)) throw typeError('Recipe arguments must be an array; correct the saved recipe', 'sciviz');
-    if (resource.kind === 'isosurface') args[2] = { ...(args[2] as object), signal: options.signal };
-    let object: object;
-    if (methods.includes(resource.kind as (typeof methods)[number]))
-      object = await (figure[resource.kind as (typeof methods)[number]] as (...a: unknown[]) => object)(...args);
-    else if (resource.kind === 'slice') {
-      const [volume, ...rest] = args as [{ slice: (...a: unknown[]) => object }, ...unknown[]];
-      if (!volume || typeof volume.slice !== 'function')
-        throw typeError('Slice needs an earlier volume; correct the resource order', 'sciviz');
-      object = volume.slice(...rest);
-    } else {
-      const codec = options.codecs?.[resource.kind] ?? (await builtinCodec(resource.kind));
-      if (!codec) throw fault('unsupported', `Unknown recipe ${resource.kind}; provide its codec explicitly`, 'sciviz');
-      object = await codec.create(figure, args, options.signal);
-      observe(figure, records.get(figure)!, resource.kind, args, object, codec);
+    const object = await createFigureResource(figure, resource.kind, args, options);
+    // Keep caller-visible spec identities stable after gaps from removed resources and across timeline restores.
+    const recipe = state.records.find((item) => item.object === object);
+    if (recipe) {
+      recipe.id = resource.id;
+      state.refs.set(object, resource.id);
+      const numeric = /^r(\d+)$/.exec(resource.id);
+      const next = numeric ? Number(numeric[1]) + 1 : 0;
+      if (Number.isSafeInteger(next)) state.nextId = Math.max(state.nextId, next);
     }
     refs.set(resource.id, object);
     for (const update of resource.updates) {

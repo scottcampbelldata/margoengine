@@ -1,5 +1,9 @@
 # README work owed
 
+- @margoengine/sciviz (batch 179 job 4): document /provenance opt-in factories, metadata schema and integrity checks, automatic PNG/SVG metadata, PDF info export, successful-call trace replay, history bounds and explicit application codecs/registries.
+- margoengine (batch 179 job 4): document generated sciviz/provenance alias.
+
+
 - @margoengine/stage (GPU inventory repair): document the declared test:gpu:viewer-extras command and its WebGPU/WebGL2 viewer regression coverage during the README phase.
 
 - @margoengine/sciviz (review 3 dependency gate): retain the package browser-root bootstrap for fallback and table test commands; examples deferred.

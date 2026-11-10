@@ -662,6 +662,8 @@ export const colormapNames: ColormapName[];
 
 export const createFigure: (canvas: HTMLCanvasElement, options?: CreateFigureOptions) => Promise<Figure>;
 
+export function createFigureResource(figure: Figure, kind: string, args: readonly unknown[], options?: FigureLoadOptions): Promise<object>;
+
 export function cubehelix(t: number, start?: number, rotations?: number, hue?: number, gamma?: number): SRGB;
 
 export function dataToScene(bounds: Bounds, half: readonly [number, number, number]): Float32Array;
@@ -887,6 +889,8 @@ export function loadSpecData(source: SpecDataURL, options?: SpecIOOptions): Prom
 export function niceNumber(x: number, round: boolean): number;
 
 export function recordedFigure(canvas: HTMLCanvasElement): Figure | undefined;
+
+export function recordedResources(figure: Figure): ReadonlyMap<object, string>;
 
 export function saveFigure(figure: Figure, options?: FigureSaveOptions): Promise<FigureSpec>;
 

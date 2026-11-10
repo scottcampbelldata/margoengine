@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15225905,
+  "total": 15253594,
   "history": [
     {
       "date": "2026-10-24",
@@ -7874,6 +7874,12 @@
       "commit": "2ed6fd460",
       "reason": "batch120-new-optional-install-profile-roots-zero-to-game740-web321-viz578-react229-bytes-forwarding-only",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "30c8a02db",
+      "reason": "Batch 179 provenance: 0 to 24854 B gzip, ceiling 25600 B, for portable numeric/GPU decoding, bounded history and integrity metadata containers. Core and stage remain 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8243,6 +8249,7 @@
     "@margoengine/fsm/parallel": 2607,
     "@margoengine/fsm/scxml": 5226,
     "@margoengine/fsm/trace": 1863,
+    "@margoengine/game": 996,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,
     "@margoengine/geometry/extras": 9302,
@@ -8626,6 +8633,7 @@
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
     "@margoengine/react": 10888,
+    "@margoengine/react-kit": 414,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/controls": 4346,
@@ -8728,6 +8736,7 @@
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 61750,
+    "@margoengine/sciviz/annotate": 7680,
     "@margoengine/sciviz/atmosphere": 35321,
     "@margoengine/sciviz/bricks": 29625,
     "@margoengine/sciviz/calc": 7263,
@@ -8753,7 +8762,8 @@
     "@margoengine/sciviz/formats": 14262,
     "@margoengine/sciviz/geo": 4293,
     "@margoengine/sciviz/geo-lod": 7509,
-    "@margoengine/sciviz/geo-vector": 27662,
+    "@margoengine/sciviz/geo-time": 41056,
+    "@margoengine/sciviz/geo-vector": 27652,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 25036,
     "@margoengine/sciviz/grids": 27050,
@@ -8776,6 +8786,7 @@
     "@margoengine/sciviz/pipeline": 2086,
     "@margoengine/sciviz/pointcloud": 22723,
     "@margoengine/sciviz/probe": 6844,
+    "@margoengine/sciviz/provenance": 27770,
     "@margoengine/sciviz/query": 7381,
     "@margoengine/sciviz/spec": 27920,
     "@margoengine/sciviz/stats": 6975,
@@ -9044,6 +9055,7 @@
     "@margoengine/viewcube/compass": 7914,
     "@margoengine/viewcube/fit": 6896,
     "@margoengine/viewcube/up": 5897,
+    "@margoengine/viz": 834,
     "@margoengine/voxel": 6127,
     "@margoengine/voxel dist/workers/light.js": 10527,
     "@margoengine/voxel dist/workers/mesher.js": 6162,
@@ -9140,6 +9152,7 @@
     "@margoengine/weather/puddles": 4070,
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
+    "@margoengine/web": 577,
     "@margoengine/webgl2-compat": 107944,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 75875,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
@@ -9286,12 +9299,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sciviz/geo-time": 41056,
-    "@margoengine/sciviz/annotate": 7680,
-    "@margoengine/game": 996,
-    "@margoengine/web": 577,
-    "@margoengine/viz": 834,
-    "@margoengine/react-kit": 485
+    "margoengine/web": 577
   }
 }
