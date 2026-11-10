@@ -57,6 +57,10 @@
     "./overlapping3d": {
       "types": "./dist/overlapping3d.d.ts",
       "import": "./dist/overlapping3d.js"
+    },
+    "./hex": {
+      "types": "./dist/hex.d.ts",
+      "import": "./dist/hex.js"
     }
   },
   "files": [

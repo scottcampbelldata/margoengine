@@ -34,6 +34,7 @@ try {
     const { buildTileset, parseTilesetXML } = await import('/packages/wfc/dist/tileset.js');
     const { ConstrainedWFC } = await import('/packages/wfc/dist/constraints.js');
     const { Overlapping3DModel } = await import('/packages/wfc/dist/overlapping3d.js');
+    const { HexWFC } = await import('/packages/wfc/dist/hex.js');
     const { install, uninstall } = await import('/packages/webgl2-compat/dist/index.js');
     const out = [];
     for (const route of ['webgpu', 'webgl2-compat']) {
@@ -58,6 +59,21 @@ try {
         for (let y = 0; y < 4; y++)
           for (let x = 0; x < 4; x++)
             if (voxels[x + 4 * (y + 4 * z)] !== (x + y + z) % 2) throw new Error('3D overlap seam failed');
+      const hex = new HexWFC(
+        [6, 6, 2],
+        [0, 1, 2].map((t) => ({
+          neighbors: Array.from({ length: 8 }, (_, d) => (d < 6 ? [0, 1, 2].filter((v) => v !== t) : [t])),
+        })),
+        { layout: 'odd-r', periodic: true },
+      );
+      const hexes = hex.solve({ seed: 7 });
+      for (let i = 0; i < hexes.length; i++)
+        for (let d = 0; d < 8; d++) {
+          const n = hex.neighbor([i % 6, Math.floor(i / 6) % 6, Math.floor(i / 36)], d),
+            a = hexes[i],
+            b = hexes[n[0] + 6 * (n[1] + 6 * n[2])];
+          if (d < 6 ? a === b : a !== b) throw new Error('Hex prism adjacency failed');
+        }
       const canvas = document.createElement('canvas');
       canvas.width = 128;
       canvas.height = 128;

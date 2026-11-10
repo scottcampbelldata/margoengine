@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12515789,
+  "total": 12519341,
   "history": [
     {
       "date": "2026-10-24",
@@ -6085,6 +6085,12 @@
       "commit": "batch-220-job-1",
       "reason": "New optional math/compat entry: 0 to 9929 B gzip; 17 porting methods on seven subclasses preserve existing small imports. A split would duplicate the opt-in surface.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-237",
+      "reason": "New optional wfc/hex 0 -> 3296 B min+gzip plus 256 B headroom; five layouts, masks, prisms, socket orientations and shared bounded graph search remain optional.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7197,6 +7203,7 @@
     "@margoengine/inspector/gl": 4760,
     "leak @margoengine/inspector/gl -> @margoengine/lines": 1,
     "@margoengine/math/compat": 10227,
-    "@margoengine/exporters/optimize-extra": 6470
+    "@margoengine/exporters/optimize-extra": 6470,
+    "@margoengine/wfc/hex": 3552
   }
 }

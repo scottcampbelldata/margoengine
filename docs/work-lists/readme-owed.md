@@ -273,8 +273,12 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/wfc: document /assemble loaded glTF templates, variants, default placement, template visibility, shared-resource ownership, cleanup and limits (batch 237 job 1).
 - margoengine: document generated wfc/assemble alias and pre-existing audio/voices and xr/hands aliases (batch 237 job 1).
-=======
 
 - @margoengine/mcp: document assets library/search/variant/download/wire tools, manifests, provider limits, assets-page installer, public URL/material targets and disposal (batch 267 job 2).
 - margoengine: document generated mcp/assets and mcp/assets-page aliases (batch 267 job 2).
->>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)
+=======
+>>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
+
+- @margoengine/wfc: document /hex layouts, side directions, prism faces, masks/sentinel, periodic parity, pins, budgets, hexCellCenter, socket rotation/reflection metadata and weight splitting (batch 237 job 4).
+- margoengine: document generated wfc/hex alias (batch 237 job 4).
+>>>>>>> 2500884a9 (feat(wfc): solve hex planes and prisms with socket orientations)

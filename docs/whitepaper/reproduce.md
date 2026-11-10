@@ -2863,3 +2863,7 @@ After building packages, run `node --test --test-timeout=90000 packages/exporter
 
 Batch 267 job 2: run node --test --test-timeout=90000 packages/mcp/tests/assets.test.js. Run node packages/mcp/tests/assets-prepare.mjs outside any GPU lock (downloads real CC0 metadata and data, stores licence manifests). Then node scripts/gpu-lock.mjs run --owner=assets-proof --max=5 --wait-max=60 -- node packages/mcp/tests/assets-browser.mjs. Fixtures cover Khronos Triangle, Poly Haven WoodenTable_02, venice_sunset HDRI and aerial_rocks_04 texture, plus the current ambientCG bricks result/zip. The saved fixtures.json records exact selected ids/variants and hashes; files are served locally for GPU checks.
 >>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)
+
+## Batch 237 hex layouts
+After building, run node --test --test-timeout=60000 packages/wfc/test/hex.test.js. Run wfc test:gpu through the shared lock for native WebGPU and WebGL2 compatibility evidence: assemble-browser.mjs solves a 6x6x2 periodic odd-r prism and checks each edge while retaining the assembly draw-count assertion. No benchmark required or run.
+>>>>>>> 2500884a9 (feat(wfc): solve hex planes and prisms with socket orientations)

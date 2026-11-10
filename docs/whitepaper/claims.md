@@ -3351,7 +3351,6 @@ The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPi
 
 ## Batch 237: WFC assembly
 assembleWFC converts solved IDs and source/orientation metadata into shared-geometry tile meshes from loaded glTF models. CPU tests cover every proper cube rotation, reflection, nested transforms, ownership, invalid inputs and rollback. assemble-browser.mjs checks four placed instances in one draw on native WebGPU and the WebGL2 compatibility layer. This is deterministic instancing evidence, with no speed claim.
-=======
 
 
 
@@ -3360,4 +3359,9 @@ Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pair
 
 
 Batch 267 job 2: asset tools search all three official catalogues, reject non-CC0 Khronos legal chains, download complete relative resources with licence/hash manifests and install real models, HDRIs and textures through existing optional packages. CPU: packages/mcp/tests/assets.test.js; reproducible real downloads: packages/mcp/tests/assets-prepare.mjs; both-backend rendered loading: packages/mcp/tests/assets-browser.mjs. This does not claim every variant is browser-decodable or compare speed.
->>>>>>> d9b8d9682 (feat(mcp): search download and wire complete CC0 assets)
+=======
+>>>>>>> 7774493a6 (feat(wfc): learn and solve cubic overlapping voxel patterns)
+
+## Batch 237: hexagonal WFC
+Six-neighbor hex layouts and eight-neighbor prisms preserve reciprocal topology on all five coordinate layouts, including even-parity periodic seams and mask holes. CPU tests compare tiny graphs against exhaustive assignments, verify all side transforms geometrically, and check 19-cell masked hex boards, copy ownership, seeded replay, pins and contradiction/abort behavior. Both rendering routes also solve and validate every side and vertical edge of a periodic odd-r 6x6x2 prism.
+>>>>>>> 2500884a9 (feat(wfc): solve hex planes and prisms with socket orientations)

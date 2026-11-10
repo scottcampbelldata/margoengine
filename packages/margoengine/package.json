@@ -1134,6 +1134,10 @@
       "types": "./dist/exporters/optimize.d.ts",
       "import": "./dist/exporters/optimize.js"
     },
+    "./exporters/optimize-extra": {
+      "types": "./dist/exporters/optimize-extra.d.ts",
+      "import": "./dist/exporters/optimize-extra.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"
@@ -3965,6 +3969,10 @@
     "./wfc/overlapping3d": {
       "types": "./dist/wfc/overlapping3d.d.ts",
       "import": "./dist/wfc/overlapping3d.js"
+    },
+    "./wfc/hex": {
+      "types": "./dist/wfc/hex.d.ts",
+      "import": "./dist/wfc/hex.js"
     },
     "./worker": {
       "types": "./dist/worker.d.ts",
