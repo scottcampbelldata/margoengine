@@ -74,7 +74,7 @@ export class SpatialPicking {
     if (owner && owner !== (this.options.scene ?? runtime.scene))
       throw fault('attached', 'Spatial ray picker belongs to another scene; attach Picking to the selected scene', 'arguments');
     const view: RenderView = { camera, viewport: [0, 0, 1, 1], scene: this.options.scene as RuntimeScene | undefined, layers: this.options.layers };
-    const hit = await abortable(this.picking.pick(canvas.clientWidth / 2, canvas.clientHeight / 2, view), signal);
+    const hit = await abortable(this.picking.pick((canvas.clientWidth || canvas.width) / 2, (canvas.clientHeight || canvas.height) / 2, view), signal);
     return this.disposed || runtime.disposed ? null : hit;
   }
   /** Nearest triangle at or inside radius metres. A sphere tests surfaces on either side, independent of camera clipping. */

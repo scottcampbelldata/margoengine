@@ -80,6 +80,22 @@ test('rays preserve each asynchronous camera and use canvas center in the reques
   assert.deepEqual(calls[1][2].camera.target, [2, 3, 3]);
   assert.equal(engine.camera.position[0], 0);
 });
+test('rays use backing dimensions per axis when canvas CSS layout size is absent or zero', async (t) => {
+  const { engine, picker, calls } = await fixture(t);
+  for (const [width, height, center] of [
+    [0, 0, [50, 40]],
+    [undefined, undefined, [50, 40]],
+    [200, 0, [100, 40]],
+    [0, 160, [50, 80]],
+    [200, 160, [100, 80]],
+  ]) {
+    engine.canvas.clientWidth = width;
+    engine.canvas.clientHeight = height;
+    await picker.ray([2, 3, 4], [0, 0, -1]);
+    assert.deepEqual(calls.at(-1).slice(0, 2), center);
+    assert.deepEqual(calls.at(-1)[2].camera.target, [2, 3, 3]);
+  }
+});
 test('invalid ranges, abort and terminal disposal refuse queries', async (t) => {
   const { picker } = await fixture(t);
   await assert.rejects(picker.ray([0, 0, 0], [0, 0, 0]), RangeError);

@@ -4302,6 +4302,8 @@ Batch 183 job 1: the one-call stage glTF entry preserves full PBR rendering and 
 Review 4 clustered composition and LTC accuracy (2026-11-10): cube cookies and stochastic shadows use distinct binding points; their combined one-light probe matches exact shadowing. The shared area/shaped-light edge angle uses owned range reduction to meet the existing GPU mirror bounds across backends. Proof: stochastic.test.js, ltc-edge.test.js, clustered-cube-projector-gpu.mjs and the unchanged shape-lights-gpu-check.js cases. No new physical accuracy or speed envelope is claimed.
 
 
+Review 2 spatial ray correction (2026-11-10): the center query uses the existing per-axis CSS/backing-size convention, including layout-free canvases. Proof: packages/selection/test/spatial.test.js checks exact query coordinates and the unchanged world camera target. No new physical-device or precision claim.
+
 Review 2, 2026-11-10: the exporters/optimize-extra retention claim now covers animation dependencies outside scene roots, including ancestors owning skins. The original regression in packages/exporters/tests/optimize-extra.test.js checks retained names, transforms and remapped skin/joint links; both source and output pass the Khronos validator. No speed result is asserted.
 
 

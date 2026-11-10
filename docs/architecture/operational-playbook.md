@@ -5595,6 +5595,8 @@ comparisons are not supplied; the public behavioural contract comparison is reco
 
 ### Section 5 evidence addition: batch 268 XR pointers
 
+Review 2 (2026-11-10): spatial rays use the picker's per-axis CSS-size or backing-size coordinate convention, including zero/absent layout dimensions on headless and worker canvases. The spatial CPU regression checks zero, absent, mixed-axis and scaled CSS sizes while preserving the world ray camera; existing selection GPU suites cover rendering on both backends.
+
 World rays use the existing GPU selection route with a camera owned by each
 query. Proximity transforms triangles to world space before nearest-contact
 queries, preserving distances under nonuniform scaling and instancing; deformed
