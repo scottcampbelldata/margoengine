@@ -10,6 +10,7 @@ import { AreaLights } from '../packages/clustered/dist/area.js';
 import { AreaShapes } from '../packages/clustered/dist/area-shapes.js';
 import { ShadowAtlas } from '../packages/clustered/dist/shadow-atlas.js';
 import { CubeProjectorLights } from '../packages/clustered/dist/cube-projector.js';
+import { StochasticLights } from '../packages/clustered/dist/stochastic.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -31,6 +32,7 @@ type Config = {
   atlas?: boolean;
   cubes?: unknown[];
   projectors?: unknown[];
+  stochastic?: boolean;
   meshes: string[];
 };
 const canvas = document.querySelector('canvas')!,
@@ -64,6 +66,7 @@ let areas: AreaLights | undefined,
   shader = '';
 let shapes: AreaShapes | undefined;
 let cookies: CubeProjectorLights | undefined;
+let stochastic: StochasticLights | undefined;
 engine.frameGraph.add({
   name: 'clustered-shadow:capture',
   order: -2.5,
@@ -72,7 +75,8 @@ engine.frameGraph.add({
   },
 });
 function scene(config: Config) {
-  for (const plugin of [cookies, shapes, areas, suns, local, lights]) plugin?.dispose();
+  for (const plugin of [stochastic, cookies, shapes, areas, suns, local, lights]) plugin?.dispose();
+  stochastic = undefined;
   cookies = undefined;
   shapes = undefined;
   areas = suns = local = undefined;
@@ -93,6 +97,7 @@ function scene(config: Config) {
     if (config.cubes) cookies.setCubes(config.cubes as never);
     if (config.projectors) cookies.setProjectors(config.projectors as never);
   }
+  if (config.stochastic) stochastic = StochasticLights.attach(engine, { lights, quad: false, temporal: false });
 }
 async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   device.pushErrorScope('validation');
@@ -108,8 +113,8 @@ async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   return result!;
 }
 const kinds: Record<number, GPUBindGroupLayoutEntry> = {};
-for (const binding of [4, 14, 155]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
-for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150, 151])
+for (const binding of [4, 14, 151, 155]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
+for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150, 152])
   kinds[binding] = { binding, visibility: 0, buffer: { type: 'read-only-storage' } };
 for (const binding of [15, 29])
   kinds[binding] = { binding, visibility: 0, texture: { sampleType: 'depth', viewDimension: '2d-array' } };

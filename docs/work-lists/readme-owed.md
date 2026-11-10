@@ -1080,3 +1080,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 176 job 2): document generated sciviz engineering entry forwarding; examples deferred.
 - @margoengine/stage (batch 183 job 1): document the PBR addGLTF path, optional pbr/animation handles, paused clips, deformation, WebGL2 compatibility device, cleanup and bind-pose fitting; replace the basic-loader description in the README phase.
 - @margoengine/shadows (batch 183 job 1): document automatic cascade distance for static PBR meshes and conservative bounds fallback for deformation, custom shading, displacement and instances.
+- @margoengine/clustered (review 4): cover cube cookies combined with stochastic shadows and their shared lighting-group ownership; README examples deferred.
+- @margoengine/clustered (review 4 LTC blocker): explain the owned edge-angle accuracy path and its unchanged shaped-light validation bounds during the README phase.

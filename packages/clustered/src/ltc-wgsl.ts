@@ -9,6 +9,15 @@ export const ltcPolygonWgsl = (
 fn ${p}Lut(st:vec2f,k:u32)->vec2f {let i=vec2u(st);let j=min(i+1u,vec2u(${ltcSize - 1}u));let f=st-vec2f(i);
   return mix(mix(${p}LutCell(i.x,i.y,k),${p}LutCell(j.x,i.y,k),f.x),mix(${p}LutCell(i.x,j.y,k),${p}LutCell(j.x,j.y,k),f.x),f.y);}
 fn ${p}Unit(p:vec3f)->vec3f {return p*inverseSqrt(max(dot(p,p),1e-20));}
+// Edge angles need tighter absolute accuracy than a backend atan2 can guarantee: horizon edge sums cancel.
+// Octant folding and a half-angle reduction bound |z| by sqrt(2)-1. The alternating arctangent series through z^17
+// has remainder below 2*|z|^19/19 (< 5.7e-9 radians), before float32 rounding. y is positive at every edge call.
+fn ${p}Angle(y:f32,x:f32)->f32 {
+  let r=min(y,abs(x))/max(y,abs(x));let z=r/(1+sqrt(1+r*r));let zz=z*z;
+  var a=2*z*(1+zz*(-1.0/3+zz*(1.0/5+zz*(-1.0/7+zz*(1.0/9+zz*(-1.0/11+zz*(1.0/13+zz*(-1.0/15+zz*(1.0/17)))))))));
+  if(y>abs(x)){a=1.57079632679-a;}
+  return select(a,3.14159265359-a,x<0.0);
+}
 // One edge's share of the polygon's vector form factor (Lambert's formula, as Heitz et al. 2016 integrate it), z
 // component: (a x b).z / |a x b| * angle(a, b) / (2 pi). The angle is atan2(|a x b|, a.b), which is well conditioned
 // everywhere (acos loses digits near a.b = 1, asin near -1), and (a x b).z / |a x b| is a direction cosine in [-1, 1],
@@ -17,7 +26,7 @@ fn ${p}Unit(p:vec3f)->vec3f {return p*inverseSqrt(max(dot(p,p),1e-20));}
 // for nearly parallel edges). Rounding adds a few ulp to atan2's own error. A zero cross product (parallel or zero
 // vectors, as the unclipped horizon chord) returns 0.
 fn ${p}Edge(a:vec3f,b:vec3f)->f32 {let n=cross(a,b);let top=max(max(abs(n.x),abs(n.y)),abs(n.z));if(top<=0.0){return 0.0;}
-  let k=n/top;let s=length(k);return k.z/s*atan2(top*s,dot(a,b))*0.15915494;}
+  let k=n/top;let s=length(k);return k.z/s*${p}Angle(top*s,dot(a,b))*0.15915494;}
 // One edge clipped to z>=0; records where the quad leaves and re-enters the upper hemisphere.
 fn ${p}Clip(s0:vec3f,e0:vec3f,leave:ptr<function,vec3f>,enter:ptr<function,vec3f>)->f32 {
   if(s0.z<0&&e0.z<0){return 0.0;}var s=s0;var e=e0;

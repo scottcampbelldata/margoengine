@@ -28,7 +28,7 @@ test('cube-only and mixed spot cookies share the hook, uploads restore, empty an
  const cookies=CubeProjectorLights.attach(h.engine,{lights}),image=cube();
  assert.equal(lights.projector,undefined);
  cookies.setCubes([image]);assert.equal(lights.projector,cookies);
- assert.deepEqual(cookies.bindings().map(b=>b.binding),[143,151]);
+ assert.deepEqual(cookies.bindings().map(b=>b.binding),[143,152]);
  assert.match(cookies.term,/clusterProjector.*clusterCubeProjector/);
  assert.match(cookies.declarations(0),/cubeCookieDirection/);
  cookies.setProjectors([{width:1,height:1,data:new Uint8Array([255,255,255,255])}]);

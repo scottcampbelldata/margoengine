@@ -7589,6 +7589,12 @@
       "commit": "dad175e1e",
       "reason": "Batch 176 job 2: new optional entries, before 0 B each; after hdf5 8990, cgns 18306, xdmf 19254, exodus 20029, openfoam 10566, ensight 11539 gzip B. Complete owner readers, field conversion and dataset normalization are worth the optional bytes. Splitting only to reduce individual entries would add orchestration without reducing bytes used by an importer. Core plus stage stays 24209 B.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "0ea7d7376",
+      "reason": "Review 4 LTC accuracy: area 10545 to 10901 B min+gzip; ceiling 10652 to 11229 B. The shared owned angle closes the unchanged WebGL2 horizon-cancellation accuracy failure. A split adds shader-composition/loading contracts but cannot remove the required per-fragment math. Core plus stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7734,7 +7740,7 @@
     "@margoengine/cinematic/ortho": 3133,
     "@margoengine/cinematic/physical-lens": 845,
     "@margoengine/clustered": 14448,
-    "@margoengine/clustered/area": 10652,
+    "@margoengine/clustered/area": 11229,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/directional": 2535,
     "@margoengine/clustered/flicker": 845,
@@ -8973,5 +8979,5 @@
     "@margoengine/sciviz/openfoam": 10883,
     "@margoengine/sciviz/xdmf": 19832
   },
-  "total": 14426835
+  "total": 14427412
 }

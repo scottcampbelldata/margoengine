@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Clustered, clusteredSampling } from '../dist/index.js';
 import { LocalShadows } from '../dist/shadows.js';
 import { MAX_STOCHASTIC_SAMPLES, StochasticLights } from '../dist/stochastic.js';
+import { CubeProjectorLights } from '../dist/cube-projector.js';
 import { estimate, exact, rng } from './stochastic-reference.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -29,6 +30,32 @@ function harness() {
   };
   return { ...h, frame };
 }
+
+test('cube cookies and stochastic shadows compose with distinct shader and resource bindings', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [1, 1, 1], shadows: { resolution: 64 } }),
+    cookies = CubeProjectorLights.attach(h.engine, { lights }),
+    stochastic = StochasticLights.attach(h.engine, { lights, quad: false });
+  lights.setLights([{ position: [0, 2, 0], range: 6, castShadow: true }]);
+  cookies.setCubes([{ faces: Array.from({ length: 6 }, () => ({
+    width: 1, height: 1, data: new Uint8Array([128, 128, 128, 255]),
+  })) }]);
+  try {
+    h.frame();
+    const entries = lights.bindings().map((entry) => entry.binding);
+    assert.equal(new Set(entries).size, entries.length, 'each composed resource needs its own binding');
+    const declarations = lights.pbr(0).declarations;
+    const bindings = [...declarations.matchAll(/@group\(0\)\s*@binding\((\d+)\)/g)].map((match) => Number(match[1]));
+    assert.equal(new Set(bindings).size, bindings.length, 'the composed shader must not alias resources');
+    assert.match(declarations, /cubeCookie:CubeCookieData/);
+    assert.match(declarations, /clusterStochastic:ClusterStochastic/);
+    assert.match(declarations, /clusterCubeProjector\(index,light,position\)/);
+  } finally {
+    stochastic.dispose();
+    cookies.dispose();
+    lights.dispose();
+  }
+});
 const lights200 = Array.from({ length: 200 }, (_, i) => ({
   radiance: [0.5, 0.4, 0.3].map((c) => c * (1 + (i % 7))),
   visibility: (i * 37) % 11 < 4 ? 0 : (i % 3) / 2,

@@ -20,7 +20,7 @@ export const MAX_CUBE_PROJECTOR_TEXELS = 1 << 24;
 const HEADER = 4 + MAX_CUBE_PROJECTORS * 4;
 const sampling=(group:number)=>/* wgsl */`
 struct CubeCookieData {header:vec4u,images:array<vec4u,16>,words:array<u32>}
-@group(${group}) @binding(151) var<storage,read> cubeCookie:CubeCookieData;
+@group(${group}) @binding(152) var<storage,read> cubeCookie:CubeCookieData;
 fn cubeCookieCoord(d:vec3f)->vec3f {
  let a=abs(d);var f=0.0;var p=vec2f(0);var m=a.x;
  if(a.x>=a.y&&a.x>=a.z){if(d.x>=0.0){p=vec2f(-d.z,-d.y);}else{f=1.0;p=vec2f(d.z,-d.y);}}
@@ -133,7 +133,7 @@ export class CubeProjectorLights extends ProjectorLights {
       if(size>limits.maxBufferSize||size>limits.maxStorageBufferBindingSize)
         throw new RangeError('Cube cookies exceed device storage limits; use fewer or smaller cubes');
       this.cubeBuffer?.destroy();this.cubeBuffer=this.device.createBuffer({size,usage:128|8});
-      this.cubeEntries=[{binding:151,resource:{buffer:this.cubeBuffer}}];this.joined=undefined;this.cubesDirty=true;
+      this.cubeEntries=[{binding:152,resource:{buffer:this.cubeBuffer}}];this.joined=undefined;this.cubesDirty=true;
     }
     super.sync();
   }

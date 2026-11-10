@@ -68,7 +68,8 @@ const project = (m, p, at = 0) => {
 
 test('without castShadow, directional and area lights leave the pre-shadow shader text, bindings and uploads exact', () => {
   // Hashes recorded from the build before directional and area shadows existed (the same scene), and recorded again
-  // when areaIntegral gained its early returns, which change the text and not the result.
+  // when areaIntegral gained its early returns and the owned edge-angle evaluation fixed backend cancellation.
+  // The four shader-text hashes include that deliberate math change; binding and upload hashes stay unchanged.
   const h = harness(),
     lights = new Clustered({ grid: [2, 2, 2] });
   h.engine.use(lights);
@@ -87,15 +88,15 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   ]);
   h.frame();
   h.frame();
-  assert.equal(hash(h.context.shader), '49c89f8da658d3e313938342c907e7ff130284bae3d44d5c88a17a8073581882');
-  assert.equal(hash(lights.pbr(2).declarations), 'b428afc965ca69c1611fc468a1b7c578a3e415a07e2ac04d8f5a47a5a6424307');
+  assert.equal(hash(h.context.shader), 'fee7cc19a437945ddb3d5402bcb99c0885f82d334736b06fad0397b9b5f7a320');
+  assert.equal(hash(lights.pbr(2).declarations), 'e7aa5546f7ed9e390393a4a95920eaa54746dcec293801ecb9f80aa5f520edb6');
   assert.equal(
     hash(lights['unshadowed'].pbr(2).declarations),
-    'cc13354f628f0af2693b47bac5fa08abeccda42d70f2a3944ff935873fb4174d',
+    '669bb2d58966f300232e1c182aca328890f013fea1c187319a4eccd68f15d83d',
   );
   assert.equal(
     hash(clusteredSampling(0, local, area, false, false, true, { directional: sun })),
-    '7187144a9e9a12d2c67071b59498235fea121b5349459d8026414c99f1c0d172',
+    '43aaf08b782550199a89b1c9e2c6e05d603440ad3b290bdf96f343bffd39ffa8',
   );
   assert.equal(hash(local.declarations(2)), '961f6b98277b21a35fb25375081db417e5364bb85c5b1ef39d54d879d1e76c6d');
   assert.deepEqual(

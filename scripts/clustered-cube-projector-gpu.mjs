@@ -20,7 +20,9 @@ try{
     projectors:[{width:1,height:1,data:new Uint8Array([0,0,0,255])},{image:{width:1,height:1,data:new Uint8Array([128,128,128,255])},colorSpace:'linear'}]});
   f.cubes([]);await f.render(2);const noCube=await f.probe(points);
   f.cubes([{image:white(64),colorSpace:'linear'},{image:white(0),colorSpace:'linear'}]);await f.render(2);const reactivated=await f.probe(points);
-  return {off,axis,rotated,srgb,oriented,mixedOff,mixed,noCube,reactivated,compiled:await f.compile(),errors:f.errors};
+  const shadowed={points:[{...light,castShadow:true}],local:{resolution:64},meshes:['floor','block']};
+  const exactCookie=await scene([grey],shadowed),sampledCookie=await scene([grey],{...shadowed,stochastic:true});
+  return {off,axis,rotated,srgb,oriented,mixedOff,mixed,noCube,reactivated,exactCookie,sampledCookie,compiled:await f.compile(),errors:f.errors};
  });
  const ratio=(a,b)=>a.map((p,i)=>p.map((v,k)=>v/b[i][k])),close=(actual,expected,label)=>assert.ok(Math.abs(actual-expected)<0.0002,`${label}: ${actual} vs ${expected}`),
    axis=ratio(result.axis,result.off),rotated=ratio(result.rotated,result.off),srgb=ratio(result.srgb,result.off),gradient=ratio(result.oriented,result.off),
@@ -34,6 +36,7 @@ try{
  close(result.mixed[4][2]/result.mixedOff[4][2],128/255,'spot cookie ignores cube');
  close(result.noCube[4][0]/result.mixedOff[4][0],1,'removing cubes preserves active spot hook and restores point light');
  close(result.reactivated[4][0]/result.mixedOff[4][0],64/255,'reactivating cubes rebuilds cached shader');
+ for(let i=0;i<result.exactCookie.length;i++)for(let k=0;k<3;k++)close(result.sampledCookie[i][k],result.exactCookie[i][k],'cube cookie with exact stochastic shadow');
  assert.deepEqual(result.compiled,{core:[],probe:[]});assert.deepEqual(result.errors,[]);
  console.log(JSON.stringify({faces:axis.slice(0,6),corner:axis[6],rotation:rotated[0],srgb:srgb[0],mixed:true}));
 }finally{await browser.close();}

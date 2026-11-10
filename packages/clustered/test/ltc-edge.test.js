@@ -10,8 +10,19 @@ const vectors = JSON.parse(readFileSync(new URL('./fixtures/ltc-edge.json', impo
 // The area lights' WGSL as the shader receives it (the polygon helpers live in src/ltc-wgsl.ts, shared with shapes).
 const source = new AreaLights({ lights: { setLights() {} } }).declarations(0);
 
-// The WGSL areaEdge step by step, every operation rounded to float32 (atan2 taken as correctly rounded).
+// The WGSL areaEdge step by step, every operation rounded to float32, including its owned angle evaluation.
 const f = Math.fround;
+function shaderAngle(y, x) {
+  const r = f(Math.min(y, Math.abs(x)) / Math.max(y, Math.abs(x))),
+    z = f(r / f(1 + f(Math.sqrt(f(1 + f(r * r)))))),
+    zz = f(z * z);
+  let series = f(1 / 17);
+  for (let denominator = 15; denominator >= 1; denominator -= 2)
+    series = f(f((denominator % 4 === 1 ? 1 : -1) / denominator) + f(zz * series));
+  let a = f(f(2 * z) * series);
+  if (y > Math.abs(x)) a = f(f(Math.PI / 2) - a);
+  return x < 0 ? f(f(Math.PI) - a) : a;
+}
 function shaderEdge(a, b) {
   [a, b] = [a.map(f), b.map(f)];
   const n = [
@@ -24,12 +35,21 @@ function shaderEdge(a, b) {
   const k = n.map((v) => f(v / top)),
     s = f(Math.sqrt(f(f(f(k[0] * k[0]) + f(k[1] * k[1])) + f(k[2] * k[2])))),
     d = f(f(f(a[0] * b[0]) + f(a[1] * b[1])) + f(a[2] * b[2]));
-  return f(f(f(k[2] / s) * f(Math.atan2(f(top * s), d))) * f(0.15915494));
+  return f(f(f(k[2] / s) * shaderAngle(f(top * s), d)) * f(0.15915494));
 }
 
-test('the shader carries the atan2 edge term', () => {
+test('the shader carries the bounded edge-angle term', () => {
   assert.ok(source.includes('fn areaEdge(a:vec3f,b:vec3f)->f32 {'));
-  assert.ok(source.includes('atan2(top*s,dot(a,b))*0.15915494'));
+  assert.ok(source.includes('areaAngle(top*s,dot(a,b))*0.15915494'));
+  assert.ok(source.includes('fn areaAngle(y:f32,x:f32)->f32'));
+});
+
+test('the owned float32 angle stays accurate across the horizon edge range', () => {
+  for (let i = 0; i <= 20000; i++) {
+    const angle = Math.PI * i / 20000,
+      x = f(Math.cos(angle)), y = f(Math.sin(angle));
+    assert.ok(Math.abs(shaderAngle(y, x) - Math.atan2(y, x)) < 4e-7, `angle ${angle}`);
+  }
 });
 
 test('ltc-edge vectors: edges within max(1e-4 relative, 1e-6) in float64 and float32, quads within 1e-4', () => {
