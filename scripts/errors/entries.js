@@ -180,6 +180,15 @@ export const entries = [
     fix: "Use `loadGLTF` from `@margoengine/gltf-pro`, or pass `decoders: {decoderModule: () => import('@margoengine/decoders')}`.",
   },
   {
+    id: 'git-lfs',
+    title: 'Git LFS pointer instead of the asset',
+    kind: 'family',
+    messages: ['<url> is a Git LFS pointer file, not the asset; run git lfs pull and serve the real file'],
+    cause:
+      'The server returned a Git LFS pointer, a short text file that starts with `version https://git-lfs`, in place of a .gltf, .glb, .bin or image. This happens when the repository was cloned or checked out without Git LFS, so the real bytes were never downloaded.',
+    fix: 'Install Git LFS, run `git lfs pull` (or `git lfs checkout`) in the repository that serves the files, and reload. A host that serves the repository raw must serve LFS objects, not their pointers.',
+  },
+  {
     id: 'camera',
     title: 'Camera and controls values',
     kind: 'family',

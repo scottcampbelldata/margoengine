@@ -81,6 +81,19 @@ export const assetLimit = 64 * 1024 * 1024;
 /** A byte budget derived from `maxDownloadBytes` was exceeded: the error names the option to raise. */
 export const overBudget = (message: string, bytes: number): RangeError =>
   new RangeError(`${message} (${bytes} bytes; raise the maxDownloadBytes option)`);
+const LFS_POINTER = 'version https://git-lfs';
+/**
+ * Throws a coded error when `bytes` are a Git LFS pointer file (a small text stub committed in place of the asset when
+ * the repository was cloned without LFS), which would otherwise fail later as invalid JSON or a truncated buffer.
+ */
+export function rejectLFSPointer(bytes: Uint8Array, name: string): void {
+  if (bytes.length < LFS_POINTER.length) return;
+  for (let i = 0; i < LFS_POINTER.length; i++) if (bytes[i] !== LFS_POINTER.charCodeAt(i)) return;
+  throw margoError(
+    'failed',
+    `${name} is a Git LFS pointer file, not the asset; run git lfs pull and serve the real file; see https://margoengine.com/errors#git-lfs`,
+  );
+}
 /** Validates a `maxDownloadBytes` option (default assetLimit). */
 export function downloadLimit(bytes: number = assetLimit): number {
   if (!Number.isSafeInteger(bytes) || bytes <= 0) throw new RangeError('maxDownloadBytes must be a positive integer');
@@ -346,6 +359,7 @@ export function container(
     input instanceof ArrayBuffer
       ? new Uint8Array(input)
       : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  rejectLFSPointer(data, 'The glTF input');
   if (data.length >= 4 && !isGLB(data)) {
     // JSON bytes: the budget is checked before the text is decoded, so a huge input is not copied twice first.
     if (data.length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
@@ -1015,6 +1029,7 @@ export async function loadAsset(
         throw error instanceof RangeError ? overBudget(error.message, limit) : error;
       },
     );
+    rejectLFSPointer(bytes, target.href);
     total += bytes.length;
     return bytes;
   };

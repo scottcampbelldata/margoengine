@@ -113,6 +113,12 @@
       <p><strong>Cause.</strong> A stage feature such as <code>addGLTF</code>, <code>addViewer</code> or <code>addScene</code> could not import an optional package because it is not installed or the app build cannot resolve it.</p>
       <p><strong>Fix.</strong> Run <code>npm install &lt;package&gt;</code> with the name from the error, for example <code>npm install @margoengine/gltf</code>. Restart the app; rebuild and redeploy a bundled app so the installed package is included.</p>
     </section>
+    <section id="git-lfs">
+      <h2><a href="#git-lfs">Git LFS pointer instead of the asset</a></h2>
+      <p class="messages"><code>&lt;url&gt; is a Git LFS pointer file, not the asset; run git lfs pull and serve the real file</code></p>
+      <p><strong>Cause.</strong> The server returned a Git LFS pointer, a short text file that starts with <code>version https://git-lfs</code>, in place of a .gltf, .glb, .bin or image. This happens when the repository was cloned or checked out without Git LFS, so the real bytes were never downloaded.</p>
+      <p><strong>Fix.</strong> Install Git LFS, run <code>git lfs pull</code> (or <code>git lfs checkout</code>) in the repository that serves the files, and reload. A host that serves the repository raw must serve LFS objects, not their pointers.</p>
+    </section>
     <section id="camera">
       <h2><a href="#camera">Camera and controls values</a></h2>
       <p class="messages"><code>Invalid projection</code> <code>Camera at target</code> <code>Vertical camera</code> <code>Invalid frustum</code> <code>Invalid fit</code> <code>Bounds exceed far: raise camera.far</code> <code>Invalid pivot</code> <code>Invalid orbit</code> <code>Invalid pan</code> <code>Invalid projection view offset</code> <code>Invalid projection tiles</code> <code>Invalid projection lens</code> <code>Invalid off-axis screen</code> <code>Invalid off-axis eye</code> <code>Invalid oblique plane</code> <code>Invalid physical camera</code> <code>Invalid wide angle mode</code> <code>Invalid wide angle distance</code> <code>Invalid wide angle view</code> <code>Invalid camera up: pass a nonzero [x, y, z]</code></p>

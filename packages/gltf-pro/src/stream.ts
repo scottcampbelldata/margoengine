@@ -18,6 +18,7 @@ import {
   entry,
   overBudget,
   parseJSON,
+  rejectLFSPointer,
   unusedBasisuFallbacks,
 } from './asset.js';
 import { decodeExtras, packPrimitive, primitiveDefs, usesLaterUV } from './pack.js';
@@ -285,6 +286,7 @@ export class GLTFStream {
       this.loaded += text.length;
       if (text.length > this.limit) throw overBudget('glTF JSON exceeds byte budget', this.limit);
       this.sources.length = 0;
+      rejectLFSPointer(text, s.url.href);
       return parseJSON(text);
     }
     const total = view.getUint32(8, true);

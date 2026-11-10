@@ -822,6 +822,29 @@ tower capture through the same external cache as verify. Every case validates it
 companions by hash. Missing files fail with the existing fetch-skip-assets recovery command; an
 unset MARGO_SPLAT_SAMPLES uses the normal shared cache. No case reports success without its input.
 
+### Git LFS pointer files
+
+A repository cloned without Git LFS serves small pointer files (text starting
+`version https://git-lfs`) in place of its models. `loadGLTF` and `parseGLTFAsync` check the first
+bytes of every .gltf, .glb, external .bin and image they fetch (the streaming loader checks its .gltf
+root), and refuse a pointer with a `MargoError` (code `failed`) that names the URL and links to
+https://margoengine.com/errors#git-lfs. Run `git lfs pull` where the files are served, then reload.
+
+```ts
+import { loadGLTF } from '@margoengine/gltf-pro';
+import type { EngineKernel } from '@margoengine/core';
+
+export async function load(engine: EngineKernel) {
+  try {
+    return await loadGLTF(engine, '/models/robot.glb');
+  } catch (error) {
+    // A pointer file reads: "... is a Git LFS pointer file, not the asset; run git lfs pull ..."
+    if (error instanceof Error && error.message.includes('Git LFS pointer')) console.error(error.message);
+    throw error;
+  }
+}
+```
+
 ## Preview tier contract
 
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
