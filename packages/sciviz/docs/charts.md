@@ -66,6 +66,30 @@ identity. Pixel-density rendering counts the actual pixel bins; CPU and compatib
 paths implement the same rule. Its 2D CustomLayer declaration is deliberate. Dispose
 the chart owner to remove listeners/layers, never the caller's table or selection.
 
+A scatterplot matrix (SPLOM) puts column `cx` against column `cy` in the cell at column `cx`, row `cy` from the top:
+each table row draws at `(cx + u[cx], d - 1 - cy + u[cy])` in matrix units, where `u` is the row's value on that
+column's shared scale (0 to 1) and `d` the number of columns. The diagonal shows a 32-bin histogram of the selected
+rows. `brushCell(x, y, xRange, yRange)` selects the rows inside both inclusive physical ranges.
+`tests/splom-browser.mjs` checks every cell against that formula on both backends.
+
+```ts
+import { scatterMatrix } from '@margoengine/sciviz/parcoords';
+import { ColumnarTable } from '@margoengine/sciviz/table';
+
+const table = new ColumnarTable({
+  x: Float64Array.of(2, 7, 5),
+  y: Float64Array.of(3, 6, 8),
+  z: Float64Array.of(9, 1, 4),
+});
+const splom = await scatterMatrix(document.querySelector('canvas')!, table, {
+  axes: ['x', 'y', 'z'].map((column) => ({ column, domain: [0, 10] as [number, number] })),
+  rowIds: ['a', 'b', 'c'],
+});
+splom.brushCell('x', 'y', [1, 6], [2, 7]); // selects row 'a' only
+console.log([...splom.selection.rowIds]);
+splom.reorder(['z', 'x', 'y']);
+```
+
 ## Statistical and additional chart families
 
 `/stats` produces owned data-space vector marks and SVG without a Figure/device.

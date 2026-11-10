@@ -32,7 +32,7 @@ current on that date.
 
 | Row | Margo (evidence) | Web rivals (their docs) | Desktop tools (expectation) |
 | --- | --- | --- | --- |
-| Chart types | scatter, line, bar, histogram, heatmap, surface, contour, error bars, box, violin, area, density, parallel coordinates, polar, ternary, Sankey and more (`tests/charts.test.js`, `tests/stats.test.js`, `tests/charts-extra.test.js`, `tests/parcoords.test.js`, `tests/contour2d.test.js`). SPLOM exists in `src/parcoords.ts` with no test yet | Plotly lists 40+ trace types; ECharts 20+ series; Vega-Lite composes marks with transforms | Matplotlib-style breadth |
+| Chart types | scatter, line, bar, histogram, heatmap, surface, contour, error bars, box, violin, area, density, parallel coordinates, polar, ternary, Sankey and more (`tests/charts.test.js`, `tests/stats.test.js`, `tests/charts-extra.test.js`, `tests/parcoords.test.js`, `tests/contour2d.test.js`), scatterplot matrix with every cell placed to the closed form, cell brushing, flip and reorder on both backends (`tests/splom-browser.mjs`) | Plotly lists 40+ trace types; ECharts 20+ series; Vega-Lite composes marks with transforms | Matplotlib-style breadth |
 | 3D scalar volume | 1D and 2D transfer functions, pre-integration, label maps, MIP, ambient occlusion, shadows, GPU and CPU isosurfaces (`tests/transfer.test.js`, `tests/labels.test.js`, `tests/cinematic.test.js`, `tests/fallback.test.js`) | VTK.js volume mapper: composite, additive, MIP, MinIP; Plotly volume and isosurface traces | ParaView and Slicer: all of these plus multi-volume |
 | Vector and tensor | quiver, RK4 streamlines, particles and pathlines, LIC, tubes and ribbons, tensor glyphs, DTI fibre tracking (README "Vector fields", `tests/flow.test.js`, `tests/lic.test.js`, `tests/tubes.test.js`, `tests/tensor.test.js`, `tests/tensor-real.test.js`) | Plotly cone and streamtube traces; VTK.js glyph mapper | ParaView stream tracer, LIC, tensor glyphs |
 | Volume scale | bricked level-of-detail volumes, OME-Zarr multiscale, N5, precomputed chunks (README "Bricked volumes", `tests/bricks.test.js`, `tests/omezarr.test.js`) | Neuroglancer reads precomputed, N5 and OME-Zarr chunked sources | Out-of-core readers |
@@ -138,7 +138,7 @@ included.
 ## Not found in Margo today
 
 MinIP, multi-component and general multi-volume compositing, the threshold, plot-over-line, integrate, resample,
-warp and connectivity filters, and a SPLOM test. These are listed in docs/known-bugs.md
+warp and connectivity filters. These are listed in docs/known-bugs.md
 under "Sciviz comparison gaps".
 
 ## Reproduce
