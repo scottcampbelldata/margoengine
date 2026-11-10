@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14673533,
+  "total": 14673825,
   "history": [
     {
       "date": "2026-10-24",
@@ -8105,6 +8105,12 @@
       "commit": "13be2be67",
       "reason": "batch 166 job 1: DynamicInstances culls, scans and compacts in one dispatch (decoupled look-back with its portable fallback) instead of three kernels",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c7891f49a",
+      "reason": "creative targets-depth: the mip shader clamps each average to its footprint's least and greatest texel so half-float mips of a uniform level stay exact on every GPU (amd-gpu-hunt row 7)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8315,7 +8321,7 @@
     "@margoengine/creative/post": 7366,
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 4277,
-    "@margoengine/creative/targets-depth": 3654,
+    "@margoengine/creative/targets-depth": 3946,
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 14096,
     "@margoengine/culling/bounds": 20401,

@@ -133,17 +133,22 @@ struct Out { @builtin(position) p: vec4f, @location(0) @interpolate(flat) layer:
   let output = max(floor(size/2.0),vec3f(1));
   let pixel = vec3f(floor(input.p.xy),${volume ? 'f32(input.layer)' : '0.0'});
   let lo = pixel*size/output; let hi = (pixel+1.0)*size/output;
-  var sum = vec4f(0); var weight = 0.0;
+  var sum = vec4f(0); var weight = 0.0; var least = vec4f(3.4e38); var most = vec4f(-3.4e38);
   for(var z=i32(floor(lo.z)); z<i32(ceil(hi.z)); z++) {
     for(var y=i32(floor(lo.y)); y<i32(ceil(hi.y)); y++) {
       for(var x=i32(floor(lo.x)); x<i32(ceil(hi.x)); x++) {
         let delta = max(vec3f(0), min(hi,vec3f(f32(x+1),f32(y+1),f32(z+1)))-max(lo,vec3f(f32(x),f32(y),f32(z))));
         let w = delta.x*delta.y*delta.z;
-        sum += textureLoad(source, ${volume ? 'vec3i(x,y,z),0' : 'vec2i(x,y),i32(input.layer),0'})*w; weight += w;
+        let v = textureLoad(source, ${volume ? 'vec3i(x,y,z),0' : 'vec2i(x,y),i32(input.layer),0'});
+        if (w > 0.0) { least = min(least, v); most = max(most, v); }
+        sum += v*w; weight += w;
       }
     }
   }
-  return sum/weight;
+  // An area average lies between its footprint's least and greatest texel. The clamp keeps it there where the
+  // division is not exact (WGSL allows 2.5 ULP: Dawn on D3D12 gives 1 - 2^-24 for 6.25 / 6.25 as a vector) and a
+  // half-float target truncates (the Radeon 680M then stored 0x3BFF for a uniform 1.0; docs/work-lists/amd-gpu-hunt.md).
+  return clamp(sum/weight, least, most);
 }` });
       this.#mipPipeline = this.#device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'vs' }, fragment: { module, entryPoint: 'fs', targets: [{ format: this.options.format }] } });
     }
