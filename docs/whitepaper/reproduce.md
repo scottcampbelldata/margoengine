@@ -3084,3 +3084,7 @@ Each bridge test independently decodes the produced GLB's PNG and compares every
 ### Batch 243 learned denoising
 With Python and NumPy 2.5.4, run python packages/voxel-pathtracer/scripts/train-denoise.py --output=test-results/denoise-ml-training. The authored seeds, 800 steps, generated weights and validation metrics are recorded; no network access or foreign weights are used. Limit BLAS threads for a busy machine. Compare generated Float32 weights against tests/fixtures/denoise-ml-training.json's SHA-256. Build the package and run node --test packages/voxel-pathtracer/tests/denoise-ml.test.js.
 Under a named shared GPU lease, run node packages/voxel-pathtracer/tests/denoise-ml-browser.mjs. Native rendering produces the independent 4-spp Box raw image and 512-spp reference; both native and WebGL2/Vulkan denoising use those same raw guide arrays. The fixture's licence/source is already recorded under gltf-pro/tests/fixtures/metadata. The script also compares actual GPU output to the same WGSL CPU evaluation, preserves HDR constants/coverage, and replaces the actual device. It writes test-results/voxel-pathtracer-denoise-ml.json and raw diagnostic inputs before assertions. No timing budget or assertion is relaxed.
+
+
+### Batch 209 null stage correctness
+After build:packages run node --test --test-timeout=120000 packages/headless/tests/null.test.js. No GPU slot is needed: the proof forbids GPU access and uses the real CPU transform kernel and animation samplers.

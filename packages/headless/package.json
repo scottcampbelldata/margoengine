@@ -51,6 +51,10 @@
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"
+    },
+    "./null": {
+      "types": "./dist/null.d.ts",
+      "import": "./dist/null.js"
     }
   },
   "files": [

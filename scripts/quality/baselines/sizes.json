@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12918246,
+  "total": 12921223,
   "history": [
     {
       "date": "2026-10-24",
@@ -6416,6 +6416,11 @@
       "commit": "6ab64e777",
       "reason": "Batch 205 optional FBX textures (586 B), BMP (1518 B) and raw RGBA (4446 B) entries; FBX worker 83143 to 97769 B adds four texture decoders without a second classic-worker asset protocol",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "reason": "Batch 209 null new optional entry: absent to 2721 B gzip, ceiling 2977 B. Keep renderer injection, real scene ticks and lifecycle together; a split adds loading complexity. Core plus stage 24209 B unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7595,6 +7600,7 @@
     "@margoengine/fbx/textures": 751,
     "@margoengine/decoders/bmp": 1774,
     "@margoengine/decoders/texture-rgba": 4702,
-    "@margoengine/voxel-pathtracer/denoise-ml": 7023
+    "@margoengine/voxel-pathtracer/denoise-ml": 7023,
+    "@margoengine/headless/null": 2977
   }
 }

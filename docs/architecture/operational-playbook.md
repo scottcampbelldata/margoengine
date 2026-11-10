@@ -2213,6 +2213,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 209 headless/null uses the existing renderer injection API with a no-op renderer. Core/stage code and GPU math stay unchanged. CPU evidence proves real hierarchy matrices, multi-scene plugin isolation, animation sampling, disposal and no GPU request. No GPU rendering work is introduced or claimed, so this entry needs no GPU slot.
+
 Batch 207 object actions: local hierarchy is checked against Blender evaluated world matrices for 1728 components, CPU plus native WebGPU and WebGL2 compatibility playback. Local shear is rejected, composed world shear retained, signed scale and constrained empty descendants covered. Procedural instance transforms and between-frame Bezier equivalence remain outside this evidence. Core/stage and GPU transform maths are unchanged.
 
 Batch 209 headless/tiles: optional capture crops a copied view-projection in clip space and reads bounded WebGPU tiles. CPU coverage includes cancellation and alpha-aware linear accumulation. tiles-gpu.mjs checks exact full-frame equivalence, four-sample coverage, canvas restoration and output wider than the real GPU limit; WebGL2 refusal is explicit. Nonlocal or temporal effects remain outside tiled still correctness. No core or stage code changes.

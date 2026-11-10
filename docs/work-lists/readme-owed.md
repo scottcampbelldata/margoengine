@@ -441,3 +441,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/voxel-pathtracer (batch 243 job 4): document DenoiseML creation, required renderImage AOVs, cancellation/disposal, device replacement, numeric limits and clean-room training/holdout evidence; examples deferred by rule 20.
 - margoengine (batch 243 job 4): generated voxel-pathtracer/denoise-ml alias; README work deferred by rule 20.
+
+
+- @margoengine/headless and margoengine: document /null createNullStage, scene/plugin and animation ticks, fixed delta/time, disposal, cancellation, and GPU-only operation refusals.
