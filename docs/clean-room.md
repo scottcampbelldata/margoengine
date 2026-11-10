@@ -1,5 +1,11 @@
 # Clean room
 
+### Batch 170 stats work counts (2026-11-10)
+
+Compared the WHATWG *HTML Living Standard* timers and canvas path API with W3C *Page Visibility Level 2* (2022).
+stats.js 0.17.0 runs only as a black box in engine-bench through its public API.
+[Titles, links and counts](whitepaper/batch-170-stats.md). No external implementation was read.
+
 ### Batch 170 React work counts and R3F harness (2026-11-10)
 
 Compared the React team's *Components and Hooks must be pure* (living documentation) with TC39's *ECMAScript 2025*

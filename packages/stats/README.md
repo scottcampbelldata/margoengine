@@ -4,7 +4,8 @@ Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stat
 
 Depends on `@margoengine/math`, with `@margoengine/core` as a peer. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;
-DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
+DOM strings and canvas drawing refresh separately every 150 ms. A timer refresh is skipped when nothing it draws
+has changed, so an idle page (no frames) does no DOM or canvas work; `refresh()` always redraws. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
 
 `Stats`, `FramePhases`, `PipelineCompiles` and `FrameBeacon` detach from the scene

@@ -278,3 +278,12 @@ Eight scenes against six rivals, same data, pixels, camera and colour ([sciviz-v
 
 The R3F adapter, its public-API scope and the smoke command are in [batch-170-react.md](batch-170-react.md).
 No rival timing was run and no speed ratio is claimed.
+
+## Batch 170 stats: work counts, 2026-11-10
+
+| Package | Work | Before | After | Black-box rival | Status |
+| --- | --- | --- | --- | --- | --- |
+| stats | `Stats` overlay, 10 s idle (no frames) | 8,580 canvas commands | 0 | stats.js 0.17.0: 0 | `perf(stats)`; timing pending the quiet rerun |
+| stats | `Stats` overlay, 10 s at 60 Hz | 7,617 canvas commands | 7,617, same draws | stats.js 0.17.0: 6,090 (bar graph scrolled by image copy) | accepted difference in drawing; timing pending the quiet rerun |
+
+Method and rival harness: [batch-170-stats.md](batch-170-stats.md). No rival timing was run.

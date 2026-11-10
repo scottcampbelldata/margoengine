@@ -1,5 +1,11 @@
 # Design envelope
 
+- Batch 170 stats: accepted difference in drawing against stats.js 0.17.0. Margo redraws a 120-sample frame-time
+  line and four text rows each 150 ms (7,617 canvas commands in 10 s at 60 Hz); stats.js scrolls a bar graph with
+  one image copy per frame (6,090 commands). Command counts are not costs. Both do nothing while idle.
+  The change key adds 50 B gzip to the stats root entry (4,934 to 4,984 B, quality baseline updated with the reason).
+  [Counts](whitepaper/batch-170-stats.md). Timing pending the quiet rerun.
+
 - Batch 164 SSAO/GTAO: 4x removes one early colour resolve; 1x is unchanged.
   The 40 B/pixel reduction counts logical rgba16float resolve source reads and
   destination writes, not physical bandwidth. No shader, quality, target-size,

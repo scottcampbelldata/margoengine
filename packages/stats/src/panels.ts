@@ -66,6 +66,10 @@ export class StatsPanels implements EnginePlugin {
   private queued = false;
   private disposed = false;
   private memoryLabel = 'Memory MiB';
+  // Counts changes to what refresh() draws (samples, passes, the memory label); `shown` is the count it last drew, so
+  // the timer skips a refresh that would redraw the same text and graphs.
+  private version = 0;
+  private shown = -1;
 
   constructor(private readonly options: StatsPanelsOptions = {}) {
     const { samples = 120, refreshMilliseconds = 150 } = options;
@@ -109,7 +113,9 @@ export class StatsPanels implements EnginePlugin {
       this.stats.element.replaceChildren(this.element);
     } else this.stats.element.append(this.element);
     this.refresh();
-    this.timer = setInterval(() => this.refresh(), refreshMilliseconds);
+    this.timer = setInterval(() => {
+      if (this.version !== this.shown) this.refresh();
+    }, refreshMilliseconds);
   }
 
   /** Attach with GPU timestamp support requested when creating a WebGPU engine. */
@@ -147,6 +153,7 @@ export class StatsPanels implements EnginePlugin {
     this.latestPasses = sample.gpuMilliseconds === null ? [] : (sample.passes ?? []).map((pass) => ({ ...pass }));
     this.sampleCount = Math.min(this.sampleCount + 1, this.series.fps.length);
     this.sampleIndex = (this.sampleIndex + 1) % this.series.fps.length;
+    this.version++;
   }
 
   private readonly collect = (): void => {
@@ -156,7 +163,9 @@ export class StatsPanels implements EnginePlugin {
     gl?.poll();
     const heap = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
     const bytes = this.options.memory ? this.options.memory() : this.memory ? this.memory.bytes : (heap ?? null);
-    this.memoryLabel = this.options.memory ? 'Memory MiB' : this.memory ? 'Tracked GPU MiB' : 'JS heap MiB';
+    const label = this.options.memory ? 'Memory MiB' : this.memory ? 'Tracked GPU MiB' : 'JS heap MiB';
+    if (label !== this.memoryLabel) this.version++;
+    this.memoryLabel = label;
     this.sample({
       fps: this.stats.fps,
       cpuMilliseconds: this.phases.last.total,
@@ -228,6 +237,7 @@ export class StatsPanels implements EnginePlugin {
   /** Refresh DOM text and draw the histories; never called by sample(). */
   refresh(): void {
     if (this.disposed) return;
+    this.shown = this.version;
     for (const metric of METRICS) {
       const values = this.series[metric],
         graph = this.graphs[metric],

@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 stats: 1,000 idle timer refreshes write the overlay text 1,000 times on the parent and never after;
+  `StatsPanels` drops from 220,000 canvas commands to zero, with identical draws whenever something changed. Work
+  evidence only, no speed claim. [Scope, stats.js counts and reproduction](batch-170-stats.md).
+
 - Batch 170 React: a 10,000-mesh StrictMode rerender enumerates 20,000 props objects on the parent and none after,
   with all 90,000 transform value bytes unchanged. The R3F 9.8.2 smoke draws 1,000 and 10,000 boxes with the same
   draw-call counts as Margo. Work evidence only, no speed claim. [Scope and reproduction](batch-170-react.md).

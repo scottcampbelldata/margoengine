@@ -1,5 +1,12 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 stats: no redraw of an unchanged overlay (2026-11-10)
+
+The 150 ms overlay timers redrew text and graphs with nothing new to show: 8,580 canvas commands in 10 idle
+seconds for `Stats`, zero after; stats.js 0.17.0 also does zero while idle. Busy drawing is unchanged (7,617 commands
+in 10 s at 60 Hz). Fix commit subject: `perf(stats): skip overlay refreshes with nothing new to draw`. Timing pending
+the quiet rerun. [Research, rival counts and reproduction](batch-170-stats.md).
+
 ## Batch 170 React: no props copy per mesh render, R3F harness (2026-11-10)
 
 `Mesh` copied its props into a handler record with object rest on every render: 20,000 props enumerations on a

@@ -1,5 +1,9 @@
 # Reproducing Margo's numbers
 
+- Batch 170 stats: after `npm run build --workspace @margoengine/stats`,
+  `node --test --test-timeout=60000 packages/stats/test/workcount.test.js` checks idle refresh work and identical
+  draws. [stats.js black-box count](batch-170-stats.md).
+
 - Batch 170 React: after building, `node --experimental-test-module-mocks --test --test-timeout=120000
   --test-name-pattern=10000 packages/react/test/declarative.test.js` checks the props enumerations and transform
   bytes. The R3F smoke is `node scripts/gpu-lock.mjs run --owner=react-smoke --max=20 -- node

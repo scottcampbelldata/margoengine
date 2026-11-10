@@ -166,7 +166,17 @@ export class Stats implements EnginePlugin {
     this.element.append(this.text, this.graph);
     parent.append(this.element);
     this.refresh();
-    this.timer = setInterval(() => this.refresh(), 150);
+    this.timer = setInterval(() => {
+      if (this.key() !== this.shown) this.refresh();
+    }, 150);
+  }
+
+  // What the last refresh drew from: the text and graph are a function of this key, so a timer refresh with the same
+  // key would redraw the same overlay, and an idle page (no frames) does no DOM or canvas work.
+  private ticks = 0;
+  private shown = '';
+  private key(): string {
+    return `${this.ticks} ${this.fps} ${this.frameTime} ${this.drawCalls} ${this.dispatches} ${this.gpuTime} ${this.gpuElapsedMilliseconds} ${this.profiler?.supported} ${!this.profiler} ${this.profiling}`;
   }
 
   static attach(engine: EngineKernel, options: StatsOptions = {}): Stats {
@@ -203,6 +213,7 @@ export class Stats implements EnginePlugin {
     this.fps = 1000 / this.frameTime;
     this.drawCalls = drawCalls;
     this.dispatches = dispatches;
+    this.ticks++;
   }
 
   enableGPUProfiling(device: GPUDevice): boolean {
@@ -390,6 +401,7 @@ export class Stats implements EnginePlugin {
 
   refresh(): void {
     if (this.disposed) return;
+    this.shown = this.key();
     const gpu =
       this.gpuTime !== null
         ? this.gpuTime.toFixed(2) + ' ms passes'
