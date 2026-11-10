@@ -62,7 +62,8 @@ export interface DOFOptions {
   /**
    * Temporal DOF: the bokeh is gathered at half resolution, a quarter of the pixels, and its taps turn by the golden
    * angle every frame, so TAA attached after DOF averages the turns in its history into smooth bokeh. In-focus pixels
-   * stay at full resolution. WebGPU only (not on the WebGL2 layer). Read when the effect attaches. Default false.
+   * stay at full resolution. Native WebGPU and the full WebGL2 compatibility layer. Read when the effect attaches.
+   * Default false.
    */
   temporal?: boolean;
 }

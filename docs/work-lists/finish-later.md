@@ -85,3 +85,4 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 53.2 | clustered | Area lights are not clustered: a range or per-cluster list for many area lights; only the first 64 may cast shadows |
 | 53.2 | clustered | IES, projector and contact per-light settings stop at index 1,024 |
 | 53.2 | clustered | area-texture images reach only the first 64 area lights (its MAX_LIGHTS); lights past 64 under a raised AreaLightOptions.maxLights draw untextured |
+| 132 | dof | Read in full: Potmesil & Chakravarty 1981 (ACM, paywalled), Vogel 1979 (Elsevier), Eldar et al. 1997 (IEEE); measure the 1% / 0.001 and 5% depth tolerances of the gather |

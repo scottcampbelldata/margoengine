@@ -1711,7 +1711,7 @@ carry the same citation as a one-line comment in the code.
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | D-01 | View depth from reversed-Z depth (perspective and orthographic) | dof/src/shaders.ts | Projection algebra |
-| D-02 | Circle of confusion | dof/src/shaders.ts, dof/src/index.ts | Thin-lens equation (Potmesil & Chakravarty, "A Lens and Aperture Camera Model", 1981) |
+| D-02 | Circle of confusion | dof/src/shaders.ts, dof/src/index.ts | Thin-lens equation (Potmesil & Chakravarty, "A Lens and Aperture Camera Model", 1981; not read in full, the ACM copy is paywalled). Checked against the sensor-plane form read in full in J. Demers, "Depth of Field: A Survey of Techniques", GPU Gems ch. 23 (2004), https://developer.nvidia.com/gpugems/gpugems/part-iv-image-processing/chapter-23-depth-field-survey-techniques : CoC = A f (z - S1) / (z (S1 - f)), turned into pixels over a sensor 2 f tan(fov / 2) high. The exact angular form for a lens focused at S1, A (1/S1 - 1/z), differs by S1 / (S1 - f): 1% at the defaults, 2x at S1 = 2f (batch 132 audit) |
 | D-03 | Defaults: focus 5, focal length 0.05, f/2.8, max radius 16 | dof/src/index.ts | Margo-own: Public-API defaults |
 | D-04 | Golden-angle spiral taps | dof/src/shaders.ts | Vogel 1979 |
 | D-05 | Gather tiers, depth tests, near weighting | dof/src/shaders.ts | Margo-own: Margo design (explained in comments) |

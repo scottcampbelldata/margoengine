@@ -64,8 +64,8 @@ console.log(dof.focalLength); // the focal length in metres the last frame used
 ## Temporal DOF
 
 `temporal: true` gathers the bokeh at half resolution, a quarter of the pixels, and turns its taps by the golden angle
-every frame; TAA attached after DOF averages the turns in its history, so the bokeh comes out smooth for about a quarter
-of the gather's cost. Pixels in focus keep the full-resolution scene as it is.
+every frame; TAA attached after DOF averages the turns in its history, so the bokeh comes out smooth from a gather over a
+quarter of the pixels (the cost has not been timed). Pixels in focus keep the full-resolution scene as it is.
 
 Temporal DOF works on native WebGPU and the full WebGL2 compatibility layer.
 The full layer writes the half scene and CoC first, then computes independent
@@ -82,7 +82,7 @@ TAA.attach(stage.engine, {depth:()=>dof.depthTexture});
 
 - The circle of confusion is still worked out per full-resolution pixel; each 2x2 block of the scene is averaged and
   takes the nearest of its four depths for the half gather. Near-field blur spreads over the focus as before.
-- Read when the effect attaches. WebGPU only: on the WebGL2 layer `DOF` throws `'unsupported'` for it. Without TAA the
+- Read when the effect attaches. Runs on native WebGPU and the full WebGL2 compatibility layer. Without TAA the
   turning taps show as a faint shimmer in large far disks; an aperture image's far taps do not turn.
 
 ## Autofocus, tilt-shift and blades

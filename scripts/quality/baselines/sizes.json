@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14603965,
+  "total": 14603957,
   "history": [
     {
       "date": "2026-10-24",
@@ -8694,7 +8694,7 @@
     "@margoengine/sciviz/format": 7562,
     "@margoengine/sciviz/formats": 14262,
     "@margoengine/sciviz/geo": 4293,
-    "@margoengine/sciviz/geo-lod": 7517,
+    "@margoengine/sciviz/geo-lod": 7509,
     "@margoengine/sciviz/geo-vector": 27662,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 25036,
@@ -8717,6 +8717,7 @@
     "@margoengine/sciviz/pipeline": 2086,
     "@margoengine/sciviz/pointcloud": 22723,
     "@margoengine/sciviz/probe": 6844,
+    "@margoengine/sciviz/query": 7381,
     "@margoengine/sciviz/spec": 27920,
     "@margoengine/sciviz/stats": 6975,
     "@margoengine/sciviz/stream": 4450,
@@ -9226,7 +9227,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sciviz/query": 7381
+    "margoengine/web": 577
   }
 }
