@@ -45,6 +45,10 @@
     "./pen": {
       "types": "./dist/pen.d.ts",
       "import": "./dist/pen.js"
+    },
+    "./vector": {
+      "types": "./dist/vector.d.ts",
+      "import": "./dist/vector.js"
     }
   },
   "files": [

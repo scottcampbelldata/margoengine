@@ -2633,3 +2633,4 @@ Build packages; run node --test --test-timeout=120000 packages/tween/test/scroll
 ### Inertia correctness samples (batch 215 job 6)
 
 Build packages; run node --test --test-timeout=120000 packages/tween/test/inertia.test.js. All time is explicitly supplied. Measure packages/tween/dist/inertia.js using bundleBytes and gzipSync, bare imports external. Tests include exact endpoint and two-sample velocity assertions plus analytic exponential samples.
+Batch 253 vector input correctness: build packages/input, then node --test --test-timeout=30000 packages/input/test/vector.test.js. Fixtures cover real Input events, gamepad polls and InputRecorder/InputReplay; no model assets or GPU are involved.

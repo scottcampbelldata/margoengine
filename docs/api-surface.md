@@ -42,7 +42,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/gltf-pro | `.` 50, `./model` 50, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 6, `./splats` 2, `./lights` 10, `./physics` 9, `./interactivity` 10, `./metadata` 13, `./coordinates` 3, `./worker` 4 | 808 | 3 | 67,473 |
 | @margoengine/headless | `.` 11, `./video` 12, `./ffmpeg` 4, `./stage` 3, `./compare` 11, `./formats` 9 | 8 |  | 2,615 |
 | @margoengine/html | `.` 8, `./texture` 5 |  |  | 7,235 |
-| @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3 | 12 |  | 5,220 |
+| @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3, `./vector` 5 | 19 |  | 5,220 |
 | @margoengine/inspector | `.` 12, `./frame` 17, `./history` 2, `./snapshot` 6, `./resources` 2, `./packages` 10 | 4 |  | 9,071 |
 | @margoengine/kinematics-constraints | `.` 21, `./swept` 5, `./sdf` 5 | 10 |  | 11,567 |
 | @margoengine/labels | `.` 22, `./declutter` 5, `./callouts` 2 | 34 |  | 5,550 |

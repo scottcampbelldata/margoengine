@@ -1378,6 +1378,10 @@
       "types": "./dist/input/pen.d.ts",
       "import": "./dist/input/pen.js"
     },
+    "./input/vector": {
+      "types": "./dist/input/vector.d.ts",
+      "import": "./dist/input/vector.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

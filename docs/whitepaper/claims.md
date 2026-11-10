@@ -3110,3 +3110,4 @@ Optional tween/scroll-pin pins a section during timeline scrubbing and snaps rea
 ### Release velocity and inertia (batch 215 job 6)
 
 Optional tween/inertia carries numeric properties using measured velocity and stops on an exact point/list/function endpoint or range, meeting the requested GSAP inertia row. packages/tween/test/inertia.test.js proves analytic free decay, identical physical samples under delta partitioning, velocity continuity, hard/bouncy bounds, exact completion, stale samples and lifecycle behaviour. Entry 2778 B gzip; no timing or speed claim.
+Batch 253 vector input claim: named 2D actions preserve analog direction with a continuous radial deadzone, normalized WASD diagonals, rebindable scalar channels, contexts and tick-exact binding replay. Proof: packages/input/test/vector.test.js. Public rival behaviour comparison and research: docs/clean-room.md, Batch 253 job 1. No speed or hardware-coverage claim.
