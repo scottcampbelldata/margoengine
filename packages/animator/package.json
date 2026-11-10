@@ -73,6 +73,10 @@
     "./blend-trees": {
       "types": "./dist/blend-trees.d.ts",
       "import": "./dist/blend-trees.js"
+    },
+    "./masks": {
+      "types": "./dist/masks.d.ts",
+      "import": "./dist/masks.js"
     }
   },
   "files": [

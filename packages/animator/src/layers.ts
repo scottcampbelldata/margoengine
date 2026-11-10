@@ -13,6 +13,8 @@ export interface StateLayerOptions {
   weight?: number;
   /** glTF node indices; omitted means every node animated by the graph's clips. */
   mask?: readonly number[];
+  /** @internal Optional dense per-node influence, supplied by the masks entry. */
+  nodeWeights?: ArrayLike<number>;
   /** Override blends toward the graph; additive adds its difference from the loaded pose. Default override. */
   blend?: 'override' | 'additive';
 }
@@ -25,6 +27,8 @@ export class StateLayer {
   weight: number;
   /** Live node selection. An empty mask affects no nodes. */
   mask: readonly number[];
+  /** @internal Dense influence, retained and read every frame when present. */
+  nodeWeights?: ArrayLike<number>;
   /** Live compositing mode. */
   blend: 'override' | 'additive';
   private readonly off: () => void;
@@ -38,6 +42,7 @@ export class StateLayer {
   ) {
     this.weight = options.weight ?? 1;
     this.blend = options.blend ?? 'override';
+    this.nodeWeights = options.nodeWeights;
     const names = new Set(
       Object.values(options.graph.states).flatMap((tree) =>
         typeof tree === 'string' ? [tree] : tree.samples.map((sample) => sample.clip),
@@ -66,6 +71,12 @@ export class StateLayer {
 
   private validate(): void {
     if (
+      this.nodeWeights !== undefined &&
+      (this.nodeWeights.length !== this.animator.animation.model.nodes.length ||
+        Array.from(this.nodeWeights).some((weight) => !Number.isFinite(weight) || weight < 0 || weight > 1))
+    )
+      throw new RangeError('Weighted layer needs one finite 0..1 weight per model node; correct the bone mask');
+    if (
       !Number.isFinite(this.weight) ||
       this.weight < 0 ||
       this.weight > 1 ||
@@ -80,8 +91,9 @@ export class StateLayer {
   }
 
   private compose(pose: Pose, layer: Pose): void {
-    const w = this.weight;
     for (const id of this.mask) {
+      const w = this.weight * (this.nodeWeights?.[id] ?? 1);
+      if (w === 0) continue;
       const additive = this.blend === 'additive';
       for (let c = 0; c < 3; c++) {
         pose.position[id][c] +=

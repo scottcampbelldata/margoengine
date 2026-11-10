@@ -9,7 +9,7 @@ try {
     const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { Animator } = await import('/packages/animator/dist/index.js');
-    const { addStateLayer } = await import('/packages/animator/dist/layers.js');
+    const { createBoneMask, addWeightedLayer } = await import('/packages/animator/dist/masks.js');
     const { createBlendTree } = await import('/packages/animator/dist/blend-trees.js');
     const canvas = document.createElement('canvas');
     document.body.replaceChildren(canvas);
@@ -20,7 +20,11 @@ try {
     });
     const model = await loadGLTF(engine, '/examples/assets/khronos/Fox/Fox.glb');
     const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
-    const upper = addStateLayer(animator, {
+    const mask = createBoneMask(
+      model.nodes.length,
+      model.nodes.map((_, id) => [id, (id % 4) / 3]),
+    );
+    const upper = addWeightedLayer(animator, {
       graph: {
         initial: 'survey',
         parameters: {
@@ -62,7 +66,7 @@ try {
         ],
       },
       weight: 0.5,
-      mask: model.nodes.map((_, id) => id),
+      mask,
     });
     animator.onPreUpdate(0.2);
     upper.graph.trigger('go');
@@ -74,6 +78,7 @@ try {
       layer: upper.graph.state,
       time: upper.graph.animator.time,
       offset: upper.graph.animator.entryTime / upper.graph.animator.stateDuration('run'),
+      soft: [...mask].some((weight) => weight > 0 && weight < 1),
       finite: model.nodes.every((node) => Array.from(node.matrix).every(Number.isFinite)),
     };
   });
@@ -82,6 +87,7 @@ try {
   assert.equal(result.offset, 0.25);
   assert.ok(result.time > 0.15);
   assert.equal(result.finite, true);
+  assert.equal(result.soft, true);
   const png = await decodePNG(await browser.page.locator('canvas').screenshot());
   let lit = 0;
   for (let i = 0; i < png.data.length; i += 4) if (png.data[i] + png.data[i + 1] + png.data[i + 2] > 80) lit++;

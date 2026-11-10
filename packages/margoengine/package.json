@@ -146,6 +146,10 @@
       "types": "./dist/animator/blend-trees.d.ts",
       "import": "./dist/animator/blend-trees.js"
     },
+    "./animator/masks": {
+      "types": "./dist/animator/masks.d.ts",
+      "import": "./dist/animator/masks.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

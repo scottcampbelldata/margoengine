@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13249774,
+  "total": 13261138,
   "history": [
     {
       "date": "2026-10-24",
@@ -6712,6 +6712,11 @@
       "commit": "batch-206-curves",
       "reason": "New optional curves entry for USD BasisCurves and Points. Uses existing lines/stroke. Worker sampler remains within its existing ceiling.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-211-job4",
+      "reason": "New animator/masks entry 0 -> 11033 B gzip, ceiling 11364. Full shared state-layer behaviour plus dense mask construction and validation; layers grows 10730 -> 10828 within its ceiling. An alternate clip-only sampler would lose graph support and duplicate pose composition."
     }
   ],
   "items": {
@@ -7935,6 +7940,7 @@
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/fbx/surfaces": 3433,
     "margoengine/fbx/surfaces": 314,
-    "@margoengine/usdz/curves": 3531
+    "@margoengine/usdz/curves": 3531,
+    "@margoengine/animator/masks": 11364
   }
 }

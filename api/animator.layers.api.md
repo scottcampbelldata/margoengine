@@ -11,6 +11,7 @@ export class StateLayer {
     readonly graph: AnimatorGraph;
     weight: number;
     mask: readonly number[];
+    nodeWeights?: ArrayLike<number>;
     blend: 'override' | 'additive';
     constructor(animator: Animator, options: StateLayerOptions);
     dispose(): void;
@@ -21,6 +22,7 @@ export interface StateLayerOptions {
     graph: AnimatorGraphDocument;
     weight?: number;
     mask?: readonly number[];
+    nodeWeights?: ArrayLike<number>;
     blend?: 'override' | 'additive';
 }
 
