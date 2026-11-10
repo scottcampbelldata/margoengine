@@ -665,8 +665,14 @@ export class SSAO implements EnginePlugin {
     this.compositeAttachment.view = undefined!;
   }
   onDeviceRestored(engine: Engine): void {
+    if (this.disposed) return;
     this.release();
-    this.setup(engine);
+    try {
+      this.setup(engine);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
   dispose(): void {
     if (this.disposed) return;

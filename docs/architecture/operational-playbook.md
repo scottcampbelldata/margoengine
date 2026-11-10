@@ -7237,3 +7237,9 @@ The sciviz notebook/share libraries remain independent of webgl2-compat. The Pyt
 ### Live volume material coherence (review5, 2026-11-10)
 
 Animation updates derived attenuation and optical depth as well as tint and hooked volume. Parsed material depth invalidates by channel on attenuation edits, or entirely on array replacement, while retaining underflow precision on untouched channels. Progressive temporary materials retain property descriptors through texture arrival. CPU tests verify public state and tint uniforms; native-volume GPU checks add 20 live cases to the existing 28 exact slab cases on both backends. The sources, scope, same-value limitation and commands are in docs/live-volume-materials.md. Core and stage remain untouched; no speed claim is made.
+
+### Review 5: refused HDR restoration (2026-11-10)
+
+DOF, Bloom, SSAO and PostStack dispose and detach on failed restoration setup, preserving the original coded refusal for engine.onError. Disposed children ignore stale callbacks. Ten actual full/half-float to masked-LDR device replacements cover default/temporal DOF, Bloom, SSAO and a GTAO/DOF/Bloom stack; each gives one coded error and three later clean frames. Physical lower-tier GPUs remain unproven. [Methods, lifetime research and reproduction](../review5-effect-restoration.md). Core and stage are unchanged.
+
+Review5 SSGI compatibility evidence (2026-11-10): the bounded raw-target investigation locates the first backend difference in the ray-trace target; captured scene/material/Hi-Z/prefilter targets match. Diagnostic finite nonzero ray normalization differs at f32 precision across ANGLE backends, without proving the repeat-render cause. Scott accepts the identical-command D3D11-only case as recorded below Margo; original tests remain unchanged. See [methods and limits](../review5-ssgi-angle.md).

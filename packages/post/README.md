@@ -52,6 +52,35 @@ values, while Bloom needs linear radiance above one. GTAO inherits SSAO's check
 inside its required PostStack. No effect silently replaces these values with
 clamped eight-bit data.
 
+A refused restoration disposes and detaches standalone Bloom or SSAO. A refused
+HDR stack disposes and detaches its children too, before `engine.onError` reports
+the original error once. Later frames render without those effects. Handle initial
+attachment refusal and restoration notification separately:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {SSAO} from 'margoengine/post/ssao';
+import {Bloom} from 'margoengine/post/bloom';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const unsupported = (error: unknown) =>
+  error instanceof Error && 'code' in error && error.code === 'unsupported';
+engine.onError = (error) => {
+  if (unsupported(error)) {
+    console.info('HDR effects detached: this device cannot preserve HDR.');
+    return;
+  }
+  console.error(error);
+};
+try {
+  PostStack.attach(engine, [new SSAO(), new Bloom()]);
+} catch (error) {
+  if (!unsupported(error)) throw error;
+  console.info('HDR effects unavailable: rendering the scene without them.');
+}
+// After capability recovery, attach a new stack with new effects.
+```
+
 Post effects and `PostStack` can be attached to a secondary scene with `scene.use()`.
 Disposing an effect detaches it from its owning scene. A stack removes only its
 original attached children, preserving same-name replacements and other scenes.

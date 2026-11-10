@@ -56,10 +56,13 @@ for (const [name, Effect, stacked] of [
             () => plugin.onDeviceRestored(),
             (error) => error.code === 'unsupported',
           );
-        assert.throws(
-          () => effect.onDeviceRestored(h.engine),
-          (error) => error.code === 'unsupported',
-        );
+        if (stacked)
+          assert.doesNotThrow(() => effect.onDeviceRestored(h.engine), 'detached children do not report another error');
+        else
+          assert.throws(
+            () => effect.onDeviceRestored(h.engine),
+            (error) => error.code === 'unsupported',
+          );
       });
       assert.ok(
         !restoration.some((entry) => ['buffer', 'texture'].includes(entry[0])),
@@ -70,6 +73,11 @@ for (const [name, Effect, stacked] of [
         'old resources released before refusal',
       );
       assert.equal(h.live().length, 0);
+      assert.equal(h.engine.hasPlugin(plugin.name), false);
+      assert.equal(h.engine.hasPlugin(effect.name), false);
+      for (let i = 0; i < 3; i++) assert.doesNotThrow(() => h.frame(), 'later frames bypass the detached effect');
+      assert.equal(h.live().length, 0, 'later frames create no effect resources');
+      assert.doesNotThrow(() => plugin.onDeviceRestored(h.engine), 'no second restore error');
       plugin.dispose();
     }
   });

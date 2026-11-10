@@ -121,6 +121,9 @@ test('restoring an HDR stack onto LDR releases its old resources and refuses bef
   );
   assert.equal(h.live().length, 0);
   assert.equal(h.resources.length, allocations);
+  assert.equal(h.plugins.size, 0, 'the refused stack and all its children detach');
+  for (let i = 0; i < 3; i++) assert.doesNotThrow(() => h.frame());
+  assert.equal(h.resources.length, allocations);
   h.engine.removePlugin('post:stack');
 });
 /** A stackable test double that logs what the stack hands it. */

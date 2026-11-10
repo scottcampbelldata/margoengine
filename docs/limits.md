@@ -6607,3 +6607,11 @@ Live volume materials (review5, 2026-11-10): attenuation edits invalidate parsed
 ### Range-cache response transit age (2026-11-10)
 
 RangeCache includes elapsed request time together with the Age header when calculating the freshness deadline after a miss or a 304 response. For max-age=10, Age=3 and a four-second request, three seconds of freshness remain when the response arrives; Age=8 with the same transit is already expired. The controlled-clock regression checks the next cache session revalidates in both cases. Existing once-per-instance checking and offline fallback policies are unchanged; this is clock correctness, not a speed result. No public API or schema change.
+
+## Review 5 refused HDR restoration
+
+DOF, Bloom and SSAO require native WebGPU or at least the half-float compatibility tier. A restoration setup failure disposes and detaches the effect; a refused HDR PostStack detaches its children too. The engine reports the original coded error once through onError. Create fresh effects after capability recovery. Ten RTX A6000 cases use masked capabilities, not physical lower-tier devices. [Methods](review5-effect-restoration.md).
+
+Locked-toolchain root entry measurements for this repair: DOF 9529 to 9538 gzip bytes, post 42105 to 42126; existing ceilings unchanged. Core plus stage remains 24209 gzip bytes.
+
+SSGI exact one-bounce round trips on RTX A6000 / ANGLE D3D11 can differ by one display level despite identical GL commands. The first differing target is the ray trace; native WebGPU and ANGLE Vulkan pass this fixture. This separately recorded driver case leaves the exact assertion unchanged. See [raw values and reproduction](review5-ssgi-angle.md).

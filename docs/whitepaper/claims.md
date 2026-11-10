@@ -4667,3 +4667,7 @@ Claim: KHR_animation_pointer volume color, thickness and distance reach the nati
 ### Range-cache response transit age (2026-11-10)
 
 Initial and 304 response freshness account for Age plus elapsed request time through the existing RFC 9111 helper. Evidence: the two parent-failing controlled-clock regressions in packages/cache/test/freshness.test.js cover a partly consumed lifetime and expiry during transit, without sleeping or timing budgets. Reproduce after build: node --test packages/cache/test/freshness.test.js. Sources and formula: docs/clean-room.md, Range-cache response transit age.
+
+### Review 5 refused HDR restoration
+
+Ten actual device-replacement cases on RTX A6000 with masked full/half-float to LDR tiers detach refused effects, report one coded error and render three subsequent frames with no GPU errors. This does not certify physical lower-tier hardware. [Methods and reproduction](../review5-effect-restoration.md).

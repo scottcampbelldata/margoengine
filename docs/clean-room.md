@@ -8623,3 +8623,7 @@ Compared Steve Becker (editor), W3C, *Indexed Database API 3.0* (2026 working dr
 ### Range-cache response transit age (2026-11-10)
 
 Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Caching* (2022), section 4.2.3, https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.3, with their earlier *RFC 7234: HTTP/1.1 Caching* (2014), section 4.2.3, https://www.rfc-editor.org/rfc/rfc7234.html#section-4.2.3. Both account for response transit in corrected age, alongside apparent age from Date. RangeCache now supplies the request start to Margo's existing common calculation on initial storage and 304 refresh. No external implementation or companion code was read or copied.
+
+### Review 5 effect restoration (2026-11-10)
+
+Compared WebGPU device-loss/resource lifetime (Ninomiya, Jones and Blandy, W3C, 2026) and WebGL EXT_color_buffer_float / EXT_color_buffer_half_float (Callow and Khronos WebGL Working Group, 2017/2022). [Full titles, links, rationale and original tests](review5-effect-restoration.md). No other repository implementation or companion code was read.

@@ -53,3 +53,5 @@ code was read or copied. No speed or physical-device certification claim.
 Reproduce with the package CPU suite, then `npm run test:gpu:tiers --workspace
 @margoengine/dof` under the shared GPU lock after building packages. The original
 `test:gpu` keeps lens, Autofocus and full compatibility image checks.
+
+Restoration follow-up (2026-11-10): failed setup now disposes and detaches DOF before rethrowing the original unsupported error. Later frames continue without DOF; the engine reports one coded error through onError. Bloom, SSAO and PostStack follow the same ownership rule. See [regressions and actual device replacement](review5-effect-restoration.md).

@@ -1532,3 +1532,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/cache: document exact indexed usage after deleting all Vary representations and repeated deletion during the README phase.
 
 - @margoengine/cache: document RangeCache freshness including request transit and Age after a miss or 304 in the README phase.
+
+
+- @margoengine/dof: review5 unsupported attachment and engine.onError restore-handling examples completed in the README phase (2026-11-10); runtime check recorded with the restore repair.
+- @margoengine/post: review5 Bloom/SSAO and HDR PostStack detachment, coded engine.onError and recreation examples completed in the README phase (2026-11-10); runtime check recorded with the restore repair.

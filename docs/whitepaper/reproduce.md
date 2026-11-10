@@ -3940,3 +3940,7 @@ Build packages, run the webgl2-compat CPU suite, then run its registered test:gp
 ### Review 5 live volume materials
 
 After npm run build:packages, run the four CPU files and the two GPU commands listed in [live volume materials](../live-volume-materials.md). The GPU fixture independently evaluates Beer attenuation and sRGB conversion for 48 authored slabs, preserving the original 28 cases and adding 20 live cases on both instancing paths and mirrors. All RGBA words compare exactly; no timing or rival comparison is claimed.
+
+### Review 5 refused HDR restoration
+
+Build packages and run the DOF/post CPU suites, then the registered DOF test:gpu:restore-tier under the shared GPU lock. [Exact commands, ten cases and limitations](../review5-effect-restoration.md). Existing package GPU suites still run on native WebGPU and WebGL2.

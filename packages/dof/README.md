@@ -4,6 +4,39 @@ Import `margoengine/dof` from the `margoengine` package, or `@margoengine/dof` f
 
 Optional WebGPU depth of field; core and stage are unchanged.
 
+DOF requires native WebGPU or the WebGL2 compatibility layer's `full` or
+`half-float` tier, including with `temporal: true`. The `ldr` tier cannot preserve
+the HDR scene capture and is refused with MargoError code `unsupported` and a
+[compatibility help link](https://margoengine.com/errors#compatibility-layer).
+Handle that code when attaching DOF and keep rendering without the effect. If
+device restoration selects LDR, DOF disposes and detaches before the engine reports
+one `unsupported` error through `engine.onError`; handle the notification there.
+The scene continues without DOF on later frames. If DOF belongs to an HDR
+`PostStack`, the refused stack and its effects detach together. Recreate effects
+after a suitable device becomes available; disposed effects cannot be reattached.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const unsupported = (error: unknown) =>
+  error instanceof Error && 'code' in error && error.code === 'unsupported';
+engine.onError = (error) => {
+  if (unsupported(error)) {
+    console.info('Depth of field detached: this device cannot preserve HDR.');
+    return;
+  }
+  console.error(error);
+};
+try {
+  DOF.attach(engine, {focalDistance:5});
+} catch (error) {
+  if (!unsupported(error)) throw error;
+  console.info('Depth of field unavailable: rendering the scene without it.');
+}
+// After capability recovery, attach a new DOF; the detached instance is disposed.
+```
+
 `DOF` and `Autofocus` detach from their owning scene on disposal, preserving
 same-name effects in other scenes. Use `scene.use()` for a secondary scene:
 

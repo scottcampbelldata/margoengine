@@ -223,8 +223,14 @@ export class PostStack implements EnginePlugin {
     this.host.target = this.host.depthTexture = this.color = this.colorView = undefined;
   }
   onDeviceRestored(): void {
+    if (this.disposed) return;
     this.release();
-    if (this.engine?.gpu) this.requireTier(this.engine.gpu);
+    try {
+      if (this.engine?.gpu) this.requireTier(this.engine.gpu);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
   dispose(): void {
     if (this.disposed) return;
