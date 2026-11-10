@@ -5356,3 +5356,11 @@ device. Its existing stereo/callback/teardown assertions stay intact on both
 backends. The dedicated webgl2-compat/test/xr-browser.mjs separately checks
 installXR's actual XRWebGLLayer bridge against native images. The native-only
 modern-xr fixture deliberately cannot stand in for that compat bridge.
+
+### 5. Batch 265 Instances evidence
+
+React Instances reuses core's existing same-geometry batching and native entity IDs. No engine, kernel, backend or GPU
+maths changes. Real-engine CPU tests inspect per-instance matrices, materials, draw batches and Scene membership.
+The paired browser gate uses the existing CC-BY-4.0 Cesium Box fixture to compare native and React pixels and draw
+counts, plus exact-instance GPU pointer delivery, range suppression and named Scenes on WebGPU and compatibility.
+No wall-clock benchmark or custom-shader instancing parity claim is made.

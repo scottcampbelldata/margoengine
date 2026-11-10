@@ -55,6 +55,7 @@ const expected = {
   './helpers': ['Billboard', 'Bounds', 'Float', 'useBounds'],
   './lines': ['Grid', 'Line'],
   './points': ['Points'],
+  './instances': ['Instance', 'Instances'],
   './lod': ['Detailed'],
   './selection': ['Outline'],
   './splats': ['Splat'],

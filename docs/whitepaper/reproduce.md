@@ -2434,3 +2434,11 @@ one per lane, --wait-max=60 and command-specific hard bounds. The whole voxel
 suite includes GI and debris; no test is removed. The separate native-only
 delay injection gap is not treated as compatibility slow-compiler evidence.
 [Receipt](results/batch-273-array-layer-limits.json).
+
+## Batch 265 job 2: Instances
+
+Build packages, then run npm test --workspace=@margoengine/react. For real rendering run node scripts/gpu-lock.mjs run
+--owner=codex-batch265 --wait-max=60 --max=2 -- node packages/react/scripts/test-instances-browser.mjs,
+then append --compat for the WebGL2 compatibility device. Each leaf has a three-minute outer process-tree deadline.
+Reports: test-results/react-instances.json and react-instances-compat.json. The page uses the unmodified Cesium
+Box.glb standard fixture and its linked licence notice. README: npm run check:readme-run -- --packages=react,margoengine.

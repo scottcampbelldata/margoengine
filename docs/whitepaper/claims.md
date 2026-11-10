@@ -2856,3 +2856,15 @@ synthetic delay injection gap remains in known-bugs; command success does not
 prove that the delay reached the compatibility device. No core/stage runtime,
 scene reduction, image-bound change or timing claim is included.
 [Receipt](results/batch-273-array-layer-limits.json).
+
+## Batch 265 job 2: React Instances
+
+Claim: the optional Instances/Instance entry supplies shared-geometry native instanced draws with independent
+position, rotation, scale, linear material tint and native pointer identity. Proof: packages/react/tests/instances.test.js
+and packages/react/scripts/test-instances-browser.mjs. CPU tests use the real engine and a recording renderer; browser
+proof compares the actual standard Cesium Box against direct native mesh construction. Scene ownership, range and
+StrictMode cleanup are covered. No rival pixel comparison or speed claim.
+
+Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.
+
+Measured evidence: [batch-265-instances.json](results/batch-265-instances.json). All three native/wrapper scenes have exact pixels on both backends and one draw call; GPU pointer delivery names the clicked instance.

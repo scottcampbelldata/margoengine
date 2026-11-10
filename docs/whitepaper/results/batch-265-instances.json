@@ -1,0 +1,146 @@
+{
+  "fixture": "Cesium Box.glb, CC-BY-4.0; packages/procedural/test/fixtures/sdf/NOTICE.md",
+  "native": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "rows": [
+      {
+        "mode": "default",
+        "stats": [
+          {
+            "visible": 2,
+            "drawCalls": 1
+          },
+          {
+            "visible": 2,
+            "drawCalls": 1
+          }
+        ],
+        "pixelsExact": true
+      },
+      {
+        "mode": "range",
+        "stats": [
+          {
+            "visible": 1,
+            "drawCalls": 1
+          },
+          {
+            "visible": 1,
+            "drawCalls": 1
+          }
+        ],
+        "pixelsExact": true
+      },
+      {
+        "mode": "scene",
+        "stats": [
+          {
+            "visible": 2,
+            "drawCalls": 1
+          },
+          {
+            "visible": 2,
+            "drawCalls": 1
+          }
+        ],
+        "pixelsExact": true
+      }
+    ]
+  },
+  "compatibility": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "rows": [
+      {
+        "mode": "default",
+        "stats": [
+          {
+            "visible": 2,
+            "drawCalls": 1
+          },
+          {
+            "visible": 2,
+            "drawCalls": 1
+          }
+        ],
+        "pixelsExact": true
+      },
+      {
+        "mode": "range",
+        "stats": [
+          {
+            "visible": 1,
+            "drawCalls": 1
+          },
+          {
+            "visible": 1,
+            "drawCalls": 1
+          }
+        ],
+        "pixelsExact": true
+      },
+      {
+        "mode": "scene",
+        "stats": [
+          {
+            "visible": 2,
+            "drawCalls": 1
+          },
+          {
+            "visible": 2,
+            "drawCalls": 1
+          }
+        ],
+        "pixelsExact": true
+      }
+    ]
+  },
+  "sizes": [
+    {
+      "specifier": "@margoengine/react/instances",
+      "before": 0,
+      "bytes": 2672,
+      "ceiling": 2928
+    },
+    {
+      "specifier": "margoengine/react/instances",
+      "before": 0,
+      "bytes": 62,
+      "ceiling": 318
+    }
+  ]
+}

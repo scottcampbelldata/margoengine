@@ -1067,3 +1067,37 @@ Unmount detaches the XR helper; picker ownership remains with the caller.
 
 The example uses Cesium's Khronos Box (CC BY 4.0), as recorded in the
 [exporter fixture notice](../exporters/tests/fixtures/NOTICE.md).
+
+## Instances
+
+Import `Instances` and `Instance` from `@margoengine/react/instances` (or `margoengine/react/instances`).
+The geometry child is shared by every instance. Each instance is a native mesh with its own transform, material tint,
+ref, visibility, children and pointer handlers. Native batching issues one draw per shared geometry per scene/pass on
+WebGPU and WebGL2, including the preview renderer. Groups supply relative transforms; providers can nest.
+
+```tsx
+import { Canvas, BoxGeometry, PbrMaterial, Group } from '@margoengine/react';
+import { Instances, Instance } from '@margoengine/react/instances';
+export function InstancedBoxes() {
+  return <Canvas style={{height: 300}} camera={{position: [0, 0, 5]}}>
+    <Instances limit={1000}>
+      <BoxGeometry />
+      <PbrMaterial color="#ffffff" roughness={0.7} />
+      <Instance position={[-1, 0, 0]} rotation={[0, 0.3, 0]} scale={[0.7, 1, 0.7]}
+        color="#ff8040" onClick={event => console.log(event.object)} />
+      <Group position={[1, 0, 0]}><Instance color="#40c080" /></Group>
+    </Instances>
+  </Canvas>;
+}
+```
+
+`limit` defaults to 1000; `range` defaults to all mounted instances. Both are nonnegative safe integers. The first
+`min(limit, range)` mounted instances draw; others keep their live refs and children. Removing an instance closes the
+range gap. Each instance accepts every `Mesh` prop plus `color` (white multiplier by default) and `visible` (true).
+Colours multiply the shared material in linear RGB. Shared material edits remain live. The container accepts Mesh
+props plus optional caller-owned `geometry` and `material` objects instead of children, and its ref is a geometry-free
+native mesh. Use one plain PBR material and one core geometry per provider; richer material and shader attributes use
+the native materials instancing API. Named Scenes and RenderViews preserve scene ownership and pointer identity.
+A shared geometry can merge with other same-geometry meshes in the same scene; the total draw count is still one.
+
+Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.

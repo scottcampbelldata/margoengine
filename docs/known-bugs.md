@@ -4049,3 +4049,12 @@ termination request. The PID was absent on inspection after the run. The browser
 helper's Windows child-exit observation needs a focused reproducer; no timeout
 was raised and no shutdown failure was accepted as a passing gate.
 
+
+### Batch 265 job 2: Instances ownership
+
+The new binding initially applied an explicit material only when its prototype mesh already existed. Child effects
+run before the owning Mesh creation; StrictMode exposed the missing attachment. The material now registers with the
+prototype attachment set and follows each live mesh. Regression: packages/react/tests/instances.test.js, named Scene,
+explicit material and live material edits. Instances is built independently of the remaining texture/priority/adaptive jobs.
+
+Outside batch 265: full verify on parent d34cadf03 plus Instances reached tests/catalog.test.js teardown SHUTDOWN_TIMEOUT at 30,000 ms for Chromium PID 94292 (absent on inspection); the existing Windows child-exit/stdio observation defect recurred. Repro: npm run verify; log retained as test-results/batch265-verify-job2-final.log. No React test failed and no timeout was raised or accepted as passing.

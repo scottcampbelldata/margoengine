@@ -842,6 +842,8 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
       'GameUi',
       'GeometryResource',
       'GizmoHelper',
+      'Instance',
+      'Instances',
       'Glitch',
       'Grid',
       'Group',

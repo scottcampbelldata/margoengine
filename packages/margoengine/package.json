@@ -2366,6 +2366,10 @@
       "types": "./dist/react/xr-pointer.d.ts",
       "import": "./dist/react/xr-pointer.js"
     },
+    "./react/instances": {
+      "types": "./dist/react/instances.d.ts",
+      "import": "./dist/react/instances.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

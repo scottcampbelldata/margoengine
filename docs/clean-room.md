@@ -4981,3 +4981,22 @@ requests, immutable adapter/device limits, refusal and recovery. Native and
 compatibility bevel cases retain layers 256/2047 and all image assertions.
 Only the standards' relevant limit sections and the papers' scopes recorded
 above were read. No companion code or other engine implementation was used.
+
+## Batch 265 job 2: declarative Instances
+
+Research first, 2026-11-10. Compared Francesco Carucci, *Inside Geometry Instancing* (GPU Gems 2, 2005),
+https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-3-inside-geometry-instancing,
+and Bryan Dudash, *Animated Crowd Rendering* (GPU Gems 3, 2007), sections 2.2 and 2.3,
+https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-2-animated-crowd-rendering.
+Carucci separates shared geometry from per-instance transforms and colour; Dudash describes per-instance attribute
+streams and independent colour variation. Combine those contracts with existing native Margo batching, rather than
+add another renderer or upload path. Khronos WebGL Working Group, *WebGL 2.0 Specification* (living standard, 2026),
+https://registry.khronos.org/webgl/specs/latest/2.0/, defines indexed instanced drawing. React team, *useEffect* (2026),
+https://react.dev/reference/react/useEffect, defines commit cleanup and StrictMode replay ownership.
+
+Public behavioural comparison only: pmndrs, *Instances* (2026),
+https://drei.docs.pmnd.rs/performances/instances. The job row covers declarative same-geometry draws, position, rotation,
+scale, colour and pointer events. Tests show those plus groups, children, range/limit changes, nested providers,
+live refs and Scene ownership. Custom shader attributes are outside this job row and no shader API parity is claimed.
+No rival source, companion code or implementation file was read or copied. Existing standard Cesium Box.glb data
+(CC-BY-4.0, 2017) supplies the browser demo, with provenance in packages/procedural/test/fixtures/sdf/NOTICE.md.

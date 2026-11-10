@@ -31,7 +31,8 @@
     "prepack": "npm --prefix ../.. run build:packages",
     "test:browser:extras": "node scripts/test-extras-browser.js",
     "test:browser:tags": "node scripts/test-tags-browser.js",
-    "test:browser:bindings": "node scripts/test-bindings-browser.mjs"
+    "test:browser:bindings": "node scripts/test-bindings-browser.mjs",
+    "test:browser:instances": "node scripts/test-instances-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -194,6 +195,11 @@
       "types": "./dist/xr-pointer.d.ts",
       "react-server": "./dist/rsc/xr-pointer.js",
       "import": "./dist/xr-pointer.js"
+    },
+    "./instances": {
+      "types": "./dist/instances.d.ts",
+      "react-server": "./dist/rsc/instances.js",
+      "import": "./dist/instances.js"
     }
   },
   "files": [

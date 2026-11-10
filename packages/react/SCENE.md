@@ -343,3 +343,6 @@ the base bundle's static dependency graph excludes optional scene subpaths.
 Line: /lines; Points: /points; Outline: /selection; Detailed: /lod; Splat: /splats;
 GizmoHelper: /viewcube; PerspectiveCamera and OrthographicCamera: /cameras.
 See README Native package bindings for peers, defaults, executable examples and the real-capture comparison.
+
+`Instances` and `Instance` share native core geometry through `@margoengine/react/instances`; no additional optional peer.
+Each native Instance ref and pointer target remains independent, including inside named Scenes.

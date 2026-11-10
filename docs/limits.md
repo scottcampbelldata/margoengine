@@ -3397,3 +3397,16 @@ Entry gzip before/after: root 105186/105282, device 105232/105329,
 XR 105035/105139, tiers 104920/105031 bytes. No ceiling increases are needed.
 Core plus stage remains 23950 bytes, below 25000. These are size counts,
 not a timing or whole-package parity claim.
+
+## React Instances (batch 265 job 2)
+
+`@margoengine/react/instances` shares one core geometry, with native per-mesh transforms, PBR tints and picking IDs.
+One native draw per geometry per scene/pass; native culling and transparency rules still apply. Container meshes do
+not draw. `limit` defaults to 1000, `range` to all; drawn count is at most their minimum and mounted count. The engine
+entity limit still applies, including transform-only Groups. Extra mounted instances retain children and refs.
+Supported prototype: core Geometry and PbrMaterial, not an arbitrary custom shader. The wider native materials
+instancing API remains separate. Preview and compatibility backends work. No core/stage change or speed claim.
+
+Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 23,950 B gzip.
+
+Measured evidence: [batch-265-instances.json](whitepaper/results/batch-265-instances.json). All three native/wrapper scenes have exact pixels on both backends and one draw call; GPU pointer delivery names the clicked instance.
