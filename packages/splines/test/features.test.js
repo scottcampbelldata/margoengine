@@ -417,3 +417,44 @@ test('fitSpline follows a noisy circle and a sharp corner, and a looser toleranc
   assert.equal(two.pieces, 1);
   assert.ok(Math.abs(two.spline.length - 3) < 1e-9);
 });
+
+test('closest point is exact at the default samples on a curve with more pieces than samples (batch 132)', () => {
+  // A fitted noisy track: 160+ pieces against the default 256 samples. The old sample-then-bisect search returned
+  // distances up to 14x the fit tolerance here; the true distance of every input point is within the tolerance.
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pts = [];
+  let x = 0,
+    y = 0;
+  for (let i = 0; i < 200; i++) {
+    x += rnd();
+    y += (rnd() - 0.5) * 2;
+    pts.push([x, y, (rnd() - 0.5) * 0.3]);
+  }
+  const fit = fitSpline(pts, { tolerance: 0.05 });
+  assert.ok(fit.pieces > 100);
+  for (const p of pts) {
+    const hit = closestPointOnSpline(fit.spline, p);
+    assert.ok(hit.distance <= 0.05 + 1e-9, `${hit.distance}`);
+    assert.ok(Math.abs(dist3(hit.point, p) - hit.distance) < 1e-12);
+  }
+  // A two-turn helix whose turns pass 0.1 apart, seeded by only 2 samples: the nearer turn still wins.
+  const helix = new Spline(
+    Array.from({ length: 33 }, (_, i) => [Math.cos(i * 0.4), Math.sin(i * 0.4), i * 0.0064]),
+    { kind: 'catmull-rom' },
+  );
+  const scratch = new Float64Array(3);
+  for (const q of [
+    [1.02, 0, 0.0],
+    [0, 1.01, 0.1],
+    [-1, 0, 0.05],
+  ]) {
+    let best = Infinity;
+    for (let i = 0; i <= 200000; i++) best = Math.min(best, dist3(helix.at(i / 200000, scratch), q));
+    const hit = closestPointOnSpline(helix, q, { samples: 2 });
+    // The scan's own error near a 0.0003 distance is about (step / 2)^2 / (2 d), below 1e-5.
+    assert.ok(hit.distance <= best + 1e-12 && hit.distance > best - 1e-5, `${hit.distance} vs ${best}`);
+  }
+  // iterations 0 keeps the nearest sample.
+  assert.equal(closestPointOnSpline(helix, [1, 0, 0], { samples: 4, iterations: 0 }).t % 0.25, 0);
+});

@@ -8903,6 +8903,12 @@ Batch 203 rebase size repair: main's tiled-camera capture and allocation invento
 
 Basic-scene size evidence follows main's full PBR Stage/gltf path (3d7dd74c9). That selected loader emits its declared lazy codec assets, recorded as notFetched; the uncompressed cube fetches no decoder, worker or Wasm. The recorder still requires exactly the page, entry/static dependencies, selected PBR/static dependencies and model, each once, and rejects unrelated optional assets. This is an explicit build-output difference from the legacy loader, preserving the full PBR work and network checks.
 
+
+
+### Batch 181 job 3: GPU ID picking
+
+Optional /pick-gpu is 5953 B min+gzip from 0 B, with a new 6209 B ceiling; existing root/grids ceilings are unchanged. Core plus stage remains 24209 B. One rgba32uint ID texel, one depth32float texel and a 256-byte aligned readback cost 276 descriptor bytes per picker; supported layers add 320-byte uniforms. CPU point/cell uploads use 12/16 bytes per item and must fit maxBufferSize. Each volume's voxel index is u32 (at most 2^32 voxels), x-fastest. The ray traverses the complete clipped box in at most 2048 midpoint samples, using current quality/classification/density and default step-opacity threshold 0.002. Query timeout defaults to 30000 ms, including queue wait. Native WebGPU and full WebGL2 compatibility are covered; native WebGL2 without compatibility rejects before allocation. Custom unsupported layer kinds are excluded. CPU-backed arrays require invalidate after in-place edits. No CPU item projections occur per query; GPU work remains proportional to input geometry. Strict nearest-centre ranking differs from the existing CPU half-pixel tie rule; original triangle cell IDs differ from the CPU height-field nearest-sample ID. First hit is not MIP-peak or perceptual structure picking. Normalized binary16 input precision and f32 voxel-boundary ambiguity remain. See sciviz-pick-gpu.md for complete semantics and independent reference proof. No speed result is claimed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -13877,6 +13883,14 @@ Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with 
 
 - Batch 203 AVIF validation tail: malformed prem item references with no auxiliary alpha, multiple targets or a target other than the actual alpha are ignored rather than rejected. Repro: add such a prem reference to a valid AVIF primary item. Cause: image.rs tests equality with the one alpha ID and treats a mismatch as straight alpha. Valid straight/premultiplied alpha decoding is implemented; strict invalid-reference rejection is a fix-phase item under rule 22.
 
+
+
+### Batch 181 job 3: existing CPU point-depth tie direction
+
+Repro: nearestPoint(identity, [0,0,0.1,0,0,0], 100,100,50,50,8) returns index 1; reversed-Z puts index 0 nearer. Cause: sciviz/src/pick.ts treats projectPoint.depth as reversed, but math/mat4 normalizes it to near=0/far=1. GPU picking uses actual reversed clip depth; strict distance ranking is separately documented. CPU-only tie correction is deferred under build-phase rule 21; it does not block the new ID pass and the existing CPU reference remains unchanged. Regression owed: real perspective camera coincident projected points, plus corrected expected depth convention in the existing CPU fixture.
+
+Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -18178,7 +18192,7 @@ const hit = closestPointOnSpline(curve, [3, 1, 4]);
 // hit.t (0..1), hit.arc (world units along the curve), hit.point, hit.distance
 ```
 
-It samples the curve (`samples`, default the spline's `divisions`), then bisects on the slope of the distance around the best sample. A curve that passes close to itself (a tight spiral) needs `samples` high enough to tell the passes apart. `distanceAt(spline, t)` and `parameterAt(spline, distance)` convert between `t` and arc length.
+The answer is exact for every curve kind, however many pieces the curve has and however close it passes to itself: each cubic piece whose control-point box could hold a nearer point has the stationary points of its squared distance (the roots of a quintic) isolated on its Bernstein form and refined by bisection (`iterations`, default 52). `samples` (default the spline's `divisions`) only seeds the search. Before batch 132 it was a sample-then-bisect search that could miss the nearest pass when a curve had about as many pieces as samples. `distanceAt(spline, t)` and `parameterAt(spline, distance)` convert between `t` and arc length.
 
 ## Stable frames and roll (`@margoengine/splines/frames`)
 
@@ -18208,10 +18222,6 @@ const spline = path.toSpline();        // a Bezier Spline
 const width = path.dataAt(0.7)[0];     // per-knot numbers blended along the curve
 const [a, b] = path.split(2);          // two paths sharing knot 2
 ```
-
-Modes: `auto` (smooth through the knot), `linear` (handles point at the neighbors; a segment between two linear knots is straight) and `broken` (the stored `tangentIn` and `tangentOut`, so a corner can point any way). `insertAt` keeps the shape by turning the new knot and its two neighbors `broken`; pass `false` as the third argument to insert an `auto` knot and let the curve reshape. A closed path builds an open Bezier whose last point is its first.
-
-## Place and deform along a spline (`@margoengine/splines/mesh`)
 
 [README continues: https://margoengine.com/llms/packages/splines.md]
 

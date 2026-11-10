@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15170703,
+  "total": 15171454,
   "history": [
     {
       "date": "2026-10-24",
@@ -7840,6 +7840,12 @@
       "date": "2026-11-10",
       "reason": "Batch 181 job 3: optional GPU ID picking, 0 -> 5953 B gzip, ceiling 6209 B. Points, chart/surface/unstructured cells, classified volume first hits, bounded readback and async hover share one lifecycle. Splitting duplicates query ownership and shaders. Core + stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "ab91b0dda",
+      "reason": "splines/closest exact closest-point search (quintic root isolation per piece), 983 to 1478 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8738,6 +8744,7 @@
     "@margoengine/sciviz/openfoam": 10883,
     "@margoengine/sciviz/parcoords": 9555,
     "@margoengine/sciviz/pdf": 5700,
+    "@margoengine/sciviz/pick-gpu": 6209,
     "@margoengine/sciviz/pipeline": 2086,
     "@margoengine/sciviz/pointcloud": 22723,
     "@margoengine/sciviz/probe": 6844,
@@ -8820,7 +8827,7 @@
     "@margoengine/splats/progressive": 31818,
     "@margoengine/splats/set": 29421,
     "@margoengine/splines": 1853,
-    "@margoengine/splines/closest": 983,
+    "@margoengine/splines/closest": 1734,
     "@margoengine/splines/fit": 3250,
     "@margoengine/splines/frames": 2039,
     "@margoengine/splines/kinds": 3058,
@@ -9251,7 +9258,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sciviz/pick-gpu": 6209
+    "margoengine/web": 577
   }
 }

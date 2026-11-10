@@ -34,7 +34,7 @@ const hit = closestPointOnSpline(curve, [3, 1, 4]);
 // hit.t (0..1), hit.arc (world units along the curve), hit.point, hit.distance
 ```
 
-It samples the curve (`samples`, default the spline's `divisions`), then bisects on the slope of the distance around the best sample. A curve that passes close to itself (a tight spiral) needs `samples` high enough to tell the passes apart. `distanceAt(spline, t)` and `parameterAt(spline, distance)` convert between `t` and arc length.
+The answer is exact for every curve kind, however many pieces the curve has and however close it passes to itself: each cubic piece whose control-point box could hold a nearer point has the stationary points of its squared distance (the roots of a quintic) isolated on its Bernstein form and refined by bisection (`iterations`, default 52). `samples` (default the spline's `divisions`) only seeds the search. Before batch 132 it was a sample-then-bisect search that could miss the nearest pass when a curve had about as many pieces as samples. `distanceAt(spline, t)` and `parameterAt(spline, distance)` convert between `t` and arc length.
 
 ## Stable frames and roll (`@margoengine/splines/frames`)
 
