@@ -307,7 +307,7 @@ class USDAsset {
     readonly meshes: USDMesh[];
     readonly issues: USDIssue[];
     constructor(document: GLTFDocument, buffers: ArrayBufferView[], meshes: USDMesh[], sources: ImageSource[], entries: Map<string, Uint8Array>,
-    issues?: USDIssue[]);
+    issues?: USDIssue[], extensions?: readonly USDExtension[]);
     create(engine: EngineKernel, { signal }?: {
         signal?: AbortSignal;
     }): Promise<PBRModel>;

@@ -2216,6 +2216,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 ## 5. Current evidence gaps
 
 Batch 231 surface placement adds CPU world-area and inverse-transpose normal preparation only; renderer and core/stage math are unchanged. Surface CPU tests prove deterministic/paint-weighted placement on nonuniform meshes and cliffs/undersides. The real Teapot/plant GPU comparison checks normal-aligned matrices against independent model roots on WebGPU and compatibility at 1x/4x MSAA, with mean channel error below 0.00005.
+Batch 206 curves: CPU basis/cardinality/width tests plus direct and worker GPU creation on WebGPU and compatibility exercise optional Lines/Points ownership and teardown. Existing Lines Stroke supplies per-point widths. World diameters use maximum transform-axis length under anisotropic scale; no elliptical cross sections are claimed. See docs/limits.md.
+
 
 Batch 232 lunar GPU maths: `scenery/moon` uses ray/sphere intersection at the far
 plane with read-only reversed-Z depth, sRGB texture decoding, world-space lunar

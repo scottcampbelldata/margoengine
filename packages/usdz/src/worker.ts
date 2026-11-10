@@ -4,6 +4,20 @@ import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/work
 import { fetchBytes, type BinaryInput } from '@margoengine/loaders/common';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import type { USDExtension, USDOptions } from './index.js';
+import type { ExtensionHooks } from './extension.js';
+
+async function finish(engine: EngineKernel, prepared: PreparedGLTF, options: USDOptions): Promise<PBRModel> {
+  const model = modelFromPrepared(engine, prepared, options.signal);
+  try {
+    for (const extension of (options.extensions ?? []) as readonly ExtensionHooks[])
+      await extension.created?.(engine, model);
+    options.signal?.throwIfAborted();
+    return model;
+  } catch (error) {
+    model.destroy();
+    throw error;
+  }
+}
 // The main-thread fallback loads the parser lazily, so the worker entry stays small.
 const workerURL = () => new URL(/* @vite-ignore */ './workers/usdz.js?no-inline', import.meta.url);
 // Extensions cross to the worker as their name and plain options; the worker makes its own copy of each.
@@ -27,7 +41,7 @@ export async function parseUSDInWorker(
     { input: movable(input), options: job(options) },
     options.signal,
   );
-  return modelFromPrepared(engine, prepared, options.signal);
+  return finish(engine, prepared, options);
 }
 /** loadUSDZ with the download, parsing and texture decoding in a worker; same model as loadUSDZ. A custom `fetch` downloads here and parses in the worker. */
 export async function loadUSDZInWorker(
@@ -51,5 +65,5 @@ export async function loadUSDZInWorker(
     { url: new URL(url, globalThis.location.href).href, options: job(options) },
     options.signal,
   );
-  return modelFromPrepared(engine, prepared, options.signal);
+  return finish(engine, prepared, options);
 }

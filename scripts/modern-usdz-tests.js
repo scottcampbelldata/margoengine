@@ -54,20 +54,89 @@ def PointInstancer "Scatter" {
     }
   });
   assert.deepEqual(scatter, { sharedMeshes: 1, instances: 2, changed: true });
+  const curvesResult = await page.evaluate(async () => {
+    const { Engine } = await import('/packages/core/dist/index.js');
+    const { parseUSDA } = await import('/packages/usdz/dist/index.js');
+    const { curves } = await import('/packages/usdz/dist/curves.js');
+    const { engineRuntime } = await import('/packages/core/dist/extension.js');
+    const { parseUSDInWorker } = await import('/packages/usdz/dist/worker.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [0, 0, 5], target: [0, 0, 0] },
+    });
+    const text =
+      '#usda 1.0\n(metersPerUnit=1 upAxis="Y")\ndef BasisCurves "C" { token type="linear" int[] curveVertexCounts=[2] point3f[] points=[(-1,0,0),(1,0,0)] float[] widths=[0.1,0.6] color3f[] primvars:displayColor=[(1,0,0)] } def Points "P" { point3f[] points=[(0,1,0)] float[] widths=[0.5] color3f[] primvars:displayColor=[(0,1,0)] }';
+    try {
+      const outcomes = [];
+      for (const worker of [false, true]) {
+        const options = { extensions: [curves()] };
+        const model = worker
+          ? await parseUSDInWorker(engine, text, options)
+          : await parseUSDA(text, options).create(engine);
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        const image = canvas.toDataURL();
+        const lines = engine.plugins.get('usd-curves-lines-0'),
+          points = engine.plugins.get('usd-curves-points-0');
+        outcomes.push({
+          lines: lines.lines.size,
+          widths: Array.from([...lines.lines][0].widths),
+          clouds: !!points,
+        });
+        model.destroy();
+        engine.render({ culling: false });
+        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+        outcomes[outcomes.length - 1].changed = image !== canvas.toDataURL();
+        outcomes[outcomes.length - 1].disposed =
+          !engine.plugins.has('usd-curves-lines-0') && !engine.plugins.has('usd-curves-points-0');
+      }
+      return outcomes;
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  });
+  for (const result of curvesResult) {
+    assert.equal(result.lines, 1);
+    assert.equal(result.clouds, true);
+    assert.equal(result.changed, true);
+    assert.equal(result.disposed, true);
+    assert.ok(Math.abs(result.widths[0] - 0.1) < 1e-6 && Math.abs(result.widths[1] - 0.6) < 1e-6);
+  }
   const shapes = await page.evaluate(async () => {
     const { Engine } = await import('/packages/core/dist/index.js');
     const { parseUSDA } = await import('/packages/usdz/dist/index.js');
     const { implicitShapes } = await import('/packages/usdz/dist/shapes.js');
-    const canvas = document.createElement('canvas');canvas.width=canvas.height=128;document.body.append(canvas);
-    const engine = await Engine.create(canvas,{backend:'webgpu',camera:{position:[7,5,10],target:[0,0,0]}});
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [7, 5, 10], target: [0, 0, 0] },
+    });
     try {
-      const body = ['Cube','Sphere','Cylinder','Capsule','Cone'].map((type,i)=>`def ${type} "S${i}" { double3 xformOp:translate = (${(i-2)*2.5},0,0) uniform token[] xformOpOrder = ["xformOp:translate"] }`).join('\n');
-      const asset = parseUSDA('#usda 1.0\n(metersPerUnit=1 upAxis="Y")\n'+body,{extensions:[implicitShapes()]});
-      const model=await asset.create(engine);engine.render({culling:false});const image=canvas.toDataURL();model.destroy();engine.render({culling:false});
-      return {count:asset.meshes.length,changed:image!==canvas.toDataURL()};
-    } finally {engine.dispose();canvas.remove();}
+      const body = ['Cube', 'Sphere', 'Cylinder', 'Capsule', 'Cone']
+        .map(
+          (type, i) =>
+            `def ${type} "S${i}" { double3 xformOp:translate = (${(i - 2) * 2.5},0,0) uniform token[] xformOpOrder = ["xformOp:translate"] }`,
+        )
+        .join('\n');
+      const asset = parseUSDA('#usda 1.0\n(metersPerUnit=1 upAxis="Y")\n' + body, { extensions: [implicitShapes()] });
+      const model = await asset.create(engine);
+      engine.render({ culling: false });
+      const image = canvas.toDataURL();
+      model.destroy();
+      engine.render({ culling: false });
+      return { count: asset.meshes.length, changed: image !== canvas.toDataURL() };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
   });
-  assert.deepEqual(shapes,{count:5,changed:true});
+  assert.deepEqual(shapes, { count: 5, changed: true });
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Sample loaded'));
   const result = await page.evaluate(async (data) => {
     const { Engine } = await import('/packages/core/dist/index.js'),
@@ -184,46 +253,49 @@ def PointInstancer "Scatter" {
   await page.locator('input[type=file]').setInputFiles('test-results/usdz-textured.usdz');
   await page.waitForFunction(() => document.querySelector('#status').textContent === 'Loaded 1 meshes');
   // A real rigged file: its clip plays on the GPU, so two moments of it draw differently.
-  const rigged = await page.evaluate(async (data) => {
-    const { Engine } = await import('/packages/core/dist/index.js'),
-      { engineRuntime } = await import('/packages/core/dist/extension.js'),
-      { parseUSDZ } = await import('/packages/usdz/dist/index.js'),
-      { composition } = await import('/packages/usdz/dist/compose.js'),
-      { skeletons } = await import('/packages/usdz/dist/skel.js'),
-      { Animation } = await import('/packages/animation/dist/index.js');
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 256;
-    canvas.style.cssText = 'width:256px;height:256px';
-    document.body.append(canvas);
-    const engine = await Engine.create(canvas, {
-        backend: 'webgpu',
-        capacity: 64,
-        camera: { position: [0, 0.8, 3.5], target: [0, 0.7, 0] },
-      }),
-      gpuErrors = [];
-    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
-    try {
-      const asset = await parseUSDZ(new Uint8Array(data), { extensions: [composition(), skeletons()] }),
-        model = await asset.create(engine),
-        animation = Animation.attach(model);
-      animation.play(asset.document.animations[0].name);
-      const frame = async (time) => {
-        animation.seek(time);
-        engine.render({ culling: false });
-        await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
-        return canvas.toDataURL();
-      };
-      const first = await frame(0),
-        later = await frame(0.7),
-        again = await frame(0);
-      animation.dispose?.();
-      model.destroy();
-      return { moved: first !== later, repeats: first === again, gpuErrors };
-    } finally {
-      engine.dispose();
-      canvas.remove();
-    }
-  }, Array.from(await readFile('packages/usdz/tests/fixtures/real/rigged/RiggedFigure.usdz')));
+  const rigged = await page.evaluate(
+    async (data) => {
+      const { Engine } = await import('/packages/core/dist/index.js'),
+        { engineRuntime } = await import('/packages/core/dist/extension.js'),
+        { parseUSDZ } = await import('/packages/usdz/dist/index.js'),
+        { composition } = await import('/packages/usdz/dist/compose.js'),
+        { skeletons } = await import('/packages/usdz/dist/skel.js'),
+        { Animation } = await import('/packages/animation/dist/index.js');
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 256;
+      canvas.style.cssText = 'width:256px;height:256px';
+      document.body.append(canvas);
+      const engine = await Engine.create(canvas, {
+          backend: 'webgpu',
+          capacity: 64,
+          camera: { position: [0, 0.8, 3.5], target: [0, 0.7, 0] },
+        }),
+        gpuErrors = [];
+      engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+      try {
+        const asset = await parseUSDZ(new Uint8Array(data), { extensions: [composition(), skeletons()] }),
+          model = await asset.create(engine),
+          animation = Animation.attach(model);
+        animation.play(asset.document.animations[0].name);
+        const frame = async (time) => {
+          animation.seek(time);
+          engine.render({ culling: false });
+          await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+          return canvas.toDataURL();
+        };
+        const first = await frame(0),
+          later = await frame(0.7),
+          again = await frame(0);
+        animation.dispose?.();
+        model.destroy();
+        return { moved: first !== later, repeats: first === again, gpuErrors };
+      } finally {
+        engine.dispose();
+        canvas.remove();
+      }
+    },
+    Array.from(await readFile('packages/usdz/tests/fixtures/real/rigged/RiggedFigure.usdz')),
+  );
   assert.deepEqual(rigged, { moved: true, repeats: true, gpuErrors: [] });
   // A real animated file moves on the GPU, and a stand-in stage's late prim appears through its pointer channel.
   const played = await page.evaluate(
@@ -261,7 +333,10 @@ def PointInstancer "Scatter" {
         return { frames, warnings };
       };
       try {
-        const real = await run(await parseUSDZ(new Uint8Array(box), { extensions: [composition(), animation()] }), [0, 1.2]),
+        const real = await run(
+            await parseUSDZ(new Uint8Array(box), { extensions: [composition(), animation()] }),
+            [0, 1.2],
+          ),
           // Without the moving parent the late mesh is the only change between these two moments.
           late = await run(
             await parseUSDFiles('late.usda', () => new TextEncoder().encode(stage), { extensions: [animation()] }),
@@ -299,73 +374,91 @@ def Mesh "Late"
   );
   assert.deepEqual(played, { moved: true, appears: true, leaves: true, warnings: [], gpuErrors: [] });
   // A real subdivided mesh draws refined on the GPU, and refining changes what it draws.
-  const refined = await page.evaluate(async (stage) => {
-    const { Engine } = await import('/packages/core/dist/index.js'),
-      { engineRuntime } = await import('/packages/core/dist/extension.js'),
-      { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
-      { subdivision } = await import('/packages/usdz/dist/subdiv.js');
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 256;
-    canvas.style.cssText = 'width:256px;height:256px';
-    document.body.append(canvas);
-    const engine = await Engine.create(canvas, {
-        backend: 'webgpu',
-        capacity: 64,
-        camera: { position: [3, 3, 4], target: [0, 0, 0] },
-      }),
-      gpuErrors = [];
-    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
-    const frame = async (extensions) => {
-      const asset = await parseUSDFiles('stage.usda', () => new TextEncoder().encode(stage.replace('metersPerUnit = 0.01', 'metersPerUnit = 1')), { extensions }),
-        model = await asset.create(engine);
-      engine.render({ culling: false });
-      const image = canvas.toDataURL();
-      model.destroy();
-      return image;
-    };
-    try {
-      const cage = await frame([]),
-        smooth = await frame([subdivision({ level: 3 })]);
-      return { differs: cage !== smooth, gpuErrors };
-    } finally {
-      engine.dispose();
-      canvas.remove();
-    }
-  }, await readFile('packages/usdz/tests/fixtures/real/usd-wg/test_assets/schemaTests/usdGeom/meshes/subdiv_catmullClark/subdiv_catmullClark.usda', 'utf8'));
+  const refined = await page.evaluate(
+    async (stage) => {
+      const { Engine } = await import('/packages/core/dist/index.js'),
+        { engineRuntime } = await import('/packages/core/dist/extension.js'),
+        { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
+        { subdivision } = await import('/packages/usdz/dist/subdiv.js');
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 256;
+      canvas.style.cssText = 'width:256px;height:256px';
+      document.body.append(canvas);
+      const engine = await Engine.create(canvas, {
+          backend: 'webgpu',
+          capacity: 64,
+          camera: { position: [3, 3, 4], target: [0, 0, 0] },
+        }),
+        gpuErrors = [];
+      engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+      const frame = async (extensions) => {
+        const asset = await parseUSDFiles(
+            'stage.usda',
+            () => new TextEncoder().encode(stage.replace('metersPerUnit = 0.01', 'metersPerUnit = 1')),
+            { extensions },
+          ),
+          model = await asset.create(engine);
+        engine.render({ culling: false });
+        const image = canvas.toDataURL();
+        model.destroy();
+        return image;
+      };
+      try {
+        const cage = await frame([]),
+          smooth = await frame([subdivision({ level: 3 })]);
+        return { differs: cage !== smooth, gpuErrors };
+      } finally {
+        engine.dispose();
+        canvas.remove();
+      }
+    },
+    await readFile(
+      'packages/usdz/tests/fixtures/real/usd-wg/test_assets/schemaTests/usdGeom/meshes/subdiv_catmullClark/subdiv_catmullClark.usda',
+      'utf8',
+    ),
+  );
   assert.deepEqual(refined, { differs: true, gpuErrors: [] });
   // A lit stage draws lit: its sun moves the engine's light, its camera moves the view, and both change the picture.
-  const lit = await page.evaluate(async (stage) => {
-    const { Engine } = await import('/packages/core/dist/index.js'),
-      { engineRuntime } = await import('/packages/core/dist/extension.js'),
-      { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
-      { lights } = await import('/packages/usdz/dist/lux.js'),
-      { applyGLTFLights, viewGLTFCamera } = await import('/packages/gltf-pro/dist/index.js');
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 256;
-    canvas.style.cssText = 'width:256px;height:256px';
-    document.body.append(canvas);
-    const engine = await Engine.create(canvas, { backend: 'webgpu', capacity: 64, camera: { position: [1.5, 1.5, 3], target: [0, 0, 0] } }),
-      gpuErrors = [];
-    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
-    try {
-      const asset = await parseUSDFiles('stage.usda', () => new TextEncoder().encode(stage), { extensions: [lights()] }),
-        model = await asset.create(engine),
-        frame = () => {
-          engine.render({ culling: false });
-          return canvas.toDataURL();
-        },
-        plain = frame();
-      applyGLTFLights(model);
-      const sunlit = frame();
-      viewGLTFCamera(model, 0);
-      const seen = frame();
-      model.destroy();
-      return { sun: plain !== sunlit, camera: sunlit !== seen, gpuErrors };
-    } finally {
-      engine.dispose();
-      canvas.remove();
-    }
-  }, `#usda 1.0
+  const lit = await page.evaluate(
+    async (stage) => {
+      const { Engine } = await import('/packages/core/dist/index.js'),
+        { engineRuntime } = await import('/packages/core/dist/extension.js'),
+        { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
+        { lights } = await import('/packages/usdz/dist/lux.js'),
+        { applyGLTFLights, viewGLTFCamera } = await import('/packages/gltf-pro/dist/index.js');
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 256;
+      canvas.style.cssText = 'width:256px;height:256px';
+      document.body.append(canvas);
+      const engine = await Engine.create(canvas, {
+          backend: 'webgpu',
+          capacity: 64,
+          camera: { position: [1.5, 1.5, 3], target: [0, 0, 0] },
+        }),
+        gpuErrors = [];
+      engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+      try {
+        const asset = await parseUSDFiles('stage.usda', () => new TextEncoder().encode(stage), {
+            extensions: [lights()],
+          }),
+          model = await asset.create(engine),
+          frame = () => {
+            engine.render({ culling: false });
+            return canvas.toDataURL();
+          },
+          plain = frame();
+        applyGLTFLights(model);
+        const sunlit = frame();
+        viewGLTFCamera(model, 0);
+        const seen = frame();
+        model.destroy();
+        return { sun: plain !== sunlit, camera: sunlit !== seen, gpuErrors };
+      } finally {
+        engine.dispose();
+        canvas.remove();
+      }
+    },
+    `#usda 1.0
 (
     metersPerUnit = 1
     upAxis = "Y"
@@ -387,7 +480,8 @@ def Camera "Shot"
 {
     double3 xformOp:translate = (0.5, 0, 4)
     uniform token[] xformOpOrder = ["xformOp:translate"]
-}`);
+}`,
+  );
   assert.deepEqual(lit, { sun: true, camera: true, gpuErrors: [] });
   // Every material of the real .mtlx files compiles as a node material on the GPU, and changes the picture. Their images
   // are not stored here, so one small picture stands in for each.
@@ -410,7 +504,11 @@ def Camera "Shot"
     canvas.width = canvas.height = 128;
     canvas.style.cssText = 'width:128px;height:128px';
     document.body.append(canvas);
-    const engine = await Engine.create(canvas, { backend: 'webgpu', capacity: 64, camera: { position: [0, 0, 3], target: [0, 0, 0] } }),
+    const engine = await Engine.create(canvas, {
+        backend: 'webgpu',
+        capacity: 64,
+        camera: { position: [0, 0, 3], target: [0, 0, 0] },
+      }),
       gpu = engineRuntime(engine).gpu,
       gpuErrors = [];
     gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
@@ -419,7 +517,11 @@ def Camera "Shot"
     brush.fillStyle = 'rgb(128, 128, 128)';
     brush.fillRect(0, 0, 2, 2);
     const png = new Uint8Array(await (await paint.convertToBlob({ type: 'image/png' })).arrayBuffer()),
-      map = gpu.createTexture({ size: [2, 2], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+      map = gpu.createTexture({
+        size: [2, 2],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
     gpu.queue.writeTexture({ texture: map }, new Uint8Array(16).fill(200), { bytesPerRow: 8 }, [2, 2]);
     const stage = (file, material) => `#usda 1.0
 (
@@ -444,7 +546,12 @@ def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
     try {
       for (const { name, text } of documents)
         for (const [, material] of text.matchAll(/<surfacematerial\s+name="([^"]+)"/g)) {
-          const reader = (id) => (id === 'stage.usda' ? new TextEncoder().encode(stage(name, material)) : id.endsWith('.mtlx') ? new TextEncoder().encode(text) : png),
+          const reader = (id) =>
+              id === 'stage.usda'
+                ? new TextEncoder().encode(stage(name, material))
+                : id.endsWith('.mtlx')
+                  ? new TextEncoder().encode(text)
+                  : png,
             asset = await parseUSDFiles('stage.usda', reader, { extensions: [materialX()] }),
             model = await asset.create(engine),
             frame = () => {
@@ -453,7 +560,9 @@ def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
             };
           try {
             const before = frame(),
-              network = await materialGraph(asset, '/MaterialX/Materials/' + material, { texture: () => ({ view: map.createView() }) });
+              network = await materialGraph(asset, '/MaterialX/Materials/' + material, {
+                texture: () => ({ view: map.createView() }),
+              });
             if (!network) throw new Error('no network');
             for (const item of network.skipped) skipped.push(item.input);
             using installed = installNodeMaterial(model, network.graph);
@@ -514,7 +623,10 @@ def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
   assert.deepEqual(networks.gpuErrors, []);
   assert.equal(networks.encodedValue, 188);
   // surface_unlit has no node material yet (docs/limits.md); it still opens as an unlit glTF material.
-  assert.deepEqual(networks.refused.map((line) => line.split(': ').at(-1)), ['surface shader surface_unlit is not converted']);
+  assert.deepEqual(
+    networks.refused.map((line) => line.split(': ').at(-1)),
+    ['surface shader surface_unlit is not converted'],
+  );
   assert.equal(networks.compiled, 30);
   // A network of constants may draw as its PBR material does; one with images must not.
   assert.deepEqual(networks.unchanged, []);

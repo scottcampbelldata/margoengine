@@ -10,7 +10,15 @@ import {
 } from '@margoengine/loaders/common';
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs, type TimeSamples } from './crate.js';
-import type { ExtensionHooks, ForeignLayer, SceneMesh, USDExtension, USDImage, USDImagePlacement, USDIssue } from './extension.js';
+import type {
+  ExtensionHooks,
+  ForeignLayer,
+  SceneMesh,
+  USDExtension,
+  USDImage,
+  USDImagePlacement,
+  USDIssue,
+} from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 import { LinearToSRGB } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
@@ -242,7 +250,9 @@ function parseLayer(
     if (!text.startsWith('#usda 1.0')) fail('expected USDA or USDC');
     // readUSDA composes internal references (`references = </Path>`), so only those pass.
     if (
-      /\b(?:references(?!\s*=\s*<)|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(text)
+      /\b(?:references(?!\s*=\s*<)|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(
+        text,
+      )
     )
       fail('composition and animation are unsupported');
     specs = asciiSpecs(text, limits.maxDepth, options.signal);
@@ -313,13 +323,22 @@ function opMatrix(kind: string, value: unknown): number[] {
 /** An affine matrix's inverse; an op that cannot be inverted is the identity's, as nothing can be undone. */
 function invert(m: number[]): number[] {
   const [a, b, c, , d, e, f, , g, h, i] = m,
-    co = [e * i - f * h, c * h - b * i, b * f - c * e, f * g - d * i, a * i - c * g, c * d - a * f, d * h - e * g, b * g - a * h, a * e - b * d],
+    co = [
+      e * i - f * h,
+      c * h - b * i,
+      b * f - c * e,
+      f * g - d * i,
+      a * i - c * g,
+      c * d - a * f,
+      d * h - e * g,
+      b * g - a * h,
+      a * e - b * d,
+    ],
     det = a * co[0] + b * co[3] + c * co[6];
   if (!det) fail('singular transform');
   const out = identity();
   for (let col = 0; col < 3; col++) for (let row = 0; row < 3; row++) out[col * 4 + row] = co[col * 3 + row] / det;
-  for (let row = 0; row < 3; row++)
-    out[12 + row] = -(out[row] * m[12] + out[4 + row] * m[13] + out[8 + row] * m[14]);
+  for (let row = 0; row < 3; row++) out[12 + row] = -(out[row] * m[12] + out[4 + row] * m[13] + out[8 + row] * m[14]);
   return out;
 }
 /** The token of `xformOpOrder` that stops a prim inheriting its parent's transform. */
@@ -369,13 +388,22 @@ export class USDAsset {
     private readonly entries: Map<string, Uint8Array>,
     /** What the import had to leave out, such as a layer it could not open. Empty for a clean file. */
     readonly issues: USDIssue[] = [],
+    private readonly extensions: readonly USDExtension[] = [],
   ) {}
   /** Attaches the scene to `engine` as a PBR model; texture ownership passes to the model. Pass `signal` to cancel texture decoding. */
   async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<PBRModel> {
     const images = await this.images({ signal });
     try {
       signal?.throwIfAborted();
-      return parseGLTF(engine, this.document, this.buffers, images);
+      const model = parseGLTF(engine, this.document, this.buffers, images);
+      try {
+        for (const extension of this.extensions as readonly ExtensionHooks[]) await extension.created?.(engine, model);
+        signal?.throwIfAborted();
+        return model;
+      } catch (error) {
+        model.destroy();
+        throw error;
+      }
     } catch (error) {
       for (const image of images) image.close();
       throw error;
@@ -393,7 +421,8 @@ export class USDAsset {
     try {
       for (const source of this.sources) {
         signal?.throwIfAborted();
-        if (source.path) images.push(source.linearColor ? await encoded(await decode(source.path)) : await decode(source.path));
+        if (source.path)
+          images.push(source.linearColor ? await encoded(await decode(source.path)) : await decode(source.path));
         else {
           const rough = source.roughness ? await decode(source.roughness.path) : undefined;
           let metal: ImageBitmap | undefined;
@@ -603,7 +632,8 @@ function asset(
   /** The primvar a texture reads, through its UsdTransform2d when it has one. */
   const uvPrimvar = (shader: string): string | undefined => {
     let node = connection(shader, 'inputs:st')?.split('.outputs:')[0];
-    if (node && attrs(node, 'info:id') === 'UsdTransform2d') node = connection(node, 'inputs:in')?.split('.outputs:')[0];
+    if (node && attrs(node, 'info:id') === 'UsdTransform2d')
+      node = connection(node, 'inputs:in')?.split('.outputs:')[0];
     const name = node && input(node, 'inputs:varname');
     return typeof name === 'string' ? name : undefined;
   };
@@ -630,7 +660,9 @@ function asset(
         soft,
       });
       if (made) {
-        const id = doc.materials.push(made.network ? { ...made.material, extras: { materialX: made.network } } : made.material) - 1;
+        const id =
+          doc.materials.push(made.network ? { ...made.material, extras: { materialX: made.network } } : made.material) -
+          1;
         materialIds.set(binding, id);
         displays.set(id, { uv: made.uv });
         return id;
@@ -657,7 +689,11 @@ function asset(
       roughness = factor(shader ? (input(shader, 'inputs:roughness') ?? 0.5) : 0.5),
       metallic = factor(shader ? (input(shader, 'inputs:metallic') ?? 0) : 0),
       threshold = factor(shader ? (input(shader, 'inputs:opacityThreshold') ?? 0) : 0),
-      color = shader ? display(shader, 'inputs:diffuseColor', 'displayColor', 3) : painted ? [0.5, 0.5, 0.5] : undefined,
+      color = shader
+        ? display(shader, 'inputs:diffuseColor', 'displayColor', 3)
+        : painted
+          ? [0.5, 0.5, 0.5]
+          : undefined,
       vertexOpacity = shader ? display(shader, 'inputs:opacity', 'displayOpacity', 1) : undefined;
     const p: NonNullable<GLTFMaterial['pbrMetallicRoughness']> = {
         baseColorFactor: [factor(rgb[0]), factor(rgb[1]), factor(rgb[2]), opacity],
@@ -713,7 +749,11 @@ function asset(
     const id = doc.materials.length;
     doc.materials.push(definition);
     materialIds.set(key, id);
-    const mapped = shader && ['inputs:diffuseColor', 'inputs:normal', 'inputs:roughness', 'inputs:metallic'].map((name) => connection(shader!, name)?.split('.outputs:')[0]).find((node) => node && attrs(node, 'info:id') === 'UsdUVTexture');
+    const mapped =
+      shader &&
+      ['inputs:diffuseColor', 'inputs:normal', 'inputs:roughness', 'inputs:metallic']
+        .map((name) => connection(shader!, name)?.split('.outputs:')[0])
+        .find((node) => node && attrs(node, 'info:id') === 'UsdUVTexture');
     displays.set(id, { color, opacity: vertexOpacity, uv: mapped ? uvPrimvar(mapped) : undefined });
     return id;
   }
@@ -726,7 +766,14 @@ function asset(
     const index = doc.accessors.length;
     doc.accessors.push({
       bufferView: view,
-      componentType: data instanceof Uint32Array ? 5125 : data instanceof Uint16Array ? 5123 : data instanceof Uint8Array ? 5121 : 5126,
+      componentType:
+        data instanceof Uint32Array
+          ? 5125
+          : data instanceof Uint16Array
+            ? 5123
+            : data instanceof Uint8Array
+              ? 5121
+              : 5126,
       count: data.length / (type === 'MAT4' ? 16 : type === 'VEC4' ? 4 : type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1),
       type,
     });
@@ -785,7 +832,9 @@ function asset(
     /** True for a prim an extension will show after its first sample. */
     shownLater = (path: string) =>
       scenes.some((hook) => hook.showsLater) &&
-      (specs[path + '.visibility']?.fields.timeSamples as TimeSamples | undefined)?.values.some((v) => v !== 'invisible');
+      (specs[path + '.visibility']?.fields.timeSamples as TimeSamples | undefined)?.values.some(
+        (v) => v !== 'invisible',
+      );
   let totalVertices = 0,
     totalTriangles = 0,
     polygonWork = 0;
@@ -865,20 +914,32 @@ function asset(
       if (totalVertices > limits.maxVertices || totalTriangles > limits.maxTriangles) fail('geometry exceeds limit');
       /** A stream of the authored mesh, as one value per corner of the new faces. */
       const reshaped = (stream: ArrayLike<number>, width: number, property: string, indices?: ArrayLike<number>) =>
-        shape!.corners(stream, width, indices, specs[path + '.' + property]?.fields.interpolation as string | undefined);
+        shape!.corners(
+          stream,
+          width,
+          indices,
+          specs[path + '.' + property]?.fields.interpolation as string | undefined,
+        );
       // A normals primvar beats the normals attribute. What is not a list of vectors is no normals at all.
       const normalName = specs[path + '.primvars:normals'] ? 'primvars:normals' : 'normals',
         normalAttribute = attrs(path, normalName),
-        normalValue = composed && !normalList(normalAttribute, specs[path + '.' + normalName]?.fields.typeName) ? undefined : normalAttribute,
+        normalValue =
+          composed && !normalList(normalAttribute, specs[path + '.' + normalName]?.fields.typeName)
+            ? undefined
+            : normalAttribute,
         authoredNormalIndices = attrs(path, normalName + ':indices') as ArrayLike<number> | undefined,
         normalIndices = shape ? undefined : authoredNormalIndices,
         materialId = material(path),
         reads = displays.get(materialId)!,
-        uvName = [reads.uv, 'st', 'UVMap', 'uv', 'st0', 'st_0', 'map1'].find((name) => name && specs[path + '.primvars:' + name]),
+        uvName = [reads.uv, 'st', 'UVMap', 'uv', 'st0', 'st_0', 'map1'].find(
+          (name) => name && specs[path + '.primvars:' + name],
+        ),
         uvValue = uvName ? attrs(path, 'primvars:' + uvName) : undefined,
         authoredNormal = normalValue === undefined ? undefined : numeric(normalValue),
         // A subdivided mesh has normals of its own, as the schema says.
-        normal = shape?.normals ?? (shape && authoredNormal ? reshaped(authoredNormal, 3, normalName, authoredNormalIndices) : authoredNormal),
+        normal =
+          shape?.normals ??
+          (shape && authoredNormal ? reshaped(authoredNormal, 3, normalName, authoredNormalIndices) : authoredNormal),
         uvProperty = 'primvars:' + uvName,
         authoredUV = uvValue === undefined ? undefined : numeric(uvValue),
         authoredUVIndices = attrs(path, uvProperty + ':indices') as ArrayLike<number> | undefined,
@@ -894,7 +955,9 @@ function asset(
         shaped = (stream: DisplayStream, width: number, property: string): DisplayStream =>
           shape ? { values: reshaped(stream.values, width, property, stream.indices) } : stream,
         tint = reads.color && shaped(displayStream(path, 'displayColor', reads.color, 3), 3, 'primvars:displayColor'),
-        fade = reads.opacity && shaped(displayStream(path, 'displayOpacity', reads.opacity, 1), 1, 'primvars:displayOpacity');
+        fade =
+          reads.opacity &&
+          shaped(displayStream(path, 'displayOpacity', reads.opacity, 1), 1, 'primvars:displayOpacity');
       const sample = (
         stream: ArrayLike<number>,
         width: number,
@@ -1064,8 +1127,12 @@ function asset(
         ...(subsets.length ? { subsets } : {}),
       });
     }
-  for (const hook of scenes)
-    hook.scene!({
+  for (const run of [
+    ...hooks(options).flatMap((hook) => (hook.geometry ? [hook.geometry.bind(hook)] : [])),
+    ...scenes.map((hook) => hook.scene!.bind(hook)),
+  ])
+    run({
+      maxVertices: limits.maxVertices,
       specs,
       document: doc,
       nodes: nodeIds,
@@ -1083,11 +1150,19 @@ function asset(
     for (const name of [source.path, source.roughness?.path, source.metallic?.path])
       if (name && !entries.has(name)) fail('missing texture ' + name);
   // A stage of cameras or lights alone is something to open; the entries that read them have run by now.
-  if (!meshes.length && !doc.nodes.some((node) => node.camera !== undefined || node.extensions?.KHR_lights_punctual))
+  if (
+    !doc.meshes.length &&
+    !doc.nodes.some((node) => node.camera !== undefined || node.extensions?.KHR_lights_punctual)
+  )
     fail('no renderable meshes');
-  return new USDAsset(doc, buffers, meshes, sources, entries, issues);
+  return new USDAsset(doc, buffers, meshes, sources, entries, issues, hooks(options));
 }
-function read(input: string | BinaryInput, entries: Map<string, Uint8Array>, id: string, options: USDOptions): USDAsset {
+function read(
+  input: string | BinaryInput,
+  entries: Map<string, Uint8Array>,
+  id: string,
+  options: USDOptions,
+): USDAsset {
   const issues: USDIssue[] = [],
     specs = parseLayer(input, options, id, entries, issues);
   return asset(specs, entries, hooks(options).some((hook) => hook.compose) ? undefined : id, options, issues);

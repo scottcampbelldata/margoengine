@@ -1,5 +1,7 @@
 import type { GLTFDocument, GLTFMaterial } from '../../shared/gltf.js';
 import type { Specs } from './crate.js';
+import type { EngineKernel } from '@margoengine/core';
+import type { PBRModel } from '@margoengine/gltf-pro/model';
 
 /**
  * An optional part of the USD import, from an entry of this package, passed in `USDOptions.extensions`. It stays out of
@@ -55,9 +57,18 @@ export interface MeshShape {
   /** A stream per authored point, per new point. Absent when the points did not change. */
   spread?(stream: ArrayLike<number>, width: number): Float32Array;
   /** Joint influences per authored point, per new point, `width` to a point. */
-  influences?(joints: Uint16Array, weights: Float32Array, width: number): { joints: Uint16Array; weights: Float32Array };
+  influences?(
+    joints: Uint16Array,
+    weights: Float32Array,
+    width: number,
+  ): { joints: Uint16Array; weights: Float32Array };
   /** An authored stream as one value per corner of the new faces. */
-  corners(stream: ArrayLike<number>, width: number, indices: ArrayLike<number> | undefined, interpolation: string | undefined): Float32Array;
+  corners(
+    stream: ArrayLike<number>,
+    width: number,
+    indices: ArrayLike<number> | undefined,
+    interpolation: string | undefined,
+  ): Float32Array;
 }
 /** A mesh of the scene, as the scene hook gets it. */
 export interface SceneMesh {
@@ -74,6 +85,8 @@ export interface SceneMesh {
 }
 /** What the scene hook gets once every prim has its node. */
 export interface SceneRead {
+  /** Total expanded vertex budget, including existing triangle meshes. */
+  maxVertices: number;
   specs: Specs;
   document: GLTFDocument;
   /** Node index by prim path. */
@@ -128,7 +141,10 @@ export interface SurfaceRead {
   /** True when the file can be read. */
   has(file: string): boolean;
   /** Adds a texture and gives its glTF texture info. */
-  image(source: USDImage, where: USDImagePlacement): { index: number; extensions?: Record<string, unknown>; scale?: number };
+  image(
+    source: USDImage,
+    where: USDImagePlacement,
+  ): { index: number; extensions?: Record<string, unknown>; scale?: number };
   soft(message: string): void;
 }
 /** A material the surface hook made. */
@@ -141,6 +157,8 @@ export interface USDSurface {
 }
 /** What an extension does: each hook runs at its step of the import. */
 export interface ExtensionHooks extends USDExtension {
+  /** Attaches optional renderers after model creation, on the main thread, including worker loads. */
+  created?(engine: EngineKernel, model: PBRModel): void | Promise<void>;
   /** Prepares optional prim schemas before the mesh walk, within the reader's geometry budgets. */
   prepare?(read: { specs: Specs; maxVertices: number; maxTriangles: number; signal?: AbortSignal }): void;
   /** Turns the root layer into one flat spec map, in place of reading it as a single static layer. */
@@ -153,6 +171,8 @@ export interface ExtensionHooks extends USDExtension {
   shape?(read: MeshRead): MeshShape | undefined;
   /** Adds to the finished scene: skins, clips and the like. */
   scene?(read: SceneRead): void;
+  /** Adds optional primitive schemas after triangle meshes, before scene instancing and animation. */
+  geometry?(read: SceneRead): void;
   /** Keeps a prim that starts invisible but has a visible sample later, so this extension can show it then. */
   showsLater?: boolean;
 }

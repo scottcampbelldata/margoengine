@@ -14,12 +14,25 @@ import { lights } from './lux.js';
 import { materialX } from './materialx.js';
 import { pointInstancers } from './instancer.js';
 import { implicitShapes } from './shapes.js';
+import { curveGeometry } from './curve-geometry.js';
 
-const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation, subdiv: subdivision, lux: lights, materialx: materialX, instancer: pointInstancers, shapes: implicitShapes };
+const known: Record<string, (options?: never) => USDExtension> = {
+  compose: composition,
+  skel: skeletons,
+  anim: animation,
+  subdiv: subdivision,
+  lux: lights,
+  materialx: materialX,
+  instancer: pointInstancers,
+  shapes: implicitShapes,
+  curves: curveGeometry,
+};
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {
     ...sent,
-    extensions: (sent.extensions as ({ name: string; options?: never } & USDExtension)[] | undefined)?.map(({ name, options }) => known[name](options)),
+    extensions: (sent.extensions as ({ name: string; options?: never } & USDExtension)[] | undefined)?.map(
+      ({ name, options }) => known[name](options),
+    ),
   };
   const usd = url
     ? await parseUSDZ(await fetchBytes(url, { maxBytes: options.maxBytes ?? 64 * 1024 * 1024 }), options)

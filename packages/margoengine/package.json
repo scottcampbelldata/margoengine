@@ -3882,6 +3882,10 @@
       "types": "./dist/usdz/shapes.d.ts",
       "import": "./dist/usdz/shapes.js"
     },
+    "./usdz/curves": {
+      "types": "./dist/usdz/curves.d.ts",
+      "import": "./dist/usdz/curves.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

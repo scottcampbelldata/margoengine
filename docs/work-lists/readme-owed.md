@@ -588,3 +588,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document sciviz/glyph optional alias after build phase.
 
 - @margoengine/fbx (batch 205 job 4): document surfaces extension, loaders/nurbs dependency, NURBS forms/weights/orders, patch bases, closure/caps, Step/budgets, page/worker and legacy composition, polygon-bake remedy for control-net deformation.
+- @margoengine/usdz (batch 206 job 3): document curves(), pose/timeCode, interpolation, automatic Lines/Points attachment, optional peers, worker lifetime and tessellation limits.

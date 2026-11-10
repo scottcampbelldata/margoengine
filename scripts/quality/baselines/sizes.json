@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13246243,
+  "total": 13249774,
   "history": [
     {
       "date": "2026-10-24",
@@ -6706,6 +6706,12 @@
       "commit": "batch-205-job4",
       "reason": "Optional surfaces entry absent to 3177 B min+gzip, ceiling 3433 B. FBX classic worker 100787 to 105877 B, ceiling 103811 to 109054 B, for the shared NURBS evaluator, all five patch bases, net closure and caps. A split adds a second worker asset/evaluator protocol without reducing the complete import. Core plus stage 24209 B unchanged. The page worker entry grows 23094 to 23102 B, ceiling 23098 to 23796 B, for the shared geometry normalization dispatch; separating it would duplicate the fallback converter.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-206-curves",
+      "reason": "New optional curves entry for USD BasisCurves and Points. Uses existing lines/stroke. Worker sampler remains within its existing ceiling.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7928,6 +7934,7 @@
     "@margoengine/scatter/surface": 1515,
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/fbx/surfaces": 3433,
-    "margoengine/fbx/surfaces": 314
+    "margoengine/fbx/surfaces": 314,
+    "@margoengine/usdz/curves": 3531
   }
 }
