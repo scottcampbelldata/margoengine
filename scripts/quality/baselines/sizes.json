@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12635299,
+  "total": 12640854,
   "history": [
     {
       "date": "2026-10-24",
@@ -6238,6 +6238,12 @@
       "commit": "batch-208",
       "reason": "cache/decoded: new optional entry 0 to 4284 B gzip including shared AssetCache storage. Preserving complete typed arrays and transactional eviction warrants the bytes; a separate serialization API adds complexity.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-224",
+      "reason": "New optional mesh-edit/section: 0 to 5299 gzip bytes (5555 B ceiling), capped split/trim and polygon slices; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7365,6 +7371,7 @@
     "@margoengine/scene/graph": 2254,
     "margoengine/scene/graph": 314,
     "@margoengine/cache/decoded": 4540,
-    "@margoengine/exporters/sparse": 21471
+    "@margoengine/exporters/sparse": 21471,
+    "@margoengine/mesh-edit/section": 5555
   }
 }

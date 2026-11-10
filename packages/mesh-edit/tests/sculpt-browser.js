@@ -4,6 +4,7 @@ import { subdivideMesh } from '@margoengine/mesh-edit/modeling';
 import { MeshSculptSession } from '@margoengine/mesh-edit/sculpt';
 import { SculptView } from '@margoengine/mesh-edit/sculpt-view';
 import { paintMeshWeights, VertexGroups } from '@margoengine/mesh-edit/weights';
+import { splitMeshByPlane } from '@margoengine/mesh-edit/section';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -74,7 +75,9 @@ window.runSculptTests = async () => {
   assert(difference(before, after) > 200, `the stroke shows in the picture (${difference(before, after)} pixels)`);
   assert(uploaded > 0 && uploaded < total / 5, `a stroke uploads part of the mesh (${uploaded} of ${total} bytes)`);
   assert(view.stats.rewrites === 0, 'a stroke on fixed topology never rewrites the mesh');
-  checks.push(`stroke on ${session.triangleCount} triangles: ${uploaded} of ${total} bytes uploaded, pick and dabs ${dabs.toFixed(1)} ms`);
+  checks.push(
+    `stroke on ${session.triangleCount} triangles: ${uploaded} of ${total} bytes uploaded, pick and dabs ${dabs.toFixed(1)} ms`,
+  );
 
   session.undo();
   const undone = snapshot(engine);
@@ -106,6 +109,15 @@ window.runSculptTests = async () => {
   const { joints, weights } = groups.skinAttributes();
   assert(joints.length === mesh.vertices.length * 4 && weights.length === joints.length, 'skin attributes per vertex');
   checks.push('paintMeshWeights and skinAttributes run in the page');
+  const empty = snapshot(engine),
+    split = splitMeshByPlane(createPrimitiveMesh('cube', 'section'), { normal: [0, 0, 1], offset: 0 }),
+    sectionSession = new MeshSculptSession(split.negative),
+    sectionView = SculptView.attach(engine, sectionSession),
+    capped = snapshot(engine);
+  assert(split.section.polygons.length === 1, 'section has one square region');
+  assert(difference(empty, capped) > 1000, 'capped half-solid reaches the renderer');
+  sectionView.dispose();
+  checks.push('splitMeshByPlane capped output renders');
   engine.dispose();
   return { checks };
 };

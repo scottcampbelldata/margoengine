@@ -334,3 +334,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 226 graph): document generated scene/graph alias in the README phase.
 - @margoengine/cache: document cache/decoded keys, typed result persistence, device format/revision/options identity, getOrDecode cancellation, budgets and storage-failure semantics.
 - margoengine: document the generated cache/decoded alias in the README phase.
+
+- @margoengine/mesh-edit: document section split/trim/slice, arbitrary plane basis, ownership, source face maps, caps, UVs, empty/tangent results, float64 limits and cancellation (batch 224 job 1).
+- margoengine: document the generated mesh-edit/section alias in the README phase (batch 224 job 1).

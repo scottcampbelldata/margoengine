@@ -2018,6 +2018,10 @@
       "types": "./dist/mesh-edit/weights.d.ts",
       "import": "./dist/mesh-edit/weights.js"
     },
+    "./mesh-edit/section": {
+      "types": "./dist/mesh-edit/section.d.ts",
+      "import": "./dist/mesh-edit/section.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
