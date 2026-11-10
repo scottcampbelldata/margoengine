@@ -5580,9 +5580,7 @@ Open (not fixed in the audit):
   focused, visible and top level got the same). Native pointer lock is unverified on this Mac.
 - `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
   so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
-- `Pen` tilt to angles at |tilt| = 90 with the other tilt nonzero returns the azimuth of the leaning side (tiltX -90,
-  tiltY 30 gives pi), where the specification's informative `tilt2spherical` returns 0 ("not enough information"); the
-  code inverts `spherical2tilt` instead, a deliberate difference.
+- Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.
 
 ## Batch 132 audit: net (fixed and open)
 

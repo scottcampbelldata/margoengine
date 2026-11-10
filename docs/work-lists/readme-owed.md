@@ -1537,6 +1537,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/dof: review5 unsupported attachment and engine.onError restore-handling examples completed in the README phase (2026-11-10); runtime check recorded with the restore repair.
 - @margoengine/post: review5 Bloom/SSAO and HDR PostStack detachment, coded engine.onError and recreation examples completed in the README phase (2026-11-10); runtime check recorded with the restore repair.
 
+- @margoengine/input: document ambiguous flat-tilt zero fallback, exact axis directions and explicit spherical-angle precedence during the README phase.
 - @margoengine/cache: document omitted 304 lifetime fields, explicit overrides and conservative legacy-record handling during the README phase.
 - @margoengine/cache: document safe delayed-hit bookkeeping across eviction/replacement and matching-validator 304 freshness during the README phase.
 

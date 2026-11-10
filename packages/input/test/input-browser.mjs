@@ -82,6 +82,53 @@ try {
     return sum / count;
   };
   const before = await centroid();
+  const penAngles = await page.evaluate(async () => {
+    const { Pen } = await import('/packages/input/dist/pen.js');
+    const target = new EventTarget(),
+      pen = new Pen(target);
+    const read = (fields) => {
+      target.dispatchEvent(Object.assign(new Event('pointermove'), { pointerType: 'pen', ...fields }));
+      return [pen.latest.altitude, pen.latest.azimuth];
+    };
+    try {
+      return {
+        ambiguous: [
+          [-90, -30],
+          [-90, 30],
+          [90, -30],
+          [90, 30],
+          [-30, -90],
+          [30, -90],
+          [-30, 90],
+          [30, 90],
+          [-90, -90],
+          [-90, 90],
+          [90, -90],
+          [90, 90],
+        ].map(([tiltX, tiltY]) => read({ tiltX, tiltY })),
+        axes: [
+          [90, 0],
+          [-90, 0],
+          [0, 90],
+          [0, -90],
+        ].map(([tiltX, tiltY]) => read({ tiltX, tiltY })),
+        explicit: read({ tiltX: 90, tiltY: 90, altitudeAngle: 0, azimuthAngle: Math.PI / 4 }),
+      };
+    } finally {
+      pen.dispose();
+    }
+  });
+  assert.deepEqual(
+    penAngles.ambiguous,
+    Array.from({ length: 12 }, () => [0, 0]),
+  );
+  assert.deepEqual(penAngles.axes, [
+    [0, 0],
+    [0, Math.PI],
+    [0, Math.PI / 2],
+    [0, Math.PI * 1.5],
+  ]);
+  assert.deepEqual(penAngles.explicit, [0, Math.PI / 4]);
   await page.locator('#lock').click({ timeout: 10000 });
   await page.waitForFunction(() => window.inputCheck.lock.locked || window.inputCheck.error, null, { timeout: 10000 });
   assert.equal(await page.evaluate(() => window.inputCheck.error), null);

@@ -6634,6 +6634,10 @@ Locked-toolchain root entry measurements for this repair: DOF 9529 to 9538 gzip 
 
 SSGI exact one-bounce round trips on RTX A6000 / ANGLE D3D11 can differ by one display level despite identical GL commands. The first differing target is the ray trace; native WebGPU and ANGLE Vulkan pass this fixture. This separately recorded driver case leaves the exact assertion unchanged. See [raw values and reproduction](review5-ssgi-angle.md).
 
+### Ambiguous flat pen tilt (2026-11-10)
+
+When a pen event lacks spherical angles, a tilt pair with both components nonzero and either at +/-90 degrees maps to altitude zero and azimuth zero, following the informative Pointer Events Level 3/4 fallback convention. This cannot recover the pen's physical direction from ambiguous readings. The four flat axis directions and explicitly supplied altitude/azimuth retain their values; raw tilt samples remain unchanged. Evidence uses synthetic legacy events on the CPU and in the native/compatibility input browser gate, not a physical stylus. No public API change.
+
 ### Validated cache policy retention (2026-11-10)
 
 AssetCache and RangeCache persist Cache-Control and Expires with their metadata. A 304 retains either omitted field, replaces any provided value and calculates freshness using the current response's Date/Age and request transit. An explicit no-cache therefore remains effective on later 304 responses that omit lifetime fields. Freshness updates require matching stored validators. Older records without saved policy remain conservatively revalidated until a response supplies it; their offline bytes remain usable. Public API and schema version are unchanged. Root and ranges entry sizes remain within their existing ceilings.

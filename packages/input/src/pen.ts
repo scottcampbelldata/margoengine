@@ -43,7 +43,12 @@ const HALF_PI = Math.PI / 2,
 /** Altitude and azimuth from tilt, by the conversion in the Pointer Events specification. */
 function anglesFromTilt(tiltX: number, tiltY: number): [altitude: number, azimuth: number] {
   if (Math.abs(tiltX) >= 90 || Math.abs(tiltY) >= 90) {
-    const azimuth = Math.atan2(Math.abs(tiltY) >= 90 ? Math.sign(tiltY) : 0, Math.abs(tiltX) >= 90 ? Math.sign(tiltX) : 0);
+    // Off-axis flat tilts do not identify an azimuth; use Pointer Events' zero fallback.
+    if (tiltX !== 0 && tiltY !== 0) return [0, 0];
+    const azimuth = Math.atan2(
+      Math.abs(tiltY) >= 90 ? Math.sign(tiltY) : 0,
+      Math.abs(tiltX) >= 90 ? Math.sign(tiltX) : 0,
+    );
     return [0, azimuth < 0 ? azimuth + TURN : azimuth];
   }
   const x = Math.tan(tiltX * RAD),
@@ -102,7 +107,8 @@ export class Pen {
   private disposed = false;
   /** @throws RangeError for a `maxSamples` that is not an integer >= 1. */
   constructor(element: EventTarget, { curve, maxSamples = 4096 }: PenOptions = {}) {
-    if (!Number.isInteger(maxSamples) || maxSamples < 1) throw new RangeError('Pen maxSamples must be an integer of at least 1');
+    if (!Number.isInteger(maxSamples) || maxSamples < 1)
+      throw new RangeError('Pen maxSamples must be an integer of at least 1');
     if (curve !== undefined && typeof curve !== 'function') throw new TypeError('Pen curve must be a function');
     this.element = element;
     this.curve = curve;
@@ -155,7 +161,8 @@ export class Pen {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const type of ['pointerdown', 'pointermove', 'pointerup']) this.element.removeEventListener(type, this.onPointer);
+    for (const type of ['pointerdown', 'pointermove', 'pointerup'])
+      this.element.removeEventListener(type, this.onPointer);
     this.element.removeEventListener('pointercancel', this.onEnd);
     this.element.removeEventListener('pointerleave', this.onLeave);
     for (const input of [...this.hosts.keys()]) this.detach(input);

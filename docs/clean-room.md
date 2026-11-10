@@ -8641,6 +8641,10 @@ Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Cachi
 
 Compared WebGPU device-loss/resource lifetime (Ninomiya, Jones and Blandy, W3C, 2026) and WebGL EXT_color_buffer_float / EXT_color_buffer_half_float (Callow and Khronos WebGL Working Group, 2017/2022). [Full titles, links, rationale and original tests](review5-effect-restoration.md). No other repository implementation or companion code was read.
 
+### Ambiguous flat pen tilt (2026-11-10)
+
+Compared Patrick H. Lauke and Robert Flack (editors), W3C, *Pointer Events Level 3* (Recommendation, 2026), section 4.1.5 and its conversion example, https://www.w3.org/TR/2026/REC-pointerevents3-20260630/, with *Pointer Events Level 4* (Working Draft, 2026), section 3.1.5, https://www.w3.org/TR/2026/WD-pointerevents4-20261008/. The examples agree that a flat off-axis pair cannot identify azimuth and use zero, while axis-aligned pairs retain their directions. The guard is derived from that boundary convention; Margo's ordinary atan2/hypot conversion stays intact. Explicit spherical readings retain their information. No external implementation or sample code was copied.
+
 ### Validated cache policy retention (2026-11-10)
 
 Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Caching* (2022), sections 3.2 and 4.3.4, https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4, with their *RFC 9110: HTTP Semantics* (2022), section 15.4.5, https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4.5. Provided 304 fields replace cached fields; omitted lifetime policy is retained. Date and Age belong to the current validation calculation rather than the earlier transfer. The shared helper keeps only Cache-Control and Expires in metadata. No external implementation or companion code was read or copied.

@@ -4690,6 +4690,10 @@ Initial and 304 response freshness account for Age plus elapsed request time thr
 
 Ten actual device-replacement cases on RTX A6000 with masked full/half-float to LDR tiers detach refused effects, report one coded error and render three subsequent frames with no GPU errors. This does not certify physical lower-tier hardware. [Methods and reproduction](../review5-effect-restoration.md).
 
+### Ambiguous flat pen tilt (2026-11-10)
+
+The missing-angle fallback follows the Pointer Events zero convention for ambiguous flat tilt. Evidence: the parent-failing 12-case regression in packages/input/test/pen.test.js checks exact altitude/azimuth, published action values and retained raw samples, with axis and explicit-angle controls. packages/input/test/input-browser.mjs checks the boundary matrix in a real browser alongside its unchanged pointer-lock and rendered-input checks. Reproduce after build: node --test packages/input/test/pen.test.js; node packages/input/test/input-browser.mjs, with and without --compat. No physical stylus claim. Sources: docs/clean-room.md, Ambiguous flat pen tilt.
+
 ### Validated cache policy retention (2026-11-10)
 
 Both cache classes retain omitted 304 lifetime policy. Evidence: the two parent-failing max-age regressions plus Expires/current-Age and explicit no-cache replacement/retention cases in packages/cache/test/freshness.test.js. All use a controlled clock without waits or speed assertions. Reproduce after build with node --test packages/cache/test/freshness.test.js. Existing stale-touch regressions retain independent replacement/eviction coverage. Sources and legacy-record limit: docs/clean-room.md and docs/limits.md, Validated cache policy retention.

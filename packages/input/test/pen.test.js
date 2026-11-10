@@ -4,9 +4,24 @@ import { Input } from '../dist/index.js';
 import { Pen } from '../dist/pen.js';
 
 const near = (a, b, message) => assert.ok(Math.abs(a - b) < 1e-9, `${message ?? ''} ${a} vs ${b}`);
-const AXES = ['pressure', 'tiltX', 'tiltY', 'altitude', 'azimuth', 'twist', 'tangential', 'down', 'barrel', 'eraser', 'hover'];
+const AXES = [
+  'pressure',
+  'tiltX',
+  'tiltY',
+  'altitude',
+  'azimuth',
+  'twist',
+  'tangential',
+  'down',
+  'barrel',
+  'eraser',
+  'hover',
+];
 function rig(options) {
-  const element = Object.assign(new EventTarget(), { captured: [], setPointerCapture: (id) => element.captured.push(id) }),
+  const element = Object.assign(new EventTarget(), {
+      captured: [],
+      setPointerCapture: (id) => element.captured.push(id),
+    }),
     input = new Input(Object.fromEntries(AXES.map((axis) => [axis, [{ type: 'control', id: 'pen', axis }]])), {
       target: new EventTarget(),
       gamepads: () => [],
@@ -110,7 +125,15 @@ test('mouse and touch are ignored', () => {
 test('take gives every coalesced reading of a stroke, once, oldest first', () => {
   const { pen, send } = rig();
   send('pointerdown', { buttons: 1, pressure: 0.1, clientX: 0 });
-  const part = (clientX, pressure) => ({ buttons: 1, pressure, clientX, clientY: 0, tiltX: 0, tiltY: 0, timeStamp: clientX });
+  const part = (clientX, pressure) => ({
+    buttons: 1,
+    pressure,
+    clientX,
+    clientY: 0,
+    tiltX: 0,
+    tiltY: 0,
+    timeStamp: clientX,
+  });
   send('pointermove', { getCoalescedEvents: () => [part(1, 0.2), part(2, 0.3), part(3, 0.4)] });
   send('pointermove', { buttons: 1, pressure: 0.5, clientX: 4, getCoalescedEvents: () => [] });
   send('pointermove', { buttons: 1, pressure: 0.6, clientX: 5 });
@@ -198,6 +221,47 @@ test('angles come from tilt where the browser gives only tilt', () => {
   near(pen.latest.azimuth, Math.PI * 1.5);
   near(read(45, 45).azimuth, Math.PI / 4);
   near(pen.latest.altitude, Math.atan(1 / Math.SQRT2));
+});
+
+test('ambiguous flat tilt uses zero azimuth while axes and explicit angles retain their directions', () => {
+  const { pen, input, send, tick } = rig();
+  for (const [tiltX, tiltY] of [
+    [-90, -30],
+    [-90, 30],
+    [90, -30],
+    [90, 30],
+    [-30, -90],
+    [30, -90],
+    [-30, 90],
+    [30, 90],
+    [-90, -90],
+    [-90, 90],
+    [90, -90],
+    [90, 90],
+  ]) {
+    send('pointermove', { tiltX, tiltY });
+    tick();
+    assert.equal(pen.latest.altitude, 0);
+    assert.equal(pen.latest.azimuth, 0, `ambiguous tilt ${tiltX}, ${tiltY}`);
+    assert.equal(input.state('azimuth').value, 0);
+    assert.deepEqual(
+      pen.take().map((s) => [s.tiltX, s.tiltY, s.azimuth]),
+      [[tiltX, tiltY, 0]],
+    );
+  }
+  for (const [tiltX, tiltY, azimuth] of [
+    [90, 0, 0],
+    [-90, 0, Math.PI],
+    [0, 90, Math.PI / 2],
+    [0, -90, Math.PI * 1.5],
+  ]) {
+    send('pointermove', { tiltX, tiltY });
+    assert.equal(pen.latest.azimuth, azimuth);
+  }
+  send('pointermove', { tiltX: 90, tiltY: 90, altitudeAngle: 0, azimuthAngle: Math.PI / 4 });
+  assert.equal(pen.latest.azimuth, Math.PI / 4, 'explicit spherical data is preserved');
+  pen.dispose();
+  input.dispose();
 });
 
 test('tilt comes from angles where the browser gives only angles, and the two conversions agree', () => {
