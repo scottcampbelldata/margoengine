@@ -27,6 +27,12 @@ try {
   await run('clear');
   console.log('ok trimmed CPU surface upload and hole');
 
+  assert.deepEqual(await run('extras'), {wrong:0,count:5}, 'all optional primitive meshes upload with outward winding');
+  const extraImage = await decodePNG(await page.locator('canvas').screenshot()), extraMiddle = [...extraImage.data.slice((200*400+200)*4,(200*400+200)*4+3)];
+  assert.ok(extraMiddle[0]>60 && extraMiddle[0]>extraMiddle[2]*2, `Goldberg mesh drawn: ${extraMiddle}`);
+  await run('clear');
+  console.log('ok optional primitive uploads and Goldberg picture');
+
   const sphere = await run('sphere');
   assert.ok(sphere.worstRadius < 1e-5, `sphere radius off by ${sphere.worstRadius}`);
   assert.ok(sphere.worstNormal < 2e-3, `sphere normals off by ${sphere.worstNormal}`);

@@ -13,6 +13,7 @@ import { GeometryGenerator } from '/packages/geometry/dist/gpu.js';
 import { toGeometry } from '/packages/geometry/dist/utils.js';
 import { NurbsSurface } from '/packages/geometry/dist/nurbs.js';
 import { trimmedNurbsSurfaceGeometry } from '/packages/geometry/dist/nurbs-edit.js';
+import { geodesicGeometry, goldbergGeometry, hemisphereGeometry, tiledBoxGeometry, tiledPlaneGeometry } from '/packages/geometry/dist/extras.js';
 
 const canvas = document.querySelector('canvas'),
   engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 6], target: [0, 0, 0] } }),
@@ -65,6 +66,18 @@ function signedVolume({ positions: P }, indices) {
 
 window.check = {
   errors: () => errors,
+
+  async extras() {
+    const shapes = [geodesicGeometry({m:2,n:1}),hemisphereGeometry(),tiledPlaneGeometry(),tiledBoxGeometry(),goldbergGeometry({m:2,n:1})];
+    let wrong = 0;
+    for (let i=0;i<shapes.length;i++) {
+      const data=shapes[i],mesh=place({geometry:toGeometry(data)});
+      wrong += backwards(data,data.indices);
+      await frame();
+      if(i<shapes.length-1)mesh.dispose();else window.keep={mesh};
+    }
+    return {wrong,count:shapes.length};
+  },
 
   async trimmed() {
     const surface = new NurbsSurface({ degreeU: 1, degreeV: 1, points: [[[-2,-2,0],[-2,2,0]],[[2,-2,0],[2,2,0]]] }),

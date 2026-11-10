@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12882757,
+  "total": 12886233,
   "history": [
     {
       "date": "2026-10-24",
@@ -6398,6 +6398,12 @@
       "commit": "c6f4ca875",
       "reason": "Batch 233 job 1: new optional road/intersections entry, 0 bytes before; measured 2165 bytes gzip with standard headroom. Curbs, returns and sidewalks remain together to avoid splitting one design operation.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-219-job2",
+      "reason": "Optional geometry/extras 5570 -> 9031 B gzip, ceiling 5826 -> 9302 B. Three geodesic classes, face-addressable Goldberg duals, hemisphere and complete cropped tiling layouts share the hull/face helpers. Splitting would fragment the optional primitive collection. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6707,7 +6713,7 @@
     "@margoengine/fsm/trace": 1863,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,
-    "@margoengine/geometry/extras": 5826,
+    "@margoengine/geometry/extras": 9302,
     "@margoengine/geometry/extrude": 8933,
     "@margoengine/geometry/flow": 2728,
     "@margoengine/geometry/gpu": 5343,

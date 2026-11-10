@@ -425,3 +425,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: optional voxel-pathtracer/mesh-pbr re-export and typed loaded-glTF interop.
 - @margoengine/road (batch 233 job 1): intersections joins/caps, curb returns, height field, curb/sidewalk layers, defaults, bounds, ownership and runnable example after build phase.
 - margoengine (batch 233 job 1): optional road/intersections forwarding entry after build phase.
+- @margoengine/geometry (batch 219 job 2): extras geodesic/Goldberg classes, face topology/groups, capped hemisphere, cropped tiling patterns/alignments/sides and per-face box options; examples deferred.
