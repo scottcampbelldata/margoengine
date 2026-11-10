@@ -45,20 +45,29 @@ export class Quaternion {
   setFromEuler(euler: EulerLike): this {
     // The product of the three half-angle axis quaternions written out per order (no per-axis loop: this runs once per
     // object per frame in animation code). Cyclic orders (XYZ, YZX, ZXY) and the others differ only in signs.
-    const sx = Math.sin(euler.x / 2),
-      cx = Math.cos(euler.x / 2),
-      sy = Math.sin(euler.y / 2),
-      cy = Math.cos(euler.y / 2),
-      sz = Math.sin(euler.z / 2),
-      cz = Math.cos(euler.z / 2);
-    const a = sx * cy * cz,
-      b = cx * sy * sz,
-      c = cx * sy * cz,
-      d = sx * cy * sz,
-      e = cx * cy * sz,
-      f = sx * sy * cz,
-      g = cx * cy * cz,
-      h = sx * sy * sz;
+    // Each half angle is read and halved once, and each pair product that two terms share is formed once; the
+    // products keep their left-to-right grouping, so the result is bit for bit the eight triple products.
+    const hx = euler.x / 2,
+      hy = euler.y / 2,
+      hz = euler.z / 2;
+    const sx = Math.sin(hx),
+      cx = Math.cos(hx),
+      sy = Math.sin(hy),
+      cy = Math.cos(hy),
+      sz = Math.sin(hz),
+      cz = Math.cos(hz);
+    const sxcy = sx * cy,
+      cxsy = cx * sy,
+      cxcy = cx * cy,
+      sxsy = sx * sy;
+    const a = sxcy * cz,
+      b = cxsy * sz,
+      c = cxsy * cz,
+      d = sxcy * sz,
+      e = cxcy * sz,
+      f = sxsy * cz,
+      g = cxcy * cz,
+      h = sxsy * sz;
     switch (euler.order) {
       case 'XYZ':
         return this.set(a + b, c - d, e + f, g - h);
