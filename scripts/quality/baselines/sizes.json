@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13948427,
+  "total": 13951828,
   "history": [
     {
       "date": "2026-10-24",
@@ -7370,6 +7370,12 @@
       "commit": "batch-188",
       "reason": "New optional environment/prefiltered entry: 0 to 3693 B gzip; lossless KTX2 upload avoids GPU prefiltering; source, SH and BRDF data retained for full quality and restore.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-184",
+      "reason": "New optional fur entry, before 0 B, 2878 B gzip including shell ownership, live controls and caster support; keep these together rather than split a single rendering feature. The FurMaterial subclass and createFur mesh constructor intentionally share materials root and its existing gltf-pro/model dependency. Record the required static edge; making a base class lazy would replace the synchronous familiar Material API or duplicate its implementation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8707,6 +8713,8 @@
     "@margoengine/vfx/json": 2860,
     "@margoengine/staging/pathtrace-materials": 1816,
     "@margoengine/compute/decomp": 3835,
-    "@margoengine/environment/prefiltered": 3949
+    "@margoengine/environment/prefiltered": 3949,
+    "@margoengine/materials/fur": 3400,
+    "leak @margoengine/materials/fur -> @margoengine/gltf-pro/model": 1
   }
 }

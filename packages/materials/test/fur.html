@@ -1,0 +1,13 @@
+<!doctype html><html><meta charset="utf-8"><canvas width="192" height="192"></canvas><style>body{margin:0}canvas{width:192px;height:192px;display:block}</style><script type="module">
+import{Engine}from'/packages/core/dist/extension.js';
+import{createFur,FurMaterial}from'/packages/materials/dist/fur.js';
+import{createMesh,Material,loadTexture}from'/packages/materials/dist/index.js';
+import{sphereGeometry}from'/packages/geometry/dist/index.js';
+import{Shadows}from'/packages/shadows/dist/index.js';
+globalThis.margoLow=new URLSearchParams(location.search).has('single')?1:undefined;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[2,1.2,4],target:[0,0,0]}});engine.stop();
+const errors=[];engine.onError=e=>errors.push(String(e));engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+let fur;const photo=await loadTexture('/examples/assets/source/skinning_ik/textures/polyhaven/wood_table_worn/wood_table_worn_diff_1k.jpg');
+const frame=async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();};
+window.furDraft={errors,async render(options={}){fur?.dispose();fur=createFur(engine,sphereGeometry(1,24,16),{shells:options.shells??16,color:[0.7,0.4,0.1],roughness:0.8,map:options.mapped?photo:undefined,fur:Object.fromEntries(Object.entries(options).filter(([key])=>key!=='mapped'&&key!=='shells'))});await frame();await frame();},async configure(options){fur.setOptions(options);await frame();},async time(t){fur.setTime(t);await frame();},async restore(){const old=engine.gpu;await engine.rebootDevice();await frame();return old!==engine.gpu;},async shadow(){const wall=createMesh(engine,{positions:[-4,-4,-2,4,-4,-2,4,4,-2,-4,4,-2],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]},new Material({roughness:1}));engine.lighting.direction.set([1,0.3,1,2]);const shadow=Shadows.attach(engine,{resolution:256,filter:'hard',bounds:{min:[-4,-4,-3],max:[4,4,3]}});shadow.add(wall);for(const m of fur.shells)shadow.add(m);await frame();await frame();return errors;},dispose(){fur?.dispose();photo.dispose();engine.dispose();}};
+</script></html>
