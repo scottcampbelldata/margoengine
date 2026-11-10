@@ -225,7 +225,9 @@ export const SCENES = {
       'mode=instanced draws them through the engine instancing API (static matrices, one batch); mode=culled through ' +
       'its GPU-culled instancing, where it has one (Margo: @margoengine/culling CulledInstances); mode=dynamic through ' +
       'its GPU-driven moving instances (Margo: @margoengine/culling DynamicInstances, matrices set per box with ' +
-      'setMatrixAt as InstancedMesh does; mode=dynamic-rows copies them into its row array unchecked). views=4 draws the ' +
+      'setMatrixAt as InstancedMesh does; mode=dynamic-rows copies them into its row array unchecked; Margo-only ' +
+      'diagnostics: mode=dynamic-upload uploads rows composed once, every row every frame, with no CPU maths, and ' +
+      'mode=dynamic-cpu composes every row every frame with no upload). views=4 draws the ' +
       'boxes four times a frame, one quarter of the canvas each (split screen), through four cameras on the same ' +
       'orbit a quarter turn apart.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs', 'drawCalls'],
@@ -577,6 +579,8 @@ export const STANDARD = {
       params: { n, mode, move: 1 },
     })),
     { scene: 'boxes', params: { n, mode: 'dynamic' } },
+    // Batch 166: the moving frame's upload alone (GPU bound) and its CPU maths alone, read beside the two above.
+    ...['dynamic-upload', 'dynamic-cpu'].map((mode) => ({ scene: 'boxes', params: { n, mode, move: 1 } })),
   ]),
   scaling: [
     ...[1, 100, 1000, 10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n } })),

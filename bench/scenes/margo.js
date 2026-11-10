@@ -147,8 +147,8 @@ const builders = {
       throw new RangeError(`boxes views=${views}: 1, or 4 with mode=mesh`);
     if (mode === 'instanced') return instancedBoxes(canvas, data, marks, { n, move });
     if (mode === 'culled') return culledBoxes(canvas, data, marks, { n, move });
-    if (mode === 'dynamic' || mode === 'dynamic-rows')
-      return dynamicBoxes(canvas, data, marks, { n, move, rows: mode === 'dynamic-rows' });
+    if (mode === 'dynamic' || mode === 'dynamic-rows' || mode === 'dynamic-upload' || mode === 'dynamic-cpu')
+      return dynamicBoxes(canvas, data, marks, { n, move, mode });
     const engine = await engineFor(canvas, data.camera, n + 8, marks),
       s = performance.now(),
       list = meshes(engine, data, palette(data));
@@ -441,12 +441,16 @@ async function culledBoxes(canvas, data, marks, { n, move }) {
   );
 }
 
-async function dynamicBoxes(canvas, data, marks, { n, move, rows }) {
+async function dynamicBoxes(canvas, data, marks, { n, move, mode }) {
   // @margoengine/culling DynamicInstances: one batch, GPU matrices, frustum culling and indirect draws, the palette as a
   // per-instance tint. Moving boxes compose the same matrix per box on the CPU as the instanced cases (three.js
   // InstancedMesh.setMatrixAt included), then setMatrixAt, which also checks each matrix (finite, affine, not mirrored).
   // mode=dynamic-rows copies the same matrix into the row array unchecked and marks all rows once (update()): the
-  // like-for-like row against InstancedMesh.setMatrixAt, which copies without checks.
+  // like-for-like row against InstancedMesh.setMatrixAt, which copies without checks. Two diagnostic modes split a
+  // moving frame's costs (batch 166): mode=dynamic-upload composes the rows once at build and marks every row each frame
+  // (the same 48 bytes a row uploaded every frame, no CPU maths, so the GPU can be the bound), and mode=dynamic-cpu
+  // composes every row every frame into the row array without update() (the CPU maths, no upload). Both draw the
+  // build-time picture.
   const engine = await engineFor(canvas, data.camera, 64, marks),
     s = performance.now(),
     at = await composer(),
@@ -464,11 +468,15 @@ async function dynamicBoxes(canvas, data, marks, { n, move, rows }) {
   );
   marks.buildMs = +(performance.now() - s).toFixed(1);
   const turn = await mover(),
-    moving = move ? n : 0;
+    moving = move ? n : 0,
+    rows = mode !== 'dynamic',
+    upload = mode === 'dynamic-upload';
   return app(
     engine,
     (t) => {
-      if (rows) {
+      if (upload) {
+        if (moving) crowd.update();
+      } else if (rows) {
         const m = crowd.matrices;
         for (let i = 0; i < moving; i++) {
           const e = turn(data.items[i], data.items[i].rotation[1] + t),
@@ -486,7 +494,7 @@ async function dynamicBoxes(canvas, data, marks, { n, move, rows }) {
           m[at + 10] = e[13];
           m[at + 11] = e[14];
         }
-        if (moving) crowd.update();
+        if (moving && mode === 'dynamic-rows') crowd.update();
       } else for (let i = 0; i < moving; i++) crowd.setMatrixAt(i, turn(data.items[i], data.items[i].rotation[1] + t));
     },
     { camera: data.camera, draws: 1 },

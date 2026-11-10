@@ -2857,7 +2857,8 @@ The Box2D browser goal remains unmet. Quiet release reruns remain required; no a
   records in row order with the look-back and with the fallback alone (36,451 rows both ways).
 - **Left, accepted:** the 96-byte record with six attributes is core's frozen instance layout (`docs/limits.md`,
   "DynamicInstances record size"). Frustum culling is Margo's extra work, kept.
-- **Timing:** pending the quiet rerun (`npm run bench -- dynamic --engines=margo,three-webgpu`).
+- **Timing:** pending the quiet rerun (`npm run bench -- dynamic --engines=margo,three-webgpu`; batch 166 job 3 added
+  the `dynamic-upload` and `dynamic-cpu` cases, smoke-run once at 10,000 and 250,000 with no errors, no number read).
 
 ## Open losses
 
@@ -2966,6 +2967,7 @@ These entries lack a recorded number, a named machine or a quiet run:
     only checks the Cycles noise at 128 samples.
 
 32. Exact 2D frame preparation (entry 112): quiet paired/browser reruns; deterministic work reduction and loaded paired advantage do not establish release speed or Box2D parity.
+33. DynamicInstances moving boxes (entry 113): `npm run bench -- dynamic --engines=margo,three-webgpu`, read with the Margo-only `dynamic-upload` (rows uploaded every frame, no CPU maths, GPU bound) and `dynamic-cpu` (CPU maths, no upload) cases beside the moving and still ones, which separates GPU clocks from the 12 MB copy at 250,000.
 
 ### Batch 69: local WFC heap and SIMD selection
 
