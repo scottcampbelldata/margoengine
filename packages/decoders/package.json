@@ -155,6 +155,10 @@
     "./texture-rgba": {
       "types": "./dist/texture-rgba.d.ts",
       "import": "./dist/texture-rgba.js"
+    },
+    "./lzfse": {
+      "types": "./dist/lzfse.d.ts",
+      "import": "./dist/lzfse.js"
     }
   },
   "files": [

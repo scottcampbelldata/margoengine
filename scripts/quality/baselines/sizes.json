@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13856900,
+  "total": 13864641,
   "history": [
     {
       "date": "2026-10-24",
@@ -7286,6 +7286,12 @@
       "commit": "batch-270-job4",
       "reason": "Prewarm and deterministic burst schedules: root 34670 to 35448 B, base 11318 to 11398 B, schedule 0 to 942 B gzip. Per-step queue submissions preserve manual simulation semantics. Keeping scheduling in one optional entry avoids extra ownership APIs; optional ceilings raised under Scott approval. Core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "1a1f53ea2",
+      "reason": "Batch241-new-optional-LZFSE-and-voxel-format-readers",
+      "grew": 2
     }
   ],
   "items": {
@@ -8607,6 +8613,8 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/vfx/schedule": 1198
+    "@margoengine/vfx/schedule": 1198,
+    "@margoengine/decoders/lzfse": 2551,
+    "@margoengine/voxel-edit/formats-extra": 5190
   }
 }

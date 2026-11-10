@@ -1002,6 +1002,10 @@
       "types": "./dist/decoders/texture-rgba.d.ts",
       "import": "./dist/decoders/texture-rgba.js"
     },
+    "./decoders/lzfse": {
+      "types": "./dist/decoders/lzfse.d.ts",
+      "import": "./dist/decoders/lzfse.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"
@@ -4477,6 +4481,10 @@
     "./voxel-edit/select": {
       "types": "./dist/voxel-edit/select.d.ts",
       "import": "./dist/voxel-edit/select.js"
+    },
+    "./voxel-edit/formats-extra": {
+      "types": "./dist/voxel-edit/formats-extra.d.ts",
+      "import": "./dist/voxel-edit/formats-extra.js"
     },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",

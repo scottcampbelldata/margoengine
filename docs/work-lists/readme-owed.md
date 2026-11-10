@@ -887,3 +887,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/water, @margoengine/environment and margoengine (batch 235 job 3): cover water/reflector capture binding, horizontal alignment, environment captureOnly/textureMatrix, source filtering, manual update versus engine.start, fallback/SSR/defaults/limits and borrowed-resource disposal; examples deferred.
 - @margoengine/vfx (batch 270 job 4): document /schedule, prewarm step/tail/submission semantics, time-zero/cycle/probability bursts, seed, immutable attachment settings and reset/restoration; examples deferred.
 - margoengine (batch 270 job 4): document generated vfx/schedule alias; examples deferred.
+
+- @margoengine/voxel-edit (batch 241 job 3): document formats-extra KV6/CUB/VMAX readers, basis/pivots, VMAX hierarchy/gridToWorld, palette/material preservation, all defaults and bounded loading; add examples in the README phase.
+- @margoengine/decoders (batch 241 job 3): document optional lzfse decodeLZFSE, all block kinds, maxBytes and AbortSignal; add examples in the README phase.
+- margoengine (batch 241 job 3): document generated voxel-edit/formats-extra and decoders/lzfse aliases during the README phase.

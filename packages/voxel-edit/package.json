@@ -102,6 +102,10 @@
     "./select": {
       "types": "./dist/select.d.ts",
       "import": "./dist/select.js"
+    },
+    "./formats-extra": {
+      "types": "./dist/formats-extra.d.ts",
+      "import": "./dist/formats-extra.js"
     }
   },
   "files": [
@@ -115,7 +119,8 @@
   "dependencies": {
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/math": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0"
+    "@margoengine/voxel": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-edit",
