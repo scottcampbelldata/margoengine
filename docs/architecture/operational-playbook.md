@@ -1927,6 +1927,17 @@ Known rendering gaps:
 
 ## 4. Quality architecture
 
+### 4.0 How work lands during the build phase (Scott, 2026-11-09)
+
+This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they differ.
+
+- **Fast gate before a push:** lint, hygiene, check:banned-terms, build:packages, api:check, quality, and the tests of the changed packages and the packages that depend on them, with their GPU tests on WebGPU and the WebGL2 compatibility layer. Exports changed: commit the api:update output.
+- **No full verify in any lane.** Local CI on the dev PC runs the one full `npm run verify` on the newest `main` (scheduled task "Margo CI (CPU)"). Running it in a lane doubles the work: eleven lanes doing so held the CPU at 94% and stretched verify from 12 to 40 minutes. A red `main` is fixed forward by the lane that caused it within about 2 hours, or that commit is reverted.
+- **No README work until the features are built.** No `check:readme-run`, no README example writing or fixing. Each job adds one line per changed package to `docs/work-lists/readme-owed.md`; the README phase before release clears it.
+- **Only complete jobs reach `main`,** squashed into one commit: no checkpoint, evidence-only or partial pushes.
+- **Round caps:** a stuck job parks with a note after 3 rounds in the build phase (5 to 10 only for an obvious bug with measured gains each round); parked notes feed the fix phase. A blocker owned by another lane gets one line in the handoff, and the lane moves on to its next job.
+- **This section stays short.** Evidence for a gate goes in its own row in 4.1 or a line in section 5, never a new essay at the top of this file.
+
 ### 4.1 Gate map
 
 | Gate | Command or path | Contract |
