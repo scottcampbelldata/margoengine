@@ -6766,3 +6766,25 @@ Batch 164 row 13.19 keeps one render pass per `NodePass` screen effect. Each eff
 Batch 164 rows 9.7 and 13.15: with a 4x scene capture, Tonemap resolves colour in a pass of its own, after core's scene pass, because core's scene pass (frozen for v1.0.0) ends without a resolve target; the `acescg` curve is the fitted AP1 RRT/ODT, not ACESFilmic, so the images differ. Row 13.17: `TAA({velocityOnly: true})` draws velocity in its own geometry pass, because core's scene pass writes no velocity attachment. Accepted differences, timing pending the quiet rerun. [Evidence](whitepaper/batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
 
 Batch 132 text bidi fix (lane I, 2026-11-10, 71beba857): the UAX #9 weak-type pass (number, separator and terminator code point lists, rules W2 to W7, number levels) grew `@margoengine/text` from 17109 to 17967 B gzip and each entry that bundles the layout (animate, curve, fit, rich) by about 640 B, recorded in scripts/quality/baselines/sizes.json with that reason under the push-anyway rule (gates skipped by the fast landing Scott ordered on 2026-11-10). No speed claim; layout time not re-measured.
+
+## Native pointer lock on a locked Mac (lane L, 2026-11-10)
+
+Chromium grants `requestPointerLock` only to a page whose view has operating-system focus. On macOS that is a view in
+the key window of the front application. The M6 Mac mini runs the browser checks unattended with its console locked:
+`ioreg -n Root -d1` reports `CGSSessionScreenIsLocked` true and `lsappinfo front` names `com.apple.loginwindow`. No
+browser window can be key, so Chromium 156.0.8078.4 rejects every request with `WrongDocumentError` ("The root
+document of this element is not valid for pointer lock."). Measured 2026-11-10 for the headless shell, new headless
+(`channel: 'chromium'`) and headed, with and without `page.bringToFront()` and CDP `Emulation.setFocusEmulationEnabled`;
+`document.hasFocus()` was true, the page visible and the click a real user activation in every case. No launch flag or
+harness change can make a window key while macOS shows the login window, so the cause is outside Margo.
+
+What the checks do instead (`scripts/support/pointer-lock.mjs`): `packages/input/test/input-browser.mjs` and
+`packages/worker/tests/browser-check.mjs` first try native lock in a scratch page. If it works, they run unchanged. If
+it is refused with `WrongDocumentError` on macOS while the console is locked or a non-browser app is in front, they
+print a `NOTE ... native acquisition not proven on this machine` line naming the error and the front app, and run
+their lock steps (request, `pointerlockchange`, locked movement into rendered pixels or worker controls, release)
+against a stand-in for the platform's lock state written to Pointer Lock 2.0 (W3C Working Draft,
+https://www.w3.org/TR/pointerlock-2/). Any other refusal, on any platform, still fails the check. What this does not
+prove: that Chromium on macOS acquires a native lock for Margo's elements. That needs a run with the console unlocked
+and the browser in front (finish-later "132 | worker"); the Windows dev PC runs the native path. Regression for the
+classifier: `tests/pointer-lock-harness.test.js`.

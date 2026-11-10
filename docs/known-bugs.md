@@ -5694,9 +5694,13 @@ Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on
   steps were followed. Not yet checked on a real phone.
 
 Open (not fixed in the audit):
-- On the M6, `packages/input/test/input-browser.mjs` fails before its pixel steps: Chromium rejects `requestPointerLock`
-  with `WrongDocumentError` under the test harness (same as the finish-later "132 | worker" row; a probe page that was
-  focused, visible and top level got the same). Native pointer lock is unverified on this Mac.
+- Closed, lane L (2026-11-10): on the M6, `packages/input/test/input-browser.mjs` (and `packages/worker/tests/browser-check.mjs`)
+  failed before their pixel steps because Chromium rejected `requestPointerLock` with `WrongDocumentError`. Root cause
+  is outside Margo: the Mac's console was locked (`ioreg` CGSSessionScreenIsLocked true, front app
+  `com.apple.loginwindow`), and Chromium on macOS grants pointer lock only to a view in the key window of the front
+  app. Both checks now probe native lock and, only for that macOS reason, run against a Pointer Lock 2.0 stand-in with
+  a printed note; any other refusal still fails. Native acquisition on this Mac stays unproven while it runs
+  unattended; docs/limits.md "Native pointer lock on a locked Mac". Regression: tests/pointer-lock-harness.test.js.
 - `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
   so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
 - Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.

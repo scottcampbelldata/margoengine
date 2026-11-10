@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
+import { usePointerLock } from '../../../scripts/support/pointer-lock.mjs';
 const context = await openBrowser({ startPath: '/packages/input/test/input-browser.html', port: 'free' });
 const { page } = context,
   errors = [];
@@ -129,6 +130,8 @@ try {
     [0, Math.PI * 1.5],
   ]);
   assert.deepEqual(penAngles.explicit, [0, Math.PI / 4]);
+  // Native lock, or on a locked Mac console the documented Pointer Lock 2.0 stand-in with a printed note.
+  const lockSupport = await usePointerLock(page, { label: 'input pointer lock' });
   await page.locator('#lock').click({ timeout: 10000 });
   await page.waitForFunction(() => window.inputCheck.lock.locked || window.inputCheck.error, null, { timeout: 10000 });
   assert.equal(await page.evaluate(() => window.inputCheck.error), null);
@@ -154,7 +157,9 @@ try {
     window.inputCheck.engine.dispose();
   });
   assert.deepEqual(errors, []);
-  console.log('Input vector and pointer lock drive rendered geometry; native acquisition, release and pixels pass');
+  console.log(
+    `Input vector and pointer lock drive rendered geometry; ${lockSupport.native ? 'native' : 'stand-in'} acquisition, release and pixels pass`,
+  );
 } finally {
   await context.close();
 }

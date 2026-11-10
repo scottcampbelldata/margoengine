@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
+import { usePointerLock } from '../../../scripts/support/pointer-lock.mjs';
 
 const browserName = process.argv.find((arg) => arg.startsWith('--browser='))?.slice('--browser='.length) ?? 'chromium';
 const context = await openBrowser({
@@ -112,6 +113,8 @@ try {
   await page.mouse.wheel(0, 400);
   result.zoomed = await until((s) => Math.abs(distance(s.camera) - distance(orbit)) > 1e-3, 'the wheel to zoom');
   assert.equal(await page.evaluate(() => scrollY), 0, 'the page stayed put');
+  // Native lock, or on a locked Mac console the documented Pointer Lock 2.0 stand-in with a printed note.
+  result.pointerLockNative = (await usePointerLock(page, { label: 'worker pointer lock' })).native;
   await ask('pointerSetup');
   await page.locator('#gpu').click();
   result.pointerLock = await until(

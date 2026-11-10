@@ -8167,7 +8167,7 @@ cinematic/physical-lens is optional: new entry 0 to 589 B minified gzip, budget 
 
 ## Batch 207 job 4: live Blender node graphs
 blender/nodes is a new optional entry; entry size and ceiling are recorded with the job's size evidence below. Core and stage are untouched. Export live_nodes defaults false. When true, reachable unsupported nodes or surface lobes fail by material/node name, with the existing baked export available by disabling live_nodes. No silent baking in the live path.
-Supports Value/RGB, reroutes, Math (41 scalar operations including safe divide/power/log domains), MixRGB and Mix (Float/Vector/RGBA, 19 color blend modes), Color Ramp (2..32 stops, Constant/Linear/Ease/Cardinal/B-spline, RGB/HSV/HSL and four hue directions), Noise (1D..4D, Fac/Color, fractional detail 0..15, normalized fBM, multifractal, ridged, hybrid and hetero terrain, roughness/lacunarity/distortion/offset/gain), UV/Generated/Object/Normal coordinates and RGB/XYZ separate/combine. Principled live inputs: base, alpha, metalness, roughness, emission/color strength and IOR. Other shader types, groups, images, arbitrary mapping/vector nodes, custom object coordinate sources and physical surface lobes are outside this entry's common-graph row and reject explicitly. This entry does not replace the existing baked or extended-material entries.
+Supports Value/RGB, reroutes, Math (41 scalar operations including safe divide/power/log domains), MixRGB and Mix (Float/Vector/RGBA, 19 color blend modes; Hue and Color keep A when B is grey, and Saturation keeps a grey A grey, since a grey has no hue), Color Ramp (2..32 stops, Constant/Linear/Ease/Cardinal/B-spline, RGB/HSV/HSL and four hue directions), Noise (1D..4D, Fac/Color, fractional detail 0..15, normalized fBM, multifractal, ridged, hybrid and hetero terrain, roughness/lacunarity/distortion/offset/gain), UV/Generated/Object/Normal coordinates and RGB/XYZ separate/combine. Principled live inputs: base, alpha, metalness, roughness, emission/color strength and IOR. Other shader types, groups, images, arbitrary mapping/vector nodes, custom object coordinate sources and physical surface lobes are outside this entry's common-graph row and reject explicitly. This entry does not replace the existing baked or extended-material entries.
 Limits: 256 live output nodes, 1024 vec4 parameters (16 KiB), 3601 animation frames, 262144 parameter samples, file limit 256 MiB. Original metadata is cloned, cycles/forward links and shader-injection enums reject. seek(seconds) clamps to the sampled scene range without looping; per-frame samples interpolate linearly. Runtime set overrides remain through seek until reset. Blender frame/subframe and images/mesh counts are restored during export. Coordinate conversion preserves Blender Z-up, UV bottom-left and scene units. Ramp stop positions/colors remain paired and sort live when they cross.
 Noise uses Margo's independent hash and gradient field, rather than Blender's private stochastic ordering: the procedural field and animation controls remain live, but exact noise texels are an accepted difference. Per-frame sampling also approximates subframe curves between samples. No speed, bandlimiting or full Blender material equivalence claim. Both are recorded for later quality work rather than hiding the difference.
 
@@ -9620,6 +9620,28 @@ Batch 164 row 13.19 keeps one render pass per `NodePass` screen effect. Each eff
 Batch 164 rows 9.7 and 13.15: with a 4x scene capture, Tonemap resolves colour in a pass of its own, after core's scene pass, because core's scene pass (frozen for v1.0.0) ends without a resolve target; the `acescg` curve is the fitted AP1 RRT/ODT, not ACESFilmic, so the images differ. Row 13.17: `TAA({velocityOnly: true})` draws velocity in its own geometry pass, because core's scene pass writes no velocity attachment. Accepted differences, timing pending the quiet rerun. [Evidence](whitepaper/batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
 
 Batch 132 text bidi fix (lane I, 2026-11-10, 71beba857): the UAX #9 weak-type pass (number, separator and terminator code point lists, rules W2 to W7, number levels) grew `@margoengine/text` from 17109 to 17967 B gzip and each entry that bundles the layout (animate, curve, fit, rich) by about 640 B, recorded in scripts/quality/baselines/sizes.json with that reason under the push-anyway rule (gates skipped by the fast landing Scott ordered on 2026-11-10). No speed claim; layout time not re-measured.
+
+## Native pointer lock on a locked Mac (lane L, 2026-11-10)
+
+Chromium grants `requestPointerLock` only to a page whose view has operating-system focus. On macOS that is a view in
+the key window of the front application. The M6 Mac mini runs the browser checks unattended with its console locked:
+`ioreg -n Root -d1` reports `CGSSessionScreenIsLocked` true and `lsappinfo front` names `com.apple.loginwindow`. No
+browser window can be key, so Chromium 156.0.8078.4 rejects every request with `WrongDocumentError` ("The root
+document of this element is not valid for pointer lock."). Measured 2026-11-10 for the headless shell, new headless
+(`channel: 'chromium'`) and headed, with and without `page.bringToFront()` and CDP `Emulation.setFocusEmulationEnabled`;
+`document.hasFocus()` was true, the page visible and the click a real user activation in every case. No launch flag or
+harness change can make a window key while macOS shows the login window, so the cause is outside Margo.
+
+What the checks do instead (`scripts/support/pointer-lock.mjs`): `packages/input/test/input-browser.mjs` and
+`packages/worker/tests/browser-check.mjs` first try native lock in a scratch page. If it works, they run unchanged. If
+it is refused with `WrongDocumentError` on macOS while the console is locked or a non-browser app is in front, they
+print a `NOTE ... native acquisition not proven on this machine` line naming the error and the front app, and run
+their lock steps (request, `pointerlockchange`, locked movement into rendered pixels or worker controls, release)
+against a stand-in for the platform's lock state written to Pointer Lock 2.0 (W3C Working Draft,
+https://www.w3.org/TR/pointerlock-2/). Any other refusal, on any platform, still fails the check. What this does not
+prove: that Chromium on macOS acquires a native lock for Margo's elements. That needs a run with the console unlocked
+and the browser in front (finish-later "132 | worker"); the Windows dev PC runs the native path. Regression for the
+classifier: `tests/pointer-lock-harness.test.js`.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -15319,9 +15341,13 @@ Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on
   steps were followed. Not yet checked on a real phone.
 
 Open (not fixed in the audit):
-- On the M6, `packages/input/test/input-browser.mjs` fails before its pixel steps: Chromium rejects `requestPointerLock`
-  with `WrongDocumentError` under the test harness (same as the finish-later "132 | worker" row; a probe page that was
-  focused, visible and top level got the same). Native pointer lock is unverified on this Mac.
+- Closed, lane L (2026-11-10): on the M6, `packages/input/test/input-browser.mjs` (and `packages/worker/tests/browser-check.mjs`)
+  failed before their pixel steps because Chromium rejected `requestPointerLock` with `WrongDocumentError`. Root cause
+  is outside Margo: the Mac's console was locked (`ioreg` CGSSessionScreenIsLocked true, front app
+  `com.apple.loginwindow`), and Chromium on macOS grants pointer lock only to a view in the key window of the front
+  app. Both checks now probe native lock and, only for that macOS reason, run against a Pointer Lock 2.0 stand-in with
+  a printed note; any other refusal still fails. Native acquisition on this Mac stays unproven while it runs
+  unattended; docs/limits.md "Native pointer lock on a locked Mac". Regression: tests/pointer-lock-harness.test.js.
 - `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
   so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
 - Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.
