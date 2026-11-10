@@ -491,7 +491,8 @@ export class NodeMaterialInstallation implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     const cleanup = new Cleanup();
-    cleanup.run(() => this.model.root.engine.removePlugin(this.name));
+    // The scene this installation was attached to, not whichever scene is active now.
+    cleanup.run(() => this.model.root.engine.sceneOf(this)?.removePlugin(this.name));
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     for (const [p, previous] of this.previous)

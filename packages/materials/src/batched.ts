@@ -470,7 +470,9 @@ export class BatchedMesh implements EnginePlugin {
     this.release();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.mesh.root.engine.removePlugin(this.name);
+    // The scene this batch was attached to, not whichever scene is active now.
+    const engine = this.mesh.root.engine;
+    engine.sceneOf(this)?.removePlugin(this.name);
     if (!this.mesh.disposed) this.mesh.dispose();
   }
   declare [Symbol.dispose]: () => void;
