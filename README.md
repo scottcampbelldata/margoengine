@@ -221,7 +221,7 @@ change the kernel.
 
 ```sh
 npm run dev               # Night Citadel showcase
-npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html
+npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html (root vite.config.mjs keeps the rival comparison pages out of the dependency scan)
 npm run lint              # Biome
 npm run typecheck         # strict TypeScript for all packages
 npm run test:all          # every Node test in the repo

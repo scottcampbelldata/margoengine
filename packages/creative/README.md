@@ -156,7 +156,7 @@ From the repository root:
 
 ```sh
 npm run dev --workspace @margoengine/creative
-# Open /examples/earth/ at the printed localhost URL.
+# Opens /examples/earth/ in your browser (the dev server has no page at /).
 npm run test --workspace @margoengine/creative
 npm run test:browser --workspace @margoengine/creative
 ```
