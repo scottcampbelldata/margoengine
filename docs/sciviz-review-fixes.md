@@ -15,3 +15,35 @@ https://bio3d.colorado.edu/imod/doc/mrc_format.txt; Cheng et al., *MRC2014: Exte
 to the MRC format header for electron cryo-microscopy and tomography* (2015),
 https://doi.org/10.1016/j.jsb.2015.04.002. The IMOD extension defines mode 101's
 low-nibble-first ordering and row padding; MRC2014 supplies the base header.
+
+## H2: physical grid orientation
+
+Grid bounds retain first and last sample coordinates in storage index order,
+including descending FITS CDELT axes. Every sample coordinate is checked against
+the axis-aligned uniform box, with a 32-ulp-scale allowance for floating point
+transform arithmetic. Rotation, shear, axis permutation and nonlinear spacing
+reject with code `unsupported` before a volume is allocated. Source `world()`
+transforms remain usable independently; resample into physical axes before using
+the grid/volume helpers for those transforms. Validation is linear in sample count
+and uses constant extra storage beyond the existing Float32 copy.
+
+scientific-image.test.js first reproduced reversed bounds and silent unsupported
+transforms. It verifies negative x/y/z axes, unchanged data order, volume argument
+propagation, and rejection before allocation. astronomy.test.js retains independent
+WCS and triclinic coordinate checks and now checks explicit grid rejection for
+those unsupported sources. astronomy-browser.mjs checks the directed volume model
+and matching physical endpoints on WebGPU and WebGL2 compatibility.
+
+Clean-room sources compared: Eric W. Greisen and Mark R. Calabretta,
+*Representations of world coordinates in FITS* (2002),
+https://arxiv.org/abs/astro-ph/0207407; Mark R. Calabretta and Eric W. Greisen,
+*Representations of celestial coordinates in FITS* (2002),
+https://arxiv.org/abs/astro-ph/0207413. The former defines the signed linear
+transformation; the latter distinguishes the nonlinear celestial projection.
+
+H2 optional-entry size: sciviz/mrc is 2,949 to 3,171 bytes minified gzip.
+Its ceiling is 3,162 to 3,427 bytes, retaining the standard 256-byte headroom.
+The additional validation prevents incorrect physical placement; splitting the shared
+helper would add loading/API complexity and allow divergent bounds behaviour.
+Core plus stage remains 24,209 bytes. Measured by equivalent parent-source and
+current builds with the repository's bundleBytes/gzip method.

@@ -39,6 +39,38 @@ for (const compat of [false, true]) {
     assert.equal(result.emdb.samples, 125 ** 3);
     assert.equal(result.idr.samples, 256 ** 2);
     assert.equal(new Set(Object.values(result).map((r) => r.hash)).size, 3);
+    const directed = await browser.page.evaluate(async () => {
+      const { figures } = await import('/examples/sciviz-astronomy.ts'),
+        { fitsWCS, volumeFromFITS } = await import('/packages/sciviz/src/fits.ts'),
+        layers = [];
+      try {
+        for (const step of [1, -1]) {
+          const wcs = fitsWCS({ CRPIX1: 1, CRVAL1: step === 1 ? 8 : 10, CDELT1: step }, 3);
+          layers.push(
+            volumeFromFITS(figures.emdb, {
+              data: Float32Array.from({ length: 12 }, (_, i) => i),
+              dims: [3, 2, 2],
+              world: (p) => wcs.world(p),
+            }),
+          );
+        }
+        await figures.emdb.ready();
+        figures.emdb.engine.render();
+        return layers.map((layer) => ({ bounds: [...layer.bounds], model: [...layer.model] }));
+      } finally {
+        for (const layer of layers) layer.dispose();
+      }
+    });
+    assert.deepEqual(
+      directed.map((l) => l.bounds.slice(0, 2)),
+      [
+        [8, 10],
+        [10, 8],
+      ],
+    );
+    assert.ok(directed[0].model[0] > 0 && directed[1].model[0] < 0);
+    assert.ok(Math.abs(directed[1].model[12] - directed[0].model[12] - directed[0].model[0]) < 1e-6);
+    assert.ok(Math.abs(directed[1].model[0] + directed[0].model[0]) < 1e-6);
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ backend: compat ? 'WebGL2 compatibility' : 'WebGPU', ...result }));
     for (const name of ['sdss', 'emdb', 'idr'])

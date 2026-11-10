@@ -1,4 +1,4 @@
-import { rangeError } from '../../shared/errors.js';
+import { fault, rangeError } from '../../shared/errors.js';
 import type { Bounds } from './layer.js';
 import type { Figure } from './figure.js';
 import type { VolumeLayer, VolumeLayerOptions } from './volume.js';
@@ -10,7 +10,7 @@ export interface ScientificImage {
   /** Exact index to physical coordinate transform, including shear or rotated axes. */
   world(index: readonly number[]): readonly number[];
 }
-/** Renderer grid plus its physical transform. The bounds enclose transformed sample centres. */
+/** Renderer grid plus its physical transform. Bounds retain first-to-last sample order on each axis. */
 export interface ScientificGrid {
   readonly data: Float32Array;
   readonly dims: [number, number, number];
@@ -24,26 +24,50 @@ export function imageGrid(image: ScientificImage): ScientificGrid {
     data = Float32Array.from(image.data);
   if (data.length !== dims[0] * dims[1] * dims[2])
     throw rangeError('Scientific grid sample count differs from dimensions', 'sciviz');
-  const bounds: Bounds = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
-  for (let corner = 0; corner < 8; corner++) {
-    const p = image.world(dims.map((n, i) => (corner & (1 << i) ? n - 1 : 0)));
-    for (let i = 0; i < 3; i++) {
-      bounds[2 * i] = Math.min(bounds[2 * i], p[i] ?? 0);
-      bounds[2 * i + 1] = Math.max(bounds[2 * i + 1], p[i] ?? 0);
-    }
+  const origin = image.world([0, 0, 0]),
+    bounds: Bounds = [0, 0, 0, 0, 0, 0];
+  for (let axis = 0; axis < 3; axis++) {
+    const last = [0, 0, 0];
+    last[axis] = dims[axis] - 1;
+    bounds[2 * axis] = origin[axis] ?? 0;
+    bounds[2 * axis + 1] = image.world(last)[axis] ?? 0;
   }
-  // Singleton axes occupy one unit so 2D images remain usable as a one-plane volume.
-  for (let i = 0; i < 3; i++) if (bounds[2 * i] === bounds[2 * i + 1]) bounds[2 * i + 1]++;
+  // Include every axis: an orthogonal cell's cos(pi/2) terms can round into a
+  // singleton axis whose own extent is zero.
+  const rounding =
+    32 *
+    Number.EPSILON *
+    Math.max(...bounds.map(Math.abs), ...[0, 1, 2].map((axis) => Math.abs(bounds[2 * axis + 1] - bounds[2 * axis])));
   let lo = Infinity,
     hi = -Infinity;
-  for (const v of data)
+  for (let n = 0; n < data.length; n++) {
+    const index = [n % dims[0], Math.floor(n / dims[0]) % dims[1], Math.floor(n / (dims[0] * dims[1]))],
+      physical = image.world(index);
+    // A box cannot encode cross-axis coupling or unequal physical sample spacing.
+    // Check every sample, not just the corners, which can hide nonlinear distortion.
+    for (let axis = 0; axis < 3; axis++) {
+      const first = bounds[2 * axis],
+        last = bounds[2 * axis + 1],
+        expected = first + (dims[axis] > 1 ? index[axis] / (dims[axis] - 1) : 0) * (last - first),
+        actual = physical[axis] ?? 0;
+      if (!Number.isFinite(expected) || !Number.isFinite(actual) || Math.abs(actual - expected) > rounding)
+        throw fault(
+          'unsupported',
+          'Scientific grid needs an axis-aligned uniformly spaced world transform; resample the image into physical axes before rendering',
+          'sciviz',
+        );
+    }
+    const v = data[n];
     if (Number.isFinite(v)) {
       lo = Math.min(lo, v);
       hi = Math.max(hi, v);
     }
+  }
+  // Give a singleton axis a nonzero display extent while keeping its first sample fixed.
+  for (let i = 0; i < 3; i++) if (bounds[2 * i] === bounds[2 * i + 1]) bounds[2 * i + 1]++;
   return { data, dims, bounds, range: lo <= hi ? [lo, hi] : [0, 0], image };
 }
-/** Draws the storage grid. Use image.world for picking in rotated, sheared or celestial coordinates. */
+/** Draws a grid in physical axes; resample rotated, sheared or nonuniform images before drawing. */
 export function imageVolume(figure: Figure, image: ScientificImage, options: VolumeLayerOptions = {}): VolumeLayer {
   const grid = imageGrid(image);
   return figure.volume(grid.data, {

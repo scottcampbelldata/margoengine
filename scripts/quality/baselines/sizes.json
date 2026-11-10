@@ -7954,6 +7954,12 @@
       "date": "2026-11-10",
       "reason": "Batch 180 job 4: new optional sciviz/cf 0 -> 14438 B gzip, ceiling 14872 B; projections 0 -> 2328 B, ceiling 2584 B. Complete coordinate metadata, model calendars, units, vertical formulas, display/conservative regridding and independent Snyder transforms justify the bytes. Splitting semantics would duplicate dimension and lifetime coordination; retained mesh rendering remains lazy. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "4df9d321a",
+      "reason": "Review H2 physical grid validation: sciviz/mrc 2949 -> 3171 B gzip; preserve signed axes and reject unsupported transforms before allocation. Keep validation shared in the optional helpers; splitting it would add loading/API complexity and permit inconsistent bounds. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8851,7 +8857,7 @@
     "@margoengine/sciviz/math": 5002,
     "@margoengine/sciviz/maths": 9120,
     "@margoengine/sciviz/monitor": 2714,
-    "@margoengine/sciviz/mrc": 3162,
+    "@margoengine/sciviz/mrc": 3427,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/sciviz/ometiff": 3463,
@@ -9389,5 +9395,5 @@
     "@margoengine/sciviz/cf": 14872,
     "@margoengine/sciviz/projections": 2584
   },
-  "total": 15392599
+  "total": 15392864
 }

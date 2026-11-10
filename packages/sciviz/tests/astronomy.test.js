@@ -72,7 +72,10 @@ test('Astropy images, cube axes, binary scalar/vector/complex/heap table cells a
     [3, -4],
   ]);
   assert.deepEqual(columns.variable.values, [[1, 2, 3], [9]]);
-  assert.equal(fitsGrid(image.image()).data.length, 60);
+  assert.throws(
+    () => fitsGrid(image.image()),
+    (e) => e.code === 'unsupported',
+  );
   const scaled = parseFITS(read('scaled.fits')).hdus[0];
   assert.deepEqual([...scaled.data], [80, NaN, 140, 160]);
   assert.deepEqual([...parseFITS(read('int64.fits')).hdus[0].data], [2n ** 60n + 1n, -(2n ** 60n) - 1n]);
@@ -144,7 +147,10 @@ test('mrcfile owner output: integer and float modes, starts, origin, reordered a
     const p = map.world([-1, 1, -3]);
     near(p[0], 10 + 2.5 * Math.cos((70 * Math.PI) / 180), 1e-6);
     near(p[1], 20 + 2.5 * Math.sin((70 * Math.PI) / 180), 1e-6);
-    assert.equal(mrcGrid(map.image()).data.length, 60);
+    assert.throws(
+      () => mrcGrid(map.image()),
+      (e) => e.code === 'unsupported',
+    );
   }
 });
 test('real EMDB CC0 map matches independent mrcfile dimensions and decoded densities', { timeout: 10000 }, async () => {
@@ -196,16 +202,26 @@ test('MRC packed 4-bit, complex component choice, endian order and cancellation'
 
 test('MRC mode 101 skips odd-width row padding and requires every padded byte', { timeout: 1000 }, () => {
   for (const nx of [1, 3, 5]) {
-    const ny = 2, nz = 2, stride = Math.ceil(nx / 2),
+    const ny = 2,
+      nz = 2,
+      stride = Math.ceil(nx / 2),
       bytes = new Uint8Array(1024 + stride * ny * nz);
     bytes.set(read('owner-float32.mrc').subarray(0, 1024));
     const header = new DataView(bytes.buffer);
-    for (const [offset, value] of [[0, nx], [4, ny], [8, nz], [12, 101]]) header.setInt32(offset, value, true);
+    for (const [offset, value] of [
+      [0, nx],
+      [4, ny],
+      [8, nz],
+      [12, 101],
+    ])
+      header.setInt32(offset, value, true);
     bytes.fill(255, 1024);
     const expected = [];
     for (let row = 0; row < ny * nz; row++)
       for (let x = 0; x < nx; x++) {
-        const value = (row * nx + x + 1) % 15, p = 1024 + row * stride + (x >> 1), shift = (x & 1) * 4;
+        const value = (row * nx + x + 1) % 15,
+          p = 1024 + row * stride + (x >> 1),
+          shift = (x & 1) * 4;
         expected.push(value);
         bytes[p] = (bytes[p] & ~(15 << shift)) | (value << shift);
       }

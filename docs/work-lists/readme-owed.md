@@ -1339,3 +1339,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 180 job 4): document optional /cf and /projections, named plane selections, unit and calendar codecs, all Appendix D vertical formulas, geographic/projected metadata, curvilinear and periodic sampling, masks, conservative averages/coverage, map layers, projection defaults/domains and the real ERA5/CMIP6 demo. No README examples written or checked during build phase.
 - margoengine (batch 180 job 4): document generated sciviz/cf and sciviz/projections forwarding subpaths during the README phase.
 - @margoengine/viz (batch 180 job 4): document CF climate and Snyder projections through the generated sciviz subpaths during the README phase.
+- @margoengine/sciviz: document directed scientific bounds, physical resampling requirements and unsupported grid transforms (review H2).
