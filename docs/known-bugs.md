@@ -5597,3 +5597,10 @@ as unsupported by the light loader.
   compared it with the unreduced `chunksSent`. Input: a session past 2^32 chunk messages, then a cut and a resume.
   Wrong output: chunks the client had went out again (or a full resend). The count is now sent modulo 2^32 and
   compared modulo 2^32. Regression in packages/voxel-net/tests/resume.test.js.
+
+## Batch 132 audit: headless (fixed)
+
+- Fixed: `decodePNG` (packages/headless/src/compare.ts) took width, height, depth and colour type from bytes 16 to 28
+  without checking the first chunk. Input: a PNG whose first chunk is renamed `aHDR` with a matching CRC. Wrong output:
+  decoded as if it were IHDR, where the PNG specification (5.6) requires IHDR first. Regression
+  packages/headless/tests/audit-132.test.js.

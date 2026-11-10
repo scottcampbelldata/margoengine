@@ -185,8 +185,7 @@ export function ssim(a: HeadlessPixels, b: HeadlessPixels, options: SSIMOptions 
       varianceA = squareA[i] - ma * ma,
       varianceB = squareB[i] - mb * mb,
       covariance = cross[i] - ma * mb,
-      score =
-        ((2 * ma * mb + C1) * (2 * covariance + C2)) / ((ma * ma + mb * mb + C1) * (varianceA + varianceB + C2));
+      score = ((2 * ma * mb + C1) * (2 * covariance + C2)) / ((ma * ma + mb * mb + C1) * (varianceA + varianceB + C2));
     scores[i] = score;
     sum += score;
   }
@@ -255,8 +254,10 @@ function unfilter(raw: Uint8Array, stride: number, height: number, step: number)
 export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
   if (!(bytes instanceof Uint8Array)) throw typeError('decodePNG needs PNG file bytes', 'headless');
   if (bytes.length < 33 || PNG_SIGNATURE.some((value, i) => bytes[i] !== value)) throw badPNG();
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-    width = view.getUint32(16),
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // The first chunk must be a 13-byte IHDR (PNG specification, 5.6 chunk ordering).
+  if (view.getUint32(8) !== 13 || String.fromCharCode(...bytes.subarray(12, 16)) !== 'IHDR') throw badPNG();
+  const width = view.getUint32(16),
     height = view.getUint32(20),
     depth = bytes[24],
     type = bytes[25],
@@ -269,7 +270,10 @@ export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
     const length = view.getUint32(at),
       name = String.fromCharCode(...bytes.subarray(at + 4, at + 8)),
       body = bytes.subarray(at + 8, at + 8 + length);
-    if (at + 12 + length > bytes.length || view.getUint32(at + 8 + length) !== crc32(bytes.subarray(at + 4, at + 8 + length)))
+    if (
+      at + 12 + length > bytes.length ||
+      view.getUint32(at + 8 + length) !== crc32(bytes.subarray(at + 4, at + 8 + length))
+    )
       throw badPNG();
     if (name === 'IDAT') compressed.push(body);
     else if (name === 'PLTE') palette = body;
@@ -285,7 +289,8 @@ export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
     most = 2 ** Math.min(depth, 8) - 1,
     scale = 255 / most,
     // The transparent colour of grey and RGB files is stored in 16 bits per sample, whatever the depth.
-    key = (index: number) => (transparency!.length > index * 2 + 1 ? (transparency![index * 2] << 8) | transparency![index * 2 + 1] : -1);
+    key = (index: number) =>
+      transparency!.length > index * 2 + 1 ? (transparency![index * 2] << 8) | transparency![index * 2 + 1] : -1;
   let consumed = 0;
   // Reads one image of `across` by `down` pixels from the stream, its pixel (x, y) landing at (left + x * stepX, top + y * stepY).
   const pass = (across: number, down: number, left: number, top: number, stepX: number, stepY: number): void => {
@@ -313,11 +318,7 @@ export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
         } else if (type === 0 || type === 4) {
           data.fill(Math.round(sample(y, x * channels) * scale), at, at + 3);
           data[at + 3] =
-            type === 4
-              ? Math.round(sample(y, x * 2 + 1) * scale)
-              : transparency && whole(y, x) === key(0)
-                ? 0
-                : 255;
+            type === 4 ? Math.round(sample(y, x * 2 + 1) * scale) : transparency && whole(y, x) === key(0) ? 0 : 255;
         } else {
           for (let c = 0; c < 3; c++) data[at + c] = Math.round(sample(y, x * channels + c) * scale);
           data[at + 3] =
