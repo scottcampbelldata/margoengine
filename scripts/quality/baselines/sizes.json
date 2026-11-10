@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13421305,
+  "total": 13422126,
   "history": [
     {
       "date": "2026-10-24",
@@ -6912,6 +6912,12 @@
       "commit": "801f70e3d",
       "reason": "Batch 248 job 2: new optional text/selection entry, pure source-range boxes over existing visual layout. No existing ceiling raised; root and core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "05a866cce",
+      "reason": "batch-244-scale-3111-to-3932B-gzip-for-3x-4x-edge-directed-reconstruction-one-pass-no-intermediate-splitting-would-duplicate-filter-plumbing",
+      "grew": 1
     }
   ],
   "items": {
@@ -7540,7 +7546,7 @@
     "@margoengine/pixel/follow": 3861,
     "@margoengine/pixel/palette": 5201,
     "@margoengine/pixel/render3d": 3866,
-    "@margoengine/pixel/scale": 3367,
+    "@margoengine/pixel/scale": 4188,
     "@margoengine/points": 24863,
     "@margoengine/points/clip": 7524,
     "@margoengine/points/copc": 15633,

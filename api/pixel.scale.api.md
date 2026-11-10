@@ -25,7 +25,7 @@ export interface PixelScaleOptions extends ScreenPassOptions {
     filter?: ScaleFilter;
 }
 
-export type ScaleFilter = 'nearest' | 'sharp-bilinear' | 'edge';
+export type ScaleFilter = 'nearest' | 'sharp-bilinear' | 'edge' | 'xbr3' | 'xbr4';
 
 export interface ScreenPassOptions {
     source: TextureSource;

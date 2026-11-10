@@ -694,3 +694,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - `margoengine` (batch 213 job 4): document generated rigging/vrma alias in README phase.
 - @margoengine/text (batch 248 job 2): document /selection getSelectionRects, UTF-16 ranges, bidi holes, shaped carets, clipping and newline semantics.
 - margoengine (batch 248 job 2): document text/selection forwarding.
+
+- @margoengine/pixel (batch 244 job 2): document scale xbr3/xbr4 filters, edge-directed 3x/4x reconstruction, shallow/steep slopes, single-pixel and alpha preservation, fractional coverage, native-factor fallback and unchanged defaults.
+
+- margoengine (batch 244 job 2): generated culling/depth and scatter/occlusion facades restored to generator output; existing exports retained, no new example work.

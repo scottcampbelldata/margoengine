@@ -4627,3 +4627,8 @@ Batch 222 job 2: authored material-chain checks found no remaining defect. Exter
 
 Batch 222 job 2 scope receipt: msft-check passes native and compatibility, including later UV2, retained vertex buffers and original material restoration. Shader-review and extension checks pass both backends. The broader compatibility materials permutation reproduces the already-recorded batch-273 16-fragment-sampler overflow (test-results/batch222-msft-gpu.log); its shader builders are unchanged by material-index/UV preparation work. Keep that separate owning-lane defect open under lane rules 16/21, with no altered assertion or accepted difference.
 Batch 248 job 2: selection rectangles built; no new open defect identified in the job.
+
+### Batch 244 job 2
+The edge-directed 3x/4x scaler is built with analytic and GPU oracle regressions. No open defect identified in this job's scope; algorithm ambiguity and external-variant differences are documented in limits.
+
+Batch 244 landing repair: the existing umbrella generated-file regression exposed manually appended culling/depth and scatter/occlusion exports with missing generated banners and noncanonical manifest order. Regenerated with scripts/umbrella.mjs, preserving both exports; tests/umbrella.test.js is the existing regression.

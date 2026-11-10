@@ -13,7 +13,7 @@ import { ScreenPass, type ScreenPassOptions, VERTEX } from './blit.js';
 export { fitRect, type PixelFit, type ScreenPassOptions, type TextureSource } from './blit.js';
 
 /** How {@link PixelScale} fills each output pixel. */
-export type ScaleFilter = 'nearest' | 'sharp-bilinear' | 'edge';
+export type ScaleFilter = 'nearest' | 'sharp-bilinear' | 'edge' | 'xbr3' | 'xbr4';
 
 /** Settings of {@link PixelScale}. */
 export interface PixelScaleOptions extends ScreenPassOptions {
@@ -29,8 +29,45 @@ ${VERTEX}
 fn at(t:vec2i)->vec4f{
 return textureLoad(image,clamp(t,vec2i(0),vec2i(textureDimensions(image))-1),0);
 }
+// Integer colour decisions are stable across GPU backends. Alpha participates, so transparent contours count.
+fn difference(a:vec4f,b:vec4f)->f32{
+let d=abs(vec4i(round(a*255))-vec4i(round(b*255)));
+return f32(3*d.r+6*d.g+d.b+10*d.a);
+}
+fn contour(j:vec2i)->vec4f{
+let bounded=clamp(j,vec2i(0),vec2i(textureDimensions(image))*s.grid-1);
+let t=bounded/s.grid;
+let q=(vec2f(bounded-t*s.grid)+0.5)/f32(s.grid);
+let e=at(t);
+var sum=vec4f(0);
+var coverage=0.0;
+// Four rotated corner hypotheses. Compare along-contour continuity to a crossing contour in a 5x5 footprint.
+for(var corner=0;corner<4;corner++){
+let sign=vec2i(select(-1,1,(corner&1)==1),select(-1,1,corner>=2));
+let dx=vec2i(sign.x,0); let dy=vec2i(0,sign.y);
+let f=at(t+dx); let h=at(t+dy); let i=at(t+dx+dy);
+if(all(e==f)||all(e==h)){continue;}
+if(all(f==h)&&all(f==at(t-dx))&&all(f==at(t-dy))){continue;}
+let along=4*difference(f,h)+difference(e,at(t+dx-dy))+difference(e,at(t-dx+dy))
+  +difference(i,at(t+2*dx))+difference(i,at(t+2*dy));
+let across=4*difference(e,i)+difference(h,at(t-dx))+difference(f,at(t-dy))
+  +difference(h,at(t+dx+2*dy))+difference(f,at(t+2*dx+dy));
+if(along>=across){continue;}
+let candidate=select((f+h)*0.5,select(f,h,difference(e,h)<difference(e,f)),difference(e,h)!=difference(e,f));
+let u=select(1-q.x,q.x,sign.x>0); let v=select(1-q.y,q.y,sign.y>0);
+let horizontal=difference(h,at(t+2*dx+dy));
+let vertical=difference(f,at(t+dx+2*dy));
+var edge=u+v-1.5;
+if(2*horizontal<vertical){edge=0.5*u+v-1.25;}
+if(2*vertical<horizontal){edge=u+0.5*v-1.25;}
+let weight=clamp(edge*f32(s.grid)+0.5,0,1);
+sum+=candidate*weight; coverage+=weight;
+}
+return (e*max(0,1-coverage)+sum)/max(1,coverage);
+}
 fn cell(j:vec2i)->vec4f{
 if(s.grid==1){return at(j);}
+if(s.grid>=3){return contour(j);}
 let t=j/2;
 let q=j-t*2;
 let e=at(t);
@@ -88,14 +125,15 @@ export class PixelScale extends ScreenPass {
     words.set(rect, 0);
     words[4] = this.filter === 'nearest' ? 0 : 1;
     // Scale2x needs room: below 2x the doubled grid would be finer than the screen, so 'edge' covers the plain one.
-    const room = Math.min(rect[2] / source.width, rect[3] / source.height) >= 2;
-    words[5] = this.filter === 'edge' && room ? 2 : 1;
+    const grid = this.filter === 'xbr4' ? 4 : this.filter === 'xbr3' ? 3 : this.filter === 'edge' ? 2 : 1;
+    const room = Math.min(rect[2] / source.width, rect[3] / source.height) >= grid;
+    words[5] = room ? grid : 1;
   }
 }
 
 const checkFilter = (filter: ScaleFilter): void => {
-  if (filter !== 'nearest' && filter !== 'sharp-bilinear' && filter !== 'edge')
-    throw rangeError(`PixelScale filter must be nearest, sharp-bilinear or edge, got ${filter}`, 'pixel-options');
+  if (!['nearest', 'sharp-bilinear', 'edge', 'xbr3', 'xbr4'].includes(filter))
+    throw rangeError(`PixelScale filter must be nearest, sharp-bilinear, edge, xbr3 or xbr4, got ${filter}`, 'pixel-options');
 };
 
 /** An RGBA picture, 4 bytes a pixel, rows from the top. */
