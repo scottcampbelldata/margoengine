@@ -63,6 +63,13 @@ test('standalone registration functions cannot silently gate their work either',
 test('removing each repaired setup refusal brings back a source contract failure', () => {
   for (const path of [
     'animation/src/morph-gpu.ts',
+    'culling/src/sort.ts',
+    'culling/src/webgl2.ts',
+    'materials/src/native-glass.js',
+    'materials/src/transmission-layers.ts',
+    'selection/src/highlight.ts',
+    'terrain/src/imagery.ts',
+    'weather/src/cover.ts',
     'animation/src/vat.ts',
     'lines/src/lines.ts',
     'lines/src/batch.ts',
