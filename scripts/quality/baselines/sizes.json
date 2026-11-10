@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13665335,
+  "total": 13667269,
   "history": [
     {
       "date": "2026-10-24",
@@ -7127,6 +7127,12 @@
       "commit": "95b63e3e8",
       "reason": "batch203-new-optional-jpeg-entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d2b23ddf8",
+      "reason": "Batch 240 object block entry, shared geometry and instance lifetime",
+      "grew": 1
     }
   ],
   "items": {
@@ -7354,6 +7360,7 @@
     "@margoengine/decoders/draco-native": 67462,
     "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/image": 787595,
+    "@margoengine/decoders/jpeg": 4030,
     "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 2851,
     "@margoengine/decoders/ktx2-gpu": 14795,
@@ -7555,6 +7562,7 @@
     "@margoengine/inspector/tweak": 4276,
     "@margoengine/kinematics-constraints": 11751,
     "@margoengine/kinematics-constraints/chain": 2160,
+    "@margoengine/kinematics-constraints/joint-limits": 1468,
     "@margoengine/kinematics-constraints/sdf": 7229,
     "@margoengine/kinematics-constraints/swept": 9491,
     "@margoengine/labels": 5806,
@@ -7947,6 +7955,7 @@
     "@margoengine/sciviz/glyph": 4644,
     "@margoengine/sciviz/graph": 23118,
     "@margoengine/sciviz/grids": 24307,
+    "@margoengine/sciviz/labels": 6548,
     "@margoengine/sciviz/lic": 24165,
     "@margoengine/sciviz/maths": 5959,
     "@margoengine/sciviz/netcdf": 3674,
@@ -8182,6 +8191,7 @@
     "@margoengine/video/360": 1881,
     "@margoengine/video/alpha": 2154,
     "@margoengine/video/codecs": 3593,
+    "@margoengine/video/dome": 2026,
     "@margoengine/video/material": 1407,
     "@margoengine/video/record": 1396,
     "@margoengine/viewcube": 5321,
@@ -8217,6 +8227,7 @@
     "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
     "@margoengine/voxel-net/rewind": 2409,
+    "@margoengine/voxel-net/rooms": 19966,
     "@margoengine/voxel-net/server": 18515,
     "@margoengine/voxel-net/shards": 9956,
     "@margoengine/voxel-net/sql-store": 1614,
@@ -8246,6 +8257,7 @@
     "@margoengine/voxel/lod": 7228,
     "@margoengine/voxel/mesher": 8312,
     "@margoengine/voxel/models": 5552,
+    "@margoengine/voxel/objects": 1934,
     "@margoengine/voxel/physics": 11412,
     "@margoengine/voxel/query": 4309,
     "@margoengine/voxel/render": 25048,
@@ -8411,11 +8423,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/voxel-net/rooms": 19966,
-    "@margoengine/kinematics-constraints/joint-limits": 1468,
-    "@margoengine/video/dome": 2026,
-    "@margoengine/sciviz/labels": 6548,
-    "@margoengine/decoders/jpeg": 4030
+    "margoengine/web": 577
   }
 }

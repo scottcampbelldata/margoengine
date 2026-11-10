@@ -4306,6 +4306,10 @@
       "types": "./dist/voxel/models.d.ts",
       "import": "./dist/voxel/models.js"
     },
+    "./voxel/objects": {
+      "types": "./dist/voxel/objects.d.ts",
+      "import": "./dist/voxel/objects.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

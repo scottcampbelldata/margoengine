@@ -2227,6 +2227,9 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 240 job 2 reuses core geometry batching and frustum culling for optional voxel object blocks, with no backend or core change. Exact CPU/GPU instance and draw counts cover two visible and one distant loaded placement, plus node graph/source lifetime, edits, streaming and disposal.
+
+
 Batch 238 job 4 adds two optional modifier compute passes around splat projection. Pre-pass writes canonical-space position/opacity before sorting; post-pass edits evaluated SH/fog colour before relighting. CPU canonical snapshots guarantee non-accumulation and restoration. Both-backend GPU evidence covers degree-4 analytic colour, extended opacity, seek identity, disable/setRest/restoration callbacks, ownership and pixel-exact restoration of the existing real capture. No covariance deformation, learned field or timing claim. Core/stage stay unchanged.
 
 Batch 190 job 1 adds optional oit/peel without core/stage changes. Private depth32float selection and R32F previous-depth sampling peel nearest distinct depths without storage buffers or float32 blending, then resolve far to near against opaque scene depth. Both native WebGPU and the full WebGL2 compatibility layer pass analytic crossing/occlusion/order/post/alpha checks and a real CC0 Khronos PBR asset. CPU recording covers multiview resize, restoration and disposal. Transparent edges are pixel-centre sampled even when the opaque scene is multisampled; coplanar surfaces share one depth. No speed claim or timing gate was added.

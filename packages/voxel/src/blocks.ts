@@ -20,7 +20,7 @@ export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
  * {@link connectStairs}). Bit 15 of either waterlogs it ({@link waterlogState}). Slabs and stairs are meshed, lit,
  * shadowed, collided and picked as their half-block boxes ({@link shapeOctants}).
  */
-export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
+export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 /** Side a stair's full-height back faces: `'+x'`, `'-x'`, `'+z'` or `'-z'`. */
 export type StairFacing = '+x' | '-x' | '+z' | '-z';
 /**
@@ -132,7 +132,7 @@ export interface BlockType {
 }
 
 const LAYERS: readonly BlockLayer[] = ['opaque', 'cutout', 'translucent', 'invisible'],
-  SHAPES: readonly BlockShape[] = ['cube', 'cross', 'liquid', 'slab', 'stair', 'model'],
+  SHAPES: readonly BlockShape[] = ['cube', 'cross', 'liquid', 'slab', 'stair', 'model', 'object'],
   FACINGS: readonly StairFacing[] = ['+x', '-x', '+z', '-z'];
 
 // Argument error for `value` that should be an integer in 0..max: TypeError for a non-number, RangeError otherwise.

@@ -32,7 +32,7 @@ export interface GpuVoxelMesherStats {
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
+type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 
 interface BlockType {
     readonly model?: readonly ModelOrientation[];

@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>Voxel object block correctness</title><canvas width="240" height="180" style="width:240px;height:180px"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '@margoengine/core';
+import {BlockTypes,VoxelWorld} from '@margoengine/voxel';
+import {VoxelObjects,objectState} from '@margoengine/voxel/objects';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[1,1,-4],target:[1,0.3,0.5],near:0.1,far:100}});
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const world=new VoxelWorld({blocks:new BlockTypes()}),objects=new VoxelObjects(engine,world),geometry=box(0.6,0.6,0.3),source=engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({color:'#ff0000'}));
+const id=objects.define('item',source);source.dispose();
+world.setBlock(0,0,0,id);world.setBlock(1,0,0,objectState(id,1));world.setBlock(10000,0,0,id);
+const red=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);const a=c.getImageData(0,0,canvas.width,canvas.height).data;let n=0;for(let i=0;i<a.length;i+=4)if(a[i]>40&&a[i]>a[i+1]*2&&a[i]>a[i+2]*2)n++;return n;};
+function draw(){objects.update();engine.render({delta:0});return {red:red(),visible:engine.stats.visible,draws:engine.stats.drawCalls,cells:objects.stats.cells};}
+window.check={async run(){
+ const before=draw();world.setBlock(0,0,0,0);const edited=draw();world.removeChunk(0,0,0);const removed=draw();
+ world.setBlock(0,0,0,id);world.setBlock(1,0,0,objectState(id,1));const reloaded=draw();
+ objects.dispose();engine.render({delta:0});const disposed=red();engine.dispose();return {before,edited,removed,reloaded,disposed,errors};
+}};window.ready=true;
+</script>

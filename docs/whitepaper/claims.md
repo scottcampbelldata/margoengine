@@ -3990,3 +3990,7 @@ Claim: optional sciviz/labels classifies integer categories, linear RGB/RGBA and
 ## Batch 203 JPEG dispatch (2026-11-10)
 
 The optional decoders/jpeg entry and decoders/image dispatch expose the same clean-room baseline and progressive JPEG implementation as exporters/jpeg-read. Evidence: packages/decoders/tests/jpeg.test.js and packages/exporters/tests/jpeg-read.test.js compare ten libjpeg-turbo reference pairs with the original bounds and mean error below one channel level. A Node worker test establishes operation without canvas or browser image APIs. This is codec coverage evidence, with the limits in docs/limits.md, and makes no speed claim.
+
+### Batch 240 job 2: object blocks
+
+VoxelObjects retains shared core Geometry identities across cells and snapshots a core glTF node graph while following chunk residency and edits. CPU objects.test.js proves two visible objects in one batch while a distant third is culled, graph transforms survive source disposal, unchanged handles survive edits, and chunk removal releases instances. objects-browser-check.mjs asserts matching native/compatibility pixels, one instanced draw for two visible cells, culling of a distant loaded chunk, edit/unload/reload and disposal. These are deterministic work counts and correctness results, not timing benchmarks.

@@ -8,7 +8,7 @@ import { ColorInput } from "@margoengine/math";
 
 export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
+export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 
 export interface BlockType {
     readonly model?: readonly ModelOrientation[];

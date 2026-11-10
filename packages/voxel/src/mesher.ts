@@ -126,6 +126,7 @@ const CELLS = 32768,
     slab: SHAPE | PART,
     stair: SHAPE | PART,
     model: NO_FACES,
+    object: NO_FACES,
   },
   // Per face direction (+x, -x, +y, -y, +z, -z): index strides of the normal, u and v axes, and the word 0 shifts of
   // the slice, u and v coordinates (x at 0, y at 5, z at 10).

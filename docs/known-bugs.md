@@ -4728,3 +4728,5 @@ Batch 214 job 2: no new defect found in legal-pose rejection; static-only scope 
 
 
 Batch 203 gate discovery: node scripts/gpu-package-tests.mjs --no-build --only=decoders --list fails before selection because cameras panorama/stereo, splats lod-sog-check and weather parity browser scripts lack registrations. Cause: global plan validation runs before package filtering. Changed-package suites were invoked directly under the shared GPU lock; registration repair belongs to the owning build jobs.
+
+Batch 240 job 2: object-block tests cover source-disposal independence, invalid graph rejection before defining an id, per-instance culling and streamed removal. No open defect accepted for this job.

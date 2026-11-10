@@ -807,3 +807,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/decoders: document /jpeg baseline and progressive RGBA8 decoding, /image JPEG dispatch, maxPixels and worker use.
 - @margoengine/exporters: document jpeg-read sharing the decoder implementation with unchanged API.
 - margoengine: expose the generated decoders/jpeg optional facade in the decoder index.
+
+- @margoengine/voxel and margoengine (batch 240 job 2): document /objects, core/glTF graph sources, cell-centre origin, quarter turns, shared ownership, retained handles and streaming; runnable README examples owed in the README phase.

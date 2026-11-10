@@ -3441,3 +3441,7 @@ View examples/sciviz-labels.html through the example server. The MSD archive sou
 After npm run build:packages, run node --test --test-timeout=120000 packages/decoders/tests/jpeg.test.js packages/decoders/tests/image.test.js packages/exporters/tests/jpeg-read.test.js. Fixtures and their independent reference PNGs are already in exporters/tests/fixtures/jpeg; source is recorded in its parent NOTICE.md. No benchmark or README execution is involved.
 
 The additional worker/GPU round trip runs with node scripts/gpu-lock.mjs run --owner=codex-batch203 --wait-max=60 --max=2 -- node packages/decoders/tests/jpeg-browser.mjs. It checks the same 15,688 stored RGBA8 channels exactly on both WebGPU and WebGL2 compatibility.
+
+### Batch 240 job 2
+
+Build packages, then node --test --test-timeout=120000 packages/voxel/tests/objects.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch240 --max=3 --wait-max=60 -- node packages/voxel/tests/objects-browser-check.mjs, and again with --compat after the script. Two visible red placements share one core draw; a third loaded object at x=10000 is culled. Edits lower coverage, unload removes it, reload restores it bit for bit and disposal leaves zero coverage.

@@ -70,7 +70,7 @@ export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array;
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model';
+type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair' | 'model' | 'object';
 
 interface BlockType {
     readonly model?: readonly ModelOrientation[];
