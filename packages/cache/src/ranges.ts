@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { byteRange, contentRange, defaultFetch, freshUntil, ifRange, transact } from './http.js';
+import { byteRange, contentRange, defaultFetch, freshnessPolicy, ifRange, transact } from './http.js';
 
 /** Options for `new RangeCache(...)`. A negative or NaN `maxBytes` or `timeout`, or a `block` under 1, throws a RangeError. */
 export interface RangeCacheOptions {
@@ -52,6 +52,8 @@ interface Stored {
   modified: string | null;
   final: string;
   fresh: number;
+  control?: string;
+  expires?: string | null;
   used: number;
   /** Stored block indices, ascending. */
   blocks: number[];
@@ -264,8 +266,8 @@ export class RangeCache {
     }
     void response.body?.cancel().catch(() => {});
     if (response.status === 304) {
-      const fresh = freshUntil(response.headers, Date.now(), sent);
-      if (fresh) this.queue((db) => this.touch(db, file.url, fresh));
+      Object.assign(file, freshnessPolicy(response.headers, Date.now(), sent, false, file));
+      this.queue((db) => this.touch(db, file.url, file));
       return 'revalidated';
     }
     const size =
@@ -365,7 +367,7 @@ export class RangeCache {
       etag: response.headers.get('etag'),
       modified: response.headers.get('last-modified'),
       final: response.url || url,
-      fresh: freshUntil(response.headers, now, sent),
+      ...freshnessPolicy(response.headers, now, sent),
       used: now,
       blocks: [],
       bytes: 0,
@@ -435,13 +437,17 @@ export class RangeCache {
   }
 
   /** Refreshes a file's last-used time (and freshness) in the same transaction that reads it. */
-  private touch(db: IDBDatabase, url: string, fresh?: number): Promise<void> {
+  private touch(db: IDBDatabase, url: string, update?: Stored): Promise<void> {
     return transact(db, [M], 'readwrite', (meta) => {
       const found = meta.get(url);
       found.onsuccess = () => {
         if (!isStored(found.result)) return;
         found.result.used = Date.now();
-        if (fresh) found.result.fresh = fresh;
+        if (update && found.result.etag === update.etag && found.result.modified === update.modified) {
+          found.result.fresh = update.fresh;
+          found.result.control = update.control;
+          found.result.expires = update.expires;
+        }
         meta.put(found.result, url);
       };
     });

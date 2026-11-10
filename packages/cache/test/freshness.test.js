@@ -25,6 +25,64 @@ async function revalidations(files, options = {}) {
 }
 const file = (headers) => ({ body: bytes(20), etag: '"e"', headers });
 
+for (const Cache of [AssetCache, RangeCache])
+  test(`${Cache.name} keeps stored cache policy when a 304 omits lifetime headers`, async (t) => {
+    globalThis.indexedDB = fakeIndexedDB();
+    let now = 100_000;
+    t.mock.method(Date, 'now', () => now);
+    const files = { '/a': file({ 'cache-control': 'max-age=10' }) },
+      network = server(files);
+    const options = { name: `retained-policy-${Cache.name}`, fetch: network };
+    const session = async () => {
+      const cache = new Cache(options);
+      assert.deepEqual(await read(await cache.fetch(base + 'a')), bytes(20));
+      cache.dispose();
+      await cache.flush();
+    };
+    await session();
+    now += 11_000;
+    files['/a'] = file({});
+    await session();
+    assert.equal(network.log.length, 2);
+    assert.equal(network.log.at(-1).etag, '"e"');
+    now += 1000;
+    await session();
+    assert.equal(network.log.length, 2, 'the 304 refresh retains max-age from the stored response');
+    now += 11_000;
+    files['/a'] = file({ 'cache-control': 'no-cache' });
+    await session();
+    assert.equal(network.log.length, 3);
+    files['/a'] = file({});
+    await session();
+    await session();
+    assert.equal(network.log.length, 5, 'a provided no-cache replaces and then survives omitted lifetime fields');
+  });
+
+for (const Cache of [AssetCache, RangeCache])
+  test(`${Cache.name} retains Expires on a 304 while using the new response age`, async (t) => {
+    globalThis.indexedDB = fakeIndexedDB();
+    let now = 100_000;
+    t.mock.method(Date, 'now', () => now);
+    const files = {
+      '/a': file({ date: new Date(now).toUTCString(), expires: new Date(200_000).toUTCString(), age: '150' }),
+    };
+    const network = server(files);
+    const session = async () => {
+      const cache = new Cache({ name: `retained-expires-${Cache.name}`, fetch: network });
+      assert.deepEqual(await read(await cache.fetch(base + 'a')), bytes(20));
+      cache.dispose();
+      await cache.flush();
+    };
+    await session();
+    now += 1000;
+    files['/a'] = file({ date: new Date(now).toUTCString() });
+    await session();
+    assert.equal(network.log.length, 2, 'the aged original response was revalidated');
+    now += 1000;
+    await session();
+    assert.equal(network.log.length, 2, 'stored Expires survives and the old Age is not reused');
+  });
+
 test('Expires in the future skips revalidation; in the past, invalid or with no lifetime it revalidates', async () => {
   assert.deepEqual(
     await revalidations({

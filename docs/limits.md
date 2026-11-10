@@ -6619,6 +6619,10 @@ Locked-toolchain root entry measurements for this repair: DOF 9529 to 9538 gzip 
 
 SSGI exact one-bounce round trips on RTX A6000 / ANGLE D3D11 can differ by one display level despite identical GL commands. The first differing target is the ray trace; native WebGPU and ANGLE Vulkan pass this fixture. This separately recorded driver case leaves the exact assertion unchanged. See [raw values and reproduction](review5-ssgi-angle.md).
 
+### Validated cache policy retention (2026-11-10)
+
+AssetCache and RangeCache persist Cache-Control and Expires with their metadata. A 304 retains either omitted field, replaces any provided value and calculates freshness using the current response's Date/Age and request transit. An explicit no-cache therefore remains effective on later 304 responses that omit lifetime fields. Freshness updates require matching stored validators. Older records without saved policy remain conservatively revalidated until a response supplies it; their offline bytes remain usable. Public API and schema version are unchanged. Root and ranges entry sizes remain within their existing ceilings.
+
 ### Asset-cache delayed hit bookkeeping (2026-11-10)
 
 An already-read response may still finish after its stored copy is evicted or replaced. Its background last-use update cannot recreate missing metadata, overwrite a newer file's size, type or validators, or move last use backwards. A 304 freshness update requires matching stored validators. The same four delayed-response cases run with plain and indexed eviction on the CPU stand-in and real IndexedDB; after a 150-byte-budget eviction only one 100-byte file remains, and replacing that file with an 80-byte response retains the new response's headers. Public API and schema are unchanged. This does not add global request coalescing or change the documented offline fallback.

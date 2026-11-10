@@ -4681,6 +4681,10 @@ Initial and 304 response freshness account for Age plus elapsed request time thr
 
 Ten actual device-replacement cases on RTX A6000 with masked full/half-float to LDR tiers detach refused effects, report one coded error and render three subsequent frames with no GPU errors. This does not certify physical lower-tier hardware. [Methods and reproduction](../review5-effect-restoration.md).
 
+### Validated cache policy retention (2026-11-10)
+
+Both cache classes retain omitted 304 lifetime policy. Evidence: the two parent-failing max-age regressions plus Expires/current-Age and explicit no-cache replacement/retention cases in packages/cache/test/freshness.test.js. All use a controlled clock without waits or speed assertions. Reproduce after build with node --test packages/cache/test/freshness.test.js. Existing stale-touch regressions retain independent replacement/eviction coverage. Sources and legacy-record limit: docs/clean-room.md and docs/limits.md, Validated cache policy retention.
+
 ### Asset-cache delayed hit bookkeeping (2026-11-10)
 
 Delayed hit bookkeeping preserves eviction and replacement outcomes. Evidence: all four regressions in packages/cache/test/stale-touch.test.js fail on the parent; packages/cache/test/stale-touch.js supplies the identical race proof to packages/cache/scripts/test-browser.js on real IndexedDB. They verify exact retained byte/file counts, byte-budget eviction after reloading a file, the old in-flight response and the replacement's body, ETag and content type. Reproduce after build with node --test packages/cache/test/stale-touch.test.js and npm run test:browser --workspace @margoengine/cache. Sources: docs/clean-room.md, Asset-cache delayed hit bookkeeping.

@@ -95,6 +95,27 @@ export function freshUntil(headers: Headers, received: number, sent = received, 
   return lifetime > initial ? received + lifetime - initial : 0;
 }
 
+/** Retain omitted lifetime fields on validation; Date and Age come from the current response. */
+export function freshnessPolicy(
+  headers: Headers,
+  received: number,
+  sent = received,
+  maxAgeOnly = false,
+  saved?: { control?: string; expires?: string | null },
+): { fresh: number; control: string; expires: string | null } {
+  const merged = new Headers(headers);
+  for (const [name, value] of [
+    ['cache-control', saved?.control],
+    ['expires', saved?.expires],
+  ] as const)
+    if (!merged.has(name) && value != null) merged.set(name, value);
+  return {
+    fresh: freshUntil(merged, received, sent, maxAgeOnly),
+    control: merged.get('cache-control') ?? '',
+    expires: merged.get('expires'),
+  };
+}
+
 /** Runs body in one transaction over the given stores; resolves when it commits, rejects when it aborts. */
 export async function transact(
   db: IDBDatabase,

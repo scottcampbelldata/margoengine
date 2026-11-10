@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { defaultFetch, freshUntil, ifRange } from './http.js';
+import { defaultFetch, freshnessPolicy, ifRange } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
@@ -104,6 +104,8 @@ interface Entry {
   etag: string | null;
   modified: string | null;
   fresh: number;
+  control?: string;
+  expires?: string | null;
   used: number;
   final: string;
 }
@@ -273,8 +275,7 @@ export class AssetCache {
       clearTimeout(timer);
     }
     if (response.status === 304) {
-      const fresh = freshUntil(response.headers, Date.now(), sent, this.maxAgeOnly);
-      if (fresh) entry.fresh = fresh;
+      Object.assign(entry, freshnessPolicy(response.headers, Date.now(), sent, this.maxAgeOnly, entry));
       return this.serve(entry, blob, range, 'revalidated');
     }
     if (response.status !== 200) {
@@ -326,8 +327,11 @@ export class AssetCache {
           if (!isEntry(saved.result)) return;
           const current = saved.result;
           current.used = Math.max(current.used, entry.used);
-          if (reason === 'revalidated' && current.etag === entry.etag && current.modified === entry.modified)
+          if (reason === 'revalidated' && current.etag === entry.etag && current.modified === entry.modified) {
             current.fresh = entry.fresh;
+            current.control = entry.control;
+            current.expires = entry.expires;
+          }
           meta.put(current, entry.url);
         };
       }),
@@ -379,7 +383,7 @@ export class AssetCache {
       type: response.headers.get('content-type') ?? '',
       etag: response.headers.get('etag'),
       modified: response.headers.get('last-modified'),
-      fresh: freshUntil(response.headers, received, sent, this.maxAgeOnly),
+      ...freshnessPolicy(response.headers, received, sent, this.maxAgeOnly),
       used: now,
       final: response.url || url,
     };

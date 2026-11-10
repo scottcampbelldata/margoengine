@@ -8635,6 +8635,10 @@ Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Cachi
 
 Compared WebGPU device-loss/resource lifetime (Ninomiya, Jones and Blandy, W3C, 2026) and WebGL EXT_color_buffer_float / EXT_color_buffer_half_float (Callow and Khronos WebGL Working Group, 2017/2022). [Full titles, links, rationale and original tests](review5-effect-restoration.md). No other repository implementation or companion code was read.
 
+### Validated cache policy retention (2026-11-10)
+
+Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Caching* (2022), sections 3.2 and 4.3.4, https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4, with their *RFC 9110: HTTP Semantics* (2022), section 15.4.5, https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4.5. Provided 304 fields replace cached fields; omitted lifetime policy is retained. Date and Age belong to the current validation calculation rather than the earlier transfer. The shared helper keeps only Cache-Control and Expires in metadata. No external implementation or companion code was read or copied.
+
 ### Asset-cache delayed hit bookkeeping (2026-11-10)
 
 Compared Steve Becker (editor), W3C, *Indexed Database API 3.0* (2026 working draft), transaction lifecycle and scheduling, https://www.w3.org/TR/2026/WD-IndexedDB-3-20261030/, with Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Caching* (2022), section 4.3.4, https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4. The read and conditional update stay within one transaction; 304 freshness is applied only while the stored validators match the validated snapshot. Last use updates the current record, preserving all its other metadata, and cannot recreate a removed record. No external implementation or companion code was read or copied.
