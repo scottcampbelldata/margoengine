@@ -23,7 +23,7 @@ export interface AggregateShadeOptions {
   readonly colormap?: ColormapName;
   /** Physical scalar display range. Default nonempty finite extrema. */ readonly range?: readonly [number, number];
   /** Circular dilation radius 0..32, default 0. Highest original alpha wins. */ readonly spread?: number;
-  /** Grow sparse marks until this occupied-neighbour fraction, default disabled. */ readonly density?: number;
+  /** Grow until this fraction of occupied pixels has an occupied neighbour, default disabled. */ readonly density?: number;
 }
 /** Packed RGBA8, bottom row first. Empty bins stay transparent before spreading. */
 export function shadeAggregate(result: RasterAggregate, options: AggregateShadeOptions = {}): Uint32Array {
@@ -94,48 +94,54 @@ export function shadeAggregate(result: RasterAggregate, options: AggregateShadeO
       pixels[b] =
         (Math.round(r * 255) | (Math.round(g * 255) << 8) | (Math.round(blue * 255) << 16) | (255 << 24)) >>> 0;
     }
-  let chosen = radius;
-  if (options.density && radius) {
-    let neighbours = 0,
-      occupiedCount = 0;
-    for (let b = 0; b < pixels.length; b++)
-      if (pixels[b]) {
-        occupiedCount++;
-        const x = b % result.width,
-          y = Math.floor(b / result.width);
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++)
-            if (
-              (dx || dy) &&
-              x + dx >= 0 &&
-              y + dy >= 0 &&
-              x + dx < result.width &&
-              y + dy < result.height &&
-              pixels[b + dy * result.width + dx]
-            )
-              neighbours++;
-      }
-    if (occupiedCount && neighbours / (8 * occupiedCount) >= options.density) chosen = 0;
+  if (!radius) return pixels;
+  const { width, height } = result;
+  if (options.density === undefined) return dilate(pixels, width, height, radius);
+  let spread: Uint32Array = pixels;
+  for (let r = 0; r < radius && neighbourFraction(spread, width, height) < options.density; r++) {
+    // Always grow the original marks: repeated dilation would exceed the requested disc radius.
+    spread = dilate(pixels, width, height, r + 1);
   }
-  if (!chosen) return pixels;
+  return spread;
+}
+
+function neighbourFraction(pixels: Uint32Array, width: number, height: number): number {
+  let occupied = 0, adjacent = 0;
+  for (let b = 0; b < pixels.length; b++) {
+    if (!pixels[b]) continue;
+    occupied++;
+    const x = b % width, y = Math.floor(b / width);
+    let neighbour = false;
+    for (let dy = -1; dy <= 1 && !neighbour; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        if ((dx || dy) && x + dx >= 0 && y + dy >= 0 && x + dx < width && y + dy < height && pixels[b + dy * width + dx]) {
+          neighbour = true;
+          break;
+        }
+    if (neighbour) adjacent++;
+  }
+  return occupied ? adjacent / occupied : 1;
+}
+
+function dilate(pixels: Uint32Array, width: number, height: number, radius: number): Uint32Array {
   const spread = pixels.slice();
   for (let b = 0; b < pixels.length; b++)
     if (pixels[b]) {
-      const x = b % result.width,
-        y = Math.floor(b / result.width);
-      for (let dy = -chosen; dy <= chosen; dy++)
-        for (let dx = -chosen; dx <= chosen; dx++) {
+      const x = b % width,
+        y = Math.floor(b / width);
+      for (let dy = -radius; dy <= radius; dy++)
+        for (let dx = -radius; dx <= radius; dx++) {
           const xx = x + dx,
             yy = y + dy;
           if (
-            dx * dx + dy * dy <= chosen * chosen &&
+            dx * dx + dy * dy <= radius * radius &&
             xx >= 0 &&
             yy >= 0 &&
-            xx < result.width &&
-            yy < result.height &&
-            !pixels[yy * result.width + xx]
+            xx < width &&
+            yy < height &&
+            !pixels[yy * width + xx]
           )
-            spread[yy * result.width + xx] = pixels[b];
+            spread[yy * width + xx] = pixels[b];
         }
     }
   return spread;

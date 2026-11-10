@@ -13,6 +13,33 @@ const table = (values, xy = 0.5) =>
     y: new Float64Array(values.length).fill(xy),
     v: Float64Array.from(values),
   });
+test('density spreading stops at the first occupied-neighbour footprint instead of the maximum radius', async () => {
+  const result = await aggregateRaster(table([1], 4.5), {
+    ...options, bounds: [0, 9, 0, 9], width: 9, height: 9,
+  });
+  const counts = result.count.slice();
+  const footprint = (pixels) => [...pixels.keys()].filter((i) => pixels[i]);
+  assert.deepEqual(footprint(shadeAggregate(result, { spread: 4, density: 0.5 })), [31, 39, 40, 41, 49]);
+  assert.equal(footprint(shadeAggregate(result, { spread: 4 })).length, 49);
+  assert.deepEqual(footprint(shadeAggregate(result, { spread: 0, density: 0.5 })), [40]);
+  assert.deepEqual(result.count, counts);
+});
+
+test('density spreading retains dense and empty images and clips growth to raster edges', async () => {
+  const result = await aggregateRaster(table([1], 0.5), { ...options, bounds: [0, 9, 0, 9], width: 9, height: 9 });
+  const pixels = shadeAggregate(result, { spread: 4, density: 0.5 });
+  assert.deepEqual([...pixels.keys()].filter((i) => pixels[i]), [0, 1, 9]);
+  const empty = await aggregateRaster(table([], 0.5), options);
+  assert.deepEqual([...shadeAggregate(empty, { spread: 4, density: 0.5 })], [0, 0, 0, 0]);
+  const denseTable = new ColumnarTable({
+    x: Float64Array.from({ length: 9 }, (_, i) => i % 3 + 3.5),
+    y: Float64Array.from({ length: 9 }, (_, i) => Math.floor(i / 3) + 3.5),
+  });
+  const dense = await aggregateRaster(denseTable, { ...options, value: undefined, bounds: [0, 9, 0, 9], width: 9, height: 9 });
+  assert.deepEqual(shadeAggregate(dense, { spread: 4, density: 0.5 }), shadeAggregate(dense));
+  const single = await aggregateRaster(table([1]), { ...options, width: 1, height: 1 });
+  assert.deepEqual(shadeAggregate(single, { spread: 4, density: 1 }), shadeAggregate(single));
+});
 test('binary64 sums and means are exact across cancellation, overflow, subnormals, ties and chunk boundaries', async () => {
   const cases = [
     [[1e16, 1, -1e16], 1, 1 / 3],

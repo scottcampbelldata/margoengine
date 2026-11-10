@@ -37,6 +37,31 @@ all original bin statistics. Display transformations are empirical histogram
 equalisation with equal-valued ties, normalised log1p, cube root and linear. Circular
 spreading fills empty display pixels and leaves the numerical bins untouched.
 
+### Review L2: density-controlled spreading (2026-11-10)
+
+With `density`, inspect the unspread image first, then circular radii 1 through `spread`.
+Stop at the first image where the requested fraction of occupied pixels has at least
+one occupied neighbour among the eight surrounding pixels, or at the maximum radius.
+Each candidate dilates the original pixels, so growth never compounds beyond the cap.
+An isolated interior mark with `spread: 4, density: 0.5` produces the five-pixel
+radius-1 footprint instead of the 49-pixel radius-4 disc. Empty images remain empty;
+edges clip the disc and a one-pixel image terminates at the cap. Statistics and hover
+retain their original bins. Without `density`, fixed-radius behaviour is unchanged.
+
+Clean-room sources compared: HoloViz contributors, Datashader Pipeline and API
+(2026 retrieval), https://datashader.org/getting_started/Pipeline.html and
+https://datashader.org/api.html (occupied pixels with neighbours and bounded dynamic
+spreading); Henk J. A. M. Heijmans, Mathematical Morphology: A Modern Approach in Image
+Processing Based on Algebra and Geometry (1995), https://doi.org/10.1137/1037001
+(dilation and iteration); Florian Heimerl, Chih-Ching Chang, Alper Sarikaya and Michael
+Gleicher, Visual Designs for Binned Aggregation of Multi-Class Scatterplots (2018,
+revised 2020), https://arxiv.org/abs/1810.02445 (separating aggregation from display).
+Combine bounded circular dilation with the neighbour-presence fraction, keeping the
+original aggregate immutable. No companion or rival implementation source was read.
+The two density regressions in aggregate.test.js fail before the repair and cover
+isolated, dense, empty, edge and one-pixel images afterward. aggregate-browser.mjs
+checks shading and retained statistics with native WebGPU and WebGL2.
+
 ## Bounds and evidence
 
 Dimensions default to 256 by 256; each edge is 1..4096 and at most 1048576 bins are
