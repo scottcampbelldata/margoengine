@@ -4762,7 +4762,7 @@ so dense seams/instances may need higher caps. Raising a cap cannot create avail
 The 4,096-corner polygon, hierarchy depth, animation/key/sample limits and GLB uint32 format
 limits are unchanged. Imported meshes are never decimated or truncated to meet these caps.
 
-Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker is 98,112 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage stays 16,769 B.
+Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker finished at 98,163 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage is 24,209 B; 16,769 B was the separately reported particlesOnly build.
 
 The large configuration also reaches GLTFAsset attachment and worker prepareGLTF: the converted GLB uses outputBytes and nodes as its downstream caps. Ordinary attachment retains the pre-existing 64 MiB glTF cap. The 2,500,002-vertex test produces a buffer above 64 MiB and attaches both directly and from prepared worker output.
 
