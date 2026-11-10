@@ -20,7 +20,11 @@
 - `pbr-ext.margo`: exported for this project by Blender 5.2.3 LTS from `tools/blender-addon/tests/blender_pbr_ext.py`:
   Principled planes with transmission, IOR, coat, sheen and subsurface over a backdrop (Apache-2.0, as this
   repository). Regenerate the same way and copy the file here.
-- `curves.margo` and `curves-truth.json`: exported for this project by Blender 5.2.3 LTS from
+- `curves.margo` and `curves-truth.json`: exported for this project by Blender 5.3.0 Beta (hash 7e7c173d45c8, macOS arm64, 2026-11-10, batch 132 audit; first exported by Blender 5.2.3 LTS on Windows) from
   `tools/blender-addon/tests/blender_curves.py` with `curves=True`: Bezier, poly, NURBS and hair curves, a point cloud
   and a volume; the JSON holds Blender's own evaluated polylines, points and openvdb voxel reads (Apache-2.0, as this
-  repository). Regenerate the same way and copy both files here.
+  repository). Regenerate the same way and copy both files here. The volume's source cube was 0.6 m, which put its top face exactly on a row of 0.1 m voxel centres: 5.2.3 on
+  Windows counted that row (224 active voxels) and 5.3 on the Mac did not (192), so `npm run modern:test:blender` failed
+  on the Mac with a fresh export. The cube is now 0.65 m, every face between centres (315 active voxels, 7 rows in z),
+  and both files were exported again. Only the volume changed: the fresh curves, points and their truth matched the old
+  files exactly. Not yet re-run with Blender 5.2.3 on Windows.

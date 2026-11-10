@@ -98,8 +98,10 @@ for i, point in enumerate(cloud.points):
 cloud_object = bpy.data.objects.new("Cloud", cloud)
 cloud_object.location = (-1.5, -1.5, 0.2)
 link(cloud_object)
-# A volume: a cube's interior as a density grid, through the Mesh to Volume modifier.
-bpy.ops.mesh.primitive_cube_add(size=0.6, location=(10, 10, 10))
+# A volume: a cube's interior as a density grid, through the Mesh to Volume modifier. Its faces sit between voxel
+# centres (0.65 m across, 0.1 m voxels): at 0.6 m the top face fell exactly on a row of centres, so whether that row
+# counted was a floating-point tie, decided one way by Blender 5.2.3 on Windows and the other by 5.3 on the Mac.
+bpy.ops.mesh.primitive_cube_add(size=0.65, location=(10, 10, 10))
 source = bpy.context.active_object
 source.name = "VolumeSource"
 source.hide_set(True)
