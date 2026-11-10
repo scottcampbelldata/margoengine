@@ -33,8 +33,9 @@ export interface BitmapPage {
 }
 
 /**
- * A font from a prebuilt distance-field atlas; pass it as `font` to any `Text`. Multi-channel atlases reduce to their
- * median channel when a glyph is placed, so corners round slightly against a true multi-channel shader.
+ * A font from a prebuilt distance-field atlas; pass it as `font` to any `Text`. RGB distance channels stay
+ * intact through GPU filtering; the shader then takes their median, preserving sharp corners.
+ * A scalar fallback is retained for glyph consumers outside TextRenderer.
  * @throws TypeError when `data` is not a BMFont file with a `distanceField`, or a page is missing.
  */
 export class BitmapFont extends Font {
@@ -77,15 +78,10 @@ export class BitmapFont extends Font {
       data.pages.map(async (page) => {
         const reply = await fetch(new URL(page, pagesAt ?? base), { signal });
         if (!reply.ok) throw new TypeError(`BitmapFont could not fetch page ${page}: ${reply.status}; check pagesAt`);
-        const image = await createImageBitmap(await reply.blob(), {
-            premultiplyAlpha: 'none',
-            colorSpaceConversion: 'none',
-          }),
-          context = new OffscreenCanvas(image.width, image.height).getContext('2d', { willReadFrequently: true })!;
-        context.drawImage(image, 0, 0);
-        const { width, height, data: pixels } = context.getImageData(0, 0, image.width, image.height);
-        image.close();
-        return { width, height, data: pixels };
+        const { decodePNG } = await import('@margoengine/decoders/png');
+        signal?.throwIfAborted();
+        // Font distance channels are data, including MTSDF alpha: never premultiply or colour-convert them.
+        return decodePNG(new Uint8Array(await reply.arrayBuffer()));
       }),
     );
     return new BitmapFont(data, pages);
@@ -116,13 +112,15 @@ export class BitmapFont extends Font {
     glyph = null;
     if (c && c.width && c.height) {
       const page = this.pages[c.page],
-        out = new Uint8Array(c.width * c.height);
+        out = new Uint8Array(c.width * c.height),
+        channels = this.multi ? new Uint8Array(c.width * c.height * 4) : undefined;
       for (let y = 0; y < c.height; y++)
         for (let x = 0; x < c.width; x++) {
           const i = ((c.y + y) * page.width + c.x + x) * 4,
             r = page.data[i],
             g = page.data[i + 1],
             b = page.data[i + 2];
+          if (channels) channels.set(page.data.subarray(i, i + 4), (y * c.width + x) * 4);
           out[y * c.width + x] = this.multi ? Math.max(Math.min(r, g), Math.min(Math.max(r, g), b)) : r;
         }
       glyph = {
@@ -133,6 +131,7 @@ export class BitmapFont extends Font {
         top: this.data.common.base - c.yoffset,
         color: false,
         data: out,
+        msdf: channels,
       };
     }
     this.bitmaps.set(cluster, glyph);

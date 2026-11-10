@@ -354,6 +354,21 @@ window.runTextTests = async () => {
   report.colors.rich = { richRed, richGreen, fieldInk };
   report.checks.push('RichText draws coloured runs and inline images; BitmapFont draws a prebuilt field');
 
+  // The median of linearly filtered RGB is not the filtered scalar median.
+  label.visible = false;
+  const rgbFont = new BitmapFont({ pages: ['diagnostic.png'], info: { size: 2 },
+    common: { lineHeight: 2, base: 2 },
+    chars: [{ id: 65, x: 0, y: 0, width: 2, height: 2, xoffset: 0, yoffset: 0, xadvance: 2, page: 0 }],
+    distanceField: { fieldType: 'msdf', distanceRange: 2 } },
+    [{ width: 2, height: 2, data: Uint8Array.of(40,240,40,255,240,40,40,255,40,240,40,255,240,40,40,255) }]);
+  const rgbText = renderer.add(new Text({ text: 'A', font: rgbFont, fontSize: 3, anchorX: 'center', anchorY: 'middle' }));
+  image = await frame();
+  assert(image.at(128,128)[0] > 200, `RGB interpolation must create the inner field: ${image.at(128,128)}`);
+  assert(image.at(104,128)[0] < 80 && image.at(152,128)[0] < 80, 'MSDF exterior must remain outside');
+  rgbText.dispose();
+  label.visible = true;
+  report.checks.push('True MSDF samples all three channels before median, keeping a corner diagnostic lost by scalar reduction');
+
   label.visible = false;
   const readmeFont = await BitmapFont.load('/tests/fixtures/fonts/readme/source-sans.json');
   const hello = new Text({ text: 'Hello', font: readmeFont, fontSize: 2, color: '#00ff00', position: [-2, 1, 0] });

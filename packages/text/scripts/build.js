@@ -30,7 +30,7 @@ await build({
       },
       formats: ['es'],
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
+    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/decoders/png'] },
   },
 });
 execFileSync(

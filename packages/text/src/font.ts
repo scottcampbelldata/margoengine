@@ -31,6 +31,9 @@ export interface GlyphBitmap {
   readonly top: number;
   readonly color: boolean;
   readonly data: Uint8Array;
+  /** Optional unmodified RGBA multi-channel distance data. TextRenderer samples RGB before taking the median.
+   * data remains a scalar fallback for other glyph consumers; alpha is not colour opacity. */
+  readonly msdf?: Uint8Array;
 }
 
 type Context2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;

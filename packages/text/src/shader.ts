@@ -53,11 +53,16 @@ fn toLinear(c: vec3f) -> vec3f {
 
 @fragment fn fragment(i: Out) -> @location(0) vec4f {
   // Screen-space derivatives first, in uniform control flow: texels of the SDF per screen pixel.
-  let texels = i.uv * vec2f(textureDimensions(sdfAtlas).xy);
+  let glyphKind = i.kind >> 2u;
+  let dimensions = select(vec2f(textureDimensions(sdfAtlas).xy), vec2f(textureDimensions(colorAtlas).xy), glyphKind == 2u);
+  let texels = i.uv * dimensions;
   let w = max(0.5 * (length(dpdx(texels)) + length(dpdy(texels))), 1e-3);
-  let texel = textureSampleLevel(sdfAtlas, atlasSampler, i.uv, i.page, 0.0).r;
+  var texel = textureSampleLevel(sdfAtlas, atlasSampler, i.uv, i.page, 0.0).r;
   var tint = textureSampleLevel(colorAtlas, atlasSampler, i.uv, i.page, 0.0);
   if (any(i.local < block.clipRect.xy) || any(i.local > block.clipRect.zw)) { discard; }
+  if (glyphKind == 2u) {
+    texel = max(min(tint.r, tint.g), min(max(tint.r, tint.g), tint.b));
+  }
   let kind = i.kind & 3u;
   // Signed distance in SDF texels, positive outside. Fade out where the field saturates so quad edges never show.
   let d = ((1.0 - texel) - block.sdf.y) * block.sdf.x;
@@ -71,7 +76,7 @@ fn toLinear(c: vec3f) -> vec3f {
     let soft = max(w, 2.0 * block.params.y);
     color = vec4f(block.shadow.rgb, block.shadow.a * smoothstep(0.0, 1.0, clamp(0.5 - (d - block.params.x) / soft, 0.0, 1.0)) * field);
   }
-  if ((i.kind >> 2u) != 0u) {
+  if (glyphKind == 1u) {
     // Color glyph (emoji): premultiplied sRGB texels, no SDF. Outlines skip it; shadows use its alpha.
     if (frame.info.x > 0.5 && tint.a > 0.0) { tint = vec4f(toLinear(tint.rgb / tint.a) * tint.a, tint.a); }
     if (kind == 2u) { return tint * block.color.a; }

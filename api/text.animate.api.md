@@ -192,6 +192,7 @@ interface GlyphBitmap {
     readonly top: number;
     readonly color: boolean;
     readonly data: Uint8Array;
+    readonly msdf?: Uint8Array;
 }
 
 interface LayoutGlyph {

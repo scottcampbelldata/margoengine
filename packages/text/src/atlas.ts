@@ -185,7 +185,7 @@ export class GlyphAtlas {
   private upload(glyph: GlyphBitmap, slot: AtlasSlot): void {
     this.device.queue.writeTexture(
       { texture: this.texture!, origin: [slot.x, slot.y, slot.page] },
-      glyph.data as Uint8Array<ArrayBuffer>,
+      (this.bytesPerTexel === 4 ? glyph.msdf ?? glyph.data : glyph.data) as Uint8Array<ArrayBuffer>,
       { bytesPerRow: glyph.width * this.bytesPerTexel, rowsPerImage: glyph.height },
       [glyph.width, glyph.height, 1],
     );

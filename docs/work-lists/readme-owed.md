@@ -706,3 +706,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 231 job 4): document scatter/attributes alias.
 - @margoengine/usdz (batch 206 job 4): previewSurface(), separate opacity textures, arbitrary numeric readers, fallbacks/interpolation, resource limits, worker and device lifetime.
 - @margoengine/gltf-pro (batch 206 job 4): uploadImage external-image texture usages and caller-owned texture lifetime.
+- @margoengine/text (batch 248 job 3): replace old median-reduction wording, document raw MSDF sampling, scalar fallback, MTSDF alpha, RGBA atlas/memory and lazy PNG decoder dependency; no examples written in build phase.

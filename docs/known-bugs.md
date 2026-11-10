@@ -4637,3 +4637,4 @@ Batch 244 landing repair: the existing umbrella generated-file regression expose
 
 No known open defect in the completed panorama entry; cancellation observes the pending map rejection before unmapping, covered by panorama-browser.mjs.
 Job 0 extra planner check on main 6081587c2: tests/check-merge-affected.test.js and tests/gpu-browser-registration.test.js fail before running because packages/weather/tests/parity-browser.mjs has no executable registration in the GPU plan. Cause: the new weather glTF browser driver was added without a test:gpu/test:browser script; owning weather lane follow-up under rule 21. Hygiene regression and affected tooling checks pass independently.
+Batch 248 job 3: prebuilt RGB field reduction was the cause of rounded MSDF corners; fixed by sampling RGB before median, covered by interpolation and GPU regression tests.
