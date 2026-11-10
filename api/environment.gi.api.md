@@ -39,9 +39,11 @@ interface CubeTextureSource {
 
 class Environment implements EnginePlugin {
     readonly name: string;
+    protected resources?: Resources;
+    protected readonly listeners: Set<(environment: Environment) => void>;
     version: number;
     disposed: boolean;
-    private constructor();
+    protected constructor(resources: Resources, settings: Settings, source: EnvironmentSource | undefined, options: EnvironmentOptions);
     static attach(engine: EngineKernel, source: EnvironmentSource, options?: EnvironmentOptions): Promise<Environment>;
     static create(target: GPUDevice | EngineKernel, source: EnvironmentSource, options?: EnvironmentOptions): Promise<Environment>;
     private get live();
@@ -216,6 +218,35 @@ interface ReflectionProbe {
     dynamic?: boolean;
 }
 
+interface Resources {
+    device: GPUDevice;
+    cube: GPUTexture;
+    cubeView: GPUTextureView;
+    specular: GPUTexture;
+    specularView: GPUTextureView;
+    brdf: GPUBuffer;
+    lut: SharedLut;
+    equirect?: GPUTexture;
+    equirectView?: GPUTextureView;
+    sampler: GPUSampler;
+    sh: GPUBuffer;
+    params: GPUBuffer;
+    radiance: Float32Array;
+    irradiance: Float32Array;
+}
+
+interface Settings {
+    size: number;
+    specularSize: number;
+    specularMips: number;
+    samples: number;
+    brdfSize: number;
+    brdfSamples: number;
+    shSize: number;
+    float32: boolean;
+    keepEquirect: boolean;
+}
+
 abstract class ShaderEffect {
     readonly name: string;
     disposed: boolean;
@@ -234,5 +265,11 @@ abstract class ShaderEffect {
     registerPasses(graph: FrameGraph): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface SharedLut {
+    buffer: GPUBuffer;
+    users: number;
+    key: string;
 }
 ```

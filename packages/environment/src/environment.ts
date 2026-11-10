@@ -69,7 +69,8 @@ export interface EnvironmentOptions {
   name?: string;
 }
 
-interface Settings {
+/** @internal Resolved processing settings, also used by optional Environment subclasses. */
+export interface Settings {
   size: number;
   specularSize: number;
   specularMips: number;
@@ -81,7 +82,8 @@ interface Settings {
   keepEquirect: boolean;
 }
 
-interface Resources {
+/** @internal Owned GPU resources, also used by optional Environment subclasses. */
+export interface Resources {
   device: GPUDevice;
   cube: GPUTexture;
   cubeView: GPUTextureView;
@@ -628,12 +630,12 @@ function destroy(resources: Resources | undefined): void {
 export class Environment implements EnginePlugin {
   readonly name: string;
   private engine?: Engine;
-  private resources?: Resources;
+  protected resources?: Resources;
   private readonly settings: Settings;
   private source?: EnvironmentSource;
   private restoring?: { device: GPUDevice; promise: Promise<void> };
   private refreshing?: Promise<void>;
-  private readonly listeners = new Set<(environment: Environment) => void>();
+  protected readonly listeners = new Set<(environment: Environment) => void>();
   private rotationValue: number;
   private intensityValue: number;
   private readonly paramsData = new Float32Array(4);
@@ -641,7 +643,7 @@ export class Environment implements EnginePlugin {
   version = 0;
   disposed = false;
 
-  private constructor(
+  protected constructor(
     resources: Resources,
     settings: Settings,
     source: EnvironmentSource | undefined,

@@ -53,3 +53,7 @@ Fixtures are used only by the tests and are not part of the published package (`
 - `piz/*.exr` are Margo-made PIZ files written by a scratch encoder from the PIZ format description, with
   `piz/roundtrip.json` (their expected decoded digests, computed from the source samples) and `piz/exr-piz.json`
   (digests and damaged-file outcomes for every EXR fixture here). They contain no third-party data.
+
+## Venice Sunset (batch 188)
+
+venice_sunset_1k.hdr: Greg Zaal / Poly Haven, CC0 1.0, https://polyhaven.com/a/venice_sunset and https://polyhaven.com/license . Downloaded unchanged from https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/venice_sunset_1k.hdr on 2026-11-10. SHA-256 92fe2b29b1957828fb8925a57633540bbba5bf380d9285ed553443e834249352. Real radiance photograph, standard test data only; no external code.

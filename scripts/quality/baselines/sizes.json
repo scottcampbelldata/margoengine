@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13944478,
+  "total": 13948427,
   "history": [
     {
       "date": "2026-10-24",
@@ -7364,6 +7364,12 @@
       "commit": "fbffe7fd8",
       "reason": "Batch 274 job 2: new optional decomp entry, 0 to 3617 B gzip, ceiling 3835 B; lazy SIMD kernel 25233 B gzip. One family shares loading and factor conventions; splitting duplicates validation and the ABI. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-188",
+      "reason": "New optional environment/prefiltered entry: 0 to 3693 B gzip; lossless KTX2 upload avoids GPU prefiltering; source, SH and BRDF data retained for full quality and restore.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8700,6 +8706,7 @@
     "@margoengine/post/pixelate": 9018,
     "@margoengine/vfx/json": 2860,
     "@margoengine/staging/pathtrace-materials": 1816,
-    "@margoengine/compute/decomp": 3835
+    "@margoengine/compute/decomp": 3835,
+    "@margoengine/environment/prefiltered": 3949
   }
 }
