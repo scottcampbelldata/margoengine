@@ -2606,3 +2606,7 @@ Batch 252 job 4: build with npm run build:packages, then run node --test --test-
 ### Batch 197 presentation controls
 
 After build:packages, run node --test --test-timeout=30000 packages/controls/tests/presentation.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js presentation. The report packages/controls/test-results/presentation-browser.json checks real WebGPU and WebGL2 product/scroll/path behavior. No wall-clock speed assertions.
+Batch 251 trigger regions: build behavior, then run
+`node --test --test-timeout=120000 packages/behavior/tests/triggers.test.js`.
+The namespace collision regression was run red before tuple encoding and green
+after it. All region and lifecycle fixtures are generated and need no GPU.

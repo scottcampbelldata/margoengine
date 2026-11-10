@@ -206,6 +206,10 @@
       "types": "./dist/behavior/text.d.ts",
       "import": "./dist/behavior/text.js"
     },
+    "./behavior/triggers": {
+      "types": "./dist/behavior/triggers.d.ts",
+      "import": "./dist/behavior/triggers.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

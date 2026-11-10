@@ -3753,3 +3753,21 @@ ScrollArea owns a native overlay scroller and HTML content slot. Defaults pages=
 PathControls drives the camera or an explicitly selected engine mesh, optionally from ScrollControls. A curve implements at(t), optionally length/atDistance for arc-length sampling (Margo Spline fits directly). Defaults loop=true, offset=0, damping=0.1 seconds, focusDamping=0.1 seconds, maxSpeed=Infinity, lookAhead=0.001. Focus is a world point or live mesh; otherwise the view follows the path tangent, including the final non-looping endpoint. Zero-length tangents use -Z, vertical views use +Z up. Points must be finite. Mesh positions use the full inverse parent matrix; orientation removes the parent's rotation and does not model shear from a nonuniform scaled/rotated parent. All classes dispose their owned listeners/plugins; ScrollArea removes only owned DOM. Applications dispose controls before removing the scroll area.
 
 Entry size: controls/presentation 0 to 6772 B min+gzip, ceiling 7028 B. Synchronous product picking imports the BVH peer; exact spring behavior uses the optional tween peer, without changing core/stage.
+## Trigger regions (batch 251)
+
+New behavior/triggers: 1,606 B min+gzip (previously absent), umbrella alias 64 B
+external. No existing ceiling raised. Coordinates are three finite world values;
+radii are finite and nonnegative. Boundaries touch, zero-radius points and
+zero-width boxes are allowed. Agent radius defaults to 0, enabled defaults true,
+namespace defaults triggers. Contact tests run once per explicit update, with
+O(agents * regions) work; fast pass-through between updates is not swept.
+Boxes are axis-aligned. Regions are detached on set; move them by calling set
+again. Disabled or removed contacts exit on the next update, disposal exits
+immediately. Duplicate agent ids reject before changing contact state. Events
+follow current-agent and region insertion order, then removed-agent exits.
+Blackboard values under triggerStateKey(id, namespace) hold inside ids and the
+last update's events, with no agent object cycles. Different systems sharing a
+board use different namespaces. Agent ids define identity across updates;
+transferring its blackboard clears the old board's membership. No GPU code or
+proven Wasm gain for the default-size contact checks. Core + stage remains
+23,950 B gzip, below the unchanged 25,000 B limit.

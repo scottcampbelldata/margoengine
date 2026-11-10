@@ -3076,3 +3076,14 @@ packages/navmesh/test/wasm.test.js runs real worker threads behind the browser W
 ### Batch 197 product presentation
 
 controls/presentation supplies bounded spring product rotation with local hit/global dragging, polar zoom and snap-back; native and wheel scroll progress with helper intervals; and scroll/imperative camera or mesh curve following. CPU evidence: packages/controls/tests/presentation.test.js covers frame-rate equality, bounds with bouncy springs, zero-delta finite output, loop seams, browser-default preservation, DOM cleanup, parent transforms and curve endpoints. presentation-browser.js checks changed product pixels, snap-back, actual DOM scroll extent, path endpoint and focused target pixels on both backends. No sensor, performance or deformed-mesh claim.
+## Trigger regions (batch 251 job 5)
+
+`behavior/triggers` adds sphere and axis-aligned box regions with point or
+bounding-sphere contacts. TriggerSystem returns deterministic enter/stay/exit
+events, writes per-agent typed blackboard memory, handles region movement,
+disabling, deletion, agent removal and final exit on disposal. Shared boards
+separate numeric/string ids and arbitrary system namespaces. Tests in
+packages/behavior/tests/triggers.test.js cover published geometric predicates,
+finite extreme coordinates, lifecycle, atomic input validation and namespace
+collision regression. This covers the documented web-reference contact row and
+adds transition memory; no continuous-motion or production-scale speed claim.

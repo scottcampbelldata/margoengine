@@ -79,6 +79,10 @@
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"
+    },
+    "./triggers": {
+      "types": "./dist/triggers.d.ts",
+      "import": "./dist/triggers.js"
     }
   },
   "files": [

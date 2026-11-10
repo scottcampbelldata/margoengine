@@ -4112,3 +4112,16 @@ fixture now passes. No open defect found by fuzzy.test.js.
 
 Batch 251 job 4: no open text-format defect found in all-node, reference,
 200 generated round-trip, syntax-location and bounded-input tests (text.test.js).
+
+Batch 251 job 5: memory namespace/id concatenation could collide, for example
+namespace foo with id string:a versus namespace foo:string with id a. Tuple
+encoding fixes the cause; triggers.test.js retains the failing-before regression.
+
+Batch 251 finish-phase test quality: subtrees.test.js uses string keys in its
+shared-memory fixture instead of BlackboardKey objects. The count assertions
+still exercise a shared board, but use a typed key in the fix phase.
+Batch 251 finish-phase typing: a variable typed TreeTextOptions with optional
+subtrees can match parseTreeText's ordinary-tree overload. Add a broad overload
+returning SubtreeDocument so that variable cannot advertise unresolved references
+as an ordinary TreeDocument. Explicit registry literals already use the correct
+overload; runtime parsing and reference validation are unaffected.

@@ -5316,7 +5316,7 @@ Research compared before implementation: Michele Colledanchise and Petter Ogren,
 *Behavior Trees in Robotics and AI: An Introduction* (2018), https://arxiv.org/abs/1709.00084
 (modular subtree composition); Robert Tarjan, *Depth-First Search and Linear Graph
 Algorithms* (1972), https://www.cs.cmu.edu/~cdm/resources/Tarjan1972-sccs.pdf
-(active-path cycle detection); Nik Korn, *Mistreevous*, public Branch and Global
+(active-path cycle detection); Nikolas Howard, *Mistreevous*, public Branch and Global
 Subtrees documentation (accessed 2026-11-10), https://github.com/nikkorn/mistreevous#branch .
 Only public descriptions were read, no rival or companion source. The combination
 uses explicit caller-owned registries, bounded reference expansion and the existing
@@ -5383,7 +5383,7 @@ AI*, cited above (runtime status model); Tamara Munzner, *A Nested Model for
 Visualization Design and Validation* (2009), https://www.cs.ubc.ca/labs/imager/tr/2009/NestedModel/
 (task/data/encoding validation); W3C, *Tree View Pattern*, ARIA APG (accessed
 2026-11-10), https://www.w3.org/WAI/ARIA/apg/patterns/treeview/ (hierarchy and
-expansion semantics); Nik Korn, *Mistreevous visualiser*, public feature description
+expansion semantics); Nikolas Howard, *Mistreevous visualiser*, public feature description
 (accessed 2026-11-10), https://github.com/nikkorn/mistreevous-visualiser .
 No source read. Combined design uses a full nested hierarchy with native details
 controls, text plus status colors, explicit last-tick labels, utility scores and
@@ -5481,7 +5481,7 @@ A Recognition-Based Syntactic Foundation* (2004),
 https://pdos.csail.mit.edu/~baford/packrat/popl04/ (deterministic recognition);
 Tim Bray, *The JavaScript Object Notation (JSON) Data Interchange Format*, RFC 8259
 (2017), https://www.rfc-editor.org/rfc/rfc8259 (attribute values and escaping);
-Colledanchise and Ogren (2018), cited above (tree structure); Nik Korn,
+Colledanchise and Ogren (2018), cited above (tree structure); Nikolas Howard,
 *Mistreevous MDSL public documentation* (accessed 2026-11-10),
 https://github.com/nikkorn/mistreevous (text/JSON trees and comments). Public
 syntax descriptions only, no parser source or companion implementation read.
@@ -5519,3 +5519,26 @@ Sources compared before the relevant implementation, accessed 2026-11-10:
 - Poimandres documentation team, *PresentationControls*, *ScrollControls* and *MotionPathControls*, public API guides (accessed 2026-11-10), https://drei.docs.pmnd.rs/controls/presentation-controls , https://drei.docs.pmnd.rs/controls/scroll-controls , https://drei.docs.pmnd.rs/controls/motion-path-controls . Compared product rotation, snap-back, polar zoom, normalized progress helpers and focused curve following. No implementation links or rival source opened.
 
 Combined design: Margo's exact Spring for bounded object pitch/yaw, BVH product picking, native DOM scroll ownership with optional wheel surface, signed damped progress and interval helpers, uniform arc-length curve adapters and parent-frame mesh placement. Synthetic boxes and curves are correctness fixtures, not an asset demo. No speed claim.
+## Batch 251 job 5: trigger regions
+
+Research compared before implementation: Christer Ericson, *Real-Time Collision
+Detection* (2005), sections 4.3.1, 5.1 and 5.2,
+https://realtimecollisiondetection.net/books/rtcd/toc/index.html (bounding-sphere
+and closest-point predicates); David Eberly, *Intersection of Box and Ellipsoid*
+(created 2015, revised 2019), https://www.geometrictools.com/Documentation/IntersectionBoxEllipsoid.pdf
+(point/box distance and separating geometry); Michael Herzog, *Yuka Trigger,
+SphericalTriggerRegion and RectangularTriggerRegion public API* (accessed
+2026-11-10), https://mugen87.github.io/yuka/docs/SphericalTriggerRegion.html
+and https://mugen87.github.io/yuka/docs/RectangularTriggerRegion.html
+(boundary and bounding-volume contact behavior); Tim Bray (2017), RFC 8259,
+cited above (unambiguous tuple encoding of memory namespaces and agent ids).
+No rival source or companion code was opened or reused.
+
+Combined clean-room design uses sphere distance and exact closest-point box
+membership, scaled before subtraction to avoid overflow. A discrete contact set
+produces enter/stay/exit, including removed and disabled agents/regions. Per-id
+memory supports shared squad boards and namespaces. Tests cover analytical face,
+edge and corner contacts, extreme finite coordinates, mutation-safe region
+snapshots, contact lifecycle, transfer/disposal and atomic validation. A separate
+namespace-collision regression fails before tuple key encoding and passes after.
+No physics solver, downloaded asset demo, GPU work or timing claim is added.
