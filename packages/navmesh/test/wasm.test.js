@@ -8,6 +8,7 @@ import { TiledNavMesh } from '../dist/tiles.js';
 import { encodeNavMesh, encodeTiledNavMesh } from '../dist/codec.js';
 import { bundleBytes } from '../../../scripts/measure-size.js';
 import binaryen from 'binaryen';
+import { fileURLToPath } from 'node:url';
 
 const previous = globalThis.Worker;
 let active = 0,
@@ -94,7 +95,7 @@ test('worker tiled build matches every polygon and retains runtime geometry for 
 test('SIMD work counts equal the reference clipper and replace two scalar interpolation lanes per intersection', async (t) => {
   await mkdir('test-results', { recursive: true });
   const path = new URL('../../../test-results/batch252-pipeline.mjs', import.meta.url);
-  await writeFile(path, await bundleBytes('packages/navmesh/src/pipeline.ts'));
+  await writeFile(path, await bundleBytes(fileURLToPath(new URL('../src/pipeline.ts', import.meta.url))));
   const reference = await import(path.href),
     input = reference.validate(floor, indices, settings),
     voxel = reference.voxelise(input.points, input.triangles, input.config, reference.gridOf(input)),

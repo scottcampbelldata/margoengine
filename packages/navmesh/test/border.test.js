@@ -5,6 +5,7 @@ import { TiledNavMesh } from '../dist/tiles.js';
 import { encodeNavMesh } from '../dist/codec.js';
 import { bundleBytes } from '../../../scripts/measure-size.js';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 const positions = [0, 0, 0, 16, 0, 0, 16, 0, 16, 0, 0, 16],
   indices = [0, 2, 1, 0, 3, 2],
@@ -18,7 +19,7 @@ class InspectTiles extends TiledNavMesh {
 test('borderSize allocates empty world-grid padding while preserving the world lattice and polygons', async () => {
   await mkdir('test-results', { recursive: true });
   const path = new URL('../../../test-results/batch252-border-pipeline.mjs', import.meta.url);
-  await writeFile(path, await bundleBytes('packages/navmesh/src/pipeline.ts'));
+  await writeFile(path, await bundleBytes(fileURLToPath(new URL('../src/pipeline.ts', import.meta.url))));
   const { validate, gridOf, voxelise } = await import(path.href),
     input = validate(positions, indices, { ...options, borderSize: 3 }),
     grid = gridOf(input),
