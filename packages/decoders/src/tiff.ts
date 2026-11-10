@@ -21,11 +21,301 @@ export interface TIFFOptions {
   maxPixels?: number;
 }
 
+/** Precision-preserving pixel storage, interleaved in raster order. */
+export type TIFFSamples =
+  | Uint8Array
+  | Int8Array
+  | Uint16Array
+  | Int16Array
+  | Uint32Array
+  | Int32Array
+  | Float32Array
+  | Float64Array;
+/** One decoded IFD, without display colour conversion or integer scaling. */
+export interface TIFFPage {
+  readonly width: number;
+  readonly height: number;
+  readonly bits: number;
+  readonly sampleFormat: number;
+  readonly samplesPerPixel: number;
+  readonly samples: TIFFSamples;
+  readonly description: string;
+  readonly tags: ReadonlyMap<number, readonly number[]>;
+}
+/** Bounded, lazy classic TIFF or BigTIFF directory reader. */
+export interface TIFFFile {
+  readonly bigTIFF: boolean;
+  readonly length: number;
+  readonly descriptions: readonly string[];
+  read(index: number, signal?: AbortSignal): TIFFPage;
+}
+
+/** Reads directory metadata once; pixels decompress only when read(index) is called. Bytes remain borrowed. */
+export function openTIFF(bytes: Uint8Array, options: TIFFOptions = {}): TIFFFile {
+  if (!(bytes instanceof Uint8Array)) throw new TypeError('openTIFF needs Uint8Array bytes');
+  const maxPixels = options.maxPixels ?? 2 ** 26;
+  if (!Number.isSafeInteger(maxPixels) || maxPixels < 1) throw new RangeError('TIFF maxPixels must be positive');
+  const little = bytes[0] === 73 && bytes[1] === 73;
+  if (bytes.length < 8 || (!little && !(bytes[0] === 77 && bytes[1] === 77))) throw corrupt('header is missing');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const bound = (at: number, size: number) => {
+    if (!Number.isSafeInteger(at) || !Number.isSafeInteger(size) || at < 0 || size < 0 || at + size > bytes.length)
+      throw corrupt('offset or count exceeds the file');
+  };
+  const u16 = (at: number) => {
+    bound(at, 2);
+    return view.getUint16(at, little);
+  };
+  const u32 = (at: number) => {
+    bound(at, 4);
+    return view.getUint32(at, little);
+  };
+  const u64 = (at: number) => {
+    bound(at, 8);
+    const n = view.getBigUint64(at, little);
+    if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw corrupt('64-bit offset exceeds safe addressing');
+    return Number(n);
+  };
+  const version = u16(2),
+    bigTIFF = version === 43;
+  if (version !== 42 && version !== 43) throw corrupt('version is invalid');
+  if (bigTIFF && (u16(4) !== 8 || u16(6) !== 0)) throw corrupt('BigTIFF offset layout is invalid');
+  const pointer = bigTIFF ? u64 : u32,
+    head = bigTIFF ? 8 : 2,
+    stride = bigTIFF ? 20 : 12,
+    inline = bigTIFF ? 8 : 4;
+  let ifd = pointer(bigTIFF ? 8 : 4);
+  const directories: Map<number, number[]>[] = [],
+    descriptions: string[] = [],
+    seen = new Set<number>();
+  const sizes: Record<number, number> = {
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 4,
+    5: 8,
+    6: 1,
+    7: 1,
+    8: 2,
+    9: 4,
+    10: 8,
+    11: 4,
+    12: 8,
+    13: 4,
+    16: 8,
+    17: 8,
+    18: 8,
+  };
+  while (ifd) {
+    if (seen.has(ifd)) throw corrupt('cyclic IFD chain');
+    seen.add(ifd);
+    const count = bigTIFF ? u64(ifd) : u16(ifd),
+      tags = new Map<number, number[]>();
+    bound(ifd + head, count * stride + inline);
+    let description = '';
+    for (let e = 0; e < count; e++) {
+      const at = ifd + head + e * stride,
+        id = u16(at),
+        type = u16(at + 2),
+        n = pointer(at + 4),
+        size = sizes[type];
+      if (!size) continue;
+      const slot = at + (bigTIFF ? 12 : 8),
+        offset = n * size <= inline ? slot : pointer(slot);
+      bound(offset, n * size);
+      if (type === 2) {
+        if (id === 270) description = new TextDecoder().decode(bytes.subarray(offset, offset + n)).replace(/\0+$/, '');
+        continue;
+      }
+      const values: number[] = [];
+      for (let i = 0; i < n; i++) {
+        const p = offset + i * size;
+        values.push(
+          type === 1 || type === 7
+            ? bytes[p]
+            : type === 3
+              ? u16(p)
+              : type === 4 || type === 13
+                ? u32(p)
+                : type === 6
+                  ? view.getInt8(p)
+                  : type === 8
+                    ? view.getInt16(p, little)
+                    : type === 9
+                      ? view.getInt32(p, little)
+                      : type === 11
+                        ? view.getFloat32(p, little)
+                        : type === 12
+                          ? view.getFloat64(p, little)
+                          : type === 16 || type === 18
+                            ? u64(p)
+                            : type === 17
+                              ? Number(view.getBigInt64(p, little))
+                              : type === 5
+                                ? u32(p) / u32(p + 4)
+                                : view.getInt32(p, little) / view.getInt32(p + 4, little),
+        );
+      }
+      tags.set(id, values);
+    }
+    directories.push(tags);
+    descriptions.push(description);
+    ifd = pointer(ifd + head + count * stride);
+  }
+  if (!directories.length) throw corrupt('no image directories');
+  return {
+    bigTIFF,
+    length: directories.length,
+    descriptions,
+    read(index, signal) {
+      signal?.throwIfAborted();
+      if (!Number.isInteger(index) || index < 0 || index >= directories.length)
+        throw corrupt('page index is out of range');
+      return rawTIFF(bytes, little, directories[index], descriptions[index], maxPixels, signal);
+    },
+  };
+}
+
+function rawTIFF(
+  bytes: Uint8Array,
+  little: boolean,
+  tags: Map<number, number[]>,
+  description: string,
+  maxPixels: number,
+  signal?: AbortSignal,
+): TIFFPage {
+  const tag = (id: number, fallback?: number): number => {
+    const n = tags.get(id)?.[0] ?? fallback;
+    if (n === undefined) throw corrupt(`required tag ${id} is missing`);
+    return n;
+  };
+  const width = tag(256),
+    height = tag(257),
+    spp = tag(277, 1),
+    bits = tag(258, 1),
+    format = tag(339, 1),
+    planar = tag(284, 1),
+    predictor = tag(317, 1),
+    compression = tag(259, 1);
+  if (
+    ![width, height, spp].every((n) => Number.isSafeInteger(n) && n > 0) ||
+    spp > 16 ||
+    width * height > maxPixels ||
+    width * height * spp > maxPixels * 4
+  )
+    throw corrupt('image exceeds sample bound');
+  if (
+    ![1, 2, 3].includes(format) ||
+    (format === 3 ? ![32, 64].includes(bits) : ![1, 2, 4, 8, 16, 32].includes(bits)) ||
+    (format === 2 && bits < 8)
+  )
+    throw refuse('sample format');
+  if ((tags.get(258) ?? [bits]).some((b) => b !== bits) || (tags.get(339) ?? [format]).some((f) => f !== format))
+    throw refuse('mixed sample formats');
+  if (![1, 2].includes(planar) || tag(266, 1) !== 1 || ![1, 5, 8, 32773, 32946].includes(compression))
+    throw refuse('storage layout');
+  if (predictor !== 1 && !(predictor === 2 && format !== 3 && bits >= 8) && !(predictor === 3 && format === 3))
+    throw refuse('predictor');
+  const tiled = tags.has(322),
+    tw = tiled ? tag(322) : width,
+    th = tiled ? tag(323) : Math.min(tag(278, height), height);
+  if (![tw, th].every((n) => Number.isSafeInteger(n) && n > 0) || tw > width + 1024 || th > height + 1024)
+    throw corrupt('invalid tile or strip size');
+  const across = Math.ceil(width / tw),
+    down = Math.ceil(height / th),
+    planes = planar === 2 ? spp : 1,
+    channels = planar === 2 ? 1 : spp;
+  const offsets = tags.get(tiled ? 324 : 273),
+    counts = tags.get(tiled ? 325 : 279),
+    rowBytes = Math.ceil((tw * channels * bits) / 8),
+    max = 2 ** bits - 1;
+  if (!offsets || !counts || offsets.length !== across * down * planes || counts.length !== offsets.length)
+    throw corrupt('missing block offsets or counts');
+  const Ctor =
+    format === 3
+      ? bits === 32
+        ? Float32Array
+        : Float64Array
+      : format === 2
+        ? bits === 8
+          ? Int8Array
+          : bits === 16
+            ? Int16Array
+            : Int32Array
+        : bits <= 8
+          ? Uint8Array
+          : bits === 16
+            ? Uint16Array
+            : Uint32Array;
+  const samples: TIFFSamples = new Ctor(width * height * spp);
+  for (let plane = 0; plane < planes; plane++)
+    for (let by = 0; by < down; by++)
+      for (let bx = 0; bx < across; bx++) {
+        signal?.throwIfAborted();
+        const index = (plane * down + by) * across + bx,
+          rows = tiled ? th : Math.min(th, height - by * th),
+          size = rowBytes * rows,
+          offset = offsets[index],
+          count = counts[index];
+        if (!Number.isSafeInteger(offset + count) || offset < 0 || count < 0 || offset + count > bytes.length)
+          throw corrupt('block exceeds file');
+        const raw = bytes.subarray(offset, offset + count),
+          decoded =
+            compression === 5
+              ? lzw(raw, size)
+              : compression === 32773
+                ? packBits(raw, size)
+                : compression === 1
+                  ? raw
+                  : inflateZlib(raw, size);
+        if (decoded.length < size) throw corrupt('short block');
+        const block = predictor === 3 ? decoded.slice() : decoded,
+          data = new DataView(block.buffer, block.byteOffset, block.byteLength),
+          row = new Float64Array(tw * channels),
+          bps = bits / 8;
+        for (let y = 0; y < rows; y++) {
+          if (predictor === 3) {
+            const begin = y * rowBytes,
+              n = tw * channels,
+              ordered = new Uint8Array(rowBytes);
+            for (let i = channels; i < rowBytes; i++)
+              block[begin + i] = (block[begin + i] + block[begin + i - channels]) & 255;
+            for (let i = 0; i < n; i++)
+              for (let b = 0; b < bps; b++) ordered[i * bps + (little ? bps - 1 - b : b)] = block[begin + b * n + i];
+            block.set(ordered, begin);
+          }
+          for (let i = 0; i < row.length; i++) {
+            const at = y * rowBytes + i * bps;
+            let v =
+              format === 3
+                ? bits === 32
+                  ? data.getFloat32(at, little)
+                  : data.getFloat64(at, little)
+                : bits === 32
+                  ? data.getUint32(at, little)
+                  : bits === 16
+                    ? data.getUint16(at, little)
+                    : bits === 8
+                      ? block[at]
+                      : (block[y * rowBytes + ((i * bits) >> 3)] >> (8 - bits - ((i * bits) & 7))) & max;
+            if (predictor === 2 && i >= channels) v = (v + row[i - channels]) % (max + 1);
+            row[i] = v;
+          }
+          if (by * th + y >= height) continue;
+          for (let x = 0; x < tw && bx * tw + x < width; x++)
+            for (let c = 0; c < channels; c++)
+              samples[((by * th + y) * width + bx * tw + x) * spp + (planar === 2 ? plane : c)] = row[x * channels + c];
+        }
+      }
+  return { width, height, bits, sampleFormat: format, samplesPerPixel: spp, samples, description, tags };
+}
+
+const SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
+
 const corrupt = (problem: string): Error =>
   decodeFailed(`TIFF ${problem}; pass the complete bytes of a valid TIFF file`);
 const refuse = (what: string): Error =>
   decodeFailed(`TIFF ${what} is not supported; save the image as baseline 8-bit, 16-bit or float RGB, grey or palette`);
-const SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
 
 /** TIFF LZW (MSB-first codes of 9 to 12 bits, Clear 256, EndOfInformation 257) into exactly `size` bytes. */
 function lzw(src: Uint8Array, size: number): Uint8Array {

@@ -1,0 +1,1058 @@
+{
+  "classic-le-uint16-lzw-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-le-uint16-lzw-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-le-uint16-deflate-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-le-uint16-deflate-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-le-int16-lzw-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-int16-lzw-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-int16-deflate-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-int16-deflate-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-uint32-lzw-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-le-uint32-lzw-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-le-uint32-deflate-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-le-uint32-deflate-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-le-int32-lzw-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-int32-lzw-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-int32-deflate-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-int32-deflate-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-le-float32-lzw-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float32-lzw-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float32-deflate-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float32-deflate-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float64-lzw-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float64-lzw-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float64-deflate-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-le-float64-deflate-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-uint16-lzw-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-be-uint16-lzw-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-be-uint16-deflate-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-be-uint16-deflate-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "classic-be-int16-lzw-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-int16-lzw-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-int16-deflate-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-int16-deflate-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-uint32-lzw-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-be-uint32-lzw-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-be-uint32-deflate-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-be-uint32-deflate-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "classic-be-int32-lzw-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-int32-lzw-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-int32-deflate-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-int32-deflate-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "classic-be-float32-lzw-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float32-lzw-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float32-deflate-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float32-deflate-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float64-lzw-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float64-lzw-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float64-deflate-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "classic-be-float64-deflate-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-uint16-lzw-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-le-uint16-lzw-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-le-uint16-deflate-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-le-uint16-deflate-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-le-int16-lzw-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-int16-lzw-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-int16-deflate-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-int16-deflate-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-uint32-lzw-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-le-uint32-lzw-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-le-uint32-deflate-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-le-uint32-deflate-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-le-int32-lzw-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-int32-lzw-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-int32-deflate-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-int32-deflate-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-le-float32-lzw-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float32-lzw-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float32-deflate-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float32-deflate-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float64-lzw-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float64-lzw-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float64-deflate-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-le-float64-deflate-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-uint16-lzw-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-be-uint16-lzw-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-be-uint16-deflate-strip.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-be-uint16-deflate-tile.tif": {
+    "dtype": "uint16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 30359437.0,
+    "first": 50000.0,
+    "last": 9171.0
+  },
+  "big-be-int16-lzw-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-int16-lzw-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-int16-deflate-strip.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-int16-deflate-tile.tif": {
+    "dtype": "int16",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-uint32-lzw-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-be-uint32-lzw-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-be-uint32-deflate-strip.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-be-uint32-deflate-tile.tif": {
+    "dtype": "uint32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": 49758093.0,
+    "first": 50000.0,
+    "last": 74707.0
+  },
+  "big-be-int32-lzw-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-int32-lzw-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-int32-deflate-strip.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-int32-deflate-tile.tif": {
+    "dtype": "int32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -148.0,
+    "first": -50.0,
+    "last": 49.0
+  },
+  "big-be-float32-lzw-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float32-lzw-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float32-deflate-strip.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float32-deflate-tile.tif": {
+    "dtype": "float32",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float64-lzw-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float64-lzw-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float64-deflate-strip.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  },
+  "big-be-float64-deflate-tile.tif": {
+    "dtype": "float64",
+    "shape": [
+      2,
+      19,
+      21
+    ],
+    "sum": -149.625,
+    "first": -50.0,
+    "last": 49.625
+  }
+}

@@ -1,0 +1,617 @@
+{
+  "sources": [
+    {
+      "name": "Sloan Digital Sky Survey r-band corrected frame 002505-3-0038",
+      "url": "https://data.sdss.org/sas/dr17/eboss/photoObj/frames/301/2505/3/frame-r-002505-3-0038.fits.bz2",
+      "licence": "CC BY (SDSS images); public domain public-release numerical data",
+      "policy": "https://www.sdss.org/collaboration/image-use-policy/",
+      "transformation": "Original bzip2 bytes, unchanged"
+    },
+    {
+      "name": "Electron Microscopy Data Bank EMD-1003",
+      "url": "https://files.wwpdb.org/pub/emdb/structures/EMD-1003/map/emd_1003.map.gz",
+      "licence": "CC0 1.0",
+      "policy": "https://www.ebi.ac.uk/emdb/documentation",
+      "transformation": "Original gzip bytes, unchanged"
+    },
+    {
+      "name": "Tratwal et al., idr0096-tratwal-marrowquant, GFP11_6192_omWAT (20x)",
+      "url": "https://ftp.ebi.ac.uk/pub/databases/IDR/idr0096-tratwal-marrowquant/20210609-ftp-ome-tiffs/GFP11_6192_omWAT%20(20x).ome.tiff",
+      "licence": "CC BY 4.0",
+      "policy": "https://raw.githubusercontent.com/IDR/idr0096-tratwal-marrowquant/master/idr0096-study.txt",
+      "transformation": "Original native JPEG 2000 tiles decoded through tifffile/imagecodecs public APIs, central 256x256 RGB crop encoded losslessly as deflate OME-TIFF. No rendered thumbnail or scaling. Original shape, exact source byte range digests and crop origin in idr-source.json."
+    },
+    {
+      "name": "Margo original format fixtures",
+      "licence": "Apache-2.0, same as repository",
+      "transformation": "Written by installed Astropy, mrcfile and tifffile public APIs. Versions and independent WCSLIB expectations in expected.json; no implementation source read."
+    }
+  ],
+  "files": [
+    {
+      "path": "emd_1003.map.gz",
+      "bytes": 7061160,
+      "sha256": "9f01396c59e58e381d4d73825692e71b87c294f6481c249ca140d99f1dcdf613"
+    },
+    {
+      "path": "expected.json",
+      "bytes": 25698,
+      "sha256": "35a62e5b14fa9073f54e0c2c8970492fcba2b5954334d6ddd3467c555b6e7235"
+    },
+    {
+      "path": "idr-source.json",
+      "bytes": 3014,
+      "sha256": "12c02a6a5a5b385c2c5af31979037cb8d9d0210786d6ed92301d9abfdef9ef03"
+    },
+    {
+      "path": "idr0096-crop.ome.tiff",
+      "bytes": 52535,
+      "sha256": "a74d6c647187c0477b13c9f18a6574355152e3b1a12daa6f73ded3d784b56016"
+    },
+    {
+      "path": "int64.fits",
+      "bytes": 5760,
+      "sha256": "144dd9fc4e70edeb66f65c48670e77f3e16975ff6ce492741368e55169893d95"
+    },
+    {
+      "path": "main.ome.tiff",
+      "bytes": 700,
+      "sha256": "bb5bc58c375a25853789b5f417c73a7e1eee5a834c18ad53d0be4ec83d7b8eaa"
+    },
+    {
+      "path": "owner-False-deflate.ome.tiff",
+      "bytes": 4743,
+      "sha256": "6f1fd707683c2e8384d51ec5a6dd72455e229176c72026fbf7c0aa0d4dee160f"
+    },
+    {
+      "path": "owner-False-lzw.ome.tiff",
+      "bytes": 5325,
+      "sha256": "de06dd8acd0c086cb6e8c2b6231cde21cddc5d0e2ac90c54ae5a62cdbd02ea81"
+    },
+    {
+      "path": "owner-float16.mrc",
+      "bytes": 1144,
+      "sha256": "3cd1a5d1779c0058ad339d96dedd2a4e9e7fd346a363992db181b0b61dd419bc"
+    },
+    {
+      "path": "owner-float32.mrc",
+      "bytes": 1264,
+      "sha256": "8231c82be9e8d848f3d7fe2745e52cf2ddac8571f50cf29eb48acf3bb4187371"
+    },
+    {
+      "path": "owner-int16.mrc",
+      "bytes": 1144,
+      "sha256": "448e9e5a0e3357aa6a75f70c4c20ebf2209aa576debea3e01e25bb759d3efcd1"
+    },
+    {
+      "path": "owner-int8.mrc",
+      "bytes": 1084,
+      "sha256": "3b7bbbb1eaee14e7f10b6a232ba23e1a6c5ac6d3b0a18b0adeda57f0f65f665c"
+    },
+    {
+      "path": "owner-True-deflate.ome.tiff",
+      "bytes": 8351,
+      "sha256": "6a8bc37c5ff09b21b2b40469d86ac4b2630c201d51efae49327874571f0f067f"
+    },
+    {
+      "path": "owner-True-lzw.ome.tiff",
+      "bytes": 9381,
+      "sha256": "cee016fd7905cde71f82ba5395fa9fc7537c0c1385f71a457fb99add61947fa1"
+    },
+    {
+      "path": "owner-uint16.mrc",
+      "bytes": 1144,
+      "sha256": "aaaec45f65f3fec2f523655c193f88d2902e8e5bb36e7b7a83b83e91c542c235"
+    },
+    {
+      "path": "owner.fits",
+      "bytes": 11520,
+      "sha256": "ff32c8c9d5ce0b493a99ca98584fe014027283416f39f07998326c9bb3406e90"
+    },
+    {
+      "path": "part.ome.tiff",
+      "bytes": 700,
+      "sha256": "b3342cb66cff181b4683c2332300588fd299edf3491afaee1a2303c8e0295547"
+    },
+    {
+      "path": "reverse.ome.tiff",
+      "bytes": 750,
+      "sha256": "a1e05414feec2586d79d42693326361d447ed6c47167b98df249da66908dcae6"
+    },
+    {
+      "path": "scaled.fits",
+      "bytes": 5760,
+      "sha256": "c3ff824ff09470f912086da111382757afc7aeb3da26cc31e07aba10ff73c228"
+    },
+    {
+      "path": "sdss-frame.fits.bz2",
+      "bytes": 3947283,
+      "sha256": "c11b30ebbad70126a92398664199e7eb785f1e76aa1d928138da61fb932926cc"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float32-deflate-strip.tif",
+      "bytes": 1189,
+      "sha256": "f4d5cc36c7c293e9d244624501fec96e8565fb88f13575ffa8a4756ca69067de"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float32-deflate-tile.tif",
+      "bytes": 1686,
+      "sha256": "b23a443a80ffbc723d99e3b7b2fd58cbc84d43bd5b921b7240f4a7a74a026fb0"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float32-lzw-strip.tif",
+      "bytes": 1333,
+      "sha256": "bf43238c51f530fd2a3121a2247d4da0b6dae1e747adc002c0a2f4f4cf9a3003"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float32-lzw-tile.tif",
+      "bytes": 1906,
+      "sha256": "62f2686e10bee2eadfa27aee70dba801aee3796bd8b3b6ded42b7faee25c328b"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float64-deflate-strip.tif",
+      "bytes": 1358,
+      "sha256": "063ef5e715e3dde312ee38b8559868dbe9c9a8245276db5ba169d5d0d03e0d3a"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float64-deflate-tile.tif",
+      "bytes": 1939,
+      "sha256": "b99f6c927f6bac624076b1cfb616fe194a6b7f57882244442bc91453fa2d5252"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float64-lzw-strip.tif",
+      "bytes": 1547,
+      "sha256": "475717241a789797491b77ac9ea3fc519e125af4ba411d65743efbb4d047a2d8"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-float64-lzw-tile.tif",
+      "bytes": 2262,
+      "sha256": "899233c1e801737bd34987b4db1d4dc3d7096cc404d862ee16cce9d59fd01ad5"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int16-deflate-strip.tif",
+      "bytes": 974,
+      "sha256": "dcda85fe44278b19ff99d241d28444d764f9e258382ae3a605253a475b560475"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int16-deflate-tile.tif",
+      "bytes": 1316,
+      "sha256": "de408de9a490cd96acd94f7286d8cd4753caf2395a1b164a0231fc8c482a284f"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int16-lzw-strip.tif",
+      "bytes": 1071,
+      "sha256": "07a4025d70d20c461ce4e6f52a2e0c08cd0f637ee8f79a9ee06fdc203ad1bd31"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int16-lzw-tile.tif",
+      "bytes": 1415,
+      "sha256": "ccd7d040b730e462f3cb776cf8e958bcb1ff34a75858f5a40e132cecc60aaf08"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int32-deflate-strip.tif",
+      "bytes": 1055,
+      "sha256": "e34ae5f0bc15b60dcc7b3e2e7c1d2412e8fa204118a16b350b4a7349f82bf6e8"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int32-deflate-tile.tif",
+      "bytes": 1419,
+      "sha256": "34f0d1f9aef113f460a8fedfea35a6baeeb9f67c332ded28e245d17237f0a300"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int32-lzw-strip.tif",
+      "bytes": 1162,
+      "sha256": "1bc0dde80478fe64360a286d97eeb26977410198fb48142ac1472d9f382d54b0"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-int32-lzw-tile.tif",
+      "bytes": 1589,
+      "sha256": "539cf9ba635904868676ad3005e9d67119ab91b1c4e105f2ae7a8764ff75ff61"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint16-deflate-strip.tif",
+      "bytes": 880,
+      "sha256": "3901782aa127ee89e3a18aca4e0f1fcaae78eeed33565b9539892209382cd0f8"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint16-deflate-tile.tif",
+      "bytes": 1291,
+      "sha256": "ac3f2d4f324902b6eb36f91afc96a49deff819477523480fdc6a0dadf99a83c9"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint16-lzw-strip.tif",
+      "bytes": 998,
+      "sha256": "c47fdb875c393ce75d3d674a254c67c6624128a7a5ceb1419d48132bfbc36ba4"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint16-lzw-tile.tif",
+      "bytes": 1453,
+      "sha256": "abfe95e801a22d028740ef8915480a82089c9e5c58384ace062d152f01307253"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint32-deflate-strip.tif",
+      "bytes": 977,
+      "sha256": "0cc6578e85abaa3ce86710db4f599dd582a3e339874d62de318ceb7e89bee45c"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint32-deflate-tile.tif",
+      "bytes": 1393,
+      "sha256": "9d44ea746131fe671950a7f9041d63ad0322df60227f91fe4531853de20e2106"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint32-lzw-strip.tif",
+      "bytes": 1210,
+      "sha256": "e554d63ce7d42461935fa6c7070e150fe3c71cb8af8e79c7279d28d04c7f1f0f"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-be-uint32-lzw-tile.tif",
+      "bytes": 1770,
+      "sha256": "5e726ecd6307c8c227324324ce0952afb5d14b53663a6e6a366b936111f78be7"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float32-deflate-strip.tif",
+      "bytes": 1189,
+      "sha256": "66ba7723cd73823af55c1c20cae0445d7a5a598880520955d9722703cdc47898"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float32-deflate-tile.tif",
+      "bytes": 1686,
+      "sha256": "da52002bf495d40b48c0632bbccacf54701a645fd6f0a860a2a1bca0d5e10ae2"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float32-lzw-strip.tif",
+      "bytes": 1333,
+      "sha256": "47c7a37241255db78466ff472df08234c983a5b4b5d4aaced881de53ea159563"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float32-lzw-tile.tif",
+      "bytes": 1906,
+      "sha256": "ab4005caaf3fc5fca939c127735f57cd79783aac71f218f6338fe8b052180055"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float64-deflate-strip.tif",
+      "bytes": 1358,
+      "sha256": "3d1e64268506fa57bfb7450cedb84410d44e1acf397aba3bfefe8ee3c07985a3"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float64-deflate-tile.tif",
+      "bytes": 1939,
+      "sha256": "635b005f178fb7a56b4d0bb123e8b70731fe9d6b643d60e405ae08241c47c651"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float64-lzw-strip.tif",
+      "bytes": 1547,
+      "sha256": "20f41287359525b63aadaf6f261b41985b3486f72bcc85a643ed8300b5c2264a"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-float64-lzw-tile.tif",
+      "bytes": 2262,
+      "sha256": "fa2e3f5d5c94a497d42cab1095bec6602f2c95121e30c8ad5bf98a5a9ab2dc36"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int16-deflate-strip.tif",
+      "bytes": 972,
+      "sha256": "8d6eff7f3300f12c15bd065533bc5f706dcd6e0ac58bef04ba14229a49d9a296"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int16-deflate-tile.tif",
+      "bytes": 1288,
+      "sha256": "b342398381434320338635239db0c6e40b151833f3431e668b7ee0c027deafb2"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int16-lzw-strip.tif",
+      "bytes": 1053,
+      "sha256": "1b1d7af4d72bfae45d2281863165000801b2e6847d97cabc2fe1a65b3933a314"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int16-lzw-tile.tif",
+      "bytes": 1413,
+      "sha256": "14c4abca9c171413a950ee68e33ec4e5d8c0582667744d07a50cca745ddb152d"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int32-deflate-strip.tif",
+      "bytes": 1033,
+      "sha256": "bce80fdf68b1a042adc29a749ac01849e65db021bda4bfdb131da4063d749d55"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int32-deflate-tile.tif",
+      "bytes": 1391,
+      "sha256": "650154d8c0e4c8ea69ef419421e3b3df02a403f6d8f167842992f855ffd574cb"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int32-lzw-strip.tif",
+      "bytes": 1160,
+      "sha256": "460d475b75cc9c795e842e9ccc7131ea6e31246dc0f50bbb09b92f0dba1f70b9"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-int32-lzw-tile.tif",
+      "bytes": 1589,
+      "sha256": "4ace931d09e79576901d2db6ab35e7b1b6e3e787fec64be631c12794c4cf684a"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint16-deflate-strip.tif",
+      "bytes": 881,
+      "sha256": "92bc71d472afcd888a4da6ad014aa3cdbc5b481007406b0b555cd1296c4ae07c"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint16-deflate-tile.tif",
+      "bytes": 1290,
+      "sha256": "5baab1d16fe34b4801664a16d8be425d3480dde23cb96bb757388711b8a29791"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint16-lzw-strip.tif",
+      "bytes": 997,
+      "sha256": "f6cf6e4196a6bb8b53320e134e3f1b13a9b0f357a558b74ba0e3c2bc086a2015"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint16-lzw-tile.tif",
+      "bytes": 1453,
+      "sha256": "719867e94697030c7adb11ab807b80fa9358e27d628edae9bb670eb76dc42720"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint32-deflate-strip.tif",
+      "bytes": 949,
+      "sha256": "638f1b9752400c064b737bde754cadaa6fd1e60cc3c20e3b5f8980840e81a8e5"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint32-deflate-tile.tif",
+      "bytes": 1360,
+      "sha256": "24d57de7221d14ab2c9633286c4a622025f964928c6629af769826c4ae4a1d2e"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint32-lzw-strip.tif",
+      "bytes": 1212,
+      "sha256": "2c0545f8799c30036dc921f00c17ecc4a806ed6f7dba1660ba296c945a1581e8"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/big-le-uint32-lzw-tile.tif",
+      "bytes": 1788,
+      "sha256": "ee76f712089ec72a84e2223964e85f29395fd05da5d73189d43323ab7469628b"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float32-deflate-strip.tif",
+      "bytes": 949,
+      "sha256": "20885e9b69cdde7ffe0c24c06aa236f6b8fa96857c9f5cfe9fff227bd9813a56"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float32-deflate-tile.tif",
+      "bytes": 1430,
+      "sha256": "5d31be8cbea38775e92760576de35e46464608ce760771f6dfe95bf7a949fa90"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float32-lzw-strip.tif",
+      "bytes": 1093,
+      "sha256": "6a5aec1ab6e3b918c572beff18d11b5de4ff71af09fb3d8e1202a56a7162f017"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float32-lzw-tile.tif",
+      "bytes": 1666,
+      "sha256": "fbc4cf7064da2be4b4db9f470e6f7b653f91686e12acf697c9ce6f1c23388cda"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float64-deflate-strip.tif",
+      "bytes": 1118,
+      "sha256": "224261a803e45880134036ec82e91fe904d4d079abf35fa5a0a9759f0ee78927"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float64-deflate-tile.tif",
+      "bytes": 1683,
+      "sha256": "26357ecda3ba2a8fc665eb7f4b42db23ca6bededefa7b3644b759f318745c5b8"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float64-lzw-strip.tif",
+      "bytes": 1307,
+      "sha256": "986b6442120094a46fee463be056c790a4e2bae66eec8e41d19a521eb075c3f5"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-float64-lzw-tile.tif",
+      "bytes": 2006,
+      "sha256": "e64078aaf81f0853e7d1e561be6fcabc4514b6daef8125fb7b48ce9068e7cbb7"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int16-deflate-strip.tif",
+      "bytes": 734,
+      "sha256": "b4b124b29db098565780374f3232276c3074430d6e82474af14f2838de5b19b6"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int16-deflate-tile.tif",
+      "bytes": 1060,
+      "sha256": "34ad6ae44f400fd79961143284dae28b2e56763de7a451db6d14cce618026259"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int16-lzw-strip.tif",
+      "bytes": 831,
+      "sha256": "11cdf58d89266daadc8ecf47d45b1a22d2cc04ea1d91ff3cfd0a33c42a720493"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int16-lzw-tile.tif",
+      "bytes": 1175,
+      "sha256": "b2fd85e492ba31df257f4414b0f4b995c4117ae203c03fbc0525c087bfd037da"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int32-deflate-strip.tif",
+      "bytes": 815,
+      "sha256": "e23c03742a32bf0f3b7f5a5fda60eacc471724436a03dedd65c1a1222bb50126"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int32-deflate-tile.tif",
+      "bytes": 1179,
+      "sha256": "87e738873e541a00bc7a5f8b9824770ab339c79d861da43f8fecea502b79b981"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int32-lzw-strip.tif",
+      "bytes": 922,
+      "sha256": "b4961fe34d369a3ff1ce3b24c6b735da6c289cc27068270926dfb6d958d0ea14"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-int32-lzw-tile.tif",
+      "bytes": 1333,
+      "sha256": "6d51cd57b2387048443adae8e091ef41512e03d5f8015758e962c062e18c9295"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint16-deflate-strip.tif",
+      "bytes": 672,
+      "sha256": "4c4b96b83cc7a8b1b7dcee35827c97b0fbe164565226767f97a69f69302e17f6"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint16-deflate-tile.tif",
+      "bytes": 1051,
+      "sha256": "c7fded84e393ddf353e60c8aa41b1a34c85bf1bd84ee1988a3fb6d40e26622ec"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint16-lzw-strip.tif",
+      "bytes": 774,
+      "sha256": "fed7772c608add578988102712419391da13451cdc04df56de2a0fa5d8bf2f56"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint16-lzw-tile.tif",
+      "bytes": 1213,
+      "sha256": "7bef5ead4a2b99cf514806005abd6dd3daf0d35e197e65f0ba035e2b14105665"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint32-deflate-strip.tif",
+      "bytes": 753,
+      "sha256": "7c767faf22e085155302635cec73dc2669c66fe096e1d78bcab374bb6a981b0b"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint32-deflate-tile.tif",
+      "bytes": 1137,
+      "sha256": "a3e6eb34999735d54be41dc0def01816c683ed856533e84aa674d295bdd976f8"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint32-lzw-strip.tif",
+      "bytes": 986,
+      "sha256": "a3394b8dd0a693843ac3f3661bcc236a847c464a47200ac609db2f85f411d449"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-be-uint32-lzw-tile.tif",
+      "bytes": 1530,
+      "sha256": "233a7bef4755692dcd3a8eabe4d7c056b0e540a5f8a1d369ffc31e01651ae20b"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float32-deflate-strip.tif",
+      "bytes": 949,
+      "sha256": "f1db88462e74a3d38a8809aa890282294280be0bb34c7976072fd67b3a17f8b7"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float32-deflate-tile.tif",
+      "bytes": 1430,
+      "sha256": "57c13724cad1506537772e06719e4ed2af653616595b0a1dc7ca4820023ff2f9"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float32-lzw-strip.tif",
+      "bytes": 1093,
+      "sha256": "04a0f1ea0908b5faaaf0eb38a18fd6f04cced8a4c5caa5c6cd9b74e58c3b692b"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float32-lzw-tile.tif",
+      "bytes": 1666,
+      "sha256": "c69ca13c782e7c9c0af43d6f2d16cbc8cbc7aa88ca683ac94500dee22b484136"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float64-deflate-strip.tif",
+      "bytes": 1118,
+      "sha256": "390988bc766a8621f6654e38edf9e0eae2b395badec369ab0f8efe91f536fa07"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float64-deflate-tile.tif",
+      "bytes": 1683,
+      "sha256": "605f1ec49a9536d883bf4356200bf46b4a7b02c7f4a7b5be1755eb5698a1e35d"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float64-lzw-strip.tif",
+      "bytes": 1307,
+      "sha256": "f4e3873292065387a5ed3907661ac1e0e68d2fee0c73b23298c1f6fd4672144c"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-float64-lzw-tile.tif",
+      "bytes": 2006,
+      "sha256": "e9da3fac2bade8c9ddf1352e89c1fb8850f382aeb2de68183398ce55af206b57"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int16-deflate-strip.tif",
+      "bytes": 732,
+      "sha256": "b8026fafd55298892ff8339dddd5836f05425e0f13fd12033335cca839c043ca"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int16-deflate-tile.tif",
+      "bytes": 1048,
+      "sha256": "150c05f11c7dabf7f73ba27b3d9a0c6abefe3ca2cb5c35fa6c4675693718f866"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int16-lzw-strip.tif",
+      "bytes": 813,
+      "sha256": "a1a83998dd65dca405eb7669c9a4df4d35b9a70cf9accd0bc9237485c41ff5cc"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int16-lzw-tile.tif",
+      "bytes": 1173,
+      "sha256": "673f43b259722d1de05cfd595a4236abcc01c90434c3aa9b45552f12ebcd9ded"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int32-deflate-strip.tif",
+      "bytes": 793,
+      "sha256": "335bc802a2bce715279a71631b3a4b5b3a5be141d8807a581b2a12b1c3e8fb3a"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int32-deflate-tile.tif",
+      "bytes": 1135,
+      "sha256": "8cb7fc83e6bdbb467626471e7237829f4d093ddf58356fdc2f0a6eb03361d625"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int32-lzw-strip.tif",
+      "bytes": 920,
+      "sha256": "cd94050528eb9665dcbdffb0b4953a2997131b3eca474374d9b937f0e09db336"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-int32-lzw-tile.tif",
+      "bytes": 1333,
+      "sha256": "457495603dc919e52b69e11431d94f9d6e4f16749d6994ac08cd88c5cd2f3de2"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint16-deflate-strip.tif",
+      "bytes": 673,
+      "sha256": "dcbfc2772ad6fc34bd0346890a549bbdf8c034a3257ed53d2caf194882024cd0"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint16-deflate-tile.tif",
+      "bytes": 1050,
+      "sha256": "4968ef959beefb447280570e122b2daa0b1e966e8bfb38c7ba961f2aebe0bc12"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint16-lzw-strip.tif",
+      "bytes": 773,
+      "sha256": "51ca24943a3ce80ace5027a4ee4f7e00d8732b35996af27645038757969a0756"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint16-lzw-tile.tif",
+      "bytes": 1213,
+      "sha256": "dd03c39a4859fc9ab95c10794bf08e883ce684d4453fdb1b6443c1a3debbeafe"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint32-deflate-strip.tif",
+      "bytes": 725,
+      "sha256": "022bb3ac1cf9055a6b2898c75839979f2dcd87910b03306eaf6ed9adfbaaeeb2"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint32-deflate-tile.tif",
+      "bytes": 1120,
+      "sha256": "66fb5d293c7919846cd4df7648b6dd1d4b1b6c991fba2efeca135fe59527fab0"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint32-lzw-strip.tif",
+      "bytes": 988,
+      "sha256": "d94beb3933e93ddde1c54f2f4119fc46bab77b23e6c410ba66e0a1cd6506b582"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/classic-le-uint32-lzw-tile.tif",
+      "bytes": 1548,
+      "sha256": "ac7d4ea53ba96aa925d3d8291de392851b43bb3a195cd9e50024dc50336f8158"
+    },
+    {
+      "path": "../../../../decoders/tests/fixtures/tiff-scientific/expected.json",
+      "bytes": 18021,
+      "sha256": "9e6f9fd47ec760954e9008b7b71059558eabb7f668d8e155598809e00343a916"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14540535,
+  "total": 14553987,
   "history": [
     {
       "date": "2026-10-24",
@@ -7763,6 +7763,18 @@
       "commit": "51dd602eb",
       "reason": "new entry @margoengine/clustered/layers (light linking and layers, batch 52 job 7)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "3d7dd74c9",
+      "reason": "Batch 176 job 3: TIFF 4401 to 6064 B; new FITS/MRC/OME entries 4908/2906/3207 B. Quantitative lazy BigTIFF, signed samples, predictors and full plane axes justify optional bytes; splitting TIFF would repeat directory or codec logic. Core plus stage unchanged 24209 B.",
+      "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "9b2973b29",
+      "reason": "Batch 176 landing: upstream tiled-export uniforms in lines/batch grew lines/debug from 9549 to 9874 B after batch 178 media landed. Preserve tile-aware debug rendering and raise its optional ceiling from 9836 to 10171 B. Splitting the shared line batch would duplicate viewport uniforms and shader state. No source change or core/stage growth.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8022,7 +8034,7 @@
     "@margoengine/decoders/texture": 914,
     "@margoengine/decoders/texture-rgba": 4702,
     "@margoengine/decoders/tga": 1614,
-    "@margoengine/decoders/tiff": 4657,
+    "@margoengine/decoders/tiff": 6320,
     "@margoengine/decoders/webp": 11720,
     "@margoengine/decoders/webp-lossless": 3366,
     "@margoengine/decoders/xz": 4182,
@@ -9168,6 +9180,9 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/sciviz/fits": 5164,
+    "@margoengine/sciviz/mrc": 3162,
+    "@margoengine/sciviz/ometiff": 3463
   }
 }

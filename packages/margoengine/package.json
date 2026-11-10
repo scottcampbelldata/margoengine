@@ -3595,6 +3595,18 @@
       "types": "./dist/sciviz/stream.d.ts",
       "import": "./dist/sciviz/stream.js"
     },
+    "./sciviz/fits": {
+      "types": "./dist/sciviz/fits.d.ts",
+      "import": "./dist/sciviz/fits.js"
+    },
+    "./sciviz/mrc": {
+      "types": "./dist/sciviz/mrc.d.ts",
+      "import": "./dist/sciviz/mrc.js"
+    },
+    "./sciviz/ometiff": {
+      "types": "./dist/sciviz/ometiff.d.ts",
+      "import": "./dist/sciviz/ometiff.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

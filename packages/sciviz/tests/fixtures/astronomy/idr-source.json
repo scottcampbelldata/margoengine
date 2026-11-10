@@ -1,0 +1,111 @@
+{
+  "originalURL": "https://ftp.ebi.ac.uk/pub/databases/IDR/idr0096-tratwal-marrowquant/20210609-ftp-ome-tiffs/GFP11_6192_omWAT%20(20x).ome.tiff",
+  "originalBytes": 146114920,
+  "shape": [
+    3,
+    9916,
+    10623
+  ],
+  "cropOrigin": [
+    4958,
+    5311
+  ],
+  "sum": [
+    14239969,
+    14209763,
+    14277213
+  ],
+  "first": [
+    215,
+    215,
+    215
+  ],
+  "ranges": [
+    {
+      "offset": 0,
+      "length": 16,
+      "sha256": "ec6c86d67e266a59f7d3ac017f12271b725f0e7a29ae3aad33d1c5ff2499a37b"
+    },
+    {
+      "offset": 0,
+      "length": 4,
+      "sha256": "eb741eb14e0c27ea76a07c8c335b680d541f8eed0a6e6c0d2bef80757f5627d7"
+    },
+    {
+      "offset": 4,
+      "length": 4,
+      "sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+    },
+    {
+      "offset": 8,
+      "length": 8,
+      "sha256": "82210e590ca9b983dbbcddd7d6018cfa5cdc955cf24cc7005da051875378f408"
+    },
+    {
+      "offset": 145986008,
+      "length": 8,
+      "sha256": "5bc67471c189d78c76461dcab6141a733bdab3799d1d69e0c419119c92e82b3d"
+    },
+    {
+      "offset": 145986016,
+      "length": 360,
+      "sha256": "48a4cfde4fc5ca9f7f273d204f2ffaab885c39991301d753cbfca759d1361ef8"
+    },
+    {
+      "offset": 145986384,
+      "length": 123186,
+      "sha256": "329dd90a99094cb0987cc76f271a01945c21049e7da6991f0222efc497348053"
+    },
+    {
+      "offset": 146109570,
+      "length": 22,
+      "sha256": "1540fecce4b2940e2014e2c038f22d9e9a99b78bb140ad72266795c0194220fb"
+    },
+    {
+      "offset": 146109592,
+      "length": 2640,
+      "sha256": "99906f64ca251b96f77bc5c9c6d716de2d2293c293ed0c90fd9a1b6d7c4f6d84"
+    },
+    {
+      "offset": 146112232,
+      "length": 2640,
+      "sha256": "9fa169557ab7ba52e5f779c0956085458188b06254e5717e10bb2affbef82157"
+    },
+    {
+      "offset": 146114872,
+      "length": 48,
+      "sha256": "c4e5062da04537393d3462b1b425287a062a12c2ebedf3f1f3557cb63484432d"
+    },
+    {
+      "offset": 46937960,
+      "length": 333378,
+      "sha256": "be582f4ac465b7de184ab051e83f591e6ffcbe71b408219beb11974ed51d8cbe"
+    },
+    {
+      "offset": 58599611,
+      "length": 356656,
+      "sha256": "92773bf1319fcebee3056b2f7d857d2cf9fd2f3205c6631490da7df8b4a7a90c"
+    },
+    {
+      "offset": 47610390,
+      "length": 333424,
+      "sha256": "653a89c3c080bc7d973b29f77535a5d18538d259a63e31e02f1b7aad1b434a91"
+    },
+    {
+      "offset": 58242238,
+      "length": 357373,
+      "sha256": "95b61d7612253d63cc14a88c9becb9ffad94139be4cd276bdb66949f8abd2af4"
+    },
+    {
+      "offset": 47943814,
+      "length": 333962,
+      "sha256": "5605ca97d665cf3dbfc313b9efeca85f499dc8388580a967b0ab0101f9f5c06c"
+    },
+    {
+      "offset": 57884263,
+      "length": 357975,
+      "sha256": "3472affc59d078f9b083c6334ca2bf8f0574db158fd73d17d939b58b8055f360"
+    }
+  ],
+  "conversion": "tifffile 2026.11.8 native tile decode and lossless deflate crop, no rescaling"
+}

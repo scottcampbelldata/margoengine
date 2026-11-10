@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Astronomy and microscopy | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
+<body><header><h1>From sky surveys to cell images</h1><p>Three scientific files decoded in the browser with their quantitative samples preserved.</p></header>
+<h2>Sloan Digital Sky Survey</h2><p>The r-band corrected frame 002505-3-0038, sampled every eight pixels for display. Colour is asinh(intensity / 0.05); the reader retains the original physical values and sky coordinates.</p><div class="view"><canvas id="sdss" aria-label="SDSS r-band sky image"></canvas></div>
+<h2>Electron Microscopy Data Bank</h2><p>EMD-1003: the full 125 by 125 by 125 density map, shown by direct volume compositing.</p><div class="view"><canvas id="emdb" aria-label="EMDB electron density volume"></canvas></div>
+<h2>IDR marrow microscopy</h2><p>Tratwal et al., GFP11_6192_omWAT (20x). The native red sample of a central 256 by 256 spatial crop. The original JPEG 2000 tiles were decoded once by tifffile and the crop stored losslessly as deflate OME-TIFF. No thumbnail or pixel rescaling.</p><div class="view"><canvas id="idr" aria-label="IDR marrow microscopy native red channel"></canvas></div>
+<p id="status" data-webgpu-status role="status">Loading scientific files...</p>
+<footer><a href="https://www.sdss.org/collaboration/image-use-policy/">Sloan Digital Sky Survey, CC BY</a>; <a href="https://www.ebi.ac.uk/emdb/EMD-1003">EMDB EMD-1003, CC0</a>; <a href="https://idr.openmicroscopy.org/webclient/?show=project-1601">IDR idr0096, Tratwal et al., CC BY 4.0</a>. Crop coordinates, source byte ranges, licences and hashes are in packages/sciviz/tests/fixtures/astronomy.</footer>
+<script type="module">import {needsWebGPU} from './needs-webgpu.js';needsWebGPU('#sdss').then(ok=>ok&&import('./sciviz-astronomy.ts'));</script></body></html>

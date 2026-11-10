@@ -1,0 +1,1353 @@
+{
+  "versions": {
+    "astropy": "8.0.2",
+    "mrcfile": "1.5.4",
+    "tifffile": "2026.11.8",
+    "imagecodecs": "2026.10.10"
+  },
+  "tiff": {
+    "classic-le-uint16-lzw-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-le-uint16-lzw-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-le-uint16-deflate-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-le-uint16-deflate-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-le-int16-lzw-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-int16-lzw-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-int16-deflate-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-int16-deflate-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-uint32-lzw-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-le-uint32-lzw-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-le-uint32-deflate-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-le-uint32-deflate-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-le-int32-lzw-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-int32-lzw-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-int32-deflate-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-int32-deflate-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-le-float32-lzw-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float32-lzw-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float32-deflate-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float32-deflate-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float64-lzw-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float64-lzw-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float64-deflate-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-le-float64-deflate-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-uint16-lzw-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-be-uint16-lzw-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-be-uint16-deflate-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-be-uint16-deflate-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "classic-be-int16-lzw-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-int16-lzw-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-int16-deflate-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-int16-deflate-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-uint32-lzw-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-be-uint32-lzw-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-be-uint32-deflate-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-be-uint32-deflate-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "classic-be-int32-lzw-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-int32-lzw-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-int32-deflate-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-int32-deflate-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "classic-be-float32-lzw-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float32-lzw-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float32-deflate-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float32-deflate-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float64-lzw-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float64-lzw-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float64-deflate-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "classic-be-float64-deflate-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-uint16-lzw-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-le-uint16-lzw-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-le-uint16-deflate-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-le-uint16-deflate-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-le-int16-lzw-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-int16-lzw-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-int16-deflate-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-int16-deflate-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-uint32-lzw-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-le-uint32-lzw-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-le-uint32-deflate-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-le-uint32-deflate-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-le-int32-lzw-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-int32-lzw-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-int32-deflate-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-int32-deflate-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-le-float32-lzw-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float32-lzw-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float32-deflate-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float32-deflate-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float64-lzw-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float64-lzw-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float64-deflate-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-le-float64-deflate-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-uint16-lzw-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-be-uint16-lzw-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-be-uint16-deflate-strip.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-be-uint16-deflate-tile.tif": {
+      "dtype": "uint16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 30359437.0,
+      "first": 50000.0,
+      "last": 9171.0
+    },
+    "big-be-int16-lzw-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-int16-lzw-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-int16-deflate-strip.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-int16-deflate-tile.tif": {
+      "dtype": "int16",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-uint32-lzw-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-be-uint32-lzw-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-be-uint32-deflate-strip.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-be-uint32-deflate-tile.tif": {
+      "dtype": "uint32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": 49758093.0,
+      "first": 50000.0,
+      "last": 74707.0
+    },
+    "big-be-int32-lzw-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-int32-lzw-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-int32-deflate-strip.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-int32-deflate-tile.tif": {
+      "dtype": "int32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -148.0,
+      "first": -50.0,
+      "last": 49.0
+    },
+    "big-be-float32-lzw-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float32-lzw-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float32-deflate-strip.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float32-deflate-tile.tif": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float64-lzw-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float64-lzw-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float64-deflate-strip.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    },
+    "big-be-float64-deflate-tile.tif": {
+      "dtype": "float64",
+      "shape": [
+        2,
+        19,
+        21
+      ],
+      "sum": -149.625,
+      "first": -50.0,
+      "last": 49.625
+    }
+  },
+  "wcs": {
+    "TAN": {
+      "cards": {
+        "WCSAXES": 2,
+        "CRPIX1": 10.0,
+        "CRPIX2": 20.0,
+        "PC1_1": -0.01,
+        "PC1_2": 0.002,
+        "PC2_1": 0.003,
+        "PC2_2": 0.02,
+        "CDELT1": 1.0,
+        "CDELT2": 1.0,
+        "CUNIT1": "deg",
+        "CUNIT2": "deg",
+        "CTYPE1": "RA---TAN",
+        "CTYPE2": "DEC--TAN",
+        "CRVAL1": 42.0,
+        "CRVAL2": -30.0,
+        "LONPOLE": 180.0,
+        "LATPOLE": -30.0,
+        "MJDREF": 0.0,
+        "RADESYS": "ICRS"
+      },
+      "pixels": [
+        [
+          9,
+          19
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          50
+        ]
+      ],
+      "world": [
+        [
+          42.0,
+          -30.0
+        ],
+        [
+          42.06029167416148,
+          -30.406979307171447
+        ],
+        [
+          41.83027294306515,
+          -29.316925022431285
+        ]
+      ]
+    },
+    "SIN": {
+      "cards": {
+        "WCSAXES": 2,
+        "CRPIX1": 10.0,
+        "CRPIX2": 20.0,
+        "PC1_1": -0.01,
+        "PC1_2": 0.002,
+        "PC2_1": 0.003,
+        "PC2_2": 0.02,
+        "CDELT1": 1.0,
+        "CDELT2": 1.0,
+        "CUNIT1": "deg",
+        "CUNIT2": "deg",
+        "CTYPE1": "RA---SIN",
+        "CTYPE2": "DEC--SIN",
+        "CRVAL1": 42.0,
+        "CRVAL2": -30.0,
+        "LONPOLE": 180.0,
+        "LATPOLE": -30.0,
+        "MJDREF": 0.0,
+        "RADESYS": "ICRS"
+      },
+      "pixels": [
+        [
+          9,
+          19
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          50
+        ]
+      ],
+      "world": [
+        [
+          42.0,
+          -30.0
+        ],
+        [
+          42.06029322656338,
+          -30.40698974247305
+        ],
+        [
+          41.83026040264122,
+          -29.31687420225241
+        ]
+      ]
+    },
+    "ARC": {
+      "cards": {
+        "WCSAXES": 2,
+        "CRPIX1": 10.0,
+        "CRPIX2": 20.0,
+        "PC1_1": -0.01,
+        "PC1_2": 0.002,
+        "PC2_1": 0.003,
+        "PC2_2": 0.02,
+        "CDELT1": 1.0,
+        "CDELT2": 1.0,
+        "CUNIT1": "deg",
+        "CUNIT2": "deg",
+        "CTYPE1": "RA---ARC",
+        "CTYPE2": "DEC--ARC",
+        "CRVAL1": 42.0,
+        "CRVAL2": -30.0,
+        "LONPOLE": 180.0,
+        "LATPOLE": -30.0,
+        "MJDREF": 0.0,
+        "RADESYS": "ICRS"
+      },
+      "pixels": [
+        [
+          9,
+          19
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          50
+        ]
+      ],
+      "world": [
+        [
+          42.0,
+          -30.0
+        ],
+        [
+          42.060292709077466,
+          -30.406986263914305
+        ],
+        [
+          41.830264583216476,
+          -29.316891144076354
+        ]
+      ]
+    },
+    "STG": {
+      "cards": {
+        "WCSAXES": 2,
+        "CRPIX1": 10.0,
+        "CRPIX2": 20.0,
+        "PC1_1": -0.01,
+        "PC1_2": 0.002,
+        "PC2_1": 0.003,
+        "PC2_2": 0.02,
+        "CDELT1": 1.0,
+        "CDELT2": 1.0,
+        "CUNIT1": "deg",
+        "CUNIT2": "deg",
+        "CTYPE1": "RA---STG",
+        "CTYPE2": "DEC--STG",
+        "CRVAL1": 42.0,
+        "CRVAL2": -30.0,
+        "LONPOLE": 180.0,
+        "LATPOLE": -30.0,
+        "MJDREF": 0.0,
+        "RADESYS": "ICRS"
+      },
+      "pixels": [
+        [
+          9,
+          19
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          50
+        ]
+      ],
+      "world": [
+        [
+          42.0,
+          -30.0
+        ],
+        [
+          42.06029245034249,
+          -30.40698452468848
+        ],
+        [
+          41.830266673318036,
+          -29.316899614232142
+        ]
+      ]
+    },
+    "ZEA": {
+      "cards": {
+        "WCSAXES": 2,
+        "CRPIX1": 10.0,
+        "CRPIX2": 20.0,
+        "PC1_1": -0.01,
+        "PC1_2": 0.002,
+        "PC2_1": 0.003,
+        "PC2_2": 0.02,
+        "CDELT1": 1.0,
+        "CDELT2": 1.0,
+        "CUNIT1": "deg",
+        "CUNIT2": "deg",
+        "CTYPE1": "RA---ZEA",
+        "CTYPE2": "DEC--ZEA",
+        "CRVAL1": 42.0,
+        "CRVAL2": -30.0,
+        "LONPOLE": 180.0,
+        "LATPOLE": -30.0,
+        "MJDREF": 0.0,
+        "RADESYS": "ICRS"
+      },
+      "pixels": [
+        [
+          9,
+          19
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          50
+        ]
+      ],
+      "world": [
+        [
+          42.0,
+          -30.0
+        ],
+        [
+          42.0602928384467,
+          -30.406987133538934
+        ],
+        [
+          41.830263538125,
+          -29.316886908833034
+        ]
+      ]
+    }
+  },
+  "sdss": {
+    "shape": [
+      1489,
+      2048
+    ],
+    "first": -0.002750396728515625,
+    "last": 0.024200439453125,
+    "sum": 57899.49455205898,
+    "world": [
+      [
+        276.86354294995425,
+        -0.27653821535263917
+      ],
+      [
+        276.97354744180876,
+        -0.16654902335784502
+      ]
+    ]
+  },
+  "emdb": {
+    "shape": [
+      125,
+      125,
+      125
+    ],
+    "sum": 3624705.815727849,
+    "first": -2.290524959564209,
+    "last": -2.783450126647949,
+    "mode": 2
+  }
+}

@@ -84,6 +84,10 @@ examples/assets/sciviz/clip/ct-org-0-samples.bin -text
 # NASA writer bytes and their provenance digests must survive Windows checkouts unchanged.
 examples/assets/sciviz/datasets/** -text
 
+# Hash-pinned standard astronomy data and owner-generated format fixtures retain exact bytes on every OS.
+packages/sciviz/tests/fixtures/astronomy/** -text
+packages/decoders/tests/fixtures/tiff-scientific/** -text
+
 examples/assets/sciviz/pointcloud/*.laz -text
 examples/assets/sciviz/geo-vector/*.geojson text eol=lf
 examples/assets/sciviz/geo-vector/*.json text eol=lf

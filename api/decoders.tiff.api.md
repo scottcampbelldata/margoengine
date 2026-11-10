@@ -15,9 +15,31 @@ export type DecodedTIFF = {
     data: Float32Array;
 };
 
+export interface TIFFFile {
+    readonly bigTIFF: boolean;
+    readonly length: number;
+    readonly descriptions: readonly string[];
+    read(index: number, signal?: AbortSignal): TIFFPage;
+}
+
 export interface TIFFOptions {
     maxPixels?: number;
 }
+
+export interface TIFFPage {
+    readonly width: number;
+    readonly height: number;
+    readonly bits: number;
+    readonly sampleFormat: number;
+    readonly samplesPerPixel: number;
+    readonly samples: TIFFSamples;
+    readonly description: string;
+    readonly tags: ReadonlyMap<number, readonly number[]>;
+}
+
+export type TIFFSamples = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
+
+export function openTIFF(bytes: Uint8Array, options?: TIFFOptions): TIFFFile;
 
 export function parseTIFF(bytes: Uint8Array, options?: TIFFOptions): DecodedTIFF;
 ```

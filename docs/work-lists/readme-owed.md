@@ -1209,3 +1209,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/water and margoengine (list 3 batch 66 job 8): document /rivers attach on a Water with a terrain coast, sources/substeps/maxFroude, setSources without restart, dispose returns the coast to Water's solver; examples deferred.
 
 - @margoengine/water and margoengine (batch 67 job 3): /rain WaterRain with weather (WeatherMachine state.rain), rain, cell, lifetime, strength, splashes into Ripples, setTime, dispose; examples deferred.
+
+- @margoengine/sciviz (batch 176 job 3): document /fits images/cubes/binary cells/WCS and scaling, /mrc cell geometry/complex modes, /ometiff series/ZCT/multifile planes, bounds/cancellation, exact sample types and storage-grid rendering limits; examples deferred.
+- @margoengine/decoders (batch 176 job 3): document openTIFF lazy classic/BigTIFF IFDs, descriptions, quantitative sample storage, predictors/limits/cancellation and unchanged parseTIFF display API; examples deferred.
+- margoengine (batch 176 job 3): document generated sciviz/fits, /mrc and /ometiff aliases and additive decoders/tiff API; examples deferred.
