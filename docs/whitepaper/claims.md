@@ -4418,3 +4418,9 @@ Review 2 water caustics: optional ripple deformation is included in beam/range e
 ### Batch 203 job 4: owned AVIF still-image decoding
 
 The optional decoders/avif entry uses one clean-room Rust SIMD asset in browser and Node workers. Its 16-file corpus matches 14,828,077 independent 8/10/12-bit YUV samples exactly, including palette, lossless/lossy/subsampled intra copy, film grain, Wiener/SGR, qmatrices/four tiles and super-resolution. Frozen references, observed tool counts and input hashes live in packages/decoders/native/avif/tests/fixtures. Native and actual Wasm decodes check them; 912 separate transform contracts pin SIMD rounding. This proves those fixtures, not universal AV1 conformance. Real alpha/grid/ICC and ordered transforms have independent RGB evidence with the stated resampling bounds and exact alpha. WebGPU/WebGL2 each upload/read back 4,762,292 bytes exactly. Scope, memory limits and deferred animated/progressive playback are recorded in docs/limits.md; no timing result is claimed.
+
+
+
+### Batch 181 GPU picking
+
+sciviz/pick-gpu picks all source scatter positions, chart/regular-surface/unstructured source cells and volume first classified hits with a one-pixel integer ID pass and 256-byte mapping. Hover and pick perform zero CPU item projections. Proof: packages/sciviz/tests/pick-gpu.test.js, pick-gpu-hover.test.js and pick-gpu-browser.mjs; million-point 2MASS exact-centre reference matches, original cell ID 16777217, live surface updates/holes, calibrated TCIA first-hit CPU-ray comparison and real engine device replacement on both GPU backends. Contract differences, memory and input precision are explicit in ../sciviz-pick-gpu.md and ../limits.md. No throughput, frame-rate or perceptual-picking claim.

@@ -1244,3 +1244,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 203 job 4): document the generated decoders/avif forwarding entry after the build phase.
 
 - Tooling (batch 203 landing integration): explain current PBR basic-scene network rows and deferred emitted codec assets during the README phase; no README example changed.
+
+
+
+- @margoengine/sciviz (batch 181 job 3): document /pick-gpu, GpuPicking pick/attachHover/invalidate/disposal, async hover and pickerror, original cell/voxel IDs, CPU-reference differences, shared-device restore, cancellation and real 2MASS/TCIA demo. No README examples written during the build phase.
+
+- margoengine (batch 181 job 3): document the generated sciviz/pick-gpu alias; README examples deferred.

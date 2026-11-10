@@ -687,6 +687,13 @@ fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u;
  * triangles (a new slice position).
  */
 export class MeshLayer implements Drawable {
+  /** @internal Borrowed current geometry for optional cell picking, retaining source-cell IDs. */
+  pickGeometry(): { buffer: GPUBuffer; count: number; cells: Uint32Array; opacity: number; scalarOpacity: boolean } | undefined {
+    return this.#disposed || !this.#corners ? undefined : {
+      buffer: this.#corners, count: this.#count, cells: this.#set.cells,
+      opacity: this.#opacity, scalarOpacity: this.#scalarOpacity,
+    };
+  }
   /** Whether the optional publication exporter can express this material without a raster. */
   get vectorSupported(): boolean {
     return !this.#appearance && !this.#scalarOpacity;

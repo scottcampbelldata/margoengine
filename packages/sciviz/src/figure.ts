@@ -86,7 +86,7 @@ export interface FigureOptions extends AxesOptions {
  * units (milliseconds on a date axis).
  */
 export interface PickResult {
-  readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer;
+  readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer | VolumeLayer | import('./grids.js').MeshLayer;
   /** The point's or vertex's index; for a surface, the nearest grid sample (j * nx + i); a bar's or cell's index. */
   readonly index: number;
   readonly x: number;
@@ -104,6 +104,8 @@ export interface PointSelection {
 
 /** The events a figure sends: `hover` when the picked item changes, `selection` when a box or lasso drag ends. */
 export interface FigureEventMap {
+  /** An asynchronous hover picker failed. The error retains its code and help link. */
+  pickerror: CustomEvent<unknown>;
   hover: CustomEvent<PickResult | null>;
   selection: CustomEvent<PointSelection>;
 }
@@ -496,6 +498,7 @@ export class Figure extends EventTarget {
     const canvas = (engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
     if (typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement)
       this.#interaction = new Interaction<PickResult>(canvas, this.theme, {
+        error: (error) => this.dispatchEvent(new CustomEvent('pickerror', { detail: error })),
         pick: (x, y) => (this.#layers.size ? this.pick(x, y) : null),
         describe: (hit) => this.#describe(hit),
         hover: (hit) => this.dispatchEvent(new CustomEvent('hover', { detail: hit })),
@@ -706,7 +709,7 @@ export class Figure extends EventTarget {
     if (typeof tooltips === 'function') return tooltips(hit);
     if (!tooltips) return null;
     const titles = this.#options.titles ?? {},
-      name = hit.layer.name,
+      name = 'name' in hit.layer ? hit.layer.name : undefined,
       // Dates read as UTC date and time.
       show = (axis: number, v: number) =>
         this.#scales[axis].type === 'date' && Number.isFinite(v)
@@ -742,6 +745,12 @@ export class Figure extends EventTarget {
    */
   get controls(): OrbitControls | undefined {
     return this.#controls;
+  }
+
+  /** Installs an optional asynchronous hover picker; null restores CPU hover. Returns its removal function. */
+  setHoverPicker(picker: ((x: number, y: number) => Promise<PickResult | null>) | null): () => void {
+    this.#check();
+    return this.#interaction?.setPicker(picker) ?? (() => {});
   }
 
   // Camera clip times the data-to-scene transform, and the canvas size in CSS pixels.

@@ -285,6 +285,11 @@ export class SurfaceLayer implements Drawable {
   get range(): readonly [number, number] {
     return this.#range;
   }
+
+  /** @internal Borrowed live height buffer for optional GPU picking. Never destroy it. */
+  pickHeights(): GPUBuffer | undefined {
+    return this.#disposed ? undefined : this.#heights?.buffer;
+  }
   set range(value: readonly [number, number]) {
     this.#range = rangeOption(value, 'Surface range')!;
     this.#dirty = true;

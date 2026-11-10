@@ -15,6 +15,8 @@ const navigating = (mode: DragMode): boolean => mode === 'orbit' || mode === 'pa
 
 /** @internal What the interaction asks of its figure. */
 interface InteractionHooks<Hit> {
+  /** Reports optional asynchronous picker failures. */
+  error(error: unknown): void;
   /** The hit under (x, y), CSS pixels from the canvas's top-left, or null. */
   pick(x: number, y: number): Hit | null;
   /** Tooltip text for a hit, or null for none. */
@@ -51,6 +53,18 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   #hit: Hit | null = null;
   #controlsWere = true;
   readonly #abort = new AbortController();
+  #picker: ((x: number, y: number) => Promise<Hit | null>) | null = null;
+  #pending = false;
+  #version = 0;
+
+  /** @internal Replaces only hover picking, keeping navigation, selection and tooltip behaviour. */
+  setPicker(picker: ((x: number, y: number) => Promise<Hit | null>) | null): () => void {
+    this.#picker = picker;
+    this.#version++;
+    return () => {
+      if (this.#picker === picker) { this.#picker = null; this.#version++; }
+    };
+  }
 
   constructor(canvas: HTMLCanvasElement, theme: Theme, hooks: InteractionHooks<Hit>) {
     this.#canvas = canvas;
@@ -138,7 +152,28 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
 
   /** Picks at (x, y), moves the tooltip there and reports a changed hit. */
   update(x: number, y: number): Hit | null {
+    if (this.#picker) {
+      this.#last = { x, y };
+      const version = ++this.#version;
+      if (!this.#pending) {
+        this.#pending = true;
+        void this.#picker(x, y).then((hit) => {
+          if (!this.#abort.signal.aborted && version === this.#version) this.#show(hit, x, y);
+        }, (error: unknown) => {
+          if (!this.#abort.signal.aborted) this.#hooks.error(error);
+        }).finally(() => {
+          this.#pending = false;
+          if (version !== this.#version && this.#last && !this.#abort.signal.aborted)
+            this.update(this.#last.x, this.#last.y);
+        });
+      }
+      return this.#hit;
+    }
     const hit = this.#hooks.pick(x, y);
+    return this.#show(hit, x, y);
+  }
+
+  #show(hit: Hit | null, x: number, y: number): Hit | null {
     if (hit?.layer !== this.#hit?.layer || hit?.index !== this.#hit?.index) {
       this.#hit = hit;
       this.#hooks.hover(hit);
@@ -170,6 +205,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   }
 
   #leave(): void {
+    this.#version++;
     this.#last = undefined;
     if (this.#tooltip) this.#tooltip.hidden = true;
     if (this.#hit !== null) {

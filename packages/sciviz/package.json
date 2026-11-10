@@ -263,6 +263,10 @@
     "./query": {
       "types": "./dist/query.d.ts",
       "import": "./dist/query.js"
+    },
+    "./pick-gpu": {
+      "types": "./dist/pick-gpu.d.ts",
+      "import": "./dist/pick-gpu.js"
     }
   },
   "files": [
@@ -321,6 +325,7 @@
     "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs",
     "test:browser:stream": "node scripts/browser-root.mjs tests/stream-browser.mjs",
     "test:browser:query": "node scripts/browser-root.mjs tests/query-browser.mjs",
-    "test:browser:colors": "node scripts/browser-root.mjs tests/colors-browser.mjs"
+    "test:browser:colors": "node scripts/browser-root.mjs tests/colors-browser.mjs",
+    "test:browser:pick-gpu": "node scripts/browser-root.mjs tests/pick-gpu-browser.mjs"
   }
 }

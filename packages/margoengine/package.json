@@ -3619,6 +3619,10 @@
       "types": "./dist/sciviz/query.d.ts",
       "import": "./dist/sciviz/query.js"
     },
+    "./sciviz/pick-gpu": {
+      "types": "./dist/sciviz/pick-gpu.d.ts",
+      "import": "./dist/sciviz/pick-gpu.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

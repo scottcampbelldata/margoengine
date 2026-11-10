@@ -4969,3 +4969,11 @@ Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with 
 - Batch 203 dependent-test finding: npm test --workspace @margoengine/navmesh fails border.test.js and wasm.test.js because their bundleBytes('packages/navmesh/src/pipeline.ts') paths resolve from the package working directory. The complete 121-test suite passes from the repository root, as local CI runs it. This package-command path repair is deferred under build-phase rule 21.
 
 - Batch 203 AVIF validation tail: malformed prem item references with no auxiliary alpha, multiple targets or a target other than the actual alpha are ignored rather than rejected. Repro: add such a prem reference to a valid AVIF primary item. Cause: image.rs tests equality with the one alpha ID and treats a mismatch as straight alpha. Valid straight/premultiplied alpha decoding is implemented; strict invalid-reference rejection is a fix-phase item under rule 22.
+
+
+
+### Batch 181 job 3: existing CPU point-depth tie direction
+
+Repro: nearestPoint(identity, [0,0,0.1,0,0,0], 100,100,50,50,8) returns index 1; reversed-Z puts index 0 nearer. Cause: sciviz/src/pick.ts treats projectPoint.depth as reversed, but math/mat4 normalizes it to near=0/far=1. GPU picking uses actual reversed clip depth; strict distance ranking is separately documented. CPU-only tie correction is deferred under build-phase rule 21; it does not block the new ID pass and the existing CPU reference remains unchanged. Regression owed: real perspective camera coincident projected points, plus corrected expected depth convention in the existing CPU fixture.
+
+Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.

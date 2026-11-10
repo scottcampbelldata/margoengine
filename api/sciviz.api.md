@@ -151,6 +151,7 @@ export class Figure extends EventTarget {
     set dragMode(mode: DragMode);
     get selection(): PointSelection | undefined;
     get controls(): OrbitControls | undefined;
+    setHoverPicker(picker: ((x: number, y: number) => Promise<PickResult | null>) | null): () => void;
     pick(x: number, y: number, options?: {
         readonly radius?: number;
     }): PickResult | null;
@@ -217,6 +218,7 @@ export class Figure extends EventTarget {
 }
 
 export interface FigureEventMap {
+    pickerror: CustomEvent<unknown>;
     hover: CustomEvent<PickResult | null>;
     selection: CustomEvent<PointSelection>;
 }
@@ -341,7 +343,7 @@ export interface PNGOptions {
 }
 
 export interface PickResult {
-    readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer;
+    readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer | VolumeLayer | import('./grids.js').MeshLayer;
     readonly index: number;
     readonly x: number;
     readonly y: number;
@@ -526,6 +528,7 @@ export class SurfaceLayer implements Drawable {
         readonly signal?: AbortSignal;
     }): Promise<import('./vector-types.js').VectorGeometry>;
     get range(): readonly [number, number];
+    pickHeights(): GPUBuffer | undefined;
     set range(value: readonly [number, number]);
     get bounds(): [number, number, number, number, number, number];
     setModel(model: Float32Array): void;
