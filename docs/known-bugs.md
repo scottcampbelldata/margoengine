@@ -5183,3 +5183,47 @@ RFC 8878 Huffman literals preserve the fitted bytes while reducing the required
 rate conditioning. At RDO 0.09375: 1,305,680 / 1,306,710 B, PSNR 44.380795263 /
 44.027242948 dB and SSIM 0.981507121 / 0.980103599. Every mip row passes.
 See whitepaper/results/batch-137-quality-r10.json and basis-zstd.test.js.
+
+## Batch 132 audit: core (read-only package; findings for Scott)
+
+Base dab36e5f9, M6 Mac mini. Core CPU 90/90 and `core test:gpu` (native, WebGL2 compat and preview) pass on Metal.
+
+### Open: core Euler lanes lose the orientation at pitch +-90 degrees
+
+Repro: `mesh.setQuaternion([0.5, 0.5, 0.5, 0.5])` (pitch exactly 90 degrees), then the no-op write
+`mesh.rotation.x = mesh.rotation.x`. The stored quaternion becomes `[0, 0.707107, 0, 0.707107]`: the mesh turns 90
+degrees. `mesh.rotation` reads `[0, pi/2, 0]` after `setQuaternion`. `writePoses` stores the same lanes, so a physics
+body at 90 degrees of pitch that a script then rotates through `rotation` jumps the same way.
+Cause: `storeQuaternion` (packages/core/src/engine.ts, the `asin` / two `atan2` lines) takes X and Z each as
+`atan2(0, 0) = 0` when `2 (xz + wy)` is +-1, so the combined roll is dropped instead of being put in one angle. Near the
+pole (1e-4 rad off) the f32 lanes round-trip with 0.013 degrees of error, which is expected.
+Fix to build: at |sinPitch| near 1 set X to 0 and Z to the combined angle `2 atan2(qz, qw)` with the sign rule for
+-90 degrees (Shoemake, "Euler Angle Conversion", Graphics Gems IV, 1994), then check `setQuaternion` then a no-op
+`rotation` write keeps every quaternion of a 90 degree pitch.
+
+### Open: core backbuffer clamp changes the aspect ratio of a wide canvas
+
+Repro: an engine on a canvas with `clientWidth 5120, clientHeight 1440` at device pixel ratio 1 (a 32:9 monitor, or
+any canvas wider than 4096 backing pixels). `resize()` sets the backbuffer to 4096 x 1440 and the camera uses its
+aspect 2.844, while the browser stretches it to the CSS aspect 3.556: the picture is 25% too wide (circles render as
+ellipses).
+Cause: packages/core/src/engine.ts `resize()` clamps width and height to 4096 one at a time. The README promises "at
+most 4096 per side" but not the distortion. Fix to build: scale both by `min(1, 4096 / max(w, h))`, or keep the
+camera aspect at the CSS aspect.
+
+### Open: core `fitToBoundingBox` frames small parts 11x too far and clips large ones at a wide field of view
+
+Repro 1: `new Camera({fov: 120, position: [1, 1, 1]}).fitToBoundingBox([-0.175, -0.175, -0.175], [0.175, 0.175,
+0.175], {duration: 0})`: the eye ends 0.385 from the centre, so the nearest corner is 0.082 away, inside `near = 0.1`;
+the box is cut open. At fov 100 the corner is 0.13 away, just past near.
+Repro 2: stage `box({size: [0.02, 0.02, 0.02]})` then `fit()` at the defaults: the eye ends 0.44 from the centre where
+the sphere fit is 0.038, so a 2 cm part fills a twelfth of the view.
+Cause: packages/core/src/camera.ts `fitToBoundingBox` raises the radius to `2 near` (which only moves small parts far
+away) and never checks `distance - radius >= near` (which a wide angle breaks). Fix to build: fit the true radius, then
+move out (or lower `near`) only when `distance - radius < near`.
+
+### Note: core direct light follows the 2021 glTF Appendix B
+
+The shader uses the separable Smith G of the 2021 revision of glTF 2.0 Appendix B; the current revision gives the
+height-correlated form (Heitz 2014). The clean-room record now says which revision (P46). Moving to the
+height-correlated form changes WebGL, gltf-pro and core pixels together and is Scott's call.
