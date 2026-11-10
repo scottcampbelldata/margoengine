@@ -853,3 +853,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 198 job 2): document viewcube/fit forwarding.
 - @margoengine/vfx (batch 270 job 3): document /shapes as an emitter superset, all five shape defaults, shell/volume semantics, normals, grid replacement, torus restrictions and birth statistics; examples deferred.
 - margoengine (batch 270 job 3): document generated vfx/shapes alias; examples deferred.
+- @margoengine/shader (batch 185 job 3): PassNodeEditor post/compute modes, named resources, save/load, input labels, caller-owned hot reload and bounded expression limits; graph input/presentation hooks.
+- margoengine (batch 185 job 3): generated shader/editor-pass alias.

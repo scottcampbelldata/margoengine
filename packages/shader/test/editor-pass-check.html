@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Post and compute authoring</title><style>#host{width:128px;height:128px}#editor{width:800px;height:420px}</style></head><body><div id="host"></div><div id="editor"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {createMesh} from '/packages/materials/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {PostStack} from '/packages/post/dist/index.js';
+import {storage,NodeMaterial,vec3,ComputePass} from '/packages/shader/dist/index.js';
+import {PassNodeEditor,compilePassGraph} from '/packages/shader/dist/editor-pass.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}}),engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+createMesh(engine,planeGeometry(2,2),new NodeMaterial({shading:'basic',colorNode:vec3(1,.5,.25)}));
+const graph=()=>({version:1,nodes:[{id:'input',op:'color',inputs:[]},{id:'scale',op:'float',inputs:[],value:.5},{id:'out',op:'mul',inputs:['input','scale']}],outputs:{color:'out'},fallback:{color:[0,0,0],emissive:[0,0,0],roughness:.5,metalness:0,opacity:1}});
+let stack,pass,builds=0;
+const input=storage(new Float32Array(Array.from({length:24},(_,i)=>[i,2,4,.5]).flat()),'vec4f'),output=storage(24,'vec4f');
+const editor=new PassNodeEditor(document.querySelector('#editor'),{document:{version:1,kind:'post',graph:graph()},resources:{input,output}});
+editor.onGraph(doc=>{const next=compilePassGraph(doc,{input,output});stack?.dispose();stack=undefined;pass?.dispose();pass=undefined;if(next instanceof ComputePass){pass=next;engine.use(pass);}else stack=PostStack.attach(engine,[next]);builds++;});
+const render=async()=>{engine.render();await device.queue.onSubmittedWorkDone();return {builds,errors:errors.splice(0)};};
+window.check={render,save:()=>editor.save(),load:json=>editor.load(json),
+  value:v=>editor.editor.model.setValue('scale',v),undo:()=>editor.editor.model.undo(),
+  move:()=>editor.editor.model.move(['scale'],10,20),
+  compute:()=>editor.load({version:1,kind:'compute',graph:graph(),compute:{size:[2,3,4],source:'input',target:'output'}}),
+  async read(){await render();const read=device.createBuffer({size:output.data.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(output.buffer(device),0,read,0,output.data.byteLength);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);const data=[...new Float32Array(read.getMappedRange())];read.unmap();read.destroy();return {data,errors:errors.splice(0),builds};},
+  close(){stack?.dispose();pass?.dispose();editor.dispose();input.dispose();output.dispose();stage.dispose();}
+};window.ready=true;
+</script></body></html>

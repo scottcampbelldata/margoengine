@@ -39,6 +39,8 @@ export interface SurfaceGraph {
     fallback: SurfaceFallback;
 }
 
+export type SurfaceGraphInputs = Partial<Record<'position' | 'worldPosition' | 'normal' | 'worldNormal' | 'color' | 'uv', s.Node<'vec3f'>>>;
+
 export interface SurfaceGraphNode {
     id: string;
     op: SurfaceOperation;
@@ -66,7 +68,7 @@ export interface SurfaceSample {
     uv?: readonly number[];
 }
 
-export function compileSurfaceGraph(value: SurfaceGraph): Pick<NodeMaterialOptions, 'colorNode' | 'roughnessNode' | 'metalnessNode' | 'emissiveNode' | 'opacityNode' | 'normalNode'>;
+export function compileSurfaceGraph(value: SurfaceGraph, inputs?: SurfaceGraphInputs): Pick<NodeMaterialOptions, 'colorNode' | 'roughnessNode' | 'metalnessNode' | 'emissiveNode' | 'opacityNode' | 'normalNode'>;
 
 export function createGraphMaterial(graph: SurfaceGraph, options?: NodeMaterialOptions): NodeMaterial;
 

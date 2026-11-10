@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13764673,
+  "total": 13798772,
   "history": [
     {
       "date": "2026-10-24",
@@ -7221,6 +7221,12 @@
       "commit": "1b25bcdca",
       "reason": "Batch 270 job 3: root 33476 to 34670 B, shapes 0 to 3592 B gzip. The emitter superset preserves existing APIs while adding uniform volume/area distributions. A separate facade would complicate setup and duplicate emitter ownership. Optional growth accepted by Scott; core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-185-job-3",
+      "reason": "New optional shader/editor-pass 0 to 33103 B gzip, ceiling 34097 B. Reuses the full NodeEditor and graph compiler; inherits the same materials/gltf-pro preview dependencies already accepted for shader/editor and shader/graph. Splitting the shared canvas/compiler would duplicate validation and authoring state; core/stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -8528,6 +8534,9 @@
     "@margoengine/decoders/zstd": 5305,
     "@margoengine/decoders/lz4": 2417,
     "@margoengine/viewcube/fit": 6898,
-    "@margoengine/vfx/shapes": 3848
+    "@margoengine/vfx/shapes": 3848,
+    "@margoengine/shader/editor-pass": 34097,
+    "leak @margoengine/shader/editor-pass -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/shader/editor-pass -> @margoengine/materials": 1
   }
 }

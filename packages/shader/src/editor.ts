@@ -34,6 +34,22 @@ export interface NodeEditorOptions {
   readOnly?: boolean;
   /** Disposes the editor when aborted. */
   signal?: AbortSignal;
+  /** Optional host labels, visible outputs and code preview, for non-material graph editors. */
+  presentation?: NodeEditorPresentation;
+}
+
+/** Presentation of the same typed graph model in another shader host. */
+export interface NodeEditorPresentation {
+  /** Palette and node descriptions; omitted operations keep their surface labels. */
+  operations?: readonly EditorOperation[];
+  /** Ordered output sockets, default all material slots. */
+  outputs?: readonly (typeof OUTPUT_SLOTS)[number][];
+  /** Output panel title, default Material output. */
+  title?: string;
+  /** Show fallback material fields, default true. */
+  fallback?: boolean;
+  /** Generated code for the preview button; default material fragment code. */
+  code?(graph: SurfaceGraph): string;
 }
 
 const css = /* css */ `
@@ -135,11 +151,17 @@ export class NodeEditor {
   private pendingWire?: [number, number, number, number];
   private flash = '';
   private disposed = false;
+  private readonly presentation: NodeEditorPresentation;
+  private readonly operations: readonly EditorOperation[];
+  private readonly slots: readonly (typeof OUTPUT_SLOTS)[number][];
 
   /**
    * @param parent Element to append the editor to; the editor fills it, so give the parent a height.
    */
   constructor(parent: HTMLElement, options: NodeEditorOptions = {}) {
+    this.presentation = options.presentation ?? {};
+    this.operations = EDITOR_OPERATIONS.map((o) => this.presentation.operations?.find((p) => p.op === o.op) ?? o);
+    this.slots = this.presentation.outputs ?? OUTPUT_SLOTS;
     this.doc = parent.ownerDocument;
     this.readOnly = options.readOnly === true;
     this.model = new GraphModel(options.graph, options.layout);
@@ -175,7 +197,10 @@ export class NodeEditor {
     this.viewport = el('div', 'viewport');
     this.viewport.tabIndex = 0;
     this.viewport.setAttribute('role', 'application');
-    this.viewport.setAttribute('aria-label', 'Surface graph canvas. Shift+A adds a node.');
+    this.viewport.setAttribute(
+      'aria-label',
+      `${this.presentation.title ?? 'Surface'} graph canvas. Shift+A adds a node.`,
+    );
     this.world = el('div', 'world');
     this.wires = this.doc.createElementNS(svgNS, 'svg') as SVGSVGElement;
     this.wires.classList.add('wires');
@@ -432,7 +457,7 @@ export class NodeEditor {
 
   private drawNode(n: EditorNode, status: EditorStatus): HTMLElement {
     const type = status.types[n.id],
-      info = EDITOR_OPERATIONS.find((o) => o.op === n.op)!;
+      info = this.operations.find((o) => o.op === n.op)!;
     const e = this.make('div', 'node');
     e.dataset.node = n.id;
     e.setAttribute('role', 'group');
@@ -538,17 +563,17 @@ export class NodeEditor {
       e = this.make('div', 'node');
     e.dataset.node = 'output';
     e.setAttribute('role', 'group');
-    e.setAttribute('aria-label', 'Material output');
+    e.setAttribute('aria-label', this.presentation.title ?? 'Material output');
     e.style.width = NODE_WIDTH + 'px';
     e.style.height = OUTPUT_HEIGHT + 'px';
     this.place(e, m.output.x, m.output.y);
     const head = this.make('div', 'head');
     head.dataset.drag = '';
     const title = this.make('span');
-    title.textContent = 'Material output';
+    title.textContent = this.presentation.title ?? 'Material output';
     head.append(title);
     const rows = this.make('div', 'rows');
-    OUTPUT_SLOTS.forEach(({ slot, label, type }, i) => {
+    this.slots.forEach(({ slot, label, type }, i) => {
       const row = this.make('div', 'row'),
         name = this.make('span', 'label'),
         source = m.outputs[slot];
@@ -587,7 +612,8 @@ export class NodeEditor {
       wrap.append(this.field(f[key], (v) => m.setFallback({ [key]: v }), `Fallback ${key}`)),
     );
     scalars.append(wrap);
-    rows.append(triple('color', 'color'), triple('emissive', 'emissive'), scalars);
+    if (this.presentation.fallback !== false)
+      rows.append(triple('color', 'color'), triple('emissive', 'emissive'), scalars);
     e.append(head, rows);
     this.nodes.set('output', e);
     return e;
@@ -616,7 +642,7 @@ export class NodeEditor {
           [x2, y2] = inputSocket(n, i);
         add(this.curve(x1, y1, x2, y2), status.types[from.id]);
       });
-    OUTPUT_SLOTS.forEach(({ slot }, i) => {
+    this.slots.forEach(({ slot }, i) => {
       const from = m.outputs[slot] ? m.node(m.outputs[slot]!) : undefined;
       if (!from) return;
       const [x1, y1] = outputSocket(from),
@@ -644,8 +670,8 @@ export class NodeEditor {
   private targetAt(x: number, y: number): Target | undefined {
     const reach = HIT / this.pan.zoom;
     const near = (c: [number, number]) => Math.hypot(c[0] - x, c[1] - y) <= reach;
-    for (let i = 0; i < OUTPUT_SLOTS.length; i++)
-      if (near(inputSocket(this.model.output, i))) return { slot: OUTPUT_SLOTS[i].slot };
+    for (let i = 0; i < this.slots.length; i++)
+      if (near(inputSocket(this.model.output, i))) return { slot: this.slots[i].slot };
     for (const n of this.model.nodes)
       for (let i = 0; i < n.inputs.length; i++) if (near(inputSocket(n, i))) return { node: n.id, input: i };
     return undefined;
@@ -973,7 +999,7 @@ export class NodeEditor {
   }
   private filter(): void {
     const words = this.search.value.toLowerCase().split(/\s+/).filter(Boolean);
-    this.matches = EDITOR_OPERATIONS.filter((o) => {
+    this.matches = this.operations.filter((o) => {
       const hay = `${o.label} ${o.op} ${o.group} ${o.description}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
@@ -1013,7 +1039,8 @@ export class NodeEditor {
       return;
     }
     try {
-      this.code.textContent = createGraphMaterial(this.model.toGraph()).fragmentCode;
+      const graph = this.model.toGraph();
+      this.code.textContent = this.presentation.code?.(graph) ?? createGraphMaterial(graph).fragmentCode;
     } catch (error) {
       this.code.textContent = error instanceof Error ? error.message : String(error);
     }

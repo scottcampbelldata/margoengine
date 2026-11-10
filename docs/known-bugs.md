@@ -4760,3 +4760,6 @@ Depth/MSAA/mip target implementation is retained on batch-271-targets, 4fa1903b7
 
 Batch 271 supplemental check: `scripts/modern-grass-tests.js --compat` reaches the 4x meadow fixture but `meadowAudit.frames > 5` times out at 30000 ms in the device-loss wait wrapper (line 491); native meadow passes. The new orbit renderer's own native/compat pixel, vacuum and replacement-device checks pass. The existing compatibility meadow's render/readiness interaction remains unisolated; no test or timeout was changed.
 Batch 270 job 3: no new open defects identified in the five birth shapes; uniform torus area and exact reset have explicit GPU regression coverage.
+
+## Batch 185 job 3
+The post/compute graph editor gap is built in shader/editor-pass. No open defect was found in its bounded expression, save/load and hot-reload contract. The source/target registry and floating-point resource requirements are explicit limits, not serialized GPU state.

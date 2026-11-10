@@ -3402,6 +3402,10 @@
       "types": "./dist/shader/compute-volume.d.ts",
       "import": "./dist/shader/compute-volume.js"
     },
+    "./shader/editor-pass": {
+      "types": "./dist/shader/editor-pass.d.ts",
+      "import": "./dist/shader/editor-pass.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"

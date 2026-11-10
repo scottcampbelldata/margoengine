@@ -99,6 +99,15 @@ export interface NodeEditorOptions {
     layout?: GraphLayout;
     readOnly?: boolean;
     signal?: AbortSignal;
+    presentation?: NodeEditorPresentation;
+}
+
+export interface NodeEditorPresentation {
+    operations?: readonly EditorOperation[];
+    outputs?: readonly (typeof OUTPUT_SLOTS)[number][];
+    title?: string;
+    fallback?: boolean;
+    code?(graph: SurfaceGraph): string;
 }
 
 export const OUTPUT_EXTRA_ROWS = 3;

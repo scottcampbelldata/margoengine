@@ -177,7 +177,15 @@ function structure(value: unknown): { graph: SurfaceGraph; order: SurfaceGraphNo
   return { graph, order };
 }
 
-function build(value: unknown): { graph: SurfaceGraph; order: SurfaceGraphNode[]; nodes: Map<string, s.Node> } {
+/** Stage inputs substituted by a non-material graph host; every input is a vec3f. */
+export type SurfaceGraphInputs = Partial<
+  Record<'position' | 'worldPosition' | 'normal' | 'worldNormal' | 'color' | 'uv', s.Node<'vec3f'>>
+>;
+
+function build(
+  value: unknown,
+  inputs: SurfaceGraphInputs = {},
+): { graph: SurfaceGraph; order: SurfaceGraphNode[]; nodes: Map<string, s.Node> } {
   const { graph, order } = structure(value),
     nodes = new Map<string, s.Node>();
   for (const node of order) {
@@ -257,6 +265,8 @@ function build(value: unknown): { graph: SurfaceGraph; order: SurfaceGraphNode[]
       default:
         result = s[node.op](a[0]);
     }
+    const input = inputs[node.op as keyof SurfaceGraphInputs];
+    if (input) result = s.cast(input, 'vec3f', node.id);
     if (result.type !== 'f32' && result.type !== 'vec3f') fail(`${node.id} must produce f32 or vec3f`);
     nodes.set(node.id, result);
   }
@@ -316,11 +326,12 @@ export function parseSurfaceGraph(json: string): SurfaceGraph {
 /** Compile graph outputs to native NodeMaterial options; omitted outputs retain material values. */
 export function compileSurfaceGraph(
   value: SurfaceGraph,
+  inputs?: SurfaceGraphInputs,
 ): Pick<
   NodeMaterialOptions,
   'colorNode' | 'roughnessNode' | 'metalnessNode' | 'emissiveNode' | 'opacityNode' | 'normalNode'
 > {
-  const { graph, nodes } = build(value),
+  const { graph, nodes } = build(value, inputs),
     result: Record<string, s.Node> = {};
   for (const slot of slots) if (graph.outputs[slot]) result[`${slot}Node`] = nodes.get(graph.outputs[slot]!)!;
   return result;
