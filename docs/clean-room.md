@@ -6535,3 +6535,23 @@ Tests execute the actual specialized WGSL on Margo's CPU interpreter against ind
 Async ownership also follows WHATWG, DOM Standard section 3, Aborting ongoing activities (living standard, accessed 2026-11-09), https://dom.spec.whatwg.org/ and Ecma International, ECMAScript 2026 Promise reactions, https://tc39.es/ecma262/2026/multipage/control-abstraction-objects.html. A cancelled caller rejects promptly while the loaded model keeps its own readback/image lifetime. The pending-readback regression times out against the first build and passes with the feature wait helper; no engine or shared harness change is needed.
 ## Batch 233 job 1: road intersection design
 Research, authors, dates, primary links and clean-room decisions are recorded in [road-design.md](road-design.md). SVG stroke semantics, Galin et al. terrain-aware road surfaces and ASAM shared junction heights combine with existing Margo polygon APIs. No rival source or external asset was used.
+
+## Culling WebGL2 occlusion (batch 223 job 1)
+
+Clean-room CPU depth testing combines Ned Greene, Michael Kass and Gavin Miller,
+*Hierarchical Z-Buffer Visibility*, SIGGRAPH 1993,
+https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/greene93_hierarchicalz.pdf
+with Jon Hasselgren, Tomas Akenine-Moller and Lennart Ohlsson,
+*Conservative Rasterization*, GPU Gems 2, 2005,
+https://developer.nvidia.com/gpugems/gpugems2/part-v-image-oriented-computing/chapter-42-conservative-rasterization .
+We use reversed-Z far depths and full-cell underestimated triangle coverage,
+then overestimated transformed bounds. Unlike a center-sample depth test this
+cannot hide an object through an uncovered portion of a cell. Current camera
+and current transforms rebuild depth each frame; no previous query result is
+trusted. Near-plane-crossing triangles do not occlude. Shared triangle edges
+can leave conservative holes, causing extra draws, never missing surfaces.
+Babylon's public WebGL2 support description establishes the rival behaviour:
+https://doc.babylonjs.com/setup/support/webGL2/ . Both implementations suppress
+opaque meshes behind other opaque surfaces. Margo takes the CPU-depth option
+explicitly allowed by the job, avoiding asynchronous query latency. No rival
+source or companion repository was read or copied.

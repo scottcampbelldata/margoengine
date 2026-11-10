@@ -298,3 +298,9 @@ File: examples/assets/sciviz/pipeline/cf-plate.dat. NASA Turbulence Modeling Res
 
 ### NASA TMR bump eddy-viscosity slice (batch 172)
 examples/assets/sciviz/contour/bump.dat is the original mut_0.3_fun3d_sa.dat from https://www.nasa.gov/wp-content/uploads/2026/01/mut-0-3-fun3d-sa-dat.zip , linked by https://tmbwg.github.io/turbmodels/bump3d_sa.html . NASA US government public-domain data. FUN3D SA solution, x=0.3 Tecplot BLOCK slice, 20449 nodes and 20166 quadrilaterals. SHA256 and original byte count are recorded in the adjacent source.json. No third-party implementation is included.
+
+- Cesium Box sample: `packages/culling/test/assets/box/Box.gltf` and `Box0.bin`,
+  copyright 2017 Cesium, Creative Commons Attribution 4.0 International,
+  https://creativecommons.org/licenses/by/4.0/ . Unmodified standard sample data
+  from https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Box/glTF .
+  Used in culling's optional-entry pixel comparison; scene placement is Margo's own.

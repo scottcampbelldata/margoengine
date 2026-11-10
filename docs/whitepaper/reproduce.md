@@ -3064,3 +3064,11 @@ Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtr
 ### Batch 233 job 1: road intersections
 After building packages: node --test --test-timeout=120000 packages/road/test/intersections.test.js. Rendering: node scripts/gpu-lock.mjs run --owner=codex-batch233 --max=8 --wait-max=60 -- node packages/road/test/browser-check.mjs. Both backends check separate layer pixels, restoration and disposal. Analytic fixtures use independent equations, no timing assertions. See [road-design.md](../road-design.md).
 Batch 219 job 2: after building packages run `node --test --test-timeout=120000 packages/geometry/tests/parity-extras.test.js`; geometry/tests/gpu-check.mjs through the shared GPU lock normally and with --compat covers all five uploads and a Goldberg picture. No timed performance comparison is claimed.
+
+Batch 223 software occlusion: build packages, then hold a shared GPU slot for
+`node packages/culling/test/gpu/webgl2-check.mjs`, and again with `--compat`.
+The six fixed edits compare both canvases byte for byte and assert hidden-row
+reduction, immediate reveal after moving a wall and disabling culling. Data is
+Cesium Box (2017), CC BY 4.0, recorded in THIRD-PARTY-NOTICES.md. CPU contracts:
+`node --test --test-timeout=120000 packages/culling/test/webgl2.test.js`.
+No timing assertions or benchmarks run during the build phase.

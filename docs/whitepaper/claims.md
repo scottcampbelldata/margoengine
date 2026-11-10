@@ -3577,3 +3577,14 @@ Locale tables resolve parent/fallback keys, plural messages and parameters, upda
 The optional mesh-pbr entry applies the specified glTF channel encodings, UV sets/transforms, normal frames, cutout and explicit mesh placements in one existing path tracer. It retains independent mesh material ids and snapshots loaded-model inputs across asynchronous image conversion. Proof: nine package CPU tests execute the specialized WGSL and compare independent sRGB, roughness/metallic, emission, coverage, wrapping, UV and normal values; loaded glTF snapshot mutation, cancellation and ownership are covered. Native WebGPU and WebGL2/Vulkan pass all six pixel/loaded-model cases each, with maximum equivalent-scene error 4.76837158203125e-6 below the unchanged 1e-5 bound, zero cutout/normal-map difference and no GPU or shader errors. Evidence: whitepaper/results/batch243-mesh-pbr-20261109.json. No speed number is claimed.
 ### Batch 233 job 1: designed road intersections
 Optional intersections unites rounded/mitered road footprints, applies explicit circular curb returns and generates separate raised curb and sidewalk layers on shared sloping ground. CPU proof: road/test/intersections.test.js, closed-form area/radius/plane equations. GPU proof: road/test/browser-check.mjs, independent layer pixels, reboot and disposal on both backends. Details and limits: [road-design.md](../road-design.md). No speed or certified civil-design claim.
+
+### Batch 223: software occlusion evidence
+
+The optional culling/webgl2 entry culls core batches on the full WebGL2 layer and
+native WebGPU using current-frame conservative CPU depth. Its licensed Cesium Box
+fixture draws 28 of 81 instances behind the wall, 81 when the wall moves away,
+and 28 when it returns, with byte-identical pixels to the unculled scene on both
+backends. Camera motion and a camera inside the crowd also match. This establishes
+opaque mesh occlusion comparable to the documented Babylon WebGL2 query behaviour,
+with conservative full-cell coverage instead of asynchronous queries. It does not
+claim universal hidden-object rejection or a speed advantage. See clean-room.md.

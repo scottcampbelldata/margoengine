@@ -762,6 +762,10 @@
       "types": "./dist/culling/meshlets.d.ts",
       "import": "./dist/culling/meshlets.js"
     },
+    "./culling/webgl2": {
+      "types": "./dist/culling/webgl2.d.ts",
+      "import": "./dist/culling/webgl2.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

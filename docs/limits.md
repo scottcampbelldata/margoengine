@@ -4599,3 +4599,22 @@ Entry size: mesh-pbr 0 to 37,233 B min+gzip, with a new 38,350 B optional ceilin
 ### Batch 233 job 1: road intersections
 Optional intersections builds rounded/mitered joins, rounded caps, tangent circular curb returns and separate raised sidewalks on shared sloping ground. Defaults, precision, input bounds, radius-fit rejection, height sampling, cancellation and ownership: [road-design.md](road-design.md). No core/stage change or speed claim.
 Batch 219 job 2: geometry/extras adds geodesicGeometry and goldbergGeometry with m=1,n=0,radius=1,smooth=false; both nonnegative integer chiralities are accepted, T=m*m+m*n+n*n <=10000. Geodesics have 20*T triangular faces; Goldberg duals have 12 pentagons first then 10*(T-1) hexagons. Spherical centroid duals can have nonplanar faces, matching the spherical web-library construction; these are not claimed as equilateral planar Goldberg solids. Face-addressable output exposes faces, paired adjacentFaces, centers, normals and one material group per face, with per-face UVs. hemisphereGeometry(radius=1,segments=32,rings=16,cap=true) lies above y=0 with a hard downward flat cap. Tiled planes default width/height=1,tileSize=1,centered alignments,pattern=none,side=front,UV rectangles=[0,0,1,1]. Seven tile/row reflection and rotation patterns and all three axis alignments retain physical texture scale through cropped edge tiles. Side can be back or double, with independent front/back UV rectangles. Tiled boxes add depth=1, six face groups (+x,-x,+y,-y,+z,-z), and per-face option overrides. Normals/winding and exact bounds are tested. Optional extras grows 5570 -> 9031 B gzip; ceiling 5826 -> 9302 B. Shared hull, lattice and face emission stay together rather than fragmenting this optional primitive collection. Core + stage unchanged at 24209 B.
+
+### Optional CPU occlusion on the full WebGL2 layer
+
+`@margoengine/culling/webgl2` supplies `WebGL2Culling` for opaque core meshes on
+both the full WebGL2 layer and native WebGPU. It rebuilds a 128 by 128 CPU depth
+buffer each view using actual triangles, then redirects compacted 96-byte rows.
+Resolution accepts integers 1 through 2048. It uses no hardware queries, no GPU
+readback and no previous-frame visibility. `readCounts()` returns the last view's
+counts synchronously. Use one redirect owner per batch. Picking and shadow data
+stay complete. Surface-changing core shaders disable occlusion for that frame.
+The preview renderer is unsupported. Models and dynamic GPU-only geometry retain
+their existing cullers; this entry culls core batches. Near-plane-crossing triangles,
+triangle seams and partially covered cells can retain hidden objects. This is
+conservative excess drawing, never an excuse to cull visible surfaces. CPU work
+scales with occluder triangles and covered software cells; no speed claim is made.
+
+Batch 223 job 1 size: culling/webgl2 new entry, 0 to 2442 B gzip. Its CPU depth
+and upload code stay together because both implement this one optional feature.
+Core plus stage remains 24,209 B gzip (under 25,000); no frozen code changed.

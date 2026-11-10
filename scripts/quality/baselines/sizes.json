@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12886233,
+  "total": 12888931,
   "history": [
     {
       "date": "2026-10-24",
@@ -6404,6 +6404,12 @@
       "commit": "batch-219-job2",
       "reason": "Optional geometry/extras 5570 -> 9031 B gzip, ceiling 5826 -> 9302 B. Three geodesic classes, face-addressable Goldberg duals, hemisphere and complete cropped tiling layouts share the hull/face helpers. Splitting would fragment the optional primitive collection. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-223-job-1",
+      "reason": "New optional culling/webgl2 entry 0 to 2442 B gzip, full-cell CPU depth and per-view compaction; one cohesive feature avoids duplicated depth code. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7578,6 +7584,7 @@
     "@margoengine/headless/tiles": 2466,
     "@margoengine/ui/i18n": 1936,
     "@margoengine/voxel-pathtracer/mesh-pbr": 38350,
-    "@margoengine/road/intersections": 2421
+    "@margoengine/road/intersections": 2421,
+    "@margoengine/culling/webgl2": 2698
   }
 }

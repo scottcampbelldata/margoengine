@@ -5987,3 +5987,12 @@ voxel-pathtracer/mesh-pbr is optional and specializes the existing composed mesh
 ### Section 5 evidence: batch 233 road intersection design
 The optional intersections entry owns plan-view union, circular reentrant fillets and shared-ground lifting. Existing polygon/extrude entries load lazily. No core/stage or renderer changes. Face normals use final float32 coordinates; collapsed faces reject. CPU equations test areas, radius, holes and slopes. The road browser gate proves separate road/curb/sidewalk pixels, exact reboot and disposal on both backends. Nonlinear terrain is piecewise planar at triangulation vertices; no engineering certification or speed claim.
 Batch 219 job 2, section 5 evidence: geometry/extras primitive generation remains CPU-only and backend-independent. The geometry GPU suite now uploads geodesic, Goldberg, hemisphere, tiled plane and tiled box arrays and checks outward winding plus visible Goldberg pixels on both rendering backends. Unit topology, UV and analytic geometry checks supplement rendering; no core, stage or backend change.
+
+Batch 223 software occlusion: the optional culling/webgl2 entry owns CPU depth
+and core batch redirects. Section 5 evidence is its CPU edge/near-plane/current
+transform/cleanup tests and byte-identical Cesium Box scene on native WebGPU and
+the full WebGL2 layer (webgl2-check.mjs). Every view uses separate upload buffers,
+so later queue writes cannot replace earlier views' records before submission.
+No engine hooks, rendering backends or frozen core/stage code were added. CPU
+rasterization uses inner coverage and reversed-Z far bounds; seam and clipping
+uncertainty retain extra geometry. CPU costs are not yet speed-phase evidence.
