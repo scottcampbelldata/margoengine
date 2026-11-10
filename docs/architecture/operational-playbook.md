@@ -749,6 +749,18 @@ mutex, and a live claimant is allowed to finish without interference.
 
 Research guiding the remaining queue and phase work, read before implementation:
 
+The sciviz CPU picker now ranks ties using the public normalized projectPoint
+depth (near=0/far=1), preserving reversed WebGPU clip depth in rendering. A real
+perspective-camera regression checks both point orders independently of the
+identity fixture. Transfer bindings install abort observation before calling
+the initial render hook and restore classification on setup failure; listener
+and double-error regressions cover cleanup. These tests are in the ordinary
+sciviz CPU gate; GPU pixel/numerical assertions and LUT sizes are unchanged.
+The initial negative transfer run reached its 60-second hard bound while Node
+formatted a full-LUT assertion diff; a boolean identity assertion now reports the
+same failed state without constructing that diagnostic. No LUT work was reduced.
+
+
 The save scene-state browser regression now fences the batch-building first
 frame through `engine.gpu.queue.onSubmittedWorkDone()` before its existing final
 render and immediate bitmap capture. Compatibility had otherwise captured a

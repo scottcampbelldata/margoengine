@@ -3945,6 +3945,15 @@ request retains its cancellation signal until completion; numeric and string IDs
 remain distinct. Completed-ID handling and transport-level session policies are
 unchanged. Regression: packages/mcp/tests/server.test.js.
 
+## Scientific picking and transfer lifetime (2026-11-10)
+nearestPoint uses normalized near=0/far=1 depths from projectPoint when resolving
+its existing half-pixel screen-distance tie; GPU clip depth remains reversed.
+bindTransfer observes abort before the initial render callback, restores its
+previous classifier on failed setup, and leaves no change/abort subscriptions
+after disposal. If setup and restoration both fail, its AggregateError retains
+both errors with code failed and a help link. Default LUT resolution remains 256.
+Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
+
 ## Behavior tree text (batch 251)
 
 `parseTreeText` infers `TreeDocument` only when its options exclude subtree

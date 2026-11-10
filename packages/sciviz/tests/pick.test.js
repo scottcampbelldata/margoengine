@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Camera } from '@margoengine/core';
 import {
   formatValue,
   heightAt,
@@ -28,12 +29,19 @@ test('pointInPolygon follows the even-odd rule, concave shapes included', () => 
 });
 
 test('nearestPoint finds the closest projected point within the radius, the nearer one on a tie', () => {
-  // Screen: (0, 0) -> (50, 50), (0.5, 0) -> (75, 50), the third point in front of the first (nearer to the eye has larger
-  // reversed-Z depth, i.e. smaller clip z).
+  // Screen: (0, 0) -> (50, 50), (0.5, 0) -> (75, 50). Larger reversed clip z is nearer;
+  // projectPoint normalizes it to near=0, so the first point is in front of the third.
   const positions = [0, 0, 0.1, 0.5, 0, 0, 0, 0, 0];
   assert.deepEqual(nearestPoint(IDENTITY, positions, 100, 100, 74, 51, 8), { index: 1, distance: Math.hypot(1, 1) });
   assert.equal(nearestPoint(IDENTITY, positions, 100, 100, 62, 50, 8), null, 'nothing within 8 px');
-  assert.equal(nearestPoint(IDENTITY, positions, 100, 100, 50, 50, 8).index, 2, 'the point nearer the eye wins');
+  assert.equal(nearestPoint(IDENTITY, positions, 100, 100, 50, 50, 8).index, 0, 'the point nearer the eye wins');
+});
+
+test('CPU point-depth ties choose the point nearer a real perspective camera in either input order', () => {
+  const camera = new Camera({ position: [0, 0, 5], target: [0, 0, 0], near: 0.1, far: 100 });
+  camera.update(1, true);
+  assert.equal(nearestPoint(camera.matrix, [0, 0, 0, 0, 0, 3], 100, 100, 50, 50, 8).index, 1);
+  assert.equal(nearestPoint(camera.matrix, [0, 0, 3, 0, 0, 0], 100, 100, 50, 50, 8).index, 0);
 });
 
 test('selectPoints keeps the points inside a box or a lasso', () => {

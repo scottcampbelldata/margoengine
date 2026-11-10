@@ -4540,6 +4540,9 @@ historical predictor 3, malformed-text equivalence, RSS parity or speed parity.
 ## Direct MCP cancellation ownership (2026-11-10)
 Concurrent tools/call requests cannot overwrite an active direct-server cancellation context by reusing its ID. Proof: packages/mcp/tests/server.test.js rejects a second dispatch, checks RPC.invalidRequest, cancels the original call and distinguishes numeric 7 from string 7 in a batch. Both regressions fail on the previous unchecked Map.set implementation. Stdio delegates to the same handler. No completed-ID session enforcement or new transport claim is made.
 
+## Scientific picking and transfer initialization (2026-11-10)
+CPU nearestPoint chooses the nearer projected point on its existing half-pixel screen-distance tie, using projectPoint's normalized depth convention. Proof: packages/sciviz/tests/pick.test.js checks an actual perspective camera in both input orders and an independent identity projection. bindTransfer restores its prior classifier and removes listeners if the initial render callback aborts or throws; dual failure reports both errors with code failed. Proof: packages/sciviz/tests/transfer.test.js; all new cases fail on the parent. GPU clip depth, the distance tie rule, default LUT dimensions and numerical acceptance bounds are unchanged.
+
 ## Behavior tree text option inference (2026-11-10)
 General TreeTextOptions variables preserve possible subtree references in the inferred SubtreeDocument result; statically absent registrations retain TreeDocument. Proof: packages/behavior/tests/text-types.test.js compiles six inference cases and requires unsafe ordinary-tree assignment to reject. The original declaration fails with false type-equality checks and an unused expected-error diagnostic. Runtime syntax and validation are unchanged.
 ### Batch 176 molecules

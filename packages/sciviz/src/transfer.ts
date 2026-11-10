@@ -402,19 +402,38 @@ export function bindTransfer(
   options.signal?.throwIfAborted();
   const previous = layer.getClassification();
   let disposed = false;
+  let applied = false;
   const apply = () => {
-    layer.setClassification(tf.table(options.resolution, layer.range));
+    if (disposed) return;
+    const table = tf.table(options.resolution, layer.range);
+    applied = true;
+    layer.setClassification(table);
     options.render?.();
   };
-  apply();
-  tf.addEventListener('change', apply);
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     tf.removeEventListener('change', apply);
     options.signal?.removeEventListener('abort', dispose);
-    if (layer.valid) layer.setClassification(previous);
+    if (applied && layer.valid) layer.setClassification(previous);
   };
   options.signal?.addEventListener('abort', dispose, { once: true });
+  try {
+    apply();
+    if (!disposed) tf.addEventListener('change', apply);
+  } catch (error) {
+    try {
+      dispose();
+    } catch (rollback) {
+      throw Object.assign(
+        new AggregateError(
+          [error, rollback],
+          'Transfer binding setup and restoration failed; recreate the layer; see https://margoengine.com/errors#sciviz',
+        ),
+        { code: 'failed' },
+      );
+    }
+    throw error;
+  }
   return { dispose, [Symbol.dispose]: dispose };
 }

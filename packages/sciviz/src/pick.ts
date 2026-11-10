@@ -49,14 +49,14 @@ export function nearestPoint(
 ): { index: number; distance: number } | null {
   let best = -1,
     bestDistance = radius,
-    bestDepth = -Infinity;
+    bestDepth = Infinity;
   const p = { x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false };
   for (let i = 0, n = positions.length / 3; i < n; i++) {
     projectPoint(matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], width, height, 'webgpu', p);
     if (!p.inFront) continue;
     const d = Math.hypot(p.x - sx, p.y - sy);
-    // WebGPU depth is reversed: larger is nearer.
-    if (d < bestDistance - 0.5 || (d <= bestDistance + 0.5 && d <= radius && p.depth > bestDepth)) {
+    // projectPoint normalizes both backends to near=0, far=1.
+    if (d < bestDistance - 0.5 || (d <= bestDistance + 0.5 && d <= radius && p.depth < bestDepth)) {
       best = i;
       bestDistance = d;
       bestDepth = p.depth;

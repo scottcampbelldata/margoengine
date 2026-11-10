@@ -5099,9 +5099,9 @@ Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with 
 
 
 
-### Batch 181 job 3: existing CPU point-depth tie direction
+### Fixed: batch 181 job 3 CPU point-depth tie direction
 
-Repro: nearestPoint(identity, [0,0,0.1,0,0,0], 100,100,50,50,8) returns index 1; reversed-Z puts index 0 nearer. Cause: sciviz/src/pick.ts treats projectPoint.depth as reversed, but math/mat4 normalizes it to near=0/far=1. GPU picking uses actual reversed clip depth; strict distance ranking is separately documented. CPU-only tie correction is deferred under build-phase rule 21; it does not block the new ID pass and the existing CPU reference remains unchanged. Regression owed: real perspective camera coincident projected points, plus corrected expected depth convention in the existing CPU fixture.
+Fixed 2026-11-10: nearestPoint now compares projectPoint's normalized near=0/far=1 depth in the correct direction, preserving the existing half-pixel screen-distance tie rule. packages/sciviz/tests/pick.test.js checks a real perspective camera in both point orders and corrects the identity fixture against the same documented depth convention. Both cases fail on the parent. GPU reversed clip depth and its picking pass are unchanged.
 
 Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
 
@@ -5119,7 +5119,7 @@ converging). Fix to build: treat a column whose norm falls below eps times the l
 zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
 relative accuracy the Jacobi method keeps for graded columns.
 
-Review 3 SV4 (61928c3a0): bindTransfer checks signal before its initial apply(), but installs the abort listener after options.render runs. Repro: bindTransfer(layer, tf, { signal: controller.signal, render: () => controller.abort() }); the returned binding leaves the gradient classifier installed, and tf.update(tf.state) performs another upload. Expected: restore the previous classifier and detach updates. Cause: the synchronous render callback can abort before the listener exists; abort events are not replayed to later listeners. Normal asynchronous abort and explicit disposal pass. Small lifecycle follow-up deferred to the fix phase under Scott rules 21/22; register/check lifetime state around the caller callback and retain the exact regression. Lane Q repro: private/review-3-transfer-reentrant-abort.test.mjs; test-results/review-3-sciviz-transfer/reentrant-abort-red.log.
+Fixed 2026-11-10: review 3 SV4 transfer-binding reentrant abort. The abort listener now exists before the initial caller render callback; an already-disposed initialization cannot subscribe to later transfer changes. Failed initialization restores the previous classifier and releases listeners, with both errors retained if restoration also fails. Regression: packages/sciviz/tests/transfer.test.js covers initial synchronous abort, throwing render callbacks and failed restoration; all three fail on the parent. Default LUT work, numerical transfer tests and rendering bounds are unchanged.
 
 
 - Batch 120 incidental gate finding, base 2ed6fd460: node --test tests/check-fixed-waits.test.js flags packages/biomes/tests/water-check.html line 101, a fixed 90-frame loop absent from the baseline. Cause: the biomes test waits for frame count instead of GPU readiness; unrelated to profile installation, deferred to its owning lane under efficiency rule 21.

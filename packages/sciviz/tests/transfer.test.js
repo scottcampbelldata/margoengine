@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { getEventListeners } from 'node:events';
 import { JSDOM } from 'jsdom';
 import {
   TransferFunction,
@@ -10,6 +11,96 @@ import {
   transferEditor,
 } from '../dist/transfer.js';
 import { VolumeLayer } from '../dist/index.js';
+
+test('an initial render callback can abort its transfer binding without leaving classification or listeners', () => {
+  const previous = { kind: 'gradient', size: [1, 1], rgba: new Uint8Array([10, 20, 30, 40]), gradientMax: 2 };
+  let current = previous;
+  let uploads = 0;
+  const layer = {
+    valid: true,
+    range: [0, 1],
+    getClassification: () => previous,
+    setClassification(value) {
+      uploads++;
+      current = value;
+    },
+  };
+  const controller = new AbortController();
+  const tf = transferPreset('mri');
+  const binding = bindTransfer(layer, tf, { signal: controller.signal, render: () => controller.abort() });
+  assert.equal(current === previous, true, 'initial abort restores the owned previous classifier');
+  assert.equal(uploads, 2);
+  assert.equal(getEventListeners(tf, 'change').length, 0);
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  tf.update(tf.state);
+  binding.dispose();
+  assert.equal(uploads, 2);
+});
+
+test('a failed initial render restores classification and releases transfer listeners', () => {
+  const failure = new Error('render failed');
+  const controller = new AbortController();
+  const tf = transferPreset('mri');
+  let current;
+  let uploads = 0;
+  const layer = {
+    valid: true,
+    range: [0, 1],
+    getClassification: () => undefined,
+    setClassification(value) {
+      uploads++;
+      current = value;
+    },
+  };
+  assert.throws(
+    () =>
+      bindTransfer(layer, tf, {
+        signal: controller.signal,
+        render: () => {
+          throw failure;
+        },
+      }),
+    (error) => error === failure,
+  );
+  assert.equal(current === undefined, true, 'failed initialization restores the absent classifier');
+  assert.equal(uploads, 2);
+  assert.equal(getEventListeners(tf, 'change').length, 0);
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  tf.update(tf.state);
+  assert.equal(uploads, 2);
+});
+
+test('transfer setup preserves both callback and restoration errors while releasing listeners', () => {
+  const failure = new Error('render failed'),
+    rollback = new Error('restoration failed');
+  const controller = new AbortController();
+  const tf = transferPreset('mri');
+  let uploads = 0;
+  const layer = {
+    valid: true,
+    range: [0, 1],
+    getClassification: () => undefined,
+    setClassification() {
+      if (++uploads === 2) throw rollback;
+    },
+  };
+  assert.throws(
+    () =>
+      bindTransfer(layer, tf, {
+        signal: controller.signal,
+        render: () => {
+          throw failure;
+        },
+      }),
+    (error) => {
+      assert.equal(error.code, 'failed');
+      assert.deepEqual(error.errors, [failure, rollback]);
+      return true;
+    },
+  );
+  assert.equal(getEventListeners(tf, 'change').length, 0);
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+});
 
 test('scalar texture retains out-of-range derivatives and disposed volumes cannot accept edits', () => {
   globalThis.GPUBufferUsage = { UNIFORM: 1, COPY_DST: 2 };

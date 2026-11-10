@@ -1382,6 +1382,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mcp: document direct/stdio rejection of duplicate active tool IDs and preserved cancellation ownership; completed-ID handling is unchanged.
 
+- @margoengine/sciviz: document normalized CPU picking depth ties and transfer binding initialization abort/error cleanup, including aggregated restoration failures.
+
 - @margoengine/behavior: cover parseTreeText inference for ordinary options, explicit registrations and TreeTextOptions variables; use BlackboardKey objects for shared subtree state.
 - @margoengine/loaders (batch 176 job 6): document loaders/mmcif and PDB residue insertion/alternate metadata, first-model/conformer policy and struct_conn limits.
 - @margoengine/sciviz (batch 176 job 6): document molecule representations/defaults, element-radius fallbacks, residue picking and resource lifetime with a runnable example in the README phase.
