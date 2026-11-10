@@ -137,6 +137,54 @@ function brdfReference(nv, roughness, steps = 700) {
   }
   return [scale, bias];
 }
+// The split-sum estimator of brdfLut evaluated in f64 over the same Hammersley points (radical inverse of i, i / n),
+// with the GGX half vector from Walter et al. 2007 eq. 35, theta = atan(alpha sqrt(xi / (1 - xi))): a form that does
+// not share the shader's algebra. Returns size * size (scale, bias) pairs, row-major.
+function brdfHammersley(size, samples) {
+  const out = new Float64Array(size * size * 2),
+    points = [];
+  for (let i = 0; i < samples; i++) {
+    let bits = i,
+      reversed = 0;
+    for (let b = 0; b < 32; b++, bits >>>= 1) reversed = reversed * 2 + (bits & 1);
+    points.push([i / samples, reversed / 2 ** 32]);
+  }
+  for (let y = 0; y < size; y++) {
+    const roughness = (y + 0.5) / size,
+      alpha = roughness * roughness,
+      a2 = alpha * alpha,
+      g1 = (x) => (2 * x) / (x + Math.sqrt(a2 + (1 - a2) * x * x)),
+      half = points.map(([u, w]) => {
+        const theta = Math.atan(alpha * Math.sqrt(w / (1 - w))),
+          phi = 2 * Math.PI * u;
+        return [Math.sin(theta) * Math.cos(phi), Math.sin(theta) * Math.sin(phi), Math.cos(theta)];
+      });
+    for (let x = 0; x < size; x++) {
+      const nv = (x + 0.5) / size,
+        v = [Math.sqrt(1 - nv * nv), 0, nv];
+      let scale = 0,
+        bias = 0;
+      for (const h of half) {
+        const vh = Math.min(1, Math.max(0, v[0] * h[0] + v[2] * h[2])),
+          lz = 2 * vh * h[2] - v[2];
+        if (lz > 0 && vh > 0) {
+          const visibility = (g1(nv) * g1(lz) * vh) / (h[2] * nv),
+            fc = (1 - vh) ** 5;
+          scale += (1 - fc) * visibility;
+          bias += fc * visibility;
+        }
+      }
+      out[(y * size + x) * 2] = scale / samples;
+      out[(y * size + x) * 2 + 1] = bias / samples;
+    }
+  }
+  return out;
+}
+// Half a unit in the last place of the f16 nearest to x (subnormal spacing 2^-24 below 2^-14).
+const halfUlp16 = (x) => 0.5 * 2 ** (Math.max(-14, Math.floor(Math.log2(Math.max(Math.abs(x), 2 ** -24)))) - 10);
+// f32 evaluation of 512 samples beyond the f16 rounding: 2.44e-4 measured on the RTX A6000 (WebGPU and WebGL2
+// compat) with the stable inverse CDF; the sqrt(1 - cos^2) form was 8.28e-4 over at the smoothest grazing cell.
+const LUT_F32_ALLOWANCE = 3e-4;
 // Karis, "Physically Based Shading on Mobile" (2014) analytic fit of the UE4 environment BRDF.
 function karisApproximation(nv, roughness) {
   const r = [roughness * -1 + 1, roughness * -0.0275 + 0.0425, roughness * -0.572 + 1.04, roughness * 0.022 - 0.04];
@@ -478,6 +526,40 @@ window.runEnvironmentTests = async () => {
     assert(JSON.stringify(await bits(third.brdfLut)) === JSON.stringify(alone), 'a fresh fill differs from the shared LUT');
     third.dispose();
     report.checks.push('Environments of one device share one BRDF LUT, which outlives its first holder and equals a fresh fill');
+  }
+
+  // 4c. Every cell of the default 128 x 128 LUT (512 samples) against an f64 CPU integration of the same Hammersley
+  // set. The smooth rows are where an f32 GGX inverse CDF written as sqrt(1 - cos^2) collapses the lobe onto the normal.
+  {
+    const size = 128,
+      samples = 512,
+      environment = await Environment.create(device, equirect(64, 32, () => [1, 1, 1]), {
+        size: 16,
+        samples: 64,
+        brdfSize: size,
+        brdfSamples: samples,
+      }),
+      lut = await readLut(device, environment.brdfLut),
+      expected = brdfHammersley(size, samples);
+    environment.dispose();
+    let worst = { excess: -Infinity },
+      smoothRows = 0;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const got = lut.at(0, x, y);
+        for (let c = 0; c < 2; c++) {
+          const want = expected[(y * size + x) * 2 + c],
+            error = Math.abs(got[c] - want),
+            // f16 storage rounds to half a unit in the last place of the stored value, then an f32 allowance.
+            excess = error - halfUlp16(want) - LUT_F32_ALLOWANCE;
+          if (excess > worst.excess) worst = { excess, error, x, y, c, got: got[c], want };
+          if (y < 4) smoothRows = Math.max(smoothRows, error);
+        }
+      }
+    }
+    assert(worst.excess <= 0, `BRDF LUT vs f64 Hammersley integration: ${JSON.stringify(worst)}`);
+    report.brdfHammersley = { worstOverF16: worst.excess + LUT_F32_ALLOWANCE, worstError: worst.error, worstCell: [worst.x, worst.y, worst.c], smoothRowsError: smoothRows };
+    report.checks.push('every BRDF LUT cell matches an f64 integration of the same Hammersley samples within f16 storage rounding');
   }
 
   // 5. Background pass rendered directly: directions, rotation, exposure, blur, HDR and 8-bit outputs, depth.

@@ -92,6 +92,17 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores k.
   `fragmentUnormRound` and `scatterUnormRound` pass, and so does the baker comparison.
 
+### Fixed 2026-11-10: GGX importance samples collapsed onto the normal at low roughness
+
+- **What:** `importanceGGX` (`packages/environment/src/shader-common.ts`, used by the prefilter, the BRDF LUT and
+  sampled probe bakes) took sinTheta as sqrt(1 - cosTheta^2). In f32, below alpha^2 = 2^-24 (roughness under about
+  0.0156) cosTheta rounds to 1 and every sample lands on the normal; just above it the subtraction cancels. The
+  default 128 x 128 LUT was 0.00117 off an f64 integration of the same samples at its smoothest grazing cell (0, 0),
+  2.4 f16 steps. Found in Scott's native Rust engine, which ported this code.
+- **Fix:** cosTheta = sqrt((1 - xi) / d) and sinTheta = alpha sqrt(xi / d) with d = (1 - xi) + alpha^2 xi, from
+  tan^2 theta = alpha^2 xi / (1 - xi) (Walter et al. 2007). Worst cell now 4.9e-4, within one f16 step, on WebGPU and
+  WebGL2 compat. Regression: `packages/environment/tests/environment-browser.js` section 4c.
+
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 
 - **What:** on the WebGL2 layer, which runs no level or cluster kernel and culls no loaded model, `MeshletMesh`

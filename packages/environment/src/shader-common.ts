@@ -1,7 +1,9 @@
 // WGSL helpers shared by the environment bakes: cube faces, equirect lookup, Hammersley points and GGX importance
 // samples. Kept apart from shaders.ts so entries that need only these (probes) do not bundle the other shaders.
 // Hammersley points: van der Corput radical inverse (2^-32 = 2.3283064365386963e-10); GGX half-vector sampling
-// cosTheta = sqrt((1 - xi) / (1 + (alpha^2 - 1) xi)): Walter et al. 2007 eq. 35-36.
+// tan^2 theta = alpha^2 xi / (1 - xi) (Walter et al. 2007 eq. 35-36), so with d = (1 - xi) + alpha^2 xi:
+// cosTheta = sqrt((1 - xi) / d) and sinTheta = alpha sqrt(xi / d). Taking sinTheta from sqrt(1 - cos^2) instead
+// cancels in f32: below alpha^2 = 2^-24 cosTheta rounds to 1 and every sample collapses onto the normal.
 export const common = /* wgsl */ `
 const PI = 3.141592653589793;
 fn faceDirection(face: u32, uv: vec2f) -> vec3f {
@@ -25,8 +27,9 @@ fn hammersley(i: u32, n: u32) -> vec2f {
 // GGX normal distribution sample in tangent space (z = normal), alpha = roughness^2.
 fn importanceGGX(xi: vec2f, alpha: f32) -> vec3f {
   let phi = 2.0 * PI * xi.x;
-  let cosTheta = sqrt((1.0 - xi.y) / (1.0 + (alpha * alpha - 1.0) * xi.y));
-  let sinTheta = sqrt(max(1.0 - cosTheta * cosTheta, 0.0));
+  let d = (1.0 - xi.y) + alpha * alpha * xi.y;
+  let cosTheta = sqrt((1.0 - xi.y) / d);
+  let sinTheta = alpha * sqrt(xi.y / d);
   return vec3f(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
 }
 `;

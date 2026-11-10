@@ -1,3 +1,12 @@
+### Section 5 evidence: stable GGX inverse CDF in the environment bakes (2026-11-10)
+
+`importanceGGX` takes cosTheta and sinTheta from d = (1 - xi) + alpha^2 xi, so the f32 lobe no longer collapses onto
+the normal below alpha^2 = 2^-24. Evidence: `packages/environment/tests/environment-browser.js` 4c compares all 16,384
+cells of the default LUT with an f64 integration of the same Hammersley set (old shader 0.00117 at cell (0, 0), new
+worst 4.9e-4, allowance f16 half step plus 3e-4), RTX A6000 WebGPU and WebGL2 compat. Missing: a prefilter check at a
+collapsing roughness; with mips spaced roughness m / (mips - 1) no level falls below 0.0156, so it is not reachable
+through `Environment`.
+
 ### Section 5 evidence: compat canvas present is a draw, not a blit (batch 166 job 2)
 
 The WebGL2 layer's canvas present was a y-flipped `blitFramebuffer` plus a colour-masked clear. Under ANGLE D3D11
