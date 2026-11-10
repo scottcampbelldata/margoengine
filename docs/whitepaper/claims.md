@@ -3254,3 +3254,6 @@ capture from this module, including list change notifications.
 
 - Stats geometry (batch 264): optional command-derived triangle, submitted-vertex and instance counters with panel/JSON output. Proof: packages/stats/test/geometry.test.js and scripts/test-stats-parity.mjs; native WebGPU/WebGL2 boxes each submit 24 triangles, 72 vertices, 2 instances. Unknown indirect/bundle work remains explicit. No claim about shader invocations, unique geometry or elapsed speed.
 Batch 253 trigger-rumble claim: independent native left/right trigger and strong/weak handle channels, accurate complete/preempted/unsupported outcomes, bounded cancellation and per-actuator call ownership. Proof: packages/input/test/haptics.test.js. Research and native/specialised public API comparison: docs/clean-room.md Batch 253 job 5. Synthetic actuator conformance does not claim physical tactile acceptance.
+### XR skinned hands
+
+The optional xr/hands entry drives real glTF skins from the 25 named WebXR joints using Margo Animation. Named mapping preserves authored hierarchy; CPU tests cover tracking loss, source replacement, abort, restoration and scene lifetime. Standard MIT generic-hand assets provide real weighted meshes. Rendering checks cover both XR routes and backends. This establishes software behavior, not real-device proof.

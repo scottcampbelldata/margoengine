@@ -5608,3 +5608,6 @@ aspect isolation. The compatibility feature and renderer matrix also gate the
 backend repair. No core or stage code changes.
 
 - Section 5 evidence, Stats geometry (batch 264): native command wrappers count WebGPU/WebGL2 submissions with preserved receivers. CPU tests exercise topology, instances, opaque commands, multiview reset and Stats wrapper composition. Hardware proof: scripts/test-stats-parity.mjs on both engine backends. Counts describe submitted candidates, with restart/opaque limitations in limits.md; core, stage and GPU math are unchanged.
+### 5. XR skinned hand ownership
+
+Tracked world poses are converted to glTF node locals after parent worlds are staged; all 25 joints map by name. Existing optional Animation handles skin deformation. Explicit per-scene subscription owners release frame hooks and players when their model scene closes, without relying on the engine's ambient scene. Real standard weighted profile assets exercise software behavior; headset proof remains absent.

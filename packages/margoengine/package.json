@@ -3937,6 +3937,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./xr/hands": {
+      "types": "./dist/xr/hands.d.ts",
+      "import": "./dist/xr/hands.js"
     }
   },
   "dependencies": {

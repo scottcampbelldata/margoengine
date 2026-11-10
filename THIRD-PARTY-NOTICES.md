@@ -273,3 +273,7 @@ install script only clears the macOS quarantine flag on its binary. `rhino3dm` a
 `test:real-files:runtimes` tool of `@margoengine/loaders` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.
 `aioquic` (BSD-3-Clause) is not in the lock: `packages/netcode/tests/webtransport-proof/server.py` uses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.
+
+## Standard WebXR generic-hand test assets
+
+`packages/xr/tests/fixtures/hands/{left,right}.glb` are standard WebXR Input Profiles model data, permitted by the standard-file exception. Pinned source: https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0.20/dist/profiles/generic-hand/left.glb and https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0.20/dist/profiles/generic-hand/right.glb. Licence: MIT, Copyright (c) 2019 Amazon, full text beside the models in LICENSE. Licence declaration: https://github.com/immersive-web/webxr-input-profiles/blob/main/packages/assets/README.md and https://github.com/immersive-web/webxr-input-profiles/blob/main/packages/assets/LICENSE.md. SHA256 left bc67783144944ea1cda54d9247885825ea5fb9d4651469fe7d00be517a5c2b87; right 291790c14f7f88a7f9bd35330c47392ed8e8d395ae6728f4bb7089f1bc1f2b96. Assets are test data only; no external implementation code is included or read.
