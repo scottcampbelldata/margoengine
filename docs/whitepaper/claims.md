@@ -2976,3 +2976,8 @@ packages/behavior/tests/inspect.test.js; visual usability on large production
 trees has not been established.
 ### Live FSM configuration view (batch 250 job 4)
 MachineView draws active hierarchy paths, parallel region paths, remembered state and bounded recent transitions in a live Inspector-compatible overlay. packages/fsm/test/inspect.test.js checks the actual Inspector shadow mount, filtering, cyclic payload safety, text escaping, live refresh and abort disposal. packages/fsm/test/inspect-browser.mjs checks rendered placement, live changes and removal in Chromium. Reference: Harel, Shneiderman and Stately public inspection descriptions in docs/clean-room.md; no editing or complete Stately feature claim.
+
+
+### Save OPFS atomic replacement (batch 255 job 3)
+
+The optional save/opfs adapter supports binary/empty values, sorted keys, namespace isolation and path-safe Unicode keys. A write commits through the File System Standard's temporary-file close swap. Proof: packages/save/tests/opfs.test.js injects open, write and close faults and precommit aborts while checking exact previous bytes and hidden placeholders. packages/save/tests/browser/safe-check.mjs checks real OPFS persistence across reload and aborted temporary writes. No cross-key, cross-tab ordering, physical power-loss or performance claim is made.

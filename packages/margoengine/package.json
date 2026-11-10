@@ -2506,6 +2506,10 @@
       "types": "./dist/save/safe.d.ts",
       "import": "./dist/save/safe.js"
     },
+    "./save/opfs": {
+      "types": "./dist/save/opfs.d.ts",
+      "import": "./dist/save/opfs.js"
+    },
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"

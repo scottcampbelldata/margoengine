@@ -2530,3 +2530,8 @@ Batch 251 inspector: after building behavior, run
 `node --test --test-timeout=120000 packages/behavior/tests/inspect.test.js`.
 The CPU DOM fixtures verify hierarchy, live updates and scheduling cleanup.
 FSM view proof: build packages, run node --test --test-timeout=120000 packages/fsm/test/inspect.test.js, then node scripts/gpu-lock.mjs run --owner=fsm-inspect --max=2 --wait-max=60 -- node packages/fsm/test/inspect-browser.mjs; repeat the browser command with --compat. Screenshots go to test-results/batch250. The overlay itself uses DOM rendering and has no GPU math or backend-specific shaders.
+
+
+### Save OPFS (batch 255 job 3)
+
+After building packages, run node --test --test-timeout=120000 packages/save/tests/opfs.test.js. The existing save test:gpu command includes safe-check.mjs, which checks real OPFS close/abort and persistence across a page reload; run once normally and once with MARGO_COMPAT=1 using a shared GPU lock. The fixture consists of generated binary test values, not a public asset demo. No timing suite is needed for this storage feature.

@@ -38,3 +38,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | ui/input umbrella entry and native-editing attachment. | batch-258 job 1 |
 | @margoengine/fsm | inspect: MachineView mounting in Inspector shadow root or parent, existing trace ownership, refresh/live/capacity, filtering, AbortSignal and disposal | batch-250 job 4 |
 | margoengine | Generated fsm/inspect alias | batch-250 job 4 |
+
+| @margoengine/save | opfs: namespace/directory defaults, binary and empty saves, atomic close, cancellation boundary, key limit and cross-tab last-close-wins | batch-255 job 3 |
+| margoengine | Generated save/opfs alias | batch-255 job 3 |

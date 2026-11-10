@@ -9,6 +9,45 @@ const browser = await openBrowser({ startPath: '/tests/modern-extension.html', p
   errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 try {
+  const opfsNamespace = `save-opfs-check-${process.pid}`;
+  await page.evaluate(async (namespace) => {
+    const { opfsStorage } = await import('/packages/save/dist/opfs.js');
+    const storage = opfsStorage({ namespace });
+    await storage.write('../slot/🦆', new Uint8Array([0, 255, 17]));
+    await storage.write('empty', new Uint8Array());
+  }, opfsNamespace);
+  await page.reload();
+  const opfs = await page.evaluate(async (namespace) => {
+    const { opfsStorage } = await import('/packages/save/dist/opfs.js');
+    const root = await navigator.storage.getDirectory();
+    const storage = opfsStorage({ namespace });
+    try {
+      const before = [...(await storage.read('../slot/🦆'))];
+      const directory = await root.getDirectoryHandle(namespace);
+      // A real writable's temporary contents must remain invisible when aborting instead of closing.
+      for await (const [name, handle] of directory.entries()) {
+        if ((await handle.getFile()).size <= 5) continue;
+        const stream = await handle.createWritable({ keepExistingData: false });
+        await stream.write(new Uint8Array([99]));
+        await stream.abort();
+      }
+      const after = [...(await storage.read('../slot/🦆'))];
+      const keys = await storage.keys();
+      const empty = [...(await storage.read('empty'))];
+      const deleted = await storage.delete('../slot/🦆');
+      return { before, after, keys, empty, deleted, absent: await storage.read('../slot/🦆') };
+    } finally {
+      await root.removeEntry(namespace, { recursive: true });
+    }
+  }, opfsNamespace);
+  assert.deepEqual(opfs, {
+    before: [0, 255, 17],
+    after: [0, 255, 17],
+    keys: ['../slot/🦆', 'empty'],
+    empty: [],
+    deleted: true,
+    absent: null,
+  });
   const durability = await page.evaluate(async () => {
     const { indexedDBStorage, saveGame, webStorage } = await import('/packages/save/dist/index.js'),
       { safeStorage } = await import('/packages/save/dist/safe.js');

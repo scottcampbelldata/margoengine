@@ -50,6 +50,10 @@
     "./safe": {
       "types": "./dist/safe.d.ts",
       "import": "./dist/safe.js"
+    },
+    "./opfs": {
+      "types": "./dist/opfs.d.ts",
+      "import": "./dist/opfs.js"
     }
   },
   "files": [
