@@ -1450,6 +1450,10 @@
       "types": "./dist/inspector/gizmo.d.ts",
       "import": "./dist/inspector/gizmo.js"
     },
+    "./inspector/textures": {
+      "types": "./dist/inspector/textures.d.ts",
+      "import": "./dist/inspector/textures.js"
+    },
     "./kinematics-constraints": {
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"

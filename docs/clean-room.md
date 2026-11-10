@@ -5817,3 +5817,61 @@ Combined clean-room design: use the same packed float transforms and camera snap
 Mask boundary regression found by the pixel proof: the old SpriteLayer interpolated a second copy of screen coordinates across the quad, rounding the exact circle-boundary point (16.5,7.5) outside a circle centred at (12,13.5), radius 7.5. Two channel comparisons failed, both for the rotated red sprite with the circle enabled. Research before the repair: Juan Pineda, *A Parallel Algorithm for Polygon Rasterization* (1988), https://doi.org/10.1145/54852.378457 ; Alan Baker, Mehmet Oguz Derin and David Neto (editors), *WebGPU Shading Language* (2026), https://www.w3.org/TR/WGSL/ (fragment position builtin and interpolation); Microsoft, *Rasterization Rules* (accessed 2026-11-10), https://learn.microsoft.com/en-gb/windows/win32/direct3d11/d3d10-graphics-programming-guide-rasterizer-stage-rules . Compare raster sample positions with interpolated attributes: masks need the former. The owning sprite shader now uses builtin fragment position minus the viewport origin, stored in the existing uniform padding. It removes the redundant position interpolator. No coordinate bias, tolerance increase or input special cases. The same fixture now reports zero mismatches on both backends. Sprite root grows 7,455 to 7,480 B gzip, within its existing ceiling; core/stage unchanged.
 ## Batch 260 job 2: CSS3D depth apertures
 Compared Thomas Porter and Tom Duff, Compositing Digital Images (1984), https://doi.org/10.1145/800031.808606 (coverage as a fourth channel); Simon Fraser, Dean Jackson and Edward O'Connor (editors), CSS Transforms Module Level 2 (2021), https://www.w3.org/TR/css-transforms-2/ (homogeneous matrices and flattening); W3C FX Task Force, Compositing and Blending Level 1 (2024), https://www.w3.org/TR/compositing-1/; and Khronos WebGL Working Group, WebGL 2.0 Specification (living standard), https://registry.khronos.org/webgl/specs/latest/2.0/. Public behaviour comparisons: Babylon HtmlMesh mask, https://doc.babylonjs.com/addons/htmlMesh/, and documented Html blending, https://drei.docs.pmnd.rs/misc/html. Combined: use labels' actual CSS3D matrix, depth-test the corresponding rectangle against the rendered scene, then replace passing fragments with premultiplied zero RGBA. Foreground depth fails and retains its scene colour; panel depth is written so later depth-aware work sees it. Real HTML remains behind the canvas with native browser layout and events. Canvas style and alpha ownership is shared and restored on the last disposal; restore recreates GPU resources lazily. No rival source or companion implementation read. Test scenes are original analytic panels/boxes under the repository licence; no media asset or downloaded dataset.
+
+
+
+
+
+## Batch 262 job 4: texture capture and inspection
+
+Research compared Lance Williams, Pyramidal Parametrics (SIGGRAPH 1983),
+https://www.cs.cmu.edu/afs/cs/academic/class/15869-f11/www/readings/williams83_mipmap.pdf
+(abstract and pyramid representation), and Alexandr Kuznetsov, Krishna Mullia,
+Zexiang Xu, Milos Hasan and Ravi Ramamoorthi, NeuMIP: Multi-Resolution Neural
+Materials (2021), https://arxiv.org/abs/2104.02789 (abstract). The former establishes
+actual resolution levels; the latter cautions that arbitrary material channels are
+not interchangeable appearance data. The viewer therefore reads a chosen mip and
+channel exactly, without inventing mips or filtering normal/material channels.
+No neural representation or paper companion implementation is used.
+
+Standards combined: W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/, texture creation/usage, views, format capabilities,
+depth/stencil aspects and buffer mapping; W3C, WebGPU Shading Language (2026),
+https://www.w3.org/TR/WGSL/#texture-builtin-functions, textureLoad signatures for
+1D/2D/3D, integer, depth and multisampled textures. Public behavior reference:
+Babylon.js contributors, The Inspector (2026 documentation),
+https://doc.babylonjs.com/legacy/inspector, texture exploration linked there;
+Babylon.js contributors, Dev log: Creating the new inspector (2018),
+https://babylonjs.medium.com/dev-log-creating-the-new-inspector-b15c50900205,
+isolated material channels. The batch row is a list with dimensions/format/mips
+and channel/mip previews, not texture painting or exporting edited assets.
+
+The implementation observes explicit startup requests because WebGPU exposes no
+resource enumeration. It preserves caller descriptor objects, adds legal sampling
+usage only inside enabled capture, and never changes transient attachment usage.
+Typed unfiltered shaders convert source values into a disposable RGBA8 target;
+all GPU formats use their native sampling type rather than CPU reinterpretation.
+No foreign source or companion code was read or copied. Real-image input is the
+existing unmodified Aerial Rocks 02 diffuse 1k JPEG, Rob Tuytel / Poly Haven, CC0,
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_rocks_02/ ; SHA-256
+708373b2af7fd07ac8de1500556006aaf904c41a99985a849cacc78874f38eac,
+already attributed in THIRD-PARTY-NOTICES.md. Other pixels are authored exact-value
+format/subresource correctness specimens. No speed measurement or claim.
+
+Layered capture regression: all captures from this module share the synchronous
+preview-allocation depth, so a second capture never publishes another preview
+as an application resource. A failing-before CPU test verifies no list notification.
+
+Backend investigation consulted the Khronos WebGL Working Group, WebGL
+WEBGL_stencil_texturing Extension Specification, revision 2 (2024),
+https://registry.khronos.org/webgl/extensions/WEBGL_stencil_texturing/ .
+It requires selecting STENCIL_INDEX_WEBGL through DEPTH_STENCIL_TEXTURE_MODE_WEBGL
+instead of the default DEPTH_COMPONENT. Compared with Khronos OpenGL ES Working
+Group, OpenGL ES 3.2 Specification (2022),
+https://registry.khronos.org/OpenGL/specs/es/3.2/es_spec_3.2.pdf, texture-object
+state and stencil sampling, and the W3C WebGPU view-aspect rules above. The owning
+compatibility backend now enables the extension, chooses stencil/depth on every
+relevant binding, and separates ordinary views of different aspects in one draw.
+The unit regression proves mode restoration, alias separation, stencil8 packed
+storage and the coded missing-extension refusal. No external implementation or
+companion code was consulted.

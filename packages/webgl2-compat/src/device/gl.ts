@@ -23,6 +23,10 @@ export interface Extensions {
   readonly parallel: { COMPLETION_STATUS_KHR: number } | null;
   readonly depthClamp: { DEPTH_CLAMP_EXT: number } | null;
   readonly polygonOffsetClamp: { polygonOffsetClampEXT(factor: number, units: number, clamp: number): void } | null;
+  readonly stencilTexturing: {
+    DEPTH_STENCIL_TEXTURE_MODE_WEBGL: number;
+    STENCIL_INDEX_WEBGL: number;
+  } | null;
   readonly colorBufferFloat: boolean;
   readonly floatBlend: boolean;
   readonly floatLinear: boolean;
@@ -42,6 +46,7 @@ export function extensions(gl: WebGL2RenderingContext): Extensions {
     parallel: get('KHR_parallel_shader_compile'),
     depthClamp: get('EXT_depth_clamp'),
     polygonOffsetClamp: get('EXT_polygon_offset_clamp'),
+    stencilTexturing: get('WEBGL_stencil_texturing'),
     colorBufferFloat: !!get('EXT_color_buffer_float'),
     floatBlend: !!get('EXT_float_blend'),
     floatLinear: !!get('OES_texture_float_linear'),

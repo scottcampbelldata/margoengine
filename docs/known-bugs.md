@@ -4189,3 +4189,17 @@ Batch 267 job 1: no open live-bridge defect found in CPU or both-backend browser
 
 ### Batch 254 audio voice completion
 Resolved while building the manager: a physical source that had already fired onEnded could otherwise notify again when logical phase reached its end. voice-manager.test.js covers physical and virtual completion exactly once. No open defect from this job.
+
+
+
+
+Fixed in batch 262: compatibility stencil-only texture previews returned zeros because render bindings retained the default depth sampling mode. The owning backend now enables WEBGL_stencil_texturing, selects the requested stencil/depth mode and separates simultaneous ordinary-view aspects. Native and compatibility texture viewer assertions pass, including the unchanged [64,64,64,255] stencil check and a new depth-after-stencil check. CPU regression: packages/webgl2-compat/test/device.test.js; failing-before log: test-results/batch262-resume-job4-regression-before-0.log.
+
+Fixed in batch 262 texture capture: a second capture published the first capture's temporary preview texture and sent spurious list notifications. Module-owned
+allocation depth now excludes viewer outputs through every wrapper layer. The
+layered-capture regression in packages/inspector/test/textures.test.js fails
+without the shared exclusion and passes with no notifications.
+
+Outside the batch 262 single-aspect viewer: simultaneous depth and stencil bindings of one resolved MSAA source still share the backend resolved texture object. applyBindings changes that object mode per binding, so the last aspect wins; ordinary non-MSAA views already get separate aliases. Repro for the fix phase: one fragment shader textureLoads both aspects of a 4-sample depth24plus-stencil8 texture in the same draw; allocate synchronized resolved aliases per aspect.
+
+Outside batch 262: scoped API surface merging accepts conflict markers and duplicate package rows from its input (observed on main 8b5e85718, including the 9ed943656 marker). scripts/api-report-scope.mjs validates the first summary/header but never rejects conflict text or duplicate rows, so a scoped merge preserves them. Full api:update regenerates a clean report; fix phase should add strict input validation with a regression.

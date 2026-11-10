@@ -6511,6 +6511,99 @@ Finalizer validation adds 28 B to history (897 -> 925), 28 B to inspector root
 (9156 -> 9184) and 24 B to tweak (4069 -> 4093), within existing ceilings.
 The command rejects a non-callable discard before changing either stack.
 
+### Batch 254 binaural AmbiX
+Optional @margoengine/audio/binaural: 1809 B minified gzip, new entry from 0 B. ACN/SN3D complete channel sets only (4/9/16); loop defaults true and all Audio transport/filter options are inherited. 32 native HRTF PannerNodes and 32*(order+1)^2 gain paths per bed; no per-sample JavaScript. World field rotation uses a normalized quaternion; listener translation moves the distant sphere, listener orientation drives native HRTFs. ambixBasis returns real SN3D harmonics for a unit [front,left,up] direction. Native HRTF datasets/interpolation/latency depend on the browser. No SOFA parsing, personalized HRIRs, mixed-order input, format inference, headphone EQ or spectral compensation. Finite-order coloration and individual front/back confusion remain possible. CPU orthogonality through degree three and browser offline PCM against independently decoded virtual speakers are the correctness bars; device output and listening quality unmeasured. Core/stage unchanged.
+Batch 257 job 1, worker/rpc: cloneable arguments/results only, with explicit transfer lists for input and output. A pool owns its workers; a standalone client owns only its subscriptions. Cancellation is cooperative, so synchronous worker tasks must yield to observe it. Cancelled calls retain their pool slot until the handler finishes. A deadline failure retires the whole pool, rejecting waiting/running work and terminating its workers, with no retry of side effects. Queue default 1024, size default 2, deadline default 30000 ms including queue time. Structured-clone failures are returned as errors. No core/stage changes.
+
+Batch 257 optional entry measurement: {"@margoengine/worker":1872,"@margoengine/worker/canvas":1341,"@margoengine/worker/rpc":2156} B gzip; previous ceilings {"@margoengine/worker":2128,"@margoengine/worker/canvas":1597,"@margoengine/worker/rpc":0} B. New ceilings use existing max(256 B, 3%) headroom. Core + stage 23950 B gzip, below 25000 B; source unchanged.
+### Wider terrain and imagery (batch 239 job 3)
+
+`@margoengine/tiles/imagery` supplies terrainImagery for EPSG:4326 and EPSG:3857 quantized-mesh, tms or slippyMap addressing, explicit manifest availability or extension-4 metadataAvailability. The latter overrides manifest available as the format requires. Mercator vertex latitude is inverse-projected from quantized v; branch bounds are computed in projected space at every level. Terrain levels are 0..30; the staging cache defaults to 32 MiB and disposal aborts requests and clears it. Missing mandatory availability metadata fails explicitly. Source heights retain the existing -500..9,000 m selection regions and existing skirts (factor 2 by default).
+
+WMS 1.1.1/1.3.0, WMTS KVP/ResourceURL and XYZ/TMS imagery layers composite in order with show and opacity (defaults true and 1). WMTS accepts explicit service matrices in projected east/north units or a global Mercator/geographic pyramid; capabilities discovery is not required to use a configured provider. WMS sizes and composite rasters accept 1..4096 pixels; composite size defaults to 256. Mosaics are limited to 16,384 pixels per side and fail explicitly if a requested matrix would exceed that limit. Composite scanlines use native Canvas 2D alpha-over and reprojection; geographic coverage outside Mercator's +/-85.05112878 degrees has no Mercator imagery. Browser image decoding and OffscreenCanvas are required for draping; terrain and URL/matrix calculations work in Node. No new core or stage imports.
+
+Entry sizes for batch 239 job 3: tiles/imagery is new, 0 to 7,237 B min+gzip with a 7,451 B ceiling; tiles/terrain is 5,744 B, inside its existing ceiling. The optional entry keeps protocols, projected placement, compositing and source lifetime together. Splitting it would fragment provider/source configuration without reducing the work of a layered terrain source. Core + stage remains 23,950 B.
+@margoengine/input/layout: 1710 B gzip (previously absent), ceiling 1954 B. Cohesive lifecycle retained; no separate fragment entry. Core and stage unchanged.
+
+Batch 253 layout labels: optional input/layout exports KeyboardLabels and layoutBindingLabel. Construct without requesting permissions, await refresh once, use label synchronously and listen for change to redraw. A native layoutchange event refreshes automatically; unexpected automatic errors set lastError and emit error, while explicit refresh propagates them. The keyboard source defaults navigator.keyboard, timeout is 5000 ms; refresh accepts AbortSignal. Missing APIs and SecurityError/NotAllowedError/NotSupportedError clear the map and use existing code labels; unknown failures are observable. Superseded requests return false and cannot replace newer maps. ASCII letters are capitalized, Unicode and punctuation are preserved; missing/blank/control-character glyphs fall back. Modifier names and gamepad layout glyphs retain bindingLabel conventions. This changes prompts only, never physical action codes or IME/text input. Browser permissions policy and platform keyboard-map support still apply.
+Keyboard Map native limitation: some Chromium versions expose getLayoutMap without draft layoutchange event methods. They use explicit refresh; automatic refresh requires the paired add/remove event methods. The browser test covers this native surface and layout.test.js has a regression fixture.
+Batch 255 job 1: optional materials/serialization owns version-1 parameter snapshots for core placeholders and every materials mesh kind, WGSL, all seven built-in surface features, image/raw/data/3D/array/cube/compressed texture sources and sampler settings. shader/serialization owns node, lighting and raw shader programs, live uniforms and CPU-backed storage inputs. save/materials composes these owner codecs lazily. Shared object identity is retained across named materials, with exact typed bytes (including NaN payloads) and explicit infinite/-0 scalar tags. URL textures require the URL to remain readable; canvas/image embedding requires a readable source. GPU-produced buffers, borrowed GPU textures/views, render targets, bind group factories, custom materials/features and callback state use caller codecs or stable external keys/resolvers; they are never silently reduced to core colour fields. Shader text is data, not JavaScript execution. Same owner format version and compatible renderer modules are required for compiled node stages. Built-in model assets are still saved by their existing URL binding; material library values can be assigned to restored model/mesh slots. No change to core or stage.
+
+Batch 255 job 1: @margoengine/materials/serialization: absent to 37667 B gzip, ceiling 38798 B; @margoengine/save/materials: absent to 205 B gzip, ceiling 461 B; @margoengine/shader/serialization: absent to 19296 B gzip, ceiling 19875 B. Owner codecs retain every built-in mesh kind, feature attachment state, compiled node stages and shared typed buffers. Serialization explicitly uses the material/glTF owner APIs, accounting for six new static reachability rows. Keeping one complete optional codec entry avoids adapter registration/import complexity or duplicated private material/shader logic. Core plus stage unchanged at 23950 B.
+### Batch 260 job 1: HTML texture preview
+New html/texture-gl entry: 0 to 6,238 B min+gzip, ceiling 0 to 6,494 B. It includes shared rasterization and native interaction when imported alone; splitting would complicate surface ownership and lifecycle. html/texture is 4,571 B, root 7,235 B; existing ceilings unchanged. HTMLTextureGL defaults and surface options match HTMLTexture. Native preview is ordinary GL depth, WebGPU/full compatibility use the existing GPU path. Transparent pixels below alpha 0.004 discard; surfaces write depth and use premultiplied source-over. Pointer interaction retains the texture route's existing lack of scene-geometry occlusion. Core/stage source unchanged and combined size remains below 25,000 B.
+
+- XR locomotion: smooth translation defaults to 2 m/s, yaw to pi/2 rad/s, radial dead zone 0.15, thumbstick axes 2/3, delta cap 0.1 s. Comfort defaults to a 90-degree angular opening, 0.2 rad feather, 0.15 s exponential response. Reattach after each immersive session. This does not establish clinical sickness reduction; physical-device proof remains blocked by unavailable Quest/Android hardware.
+
+- xr/locomotion: 0 to 3134 B gzip, ceiling 3390 B for the new optional movement and stereo comfort entry. Core + stage remains 23950 B.
+
+| Optional entry | Limits (batch 267 job 1) |
+| --- | --- |
+| `@margoengine/mcp/live` | Explicit enabled:true, one connected dev page, inspector-exposed numeric/boolean/three-vector properties; error ring 100 by default, maximum 1000, messages truncated at 4000 characters; PNG maximum 12 MB. App supplies addAsset for its loaders. |
+| `@margoengine/mcp/live-host` | Loopback-only authenticated HTTP relay; exact browser origin allow list; 64 pending commands, 30 s deadline (100 ms to 300 s); 20 s polling; 17 MB response-body cap. Abort cancels queued commands and waits, not edits already performed by a page. No evaluation or production activation. |
+
+Batch 267 job 1: mcp/live 2348 B gzip (new, ceiling 2604 B), mcp/live-host 1523 B (new, ceiling 1779 B). Separate browser and Node entries avoid Node builtins in page bundles; their cohesive relay and operation dispatch justify these optional bytes. Core plus stage remains 23950 B.
+
+Batch 257 job 2: worker/auto accepts an absolute URL to an emitted JavaScript module exporting createScene. Bundled applications must emit that scene as a separately loadable module and allow it and the worker under CSP. Default mode/backend auto, startup/cleanup timeout 30000 ms. The worker probe checks OffscreenCanvas, worker animation frames and a WebGPU adapter or WebGL2 context. Auto fallback occurs before irreversible transfer; post-transfer scene/runtime errors reject, without rerunning application side effects. Async disposal awaits scene cleanup before terminating its owned worker. User data uses structured clone/explicit transfer in worker mode and the original values on the page. Attached engines are disposed with the scene; renderer visibility forwarding remains owned by the canvas bridge.
+
+Batch 257 optional entry measurement: {"@margoengine/worker/auto":3345,"@margoengine/worker dist/workers/scene.js":2371} B gzip; previous ceilings {"@margoengine/worker/auto":0,"@margoengine/worker dist/workers/scene.js":0} B. New ceilings use existing max(256 B, 3%) headroom. Core + stage 23950 B gzip, below 25000 B; source unchanged.
+
+
+### Batch 254 global voice budget
+Optional @margoengine/audio/voices: 2117 B minified gzip, new entry from 0 B. AudioVoiceManager has maxVoices=32 (integer >=0) and linear threshold=0.0001. add(sound,{priority=0,gain=()=>1}) returns a managed transport. All registered decoded-buffer sounds on one listener share the cap, including global, stereo and positional sounds. Larger finite priority wins, then volume/fade/master/distance/cone/custom gain; ties retain registration order. Each frame updates managed poses before ranking. Losers release buffer sources before winners allocate, so the cap is never transiently exceeded. Virtual voices allocate no buffer source; logical phase advances on context.currentTime, wraps configured loops and integrates playbackRate*2^(detune/1200). Handle play/pause/stop/seek, playbackRate and detune own transport; pitch changes restart a physical source at the exact phase. Do not call raw sound/pool transport, replace buffers, automate source pitch, or attach Doppler/timeline transport while managed. Raw volume, pose, filters and fades remain available. Media/stream/node sources cannot be phase-virtualized by this buffer-only manager. gain is a caller-supplied estimate for effects/occlusion/bus gain; no perceptual masking analysis. Selection occurs on updates, not within an audio render quantum. Handles/manager stop sources on dispose and preserve caller-owned sounds/buffers; listener teardown owns the sounds. Core/stage unchanged.
+
+### Sprite picking (batch 245 job 3)
+The optional sprites/pick entry exports pickSprite. Points use target pixels,
+y down; CSS pointers need canvas-to-client scaling first. Defaults match
+SpriteLayer: camera (0,0,1), snapping on, y sorting off. Pixel mode (default)
+uses original RGBA8 atlas alpha multiplied by packed sprite opacity; box mode
+requires only atlas dimensions. Threshold defaults to 1 byte; zero alpha never
+picks. Pages have equal dimensions, and source bytes remain caller-owned.
+Rotation, signed scale, pivot, texture flips, z/y/add order and layer masks are
+honoured. Picking never mutates the list or reads the GPU. Shader-generated alpha
+and smooth-filter reconstruction are outside source-alpha hit-test semantics.
+Entry: 1,933 B gzip (new, previously 0), ceiling 2,189 B; core + stage unchanged
+at 23,950 B. The same transform packer avoids a second renderer-specific transform.
+The picking proof also found and fixed the sprite renderer's circle-boundary
+interpolation error. Masks now use raster pixel centres with the view origin
+removed. Sprite root is 7,480 B gzip (was 7,455); its existing 7,660 B ceiling
+holds. Existing uniform padding stores the origin, so uniform allocation does
+not grow. The redundant two-float position interpolator is removed.
+
+Current slice bundle after the shared mask repair is 8,614 B gzip (8,587 B at
+job 1 landing), within its unchanged 8,845 B ceiling. Caller-owned picking
+bytes must match the atlas currently uploaded to the renderer.
+### Batch 260 job 2: CSS3D depth blending
+New html/blend entry: 0 to 3,047 B min+gzip, ceiling 0 to 3,303 B. It deliberately keeps canvas ownership and both mask backends together; splitting would complicate consistent lifecycle. Rectangular, double-sided CSS3D panels use the existing default 0.01 world units/CSS pixel and default name html-blend; their uncovered pixels replace RGBA with zero and write scene depth. Native preview requires an alpha-enabled context at creation. Canvas pointer events are disabled while any blend owns it; bind scene controls to a shared parent. DOM input is live but not masked by foreground geometry. CSS transparency reveals the underlying page throughout the rectangular aperture. Apply colour/post effects before the mask if they would otherwise overwrite alpha. Core/stage are unchanged.
+
+
+
+
+## Batch 262 texture viewer
+
+New inspector/textures: absent to 4707 B min+gzip, bare imports external; standard
+256 B ceiling headroom. Core plus stage unchanged at 23950 B. This opt-in capture
+adds TEXTURE_BINDING at creation (unless disabled or transient), retains weak
+metadata, and lists all captured live GPUTextures. WebGPU cannot enumerate unknown
+earlier textures; start before Engine.create, or register known earlier resources.
+Swapchain images need explicit watchCanvas and sampling usage; external video
+resources are not GPUTextures. The preview has no material textures; the full
+WebGL2 compatibility device uses the same API. Device format features still apply.
+Display is RGBA8, unfiltered per mip/layer, with explicit exposure/range and MSAA
+sample averaging. Integer/HDR data is mapped, not a lossless numeric export.
+Transient or earlier textures lacking sampling usage list but reject preview with
+an actionable code. Inspector/edit remains 4451 B; other entry changes are recorded
+in the preceding scene-editing section.
+
+Layered capture isolation changes the provisional texture entry from 4708 to
+4707 B, within its existing ceiling. Native format/subresource pixels pass.
+Native and compatibility assertions now pass for every listed fixture. Stencil
+sampling requires WEBGL_stencil_texturing; absent support rejects with a coded
+diagnostic. The compatibility device entry grows from 105626 to 105766 B gzip
+(+140 B) for aspect selection and ordinary-view alias separation, within its
+existing ceiling. Core plus stage remains 23950 B. Resolved-MSAA simultaneous
+depth/stencil aliasing is a separate backend fix-phase item in known-bugs.md.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -10614,9 +10707,10 @@ Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails Rigged
 Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
 text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 
-### Batch 255 save capture blockers
+### Batch 255 save capture owner gaps resolved
 
-- Job 1 remains unbuilt: captureScene reduces every material to the core fields (packages/save/src/engine.ts material block). Repro: capture a textured/emissive optional material; it is not restored as that kind. A lossless implementation for every kind also needs shader-owned serialization: NodeMaterial discards its constructor node roots (packages/shader/src/material.ts constructor); surfaceGraph exists only for createGraphMaterial. This lane's save-only scope cannot add that owning-package API. No partial materials entry is shipped.
+Jobs 1 and 2 now have owner-backed optional capture APIs. Custom procedural/GPU resources retain explicit application bindings; no current built-in material or playback feature is omitted.
+
 
 ### Fixed: derived-grid validation coerced nonnumeric primitives before its diagnostic
 
@@ -10696,6 +10790,27 @@ the optional finalizer before mutation. Regression: the invalid history finalize
 case in packages/inspector/test/edit.test.js fails without the validation.
 
 Fixed in batch 262: the React after-scene readiness fixture counted historical plugin instances whenever their name was currently attached. Reused materials:opaque-color names could count twice with no material installation, publish ready too soon, then report 0 instead of 1. It now reads the current engine.plugins identities. Regression: packages/react/tests/plugin-state.test.js and the unchanged installation assertion in packages/react/scripts/test-after-scene-browser.js. The latter passed once on clean main 5d6e5facd, failed with the rebased fixture, and passes after the observation fix; no assertion or timeout was loosened.
+- Batch 255 follow-up (rule 21): save/scene-state shadow restoration uses Object.assign on bound settings. Repro: an unsigned snapshot with an own __proto__ key changes the settings prototype; cause is the assignment setter. Use own data-property definitions in the fix phase, with a regression test. Playback and light lists are unaffected.
+
+Batch 267 job 1: no open live-bridge defect found in CPU or both-backend browser correctness checks; origin-clean capture and dev-only deployment limits are documented in docs/limits.md.
+
+
+### Batch 254 audio voice completion
+Resolved while building the manager: a physical source that had already fired onEnded could otherwise notify again when logical phase reached its end. voice-manager.test.js covers physical and virtual completion exactly once. No open defect from this job.
+
+
+
+
+Fixed in batch 262: compatibility stencil-only texture previews returned zeros because render bindings retained the default depth sampling mode. The owning backend now enables WEBGL_stencil_texturing, selects the requested stencil/depth mode and separates simultaneous ordinary-view aspects. Native and compatibility texture viewer assertions pass, including the unchanged [64,64,64,255] stencil check and a new depth-after-stencil check. CPU regression: packages/webgl2-compat/test/device.test.js; failing-before log: test-results/batch262-resume-job4-regression-before-0.log.
+
+Fixed in batch 262 texture capture: a second capture published the first capture's temporary preview texture and sent spurious list notifications. Module-owned
+allocation depth now excludes viewer outputs through every wrapper layer. The
+layered-capture regression in packages/inspector/test/textures.test.js fails
+without the shared exclusion and passes with no notifications.
+
+Outside the batch 262 single-aspect viewer: simultaneous depth and stencil bindings of one resolved MSAA source still share the backend resolved texture object. applyBindings changes that object mode per binding, so the last aspect wins; ordinary non-MSAA views already get separate aliases. Repro for the fix phase: one fragment shader textureLoads both aspects of a 4-sample depth24plus-stencil8 texture in the same draw; allocate synchronized resolved aliases per aspect.
+
+Outside batch 262: scoped API surface merging accepts conflict markers and duplicate package rows from its input (observed on main 8b5e85718, including the 9ed943656 marker). scripts/api-report-scope.mjs validates the first summary/header but never rejects conflict text or duplicate rows, so a scoped merge preserves them. Full api:update regenerates a clean report; fix phase should add strict input validation with a regression.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -1573,7 +1573,10 @@ export class Replayer {
         return false;
       }
       const view = found.bound.view,
-        tex = view.texture;
+        tex = view.texture,
+        stencil = tex.info.kind === 'stencil' || view.aspect === 'stencil-only';
+      if (t.unit >= 0 && stencil && !device.ext.stencilTexturing)
+        throw device.unsupported('sampling a stencil aspect (this WebGL2 has no WEBGL_stencil_texturing)');
       let sampler: WebGLSampler = device.loadSampler;
       if (t.sampler) {
         const samp = samplerAt(t.sampler);
@@ -1620,7 +1623,8 @@ export class Replayer {
         this.resolveForSampling(tex);
         plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: tex.resolved, sampler });
       } else {
-        const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`;
+        const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`,
+          sampleState = `${range}:${stencil}`;
         let storage = tex.sampled(view),
           alias = 1;
         // WebGPU lets a pass sample the depth texture it has attached read-only; GL calls that a feedback loop and refuses
@@ -1629,8 +1633,8 @@ export class Replayer {
         if (attachment?.texture === tex && storage === tex.attached(attachment)) storage = tex.sampled(view, alias++);
         // GL keeps one base and max level per texture object: another range of a texture this draw already samples
         // (Bloom's last up step reads two levels of its down chain) reads a copy of its own.
-        while (ranges.has(storage) && ranges.get(storage) !== range) storage = tex.sampled(view, alias++);
-        ranges.set(storage, range);
+        while (ranges.has(storage) && ranges.get(storage) !== sampleState) storage = tex.sampled(view, alias++);
+        ranges.set(storage, sampleState);
         tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
         if (storage.levels !== range) {
           s.scratch(storage.target, storage.gl);
@@ -1639,6 +1643,18 @@ export class Replayer {
           storage.levels = range;
         }
         plan.push({ unit: t.unit, target: storage.target, texture: storage.gl, sampler });
+      }
+      // The sampling aspect belongs to the GL texture object, including resolved MSAA storage.
+      // Restore depth on later draws; ordinary views use aliases above for simultaneous aspects.
+      if (t.unit >= 0 && hasStencil(tex.info) && device.ext.stencilTexturing) {
+        const ext = device.ext.stencilTexturing,
+          sampled = plan[plan.length - 1];
+        s.scratch(sampled.target, sampled.texture);
+        gl.texParameteri(
+          sampled.target,
+          ext.DEPTH_STENCIL_TEXTURE_MODE_WEBGL,
+          stencil ? ext.STENCIL_INDEX_WEBGL : gl.DEPTH_COMPONENT,
+        );
       }
       if (t.sizes.length) {
         const [w, h, d] = tex.levelSize(tex.renderbuffer ? 0 : view.baseMipLevel);

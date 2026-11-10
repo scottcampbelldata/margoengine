@@ -2727,3 +2727,22 @@ compared with the actual canvas pixel, with and without y sorting and a circle
 mask. Unit tests cover fractional alpha and dimension-only box picking as well.
 ### Batch 260 CSS3D blending
 The existing HTML browser commands above also run blendScenario on WebGPU and native preview, and on the full layer with --compat. Inspect report measurements.blend for zero-alpha apertures and opaque foreground/off-panel pixels. CPU tests include blend.test.js. Preview setup uses fallback: canvas => webglRenderer(canvas, {transparent: true}); an already opaque preview is refused with a coded error.
+
+
+
+
+## Batch 262 texture explorer
+
+Run the inspector unit suite and build:packages. README work is tracked in
+docs/work-lists/readme-owed.md.
+Run node scripts/gpu-lock.mjs run --owner=codex-batch262 --wait-max=60 --max=4 --
+node packages/inspector/test/textures-browser.mjs; repeat with --compat appended.
+The source textures precede panel attachment and exact byte assertions check mip,
+channel, aspect, integer range, array/depth slices, 1D, sRGB and MSAA. The CC0 real
+image is the existing terrain fixture, not a downloaded engine implementation.
+GPU format support follows requested device features; no timing assertion is used.
+
+The backend aspect regression runs with node --test --test-timeout=120000
+packages/webgl2-compat/test/device.test.js. Run the owning backend features-browser.mjs
+and compat-browser-check.mjs under the shared GPU lock for sampling and renderer
+coverage. No timing assertions or benchmark measurements are involved.

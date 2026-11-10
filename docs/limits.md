@@ -3985,3 +3985,31 @@ job 1 landing), within its unchanged 8,845 B ceiling. Caller-owned picking
 bytes must match the atlas currently uploaded to the renderer.
 ### Batch 260 job 2: CSS3D depth blending
 New html/blend entry: 0 to 3,047 B min+gzip, ceiling 0 to 3,303 B. It deliberately keeps canvas ownership and both mask backends together; splitting would complicate consistent lifecycle. Rectangular, double-sided CSS3D panels use the existing default 0.01 world units/CSS pixel and default name html-blend; their uncovered pixels replace RGBA with zero and write scene depth. Native preview requires an alpha-enabled context at creation. Canvas pointer events are disabled while any blend owns it; bind scene controls to a shared parent. DOM input is live but not masked by foreground geometry. CSS transparency reveals the underlying page throughout the rectangular aperture. Apply colour/post effects before the mask if they would otherwise overwrite alpha. Core/stage are unchanged.
+
+
+
+
+## Batch 262 texture viewer
+
+New inspector/textures: absent to 4707 B min+gzip, bare imports external; standard
+256 B ceiling headroom. Core plus stage unchanged at 23950 B. This opt-in capture
+adds TEXTURE_BINDING at creation (unless disabled or transient), retains weak
+metadata, and lists all captured live GPUTextures. WebGPU cannot enumerate unknown
+earlier textures; start before Engine.create, or register known earlier resources.
+Swapchain images need explicit watchCanvas and sampling usage; external video
+resources are not GPUTextures. The preview has no material textures; the full
+WebGL2 compatibility device uses the same API. Device format features still apply.
+Display is RGBA8, unfiltered per mip/layer, with explicit exposure/range and MSAA
+sample averaging. Integer/HDR data is mapped, not a lossless numeric export.
+Transient or earlier textures lacking sampling usage list but reject preview with
+an actionable code. Inspector/edit remains 4451 B; other entry changes are recorded
+in the preceding scene-editing section.
+
+Layered capture isolation changes the provisional texture entry from 4708 to
+4707 B, within its existing ceiling. Native format/subresource pixels pass.
+Native and compatibility assertions now pass for every listed fixture. Stencil
+sampling requires WEBGL_stencil_texturing; absent support rejects with a coded
+diagnostic. The compatibility device entry grows from 105626 to 105766 B gzip
+(+140 B) for aspect selection and ordinary-view alias separation, within its
+existing ceiling. Core plus stage remains 23950 B. Resolved-MSAA simultaneous
+depth/stencil aliasing is a separate backend fix-phase item in known-bugs.md.

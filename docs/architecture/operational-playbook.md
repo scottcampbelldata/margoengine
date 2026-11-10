@@ -5584,3 +5584,25 @@ SpriteLayer now tests builtin fragment position minus view origin. The origin
 reuses two uniform padding floats; no extra uniform bytes or position varying.
 ### Section 5 evidence: batch 260 CSS3D apertures
 html/blend draws zero RGBA over a rectangular CSS3D panel only where its scene-depth test passes, on WebGPU/full WebGL2 compatibility and native alpha-enabled preview. It shares LabelRenderer's pose, inherited visibility and near-plane clipping; layout size is remeasured each frame. The DOM stays live beneath the canvas. Browser checks cover per-pixel foreground coverage, movement/resizing, removal, visibility, native input and canvas-style restoration. Unit tests verify depth writes, replacement blending, alpha-mode preservation, ownership and the opaque-preview diagnostic. No core or stage changes, timing claim or readback-based clipping.
+
+
+
+
+
+## Section 5 evidence: batch 262 texture inspection
+
+Texture capture is explicit and optional, before engine/device creation; late viewers
+read its weak registry. No core instrumentation is added. New texture descriptors gain
+legal sampling usage for inspection without changing their source object; transient
+attachments remain untouched. Preview uses textureLoad with a format-specific binding,
+a mip-scoped view and explicit layer/slice, then row-padded readback into top-left RGBA8.
+Integer, unfilterable float, depth/stencil and multisample paths avoid treating data as
+filtered color. All temporary GPU resources release on success, cancellation or failure;
+viewer outputs are suppressed from capture. Native and compatibility pixel assertions
+cover the selected subresources and a real licensed texture; no performance proof.
+
+Current evidence: native and compatibility texture pixels pass, including
+stencil, depth-after-stencil, MSAA and the CC0 real-image assertions. The backend
+unit regression fails before extension/aspect selection and proves ordinary-view
+aspect isolation. The compatibility feature and renderer matrix also gate the
+backend repair. No core or stage code changes.

@@ -3227,3 +3227,27 @@ centres over four sorting/mask combinations on both GPU backends. Custom
 fragment effects are not executed on the CPU. No speed claim.
 ### CSS3D per-pixel blending (batch 260 job 2)
 html/blend's HTMLBlend provides a live DOM panel behind a scene-depth-tested canvas aperture on WebGPU, full compatibility and alpha-enabled preview. packages/html/test/blend-browser.js proves zero RGBA on uncovered panel pixels, intact opaque foreground and off-panel scene pixels, moving/resizing/hidden/removed panels, live input and disposal. A rectangular mask matches the requested blending row; transparent CSS inside that rectangle reveals the page beneath it, rather than reconstructing scene content behind the panel. It does not claim DOM pointer occlusion by scene geometry.
+
+
+
+
+
+## Batch 262 texture-viewer row
+
+Optional inspector/textures provides a startup capture and a late-attached viewer of
+all captured live GPUTextures, including metadata and mip/channel/layer previews.
+This implements the native texture exploration row described in the cited public
+inspector descriptions on native WebGPU and the WebGL2 compatibility layer. Texture
+painting is outside this row. It cannot enumerate
+unknown resources made before capture, an explicit WebGPU restriction. The browser
+fixture creates every source before opening the panel and checks exact mip/channel,
+array-layer/3D-slice/1D, uint display range, sRGB, depth/stencil and multisample pixels,
+plus the existing CC0 Poly Haven real-image data. CPU tests cover descriptor integrity,
+resource lifecycle, cancellation, weak bookkeeping and wrapper composition.
+Compatibility uses the same WebGPU-facing API. No raw numeric export or speed parity
+is claimed; restrictions are in limits.md.
+
+Native and compatibility assertions pass all listed formats/subresources,
+including stencil and restoration of depth sampling on the same texture.
+The layered-capture regression also proves preview outputs stay out of every
+capture from this module, including list change notifications.

@@ -57,6 +57,10 @@
     "./gizmo": {
       "types": "./dist/gizmo.d.ts",
       "import": "./dist/gizmo.js"
+    },
+    "./textures": {
+      "types": "./dist/textures.d.ts",
+      "import": "./dist/textures.js"
     }
   },
   "files": [
@@ -88,6 +92,8 @@
     "test:browser:gizmo": "node test/gizmo-browser.mjs",
     "test:browser:gizmo:compat": "node test/gizmo-browser.mjs --compat",
     "test:browser:edit": "node test/edit-browser.mjs",
-    "test:browser:edit:compat": "node test/edit-browser.mjs --compat"
+    "test:browser:edit:compat": "node test/edit-browser.mjs --compat",
+    "test:browser:textures": "node test/textures-browser.mjs",
+    "test:browser:textures:compat": "node test/textures-browser.mjs --compat"
   }
 }

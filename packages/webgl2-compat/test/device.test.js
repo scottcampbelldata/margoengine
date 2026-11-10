@@ -481,3 +481,41 @@ test('compact installer diagnostics retain unavailable APIs, missing capabilitie
       else delete globalThis[name];
   }
 });
+test('texture replay selects stencil aspects, restores depth and isolates simultaneous aspects', async () => {
+  const { device, gl, requested } = await offsetDevice(false);
+  const modes = [], aliases = [];
+  gl.TEXTURE_2D = 0x0de1;
+  gl.DEPTH_COMPONENT = 0x1902;
+  gl.texParameteri = (_target, pname, value) => modes.push([pname, value]);
+  device.ext.stencilTexturing = { DEPTH_STENCIL_TEXTURE_MODE_WEBGL: 0x90ea, STENCIL_INDEX_WEBGL: 0x1901 };
+  const stores = [0, 1].map((id) => ({ gl: { id }, target: gl.TEXTURE_2D, levels: '0:0' }));
+  const texture = {
+    info: { kind: 'depth-stencil' }, renderbuffer: null,
+    sampled(_view, alias = 0) { aliases.push(alias); return stores[alias]; },
+    read() {},
+  };
+  const view = (aspect) => ({ texture, aspect, baseMipLevel: 0, mipLevelCount: 1, baseArrayLayer: 0, arrayLayerCount: 1 });
+  const bind = (aspects) => {
+    const pipeline = { program: {}, finish() {}, uniforms: [], storage: [], attributes: [],
+      textures: aspects.map((_a, binding) => ({ group: 0, binding, unit: binding, modes: [], sizes: [], levels: [] })) };
+    device.replayer.pass = { pipeline, desc: {}, groups: [{ group: {
+      layout: { dynamic: [] }, entries: new Map(aspects.map((aspect, i) => [i, { kind: 'view', view: view(aspect) }])) },
+      offsets: [] }] };
+    device.replayer.draw(3, 1, 0, 0);
+  };
+  device.replayer.applyPipeline = () => {};
+  try {
+    assert.ok(requested.includes('WEBGL_stencil_texturing'));
+    bind(['stencil-only']);
+    bind(['depth-only']);
+    bind(['depth-only', 'stencil-only']);
+    assert.deepEqual(modes.filter(([p]) => p === 0x90ea).map(([, v]) => v), [0x1901, 0x1902, 0x1902, 0x1901]);
+    assert.deepEqual(aliases, [0, 0, 0, 0, 1], 'simultaneous aspects need separate GL texture state');
+    texture.info.kind = 'stencil';
+    bind(['all']);
+    assert.equal(modes.at(-1)[1], 0x1901, 'stencil8 uses its physical packed stencil aspect by default');
+    texture.info.kind = 'depth-stencil';
+    device.ext.stencilTexturing = null;
+    assert.throws(() => bind(['stencil-only']), (error) => error.code === 'unsupported' && /WEBGL_stencil_texturing/.test(error.message));
+  } finally { device.destroy(); }
+});

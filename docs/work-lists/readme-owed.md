@@ -160,3 +160,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Document the sprites/pick alias and target-pixel coordinate convention | batch-245 job 3 |
 | @margoengine/html | blend: HTMLBlend rectangular apertures, canvas alpha requirement, shared ownership, input routing, panel transforms and disposal. | Batch 260 job 2 |
 | margoengine | Generated html/blend alias and synchronised upstream export aliases. | Batch 260 job 2 |
+| @margoengine/inspector | Startup texture capture, late viewers, mip/channel/layer/aspect previews, exposure/range, cancellation and capture limits. | Batch 262 job 4 |
+| margoengine | Optional inspector/textures import and capture startup ordering. | Batch 262 job 4 |
+| @margoengine/webgl2-compat | Stencil-aspect sampling extension, coded capability refusal, depth restoration and ordinary-view aliases. | Batch 262 job 4 |
+| margoengine | Generated aliases for APIs already on main: save/scene-state, audio/binaural, materials/serialization, save/materials, shader/serialization and xr/locomotion; also inspector/textures. | Batch 262 job 4 |

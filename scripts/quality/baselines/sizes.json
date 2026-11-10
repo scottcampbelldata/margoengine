@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12403705,
+  "total": 12408669,
   "history": [
     {
       "date": "2026-10-24",
@@ -5669,6 +5669,12 @@
       "commit": "batch-260",
       "reason": "HTML CSS3D blending: optional depth-tested canvas aperture with shared DOM placement and canvas ownership",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-262-job4",
+      "reason": "New optional texture capture/viewer absent to 4708 B min+gzip; complete typed mip/channel/aspect inspection, startup tracking and bounded lifetimes stay together. Core plus stage unchanged at 23950 B. No split is needed for this explicit optional entry.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6750,6 +6756,7 @@
     "margoengine/web": 577,
     "@margoengine/audio/voices": 2373,
     "@margoengine/sprites/pick": 2189,
-    "@margoengine/html/blend": 3303
+    "@margoengine/html/blend": 3303,
+    "@margoengine/inspector/textures": 4964
   }
 }

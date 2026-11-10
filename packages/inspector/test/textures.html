@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>Texture mip and channel explorer</title><main></main>
+<script type="module">
+import {TextureCapture,TextureViewer} from '@margoengine/inspector/textures';
+window.setup=async()=>{
+  window.viewer?.dispose();window.capture?.dispose();window.device?.destroy();
+  const capture=window.capture=TextureCapture.start();
+  const adapter=await navigator.gpu.requestAdapter();
+  const device=window.device=await adapter.requestDevice();
+  window.errors=[];device.addEventListener('uncapturederror',e=>window.errors.push(e.error.message));
+  const create=(label,descriptor)=>{const t=device.createTexture({label,...descriptor});return {texture:t,id:capture.list().find(x=>x.label===label).id};};
+  const test=window.test=create('Before viewer',{size:[8,4,2],format:'rgba8unorm',mipLevelCount:3,usage:2});
+  for(let mip=0;mip<3;mip++)for(let layer=0;layer<2;layer++){
+    const w=Math.max(1,8>>mip),h=Math.max(1,4>>mip),bytes=new Uint8Array(w*h*4);
+    for(let i=0;i<w*h;i++)bytes.set([40+mip*60,80+layer*80,120,160],i*4);
+    device.queue.writeTexture({texture:test.texture,mipLevel:mip,origin:[0,0,layer]},bytes,{bytesPerRow:w*4},[w,h]);
+  }
+  const int=window.integer=create('Integer data',{size:[2,2],format:'r32uint',usage:2});
+  device.queue.writeTexture({texture:int.texture},new Uint32Array([25,50,75,100]),{bytesPerRow:8},[2,2]);
+  const vol=window.volume=create('Volume',{size:[2,2,2],dimension:'3d',format:'rgba8unorm',usage:2});
+  const voxels=new Uint8Array(32);for(let i=0;i<8;i++)voxels.set(i<4?[255,0,0,255]:[0,255,0,255],i*4);
+  device.queue.writeTexture({texture:vol.texture},voxels,{bytesPerRow:8,rowsPerImage:2},[2,2,2]);
+  const one=window.one=create('1D',{size:[4],dimension:'1d',format:'rgba8unorm',usage:2});
+  device.queue.writeTexture({texture:one.texture},new Uint8Array([10,20,30,255,40,50,60,255,70,80,90,255,100,110,120,255]),{},[4]);
+  const srgb=window.srgb=create('sRGB',{size:[1,1],format:'rgba8unorm-srgb',usage:2});
+  device.queue.writeTexture({texture:srgb.texture},new Uint8Array([64,128,192,255]),{},[1,1]);
+  const depth=window.depth=create('Depth',{size:[2,2],format:'depth24plus-stencil8',usage:16});
+  const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:depth.texture.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0.25,stencilLoadOp:'clear',stencilStoreOp:'store',stencilClearValue:64}});pass.end();device.queue.submit([encoder.finish()]);
+  const ms=window.ms=create('Multisampled',{size:[2,2],format:'rgba8unorm',sampleCount:4,usage:16});
+  const enc=device.createCommandEncoder(),mp=enc.beginRenderPass({colorAttachments:[{view:ms.texture.createView(),loadOp:'clear',storeOp:'store',clearValue:{r:0.2,g:0.4,b:0.6,a:1}}]});mp.end();device.queue.submit([enc.finish()]);
+  // Standard data already retained in this repository: Aerial Rocks 02, Rob Tuytel / Poly Haven, CC0.
+  const bitmap=await createImageBitmap(await(await fetch('/packages/terrain/test/fixtures/aerial-rocks-02/aerial_rocks_02_diff_1k.jpg')).blob());
+  const real=window.real=create('Poly Haven Aerial Rocks 02 (CC0)',{size:[bitmap.width,bitmap.height],format:'rgba8unorm',usage:18});
+  device.queue.copyExternalImageToTexture({source:bitmap},{texture:real.texture},[bitmap.width,bitmap.height]);bitmap.close();
+  // Every resource above predates panel attachment. No enumeration or source-code scanning is used.
+  window.viewer=TextureViewer.attach(capture,{parent:document.querySelector('main')});
+  window.pixel=async(id,options={})=>{const p=await capture.preview(id,options);return {width:p.width,height:p.height,first:[...p.data.slice(0,4)],last:[...p.data.slice(-4)]};};
+  return capture.list();
+};
+</script>

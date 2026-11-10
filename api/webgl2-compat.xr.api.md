@@ -574,6 +574,10 @@ interface Extensions {
     readonly polygonOffsetClamp: {
         polygonOffsetClampEXT(factor: number, units: number, clamp: number): void;
     } | null;
+    readonly stencilTexturing: {
+        DEPTH_STENCIL_TEXTURE_MODE_WEBGL: number;
+        STENCIL_INDEX_WEBGL: number;
+    } | null;
     readonly colorBufferFloat: boolean;
     readonly floatBlend: boolean;
     readonly floatLinear: boolean;
