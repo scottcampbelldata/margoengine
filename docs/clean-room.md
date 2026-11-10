@@ -8690,3 +8690,16 @@ Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Cachi
 ### Asset-cache delayed hit bookkeeping (2026-11-10)
 
 Compared Steve Becker (editor), W3C, *Indexed Database API 3.0* (2026 working draft), transaction lifecycle and scheduling, https://www.w3.org/TR/2026/WD-IndexedDB-3-20261030/, with Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Caching* (2022), section 4.3.4, https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4. The read and conditional update stay within one transaction; 304 freshness is applied only while the stored validators match the validated snapshot. Last use updates the current record, preserving all its other metadata, and cannot recreate a removed record. No external implementation or companion code was read or copied.
+
+### road
+
+Batch 132 audit (lane N, 2026-11-10). "Read" means the page or specification text was fetched and the cited part read.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| RD1 | WGS84 geodetic to ECEF (a = 6378137 m, e^2 = 0.00669437999014), then ECEF to local east/north/up, stored as Y-up [east, up, -north] (right-handed: east x up = south) | road/src/geojson.ts | Textbook geodesy from memory (NIMA TR8350.2 constants); not re-read this pass. The rotation rows were checked by hand against the ENU definition |
+| RD2 | GeoJSON LineString/MultiLineString positions [lon, lat, alt?] | road/src/geojson.ts | IETF RFC 7946 from the record; not re-read this pass |
+| RD3 | OSM oneway: yes/-1, implied on junction=roundabout and highway=motorway, reversible/alternating kept two-way with a warning; lanes, lanes:forward/backward/both_ways, width:lanes left to right | road/src/geojson.ts | **Read:** OpenStreetMap wiki Key:oneway (raw page, 2026-11-10), "Implied oneway restriction" and the value list; Tag:junction=circular (asks for an explicit oneway, so the code does not imply it) |
+| RD4 | Curb-return fillet: tangent length r tan(turn / 2), chord count from sagitta r (1 - cos(theta / 2)) <= tolerance | road/src/intersections.ts | Elementary circle geometry, derived here |
+| RD5 | Bank rotation about the forward tangent (Rodrigues' formula) | road/src/banking.ts | Elementary, checked term by term |
+| RD6 | Sweep fold bound: each side's offset scaled to 0.95 / (turn x extent) of the next row's forward chord | road/src/index.ts | Own derivation (comment in the file); pinned by the tight-hairpin tests |

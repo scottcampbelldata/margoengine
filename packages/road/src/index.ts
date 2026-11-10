@@ -14,7 +14,7 @@ export interface RoadOptions {
   segments?: number;
   /** World units per UV repeat, across and along the road. Default 5. */
   uvMeters?: number;
-  /** Lateral offset and height pairs (2..32, no consecutive duplicates) replacing the default curbed profile built from the widths above. */
+  /** Lateral offset and height pairs (2..32, no consecutive duplicates) replacing the default curbed profile built from the widths above. Positive offsets lie on the driver's left (up x tangent, Y-up right-handed), as in `lanes`. */
   crossSection?: readonly (readonly [number, number])[];
 }
 /** Result of `road`. */

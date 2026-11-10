@@ -7,7 +7,7 @@ export interface RoadMarking {
   kind: 'line' | 'arrow';
   /** World-space centre, each coordinate within +/-1,000,000 m. */
   position: readonly [number, number, number];
-  /** Radians clockwise from +Z as viewed from above. Default 0. */
+  /** Radians about +Y from +Z toward +X (counterclockwise as viewed from above, the right-handed sense): 0 runs along +Z, pi/2 along +X. Default 0. */
   angle?: number;
   /** Full longitudinal extent, positive through 10000 m. Default 4. */
   length?: number;
