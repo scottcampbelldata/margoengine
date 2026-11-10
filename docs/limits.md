@@ -3778,3 +3778,7 @@ Optional tween/async: 3431 B min+gzip (new entry, previously 0 B). Core and stag
 ### Tween property entry (batch 215 job 2)
 
 New tween/props entry: 3223 B gzip from 0 B. Numeric writable object/vector properties only; destination lists are explicit starts and evenly spaced keys. Frame lists support ordered offsets and segment easing; missing properties hold the preceding key. Relative +=, -=, *= and /= values resolve against preceding endpoints. from/fromTo and explicit keys render their first values immediately. Caller supplies update deltas; local speed defaults to 1. Rejections must be observed. Core/stage unchanged.
+
+### Full tween timeline (batch 215 job 3)
+
+New tween/timeline entry: 3184 B gzip from 0 B. A separate Timeline class holds scalar, array, custom, path and nested timelines. Local speeds are finite > 0 (default 1), repeats integers >= 0 or Infinity, yoyo false. Attached children have one owning parent; their clocks are sampled by that parent. Calls/completions run on playback crossings and never on seek. Nested durations include repeats and divide by child speed. Infinite children make a parent endless; an endless zero-duration repeat rejects. Cancellation freezes the tree, rejects observed finished promises, and preserves signal.reason. Callback errors propagate and reject the owner. Core/stage unchanged.

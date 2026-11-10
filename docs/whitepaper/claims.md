@@ -3094,3 +3094,7 @@ The optional tween/async entry offers awaitable scalar, array, path and custom o
 ### Object and vector tween channels (batch 215 job 2)
 
 Optional tween/props supplies to, from, fromTo, relative arithmetic and property/keyframe lists, matching the requested GSAP-style numeric-object row. Analytic results for actual Vector3, mixed channels, offsets, easing and repeat/yoyo are asserted in packages/tween/test/props.test.js. Atomic invalid-input and exact cancellation tests cover lifecycle behaviour. Entry: 3223 B gzip.
+
+### Hierarchical mixed tween timelines (batch 215 job 3)
+
+Optional tween/timeline supplies mixed scalar/array/path/custom clips and nested independent speed/repeat/yoyo clocks, covering the requested GSAP/anime nesting row. packages/tween/test/full-timeline.test.js proves overlapping start capture, merged callback order and sample values, repeat overshoot equivalence, cycles/parent ownership, reverse seeks, exact aborts, replay promises and error propagation. Entry 3184 B gzip; no speed result claimed.

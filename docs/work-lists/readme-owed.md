@@ -82,3 +82,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: optional tween/async re-export and the same await/cancel lifecycle (batch 215 job 1).
 - @margoengine/tween: props to/from/fromTo, relative arithmetic, Vector3, keyframe values/offsets, immediate starts, pause/speed and AbortSignal (batch 215 job 2).
 - margoengine: tween/props alias (batch 215 job 2).
+- @margoengine/tween: optional Timeline mixed clips, nesting/local speed, labels, replay promises, seek vs playback callbacks and cancellation (batch 215 job 3).
+- margoengine: tween/timeline alias (batch 215 job 3).

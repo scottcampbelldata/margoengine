@@ -3238,6 +3238,10 @@
       "types": "./dist/tween/props.d.ts",
       "import": "./dist/tween/props.js"
     },
+    "./tween/timeline": {
+      "types": "./dist/tween/timeline.d.ts",
+      "import": "./dist/tween/timeline.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

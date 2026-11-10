@@ -2617,3 +2617,7 @@ Run npm test --workspace @margoengine/tween. async.test.js uses deterministic ca
 ### Tween property sampling (batch 215 job 2)
 
 Build packages and run node --test --test-timeout=120000 packages/tween/test/props.test.js. Samples use explicit deltas and analytic expected values, not wall-clock timing. Measure packages/tween/dist/props.js with bundleBytes and gzipSync from scripts/measure-size.js, leaving bare imports external.
+
+### Mixed/nested timeline samples (batch 215 job 3)
+
+Build packages; run node --test --test-timeout=120000 packages/tween/test/full-timeline.test.js. Entry bytes use bundleBytes on packages/tween/dist/full-timeline.js and gzipSync. Tests use analytic deltas and values without real-time assertions.

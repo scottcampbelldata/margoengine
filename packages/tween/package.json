@@ -49,6 +49,10 @@
     "./props": {
       "types": "./dist/props.d.ts",
       "import": "./dist/props.js"
+    },
+    "./timeline": {
+      "types": "./dist/full-timeline.d.ts",
+      "import": "./dist/full-timeline.js"
     }
   },
   "files": [
