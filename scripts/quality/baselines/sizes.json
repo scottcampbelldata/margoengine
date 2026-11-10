@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12785436,
+  "total": 12797432,
   "history": [
     {
       "date": "2026-10-24",
@@ -6346,6 +6346,12 @@
       "commit": "batch-265-performance",
       "reason": "New optional React performance entry, 0 -> 5619 B gzip, ceiling 5769 B. Window controller, lifetime, isolated scene targets, presentation and logical picking form one optional behavior. Splitting would add duplicate ownership and asynchronous presentation boundaries. Core/stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-219",
+      "reason": "New optional geometry/nurbs-edit: absent -> 11646 B gzip, ceiling 11996 B. Homogeneous editing, UV trimming and exact one-sided surface evaluation share rational evaluation and topology helpers. Core/stage untouched.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7506,6 +7512,7 @@
     "@margoengine/ui/keyboard": 1770,
     "leak @margoengine/ui/keyboard -> @margoengine/text": 1,
     "@margoengine/sciviz/contour": 3323,
-    "@margoengine/react/performance": 5769
+    "@margoengine/react/performance": 5769,
+    "@margoengine/geometry/nurbs-edit": 11996
   }
 }

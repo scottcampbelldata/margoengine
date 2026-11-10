@@ -398,3 +398,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/react | performance: PerformanceMonitor defaults, measured samples, callbacks/hook/controller, AdaptiveDpr decline/restoration, per-Canvas targets, picking, demand/XR and lifecycle limits | batch 265 job 5 |
 | margoengine | react/performance optional alias | batch 265 job 5 |
+- @margoengine/geometry (batch 219 job 1): nurbs-edit insertion/elevation for curves and both surface axes, UV trimming with holes/islands, defaults and numerical/resolution limits; generated margoengine/geometry/nurbs-edit alias.
+- margoengine (batch 219 job 1): generated geometry/nurbs-edit alias and current umbrella alias completeness; examples remain deferred.

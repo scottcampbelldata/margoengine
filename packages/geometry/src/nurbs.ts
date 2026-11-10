@@ -389,15 +389,16 @@ export class NurbsSurface {
   }
 
   /**
-   * The point at knot parameters (u, v) and its exact first partial derivatives.
+   * The point at knot parameters (u, v) and its exact first partial derivatives. `leftU` and `leftV` select the
+   * left-hand limit at repeated knots on their respective axes; both default to false (right-hand limit).
    *
    * @throws RangeError when a parameter is outside its knot range.
    */
-  derivatives(u: number, v: number): NurbsSurfaceDerivatives {
+  derivatives(u: number, v: number, leftU = false, leftV = false): NurbsSurfaceDerivatives {
     checkParameter(u, this.knotsU[this.degreeU], this.knotsU[this.countU]);
     checkParameter(v, this.knotsV[this.degreeV], this.knotsV[this.countV]);
     const out = new Float64Array(9);
-    frame(this, lineU(this, u, false), lineV(this, v, false), out);
+    frame(this, lineU(this, u, leftU), lineV(this, v, leftV), out);
     return { point: [out[0], out[1], out[2]], du: [out[3], out[4], out[5]], dv: [out[6], out[7], out[8]] };
   }
 

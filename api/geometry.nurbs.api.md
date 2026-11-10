@@ -37,7 +37,7 @@ export class NurbsSurface {
     readonly control: Float64Array;
     constructor(options: NurbsSurfaceOptions);
     evaluate(u: number, v: number): MutableVec3;
-    derivatives(u: number, v: number): NurbsSurfaceDerivatives;
+    derivatives(u: number, v: number, leftU?: boolean, leftV?: boolean): NurbsSurfaceDerivatives;
     getPoint(u: number, v: number): MutableVec3;
     getNormal(u: number, v: number): MutableVec3;
 }

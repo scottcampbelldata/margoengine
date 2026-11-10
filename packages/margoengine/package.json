@@ -1278,6 +1278,10 @@
       "types": "./dist/geometry/nurbs.d.ts",
       "import": "./dist/geometry/nurbs.js"
     },
+    "./geometry/nurbs-edit": {
+      "types": "./dist/geometry/nurbs-edit.d.ts",
+      "import": "./dist/geometry/nurbs-edit.js"
+    },
     "./geometry/sample": {
       "types": "./dist/geometry/sample.d.ts",
       "import": "./dist/geometry/sample.js"

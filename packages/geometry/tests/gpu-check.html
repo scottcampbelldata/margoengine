@@ -10,6 +10,9 @@
 <script type="module">
 import { Engine, PbrMaterial } from '/packages/core/dist/index.js';
 import { GeometryGenerator } from '/packages/geometry/dist/gpu.js';
+import { toGeometry } from '/packages/geometry/dist/utils.js';
+import { NurbsSurface } from '/packages/geometry/dist/nurbs.js';
+import { trimmedNurbsSurfaceGeometry } from '/packages/geometry/dist/nurbs-edit.js';
 
 const canvas = document.querySelector('canvas'),
   engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 6], target: [0, 0, 0] } }),
@@ -63,6 +66,15 @@ function signedVolume({ positions: P }, indices) {
 window.check = {
   errors: () => errors,
 
+  async trimmed() {
+    const surface = new NurbsSurface({ degreeU: 1, degreeV: 1, points: [[[-2,-2,0],[-2,2,0]],[[2,-2,0],[2,2,0]]] }),
+      data = trimmedNurbsSurfaceGeometry(surface, {contour:[[0,0],[1,0],[1,1],[0,1]],holes:[[[.375,.375],[.625,.375],[.625,.625],[.375,.625]]]}, {slices:8,stacks:8}),
+      geometry = toGeometry(data), mesh = place({geometry});
+    await frame();
+    window.keep = {mesh};
+    return backwards(data, data.indices);
+  },
+
   /** A sphere lies on its radius with radial normals, and fills the screen's middle. */
   async sphere() {
     const item = generator.sphere({ radius: 1.5, columns: 48, rows: 24 }),
@@ -86,7 +98,7 @@ window.check = {
 
   async clear() {
     window.keep.mesh.dispose();
-    window.keep.item.dispose();
+    window.keep.item?.dispose();
     await frame();
   },
 

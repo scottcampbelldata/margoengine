@@ -3034,3 +3034,5 @@ Batch 172 contours: build packages, run node --test packages/sciviz/tests/contou
 ### Batch 265 adaptive performance
 
 After build:packages, run node --test --test-timeout=120000 packages/react/tests/performance.test.js packages/react/tests/performance-react.test.js. Run node scripts/gpu-lock.mjs run --owner=react-performance --wait-max=60 --max=4 -- node packages/react/scripts/test-performance-browser.mjs, then the same command with --compat appended. The fixture injects fixed measured durations into the production controller to prove reduction and restoration independent of machine load. It does not benchmark elapsed execution. The default controller's monotonic clock and explicit sample input share the same arithmetic.
+Batch 219 job 1: after building packages, run `node --test --test-timeout=120000 packages/geometry/tests/nurbs-edit.test.js`. Run geometry/tests/gpu-check.mjs through the shared GPU lock, once normally and once with --compat. The trimmed panel must render red with background visible at its central UV hole; existing geometry GPU readbacks remain in the same suite. No benchmark is needed for these correctness claims.
+
