@@ -161,6 +161,28 @@ test('disposing a select closes its owned popup', () => {
   ui.dispose();
 });
 
+test('a closed popup settling cannot release a reopened select popup', async () => {
+  const ui = makeUi(),
+    select = new Select({ options: choices });
+  ui.add(select);
+  try {
+    select.activate();
+    ui.execute('cancel');
+    select.activate();
+    const popupId = select.popupId;
+    assert.equal(select.expanded, true);
+    await Promise.resolve();
+    assert.equal(select.expanded, true);
+    assert.equal(select.popupId, popupId);
+    select.activate();
+    assert.equal(ui.modalLayer.children.length, 1);
+    select.dispose();
+    assert.equal(ui.modalLayer.children.length, 0);
+  } finally {
+    ui.dispose();
+  }
+});
+
 test('hex editing keeps a valid RGB prefix while the user completes alpha', () => {
   const picker = new ColorPicker();
   picker.hexInput.edit('#336699', 7, 7, 'none');

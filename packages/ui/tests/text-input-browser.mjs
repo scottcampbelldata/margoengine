@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
+import { fileURLToPath } from 'node:url';
+process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 
 const context = await openBrowser({ startPath: '/packages/ui/tests/text-input.html', port: 'free' });
 const { page, hardware } = context,

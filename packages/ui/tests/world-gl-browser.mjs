@@ -1,5 +1,7 @@
 ﻿import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { fileURLToPath } from 'node:url';
+process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const browser = await openBrowser({ startPath: '/packages/ui/tests/world-gl.html?backend=webgl2', port: 'free' }),
   { page } = browser,
   errors = [];

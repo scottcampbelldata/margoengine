@@ -1041,3 +1041,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz (batch 180 job 1): document geo-lod, selection/cache/fades, terrain stream and quantized height adapters, cancellation, errors, provider attribution and real AWS demo; margoengine generated geo-lod alias.
 - @margoengine/sciviz (batch 181 job 1): document createFallbackFigure from /fallback, page-wide explicit WebGL2 installation, full-tier requirements, same-case CPU isosurfaces, ownership/cancellation/restore and ?backend=webgl2 for the three real-data demos; examples deferred.
+
+- @margoengine/ui (review 2): describe Select popup ownership when closing and reopening within one turn, including disposal of the current popup.

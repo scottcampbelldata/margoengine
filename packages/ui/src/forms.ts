@@ -131,6 +131,7 @@ export class Select extends Button {
     );
     this.invalidate(false);
     void dialog.result.then(() => {
+      if (this.popup !== dialog) return;
       this.popup = undefined;
       this.invalidate(false);
     });

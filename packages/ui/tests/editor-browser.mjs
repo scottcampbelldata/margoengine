@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { fileURLToPath } from 'node:url';
+process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const browser = await openBrowser({ startPath: '/examples/ui-editor/', port: 'free' }),
   { page } = browser,
   errors = [];
