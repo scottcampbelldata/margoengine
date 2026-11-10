@@ -5474,3 +5474,10 @@ termination. PID 84700 was absent afterward; exact event/handle cause remains un
 shared-launcher repair belongs to batch 160, not sciviz. This is a failing hang and blocks landing
 job 4; metadata repairs and pre-rebase GPU acceptance do not supersede it. No failed check is
 weakened, retried unchanged, marked busy, or reported as a passing suite. See known-bugs.md.
+### 5. Sprite slices and repeat fills (batch 245 job 1)
+The optional sprites/slice entry reuses the existing sprite pipeline and frame
+hook. Each image occupies up to nine stable instance slots with a common parent
+pivot and sort keys. Repeat counts and phase map UVs within each source cell,
+using integer loads or explicit-gradient linear sampling. Core and stage have
+no changes. CPU layout and real pixel readback fixtures are in sprites/tests/
+slice.test.js and slice-check.mjs; both GPU backends are required before landing.

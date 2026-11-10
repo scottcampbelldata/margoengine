@@ -2906,6 +2906,10 @@
       "types": "./dist/sprites/skeletal.d.ts",
       "import": "./dist/sprites/skeletal.js"
     },
+    "./sprites/slice": {
+      "types": "./dist/sprites/slice.d.ts",
+      "import": "./dist/sprites/slice.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

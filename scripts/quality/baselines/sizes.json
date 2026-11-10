@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12112383,
+  "total": 12121228,
   "history": [
     {
       "date": "2026-10-24",
@@ -5408,6 +5408,12 @@
       "commit": "batch-171-derive-input-types",
       "reason": "Check primitive types before fround coercion so BigInt/Symbol receive the linked owning diagnostic: 3982 -> 3993 B gzip, ceiling 4238 -> 4249 B with standard 256 B headroom. Keep validation with its API; core+stage unchanged at 23924 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "fdbd648f3",
+      "reason": "New optional sprites/slice: 0 to 8587 B gzip, ceiling 8845 B. Fixed corners, repeat/scroll, seamless smooth sampling and stable resize share one instanced pipeline. A split duplicates the layer. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6429,6 +6435,7 @@
     "@margoengine/controls/collide": 7341,
     "leak @margoengine/controls/collide -> @margoengine/bvh": 1,
     "@margoengine/netcode/presence": 6475,
-    "@margoengine/sciviz/derive": 4249
+    "@margoengine/sciviz/derive": 4249,
+    "@margoengine/sprites/slice": 8845
   }
 }

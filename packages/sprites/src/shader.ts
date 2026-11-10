@@ -9,7 +9,8 @@ export type { SpriteShader } from './index.js';
 /**
  * Wraps WGSL that defines `fn effect(color: vec4f, sprite: SpriteInput) -> vec4f` for a layer's `shader` option.
  * `color` is the tinted texel in atlas bytes over 255, straight alpha; return the colour to draw, alpha 0 to drop it.
- * `SpriteInput` holds `texel` (vec2f, atlas texels), `cell` (vec2i, the texel read), `low` and `high` (vec2f, the
+ * `SpriteInput` holds `texel` (vec2f, atlas texels), `dx`/`dy` (vec2f, texel gradients computed before masking),
+ * `cell` (vec2i, the texel read), `low` and `high` (vec2f, the
  * rectangle's first and last texel), `params` (vec4f, the sprite's `params`), `tint` (vec4f, its tint and alpha) and `time` (f32, the layer's `time`).
  * `spriteTexel(sprite, offset: vec2i) -> vec4f` reads an untinted neighbour, transparent outside the rectangle.
  * @throws TypeError when `code` is not a string that defines `fn effect`.

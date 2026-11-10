@@ -2564,3 +2564,9 @@ CPU/GPU bounds are absolute, scale-aware envelopes on a rounded input, not trunc
 No benchmarks or timing-only assertions; build phase remains in effect.
 
 Batch 171 derived-field source evidence: results/batch-171-derive-entries.json and results/batch-171-derive-network.json preserve the complete original 461e82a93 pair (both dirty=false), together with the retained source audit branch. Shared current benchmark records retain the other lanes' updates. This is historical byte/network evidence, not a new speed run.
+### Sprite slices (batch 245 job 1)
+After build:packages, run node --test --test-timeout=120000 packages/sprites/tests/slice.test.js.
+Pixel proof: node scripts/gpu-lock.mjs run --owner=slice-proof --gpu="Slice pixel readback" --max=3 --wait-max=60 -- node packages/sprites/tests/slice-check.mjs.
+Repeat that command with --compat appended to the leaf for WebGL2 compatibility.
+Fixtures are generated RGBA gradients; nearest pixels are compared to independent
+source-cell indices for fixed corners, repeat edges, flips and scrolled fills.

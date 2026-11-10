@@ -132,7 +132,7 @@ struct Varying{
 }
 ${
   effect
-    ? `struct SpriteInput{texel:vec2f,cell:vec2i,low:vec2f,high:vec2f,params:vec4f,tint:vec4f,time:f32${pages ? ',page:u32' : ''}}
+    ? `struct SpriteInput{texel:vec2f,cell:vec2i,low:vec2f,high:vec2f,params:vec4f,tint:vec4f,time:f32,dx:vec2f,dy:vec2f${pages ? ',page:u32' : ''}}
 fn spriteTexel(s:SpriteInput,o:vec2i)->vec4f{
   let p=s.cell+o;
   if(any(vec2f(p)<s.low)||any(vec2f(p)>s.high)){return vec4f(0);}
@@ -166,6 +166,7 @@ ${
     ? 'struct Output{@location(0) color:vec4f,@location(1) normal:vec4f}\n@fragment fn fragmentMain(v:Varying)->Output'
     : '@fragment fn fragmentMain(v:Varying)->@location(0) vec4f'
 }{
+  ${smooth || effect ? 'let dx=dpdx(v.texel); let dy=dpdy(v.texel);' : ''}
   // The mask tests the pixel centre in layer pixels: inside a rect is low <= p < high, inside a circle |p - c| <= r.
   let m=frame.mask;
   let k=frame.shape.x;
@@ -178,17 +179,17 @@ ${
   ${
     smooth
       ? `// Premultiplied linear texels, kept half a texel inside the rectangle so the next cell does not bleed in.
-  let f=textureSample(atlas,filtered,clamp(v.texel,v.low+0.5,v.high+0.5)/vec2f(textureDimensions(atlas))${pages ? ',v.page' : ''});
+  let f=textureSampleGrad(atlas,filtered,clamp(v.texel,v.low+0.5,v.high+0.5)/vec2f(textureDimensions(atlas))${pages ? ',v.page' : ''},dx/vec2f(textureDimensions(atlas)),dy/vec2f(textureDimensions(atlas)));
   ${
     effect
       ? `let lit=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);
-  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,frame.size.w${pages ? ',v.page' : ''}));
+  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,frame.size.w,dx,dy${pages ? ',v.page' : ''}));
   let linear=vec4f(decode(e.rgb)*e.a,e.a);`
       : 'let linear=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);'
   }
   if(linear.a==0){discard;}
   let color=select(vec4f(encode(linear.rgb/linear.a)*linear.a,linear.a),linear,frame.size.z>0);`
-      : `let color=${effect ? `effect(textureLoad(atlas,t,${page}0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,frame.size.w${pages ? ',v.page' : ''}))` : `textureLoad(atlas,t,${page}0)*v.tint`};
+      : `let color=${effect ? `effect(textureLoad(atlas,t,${page}0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,frame.size.w,dx,dy${pages ? ',v.page' : ''}))` : `textureLoad(atlas,t,${page}0)*v.tint`};
   if(color.a==0){discard;}`
   }
   ${

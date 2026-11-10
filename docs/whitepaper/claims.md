@@ -3012,3 +3012,9 @@ no measured atmospheric vortex, original-data error, material coherence, pressur
 Sources and synthesis: clean-room.md; reproduction: reproduce.md. Final acceptance is recorded separately.
 
 Batch 171 job 4 is an unlanded implementation checkpoint: [numerical GPU evidence](results/batch-171-derive-gpu.json) and [complete checkpoint receipt](results/batch-171-derive-validation.json). All integrated mathematical checks pass, but shared Chromium process/stdio teardown blocks acceptance. No full-green verify or completed-job claim.
+### Sprite slice and tiling correctness (batch 245 job 1)
+The optional sprites/slice entry keeps source corners fixed, stretches or repeats
+middle regions, clips final repeats to target dimensions and scrolls atlas fills.
+Proof: packages/sprites/tests/slice.test.js and slice-check.mjs. Instances stay
+bounded by nine per image, regardless of repeat count. This is a deterministic
+work-count claim, not a measured speed claim. Core/stage are unchanged.

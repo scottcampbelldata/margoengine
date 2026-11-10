@@ -3648,3 +3648,14 @@ The earlier 23924 B figures above describe their original feature checkpoints. E
 records both genuinely measured 461e82a93 with dirty=false. No record has been relabeled.
 Acceptance is blocked on shared Chromium process/stdio cleanup after 30 passing root rendering
 assertions, as recorded in known-bugs.md. No new native-WebGL2 volume claim or speed claim.
+### Sprites slice entry (batch 245 job 1)
+`@margoengine/sprites/slice` exports SliceLayer, SliceSprite and sliceParts.
+Fixed source borders shrink proportionally when the target cannot contain them.
+Middle regions stretch by default or repeat with positive tileScaleX/Y (default 1)
+and scrollX/Y (default 0). Source rectangles and borders use integer texels;
+width/height use nonnegative world units. Normal maps and custom shaders need a
+separate SpriteLayer. At most nine visible instances per image share one draw,
+including ordinary sprites and atlas pages. Linear filtering uses premultiplied
+linear-light sampling. There is no CPU pixel loop and no Wasm module. The new
+entry is 8,587 B gzip (previously absent); core + stage remains 23,950 B, source
+unchanged. No optional ceiling is lowered or quality removed to reduce bytes.

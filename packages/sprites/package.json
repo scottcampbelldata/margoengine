@@ -50,6 +50,10 @@
     "./skeletal": {
       "types": "./dist/skeletal.d.ts",
       "import": "./dist/skeletal.js"
+    },
+    "./slice": {
+      "types": "./dist/slice.d.ts",
+      "import": "./dist/slice.js"
     }
   },
   "files": [
@@ -73,6 +77,7 @@
     "test:gpu:shader": "cd ../.. && node packages/sprites/tests/shader-check.mjs",
     "test:gpu:pages": "cd ../.. && node packages/sprites/tests/pages-check.mjs",
     "test:gpu:skeletal": "cd ../.. && node packages/sprites/tests/skeletal-check.mjs",
-    "test:gpu:masks": "cd ../.. && node packages/sprites/tests/masks-check.mjs"
+    "test:gpu:masks": "cd ../.. && node packages/sprites/tests/masks-check.mjs",
+    "test:gpu:slice": "cd ../.. && node packages/sprites/tests/slice-check.mjs"
   }
 }
