@@ -4313,3 +4313,5 @@ are retained, budgets unchanged, and tests/integration-json.test.js parses all
 workspace manifests and quality baselines and checks their totals.
 
 Batch 258 forms fixed blockers: the generic mirror delegated Enter/Space on div options as though they were native buttons, and transferred focus during a canvas pointer press, losing its pointer ID. Exact activation and pointer-release regressions cover both repairs. Form annotations now run after mirror frame reconciliation; hex editing preserves a valid RGB prefix while alpha is entered. Remaining polish: continuous SV gradient and human AT certification are in private finish-later. No missing form widget remains in this job.
+
+Batch 220 job 1: the requested missing math methods are supplied by math/compat; no open defect found in the added methods. Base per-type entries intentionally retain their original API and size contract; opt into the new entry when porting these methods.

@@ -262,3 +262,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | ui/forms alias and accessible form setup. | batch-258 job 3 |
 | @margoengine/inspector | gl: GLInspector attach/setDebug/capture, native preview backend, state restoration, timing limits and cancellation | batch-263 job 2 |
 | margoengine | Generated inspector/gl alias | batch-263 job 2 |
+
+- @margoengine/math (batch 220 job 1): document math/compat import migration, 17 methods, radians/shear layout, native and separate cameras, axis-angle output, degenerate/closed geometry, color spaces, cloning and original-entry size preservation.
+- margoengine (batch 220 job 1): document generated math/compat alias.

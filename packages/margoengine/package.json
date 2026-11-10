@@ -1898,6 +1898,10 @@
       "types": "./dist/math/affine.d.ts",
       "import": "./dist/math/affine.js"
     },
+    "./math/compat": {
+      "types": "./dist/math/compat.d.ts",
+      "import": "./dist/math/compat.js"
+    },
     "./mcp": {
       "types": "./dist/mcp.d.ts",
       "import": "./dist/mcp.js"

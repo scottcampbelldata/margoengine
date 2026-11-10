@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12498877,
+  "total": 12509104,
   "history": [
     {
       "date": "2026-10-24",
@@ -6073,6 +6073,12 @@
       "commit": "a4bb4db92",
       "reason": "Optional inspector/gl: absent to 4504 B gzip, intentional shared Lines helper import, no core/stage changes. Full rebuild also measures the already-landed water caustics root at 20210 B against its stale 20185 B ceiling; retain that complete implementation rather than split or reduce quality.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-220-job-1",
+      "reason": "New optional math/compat entry: 0 to 9929 B gzip; 17 porting methods on seven subclasses preserve existing small imports. A split would duplicate the opt-in surface.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7181,6 +7187,7 @@
     "@margoengine/ui/forms": 3743,
     "leak @margoengine/ui/forms -> @margoengine/text": 1,
     "@margoengine/inspector/gl": 4760,
-    "leak @margoengine/inspector/gl -> @margoengine/lines": 1
+    "leak @margoengine/inspector/gl -> @margoengine/lines": 1,
+    "@margoengine/math/compat": 10227
   }
 }

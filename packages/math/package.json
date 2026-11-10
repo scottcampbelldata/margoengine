@@ -151,6 +151,10 @@
     "./affine": {
       "types": "./dist/affine.d.ts",
       "import": "./dist/affine.js"
+    },
+    "./compat": {
+      "types": "./dist/compat.d.ts",
+      "import": "./dist/compat.js"
     }
   },
   "files": [

@@ -5696,3 +5696,5 @@ The receipt docs/whitepaper/results/batch-273-firefox-matrix.json retains the or
 ### Section 5 evidence: inspector WebGL2 debugging, batch 263
 
 `inspector/gl` adds a preview-backend pass for shared wireframe geometry and existing normals, box and light helper data. Its native GL state changes are restored in finally; resources rebuild after context loss. The capture wraps existing graph passes for one frame, restores methods on success/error/abort, and uses stats/gl for asynchronous GPU intervals. Native WebGL2 pixels on a CC0 real asset and CPU failure/lifetime fixtures are the evidence. The root inspector geometry extraction changes no root behaviour. No core or stage edits; current combined root size is measured by the landing gate.
+
+Batch 220 job 1, section 5 evidence: math/compat adds CPU-side camera transforms and geometric queries without touching core, stage, shader maths or backends. Analytic tests cover native combined matrices and separate camera matrices under both depth ranges. Existing per-type size tests stay intact because the subclasses occupy an optional entry. No GPU execution or speed claim is introduced.
