@@ -12,6 +12,7 @@ export const previewRoutes = {
   'packages/html/src/index.ts:HTML': [1, 'packages/html/test/html.test.js'],
   'packages/html/src/texture-gl.ts:HTMLTextureGL': [1, 'packages/html/test/html-browser.js'],
   'packages/html/src/texture.ts:HTMLTexture': [1, 'packages/html/test/html-browser.js'],
+  'packages/inspector/src/gl.ts:GLInspector': [3, 'packages/inspector/test/gl-browser.mjs'],
   'packages/inspector/src/index.ts:Inspector': [5, 'packages/inspector/test/inspector.test.js'],
   'packages/lod/src/index.ts:LODSystem': [1, 'packages/lod/test/preview.test.js'],
   'packages/sciviz/src/render.ts:SciRenderer': [1, 'packages/sciviz/tests/webgl2.test.js'],

@@ -347,6 +347,8 @@ console.log(report);
 panel.dispose(); engine.dispose(); canvas.remove();
 ```
 
+`GLInspector` is a reviewed preview route in `scripts/check-preview-contract.mjs` (2026-11-10, 3 `backend` tests): it exists for the small WebGL2 preview and draws its overlays with WebGL2 there. Pixel evidence: `test/gl-browser.mjs` (`npm run test:browser:gl`, and `test:browser:gl:compat`); unit evidence: `test/gl.test.js`. No behaviour changed; the row was missing, which kept `npm run verify` red.
+
 ## Cameras, screenshots, recordings and glTF
 
 `CameraTools.attach` defaults to `document.body`; use `parent: inspector.root` to place
