@@ -3922,6 +3922,13 @@ Batch 250 job 5: fsm/scxml 0 to 4970 B min+gzip, ceiling 5226 B. Optional runtim
 
 ## Behavior tree text (batch 251)
 
+`parseTreeText` infers `TreeDocument` only when its options exclude subtree
+registrations. A variable typed `TreeTextOptions` (including an optional variable)
+returns `SubtreeDocument`; consumers must use the subtree-aware API or resolve
+references before ordinary-tree execution. Explicitly absent registrations retain
+ordinary-tree inference. Parsing syntax, runtime validation and text budgets are
+unchanged. Regression: `packages/behavior/tests/text-types.test.js`.
+
 New behavior/text: 3,751 B min+gzip, previously absent; umbrella alias 60 B external.
 No existing ceiling raised. Syntax is type(key=JSON,...) with optional brace-delimited
 children and an optional tree wrapper. Utility children use option(score=JSON)

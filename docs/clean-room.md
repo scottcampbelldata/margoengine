@@ -8326,3 +8326,6 @@ Canvas2D's mandatory premultiplied storage loses transparent RGB; WebGL ignores
 bitmap alpha and flip unpack flags. A VideoFrame bridge preserved whole straight
 RGB but failed cropped and converted-alpha comparisons and was rejected.
 No rival implementation source or companion code was read or copied.
+
+## Behavior tree text options and shared-memory regression (2026-11-10)
+Research compared Michele Colledanchise and Petter Ogren, Behavior Trees in Robotics and AI: An Introduction (2018), https://arxiv.org/abs/1709.00084, on modular subtree composition, with the Microsoft TypeScript contributors, More on Functions and Type Compatibility (2026), https://www.typescriptlang.org/docs/handbook/2/functions.html and https://www.typescriptlang.org/docs/handbook/type-compatibility.html. Structural typing permits extra properties on a variable and overload order chooses the first compatible signature. Ordinary-tree inference must therefore exclude optional subtree registrations explicitly, with a broad subtree-document overload for general options. Compiler fixtures cover ordinary, registered and optional option variables plus unsafe consumer rejection; the runtime shared-state fixture uses independent typed keys. Runtime tree parsing and scheduling are unchanged. No external implementation source or files were read or copied.

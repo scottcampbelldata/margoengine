@@ -1369,3 +1369,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/sciviz, batch 176 job 5: document /tensor symmetric layouts, CPU/GPU eigensystems and ownership, ellipsoid/superquadric glyphs, FA/direction colour, Euler/FACT tracking, hyperstreamlines and explicitly ordinary linear least-squares DWI fitting with all defaults and precision/coordinate limits.
 - margoengine and @margoengine/viz, batch 176 job 5: document generated /sciviz/tensor aliases.
+
+- @margoengine/behavior: cover parseTreeText inference for ordinary options, explicit registrations and TreeTextOptions variables; use BlackboardKey objects for shared subtree state.

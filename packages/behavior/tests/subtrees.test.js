@@ -1,16 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SubtreeTree, subtree, resolveTree, validateTree } from '../dist/subtrees.js';
-import { BehaviorTree, action, wait } from '../dist/index.js';
+import { BehaviorTree, action, blackboardKey, wait } from '../dist/index.js';
 
 test('references resolve nested registrations and run like an inline tree, with shared blackboard', () => {
+  const count = blackboardKey('count', 0);
+  const other = blackboardKey('other', 100);
   const registry = { outer: { type: 'sequence', children: [subtree('inner'), action('done')] }, inner: wait(0.25) };
   const root = { type: 'sequence', children: [subtree('outer'), subtree('outer')] };
   const options = {
     handlers: {
       actions: {
         done: (tick) => {
-          tick.blackboard.set('count', (tick.blackboard.get('count') ?? 0) + 1);
+          tick.blackboard.set(count, tick.blackboard.get(count) + 1);
         },
       },
     },
@@ -22,7 +24,10 @@ test('references resolve nested registrations and run like an inline tree, with 
     assert.equal(tree.tick(0.125), inline.tick(0.125));
     assert.deepEqual(tree.trace, inline.trace);
   }
-  assert.ok(tree.blackboard.get('count') >= 2);
+  assert.ok(tree.blackboard.get(count) >= 2);
+  assert.equal(tree.blackboard.get(count), inline.blackboard.get(count));
+  assert.equal(tree.blackboard.get(other), 100);
+  assert.deepEqual(tree.blackboard.toJSON(), { count: tree.blackboard.get(count) });
   assert.equal(root.children[0].type, 'subtree');
 });
 test('each reference and agent has independent running state and abort signals', () => {

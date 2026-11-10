@@ -4225,14 +4225,16 @@ Batch 251 job 5: memory namespace/id concatenation could collide, for example
 namespace foo with id string:a versus namespace foo:string with id a. Tuple
 encoding fixes the cause; triggers.test.js retains the failing-before regression.
 
-Batch 251 finish-phase test quality: subtrees.test.js uses string keys in its
-shared-memory fixture instead of BlackboardKey objects. The count assertions
-still exercise a shared board, but use a typed key in the fix phase.
-Batch 251 finish-phase typing: a variable typed TreeTextOptions with optional
-subtrees can match parseTreeText's ordinary-tree overload. Add a broad overload
-returning SubtreeDocument so that variable cannot advertise unresolved references
-as an ordinary TreeDocument. Explicit registry literals already use the correct
-overload; runtime parsing and reference validation are unaffected.
+Fixed 2026-11-10: batch 251 subtree shared-memory fixture. The fixture uses
+BlackboardKey objects, compares the inline and referenced counters, checks an
+independent fallback and verifies that serialization names the counter correctly.
+Regression: packages/behavior/tests/subtrees.test.js.
+Fixed 2026-11-10: batch 251 tree-text options typing. Ordinary-tree options now
+exclude possible registrations; a broad overload returns SubtreeDocument when
+TreeTextOptions may carry references, including optional options variables.
+The compiler regression in packages/behavior/tests/text-types.test.js rejects
+passing that result as TreeDocument and retains ordinary-tree inference when
+registrations are absent. Runtime parsing and validation are unchanged.
 ### Batch 215 async lifecycle coverage
 
 No open defect identified in the new completion/AbortSignal entry. Deterministic lifecycle coverage is in packages/tween/test/async.test.js; existing root APIs remain available.

@@ -136,7 +136,12 @@ function validate(document: unknown, options: TreeTextOptions): void {
  */
 export function parseTreeText(text: string, options: TreeTextOptions & { subtrees: SubtreeRegistry }): SubtreeDocument;
 /** Parse an ordinary tree without named registrations. */
-export function parseTreeText(text: string, options?: Omit<TreeTextOptions, 'subtrees'>): TreeDocument;
+export function parseTreeText(
+  text: string,
+  options?: Omit<TreeTextOptions, 'subtrees'> & { subtrees?: undefined },
+): TreeDocument;
+/** Options that may contain registrations preserve the possibility of unresolved subtree references. */
+export function parseTreeText(text: string, options?: TreeTextOptions): SubtreeDocument;
 export function parseTreeText(text: string, options: TreeTextOptions = {}): SubtreeDocument {
   if (typeof text !== 'string' || text.length > MAX_TREE_TEXT_LENGTH)
     throw new TypeError('Tree text must be a string of at most 8388608 code units; split the document');

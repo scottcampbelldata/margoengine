@@ -13,7 +13,10 @@ export interface TreeTextOptions {
 export function parseTreeText(text: string, options: TreeTextOptions & {
     subtrees: SubtreeRegistry;
 }): SubtreeDocument;
-export function parseTreeText(text: string, options?: Omit<TreeTextOptions, 'subtrees'>): TreeDocument;
+export function parseTreeText(text: string, options?: Omit<TreeTextOptions, 'subtrees'> & {
+    subtrees?: undefined;
+}): TreeDocument;
+export function parseTreeText(text: string, options?: TreeTextOptions): SubtreeDocument;
 
 export function printTreeText(input: SubtreeSpec | SubtreeDocument, options?: TreeTextOptions): string;
 
