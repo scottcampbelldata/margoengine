@@ -67,6 +67,10 @@
     "./subtrees": {
       "types": "./dist/subtrees.d.ts",
       "import": "./dist/subtrees.js"
+    },
+    "./inspect": {
+      "types": "./dist/inspect.d.ts",
+      "import": "./dist/inspect.js"
     }
   },
   "files": [

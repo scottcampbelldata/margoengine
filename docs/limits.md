@@ -3534,3 +3534,13 @@ Job 5 gzip entry sizes: sciviz/netcdf absent -> 3418 B (ceiling 3674); sciviz/vt
 (ceiling 6201); loaders/vtk-xml recorded 6788 -> 7492 B (ceiling 7748). The added optional bytes preserve
 one authoritative decoder, lazy intact topology and bounded ranges. Splitting again would complicate ownership
 and duplicate decoding. Core plus stage measures 23950 B, below 25000, unchanged by this job.
+## Behavior inspector (batch 251)
+
+New optional behavior/inspect: 1,602 B min+gzip, previously absent; generated
+umbrella alias 63 B external. No existing ceiling raised. Requires a DOM container;
+automatic refresh uses its window requestAnimationFrame. With autoRefresh:false,
+call refresh after simulation ticks. Build the source with trace:true. The panel
+shows the last tick, not historical status of unvisited nodes; paused display
+never pauses the simulation. Hierarchy uses native collapsible details and text
+labels as well as colors. All nodes are mounted; no virtual scrolling or history
+replay. Source document topology is fixed for the life of the panel. No GPU code.

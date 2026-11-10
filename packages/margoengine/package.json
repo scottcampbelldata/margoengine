@@ -194,6 +194,10 @@
       "types": "./dist/behavior/subtrees.d.ts",
       "import": "./dist/behavior/subtrees.js"
     },
+    "./behavior/inspect": {
+      "types": "./dist/behavior/inspect.d.ts",
+      "import": "./dist/behavior/inspect.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

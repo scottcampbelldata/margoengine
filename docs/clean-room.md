@@ -5191,3 +5191,18 @@ https://www.rfc-editor.org/rfc/rfc9457.html, on human-readable documentation at 
 an error-documentation convention, not a claim that the JavaScript errors are HTTP problem responses.
 Asset attribution is recorded in supply-chain.mjs and generated into THIRD-PARTY-NOTICES.md, never hand-appended.
 The existing errors-page, parallel-check and supply-chain tests failed before these corrections and validate them.
+## Batch 251 job 2: live behavior inspector
+
+Sources compared: Colledanchise and Ogren (2018), *Behavior Trees in Robotics and
+AI*, cited above (runtime status model); Tamara Munzner, *A Nested Model for
+Visualization Design and Validation* (2009), https://www.cs.ubc.ca/labs/imager/tr/2009/NestedModel/
+(task/data/encoding validation); W3C, *Tree View Pattern*, ARIA APG (accessed
+2026-11-10), https://www.w3.org/WAI/ARIA/apg/patterns/treeview/ (hierarchy and
+expansion semantics); Nik Korn, *Mistreevous visualiser*, public feature description
+(accessed 2026-11-10), https://github.com/nikkorn/mistreevous-visualiser .
+No source read. Combined design uses a full nested hierarchy with native details
+controls, text plus status colors, explicit last-tick labels, utility scores and
+pause/resume of display only. DOM tests verify every path, untouched-node idle,
+score changes, safe text, retained collapsed state, frame lifecycle and abort.
+The reference row is live execution visualization, not a tree editor. No downloaded
+asset demo, timing result or user-study claim.

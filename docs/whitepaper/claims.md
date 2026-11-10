@@ -2954,3 +2954,11 @@ examples/assets/sciviz/formats.json. All 200 samples are compared exactly, not w
 Tests distinguish interleaved multi-record padding from sole-record byte/short packing and verify physical VTI
 extents, endian headers, compression, selected reads and cancellation. Research: docs/clean-room.md, batch 171 job 5.
 Limits, including explicit HDF5 rejection, are in docs/limits.md; no general HDF5/solver-renderer or speed claim.
+## Live behavior inspector (batch 251 job 2)
+
+`behavior/inspect` mounts a complete collapsible tree with per-node last-tick
+status, idle for unvisited nodes and utility score vectors from tree.trace.
+Refresh is manual or window-frame driven and never ticks the source. Pause,
+resume, AbortSignal and disposal clean up panel-local work. DOM proof is
+packages/behavior/tests/inspect.test.js; visual usability on large production
+trees has not been established.

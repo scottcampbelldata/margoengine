@@ -2508,3 +2508,6 @@ are checked against the same NOAA input converted by public netCDF4 and VTK writ
 `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=3 -- node packages/sciviz/tests/formats-browser.mjs`
 checks six format variants on WebGPU and the WebGL2 compatibility backend. Its JSON stays in
 `test-results/sciviz-fixes/formats-gpu.json`. No benchmark or timing-only assertion is run during the build phase.
+Batch 251 inspector: after building behavior, run
+`node --test --test-timeout=120000 packages/behavior/tests/inspect.test.js`.
+The CPU DOM fixtures verify hierarchy, live updates and scheduling cleanup.

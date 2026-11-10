@@ -4065,3 +4065,5 @@ Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails Rigged
 
 - **Repro:** `node --test --test-reporter=tap tests/gpu-lock.test.js` on origin/main 896ebf844 while other lanes hold the shared GPU lock: five tests pass, then the file exits 1 with no failing subtest named (about 78 s). Selected tests (`--test-name-pattern`) pass.
 - **Cause:** not yet found; the file-level exit happens before the sixth test reports. Owner: scripts/gpu-lock.mjs and its tests. Waits for the fix phase (Scott 2026-11-09, build first).
+Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
+text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
