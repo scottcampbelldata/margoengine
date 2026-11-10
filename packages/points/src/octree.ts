@@ -267,7 +267,7 @@ export interface OctreeCloudOptions {
   minNodePixels?: number;
   /** Points kept loaded (drawn or not); least recently used nodes past it are freed. Default 3 x pointBudget. */
   maxLoadedPoints?: number;
-  /** Nodes loading at once. Default 4. */
+  /** Positive safe integer number of nodes loading at once. Default 4. */
   maxConcurrentLoads?: number;
   /** Material shared by every node's cloud. */
   material?: PointsMaterial | PointsMaterialOptions;
@@ -373,7 +373,12 @@ export class OctreeCloud implements EnginePlugin {
     this.pointBudget = options.pointBudget ?? 2_000_000;
     this.minNodePixels = options.minNodePixels ?? 150;
     this.maxLoadedPoints = options.maxLoadedPoints ?? this.pointBudget * 3;
-    this.maxConcurrent = options.maxConcurrentLoads ?? 4;
+    const concurrency = options.maxConcurrentLoads === undefined ? 4 : options.maxConcurrentLoads;
+    const concurrencyHelp =
+      'Invalid OctreeCloud maxConcurrentLoads; pass a positive safe integer; see https://margoengine.com/errors#points';
+    if (typeof concurrency !== 'number') throw new TypeError(concurrencyHelp);
+    if (!Number.isSafeInteger(concurrency) || concurrency <= 0) throw new RangeError(concurrencyHelp);
+    this.maxConcurrent = concurrency;
     if (!(this.pointBudget > 0) || !(this.minNodePixels > 0) || !(this.maxLoadedPoints > 0))
       throw new RangeError(
         'Invalid OctreeCloud option; pointBudget, minNodePixels and maxLoadedPoints must be above 0',

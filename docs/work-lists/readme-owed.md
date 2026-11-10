@@ -1382,6 +1382,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mcp: document direct/stdio rejection of duplicate active tool IDs and preserved cancellation ownership; completed-ID handling is unchanged.
 
+- @margoengine/points: document maxConcurrentLoads as a positive safe integer, default four, with constructor TypeError/RangeError validation.
 - @margoengine/sciviz: document normalized CPU picking depth ties and transfer binding initialization abort/error cleanup, including aggregated restoration failures.
 
 - @margoengine/behavior: cover parseTreeText inference for ordinary options, explicit registrations and TreeTextOptions variables; use BlackboardKey objects for shared subtree state.

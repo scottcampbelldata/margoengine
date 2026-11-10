@@ -61,6 +61,59 @@ function host() {
   const clouds = new Set();
   return { clouds, add: (c) => (clouds.add(c), c), remove: (c) => clouds.delete(c) };
 }
+
+test('OctreeCloud rejects concurrency limits that cannot schedule a positive integer number of loads', () => {
+  const source = buildOctree(cloud(2));
+  for (const maxConcurrentLoads of [0, -1, 0.5, NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1])
+    assert.throws(
+      () => new OctreeCloud(host(), source, { maxConcurrentLoads }),
+      (error) => error instanceof RangeError && /maxConcurrentLoads/.test(error.message),
+      `invalid concurrency ${maxConcurrentLoads}`,
+    );
+  for (const maxConcurrentLoads of [null, '4', true, {}, 4n])
+    assert.throws(
+      () => new OctreeCloud(host(), source, { maxConcurrentLoads }),
+      (error) => error instanceof TypeError && /maxConcurrentLoads/.test(error.message),
+      `invalid concurrency type ${typeof maxConcurrentLoads}`,
+    );
+});
+
+test('OctreeCloud schedules the default four or the requested positive integer number of child loads', async () => {
+  const positions = new Float32Array(8 * 2 * 3);
+  for (let octant = 0; octant < 8; octant++)
+    for (let point = 0; point < 2; point++)
+      for (let axis = 0; axis < 3; axis++)
+        positions[(octant * 2 + point) * 3 + axis] = (octant & (1 << axis) ? 1 : -1) * (1 - point * 0.1);
+  const tree = buildOctree({ positions }, { maxPointsPerNode: 10, grid: 1 });
+  assert.equal(tree.root.children.filter(Boolean).length, 8);
+  for (const [options, expected] of [
+    [{}, 4],
+    [{ maxConcurrentLoads: undefined }, 4],
+    [{ maxConcurrentLoads: 1 }, 1],
+    [{ maxConcurrentLoads: 8 }, 8],
+  ]) {
+    let pending = 0;
+    const source = {
+      root: tree.root,
+      load(node, signal) {
+        if (node === tree.root) return tree.load(node);
+        pending++;
+        return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+      },
+    };
+    const instance = new OctreeCloud(host(), source, { minNodePixels: 1, ...options });
+    try {
+      const view = { position: [0, 0, 0], screenHeight: 800 };
+      instance.select(view);
+      await Promise.resolve();
+      instance.select(view);
+      assert.equal(pending, expected);
+      assert.equal(instance.stats.loading, expected);
+    } finally {
+      instance.dispose();
+    }
+  }
+});
 const settle = async () => {
   for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
 };

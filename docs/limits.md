@@ -3954,6 +3954,13 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Point octree load concurrency (2026-11-10)
+OctreeCloud maxConcurrentLoads must be a positive safe integer. Omitted or
+undefined keeps the default four. Wrong types throw TypeError; zero, negative,
+fractional, non-finite and unsafe integer values throw RangeError before material
+creation. The existing point budget, sampling and rendering limits are unchanged.
+Regression: packages/points/tests/octree.test.js includes real child-load counts.
+
 ## Behavior tree text (batch 251)
 
 `parseTreeText` infers `TreeDocument` only when its options exclude subtree
