@@ -395,6 +395,14 @@ export interface ScatterLayerOptions {
 }
 
 export class SciRenderer implements EnginePlugin {
+    cpuIsosurface?: (data: Float32Array, level: number, options: {
+        dims: readonly [number, number, number];
+        maxTriangles: number;
+        signal: AbortSignal;
+    }) => Promise<{
+        vertices: Float32Array;
+        triangles: number;
+    }>;
     readonly name: string;
     readonly order: number;
     readonly fallback: FallbackBackend | undefined;

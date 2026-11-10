@@ -1,9 +1,9 @@
 // OpenNeuro ds000030, CC0. The local NRRD has the scan's intensities and 2 mm RAS sampling.
-import { Figure, type IsosurfaceLayer, type SliceLayer } from '@margoengine/sciviz';
+import type { IsosurfaceLayer, SliceLayer } from '@margoengine/sciviz';
 import { loadNRRD, nrrdGrid } from '@margoengine/sciviz/nrrd';
-import { element, exportButton, fail, signal } from './sciviz-demo.js';
+import { createFigure, element, exportButton, fail, signal } from './sciviz-demo.js';
 
-export const figure = await Figure.create(element<HTMLCanvasElement>('viewport'), {
+export const figure = await createFigure(element<HTMLCanvasElement>('viewport'), {
   aspect: [174 / 254, 1, 1],
   titles: { x: 'Right (mm)', y: 'Anterior (mm)', z: 'Superior (mm)' },
 });

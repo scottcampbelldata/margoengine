@@ -7597,3 +7597,26 @@ Rival behaviour read as documentation only: deck.gl TileLayer https://deck.gl/do
 Real data: 21 unmodified AWS Terrarium PNGs at XYZ zoom 0..2, 1,909,575 bytes, sources and hashes in examples/assets/sciviz/geo-lod/source.json; complete regional provider credits and terms in attribution.txt. Quantized decoder oracle reuses the already licensed Everest terrain asset; no new third-party code or asset implementation is copied.
 
 Browser gate launch correction: source-relative ES module resolution and WHATWG DOM AbortSignal cancellation, https://dom.spec.whatwg.org/#interface-AbortSignal (Living Standard, WHATWG, accessed 2026-11-10), complement the OGC streaming contract. Package browser commands use one sciviz-owned bootstrap that resolves the entry before setting the repository serving root. browser-root.test.js runs a real child from the package cwd and rejects unbootstrapped browser commands. No browser lifecycle helper is changed. Cache disposal rejects waits even when a provider ignores its load signal.
+## Batch 181 complete WebGL2 route (2026-11-10)
+
+Research preceded this addition. William E. Lorensen and Harvey E. Cline,
+*Marching Cubes: A High Resolution 3D Surface Construction Algorithm* (1987),
+https://people.eecs.berkeley.edu/~jrs/meshpapers/LorensenCline.pdf (abstract and sections 3-4),
+defines case classification, edge interpolation and gradient normals. Marc Levoy,
+*Display of Surfaces from Volume Data* (1988), https://graphics.stanford.edu/papers/volume-cga88/
+(abstract and interpolation correction), separates scalar classification, shading and compositing.
+Khronos WebGL Working Group, *WebGL 2.0 Specification* (2017, living draft read 2026),
+https://registry.khronos.org/webgl/specs/latest/2.0/ (3D textures, buffers and framebuffer rules),
+supplies the shared renderer's target contract. Compared retaining a second native GLSL volume
+renderer with reusing Margo's complete compatibility layer. The latter keeps every existing layer,
+axes and bricked page table on one shader path, as parity/group-10 recommends.
+
+The optional sciviz/fallback createFallbackFigure explicitly installs that full WebGL2 layer and
+creates an ordinary Figure, with a per-renderer CPU marching-cubes hook. Existing Margo Wasm,
+cases and GPU vertex layout are reused; no new numerical algorithm or speed claim. CPU results
+are staged, checked for cancellation, then published atomically into a drawing buffer. Failed
+extraction retains the displayed result. Real OpenNeuro head data is reduced by nearest sample
+only in the correctness fixture; the three existing demos use their original complete files
+and existing source/licence ledger in examples/assets/sciviz/README.md. No external implementation
+or companion source was read or copied. The native preview attacher remains a subset; the complete
+row is the shared WebGL2 route, not a new parallel renderer.

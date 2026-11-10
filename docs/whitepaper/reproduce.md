@@ -3658,3 +3658,12 @@ After build:packages, run clustered CPU tests. Run node scripts/gpu-lock.mjs run
 
 
 Batch 180 job 1: build packages, then node --test packages/sciviz/tests/geo-lod.test.js; for rendering use node scripts/gpu-lock.mjs run --owner=geo-lod-repro --wait-max=60 --max=4 -- node packages/sciviz/tests/geo-lod-browser.mjs. The browser suite tests both WebGPU and webgl2-compat and writes test-results/sciviz-geo-lod.json. Demo: examples/sciviz-geo-lod.html, pinned levels 0..2 by default; optional live AWS detailed tiles. No benchmark or exclusive lock.
+Batch 181 job 1: build packages, then run node --test --test-timeout=120000
+packages/sciviz/tests/*.test.js. Run node scripts/gpu-lock.mjs run
+--owner=codex-batch181 --max=6 --wait-max=60 -- node packages/sciviz/tests/fallback-browser.mjs
+for native/shared-WebGL2 pixels, CPU extraction, replacement, cancellation and all three
+real-data demos. Result: test-results/sciviz-fallback.json. Open examples/sciviz-head.html,
+sciviz-stars.html and sciviz-wind.html with ?backend=webgl2 to force the complete route.
+Data sources and licences remain in examples/assets/sciviz/README.md; no new dataset or
+performance measurement is introduced. The scripts test correctness under a hard outer
+process-tree deadline and shared GPU admission, with no exclusive speed reservation.

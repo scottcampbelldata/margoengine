@@ -304,6 +304,38 @@ export class IsosurfaceLayer implements Drawable {
   async #extract(level: number, signal: AbortSignal): Promise<number> {
     if (this.#gpu.device && this.#gpu.device !== this.#renderer.device)
       throw fault('state', 'Device replaced; request the isosurface again', 'sciviz');
+    if (this.#renderer.cpuIsosurface) {
+      const device = this.#renderer.device!;
+      const data = this.#cpu ?? await this.#field.read({ signal });
+      const result = await this.#renderer.cpuIsosurface(data, level, {
+        dims: this.dims,
+        maxTriangles: Math.floor(device.limits.maxStorageBufferBindingSize / 96),
+        signal,
+      });
+      signal.throwIfAborted();
+      let vertices: GPUBuffer | undefined;
+      try {
+        vertices = result.triangles ? device.createBuffer({
+          size: result.vertices.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        }) : undefined;
+        if (vertices) device.queue.writeBuffer(vertices, 0, result.vertices as Float32Array<ArrayBuffer>);
+        const group = vertices ? device.createBindGroup({
+          layout: this.#layout!, entries: [
+            { binding: 0, resource: { buffer: this.#uniform! } },
+            { binding: 1, resource: { buffer: vertices } },
+          ],
+        }) : undefined;
+        signal.throwIfAborted();
+        this.#vertices?.destroy();
+        this.#vertices = vertices;
+        vertices = undefined;
+        this.#group = group;
+        this.#triangles = result.triangles;
+        this.#level = level;
+        this.#committed = true;
+        return result.triangles;
+      } finally { vertices?.destroy(); }
+    }
     const gpu = this.#gpu,
       [nx, ny, nz] = this.dims,
       cells = (nx - 1) * (ny - 1) * (nz - 1);

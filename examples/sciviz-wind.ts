@@ -1,6 +1,6 @@
 // NOAA NCEP-NCAR Reanalysis 1. Native daily u/v samples, no synthetic flow.
-import { Figure, type LineLayer } from '@margoengine/sciviz';
-import { element, exportButton, fail, floats } from './sciviz-demo.js';
+import type { Figure, LineLayer } from '@margoengine/sciviz';
+import { createFigure, element, exportButton, fail, floats } from './sciviz-demo.js';
 
 const nx = 49,
   ny = 19,
@@ -8,7 +8,7 @@ const nx = 49,
 const km = (Math.PI * 6371) / 180,
   cosCentre = Math.cos((42.5 * Math.PI) / 180);
 const bounds: [number, number, number, number] = [-60 * km * cosCentre, 60 * km * cosCentre, -22.5 * km, 22.5 * km];
-export const figure = await Figure.create(element<HTMLCanvasElement>('viewport'), {
+export const figure = await createFigure(element<HTMLCanvasElement>('viewport'), {
   mode: '2d',
   limits: bounds,
   titles: { x: 'East of 40 W (km)', y: 'North of 42.5 N (km)' },

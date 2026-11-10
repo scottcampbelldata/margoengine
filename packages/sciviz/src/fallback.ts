@@ -1,6 +1,30 @@
 // Optional CPU extraction for the WebGL2 path. No renderer, global patch or Wasm load on import.
 import { fault, rangeError, wasmError } from '../../shared/errors.js';
 import { cubeTables } from './cubes.js';
+import type { Figure, CreateFigureOptions } from '@margoengine/sciviz';
+
+/**
+ * Creates a complete figure on the shared WebGL2 compatibility renderer. Explicitly installs that
+ * renderer for the page, even when WebGPU is available. Nothing is installed on import.
+ * Uses CPU marching cubes with the same cases as WebGPU, then uploads its vertices for drawing.
+ * Requires the compatibility layer's full tier; unsupported hardware rejects with code `unsupported`.
+ * The returned figure owns its engine. Dispose figures before uninstalling the shared layer.
+ */
+export async function createFallbackFigure(canvas: HTMLCanvasElement, options: CreateFigureOptions = {}): Promise<Figure> {
+  options.signal?.throwIfAborted();
+  const { install } = await import('@margoengine/webgl2-compat');
+  await install({ force: true, signal: options.signal });
+  options.signal?.throwIfAborted();
+  const { Figure } = await import('@margoengine/sciviz');
+  options.signal?.throwIfAborted();
+  const figure = await Figure.create(canvas, options);
+  if (options.signal?.aborted) {
+    figure.dispose();
+    throw options.signal.reason;
+  }
+  figure.renderer.cpuIsosurface = marchingCubes;
+  return figure;
+}
 
 /** Options for CPU marching cubes, using the same cases and vertex layout as the WebGPU extractor. */
 export interface CpuIsosurfaceOptions {

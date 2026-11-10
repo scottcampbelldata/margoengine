@@ -1,18 +1,18 @@
-﻿import { Figure, type RectsLayer, type ScatterLayer } from '@margoengine/sciviz';
+import type { RectsLayer, ScatterLayer } from '@margoengine/sciviz';
 import { SelectionStore, bindSelection, type SelectionBinding } from '@margoengine/sciviz/link';
-import { element, exportButton, fail, floats } from './sciviz-demo.js';
+import { createFigure, element, exportButton, fail, floats } from './sciviz-demo.js';
 
 // Public-domain 2MASS sample; exact provenance and query in assets/sciviz/stars.json.
-export const figure = await Figure.create(element<HTMLCanvasElement>('viewport'), {
+export const figure = await createFigure(element<HTMLCanvasElement>('viewport'), {
   aspect: [1, 0.6, 0.45],
   pointBudget: 1_000_000,
   titles: { x: 'RA (deg)', y: 'Dec (deg)', z: 'J - Ks (mag)' },
 });
-export const histogram = await Figure.create(element<HTMLCanvasElement>('histogram'), {
+export const histogram = await createFigure(element<HTMLCanvasElement>('histogram'), {
   mode: '2d',
   titles: { x: 'J - Ks (mag)', y: 'Sources' },
 });
-export const heatmap = await Figure.create(element<HTMLCanvasElement>('heatmap'), {
+export const heatmap = await createFigure(element<HTMLCanvasElement>('heatmap'), {
   mode: '2d',
   titles: { x: 'J - Ks (mag)', y: 'Ks (mag)' },
 });

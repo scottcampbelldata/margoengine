@@ -4203,3 +4203,12 @@ The new optional entry projects six-face images from point lights through every 
 
 
 Batch 180 job 1: optional sciviz/geo-lod streams raster imagery and height grids by projected view with bounded residency, ancestor fallback/fades, skirts and signal cancellation. Proof: packages/sciviz/tests/geo-lod.test.js and geo-lod-browser.mjs; real AWS inputs pinned in examples/assets/sciviz/geo-lod/source.json. Scope/limits in docs/limits.md; no timing result or whole-engine rival parity claim.
+Batch 181 job 1 (2026-11-10): optional sciviz/fallback createFallbackFigure uses the complete
+shared WebGL2 renderer for surfaces, 3D volumes, slices and charts, with same-case CPU marching
+cubes uploaded for isosurface drawing. fallback-browser.mjs compares seven real-head/chart
+fixtures to native WebGPU (all bytes identical on this device), checks cancellation, actual
+device replacement and the head/stars/wind demo route. updates.test.js proves no compute
+dispatch and atomic publication on success, failure and cancellation. Existing package GPU
+suites cover the shared renderer's remaining layers. The small native preview attacher is
+not the complete route. This is backend support and fixture parity, with the bound in
+limits.md, not universal numerical identity or a speed claim. Research: clean-room.md.

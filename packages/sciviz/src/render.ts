@@ -73,6 +73,10 @@ let serial = 0;
  * place yourself.
  */
 export class SciRenderer implements EnginePlugin {
+  /** @internal Optional CPU extractor, installed only by sciviz/fallback. */
+  cpuIsosurface?: (data: Float32Array, level: number, options: {
+    dims: readonly [number, number, number]; maxTriangles: number; signal: AbortSignal;
+  }) => Promise<{ vertices: Float32Array; triangles: number }>;
   /** Plugin name, unique per renderer. */
   readonly name = `sciviz:${serial++}`;
   /** Frame-graph order: after the scene (0), before points (10) and fat lines (20). */

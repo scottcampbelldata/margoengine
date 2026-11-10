@@ -105,6 +105,39 @@ function fixture() {
   return { renderer, gpu, buffers, generated, waiting, draw };
 }
 
+test('optional CPU isosurfaces publish atomically, without compute dispatch, and preserve cancellation', {
+  timeout: 5000,
+}, async () => {
+  const f = fixture();
+  const calls = [];
+  f.renderer.cpuIsosurface = async (data, level, options) => {
+    calls.push({ data, level, options });
+    return { triangles: level, vertices: new Float32Array(level * 24) };
+  };
+  const iso = new IsosurfaceLayer(f.renderer, f.gpu, new Float32Array(8));
+  assert.equal(await iso.update(2), 2);
+  assert.equal(f.draw(iso).count, 6);
+  assert.equal(f.generated.length, 0);
+  assert.equal(f.waiting.length, 0);
+  assert.deepEqual(calls[0].options.dims, [2, 2, 2]);
+  assert.equal(calls[0].options.maxTriangles, Math.floor((1 << 24) / 96));
+  const previous = f.draw(iso).buffer;
+  f.renderer.cpuIsosurface = async () => { throw new Error('extraction failed'); };
+  await assert.rejects(iso.update(3), /extraction failed/);
+  assert.equal(f.draw(iso).buffer, previous);
+  assert.equal(iso.level, 2);
+  const abort = new AbortController();
+  f.renderer.cpuIsosurface = async () => {
+    abort.abort('exact reason');
+    return { triangles: 3, vertices: new Float32Array(72) };
+  };
+  await assert.rejects(iso.update(3, { signal: abort.signal }), e => e === 'exact reason');
+  assert.equal(f.draw(iso).buffer, previous);
+  assert.equal(previous.destroyed, false);
+  iso.dispose();
+  assert.equal(previous.destroyed, true);
+});
+
 test('overlapping isosurface updates publish matching vertices, level and count in order', {
   timeout: 5000,
 }, async () => {
