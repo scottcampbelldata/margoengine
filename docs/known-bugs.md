@@ -1,5 +1,13 @@
 # Known bugs and unverified features
 
+### Fixed: batch 256 synchronous host recovery deadline
+
+A synchronous Connection could complete recovery from inside status broadcast,
+then the returning outer frame armed a deadline that closed the healthy session.
+Initialize the timer before notifying peers and stop recovery work once authority
+is ready. The synchronous-transport case in packages/netcode/tests/migrate.test.js
+fails before the change and stays ready past the deadline afterward.
+
 ### Batch 258 text fields
 
 Tooling follow-up: running quality concurrently with React subpath CPU tests

@@ -90,6 +90,10 @@
     "./generate-rust": {
       "types": "./dist/generate-rust.d.ts",
       "import": "./dist/generate-rust.js"
+    },
+    "./migrate": {
+      "types": "./dist/migrate.d.ts",
+      "import": "./dist/migrate.js"
     }
   },
   "files": [

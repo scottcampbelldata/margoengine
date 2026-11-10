@@ -1,5 +1,16 @@
 # Claims and evidence
 
+Batch 256 job 4: ten tests in `packages/netcode/tests/migrate.test.js` establish
+confirmed-state recovery through successive host departures under loss/jitter,
+rollback of a partial commit, arbitrary-target handoff, stale-epoch rejection,
+prepare interruption, detached state copies, cancellation, hard deadlines,
+message forwarding, invalid packet/option rejection, a departing handoff target
+and a survivor departing during the resume barrier. A synchronous-transport
+regression fails before moving recovery-deadline initialization ahead of peer
+notification; completed recovery must not arm a stale timer. This covers the requested
+P2P host migration row in the documented trusted connected-mesh model; external
+partition consensus and membership admission are outside this claim.
+
 Batch 256 job 3: `packages/netcode/tests/generate-rust.test.js` compiles and runs
 standalone generated Rust. One hundred full/delta pairs and 1,000 corrupted or
 truncated full/delta inputs agree with both the runtime codec and TypeScript

@@ -1,5 +1,25 @@
 # Clean room
 
+## Batch 256 job 4: P2P host migration
+
+Research compared before implementation: Diego Ongaro and John Ousterhout,
+*In Search of an Understandable Consensus Algorithm* (2014), https://raft.github.io/raft.pdf
+(separating authority epochs, replication and membership); Microsoft, *DirectPlay
+8 Protocol: Host Migration (Peer-to-Peer)* (2024), https://learn.microsoft.com/en-us/openspecs/windows_protocols/mc-dpl8cs/c188116b-228c-4c39-9959-381845f3d1af
+(deterministic candidate, survivor state exchange and a resume barrier); Exit
+Games, *Photon Realtime: Master Client & Host Migration* (2026),
+https://doc.photonengine.com/realtime/v5/gameplay/hostmigration and *Rooms and
+Players* (2026), https://doc.photonengine.com/realtime-core/v6/manual/rooms-and-players
+(web-library role switch and caller responsibility for replicated state).
+Combined design: canonical schema checkpoints, all-connected prepare/commit
+acknowledgements, two retained committed checkpoints, survivor-common recovery,
+lowest-id election, epoch fencing and explicit arbitrary-peer handoff. A commit
+interrupted on some survivors rolls back to their newest common checkpoint.
+The new host waits for every survivor's resume acknowledgement before publishing.
+This is a trusted connected-mesh game protocol, not an implementation of Raft,
+Byzantine agreement or partition consensus. Only specs/papers/public API text
+were read. Synthetic game state is a correctness fixture, not a new asset demo.
+
 ## Batch 256 job 3: standalone Rust schema generator
 
 Research sources for this implementation: DWARF Committee, Michael Eager editor,

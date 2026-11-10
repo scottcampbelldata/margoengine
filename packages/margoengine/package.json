@@ -2030,6 +2030,10 @@
       "types": "./dist/netcode/generate-rust.d.ts",
       "import": "./dist/netcode/generate-rust.js"
     },
+    "./netcode/migrate": {
+      "types": "./dist/netcode/migrate.d.ts",
+      "import": "./dist/netcode/migrate.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"

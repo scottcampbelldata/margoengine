@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12232780,
+  "total": 12241387,
   "history": [
     {
       "date": "2026-10-24",
@@ -5534,6 +5534,12 @@
       "commit": "0eeafe3e8",
       "reason": "Batch 252 job 5: @margoengine/navmesh/obstacles: 1558 B gzip (ceiling 0 -> 1814 B). Optional navigation behavior retains one shared implementation; splitting would duplicate graph traversal and controller ownership. Core/stage source unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-256",
+      "reason": "New optional netcode/migrate: 8351 B gzip, previously absent. Complete checkpoint validation, replication, handoff and recovery stay together; a split exposes protocol internals and duplicates lifecycle wiring. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6579,6 +6585,7 @@
     "@margoengine/tween/inertia": 3034,
     "@margoengine/input/vector": 4551,
     "@margoengine/inspector/tweak": 4276,
-    "@margoengine/navmesh/obstacles": 1814
+    "@margoengine/navmesh/obstacles": 1814,
+    "@margoengine/netcode/migrate": 8607
   }
 }

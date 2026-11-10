@@ -1,5 +1,11 @@
 # Reproducing Margo's numbers
 
+Batch 256 job 4: build packages and run
+`node --test --test-timeout=30000 packages/netcode/tests/migrate.test.js`.
+Seeded virtual-clock mesh fixtures cover loss/jitter and precise interruptions
+between prepare, commit and resume acknowledgements. They make no wall-clock
+performance assertion and require no GPU or assets.
+
 Batch 256 job 3: with rustc on PATH, build packages, then run
 `node --test --test-timeout=120000 packages/netcode/tests/generate-rust.test.js`.
 The test generates Rust and TypeScript into its own worktree test-results folder,

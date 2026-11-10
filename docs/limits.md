@@ -1,5 +1,32 @@
 # Design envelope
 
+Batch 256 migration: `@margoengine/netcode/migrate` exports HostMigration and its
+typed options/state. Give each peer the same schema, initial state, frame and
+host (default lowest id), and reliable full-mesh Connection links. It owns and
+closes these links, forwards other message kinds to earlier handlers, and uses
+wire prefix 112 for migration. Up to 64 peers; checkpoint default 1 MiB, maximum
+16 MiB. Initial frame defaults to 0, operation/recovery/wait timeout to 10 seconds.
+Frames, sequences and authority epochs are unsigned 32-bit; create a new session
+before overflow. `confirm(state, frame, { signal })` serially prepares and commits
+on every connected peer and resolves only after all stored acknowledgements.
+`confirmed` is a detached locally committed copy; await confirm before treating
+it as globally confirmed. Exactly two committed checkpoints are retained.
+Host disconnect selects the lowest surviving id, restores the newest common
+checkpoint and completes a survivor acknowledgement barrier before isHost becomes
+true. `handoff(target, { signal })` moves authority without leaving. Only isHost
+may simulate/publish authority work; use waitForHost to resume after migration.
+Abort/timeout of a publishing operation retires that session and closes its links
+rather than reusing an uncertain checkpoint. Cancelling waitForHost only cancels
+that wait. Trusted peers and a connected surviving full mesh are required; arbitrary
+network partitions, malicious voters, durable restart and adding peers to a live
+session require external membership/fencing or a fresh session. No consensus or
+partition-safety claim is made. The public role-switch behavior of Photon Realtime
+is covered, with explicit checkpoint replication/restoration supplied here.
+New migration entry gzip is 8,351 B (previously absent), ceiling 8,607 B. Complete
+checkpoint validation, two-phase replication, handoff and recovery remain in one
+optional entry. Splitting them would expose protocol internals and duplicate
+session lifecycle wiring. Core and stage remain 23,950 B combined gzip.
+
 Batch 256 Rust generation: `@margoengine/netcode/generate-rust` exports
 generateRust(schema.json or compiledSchema, { source? }). Output is standalone
 Rust 2021 requiring Rust 1.82 or newer, with no crate dependencies. Each schema
