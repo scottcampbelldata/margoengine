@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Climate conventions and projections | Margo Engine</title>
+<style>body{margin:0;background:#101820;color:#ecf3f7;font:15px system-ui}main{max-width:1100px;margin:24px auto;padding:0 20px}h1{font-size:28px}form{display:flex;gap:18px;flex-wrap:wrap}label{display:flex;gap:8px;align-items:center}select,input{font:inherit;padding:6px;background:#1b2b38;color:inherit}canvas{width:100%;height:580px;display:block}#view{position:relative;margin-top:18px}p{line-height:1.5;color:#a8c2d1}a{color:#9fdae4}</style></head>
+<body><main><h1>Climate on the map</h1><form onsubmit="return false">
+<label>Field <select id="dataset"><option value="era5">ERA5: 2 metre temperature</option><option value="cmip6">CMIP6: IPSL near-surface temperature</option></select></label>
+<label>Projection <select id="projection"><option value="mollweide">Mollweide</option><option value="robinson">Robinson</option><option value="lambert-conformal-conic">Lambert conformal conic</option><option value="albers">Albers equal area</option><option value="polar-stereographic">Polar stereographic</option></select></label>
+<label>Area <select id="mask"><option value="all">All</option><option value="land">Land</option><option value="ocean">Ocean</option></select></label>
+<label>Step <input id="step" type="number" value="0" min="0" max="7" step="1"></label></form>
+<p id="status" role="status">Loading...</p><div id="view"><canvas id="map" width="1050" height="580" aria-label="Climate temperature map in degrees Celsius"></canvas></div>
+<p>ERA5: eight six-hour observations, 2-3 January 2020, via WeatherBench 2. CMIP6: twelve monthly fields, 1850, IPSL-CM6A-LR historical r1i1p1f1. Each sample retains the original temperature and CF time metadata. The map uses bilinear display sampling; missing data remain transparent. Land fraction comes from IPSL sftlf.</p>
+<p>Credit: Copernicus Climate Change Service / ECMWF / Google Research and IPSL Climate Modelling Centre / ESGF / AWS Open Data. Data: CC BY 4.0. <a href="/examples/assets/sciviz/climate/source.json">Sources, transformations and hashes</a>.</p>
+</main><script type="module" src="/examples/sciviz-climate.ts"></script></body></html>

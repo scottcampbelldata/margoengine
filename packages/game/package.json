@@ -671,6 +671,10 @@
       "types": "./dist/compute/onnx.d.ts",
       "import": "./dist/compute/onnx.js"
     },
+    "./compute/quant": {
+      "types": "./dist/compute/quant.d.ts",
+      "import": "./dist/compute/quant.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"

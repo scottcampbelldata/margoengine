@@ -7949,6 +7949,11 @@
       "commit": "batch-175-j5",
       "reason": "New optional sciviz/graph-gpu: 0 to 13717 B gzip, ceiling 14129 B. FR/FA2 spatial layout, direct styled drawing, FDEB and label collision avoidance stay in one optional entry. Splitting would fragment shared layout/draw/bundle lifetimes without reducing core or stage, unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "reason": "Batch 180 job 4: new optional sciviz/cf 0 -> 14438 B gzip, ceiling 14872 B; projections 0 -> 2328 B, ceiling 2584 B. Complete coordinate metadata, model calendars, units, vertical formulas, display/conservative regridding and independent Snyder transforms justify the bytes. Splitting semantics would duplicate dimension and lifetime coordination; retained mesh rendering remains lazy. Core/stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -9380,7 +9385,9 @@
     "@margoengine/compute/onnx": 10444,
     "@margoengine/sciviz/notebook": 2095,
     "@margoengine/compute/quant": 4183,
-    "@margoengine/sciviz/graph-gpu": 14129
+    "@margoengine/sciviz/graph-gpu": 14129,
+    "@margoengine/sciviz/cf": 14872,
+    "@margoengine/sciviz/projections": 2584
   },
-  "total": 15375143
+  "total": 15392599
 }

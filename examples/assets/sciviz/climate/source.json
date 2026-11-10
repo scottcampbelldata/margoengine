@@ -1,0 +1,269 @@
+{
+  "accessed": "2026-11-10",
+  "files": [
+    {
+      "file": "era5.nc",
+      "bytes": 67276,
+      "sha256": "636a1d0ea6fb6b4f85d964c0d916cdc5955278d94ceea3bf5c27a2a4e47ddf7f"
+    },
+    {
+      "file": "cmip6.nc",
+      "bytes": 998224,
+      "sha256": "6426264f6090a09f400cfe223031e187dc8a484a0ae6240d28315226a8475c78"
+    },
+    {
+      "file": "land-fraction.nc",
+      "bytes": 91080,
+      "sha256": "a8156acb147397a443f398db9d14a17a7a314baa903f847a4fdb8d21136ecd9d"
+    }
+  ],
+  "sources": [
+    {
+      "name": "ERA5 via WeatherBench 2",
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
+      "license": "CC BY 4.0",
+      "terms": "https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview",
+      "credit": "Contains modified Copernicus Climate Change Service information [2020] via WeatherBench 2 (Google Research).",
+      "transformation": "2m_temperature time indices 89124:89132, eight 6-hour steps of 2020-01-02/03; retains original K and 64x32 longitude/latitude samples. CDF-2 reencoding adds truthful longitude/latitude CF units, standard_name and axis attributes omitted in upstream metadata. No temperature values rescaled.",
+      "providerDocumentation": "https://weatherbench2.readthedocs.io/en/latest/data-guide.html"
+    },
+    {
+      "name": "CMIP6 IPSL-CM6A-LR historical r1i1p1f1",
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/",
+      "license": "CC BY 4.0, producer relicense supersedes older noncommercial file attribute",
+      "terms": "https://cmc.ipsl.fr/online-resources/",
+      "credit": "IPSL Climate Modelling Centre / Institut Pierre-Simon Laplace. CMIP6 data distributed through ESGF and AWS Open Data.",
+      "transformation": "First 12 monthly tas fields from 1850, original K and 143x144 grid. fx/sftlf/gr/v20180803 land fraction percent grid. CDF-2 reencoding preserves original metadata and source_original_license; license records the IPSL relicense. No field values fabricated."
+    }
+  ],
+  "sourceObjects": [
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/tas/.zarray",
+      "bytes": 387,
+      "sha256": "be2981aecf410c9448ae52dbd813a45212741244cf08e047604760cf37dd8669",
+      "file": "0f7515b3b3668206874659210ef699951f8599187b3716e883a1d1805eeea32a"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/tas/.zattrs",
+      "bytes": 474,
+      "sha256": "b027734580e5bc6609a3673d6489558c18735e41d08687f4dd0f8ac6641b97b7",
+      "file": "efc18be6218817e19650a1ca042d3a6511325f4a8366e770f18b5711ebfc60af"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/tas/0.0.0",
+      "bytes": 31271926,
+      "sha256": "53c8c2ef3aff940e0751d67bb1198056e37d4d581be00cfbb7858dae4c06ca35",
+      "file": "5ce413b1a6ff9e5a539f37162ae138247bb992c625266291b0e26f3e9357eea3"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/lat/.zarray",
+      "bytes": 317,
+      "sha256": "53278c86910efcd00de3ddf88b18fa8447727f08bb0d47d3ca74ff40794b1a23",
+      "file": "8939c3bf2924c82af807ccf90510b7fd22978b6c8256bce220739c35cfbcbc4b"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/lat/.zattrs",
+      "bytes": 159,
+      "sha256": "93895f2189047140dcdb1378ccbce9e1f9407139d9d477748afc68be32163b92",
+      "file": "bd8f0fc66e9738f21d49bcb2e2afdd98fe872ba939dc542c5cac134afb9132c2"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/lat/0",
+      "bytes": 505,
+      "sha256": "0f5c985f44cba540b3326c1fc1ab30252a3e0d8e9af16786b5372d2164a13569",
+      "file": "f7ee492cc2fc0a71e06c7af506ef215228dfada8bc92acdf87e1f94577ae2cd5"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/lon/.zarray",
+      "bytes": 317,
+      "sha256": "a77affd11326f7ab5484504202237423b91d08dbb98c3cb045ee5c3093168154",
+      "file": "2cb9eb21ad1c4b2293716db17aab428bb2888d5e25a0c8398e2a560185830f6a"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/lon/.zattrs",
+      "bytes": 160,
+      "sha256": "707359ce97b790cd613db52452aea1c0af7268b8c61d1fbf92c4a7cf442629c7",
+      "file": "21ab07653d5c60680b03419b4e53055aca38cbfdfb861704b85c347f89930689"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/lon/0",
+      "bytes": 257,
+      "sha256": "8d7e0239eed8276a7e6f76678a51e6d4e3a48263b2c9b231af1976937b8679f9",
+      "file": "b240e78f2dafff8e66e058f7abb0ce991e2d764add3db871d89398b1cd225a58"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/time/.zarray",
+      "bytes": 319,
+      "sha256": "5b8005aca0e134cb165e1b18604412c73dfb5c2f1da64564448b924cd261444a",
+      "file": "b5aa2ef32e8574a69c07200864e9e884a700fb0a6032a7ddff1d172b672b8b22"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/time/.zattrs",
+      "bytes": 265,
+      "sha256": "48291c59a6e74faadf0e41ec6067f1ea55c675eb47de337ef12c0e58f78c5e90",
+      "file": "30212cbd97234b8e73ad9e352ab6b2c9a6e306fca16ff670924771ed90a0e404"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/time/0",
+      "bytes": 2885,
+      "sha256": "2b075bef11e8ddfd6aa8f6b4956c48a22c9584ee46b8487237cd5d7c61267697",
+      "file": "42147c8ee1ae10b240a369a0b46c50bc6860ae47bedb69f65bf4b890e688469f"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/sftlf/.zarray",
+      "bytes": 360,
+      "sha256": "93d79e4ce79ab1882848484edbfc03433d6ec14eb2cdc5217616c31f651c7175",
+      "file": "e7166e8e1ef7d8bc6256e8a1cfb377e2e177ee89c612eda06b43fb4cfc799564"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/sftlf/.zattrs",
+      "bytes": 362,
+      "sha256": "6f3699ff9c6ab54eeb9e011c26d33629e3a663ecd3cf33585fcccb19369b412a",
+      "file": "d096d312b7c5812683914ba2372ac7e16df4ebe74ddb3cfe1706d25d7d9325be"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/sftlf/0.0",
+      "bytes": 20483,
+      "sha256": "d3dbedfe423c0953c691a3ba74d2a42a3cad8cca6de0bfd95706c708e09492b0",
+      "file": "7f525895a595db021425742ca1a25fc16f1c82d383bcfcc71447961e53e819fa"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/lat/.zarray",
+      "bytes": 317,
+      "sha256": "53278c86910efcd00de3ddf88b18fa8447727f08bb0d47d3ca74ff40794b1a23",
+      "file": "003c34d2d6881bd420291f2251d4cf8830300c9defebd4bfed244278293759ed"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/lat/.zattrs",
+      "bytes": 159,
+      "sha256": "93895f2189047140dcdb1378ccbce9e1f9407139d9d477748afc68be32163b92",
+      "file": "c62076b93a633af4735eb59dfb990f6d7362ea6e3e2ef63e5e882a1aac10013d"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/lat/0",
+      "bytes": 505,
+      "sha256": "0f5c985f44cba540b3326c1fc1ab30252a3e0d8e9af16786b5372d2164a13569",
+      "file": "a914c5328d166eb2cd92de088cf6e7ebbb5f9e036adca174beb643665a1a0ece"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/lon/.zarray",
+      "bytes": 317,
+      "sha256": "a77affd11326f7ab5484504202237423b91d08dbb98c3cb045ee5c3093168154",
+      "file": "9a0a8b4f7e08974721657a6e44f21254e5109fe63d06410ef6572122ee94f18f"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/lon/.zattrs",
+      "bytes": 160,
+      "sha256": "707359ce97b790cd613db52452aea1c0af7268b8c61d1fbf92c4a7cf442629c7",
+      "file": "ecb7079b3f1c5147270fccaac244ec74841aab03986efa86dd84f1cda78ad719"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/lon/0",
+      "bytes": 257,
+      "sha256": "8d7e0239eed8276a7e6f76678a51e6d4e3a48263b2c9b231af1976937b8679f9",
+      "file": "31f18b588c829cb7c49290c8c19a5004c23ed2debb2c73fdea942b3f07c668c3"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/2m_temperature/.zarray",
+      "bytes": 367,
+      "sha256": "68038d2ee2e02189ed7d8e0e76c2d31a00defbfaa499bdab0c53431564ce312f",
+      "file": "bd6b7ae3d88120969498873b1267212c33aa05129efb2610344edf9973be2c11"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/2m_temperature/.zattrs",
+      "bytes": 175,
+      "sha256": "5cd1a4fb611849ade08dc6de7ab78297774c5985a9ff7cc91f0e58e17e6bc1ee",
+      "file": "d7bc1a1199115802434cc2389ea321873764977eff00b538ce29ba397e81c0cb"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/2m_temperature/891.0.0",
+      "bytes": 578089,
+      "sha256": "af410b32e16bef88d7732c5a4db8b1701ce3b380f8ee25b52a7fc8f9b1f45ae1",
+      "file": "fc44a56e8cf0e1737900759dc101ba5e7b27854369033c094af15670e5530b6b"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/latitude/.zarray",
+      "bytes": 315,
+      "sha256": "c9d688a23508069b17fd7c7a0a4933545950af008968ac7c474d6a5f0d54c220",
+      "file": "d853e4956c6be5efb8231f7f58da542a93e03d9eaf9648b577cfa3e9260653f5"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/latitude/.zattrs",
+      "bytes": 55,
+      "sha256": "223e2ef350628ab138755c14064b51a42b59e74ddc32424d59401373a7475403",
+      "file": "03cec2fa01bdbafb6cd91f840ac7a1e33f4ccdd380a1aab94503182c2c27a8e2"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/latitude/0",
+      "bytes": 169,
+      "sha256": "886ed4a4c20c1cbd44df758c399e73e893a977ce3c30a1f9776899eae738cc43",
+      "file": "2165111b1a60438e98ac3c6713422df495ea6f913a726b3bb43c50258ce3d7c4"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/longitude/.zarray",
+      "bytes": 315,
+      "sha256": "ccbdceb9e88af612b748f6f46c9d3a196879ccf5fafe8542507e1894df5f0a50",
+      "file": "e3d7d997a2027bbb49491db4e8933fa00687f9d26c17ca87979f1f909064fff5"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/longitude/.zattrs",
+      "bytes": 56,
+      "sha256": "6044b31805b2112baf968c616ab366628ff813d94c17fa47aaa589adcddd5eed",
+      "file": "9dc2df37d4eb994449fcc6713d7e07e1af7ff75a74e431b90e797ec734014b5b"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/longitude/0",
+      "bytes": 192,
+      "sha256": "e1924d9c72175fe942ae9aa0caea8c8f48962c8c855b056400c0f32391a54a94",
+      "file": "a8b155a1c67c90a15a59eeac8bcaee8bae748760fd4cbd86e44cec463c8396fe"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/time/.zarray",
+      "bytes": 320,
+      "sha256": "1833a4abfd22df610af0b9a463b51a342adeb8344f8cdc5409b051d8cbeb4abd",
+      "file": "6bd799b7406757ece7a183769b3a426633a2713671ebe95dd32e77308c406b41"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/time/.zattrs",
+      "bytes": 129,
+      "sha256": "b16911712f282c2d36ef85d8769be630a96637a919b398d114716ed5218ff705",
+      "file": "e41def408cc1b0b82ff3a40fd4fe08b2244f05ef3b54247c81efbc92216f2168"
+    },
+    {
+      "url": "https://storage.googleapis.com/weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr/time/3",
+      "bytes": 3374,
+      "sha256": "a7f6e4cac0dc83bb0426d1dcc31bc5b1d369d3a0e3380e30b7d8ca7c58ba8000",
+      "file": "a0f146df04edf5efaa9e5212bcf3adf0f43e5c7652bb8119cee2f6280bf9efed"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/height/0",
+      "file": "d56f33c738ba3ee05eba86fee4eeebff32c73bde014df2e4c073f5695079a62b",
+      "bytes": 8,
+      "sha256": "3f710ac088db33363087de2b9a657541fe5447821debaa9fe5cbd538eb1a5f29"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/time_bounds/.zarray",
+      "file": "2481a9ac6e9d5952cf0b276d3c94f5f17258e559cf0b1ab90cf1ffb543dc2592",
+      "bytes": 341,
+      "sha256": "fe26f753e71e99533227e7474f06cb73a618d6ca1ad06eaaa5b30d5980f0b8d8"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/time_bounds/.zattrs",
+      "file": "9f7505241190583b5417c015c90f9642093ebe4e744a300f4c51b5a97271ec44",
+      "bytes": 142,
+      "sha256": "386a4b8c855373f63e214b77da687512cc553b187e8e0736e261c5c6b907099c"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/Amon/tas/gr/v20180803/time_bounds/0.0",
+      "file": "8b579ad3a6df4be0702b4ff31813f061892b29ad99fb824ecd1f7357c4104fbe",
+      "bytes": 5026,
+      "sha256": "e9caf41e41d9b42075e27dce22fbf39f1d52e0bd694383470b9b0e8f94fcbab5"
+    },
+    {
+      "url": "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/IPSL/IPSL-CM6A-LR/historical/r1i1p1f1/fx/sftlf/gr/v20180803/type/0",
+      "file": "06c3bfbbb82b1c3c0b0301a4105d01220e43f154ef21bfbddb87d1c23dacc50c",
+      "bytes": 255,
+      "sha256": "ac04000ae0e6bc0c7890baaa9b1bb3b6cb5b70d317902095913ca3a114e26fcd"
+    }
+  ]
+}

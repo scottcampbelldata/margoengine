@@ -231,6 +231,10 @@
       "types": "./dist/compute/onnx.d.ts",
       "import": "./dist/compute/onnx.js"
     },
+    "./compute/quant": {
+      "types": "./dist/compute/quant.d.ts",
+      "import": "./dist/compute/quant.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"
@@ -1750,6 +1754,14 @@
     "./sciviz/graph-gpu": {
       "types": "./dist/sciviz/graph-gpu.d.ts",
       "import": "./dist/sciviz/graph-gpu.js"
+    },
+    "./sciviz/cf": {
+      "types": "./dist/sciviz/cf.d.ts",
+      "import": "./dist/sciviz/cf.js"
+    },
+    "./sciviz/projections": {
+      "types": "./dist/sciviz/projections.d.ts",
+      "import": "./dist/sciviz/projections.js"
     },
     "./selection": {
       "types": "./dist/selection.d.ts",

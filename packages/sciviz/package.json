@@ -319,6 +319,14 @@
     "./graph-gpu": {
       "types": "./dist/graph-gpu.d.ts",
       "import": "./dist/graph-gpu.js"
+    },
+    "./cf": {
+      "types": "./dist/cf.d.ts",
+      "import": "./dist/cf.js"
+    },
+    "./projections": {
+      "types": "./dist/projections.d.ts",
+      "import": "./dist/projections.js"
     }
   },
   "files": [
@@ -394,6 +402,7 @@
     "test:browser:density": "node scripts/browser-root.mjs tests/density-browser.mjs",
     "test:browser:density-scale": "node scripts/browser-root.mjs tests/density-scale-browser.mjs",
     "test:browser:notebook": "node scripts/browser-root.mjs tests/notebook-browser.mjs",
-    "test:browser:graph-gpu": "node scripts/browser-root.mjs tests/graph-gpu-browser.mjs"
+    "test:browser:graph-gpu": "node scripts/browser-root.mjs tests/graph-gpu-browser.mjs",
+    "test:browser:cf": "node scripts/browser-root.mjs tests/cf-browser.mjs"
   }
 }
