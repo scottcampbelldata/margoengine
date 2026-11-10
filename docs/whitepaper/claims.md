@@ -4671,3 +4671,7 @@ Initial and 304 response freshness account for Age plus elapsed request time thr
 ### Review 5 refused HDR restoration
 
 Ten actual device-replacement cases on RTX A6000 with masked full/half-float to LDR tiers detach refused effects, report one coded error and render three subsequent frames with no GPU errors. This does not certify physical lower-tier hardware. [Methods and reproduction](../review5-effect-restoration.md).
+
+### Asset-cache delayed hit bookkeeping (2026-11-10)
+
+Delayed hit bookkeeping preserves eviction and replacement outcomes. Evidence: all four regressions in packages/cache/test/stale-touch.test.js fail on the parent; packages/cache/test/stale-touch.js supplies the identical race proof to packages/cache/scripts/test-browser.js on real IndexedDB. They verify exact retained byte/file counts, byte-budget eviction after reloading a file, the old in-flight response and the replacement's body, ETag and content type. Reproduce after build with node --test packages/cache/test/stale-touch.test.js and npm run test:browser --workspace @margoengine/cache. Sources: docs/clean-room.md, Asset-cache delayed hit bookkeeping.

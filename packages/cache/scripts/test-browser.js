@@ -219,6 +219,24 @@ try {
   ]);
   report.evictionVariants = variants;
 
+  const staleTouches = await call('staleTouch');
+  assert.equal(staleTouches.length, 4);
+  for (const result of staleTouches) {
+    assert.deepEqual(result.after, result.before, 'a delayed hit cannot change stored byte/file totals');
+    assert.deepEqual(result.old, [100, 1], 'the already-read response remains valid for its caller');
+    if (result.mode === 'evict') {
+      assert.deepEqual(result.after, { bytes: 100, files: 1 });
+      assert.deepEqual(result.restored, { bytes: 100, files: 1 });
+      assert.equal(result.b, 'TypeError', 'recreating a must make budget room by evicting b');
+    } else {
+      assert.deepEqual(result.after, { bytes: 80, files: 1 });
+      assert.deepEqual(result.current, [80, 9]);
+      assert.equal(result.etag, '"new"');
+      assert.equal(result.type, 'application/new');
+    }
+  }
+  report.staleTouches = staleTouches;
+
   // 6. 2,000 stored files, then 30 more writes under a full budget: the records each write reads.
   const plain = await call('evictionReads', 'plain', false, 2000, 30),
     indexed = await call('evictionReads', 'indexed', true, 2000, 30);

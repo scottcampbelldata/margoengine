@@ -9,6 +9,7 @@ import { DecodedAssetCache } from '../dist/decoded.js';
 import { hashBytes } from '../dist/hashed.js';
 import { DracoDecoder, KTX2Decoder } from '../../decoders/dist/index.js';
 import { prefetchProof, throttleProof } from './browser-prefetch.js';
+import { staleTouch } from './stale-touch.js';
 
 const query = new URLSearchParams(location.search);
 
@@ -73,6 +74,12 @@ async function stream(ranges, url) {
 }
 
 window.cacheChecks = {
+  async staleTouch() {
+    const results = [];
+    for (const indexed of [false, true])
+      for (const mode of ['evict', 'replace']) results.push({ indexed, mode, ...(await staleTouch(mode, indexed)) });
+    return results;
+  },
   prefetchProof: () => prefetchProof('window-prefetch'),
   throttleProof,
   async serviceWorkerReady(revision = 1) {

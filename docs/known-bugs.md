@@ -5437,9 +5437,7 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 ### Open: cache findings not fixed in the audit
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
-- `serve()` puts the entry back blind: a hit looked up before a queued write evicts it brings back a record without
-  bytes (maxBytes 150, two 100-byte files: usage 200 bytes, 2 files). Fix: get then put in one transaction, only if the
-  record exists, as RangeCache `touch` does.
+- Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
 - A 304 without `Cache-Control` or `Expires` drops the stored lifetime instead of keeping it (RFC 9111 4.3.4; only
   non-conforming servers, as RFC 9110 15.4.5 makes servers send them).
 - RangeCache combines blocks under a weak ETag or no validator at all; RFC 9111 3.4 allows it only under one strong

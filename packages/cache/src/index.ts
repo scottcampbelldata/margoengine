@@ -319,7 +319,19 @@ export class AssetCache {
     this.stats.hits++;
     if (reason) this.stats[reason]++;
     entry.used = Date.now();
-    this.queue(() => this.tx('readwrite', (meta) => meta.put(entry, entry.url)));
+    this.queue(() =>
+      this.tx('readwrite', (meta) => {
+        const saved = meta.get(entry.url);
+        saved.onsuccess = () => {
+          if (!isEntry(saved.result)) return;
+          const current = saved.result;
+          current.used = Math.max(current.used, entry.used);
+          if (reason === 'revalidated' && current.etag === entry.etag && current.modified === entry.modified)
+            current.fresh = entry.fresh;
+          meta.put(current, entry.url);
+        };
+      }),
+    );
     return this.respond(entry, blob, range);
   }
 

@@ -6615,3 +6615,7 @@ DOF, Bloom and SSAO require native WebGPU or at least the half-float compatibili
 Locked-toolchain root entry measurements for this repair: DOF 9529 to 9538 gzip bytes, post 42105 to 42126; existing ceilings unchanged. Core plus stage remains 24209 gzip bytes.
 
 SSGI exact one-bounce round trips on RTX A6000 / ANGLE D3D11 can differ by one display level despite identical GL commands. The first differing target is the ray trace; native WebGPU and ANGLE Vulkan pass this fixture. This separately recorded driver case leaves the exact assertion unchanged. See [raw values and reproduction](review5-ssgi-angle.md).
+
+### Asset-cache delayed hit bookkeeping (2026-11-10)
+
+An already-read response may still finish after its stored copy is evicted or replaced. Its background last-use update cannot recreate missing metadata, overwrite a newer file's size, type or validators, or move last use backwards. A 304 freshness update requires matching stored validators. The same four delayed-response cases run with plain and indexed eviction on the CPU stand-in and real IndexedDB; after a 150-byte-budget eviction only one 100-byte file remains, and replacing that file with an 80-byte response retains the new response's headers. Public API and schema are unchanged. This does not add global request coalescing or change the documented offline fallback.

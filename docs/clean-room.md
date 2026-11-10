@@ -8627,3 +8627,7 @@ Compared Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Cachi
 ### Review 5 effect restoration (2026-11-10)
 
 Compared WebGPU device-loss/resource lifetime (Ninomiya, Jones and Blandy, W3C, 2026) and WebGL EXT_color_buffer_float / EXT_color_buffer_half_float (Callow and Khronos WebGL Working Group, 2017/2022). [Full titles, links, rationale and original tests](review5-effect-restoration.md). No other repository implementation or companion code was read.
+
+### Asset-cache delayed hit bookkeeping (2026-11-10)
+
+Compared Steve Becker (editor), W3C, *Indexed Database API 3.0* (2026 working draft), transaction lifecycle and scheduling, https://www.w3.org/TR/2026/WD-IndexedDB-3-20261030/, with Roy Fielding, Mark Nottingham and Julian Reschke, *RFC 9111: HTTP Caching* (2022), section 4.3.4, https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4. The read and conditional update stay within one transaction; 304 freshness is applied only while the stored validators match the validated snapshot. Last use updates the current record, preserving all its other metadata, and cannot recreate a removed record. No external implementation or companion code was read or copied.
