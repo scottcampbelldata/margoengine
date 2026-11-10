@@ -1002,3 +1002,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/staging (batch 272 job 4): document Backdrop/backdropGeometry dimensions, mesh orientation/material/ownership and stagingLights/stagingLighting presets, forwarded environment options/cancellation and limitations; examples deferred.
 - margoengine (batch 272 job 4): document staging/backdrop forwarding; examples deferred.
+- @margoengine/sciviz (batch 176 job 1): document /datasets constructors, normalized DataSet filter contract, composites and common arrays, higher-order refinement, face-stream limits, VTK/PLOT3D readers, options, cancellation and the real NASA example; add runnable examples after the build phase.
+- @margoengine/loaders (batch 176 job 1): document lazy VTKXMLPiece coordinates and topology metadata, RectilinearGrid support and unnamed coordinate axis order after the build phase.
+- margoengine (batch 176 job 1): document generated sciviz/datasets forwarding after the build phase.

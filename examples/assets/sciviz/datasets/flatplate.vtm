@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<VTKFile type="vtkMultiBlockDataSet" version="1.0" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+  <vtkMultiBlockDataSet>
+    <DataSet index="0" name="rectilinear" file="flatplate/flatplate_0.vtr"/>
+    <DataSet index="1" name="structured" file="flatplate/flatplate_1.vts"/>
+  </vtkMultiBlockDataSet>
+</VTKFile>

@@ -374,6 +374,10 @@ export interface VTKXMLPiece {
   readonly cellData: Readonly<Record<string, VTKXMLArray>>;
   readonly points?: VTKXMLArray;
   readonly cells: Readonly<Record<string, VTKXMLArray>>;
+  /** Rectilinear axes in x,y,z order, retaining unnamed arrays. */
+  readonly coordinates: readonly VTKXMLArray[];
+  /** PolyData topology in VTK cell order: Verts, Lines, Polys, Strips. */
+  readonly topology: Readonly<Record<string, Readonly<Record<string, VTKXMLArray>>>>;
 }
 
 /** The file metadata. Numeric payloads are read only on demand. */
@@ -430,7 +434,7 @@ export function openVTKXMLDataset(input: BinaryInput, options: VTKXMLDatasetOpti
     throw new LoaderError(F, 'limit', 'maxBytes must be a positive safe integer');
   const { file, context } = xmlContext(toBytes(input, F), maxBytes, options.signal),
     type = file.attributes.type;
-  if (!['PolyData', 'UnstructuredGrid', 'ImageData', 'StructuredGrid'].includes(type))
+  if (!['PolyData', 'UnstructuredGrid', 'ImageData', 'StructuredGrid', 'RectilinearGrid'].includes(type))
     throw new LoaderError(F, 'unsupported', `dataset type "${String(type).slice(0, 32)}" is not read`);
   const dataset = child(file, type);
   if (!dataset) throw new LoaderError(F, 'syntax', `no <${type}> element`);
@@ -471,6 +475,8 @@ export function openVTKXMLDataset(input: BinaryInput, options: VTKXMLDatasetOpti
       cellData: fields(child(p, 'CellData')),
       points: arrays(child(p, 'Points'))[0] ? entry(arrays(child(p, 'Points'))[0]) : undefined,
       cells: fields(child(p, 'Cells')),
+      coordinates: arrays(child(p, 'Coordinates')).map(entry),
+      topology: Object.fromEntries(['Verts', 'Lines', 'Polys', 'Strips'].map((name) => [name, fields(child(p, name))])),
     }));
   if (!pieces.length) throw new LoaderError(F, 'syntax', 'dataset has no pieces');
   return { type, attributes: { ...dataset.attributes }, pieces };

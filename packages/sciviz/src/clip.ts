@@ -56,7 +56,7 @@ function named(grid: AnalysisGrid, point: boolean): Record<string, ArrayLike<num
   return { ...(point ? grid.pointArrays : grid.cellArrays), ...((point ? grid.pointData : grid.cellData) ? { '': (point ? grid.pointData : grid.cellData)! } : {}) };
 }
 function validate(grid: AnalysisGrid): void {
-  checkComplex(grid);
+  checkComplex(grid, true);
   if (Object.hasOwn(grid.pointArrays ?? {}, '') || Object.hasOwn(grid.cellArrays ?? {}, ''))
     throw rangeError('Named analysis arrays must use a nonempty name; default scalars use pointData/cellData', 'sciviz');
   if (Array.from(grid.points).some(x => !Number.isFinite(x))) throw rangeError('Analysis coordinates must be finite', 'sciviz');
@@ -174,10 +174,11 @@ async function cut(grid: AnalysisGrid, field: Float64Array, signal?: AbortSignal
   const emit = (vertices: number[], cell: number) => {
     if (new Set(vertices).size !== vertices.length) return;
     const p = vertices.map(id => points.slice(3 * id, 3 * id + 3));
-    const a = sub3(p[1], p[0]), b = sub3(p[2], p[0]), measure = vertices.length === 4 ? dot3(cross3(a, b), sub3(p[3], p[0])) : Math.hypot(...cross3(a, b));
+    const a = p.length > 1 ? sub3(p[1], p[0]) : [], b = p.length > 2 ? sub3(p[2], p[0]) : [],
+      measure = p.length === 1 ? 1 : p.length === 2 ? Math.hypot(...a) : vertices.length === 4 ? dot3(cross3(a, b), sub3(p[3], p[0])) : Math.hypot(...cross3(a, b));
     if (measure === 0) return;
     if (vertices.length === 4 && measure < 0) [vertices[1], vertices[2]] = [vertices[2], vertices[1]];
-    connectivity.push(...vertices); offsets.push(connectivity.length); types.push(vertices.length === 4 ? 10 : 5); source.push(grid.sourceCells?.[cell] ?? cell);
+    connectivity.push(...vertices); offsets.push(connectivity.length); types.push([0, 1, 3, 5, 10][vertices.length]); source.push(grid.sourceCells?.[cell] ?? cell);
     for (const [name, data] of Object.entries(cellRows)) {
       const width = data.length / grid.types.length; for (let k = 0; k < width; k++) ca[name].push(data[cell * width + k]);
     }
@@ -187,6 +188,11 @@ async function cut(grid: AnalysisGrid, field: Float64Array, signal?: AbortSignal
     if (visited++ % 2048 === 0) { await pause(); signal?.throwIfAborted(); }
     if (corners.every(id => field[id] >= 0)) { emit(corners.map(original), cell); continue; }
     if (corners.every(id => field[id] < 0)) continue;
+    if (corners.length === 2) {
+      const [a, b] = corners;
+      emit(field[a] >= 0 ? [original(a), edge(a, b)] : [edge(a, b), original(b)], cell);
+      continue;
+    }
     const volume = corners.length === 4, faces = volume ? [[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]] : [[0, 1, 2]], clipped: number[][] = [], cap = new Set<number>();
     for (const face of faces) {
       const ring = face.map(k => corners[k]), out: number[] = [];

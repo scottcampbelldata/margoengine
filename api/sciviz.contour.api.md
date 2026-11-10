@@ -21,8 +21,10 @@ export interface ContourOptions {
 export interface GridContours {
     readonly triangles: TriangleSet;
     readonly lines: ContourLines;
+    readonly points: ContourLines;
     readonly triangleLevels: Uint32Array;
     readonly lineLevels: Uint32Array;
+    readonly pointLevels: Uint32Array;
     readonly floatBound: number;
 }
 

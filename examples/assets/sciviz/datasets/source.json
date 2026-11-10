@@ -1,0 +1,45 @@
+{
+  "title": "NASA TMR flat-plate verification grids, 35 x 25",
+  "source": "https://tmbwg.github.io/turbmodels/flatplate_grids.html",
+  "download": "https://www.nasa.gov/wp-content/uploads/2026/02/flatplategrids-grids.zip",
+  "license": "US government public domain",
+  "writer": "VTK 9.7.2",
+  "conversion": "PLOT3D originals unchanged. VTS retains original 2D coordinates. VTR projects onto the first x coordinate row and first y coordinate column; max absolute differences 4.75693703178e-17 in x, 2.0000112677109882e-12 in y. VTM contains both representations. Scalars are original grid x coordinates, not a flow solution.",
+  "files": [
+    {
+      "file": "flatplate/flatplate_0.vtr",
+      "bytes": 2646,
+      "sha256": "0bec44281f5142ab86a5104e0b4f520713150c48bd7b0338e03a641ea4300a9e"
+    },
+    {
+      "file": "flatplate/flatplate_1.vts",
+      "bytes": 6616,
+      "sha256": "0faf7a24598d052fbbedd0e827c712587344c213c14f02235e69686d4669b65a"
+    },
+    {
+      "file": "flatplate.vtm",
+      "bytes": 371,
+      "sha256": "1cd2ac7583505ddbb709c97e5080c796c947001d4c63a1eeea7171726c3ddec3"
+    },
+    {
+      "file": "flatplate.vtr",
+      "bytes": 2630,
+      "sha256": "8e463db0e4ef2c0bac642d44b26db93f298f0e7cd99d39a16032df9ebdc8a124"
+    },
+    {
+      "file": "flatplate.vts",
+      "bytes": 6381,
+      "sha256": "652b1920099caae0225dceb86ff120504791f19d3cf1f036c48295410c0a12eb"
+    },
+    {
+      "file": "flatplate_clust2_4levelsdown_35x25.p2dfmt",
+      "bytes": 42622,
+      "sha256": "41c409f49afca8affaafd4a0a49c6ba934eca9007da502fe0c20afbd091500b0"
+    },
+    {
+      "file": "flatplate_clust2_4levelsdown_35x25.p3dfmt",
+      "bytes": 127800,
+      "sha256": "37fe2257e2da6b6eb66d980b1a5efd642cce06a93ff4b64aac4ba916037183e4"
+    }
+  ]
+}

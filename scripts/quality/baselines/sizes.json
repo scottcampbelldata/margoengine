@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14157547,
+  "total": 14170970,
   "history": [
     {
       "date": "2026-10-24",
@@ -7489,6 +7489,12 @@
       "commit": "batch-272-job4",
       "reason": "New optional staging/backdrop: absent to 1332 B gzip, ceiling 1588 B. Smooth real-mesh cyclorama and original photographic rigs share one small entry; existing environment loads lazily. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "76db3f779",
+      "reason": "Batch 176 job 1: new optional sciviz/datasets entry 0 to 13072 gzip bytes, ceiling 13423. Scientific topology, finite-element interpolation, nonconvex decomposition and format readers belong together behind this entry; splitting would add cross-entry orchestration without reducing bytes for its users. Core plus stage unchanged at 24209 bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8846,6 +8852,7 @@
     "@margoengine/clustered/shadow-atlas": 14448,
     "@margoengine/post/curvature": 9209,
     "@margoengine/sciviz/export-vector": 4213,
-    "@margoengine/staging/backdrop": 1588
+    "@margoengine/staging/backdrop": 1588,
+    "@margoengine/sciviz/datasets": 13423
   }
 }

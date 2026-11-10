@@ -1,6 +1,6 @@
 // One real GPU leaf, two backends, all six writer-produced format variants.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -58,5 +58,6 @@ for (const compat of [false, true]) {
     await context.close();
   }
 }
+await mkdir('test-results/sciviz-fixes', { recursive: true });
 await writeFile('test-results/sciviz-fixes/formats-gpu.json', JSON.stringify(reports, null, 2));
 console.log(JSON.stringify(reports));

@@ -3422,6 +3422,10 @@
       "types": "./dist/sciviz/export-vector.d.ts",
       "import": "./dist/sciviz/export-vector.js"
     },
+    "./sciviz/datasets": {
+      "types": "./dist/sciviz/datasets.d.ts",
+      "import": "./dist/sciviz/datasets.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

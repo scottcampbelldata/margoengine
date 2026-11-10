@@ -21,8 +21,11 @@ export interface ContourLines {
 export interface GridContours {
   readonly triangles: TriangleSet;
   readonly lines: ContourLines;
+  /** Isolated crossings of line cells, and matching vertex cells; one xyz tuple per point. */
+  readonly points: ContourLines;
   readonly triangleLevels: Uint32Array;
   readonly lineLevels: Uint32Array;
+  readonly pointLevels: Uint32Array;
   /** Absolute per-coordinate CPU/GPU bound on the shared float32 input. Normals are identical. */
   readonly floatBound: number;
 }
@@ -32,7 +35,7 @@ const pause = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 const BATCH = 4096;
 
 function snapshot(grid: ContourGrid, levels: readonly number[]) {
-  checkComplex(grid);
+  checkComplex(grid, true);
   if (!grid.pointData) throw rangeError('Contours require one scalar pointData value per point', 'sciviz');
   const finite = (values: ArrayLike<number>) => {
     const copy = Float32Array.from(values);
@@ -50,6 +53,14 @@ function snapshot(grid: ContourGrid, levels: readonly number[]) {
 // Topology depends only on comparisons, never rounded GPU intersections. GPU computes every output coordinate.
 function* plan(grid: ReturnType<typeof snapshot>): Generator<Primitive | null> {
   for (const { ids, cell } of simplices(grid)) {
+    if (ids.length < 3) {
+      for (let level = 0; level < grid.levels.length; level++) {
+        const value = grid.levels[level], a = ids[0], b = ids[ids.length - 1], va = grid.pointData[a], vb = grid.pointData[b];
+        if (ids.length === 1 ? va === value : (va < value && vb >= value) || (vb < value && va >= value))
+          yield { edges: [[a, b]], normal: [0, 0, 0], cell, level, value };
+      }
+      yield null; continue;
+    }
     const p = ids.map(id => Array.from(grid.points.subarray(3 * id, 3 * id + 3))), v = ids.map(id => grid.pointData[id]);
     const a = sub3(p[1], p[0]), b = sub3(p[2], p[0]), ab = cross3(a, b);
     let gradient: number[];
@@ -95,7 +106,7 @@ struct Params { count: u32 }
 @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
   let i = id.x; if (i >= params.count) { return; }
   let a = endpoints[2u*i]; let b = endpoints[2u*i+1u];
-  let t = clamp((levels[i]-a.w)/(b.w-a.w),0.0,1.0);
+  let t = select(clamp((levels[i]-a.w)/(b.w-a.w),0.0,1.0), 0.0, a.w == b.w);
   let p = a.xyz + t*(b.xyz-a.xyz);
   positions[3u*i] = p.x; positions[3u*i+1u] = p.y; positions[3u*i+2u] = p.z;
 }`;
@@ -103,7 +114,7 @@ struct Params { count: u32 }
 async function execute(grid: ContourGrid, levels: readonly number[], options: ContourOptions, gpu?: ComputeContext): Promise<GridContours> {
   options.signal?.throwIfAborted();
   const input = snapshot(grid, levels), iterator = plan(input),
-    positions: number[][] = [[], []], normals: number[] = [], values: number[][] = [[], []], cells: number[][] = [[], []], levelIds: number[][] = [[], []],
+    positions: number[][] = [[], [], []], normals: number[] = [], values: number[][] = [[], [], []], cells: number[][] = [[], [], []], levelIds: number[][] = [[], [], []],
     seen = new Set<string>();
   let floatBound = 0, total = 0;
   if (gpu) await gpu.routeReady;
@@ -125,7 +136,7 @@ async function execute(grid: ContourGrid, levels: readonly number[], options: Co
           const [a, b] = edge, va = input.pointData[a], vb = input.pointData[b];
           const scale = Math.max(1, ...edge.flatMap(id => Array.from(input.points.subarray(3 * id, 3 * id + 3))).map(Math.abs));
           // Division/subtractions and interpolation, including cancellation, have this absolute envelope.
-          floatBound = Math.max(floatBound, 32 * 2 ** -23 * scale * (1 + Math.max(Math.abs(va), Math.abs(vb), Math.abs(item.value)) / Math.abs(vb - va)));
+          floatBound = Math.max(floatBound, 32 * 2 ** -23 * scale * (1 + (va === vb ? 0 : Math.max(Math.abs(va), Math.abs(vb), Math.abs(item.value)) / Math.abs(vb - va))));
           for (const id of edge) ends.push(...input.points.subarray(3 * id, 3 * id + 3), input.pointData[id]);
           isos.push(item.value);
         }
@@ -146,14 +157,14 @@ async function execute(grid: ContourGrid, levels: readonly number[], options: Co
       } else {
         output = new Float32Array(isos.length * 3);
         for (let i = 0; i < isos.length; i++) {
-          const t = Math.max(0, Math.min(1, (isos[i] - ends[8 * i + 3]) / (ends[8 * i + 7] - ends[8 * i + 3])));
+          const t = ends[8 * i + 7] === ends[8 * i + 3] ? 0 : Math.max(0, Math.min(1, (isos[i] - ends[8 * i + 3]) / (ends[8 * i + 7] - ends[8 * i + 3])));
           for (let k = 0; k < 3; k++) output[3 * i + k] = ends[8 * i + k] + t * (ends[8 * i + 4 + k] - ends[8 * i + k]);
         }
       }
       options.signal?.throwIfAborted();
       let at = 0;
       for (const item of batch) {
-        const line = item.edges.length === 2 ? 1 : 0, count = item.edges.length;
+        const line = item.edges.length === 1 ? 2 : item.edges.length === 2 ? 1 : 0, count = item.edges.length;
         const p = Array.from({ length: count }, (_, k) => Array.from(output.subarray(at + 3 * k, at + 3 * k + 3)));
         // Winding uses the field gradient; it does not change the chosen diagonal.
         if (!line && dot3(cross3(sub3(p[1], p[0]), sub3(p[2], p[0])), item.normal) < 0) [p[1], p[2]] = [p[2], p[1]];
@@ -169,7 +180,8 @@ async function execute(grid: ContourGrid, levels: readonly number[], options: Co
   };
   return { triangles: { positions: new Float32Array(positions[0]), normals: new Float32Array(normals), values: new Float32Array(values[0]), cells: new Uint32Array(cells[0]), bounds: bounds(positions[0]) },
     lines: { positions: new Float32Array(positions[1]), values: new Float32Array(values[1]), cells: new Uint32Array(cells[1]), bounds: bounds(positions[1]) },
-    triangleLevels: new Uint32Array(levelIds[0]), lineLevels: new Uint32Array(levelIds[1]), floatBound };
+    points: { positions: new Float32Array(positions[2]), values: new Float32Array(values[2]), cells: new Uint32Array(cells[2]), bounds: bounds(positions[2]) },
+    triangleLevels: new Uint32Array(levelIds[0]), lineLevels: new Uint32Array(levelIds[1]), pointLevels: new Uint32Array(levelIds[2]), floatBound };
 }
 
 /** March point data on convex cells using a globally consistent piecewise-linear field. */

@@ -37,6 +37,8 @@ export interface VTKXMLPiece {
     readonly cellData: Readonly<Record<string, VTKXMLArray>>;
     readonly points?: VTKXMLArray;
     readonly cells: Readonly<Record<string, VTKXMLArray>>;
+    readonly coordinates: readonly VTKXMLArray[];
+    readonly topology: Readonly<Record<string, Readonly<Record<string, VTKXMLArray>>>>;
 }
 
 export interface VTKXMLResult extends LoadedGeometry {
