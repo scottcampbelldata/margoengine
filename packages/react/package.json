@@ -38,7 +38,8 @@
     "test:browser:textures": "node scripts/test-textures-browser.mjs",
     "test:browser:controls-extra": "node scripts/test-controls-extra-browser.mjs",
     "test:browser:portals": "node scripts/test-portals-browser.mjs",
-    "test:browser:effects-extra": "node scripts/test-effects-extra-browser.mjs"
+    "test:browser:effects-extra": "node scripts/test-effects-extra-browser.mjs",
+    "test:browser:test-offscreen": "node scripts/test-test-offscreen-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -231,6 +232,16 @@
       "types": "./dist/effects-extra.d.ts",
       "react-server": "./dist/rsc/effects-extra.js",
       "import": "./dist/effects-extra.js"
+    },
+    "./test": {
+      "types": "./dist/test.d.ts",
+      "react-server": "./dist/rsc/test.js",
+      "import": "./dist/test.js"
+    },
+    "./offscreen": {
+      "types": "./dist/offscreen.d.ts",
+      "react-server": "./dist/rsc/offscreen.js",
+      "import": "./dist/offscreen.js"
     }
   },
   "files": [
@@ -279,7 +290,9 @@
     "@margoengine/lod": "^1.0.0",
     "@margoengine/splats": "^1.0.0",
     "@margoengine/viewcube": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/headless": "^1.0.0",
+    "@margoengine/worker": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -385,6 +398,12 @@
       "optional": true
     },
     "@margoengine/decoders": {
+      "optional": true
+    },
+    "@margoengine/headless": {
+      "optional": true
+    },
+    "@margoengine/worker": {
       "optional": true
     }
   }

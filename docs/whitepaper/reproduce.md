@@ -3384,3 +3384,8 @@ Build packages, run node --test --test-timeout=120000 packages/mixer/tests/pitch
 
 ### Voxel generation (batch 241 job 1)
 After building packages, run `node --test --test-timeout=120000 packages/voxel-edit/tests/generate.test.js`; native font proof: `node packages/voxel-edit/tests/generate-browser-check.mjs`. Package GPU correctness uses `node scripts/gpu-lock.mjs run --owner=codex-batch241 --wait-max=60 --max=5 -- npm run test:gpu --workspace=@margoengine/voxel-edit`, then the same command with MARGO_COMPAT=1. No benchmark is required. No external fixture download.
+
+
+### Batch 266 job 3: React component and offscreen proof
+
+After build:packages, run node --test --test-timeout=30000 packages/react/tests/test-renderer.test.js packages/react/tests/offscreen.test.js. For rendering, run node scripts/gpu-lock.mjs run --owner=react-test-offscreen --wait-max=60 --max=3 -- node packages/react/scripts/test-test-offscreen-browser.mjs, and again with --compat on the browser script. The generated cube is a mathematical control; no imported demo asset. Both paths use margoLow=1, 128 by 128 backing pixels and the same camera/material. The fixture asserts exact pixels, scene/frame/click counts, all thread selection paths, React page state and cleanup, with bounded waits and no timing or speed assertion.

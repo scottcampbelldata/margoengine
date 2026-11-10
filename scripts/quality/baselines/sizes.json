@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13529576,
+  "total": 13537199,
   "history": [
     {
       "date": "2026-10-24",
@@ -7020,6 +7020,12 @@
       "commit": "d43bfabf5",
       "reason": "new entry @margoengine/clustered/stochastic (StochasticLights, batch 52 job 8) and the Clustered.stochastic hook in @margoengine/clustered",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-266-job-3",
+      "reason": "New optional React test/offscreen entries, 0 to 5944/1167 B gzip; ceilings 6200/1423 B. DOM testing and shared-scene lifetime stay together without core/stage growth.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8292,6 +8298,8 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/react/test": 6200,
+    "@margoengine/react/offscreen": 1423
   }
 }

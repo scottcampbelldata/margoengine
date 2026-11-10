@@ -3933,3 +3933,8 @@ Continuous delay-line transposition retains source clock and frame count. Proof:
 
 ### Voxel generation (batch 241 job 1)
 The optional voxel-edit `/generate` entry turns Grey8 or RGBA8 into coloured columns and native shaped text into extruded cells. Proof: `packages/voxel-edit/tests/generate.test.js` checks exact heights, channels, transparency, indexing, budgets, cancellation and deterministic palette reduction; `generate-browser-check.mjs` checks actual font holes, multiline bounds, context reuse and equal extrusion planes. No speed or cross-platform font-mask identity claim.
+
+
+### Batch 266 job 3: React tests and worker canvas
+
+react/test mounts ordinary React DOM components on a real GPU-free null stage and exposes scene queries, manual frames and explicit-hit pointer dispatch. react/offscreen keeps React on the page and delegates the shared native scene to worker/auto, falling back before transfer when unavailable. Evidence: packages/react/tests/test-renderer.test.js, offscreen.test.js and scripts/test-test-offscreen-browser.mjs. Browser controls compare the component/headless and native worker/page cube pixels exactly on both supported backend routes, including missing-worker and missing-transfer selection. This is feature/correctness coverage, not a speed or universal library superiority claim. The package-wide reconciler ban and its tests remain unchanged.

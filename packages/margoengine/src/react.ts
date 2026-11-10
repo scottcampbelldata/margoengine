@@ -29,3 +29,5 @@ export * from '@margoengine/react/instances';
 export * from '@margoengine/react/controls-extra';
 export * from '@margoengine/react/portals';
 export * from '@margoengine/react/effects-extra';
+export * from '@margoengine/react/test';
+export * from '@margoengine/react/offscreen';

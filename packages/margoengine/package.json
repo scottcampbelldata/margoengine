@@ -2926,6 +2926,14 @@
       "types": "./dist/react/effects-extra.d.ts",
       "import": "./dist/react/effects-extra.js"
     },
+    "./react/test": {
+      "types": "./dist/react/test.d.ts",
+      "import": "./dist/react/test.js"
+    },
+    "./react/offscreen": {
+      "types": "./dist/react/offscreen.d.ts",
+      "import": "./dist/react/offscreen.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

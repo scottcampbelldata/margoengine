@@ -753,3 +753,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/clustered | stochastic: StochasticLights (samples, temporal, quad), MAX_STOCHASTIC_SAMPLES, Clustered.stochastic hook, needs LocalShadows or integrated shadows | batch-52 job 8 |
 | margoengine | clustered/stochastic alias | batch-52 job 8 |
+
+
+- @margoengine/react (batch 266 job 3): document /test createTestRenderer, DOM/jsdom setup, null-stage ownership, frame/query/pointer helpers, and /offscreen main-thread React plus shared-scene URL, worker/page fallback, startup props and cleanup; examples deferred.
+- margoengine (batch 266 job 3): document generated react/test and react/offscreen aliases; examples deferred.

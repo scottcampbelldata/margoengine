@@ -17,6 +17,8 @@ const specifier = (subpath) => '@margoengine/react' + (subpath === '.' ? '' : su
 // binding that needs @margoengine/<name> is in @margoengine/react/<name> (2026-10-27).
 const runtimes = ['./jsx-runtime', './jsx-dev-runtime'];
 const expected = {
+  './test': ['TestRenderer', 'act', 'createTestRenderer'],
+  './offscreen': ['OffscreenCanvas'],
   './effects-extra': ['Decal', 'Edges', 'Sparkles', 'Stars', 'Trail'],
   './portals': ['Hud', 'RenderTexture'],
   './controls-extra': ['KeyboardControls', 'PresentationControls', 'Scroll', 'ScrollControls', 'useKeyboardControls', 'useScroll'],
@@ -114,6 +116,8 @@ const expected = {
   './ui': ['Figure', 'GameUi', 'LinePlot', 'ScatterPlot', 'Sound', 'Sprite', 'SpriteLayer', 'SurfacePlot'],
 };
 const optionalPeers = [
+  '@margoengine/headless',
+  '@margoengine/worker',
   '@margoengine/gltf-pro',
   '@margoengine/fbx',
   '@margoengine/environment',
