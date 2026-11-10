@@ -5575,6 +5575,12 @@
       "commit": "5a32a0b2c",
       "reason": "Optional ui/image: 0 to 2524 B gzip, ceiling 2700 B. UI root 31885 to 32080 B uses existing ordered colour quads instead of a separate pipeline. Core+stage remains 23950 B. Input and image widgets share UI text dependency.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "501c04f13",
+      "reason": "Batch 252 job 6: @margoengine/navmesh/build: 12519 B gzip (ceiling 12727 -> 12727 B); @margoengine/navmesh/tiles: 14985 B gzip (ceiling 15113 -> 15113 B); @margoengine/navmesh/wasm: 17357 B gzip (ceiling 17808 -> 17808 B); @margoengine/navmesh dist/workers/navmesh-build.js: 17511 B gzip (ceiling 17951 -> 17951 B). Optional navigation behavior retains one shared implementation; splitting would duplicate graph traversal and controller ownership. Core/stage source unchanged.",
+      "grew": 4
     }
   ],
   "items": {

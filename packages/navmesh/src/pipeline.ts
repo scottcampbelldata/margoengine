@@ -31,7 +31,7 @@ export interface NavigationOptions {
   cs?: number;
   /** Cell height on Y, wu, > 0. Default 0.2. */
   ch?: number;
-  /** Empty border around the voxel grid, vx. Accepted for compatibility: a single mesh only gains empty cells. Default 0. */
+  /** Extra voxel-grid padding per side, rounded up. Tiles use at least this much context before cropping to their bounds. Default 0. */
   borderSize?: number;
   /** Steepest walkable slope in degrees, 0 <= angle < 90. Default 60. */
   walkableSlopeAngle?: number;
@@ -102,7 +102,8 @@ const DEFAULTS: Required<NavigationOptions> = {
   obstacles: [],
   areas: [],
 };
-const VOXEL_BUDGET = 16_000_000;
+/** Maximum cells in one padded whole-level or tile raster grid. */
+export const VOXEL_BUDGET = 16_000_000;
 const FIX = 'check the geometry is walkable at these settings (cs, walkableSlopeAngle)';
 /** Open space above the highest span of a column, in voxels. */
 export const SKY = 1 << 30;
@@ -195,10 +196,13 @@ export function validate(
     config.walkableSlopeAngle >= 90 ||
     config.maxVertsPerPoly < 3 ||
     config.maxVertsPerPoly >= 7 ||
-    (budget && Math.ceil((max[0] - min[0]) / config.cs) * Math.ceil((max[2] - min[2]) / config.cs) > VOXEL_BUDGET)
+    (budget &&
+      (Math.max(1, Math.ceil((max[0] - min[0]) / config.cs)) + 2 * Math.ceil(config.borderSize)) *
+        (Math.max(1, Math.ceil((max[2] - min[2]) / config.cs)) + 2 * Math.ceil(config.borderSize)) >
+        VOXEL_BUDGET)
   )
     throw new RangeError(
-      'Recast voxel budget or config exceeded: cs and ch must be > 0, walkableSlopeAngle < 90, maxVertsPerPoly 3 to 6, and ceil(xSize / cs) * ceil(zSize / cs) at most 16,000,000 (raise cs)',
+      'Recast voxel budget or config exceeded: cs and ch must be > 0, walkableSlopeAngle < 90, maxVertsPerPoly 3 to 6, and the padded XZ grid at most 16,000,000 cells (raise cs or reduce borderSize)',
     );
   return { points, triangles, config, min, max };
 }
@@ -503,14 +507,15 @@ export interface Grid {
 
 /** The grid of a whole level. */
 export function gridOf({ config, min, max }: Input): Grid {
+  const border = Math.ceil(config.borderSize);
   return {
-    width: Math.max(1, Math.ceil((max[0] - min[0]) / config.cs)),
-    depth: Math.max(1, Math.ceil((max[2] - min[2]) / config.cs)),
+    width: Math.max(1, Math.ceil((max[0] - min[0]) / config.cs)) + 2 * border,
+    depth: Math.max(1, Math.ceil((max[2] - min[2]) / config.cs)) + 2 * border,
     ox: min[0],
     oy: min[1],
     oz: min[2],
-    cx: 0,
-    cz: 0,
+    cx: -border,
+    cz: -border,
     keep: null,
     floor: 0,
   };

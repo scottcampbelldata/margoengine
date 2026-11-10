@@ -2679,3 +2679,6 @@ Build sky and sciviz, then run node --test --test-timeout=120000 packages/sciviz
 
 ### Batch 258 image correctness
 After build:packages, run node --test --test-timeout=120000 packages/ui/tests/image.test.js. Under one shared GPU slot run node packages/ui/tests/image-browser.mjs, then the same command with --compat. Each mode also runs the preview GL page. The tracked Poly Haven JPG and its CC0 provenance are in examples/assets/source/skinning_ik/textures/polyhaven and examples/assets/skinning-ik-LICENSE.md. The tests assert actual nine-slice/cell/fit pixels, photograph decoding, tint and unchanged uploads. No timing comparison is performed.
+
+
+Batch 252 job 6: after building, run node --test --test-timeout=120000 packages/navmesh/test/border.test.js packages/navmesh/test/wasm.test.js. A 32x32-cell floor with borderSize=3 must allocate 38x38 columns with empty outer padding, retain byte-identical walkable polygons and match the Rust worker. Tile tests inspect bounds and all interior cell centers, not timings.

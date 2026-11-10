@@ -3169,3 +3169,8 @@ sciviz/atmosphere adds a date-driven solar globe using sky's existing Hillaire t
 
 ### UI image widget (batch 258 job 2)
 The optional ui/image entry draws pixel textures and atlas cells with contain/cover/fill, tint and fixed-corner nine-slice borders. Claim scope is the job row, not all sprite-animation or image-editing functionality. CPU geometry/gutter/copy regressions and image-browser.mjs support the claim; the browser driver checks actual pixels on WebGPU, complete compatibility and preview GL. It also requires zero uploads on an unchanged image-only second frame. No elapsed-speed number is claimed.
+
+
+## Batch 252 job 6: effective border padding
+
+packages/navmesh/test/border.test.js proves borderSize allocates empty raster columns on all sides, leaves world-space output polygons intact, increases tile context above the automatic minimum, crops output to tile bounds, preserves cross-tile paths and rebuilds, rounds fractions upward and rejects padded budgets before allocation. The worker parity fixture also covers borderSize=3. This implements the documented heightfield-border behavior and preserves the larger clearance context needed by the existing filters.

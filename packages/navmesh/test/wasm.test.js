@@ -47,6 +47,7 @@ const controls = { timeout: 30000 };
 test('real CPU worker Rust SIMD builds byte-identical meshes for floors, ramps, obstacles and irregular triangles', async () => {
   const cases = [
     [floor, indices, settings],
+    [floor, indices, { ...settings, borderSize: 3 }],
     [[0, 0, 0, 16, 4, 0, 16, 4, 16, 0, 0, 16], indices, { ...settings, detailSampleDist: 1 }],
     [
       floor,
