@@ -34,7 +34,8 @@
     "test:browser:bindings": "cd ../.. && node packages/react/scripts/test-bindings-browser.mjs",
     "test:browser:instances": "cd ../.. && node packages/react/scripts/test-instances-browser.mjs",
     "test:browser:priority": "node scripts/test-priority-browser.mjs",
-    "test:browser:performance": "node scripts/test-performance-browser.mjs"
+    "test:browser:performance": "node scripts/test-performance-browser.mjs",
+    "test:browser:textures": "node scripts/test-textures-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -207,6 +208,11 @@
       "types": "./dist/instances.d.ts",
       "react-server": "./dist/rsc/instances.js",
       "import": "./dist/instances.js"
+    },
+    "./textures": {
+      "types": "./dist/textures.d.ts",
+      "react-server": "./dist/rsc/textures.js",
+      "import": "./dist/textures.js"
     }
   },
   "files": [
@@ -254,7 +260,8 @@
     "@margoengine/points": "^1.0.0",
     "@margoengine/lod": "^1.0.0",
     "@margoengine/splats": "^1.0.0",
-    "@margoengine/viewcube": "^1.0.0"
+    "@margoengine/viewcube": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -357,6 +364,9 @@
       "optional": true
     },
     "@margoengine/viewcube": {
+      "optional": true
+    },
+    "@margoengine/decoders": {
       "optional": true
     }
   }

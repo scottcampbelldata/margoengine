@@ -5239,7 +5239,9 @@ export class PBRModel implements EnginePlugin {
     }
     this.lighting.clear();
     this.lightingList = noLighting;
-    cleanup.run(() => this.engine.removePlugin(this.name)).run(() => this.engine.frameGraph.removeOwner(this.name));
+    const scene = this.engine.sceneOf(this);
+    if (scene) cleanup.run(() => this.engine.removePlugin(this.name, scene));
+    else cleanup.run(() => this.engine.frameGraph.removeOwner(this.name));
     for (const callback of this.cleanupCallbacks) cleanup.run(callback);
     this.cleanupCallbacks.clear();
     cleanup.run(() => this.releaseGPU());

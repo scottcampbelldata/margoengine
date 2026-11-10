@@ -5,11 +5,12 @@
 ```ts
 import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, RenderView, Vec3 } from "@margoengine/core";
 import { EnginePlugin } from "@margoengine/core/extension";
+import { Texture } from "@margoengine/materials";
 import { ColorInput } from "@margoengine/math";
 import { Stage } from "@margoengine/stage";
 import { CSSProperties, ElementType, ReactNode, RefAttributes } from "react";
 
-export function BoxGeometry({ args }: {
+export function BoxGeometry(_arg2: {
     args?: Vec3;
 }): null;
 
@@ -50,7 +51,7 @@ export interface DirectionalLightProps {
     intensity?: number;
 }
 
-export function GeometryResource({ geometry }: {
+export function GeometryResource(_arg3: {
     geometry: Geometry;
 }): null;
 
@@ -76,7 +77,7 @@ export interface LoaderContext {
     fetch: typeof fetch;
 }
 
-export function MargoCanvas({ children, style, className, label, capacity, backend, camera, powerPreference, fallback, loadFallback, fallbackContent, loadCompat, frameloop, maxDpr, onCreated, onError, onPointerMissed }: CanvasProps): import("react").JSX.Element;
+export function MargoCanvas(_arg0: CanvasProps): import("react").JSX.Element;
 
 export type MargoCanvasProps = CanvasProps;
 
@@ -140,12 +141,19 @@ export interface MeshProps extends PointerHandlers {
 
 export type MeshRef = MeshHandle;
 
-export function PbrMaterial({ color, roughness, metalness }: PbrMaterialProps): null;
+export function PbrMaterial(props: PbrMaterialProps): import("react").JSX.Element;
 
 export interface PbrMaterialProps {
     color?: string | readonly number[];
     roughness?: number;
     metalness?: number;
+    map?: Texture | TextureSource | null;
+    normalMap?: Texture | TextureSource | null;
+    roughnessMap?: Texture | TextureSource | null;
+    metalRoughnessMap?: Texture | TextureSource | null;
+    emissiveMap?: Texture | TextureSource | null;
+    emissive?: string | readonly number[];
+    emissiveIntensity?: number;
 }
 
 export interface PointerHandlers {
@@ -188,7 +196,7 @@ export interface SceneProps {
     children?: ReactNode;
 }
 
-export function Stage({ camera, children }: StageProps): import("react").JSX.Element | null;
+export function Stage(_arg1: StageProps): import("react").JSX.Element | null;
 
 export interface StageProps {
     camera?: EngineOptions['camera'];
@@ -204,7 +212,7 @@ export interface SunProps {
 }
 
 export { BoxGeometry as boxGeometry };
-function BoxGeometry({ args }: {
+function BoxGeometry(_arg2: {
     args?: Vec3;
 }): null;
 
@@ -219,7 +227,7 @@ export { Mesh as mesh };
 const Mesh: import("react").ForwardRefExoticComponent<MeshProps & import("react").RefAttributes<MeshHandle>>;
 
 export { PbrMaterial as meshStandardMaterial };
-function PbrMaterial({ color, roughness, metalness }: PbrMaterialProps): null;
+function PbrMaterial(props: PbrMaterialProps): import("react").JSX.Element;
 
 export function useCamera(): EngineKernel['camera'];
 
@@ -234,4 +242,8 @@ export function useMargo(): MargoContextValue;
 export function useMargoStage(): EngineKernel;
 
 export function useProgress(): LoadProgress;
+
+// Not exported from this entry, but used by the exports above:
+
+type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;
 ```

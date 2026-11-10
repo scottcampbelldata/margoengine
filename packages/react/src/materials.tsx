@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, Suspense } from 'react';
 import { PbrMaterial as CoreMaterial, type Geometry, type Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import type { PBRModel, PreparedGeometry } from '@margoengine/gltf-pro';
@@ -8,6 +8,7 @@ import { live, useMesh, useResourceEffect, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { modelPicking } from './picking.js';
 import { MargoError } from '@margoengine/math/errors';
+import { MappedMaterial } from './texture-material.js';
 
 export { BatchedMesh, BatchedItem, type BatchedMeshProps, type BatchedItemProps } from './batched.js';
 
@@ -203,6 +204,8 @@ function TransmissionBinding(props: MeshTransmissionMaterialProps) {
 export function MeshTransmissionMaterial({ factor = 1, ...props }: MeshTransmissionMaterialProps) {
   if (typeof factor !== 'number' || !Number.isFinite(factor) || factor < 0 || factor > 1)
     throw new RangeError('MeshTransmissionMaterial: factor must be between 0 and 1');
+  if (props.map || props.normalMap || props.roughnessMap || props.emissiveMap || props.metalRoughnessMap)
+    return <Suspense fallback={null}><MappedMaterial {...props} transmissionOptions={{ ...props, factor }} /></Suspense>;
   return (
     <>
       <PbrMaterial color={props.color} roughness={props.roughness} metalness={props.metalness} />

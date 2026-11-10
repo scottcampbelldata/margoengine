@@ -3129,3 +3129,8 @@ After build:packages, run node --test --test-timeout=120000 packages/headless/te
 
 ### Batch 224 mesh hull/Minkowski
 After npm run build:packages run node --test --test-timeout=120000 packages/geometry/tests/hull-indices.test.js packages/geometry/tests/convex.test.js packages/mesh-edit/tests/hull.test.js. Analytic volumes (27,16,26,32.256 and disconnected volume16), large-offset source precision, cavity retention, zero plane triples for convex inputs, budget failure and cancellation are asserted independently. For rendering run the mesh-edit browser script natively and with --compat, plus packages/geometry/tests/gpu-check.mjs on each backend, under the shared GPU lock. Fixtures are synthetic correctness solids, not external demonstrations or measured speed scenes.
+
+
+### Batch 265 texture hooks
+
+Build packages, then run `node --experimental-test-module-mocks --test --test-timeout=120000 packages/react/tests/textures.test.js packages/materials/tests/shared-pass.test.js`. For pixel comparisons run `node scripts/gpu-lock.mjs run --owner=react-textures --wait-max=60 --max=6 -- node packages/react/scripts/test-textures-browser.mjs`, then the same command with `--compat` appended. The test compares unmodified native and React material output for each supported native shading class and named/default Scenes, plus image, KTX2 and video fixtures, with exact pixels.

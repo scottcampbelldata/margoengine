@@ -490,3 +490,11 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/geometry: document geometry/hull convexHullTriangles source-index/double-precision contract, empty lower dimensions, normalized tolerance and cancellation; retain legacy convexGeometry behavior (batch 224 job 4).
 - @margoengine/mesh-edit: document convexMeshHull and general minkowskiSumMeshes, concavity/cavities, new face IDs/UVs, work counters/budgets, floating limits and cancellation (batch 224 job 4).
 - margoengine: document geometry/hull and mesh-edit/hull aliases and restored mesh-edit/repair manifest alias in the README phase (batch 224 job 4).
+
+
+| @margoengine/react | Texture hooks, TextureProvider for root map props, TextureMaterial for every native material, Scene ownership, media lifetime and both backends | batch 265 job 3 |
+| @margoengine/materials | Material queues are per Scene, including named Scene disposal | batch 265 job 3 |
+| @margoengine/gltf-pro | Model disposal removes its owning Scene plugin | batch 265 job 3 |
+| margoengine | New react/textures alias and separate decoder-bearing import | batch 265 job 3 |
+
+| @margoengine/shader | sceneColor shares the owning Scene capture; keep recorder fixtures aligned with Engine frameGraph and sceneOf | batch 265 job 3 |

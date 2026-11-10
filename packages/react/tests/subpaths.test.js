@@ -17,6 +17,7 @@ const specifier = (subpath) => '@margoengine/react' + (subpath === '.' ? '' : su
 // binding that needs @margoengine/<name> is in @margoengine/react/<name> (2026-10-27).
 const runtimes = ['./jsx-runtime', './jsx-dev-runtime'];
 const expected = {
+  './textures': ['MappedPbrMaterial', 'TextureMaterial', 'TextureProvider', 'useKTX2', 'useTexture', 'useVideoTexture'],
   './xr-pointer': ['XRPointerEvents', 'dispatchXRPointer'],
   '.': [
     'BoxGeometry',

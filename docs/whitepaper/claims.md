@@ -3649,3 +3649,8 @@ headless/gif uses the exporter writer and exporters/palette quantizer without du
 
 ### Batch 224 hull and Minkowski capabilities
 The optional mesh hull retains original double positions, including a unit cube at offset 1e9 that float32 cannot preserve. General Minkowski sums retain nonconvex topology: L-shape plus cube has volume 16, two L-shapes have volume 26, and a 3-unit hollow box plus a 0.2-unit cube has volume 3.2^3 - 0.8^3 = 32.256. Independent tests check closure, nondegenerate faces, source ownership, convex-pair equivalence and translation covariance. Exact BSP classification precedes floating cell export and hulls; no exact-output, minimal-cell or speed claim is made. See clean-room references and numeric/work limits.
+
+
+### Batch 265 texture integration
+
+The optional React textures entry uses native image, KTX2 and video Texture values on native Material classes. Normal, roughness and emissive map inputs preserve Scene ownership and core remains unchanged. Evidence: packages/react/tests/textures.test.js, packages/materials/tests/shared-pass.test.js and packages/react/scripts/test-textures-browser.mjs. Reproduction and exact supported inputs are in docs/limits.md and reproduce.md; this is a functionality claim, not a speed result.

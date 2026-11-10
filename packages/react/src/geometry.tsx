@@ -1,11 +1,13 @@
 import { forwardRef, useEffect, useRef } from 'react';
 import type { Geometry, Mesh as EngineMesh } from '@margoengine/core/extension';
 import type * as GeometryModule from '@margoengine/geometry';
-import { Mesh, PbrMaterial, type PbrMaterialProps, type MeshProps, type MeshRef } from './components.js';
+import { Mesh, type PbrMaterialProps, type MeshProps, type MeshRef } from './components.js';
 import { useScene, useMesh, live, setGeometry, report } from './internal.js';
 import { MeshShadows } from './mesh-shadows.js';
 import { optionalPeer } from './optional.js';
-import { TexturedShape, type TextureSource } from './textured.js';
+import { geometrySources } from './texture-geometry.js';
+import { MappedPbrMaterial } from './texture-material.js';
+import { PbrMaterial as PlainPbrMaterial } from './components.js';
 
 export type { TextureSource } from './textured.js';
 
@@ -39,7 +41,9 @@ function ShapeGeometry({
       .then((api) => {
         if (!active || scene.engine.disposed) return;
         const create = api[kind] as (...args: number[]) => ReturnType<GeometryApi[ShapeKind]>;
-        geometry = api.toGeometry(create(...args));
+        const data = create(...args);
+        geometry = api.toGeometry(data);
+        geometrySources.set(geometry, data);
         registry.attachments.add(attach);
         try {
           const mesh = live(registry);
@@ -75,12 +79,7 @@ export function PlaneGeometry({ args = [], onError }: ShapeGeometryProps<'planeG
 }
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
   castShadow?: boolean;
-  /**
-   * A base colour texture: a URL (fetched through the Canvas asset cache, so `useProgress` counts it) or the PNG or JPEG
-   * bytes. It is multiplied by `color` (default white with a map) and uses the shape's UVs. Needs the optional peer
-   * `@margoengine/gltf` and WebGPU. Default: none, a plain colour.
-   */
-  map?: TextureSource;
+
 }
 /** Props of the Box component; every prop is optional unless noted. */
 export interface BoxProps extends ShapeProps {
@@ -96,91 +95,47 @@ export interface PlaneProps extends ShapeProps {
 }
 /** The box component. */
 export const Box = forwardRef<MeshRef, BoxProps>(function Box(
-  { args = [], castShadow = false, onError, color, roughness, metalness, map, children, ...props },
+  { args = [], castShadow = false, onError, color, roughness, metalness, map, normalMap, roughnessMap, emissiveMap, metalRoughnessMap, emissive, emissiveIntensity, children, ...props },
   ref,
 ) {
   return (
     <Mesh {...props} ref={ref}>
-      {map === undefined ? (
-        <>
-          <ShapeGeometry kind="boxGeometry" args={args as number[]} onError={onError} />
-          <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-          <MeshShadows castShadow={castShadow} onError={onError} />
-        </>
-      ) : (
-        <TexturedShape
-          kind="boxGeometry"
-          args={args as number[]}
-          map={map}
-          color={color}
-          roughness={roughness}
-          metalness={metalness}
-          castShadow={castShadow}
-          receiveShadow={props.receiveShadow}
-          onError={onError}
-        />
-      )}
+      <ShapeGeometry kind="boxGeometry" args={args as number[]} onError={onError} />
+      <ShapeMaterial color={color} roughness={roughness} metalness={metalness} map={map} normalMap={normalMap} roughnessMap={roughnessMap} emissiveMap={emissiveMap} metalRoughnessMap={metalRoughnessMap} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+      <MeshShadows castShadow={castShadow} onError={onError} />
       {children}
     </Mesh>
   );
 });
 /** The sphere component. */
 export const Sphere = forwardRef<MeshRef, SphereProps>(function Sphere(
-  { args = [], castShadow = false, onError, color, roughness, metalness, map, children, ...props },
+  { args = [], castShadow = false, onError, color, roughness, metalness, map, normalMap, roughnessMap, emissiveMap, metalRoughnessMap, emissive, emissiveIntensity, children, ...props },
   ref,
 ) {
   return (
     <Mesh {...props} ref={ref}>
-      {map === undefined ? (
-        <>
-          <ShapeGeometry kind="sphereGeometry" args={args as number[]} onError={onError} />
-          <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-          <MeshShadows castShadow={castShadow} onError={onError} />
-        </>
-      ) : (
-        <TexturedShape
-          kind="sphereGeometry"
-          args={args as number[]}
-          map={map}
-          color={color}
-          roughness={roughness}
-          metalness={metalness}
-          castShadow={castShadow}
-          receiveShadow={props.receiveShadow}
-          onError={onError}
-        />
-      )}
+      <ShapeGeometry kind="sphereGeometry" args={args as number[]} onError={onError} />
+      <ShapeMaterial color={color} roughness={roughness} metalness={metalness} map={map} normalMap={normalMap} roughnessMap={roughnessMap} emissiveMap={emissiveMap} metalRoughnessMap={metalRoughnessMap} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+      <MeshShadows castShadow={castShadow} onError={onError} />
       {children}
     </Mesh>
   );
 });
 /** The plane component. */
 export const Plane = forwardRef<MeshRef, PlaneProps>(function Plane(
-  { args = [], castShadow = false, onError, color, roughness, metalness, map, children, ...props },
+  { args = [], castShadow = false, onError, color, roughness, metalness, map, normalMap, roughnessMap, emissiveMap, metalRoughnessMap, emissive, emissiveIntensity, children, ...props },
   ref,
 ) {
   return (
     <Mesh {...props} ref={ref}>
-      {map === undefined ? (
-        <>
-          <ShapeGeometry kind="planeGeometry" args={args as number[]} onError={onError} />
-          <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-          <MeshShadows castShadow={castShadow} onError={onError} />
-        </>
-      ) : (
-        <TexturedShape
-          kind="planeGeometry"
-          args={args as number[]}
-          map={map}
-          color={color}
-          roughness={roughness}
-          metalness={metalness}
-          castShadow={castShadow}
-          receiveShadow={props.receiveShadow}
-          onError={onError}
-        />
-      )}
+      <ShapeGeometry kind="planeGeometry" args={args as number[]} onError={onError} />
+      <ShapeMaterial color={color} roughness={roughness} metalness={metalness} map={map} normalMap={normalMap} roughnessMap={roughnessMap} emissiveMap={emissiveMap} metalRoughnessMap={metalRoughnessMap} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+      <MeshShadows castShadow={castShadow} onError={onError} />
       {children}
     </Mesh>
   );
 });
+
+function ShapeMaterial(props: PbrMaterialProps) {
+  return props.map || props.normalMap || props.roughnessMap || props.emissiveMap || props.metalRoughnessMap || props.emissive ? <MappedPbrMaterial {...props} /> : <PlainPbrMaterial {...props} />;
+}

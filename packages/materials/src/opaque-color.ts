@@ -15,7 +15,7 @@ const copyShader =
   fullscreen +
   `@group(0) @binding(0) var source:texture_2d<f32>;
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{return textureLoad(source,vec2i(p.xy),0);}`;
-const captures = new WeakMap<Engine, OpaqueColor>();
+const captures = new WeakMap<FrameGraph, OpaqueColor>();
 
 interface Capture {
   width: number;
@@ -53,7 +53,7 @@ class OpaqueColor implements EnginePlugin {
     descriptor: GPURenderPipelineDescriptor;
   };
   private disposed = false;
-  constructor(private readonly engine: Engine) {}
+  constructor(private readonly engine: Engine, private readonly graph: FrameGraph) {}
   get view(): GPUTextureView {
     return this.capture?.view ?? this.placeholderView!;
   }
@@ -308,9 +308,11 @@ class OpaqueColor implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     const cleanup = new Cleanup();
-    cleanup.run(() => this.engine.removePlugin(this.name)).run(() => this.release());
+    const scene = this.engine.sceneOf(this);
+    if (scene) cleanup.run(() => this.engine.removePlugin(this.name, scene));
+    cleanup.run(() => this.release());
     this.updates.clear();
-    if (captures.get(this.engine) === this) captures.delete(this.engine);
+    if (captures.get(this.graph) === this) captures.delete(this.graph);
     cleanup.finish();
   }
 }
@@ -321,11 +323,12 @@ export function acquireOpaqueColor(
   update: Update,
 ): { readonly view: GPUTextureView; texture(): GPUTexture | undefined; release(): void } {
   if (typeof update !== 'function') throw new TypeError('Expected an opaque color view callback');
-  let capture = captures.get(engine);
+  const graph = engine.frameGraph;
+  let capture = captures.get(graph);
   if (!capture) {
-    capture = new OpaqueColor(engine);
+    capture = new OpaqueColor(engine, graph);
     engine.use(capture);
-    captures.set(engine, capture);
+    captures.set(graph, capture);
   }
   const value = capture,
     listener: Update = (view) => update(view);

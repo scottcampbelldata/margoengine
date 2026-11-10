@@ -3670,7 +3670,7 @@ interface MaterialDraws {
   /** Re-sorts on the next frame (a render order changed). */
   reorder(): void;
 }
-const queues = new WeakMap<Engine, MaterialDraws>(),
+const queues = new WeakMap<Engine['frameGraph'], MaterialDraws>(),
   late = (m: Material) => m.transparent || m.transmissive;
 function lateEntry(entry: Entry, index: number): boolean {
   return late(entry.materials[index]) || primitiveAfterOpaque(entry.model.primitives[index]);
@@ -3684,7 +3684,8 @@ function lateFlags(entry: Entry): number {
 let serial = 0;
 /** One pass per engine draws every material mesh: opaque then transparent, each by renderOrder; transparent meshes back to front. */
 function queue(runtime: Engine): MaterialDraws {
-  let draws = queues.get(runtime);
+  const graph = runtime.frameGraph;
+  let draws = queues.get(graph);
   if (draws) return draws;
   const members: Entry[] = [],
     tail: Phase[] = [],
@@ -3748,7 +3749,7 @@ function queue(runtime: Engine): MaterialDraws {
       requireWebGPU(engine, 'Material draw queue');
     },
     dispose() {
-      queues.delete(runtime);
+      queues.delete(graph);
     },
     registerPasses(graph) {
       graph.add({
@@ -3825,7 +3826,7 @@ function queue(runtime: Engine): MaterialDraws {
       arranged = false;
     },
   };
-  queues.set(runtime, draws);
+  queues.set(graph, draws);
   return draws;
 }
 const renderStates = new WeakMap<Material, PBRRenderState>(),

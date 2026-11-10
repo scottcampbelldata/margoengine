@@ -410,7 +410,8 @@ export class MaterialInstallation implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     const cleanup = new Cleanup();
-    cleanup.run(() => this.model.root.engine.removePlugin(this.name));
+    const engine = this.model.root.engine, scene = engine.sceneOf(this);
+    if (scene) cleanup.run(() => engine.removePlugin(this.name, scene));
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     for (const plan of this.plans)
@@ -430,7 +431,8 @@ export class MaterialInstallation implements EnginePlugin {
 /** Explicit opt-in after loadGLTF/parseGLTF; absent material metadata allocates nothing. */
 export function install(model: PBRModel): MaterialInstallation {
   const installation = new MaterialInstallation(model);
-  model.root.engine.use(installation);
+  const engine = model.root.engine;
+  engine.use(installation, engine.sceneOf(model));
   return installation;
 }
 

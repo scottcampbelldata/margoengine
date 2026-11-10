@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13018113,
+  "total": 13028254,
   "history": [
     {
       "date": "2026-10-24",
@@ -6503,6 +6503,12 @@
       "commit": "batch-224-job4",
       "reason": "New optional mesh-edit/hull 0 to 11992 gzip B (12352 ceiling), geometry/hull 0 to 2071 B (2327 ceiling). Reused source-index hull, exact BSP cells and one batch union cover general Minkowski sums without duplicated geometry code. geometry/extras grows 5570 to 5617 B within its existing ceiling; core and stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-265-textures-final",
+      "reason": "Final optional React mapping entries: textures draft 4067 to 4684 B gzip; geometry draft 4806 to 5402; materials draft 6114 to 6705. React root on landed job 5 is 10259, now 10570. Per-Canvas loader lifetime, separate green roughness with preserved borrowed blue metalness, UV geometry and Scene-owned models remain together. Splitting would duplicate ownership and cleanup. Core/stage stays 24209 B. JSX runtimes are 2731 and 2736 B gzip, above recorded 2522 B ceilings; ceilings 2987 and 2992 preserve mapped intrinsic props.",
+      "grew": 6
     }
   ],
   "items": {
@@ -7128,7 +7134,7 @@
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
-    "@margoengine/react": 10551,
+    "@margoengine/react": 10888,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/controls": 4346,
@@ -7136,16 +7142,16 @@
     "@margoengine/react/dof": 1157,
     "@margoengine/react/environment": 3131,
     "@margoengine/react/fbx": 3843,
-    "@margoengine/react/geometry": 4374,
+    "@margoengine/react/geometry": 5658,
     "@margoengine/react/gltf-pro": 3809,
     "@margoengine/react/helpers": 3799,
     "@margoengine/react/html": 1529,
     "@margoengine/react/instances": 2928,
-    "@margoengine/react/jsx-dev-runtime": 2522,
-    "@margoengine/react/jsx-runtime": 2522,
+    "@margoengine/react/jsx-dev-runtime": 2992,
+    "@margoengine/react/jsx-runtime": 2987,
     "@margoengine/react/lines": 1758,
     "@margoengine/react/lod": 3020,
-    "@margoengine/react/materials": 4316,
+    "@margoengine/react/materials": 6961,
     "@margoengine/react/physics": 6167,
     "@margoengine/react/points": 1460,
     "@margoengine/react/post": 4243,
@@ -7707,6 +7713,7 @@
     "@margoengine/headless/gif": 374,
     "@margoengine/exporters/palette": 2853,
     "@margoengine/mesh-edit/hull": 12352,
-    "@margoengine/geometry/hull": 2327
+    "@margoengine/geometry/hull": 2327,
+    "@margoengine/react/textures": 4940
   }
 }

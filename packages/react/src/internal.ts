@@ -90,6 +90,7 @@ export interface Frames {
   callbacks: Set<FrameCallback>;
 }
 export interface Scene {
+  mappedMaterial?: import('react').ComponentType<import('./components.js').PbrMaterialProps>;
   engine: Engine;
   registry: Registry | null;
   resources: Resources;

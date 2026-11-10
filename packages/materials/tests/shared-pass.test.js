@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { PBRDrawRun, PBRModel, parseGLTF } from '../../gltf-pro/dist/index.js';
-import { Material, createMesh } from '../dist/index.js';
+import { Material, createMesh, install } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { materialQuad } from '../../../tests/support/materials-fixture.js';
 
@@ -53,6 +53,54 @@ async function world() {
   return { engine, store, context, log, destroy: () => engine.dispose() };
 }
 const triangle = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1] };
+
+test('transmission maps capture and dispose in their model Scene even when installed outside its setup', async () => {
+  const w = await world();
+  try {
+    const first = createMesh(w.engine, triangle, new Material());
+    const scene = w.engine.createScene('transmission');
+    let second;
+    scene.use({ name: 'setup-transmission', setup() { second = createMesh(w.engine, triangle, new Material()); } });
+    for (const model of [first, second]) model.primitives[0].material.transmission = { factor: 0.5, volume: { thicknessFactor: 0.2 } };
+    const a = install(first), b = install(second);
+    assert.equal(w.engine.sceneOf(a), w.engine.scene);
+    assert.equal(w.engine.sceneOf(b), scene);
+    assert.notEqual(scene.plugins.get('materials:opaque-color'), w.engine.scene.plugins.get('materials:opaque-color'));
+    second.dispose();
+    assert.equal(scene.plugins.has(b.name), false);
+    assert.equal(scene.plugins.has('materials:opaque-color'), false);
+    assert.equal(w.engine.scene.plugins.has(a.name), true);
+    assert.equal(w.engine.scene.plugins.has('materials:opaque-color'), true);
+    first.dispose();
+    assert.equal(w.engine.scene.plugins.has(a.name), false);
+    assert.equal(w.engine.scene.plugins.has('materials:opaque-color'), false);
+  } finally { w.destroy(); }
+});
+
+test('material queues belong to their Scene and disposal removes only that Scene model', async () => {
+  const w = await world();
+  try {
+    const material = new Material({ color: '#ffffff' });
+    const main = createMesh(w.engine, triangle, material);
+    const scene = w.engine.createScene('maps');
+    let other;
+    scene.use({ name: 'setup-maps', setup() { other = createMesh(w.engine, triangle, material); } });
+    w.store.tick(false);
+    w.engine.frameGraph.execute(w.context);
+    assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 1, 'default Scene contains only its own mesh');
+    w.log.length = 0;
+    scene.frameGraph.execute(w.context);
+    assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 1, 'named Scene has its own material queue');
+    other.dispose();
+    assert.equal(scene.plugins.has(other.name), false, 'named Scene model plugin removed outside Scene scope');
+    assert.equal(w.engine.scene.plugins.has(main.name), true);
+    w.log.length = 0;
+    scene.frameGraph.execute(w.context);
+    assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 0);
+    w.engine.frameGraph.execute(w.context);
+    assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 1);
+  } finally { w.destroy(); }
+});
 
 test('ten opaque materials meshes draw in one render pass', async () => {
   const w = await world();

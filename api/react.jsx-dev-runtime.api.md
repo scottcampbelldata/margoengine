@@ -4,6 +4,7 @@
 
 ```ts
 import { Mesh, Vec3 } from "@margoengine/core";
+import { Texture } from "@margoengine/materials";
 import { ColorInput } from "@margoengine/math";
 import { React, ReactNode, RefAttributes } from "react";
 
@@ -84,6 +85,13 @@ interface PbrMaterialProps {
     color?: string | readonly number[];
     roughness?: number;
     metalness?: number;
+    map?: Texture | TextureSource | null;
+    normalMap?: Texture | TextureSource | null;
+    roughnessMap?: Texture | TextureSource | null;
+    metalRoughnessMap?: Texture | TextureSource | null;
+    emissiveMap?: Texture | TextureSource | null;
+    emissive?: string | readonly number[];
+    emissiveIntensity?: number;
 }
 
 interface PointerHandlers {
@@ -100,4 +108,6 @@ interface PointerHandlers {
     onWheel?: (event: MargoPointerEvent<WheelEvent>) => void;
     onPointerMissed?: (event: MouseEvent) => void;
 }
+
+type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;
 ```

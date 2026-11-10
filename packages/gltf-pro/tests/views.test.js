@@ -29,6 +29,20 @@ const camera = (x) => ({
   target: [x, 0, 0],
 });
 
+test('a model disposed outside its named Scene removes the owning plugin and passes', async (t) => {
+  const { model: initial } = await scene(t);
+  const engine = initial.root.engine;
+  const named = engine.createScene('textures');
+  let model;
+  named.use({ name: 'named-setup', setup() { model = parseGLTF(engine, doc, [positions]); } });
+  assert.equal(engine.sceneOf(model), named);
+  assert.equal(named.plugins.has(model.name), true);
+  model.dispose();
+  assert.equal(named.plugins.has(model.name), false);
+  assert.equal(engine.sceneOf(model), undefined);
+  assert.equal(engine.scene.plugins.has(initial.name), true);
+});
+
 async function scene(t, { batch = false } = {}) {
   const gpu = strictGPU(),
     engine = new Engine(

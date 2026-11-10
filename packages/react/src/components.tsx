@@ -7,6 +7,7 @@ import {
   useState,
   useImperativeHandle,
   forwardRef,
+  Suspense,
   type ReactNode,
   type CSSProperties,
 } from 'react';
@@ -53,6 +54,9 @@ import { ownerHook } from './dev-names.js';
 import { capPixelRatio } from './pixel-ratio.js';
 import { envReadable } from './dev-mode.js';
 import { advanceFrames, bridgeFrames, FrameCallbacks, subscribeFrame } from './frame-priority.js';
+import { geometrySources } from './texture-geometry.js';
+import type { Texture } from '@margoengine/materials';
+import type { TextureSource } from './textured.js';
 // Bundlers replace process.env.NODE_ENV, usually with no global `process` on the page: see dev-mode.ts.
 declare const process: { env: { NODE_ENV?: string } };
 
@@ -706,6 +710,18 @@ export function BoxGeometry({ args = one }: { args?: Vec3 }) {
       attach = (mesh: EngineMesh) => {
         setGeometry(registry, mesh, geometry);
       };
+    geometrySources.set(geometry, () => {
+    const positions = [], normals = [], uvs = [];
+    for (let i = 0; i < geometry.vertices.length; i += 6) {
+      const v = geometry.vertices;
+      positions.push(v[i], v[i + 1], v[i + 2]);
+      normals.push(v[i + 3], v[i + 4], v[i + 5]);
+      const axis = Math.abs(v[i + 3]) > 0.5 ? 0 : Math.abs(v[i + 4]) > 0.5 ? 1 : 2;
+      const u = axis === 0 ? 2 : 0, w = axis === 1 ? 2 : 1;
+      uvs.push(v[i + u] / (args[u] || 1) + 0.5, v[i + w] / (args[w] || 1) + 0.5);
+    }
+    return { positions, normals, uvs, indices: geometry.indices };
+    });
     registry.attachments.add(attach);
     try {
       if (registry.current) attach(registry.current);
@@ -748,9 +764,22 @@ export interface PbrMaterialProps {
   color?: string | readonly number[];
   roughness?: number;
   metalness?: number;
+  map?: Texture | TextureSource | null;
+  normalMap?: Texture | TextureSource | null;
+  roughnessMap?: Texture | TextureSource | null;
+  metalRoughnessMap?: Texture | TextureSource | null;
+  emissiveMap?: Texture | TextureSource | null;
+  emissive?: string | readonly number[];
+  emissiveIntensity?: number;
 }
 /** The pbr material component. */
-export function PbrMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 }: PbrMaterialProps) {
+export function PbrMaterial(props: PbrMaterialProps) {
+  const Binding = useScene().mappedMaterial;
+  const mapped = !!(props.map || props.normalMap || props.roughnessMap || props.metalRoughnessMap || props.emissiveMap || props.emissive);
+  if (mapped && !Binding) throw new MargoError('state', 'Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry\'s MappedPbrMaterial.');
+  return mapped && Binding ? <Suspense fallback={null}><Binding {...props} /></Suspense> : <PlainMaterial {...props} />;
+}
+function PlainMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 }: PbrMaterialProps) {
   const registry = useMesh();
   useCommit(() => {
     const material = new Material({ color, roughness, metalness }),

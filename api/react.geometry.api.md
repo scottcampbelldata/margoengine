@@ -4,6 +4,7 @@
 
 ```ts
 import { Mesh, Vec3 } from "@margoengine/core";
+import { Texture } from "@margoengine/materials";
 import { ReactNode } from "react";
 import * as GeometryModule from "@margoengine/geometry";
 
@@ -77,6 +78,13 @@ interface PbrMaterialProps {
     color?: string | readonly number[];
     roughness?: number;
     metalness?: number;
+    map?: Texture | TextureSource | null;
+    normalMap?: Texture | TextureSource | null;
+    roughnessMap?: Texture | TextureSource | null;
+    metalRoughnessMap?: Texture | TextureSource | null;
+    emissiveMap?: Texture | TextureSource | null;
+    emissive?: string | readonly number[];
+    emissiveIntensity?: number;
 }
 
 interface PointerHandlers {
@@ -98,6 +106,5 @@ type ShapeKind = 'boxGeometry' | 'sphereGeometry' | 'planeGeometry';
 
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
     castShadow?: boolean;
-    map?: TextureSource;
 }
 ```

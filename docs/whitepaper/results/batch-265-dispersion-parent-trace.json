@@ -1,0 +1,361 @@
+{
+  "mainParent": "adc342df4",
+  "scope": "Diagnostic 4x full canonical prefix through live reset and resource checks, not a replacement for the full GPU grid",
+  "canonical": {
+    "native": "278 checks pass",
+    "compat": "4x live reset fails exact zero by 0.000244140625; pre-existing main failure 9 remains open"
+  },
+  "mainCanonical": "6ab64e777 and exact parent adc342df4 passed their individual complete runs",
+  "historicalMainFailure": "2a74c14e3; docs/whitepaper/results/batch-273-dispersion-state-checkpoint.json",
+  "trace": {
+    "renders": 57,
+    "matching": 57,
+    "ownFailures": [],
+    "parentFailures": [],
+    "inputs": "GL mutation calls, shader strings, typed-array bytes, stable object ordinals; queries, synchronization polling and readback destination contents excluded. Each row matches call counts and two independent 32-bit rolling hashes. No driver diagnosis or full-grid pass is claimed.",
+    "rows": [
+      {
+        "label": "sample-count",
+        "calls": 945,
+        "fnv1a": 452356130,
+        "djb2xor": 1150820546
+      },
+      {
+        "label": "warmup",
+        "calls": 1666,
+        "fnv1a": 183696450,
+        "djb2xor": 498822888
+      },
+      {
+        "label": "absent",
+        "calls": 2387,
+        "fnv1a": 3744397723,
+        "djb2xor": 1720108601
+      },
+      {
+        "label": "zero",
+        "calls": 3108,
+        "fnv1a": 1376350537,
+        "djb2xor": 888835531
+      },
+      {
+        "label": "spectral-dispersive",
+        "calls": 3829,
+        "fnv1a": 1129726338,
+        "djb2xor": 1752103964
+      },
+      {
+        "label": "spectral-zero",
+        "calls": 4550,
+        "fnv1a": 629811268,
+        "djb2xor": 3869071470
+      },
+      {
+        "label": "spectral-scalar-r",
+        "calls": 5271,
+        "fnv1a": 3281369916,
+        "djb2xor": 3322335150
+      },
+      {
+        "label": "spectral-scalar-g",
+        "calls": 5992,
+        "fnv1a": 495955321,
+        "djb2xor": 1306265829
+      },
+      {
+        "label": "spectral-scalar-b",
+        "calls": 6713,
+        "fnv1a": 3591973405,
+        "djb2xor": 1290993607
+      },
+      {
+        "label": "clamp-low-red-IOR-dispersive",
+        "calls": 7434,
+        "fnv1a": 49698231,
+        "djb2xor": 3291719983
+      },
+      {
+        "label": "clamp-low-red-IOR-zero",
+        "calls": 8155,
+        "fnv1a": 489823393,
+        "djb2xor": 2426382731
+      },
+      {
+        "label": "clamp-low-red-IOR-scalar-r",
+        "calls": 8876,
+        "fnv1a": 3062943572,
+        "djb2xor": 2340451192
+      },
+      {
+        "label": "clamp-low-red-IOR-scalar-g",
+        "calls": 9597,
+        "fnv1a": 2851715808,
+        "djb2xor": 2582746906
+      },
+      {
+        "label": "clamp-low-red-IOR-scalar-b",
+        "calls": 10318,
+        "fnv1a": 3174746184,
+        "djb2xor": 4226227648
+      },
+      {
+        "label": "maps-uv0-dispersive",
+        "calls": 10980,
+        "fnv1a": 3572482258,
+        "djb2xor": 1558880656
+      },
+      {
+        "label": "maps-uv0-zero",
+        "calls": 11617,
+        "fnv1a": 2288353671,
+        "djb2xor": 3084658975
+      },
+      {
+        "label": "maps-uv0-scalar-r",
+        "calls": 12254,
+        "fnv1a": 1405727303,
+        "djb2xor": 1111625273
+      },
+      {
+        "label": "maps-uv0-scalar-g",
+        "calls": 12891,
+        "fnv1a": 4008025541,
+        "djb2xor": 60663005
+      },
+      {
+        "label": "maps-uv0-scalar-b",
+        "calls": 13528,
+        "fnv1a": 1146416292,
+        "djb2xor": 1345757880
+      },
+      {
+        "label": "maps-uv1-dispersive",
+        "calls": 14165,
+        "fnv1a": 1286822539,
+        "djb2xor": 4277322467
+      },
+      {
+        "label": "maps-uv1-zero",
+        "calls": 14802,
+        "fnv1a": 1240590802,
+        "djb2xor": 3080675368
+      },
+      {
+        "label": "maps-uv1-scalar-r",
+        "calls": 15439,
+        "fnv1a": 315400002,
+        "djb2xor": 1960062010
+      },
+      {
+        "label": "maps-uv1-scalar-g",
+        "calls": 16076,
+        "fnv1a": 231945953,
+        "djb2xor": 2022251259
+      },
+      {
+        "label": "maps-uv1-scalar-b",
+        "calls": 16713,
+        "fnv1a": 2565227020,
+        "djb2xor": 4179851504
+      },
+      {
+        "label": "maps-transformed-uv1",
+        "calls": 17350,
+        "fnv1a": 3120390927,
+        "djb2xor": 3057553149
+      },
+      {
+        "label": "maps-scalar0",
+        "calls": 18062,
+        "fnv1a": 263985797,
+        "djb2xor": 2788347499
+      },
+      {
+        "label": "maps-scalar1",
+        "calls": 18783,
+        "fnv1a": 2714140712,
+        "djb2xor": 405391046
+      },
+      {
+        "label": "maps-transmission-only",
+        "calls": 19429,
+        "fnv1a": 1837006638,
+        "djb2xor": 3199759752
+      },
+      {
+        "label": "maps-loaded-uv1",
+        "calls": 20171,
+        "fnv1a": 3008257362,
+        "djb2xor": 891244692
+      },
+      {
+        "label": "constructed-positive",
+        "calls": 20918,
+        "fnv1a": 2124055634,
+        "djb2xor": 2131895442
+      },
+      {
+        "label": "loaded-positive",
+        "calls": 21651,
+        "fnv1a": 3247011247,
+        "djb2xor": 2588118949
+      },
+      {
+        "label": "loaded-spectral-dispersive",
+        "calls": 22407,
+        "fnv1a": 683588954,
+        "djb2xor": 2239619950
+      },
+      {
+        "label": "loaded-spectral-zero",
+        "calls": 23163,
+        "fnv1a": 3188508718,
+        "djb2xor": 4058877624
+      },
+      {
+        "label": "loaded-spectral-scalar-r",
+        "calls": 23919,
+        "fnv1a": 828046568,
+        "djb2xor": 738233304
+      },
+      {
+        "label": "loaded-spectral-scalar-g",
+        "calls": 24675,
+        "fnv1a": 36507401,
+        "djb2xor": 627425733
+      },
+      {
+        "label": "loaded-spectral-scalar-b",
+        "calls": 25431,
+        "fnv1a": 1193724107,
+        "djb2xor": 3418899279
+      },
+      {
+        "label": "advanced-iridescence-anisotropy-dispersive",
+        "calls": 26100,
+        "fnv1a": 3463765581,
+        "djb2xor": 2728425247
+      },
+      {
+        "label": "advanced-iridescence-anisotropy-zero",
+        "calls": 26737,
+        "fnv1a": 2845628948,
+        "djb2xor": 3460203222
+      },
+      {
+        "label": "advanced-iridescence-anisotropy-scalar-r",
+        "calls": 27374,
+        "fnv1a": 1877117618,
+        "djb2xor": 1206318866
+      },
+      {
+        "label": "advanced-iridescence-anisotropy-scalar-g",
+        "calls": 28011,
+        "fnv1a": 886207261,
+        "djb2xor": 3475429661
+      },
+      {
+        "label": "advanced-iridescence-anisotropy-scalar-b",
+        "calls": 28648,
+        "fnv1a": 362938813,
+        "djb2xor": 4250373675
+      },
+      {
+        "label": "advanced-zero",
+        "calls": 29285,
+        "fnv1a": 3647580404,
+        "djb2xor": 268237704
+      },
+      {
+        "label": "advanced-without-lobes",
+        "calls": 29922,
+        "fnv1a": 2236853202,
+        "djb2xor": 1922470170
+      },
+      {
+        "label": "advanced-scalar-volume",
+        "calls": 30550,
+        "fnv1a": 2239435369,
+        "djb2xor": 3076097989
+      },
+      {
+        "label": "advanced-loaded",
+        "calls": 31242,
+        "fnv1a": 3017334266,
+        "djb2xor": 2716564222
+      },
+      {
+        "label": "no-volume-zero",
+        "calls": 31970,
+        "fnv1a": 3270416059,
+        "djb2xor": 4054577575
+      },
+      {
+        "label": "no-volume-positive",
+        "calls": 32691,
+        "fnv1a": 3468233191,
+        "djb2xor": 173115061
+      },
+      {
+        "label": "IOR-one-zero",
+        "calls": 33412,
+        "fnv1a": 3129353862,
+        "djb2xor": 2713880848
+      },
+      {
+        "label": "IOR-one-positive",
+        "calls": 34133,
+        "fnv1a": 450159130,
+        "djb2xor": 68887482
+      },
+      {
+        "label": "no-scene-tinted-fallback-zero",
+        "calls": 34695,
+        "fnv1a": 1879518101,
+        "djb2xor": 1557966115
+      },
+      {
+        "label": "no-scene-tinted-fallback-positive",
+        "calls": 35145,
+        "fnv1a": 2256343981,
+        "djb2xor": 4275704941
+      },
+      {
+        "label": "live-zero",
+        "calls": 35854,
+        "fnv1a": 86962372,
+        "djb2xor": 1693260886
+      },
+      {
+        "label": "live-positive",
+        "calls": 36105,
+        "fnv1a": 720535564,
+        "djb2xor": 4129065832
+      },
+      {
+        "label": "live-zero-again",
+        "calls": 36356,
+        "fnv1a": 1379429473,
+        "djb2xor": 2179525861
+      },
+      {
+        "label": "live-constructor-reference",
+        "calls": 37077,
+        "fnv1a": 3835693057,
+        "djb2xor": 3555301707
+      },
+      {
+        "label": "resource-zero",
+        "calls": 37798,
+        "fnv1a": 1103136639,
+        "djb2xor": 2138782533
+      },
+      {
+        "label": "resource-positive",
+        "calls": 38519,
+        "fnv1a": 4144724797,
+        "djb2xor": 620273355
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { Material, MeshGeometry, TransmissionOptions } from "@margoengine/materials";
+import { Material, MeshGeometry, Texture, TransmissionOptions } from "@margoengine/materials";
 import { BatchedMesh, BatchedMeshOptions } from "@margoengine/materials/batched";
 import { ColorInput } from "@margoengine/math";
 import { ReactNode } from "react";
@@ -45,5 +45,14 @@ interface PbrMaterialProps {
     color?: string | readonly number[];
     roughness?: number;
     metalness?: number;
+    map?: Texture | TextureSource | null;
+    normalMap?: Texture | TextureSource | null;
+    roughnessMap?: Texture | TextureSource | null;
+    metalRoughnessMap?: Texture | TextureSource | null;
+    emissiveMap?: Texture | TextureSource | null;
+    emissive?: string | readonly number[];
+    emissiveIntensity?: number;
 }
+
+type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;
 ```

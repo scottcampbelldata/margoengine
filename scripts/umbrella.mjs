@@ -146,6 +146,7 @@ export const REACT_SEPARATE = [
   'fbx',
   'animation',
   'materials',
+  'textures',
   'jsx-runtime',
   'jsx-dev-runtime',
 ].map((name) => `@margoengine/react/${name}`);

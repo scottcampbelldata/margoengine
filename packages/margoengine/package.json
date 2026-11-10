@@ -2738,6 +2738,10 @@
       "types": "./dist/react/instances.d.ts",
       "import": "./dist/react/instances.js"
     },
+    "./react/textures": {
+      "types": "./dist/react/textures.d.ts",
+      "import": "./dist/react/textures.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

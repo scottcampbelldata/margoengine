@@ -118,7 +118,7 @@ test('a ScenePass takes a model an SSR-like effect already captures', () => {
 });
 
 test('sceneColor reads linear light and undoes the sRGB curve only on an encoded target', () => {
-  const engine = { gpu: {}, use() {}, removePlugin() {} };
+  const engine = { gpu: {}, frameGraph: {}, sceneOf: () => undefined, use() {}, removePlugin() {} };
   assert.throws(() => sceneColor({ use() { throw new Error('needs WebGPU'); } }), /needs WebGPU/);
   const behind = sceneColor(engine),
     code = new NodeMaterial({ transparent: true, emissiveNode: behind.read() }).fragmentCode;
