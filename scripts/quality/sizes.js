@@ -8,7 +8,7 @@ import { cpus } from 'node:os';
 import { dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { parseSync } from 'rolldown/utils';
-import { LAZY_SPLITS } from '../lazy-files.js';
+import { LAZY_SPLITS, lazyFileDrift, unmeasuredLazyFiles } from '../lazy-files.js';
 import { bundleBytes, bundleSplit } from '../measure-size.js';
 import { slash } from './packages.js';
 
@@ -44,6 +44,21 @@ export async function sizesGate({ root, packages }) {
   }
   const missing = packages.flatMap((p) => p.entries).filter((e) => !existsSync(join(root, e.dist)));
   if (missing.length) throw new Error(`${missing[0].dist} missing; run npm run build:packages first`);
+  // Every worker and Wasm file a package loads on its own has a row in scripts/lazy-files.js, so the sizes record and
+  // page measure it (an unlisted one broke main's sizes test, 2026-11-10).
+  const { unlisted, unbuilt } = lazyFileDrift(root);
+  if (unlisted.length)
+    throw new Error(
+      `${unlisted.join(', ')}: loaded on its own but not in scripts/lazy-files.js; add a LAZY_FILES row, then run node examples/package-benchmarks/entry-sizes.mjs and node scripts/basic-scene-network.mjs`,
+    );
+  if (unbuilt.length)
+    throw new Error(`${unbuilt.join(', ')}: in scripts/lazy-files.js but not built; run npm run build:packages first`);
+  // ...and every row is measured in the committed record, which the sizes page reads (b3e5e8f7d added a row without it).
+  const unmeasured = unmeasuredLazyFiles(root);
+  if (unmeasured.length)
+    throw new Error(
+      `${unmeasured.join(', ')}: no measurement in entry-sizes.json; run node examples/package-benchmarks/entry-sizes.mjs and node scripts/basic-scene-network.mjs`,
+    );
   const sizes = await pool(
     jobs.map((job) => async () => gzipSync(await bundleBytes(join(root, job.file))).length),
     Math.max(2, Math.min(8, cpus().length)),

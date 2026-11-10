@@ -3,10 +3,13 @@
 // the same commit, and that commit. Checks the committed records; `npm run build:site` re-measures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { readSizesInputs, sizesPage } from '../scripts/build-sizes.js';
-import { isLazyBuildFile, LAZY_FILES } from '../scripts/lazy-files.js';
+import { LAZY_FILES, lazyFileDrift, unmeasuredLazyFiles } from '../scripts/lazy-files.js';
 import { CORE_STAGE_GZIP_LIMIT } from '../scripts/core-budget.js';
 
 const inputs = readSizesInputs(),
@@ -100,23 +103,40 @@ test('sizes page refuses a catalog package without a measurement', () => {
   assert.throws(() => sizesPage({ ...inputs, sizes: { ...sizes, packages } }), /no sizes for @margoengine\/core/);
 });
 
+// Regression (2026-11-10): 9de13807a built hdr6.worker.js and hdr6.wasm with no LAZY_FILES row and main failed this file
+// for hours; the drift check now also runs in `npm run quality`, which every lane runs before a push.
+test('lazy file drift finds an unlisted worker, Wasm or URL-loaded file and a listed file that was not built', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'margo-lazy-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (path, text = '') => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  write('packages/a/dist/index.js', "new Worker(new URL('./tile.worker.js?no-inline', import.meta.url));\n");
+  write('packages/a/dist/tile.worker.js', "fetch(new URL('./model.data', import.meta.url));\n");
+  write('packages/a/dist/model.data');
+  write('packages/a/dist/codec.wasm');
+  write('packages/a/dist/listed.wasm');
+  write('packages/margoengine/dist/umbrella.wasm');
+  const row = (file) => ({ package: '@margoengine/a', file, label: file, kind: 'Wasm', measure: 'file', when: '-' });
+  assert.deepEqual(lazyFileDrift(root, [row('packages/a/dist/listed.wasm'), row('packages/a/dist/gone.worker.js')]), {
+    unlisted: ['packages/a/dist/codec.wasm', 'packages/a/dist/model.data', 'packages/a/dist/tile.worker.js'],
+    unbuilt: ['packages/a/dist/gone.worker.js'],
+  });
+  // A row with no measurement (b3e5e8f7d listed cpu-kernel.wasm without measuring it, and this file failed to load).
+  write('examples/package-benchmarks/results/entry-sizes.json', JSON.stringify({ lazyFiles: { 'packages/a/dist/listed.wasm': {} } }));
+  assert.deepEqual(unmeasuredLazyFiles(root, [row('packages/a/dist/listed.wasm'), row('packages/a/dist/codec.wasm')]), [
+    'packages/a/dist/codec.wasm',
+  ]);
+  const gate = readFileSync(new URL('../scripts/quality/sizes.js', import.meta.url), 'utf8');
+  assert.match(gate, /const \{ unlisted, unbuilt \} = lazyFileDrift\(root\);/, 'npm run quality checks the drift');
+  assert.match(gate, /const unmeasured = unmeasuredLazyFiles\(root\);/, 'npm run quality checks the measurements');
+});
+
 test('sizes page lists every file loaded later, with its measured bytes and the call that loads it', () => {
   const root = new URL('../', import.meta.url);
-  const built = readdirSync(new URL('packages/', root)).flatMap((id) =>
-    existsSync(new URL(`packages/${id}/dist`, root))
-      ? readdirSync(new URL(`packages/${id}/dist`, root), { recursive: true }).map(
-          (file) => `packages/${id}/dist/${file.replaceAll('\\', '/')}`,
-        )
-      : [],
-  );
   // Both ways: every built worker and .wasm is listed in scripts/lazy-files.js, and every listed one was built.
-  assert.deepEqual(
-    built.filter(isLazyBuildFile).sort(),
-    LAZY_FILES.map((entry) => entry.file)
-      .filter(isLazyBuildFile)
-      .sort(),
-    'run npm run build:packages first',
-  );
+  assert.deepEqual(lazyFileDrift(fileURLToPath(root)), { unlisted: [], unbuilt: [] }, 'run npm run build:packages first');
   for (const entry of LAZY_FILES) assert.ok(existsSync(new URL(entry.file, root)), entry.file);
   for (const name of [
     'draco_decoder.wasm',

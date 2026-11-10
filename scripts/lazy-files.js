@@ -6,6 +6,9 @@
 // `measure`: 'file' = served as is (copied by the bundler as an asset: prebuilt workers, Emscripten glue, .wasm), so the
 // bytes on disk are the bytes served; 'bundle' = the app's bundler builds it into its own chunk (a dynamic import, a
 // module worker, a peer package), so it is bundled and minified like entry-sizes' entries, with `external` left out.
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
+
 const core = [/^@margoengine\/core(\/|$)/];
 
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
@@ -353,6 +356,22 @@ export const LAZY_FILES = [
     when: 'With the JPEG XL glue above',
   },
   {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/hdr6.worker.js',
+    label: 'hdr6.worker.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First `KTX2HDR6Decoder.decode()`: up to `workerLimit` workers, reused until `dispose()`',
+  },
+  {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/hdr6.wasm',
+    label: 'hdr6.wasm',
+    kind: 'Wasm',
+    measure: 'file',
+    when: 'With the HDR 6x6 worker above, once per worker; `decoderPath` serves it from elsewhere',
+  },
+  {
     package: '@margoengine/exporters',
     file: 'packages/exporters/dist/encoder.worker.js',
     label: 'encoder.worker.js',
@@ -410,6 +429,39 @@ export const LAZY_FILES = [
     measure: 'bundle',
     external: core,
     when: '`EnvironmentLighting.load(engine, url)` with a URL, first call (an app that imports no decoder itself)',
+  },
+  // The OpenEXR codec set of `@margoengine/environment/exr-codecs` (prebuilt OpenEXR Wasm, THIRD-PARTY-NOTICES.md).
+  {
+    package: '@margoengine/environment',
+    file: 'packages/environment/dist/workers/exr-codecs.js',
+    label: 'workers/exr-codecs.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'Each `decodeEXR()` / `loadEXR()` of `@margoengine/environment/exr-codecs`: one worker per call',
+  },
+  {
+    package: '@margoengine/environment',
+    file: 'packages/environment/dist/vendor/exr-codecs/exrview.mjs',
+    label: 'vendor/exr-codecs/exrview.mjs',
+    kind: 'OpenEXR glue',
+    measure: 'file',
+    when: 'With the EXR codec worker above, in a browser',
+  },
+  {
+    package: '@margoengine/environment',
+    file: 'packages/environment/dist/vendor/exr-codecs/exrview.cjs',
+    label: 'vendor/exr-codecs/exrview.cjs',
+    kind: 'OpenEXR glue',
+    measure: 'file',
+    when: 'With the EXR codec worker above, in Node (loaded through createRequire)',
+  },
+  {
+    package: '@margoengine/environment',
+    file: 'packages/environment/dist/vendor/exr-codecs/exrview.wasm',
+    label: 'vendor/exr-codecs/exrview.wasm',
+    kind: 'Wasm',
+    measure: 'file',
+    when: 'With the OpenEXR glue above',
   },
   // Parser workers: one per call, from each package's `/worker` entry (or progressive loading).
   // Draco and KTX2 are not inside these scripts. A compressed file is handed back to the owning thread,
@@ -613,3 +665,46 @@ export const isLazyBuildFile = (path) =>
   /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|draco-full|draco-encoder|basis|basis-encoder|jxl)\/[^/]+\.js)$/.test(
     path,
   );
+
+// `new URL('./file', import.meta.url)` in built code: how a package reaches a file it loads on its own.
+const ASSET_URL = /new URL\(\s*["'`](\.{1,2}\/[^"'`?#$]+)[^"'`]*["'`]\s*,\s*import\.meta\.url\s*\)/g;
+
+/**
+ * How the built packages under `root` and `list` disagree: `unlisted` are built files that load on their own (by name,
+ * isLazyBuildFile, or because built code reaches them with `new URL(..., import.meta.url)`) but have no row; `unbuilt`
+ * are rows of that kind whose file was not built. The margoengine umbrella only re-exports, so it is left out.
+ *
+ * Bug (2026-11-10): 9de13807a added hdr6.worker.js and hdr6.wasm to @margoengine/decoders without rows, and main's
+ * tests/sizes-page.test.js failed for hours because no gate a lane runs before a push looked. `npm run quality` (sizes
+ * gate) now fails on any drift, so a new lazy file cannot land unlisted.
+ */
+export function lazyFileDrift(root, list = LAZY_FILES) {
+  const built = [],
+    reached = new Set();
+  for (const id of readdirSync(join(root, 'packages')).sort()) {
+    const dist = `packages/${id}/dist`;
+    if (id === 'margoengine' || !existsSync(join(root, dist))) continue;
+    for (const name of readdirSync(join(root, dist), { recursive: true })) {
+      const file = `${dist}/${String(name).split('\\').join('/')}`;
+      built.push(file);
+      if (!/\.m?js$/.test(file)) continue;
+      for (const [, target] of readFileSync(join(root, file), 'utf8').matchAll(ASSET_URL)) {
+        const path = posix.normalize(posix.join(posix.dirname(file), target));
+        if (path.startsWith(`${dist}/`) && existsSync(join(root, path))) reached.add(path);
+      }
+    }
+  }
+  const listed = new Set(list.map((entry) => entry.file)),
+    lazy = new Set([...built.filter(isLazyBuildFile), ...reached]);
+  return {
+    unlisted: [...lazy].filter((file) => !listed.has(file)).sort(),
+    unbuilt: [...listed].filter((file) => isLazyBuildFile(file) && !built.includes(file)).sort(),
+  };
+}
+
+/** Rows of `list` with no measurement in `root`'s committed entry-sizes.json (the sizes page refuses to build then). */
+export function unmeasuredLazyFiles(root, list = LAZY_FILES) {
+  const record = join(root, 'examples/package-benchmarks/results/entry-sizes.json');
+  const measured = existsSync(record) ? (JSON.parse(readFileSync(record, 'utf8')).lazyFiles ?? {}) : {};
+  return list.filter((entry) => !measured[entry.file]).map((entry) => entry.file);
+}
