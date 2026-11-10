@@ -6,7 +6,7 @@ const browser = await openBrowser({ startPath: '/tests/modern-extension.html', p
 const errors = [];
 browser.page.on('pageerror', (error) => errors.push(error.message));
 try {
-  const feature = process.argv.includes('--clone') ? 'clone' : 'graph';
+  const feature = process.argv.includes('--tags') ? 'tags' : process.argv.includes('--clone') ? 'clone' : 'graph';
   const result = await browser.page.evaluate(async (feature) => {
     const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
@@ -43,6 +43,26 @@ try {
         drawing = children(copied)[0];
         if (drawing.geometry !== mesh.geometry || drawing.material !== mesh.material) throw new Error('clone did not share resources');
         mesh.dispose(); root.dispose();
+      } else if (feature === 'tags') {
+        const { tags, queryTags, SceneEvents } = await import('/packages/scene/dist/tags.js');
+        const { cloneSubtree } = await import('/packages/scene/dist/clone.js');
+        tags(mesh).add('renderable', 'red');
+        if (queryTags(engine.scene, 'renderable && red')[0] !== mesh) throw new Error('tag query missed rendered mesh');
+        const observer = new SceneEvents(engine);
+        let added = 0, disposed = 0;
+        observer.on('added', (event) => {
+          if (event.mesh !== mesh) return;
+          if (localToWorld(mesh, [0, 0, 0]).some((v) => Math.abs(v) > 1e-6)) throw new Error('listener saw unfinished attach');
+          added++;
+        });
+        observer.on('disposed', () => disposed++);
+        attach(destination, mesh);
+        const copy = cloneSubtree(mesh);
+        if (!tags(copy).has(['renderable', 'red'])) throw new Error('clone lost tags');
+        copy.dispose();
+        if (added !== 1 || disposed !== 1) throw new Error('lifecycle did not cover mutations');
+        mesh.visible = queryTags(engine.scene, 'renderable && !hidden').includes(mesh);
+        observer.dispose();
       } else attach(destination, mesh);
       const after = await snap();
       const p = [1, 2, 3], recovered = worldToLocal(drawing, localToWorld(drawing, p));

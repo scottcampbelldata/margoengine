@@ -362,3 +362,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mesh-edit: cover boolean-batch n-ary union/intersection, first-minus-union, empties, duplicate IDs and per-input provenance, work counters, exact-space rounding, limits and cancellation (batch 224 job 2).
 - margoengine: document the generated mesh-edit/boolean-batch alias and upstream exporters/sparse alias in the README phase (batch 224 job 2).
+- @margoengine/scene (batch 226 tags): document TagSet and DOM events, OR/AND arrays, boolean query grammar/limits, cloned tags, explicit SceneEvents installation/restoration, event ordering, transactional compound operations, errors and abortable subscriptions, with examples in the README phase.
+- margoengine (batch 226 tags): document generated scene/tags alias in the README phase.

@@ -7,6 +7,7 @@ import { axisAngleToQuaternion, multiplyQuaternions, rotateByQuaternion, splitTR
 import { rangeError, typeError } from '../../shared/errors.js';
 import { children, parent, traverse, worldMatrix } from './index.js';
 import type { VectorTarget } from './index.js';
+import { sceneMutation } from './mutations.js';
 
 /** Mesh selection function. Search includes the supplied root. */
 export type MeshPredicate = (mesh: Mesh) => boolean;
@@ -123,8 +124,10 @@ export function attach<T extends Mesh>(newParent: Mesh | null, mesh: T): T {
   const world = worldMatrix(mesh);
   const matrix = newParent ? inverse(worldMatrix(newParent)).multiply({ elements: world }).elements : world;
   const p = parts(matrix);
-  mesh.setParent(newParent);
-  return mesh.setPosition(p.position).setQuaternion(p.rotation).setScale(p.scale);
+  return sceneMutation(meshRuntime(mesh).engine, () => {
+    mesh.setParent(newParent);
+    return mesh.setPosition(p.position).setQuaternion(p.rotation).setScale(p.scale);
+  });
 }
 
 const axisUnit = (axis: Vec3 | Vec3Like, amount: number) => {

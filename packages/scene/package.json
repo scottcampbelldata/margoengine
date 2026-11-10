@@ -29,7 +29,8 @@
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
     "test:gpu": "node tests/graph-browser.mjs",
-    "test:gpu:clone": "node tests/graph-browser.mjs --clone"
+    "test:gpu:clone": "node tests/graph-browser.mjs --clone",
+    "test:gpu:tags": "node tests/graph-browser.mjs --tags"
   },
   "sideEffects": false,
   "exports": {
@@ -52,6 +53,10 @@
     "./clone": {
       "types": "./dist/clone.d.ts",
       "import": "./dist/clone.js"
+    },
+    "./tags": {
+      "types": "./dist/tags.d.ts",
+      "import": "./dist/tags.js"
     }
   },
   "files": [

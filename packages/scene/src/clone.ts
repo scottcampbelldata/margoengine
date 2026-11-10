@@ -2,6 +2,8 @@ import type { Mesh } from '@margoengine/core';
 import { meshRuntime } from '@margoengine/core/extension';
 import { typeError } from '../../shared/errors.js';
 import { parent, traverse, userData } from './index.js';
+import { copyTagState } from './tag-state.js';
+import { sceneMutation } from './mutations.js';
 
 /** Options for {@link cloneSubtree}. */
 export interface CloneOptions {
@@ -31,6 +33,7 @@ export function cloneSubtree(source: Mesh, { recursive = true, parent: targetPar
   try { metadata = structuredClone(sources.map((mesh) => userData(mesh))); }
   catch (cause) { throw Object.assign(typeError('cloneSubtree: use structured-cloneable userData', 'arguments'), { cause }); }
   for (const mesh of sources) mesh.check();
+  return sceneMutation(runtime.engine, () => {
   const copies = new Map<Mesh, Mesh>();
   try {
     for (const [i, mesh] of sources.entries()) {
@@ -47,6 +50,7 @@ export function cloneSubtree(source: Mesh, { recursive = true, parent: targetPar
         to.engine.store.transforms[key][to.id] = from.engine.store.transforms[key][from.id];
       to.engine.store.rotations.set(from.engine.store.rotations.subarray(from.id * 3, from.id * 3 + 3), to.id * 3);
       userData(copy, metadata[i]);
+      copyTagState(mesh, copy);
     }
     return copies.get(source)!;
   } catch (error) {
@@ -57,4 +61,5 @@ export function cloneSubtree(source: Mesh, { recursive = true, parent: targetPar
     if (errors.length > 1) throw new AggregateError(errors, 'cloneSubtree: allocation and cleanup failed; dispose the engine');
     throw error;
   }
+  });
 }

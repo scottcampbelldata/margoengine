@@ -2950,3 +2950,5 @@ Build packages; run node --test --test-timeout=30000 packages/animation/tests/mi
 
 ### Batch 224 batch booleans
 After npm run build:packages, run node --test --test-timeout=120000 packages/mesh-edit/tests/boolean-batch.test.js packages/mesh-edit/tests/boolean-exact.test.js. The 200-solid fixture checks space/materialization/tree-build counts, closure, provenance and analytic volume; no benchmark or timing assertion runs. The existing mesh-edit browser command (and --compat variant) additionally draws the final batch output. No downloaded demo is introduced.
+### Batch 226 tags and lifecycle
+Build packages, then node --test --test-timeout=120000 packages/scene/tests/tags.test.js. Run node scripts/gpu-lock.mjs run --owner=scene-tags --max=4 --wait-max=60 -- node packages/scene/tests/graph-browser.mjs --tags, then append --compat for real WebGL2 compatibility. Outputs: test-results/batch226/tags-*.json. Default and --clone variants retain earlier graph/clone rendering regressions. No benchmark or README execution.

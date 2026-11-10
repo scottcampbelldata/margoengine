@@ -2802,6 +2802,10 @@
       "types": "./dist/scene/clone.d.ts",
       "import": "./dist/scene/clone.js"
     },
+    "./scene/tags": {
+      "types": "./dist/scene/tags.d.ts",
+      "import": "./dist/scene/tags.js"
+    },
     "./scenery": {
       "types": "./dist/scenery.d.ts",
       "import": "./dist/scenery.js"
