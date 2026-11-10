@@ -2846,6 +2846,10 @@
       "types": "./dist/road/geojson.d.ts",
       "import": "./dist/road/geojson.js"
     },
+    "./road/structures": {
+      "types": "./dist/road/structures.d.ts",
+      "import": "./dist/road/structures.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

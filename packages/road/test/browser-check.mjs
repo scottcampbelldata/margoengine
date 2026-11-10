@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'intersections', 'lanes', 'geojson', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
+  for (const feature of ['junctions', 'intersections', 'lanes', 'geojson', 'structures-bridge', 'structures-tunnel', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -125,6 +125,14 @@ try {
         const [a,b]=link.points,mid=a.map((x,k)=>(x+b[k])/2),height=Math.max(link.curve.length,link.width)*1.6;
         engine.camera.position=[mid[0],mid[1]+height,mid[2]+0.001];engine.camera.target=mid;engine.camera.far=height*4;
         data=road(link.curve,{segments:1,crossSection:[[-link.width/2,0],[link.width/2,0]]});
+      } else if (feature.startsWith('structures-')) {
+        const {structures}=await import('/packages/road/dist/structures.js');
+        const {Spline}=await import('/packages/splines/dist/index.js');
+        const isBridge=feature==='structures-bridge';
+        const design=structures(new Spline([[0,isBridge?6:0,-10],[0,isBridge?6:0,10]]),isBridge?{}:{spans:[{kind:'tunnel',start:0,end:20}]});
+        data={geometry:(isBridge?design.decks:design.tunnels).geometry,design};
+        engine.camera.position=isBridge?[13,12,18]:[10,8,19];engine.camera.target=[0,isBridge?3:2,0];
+        if(isBridge?design.supportPositions.length===0:design.openings.length!==2)throw new Error('Structure placement oracle');
       } else if (feature === 'markings') {
         const {road} = await import('/packages/road/dist/index.js');
         const {Spline} = await import('/packages/splines/dist/index.js');
@@ -184,6 +192,7 @@ try {
       const extraMeshes=[];
       if(feature==='intersections')for(const [part,color] of [[data.curb,'#0000ff'],[data.sidewalk,'#00ff00']])extraMeshes.push(engine.createMesh().setGeometry(part.geometry).setMaterial(new PbrMaterial({color})));
       if(feature==='lanes')for(const part of data.paint)extraMeshes.push(engine.createMesh().setGeometry(part.geometry).setMaterial(new PbrMaterial({color:'#ffffff'})));
+      if(feature.startsWith('structures-'))extraMeshes.push(engine.createMesh().setGeometry((feature==='structures-bridge'?data.design.supports:data.design.portals).geometry).setMaterial(new PbrMaterial({color:'#00ff00'})));
       let paint;
       if(feature === 'markings') {
         const {Tonemap}=await import('/packages/tonemap/dist/index.js');
@@ -231,7 +240,7 @@ try {
     const pixels = () => page.locator('canvas').screenshot().then(decodePNG);
     const first = await pixels();
     const rgb = (p, x, y) => Array.from(p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3));
-    for (const [x, y] of (feature === 'geojson' ? [[64,64]] : feature === 'lanes' ? [[64,24],[64,104]] : feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
+    for (const [x, y] of (feature.startsWith('structures-') ? [] : feature === 'geojson' ? [[64,64]] : feature === 'lanes' ? [[64,24],[64,104]] : feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
       [64, 64],
       [24, 64],
       [104, 64],
@@ -249,6 +258,10 @@ try {
     if(feature==='lanes') {
       let white=0;for(let i=0;i<first.data.length;i+=4){const [r,g,b]=first.data.subarray(i,i+3);if(Math.min(r,g,b)>60&&Math.max(r,g,b)-Math.min(r,g,b)<5)white++;}
       assert.ok(white>200,`${mode}: curved lane lines and arrows paint ${white} pixels`);
+    }
+    if(feature.startsWith('structures-')) {
+      let red=0,green=0;for(let i=0;i<first.data.length;i+=4){const [r,g,b]=first.data.subarray(i,i+3);if(r>g+30&&r>b+30)red++;if(g>r+30&&g>b+30)green++;}
+      assert.ok(red>100&&green>30,`${mode}: ${feature} main and support/portal pixels ${red}/${green}`);
     }
     if(feature === 'markings') {
       let white=0;for(let y=50;y<78;y++)for(let x=67;x<78;x++){const p=rgb(first,x,y);if(Math.min(...p)>60 && Math.max(...p)-Math.min(...p)<5)white++;}

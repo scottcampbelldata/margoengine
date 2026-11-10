@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13073899,
+  "total": 13077807,
   "history": [
     {
       "date": "2026-10-24",
@@ -6561,6 +6561,12 @@
       "date": "2026-11-10",
       "commit": "batch-211",
       "reason": "New optional animator/layers 0 -> 10132 B gzip (10436 B ceiling): independent complete graph playback and ordered pose composition reuse AnimatorGraph. Splitting graph state across entries would complicate ownership."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b28e4c047",
+      "reason": "Batch 233 job 4: new optional road/structures entry 0 to 3652 B gzip, ceiling 3908 B. Terrain/road classification, slab and open shell profiles share arc frames, metadata and pier exclusion. Splitting would duplicate those correctness boundaries.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7758,6 +7764,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/animator/layers": 10436
+    "@margoengine/animator/layers": 10436,
+    "@margoengine/road/structures": 3908
   }
 }

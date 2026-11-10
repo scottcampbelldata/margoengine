@@ -61,6 +61,10 @@
     "./geojson": {
       "types": "./dist/geojson.d.ts",
       "import": "./dist/geojson.js"
+    },
+    "./structures": {
+      "types": "./dist/structures.d.ts",
+      "import": "./dist/structures.js"
     }
   },
   "files": [
