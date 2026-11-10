@@ -16,7 +16,7 @@ Versions are the ones in `package-lock.json`; users get whatever their own lockf
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
 | `@dimforge/rapier2d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics2d, margoengine | Rapier 2D rigid-body solver; optional, the app installs and initializes it |
-| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
+| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/game, @margoengine/physics, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
 | `react` | 19.3.0 | MIT | optional peer | @margoengine/game, @margoengine/react, @margoengine/react-kit, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/react-kit, margoengine | React DOM root and portal rendering for scene and HTML components |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | margoengine | React DOM scheduling dependency |
@@ -97,7 +97,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/exporters` | none | none | LICENSE, NOTICE |
 | `@margoengine/fbx` | none | none | LICENSE, NOTICE |
 | `@margoengine/fsm` | none | none | LICENSE, NOTICE |
-| `@margoengine/game` | react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
+| `@margoengine/game` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/geometry` | none | none | LICENSE, NOTICE |
 | `@margoengine/gltf` | none | none | LICENSE, NOTICE |
 | `@margoengine/gltf-pro` | none | none | LICENSE, NOTICE |
