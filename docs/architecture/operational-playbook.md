@@ -636,12 +636,27 @@ BigInt over the holder's process tree, retaining known descendants after an
 intermediate exits. The provider has a 45-second hard limit and a 5-second
 tree-kill bound. Missing providers, errors, empty/incomplete samples, counter
 resets, PID reuse and gaps beyond 90 seconds reset the idle window to unknown.
-Three minutes of stable complete samples with no increasing GPU counter trigger
+By default, three minutes of stable complete samples with no increasing GPU counter trigger
 an identity-confirming second observation, process-tree termination and an
 `ERR_GPU_IDLE_RECLAIM` record in `gpu-lock-idle.log`. Only that lease token is
 released after successful termination. Birth times use CIM's microsecond
 representation, including the native termination check; handles stay open during
 taskkill and the bounded exit wait so PIDs cannot be reused during termination.
+CPU shader compilation can leave those GPU counters unchanged. A command may set
+`MARGO_GPU_IDLE_MIN` from its measured runtime plus margin; acquisition validates
+and records that window for the independent heartbeat, capped by the existing
+hard hold limit. Both the wrapper and heartbeat still enforce `--max`. For Bug 45,
+the earlier full D3D11 render took 143.698 s, but a later CPU-active run lost its
+readback to idle reclamation after 194.050 s. Use an eight-minute hold and a
+four-minute idle window for the instrumented full parity leaf, with its existing
+eight-minute test limit unchanged. The first-hit diagnostic completed in 73.376 s
+with 448 exact albedo, normal and depth words; that is not full transport proof.
+`tests/gpu-idle-window.test.js` simulates the old reclaim interval and checks
+eventual reclaim, unchanged defaults, invalid values and the hard-limit cap;
+`tests/gpu-lock.test.js` checks the actual published lease. This implements the
+distinction between pipeline-creation work and queue execution described by the
+W3C GPU for the Web Working Group, [WebGPU](https://www.w3.org/TR/webgpu/#dom-gpudevice-createcomputepipelineasync)
+(2026). It does not change Windows' watchdog or any correctness deadline.
 The detached heartbeat uses the checkout cwd, and ticket completion waits for
 the owner to close its Windows handles before returning, so a command's temporary
 directory can be removed after completion (30-second owner drain bound).

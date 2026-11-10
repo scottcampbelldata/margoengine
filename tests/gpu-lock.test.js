@@ -6,7 +6,7 @@ process.env.MARGO_SPEED_PHASE = 'active';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -180,6 +180,19 @@ async function withLock(body, envOrFn = {}) {
     rmSync(folder, { recursive: true, force: true });
   }
 }
+
+test('a command publishes its bounded compile idle window for the independent heartbeat', { timeout: 15000 }, () =>
+  withLock(async (gpu) => {
+    const release = await gpu.acquire({ owner: 'compile-window', max: 8, log: quiet });
+    try {
+      const directory = join(gpu.lockDir, 'shared');
+      const entry = JSON.parse(readFileSync(join(directory, readdirSync(directory)[0]), 'utf8'));
+      assert.equal(entry.idleMs, 240_000);
+      assert.equal(entry.maxMinutes, 8);
+    } finally {
+      release();
+    }
+  }, { MARGO_GPU_IDLE_MIN: '4' }));
 
 test('shared FIFO tickets preserve arrival order when timestamps tie and owner names sort backwards', () =>
   withLock(async (gpu) => {

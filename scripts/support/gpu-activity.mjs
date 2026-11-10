@@ -1,6 +1,15 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+/** An idle window may cover a measured compile, but cannot outlive the command's hard hold limit. */
+export function gpuIdleWindow(maxMinutes, idleMinutes = 3) {
+  if (!Number.isFinite(maxMinutes) || maxMinutes <= 0)
+    throw new RangeError('GPU hold minutes must be finite and positive');
+  if (!Number.isFinite(idleMinutes) || idleMinutes <= 0)
+    throw new RangeError('MARGO_GPU_IDLE_MIN must be finite and positive');
+  return Math.min(maxMinutes, idleMinutes) * 60_000;
+}
+
 /** Windows WDDM cumulative per-engine work; query errors and missing providers are unknown, never zero. */
 function runProbe(
   script,

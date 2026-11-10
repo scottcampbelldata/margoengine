@@ -1,5 +1,14 @@
 # Reproducing Margo's numbers
 
+For the Bug 45 GPU idle-lease correction, run
+`node --test --test-timeout=60000 tests/gpu-idle-window.test.js tests/gpu-activity.test.js tests/gpu-monitor-edges.test.js tests/gpu-lock.test.js`.
+These CPU fixtures simulate the exact idle intervals and inspect real fake-lock
+entries; no GPU work or timing benchmark is involved. For an actual instrumented
+parity run, set `MARGO_GPU_IDLE_MIN=4` in that command's environment and retain
+`--max=8 --wait-max=60`, one shared slot and the existing eight-minute leaf limit.
+The idle window is 240 seconds, covering the measured 194.050-second reclamation
+interval plus 45.950 seconds of margin. Test and wrapper deadlines remain intact.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

@@ -1,5 +1,13 @@
 # Claims and evidence
 
+GPU lease correction (Bug 45, 2026-11-09): `MARGO_GPU_IDLE_MIN` declares a measured
+compile idle window, default three minutes and capped by the unchanged hard hold.
+The independent heartbeat reads the recorded window. Deterministic regressions
+in `tests/gpu-idle-window.test.js` retain a lease at the observed 194.050-second
+reclaim point, reclaim at four minutes, and check defaults and invalid limits;
+`tests/gpu-lock.test.js` proves acquisition publishes the window. This is a
+scheduler correctness claim, not a renderer, timing or full D3D11 parity claim.
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four

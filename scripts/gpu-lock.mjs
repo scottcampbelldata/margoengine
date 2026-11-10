@@ -30,6 +30,7 @@
 //      node scripts/gpu-lock.mjs status
 // Env: MARGO_GPU_SLOTS=<n> shared slots (default 3); MARGO_GPU_EXCLUSIVE=1 requests exclusive but still needs speed
 // classification or a timing reason. MARGO_GPU_LOCK=<folder> uses another lock. Refusals are logged beside the lock.
+// MARGO_GPU_IDLE_MIN sizes the idle window for a measured compile (default 3), capped by the hard --max hold.
 // Scripts that take the lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it excuses only that
 // lock, so a GPU test inside a different lock still takes the GPU lock) when run under `run`, so wrapping them can't
 // deadlock; acquire() is a no-op there. MARGO_GPU_LOCK_NESTED_MODE names the outer holder's mode: an exclusive request
@@ -65,7 +66,7 @@ import {
   sameLane,
   worktreeIdentity,
 } from './support/gpu-admission.mjs';
-import { GpuActivity, monitorGpuLease, terminateGpuTree } from './support/gpu-activity.mjs';
+import { GpuActivity, gpuIdleWindow, monitorGpuLease, terminateGpuTree } from './support/gpu-activity.mjs';
 
 /**
  * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
@@ -656,6 +657,7 @@ export async function acquire({
   const mode = resolveMode(timing === undefined ? requested : 'exclusive');
   const maxMinutes = max ?? defaultMaxMinutes(mode);
   validateRequest({ owner, mode, maxMinutes, command, timing });
+  const idleMs = gpuIdleWindow(maxMinutes, number('MARGO_GPU_IDLE_MIN', 3));
   // Inside `run` of this same lock the command already holds it; a different lock is still taken.
   if (process.env.MARGO_GPU_LOCK_NESTED === join(lockDir, 'nested')) {
     if (mode === 'exclusive' && process.env.MARGO_GPU_LOCK_NESTED_MODE === 'shared')
@@ -684,6 +686,7 @@ export async function acquire({
         ...(timing ? { timing } : {}),
         takenAt: new Date(now).toISOString(),
         maxMinutes,
+        idleMs,
         deadline: now + maxMinutes * MIN,
         beats,
       });
@@ -818,6 +821,7 @@ Options:
   --gpu=<reason>             explain an unclassified GPU leaf (logged; cannot override a CPU command)
   --max=<min>                hold limit in minutes (default 20; exclusive GPU maximum 20)
   --wait-max=<min>           give up waiting after this many minutes (default 60)
+  MARGO_GPU_IDLE_MIN         idle window in minutes (default 3, capped by --max); size from runtime plus margin
   --owner=<id>              name shown to other waiters
   -h, --help                 print this help and exit
 
@@ -835,7 +839,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms> [<starter pid>]
     const [file, token, parent, deadline, starter] = rest;
     const original = read(file);
-    const activity = new GpuActivity({ bornBefore: original?.requestedAt ?? Date.now() });
+    const activity = new GpuActivity({
+      bornBefore: original?.requestedAt ?? Date.now(),
+      idleMs: original?.idleMs ?? 180_000,
+    });
     let sampling = false;
     let lastSampleAt = performance.now();
     const grace = Number(process.env.MARGO_GPU_GRACE_MS ?? 15_000);
