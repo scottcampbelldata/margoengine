@@ -1,5 +1,13 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 controls: consumed motion and carried lists (2026-11-10)
+
+`p-arcball` rebuilt its screen basis on the explicit update after immediate pointer input; `p-drag-controls`
+allocated a new carried-object list on every move. The work-count regressions reduce 10,000 idle basis builds to
+zero and 200 list replacements to zero. All replayed raw camera/transform bytes match the parent. Fix commit subject:
+`perf(controls): avoid consumed-motion and carried-list work`. Timing pending the quiet rerun; historical slower
+rows are retained. [Research, counts, fixture scope and reproduction](batch-170-controls.md).
+
 ## Verify cache metadata work
 
 The post-build pause repeated a full synchronous archive stat/sort per newly

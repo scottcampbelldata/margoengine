@@ -1,5 +1,12 @@
 # Clean room
 
+### Batch 170 controls work counts (2026-11-10)
+
+Compared Shoemake's *ARCBALL* (1992) with Lauke and Flack's W3C *Pointer Events Level 4* (2026 draft), retaining
+rotation composition and delivered pointer lifecycle while removing private allocation and consumed-motion work.
+[Full source titles, authors, dates, links, rationale and reproduction](whitepaper/batch-170-controls.md).
+No external implementation or companion code was read or copied.
+
 ### Batch 179 provenance and API trace (2026-11-10)
 
 Build-record generator correction: compared Git Project contributors, gitattributes end-of-line conversion (2026), https://git-scm.com/docs/gitattributes , with Reproducible Builds contributors, Stable order for inputs (2026), https://reproducible-builds.org/docs/stable-inputs/ , and the survey below. Compare semantic LF text while retaining an equivalent CRLF checkout byte-for-byte. The isolated generator regression covers exact file identity and resolved versions, with no timing assertion and no Git configuration change.

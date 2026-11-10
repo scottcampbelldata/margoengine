@@ -255,7 +255,9 @@ export class DragControls extends EventDispatcher {
       return;
     }
     // A member disposed during the drag is left behind.
-    d.carried = d.carried.filter(alive);
+    let count = 0;
+    for (const carried of d.carried) if (alive(carried)) d.carried[count++] = carried;
+    d.carried.length = count;
     if (this.mode === 'rotate') this.turn(d, x, y);
     else {
       const r = this.raycaster.setFromEngine(this.engine, x, y),

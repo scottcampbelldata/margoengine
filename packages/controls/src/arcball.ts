@@ -302,6 +302,17 @@ export class ArcballControls extends Controls {
 
   /** Applies pending motion (all of it, or the damped share for `delta` seconds, default 1/60). Returns true when the camera moved. */
   override update(delta = 1 / 60): boolean {
+    // Immediate pointer input already consumed its motion. A following frame update only needs
+    // the live distance limits; do not construct a screen frame and temporary vectors again.
+    if (!this.spinAngle && !this.logScale && !this.shift[0] && !this.shift[1] && !this.shift[2]) {
+      const p = this.camera.position,
+        t = this.camera.target,
+        distance = Math.hypot(p[0] - t[0], p[1] - t[1], p[2] - t[2]);
+      if (distance >= Math.max(this.minDistance, EPS) && distance <= this.maxDistance) {
+        if (this.state === 'none') this.cursor = null;
+        return false;
+      }
+    }
     const camera = this.camera,
       p0 = camera.position,
       t0 = camera.target,

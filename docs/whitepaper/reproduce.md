@@ -1,5 +1,9 @@
 # Reproducing Margo's numbers
 
+- Batch 170 controls: [commands, parent byte hash and work-count scope](batch-170-controls.md). Correctness uses
+  `node --test --test-timeout=120000 packages/controls/tests/workcount.test.js` after building packages. Timing
+  pending the quiet rerun; no new speed ratio is claimed.
+
 - Batch 179 provenance: after building packages, run node --test packages/sciviz/tests/provenance.test.js. Browser correctness: node scripts/gpu-lock.mjs run --owner=provenance-review --wait-max=60 --max=8 -- node packages/sciviz/tests/provenance-browser.mjs, with a hard outer process-tree timeout. Default covers all 24 demos on both backends. PROVENANCE_BACKENDS=webgpu or webgl2 and PROVENANCE_DEMOS=head,points select affected cases; PROVENANCE_ARTIFACTS=1 writes MRI PNG/SVG/PDF and the executed ESM trace under test-results/sciviz-provenance. Reports include record data hash counts, package/device identity and exported byte counts, which are file sizes rather than speed measurements. All real inputs retain their existing demo source/licence attribution.
 
 

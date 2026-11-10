@@ -201,8 +201,8 @@ fetched for the scene.
 | 13.20 | Lensflare | Margo missing | Margo missing | `p-lensflare` |  |
 | 14.1 | OrbitControls, MapControls, TrackballControls, FlyControls, FirstPersonControls, | faster | faster | `p-orbit-controls` |  |
 | 14.2 | TransformControls | faster | faster | `p-transform-controls` |  |
-| 14.3 | DragControls | slower | slower | `p-drag-controls` |  |
-| 14.4 | ArcballControls | slower | slower | `p-arcball` |  |
+| 14.3 | DragControls | slower | slower | `p-drag-controls` | Batch 170: every move replaced the carried-object list with filter, including 200 allocations in this row's gesture. Stable in-place compaction removes those 200 replacement arrays and still removes disposed members. Raw transform bytes match the parent replay. Fix: perf(controls): avoid consumed-motion and carried-list work. Timing pending the quiet rerun; the historical slower result stays until measured. |
+| 14.4 | ArcballControls | slower | slower | `p-arcball` | Batch 170: immediate pointer handling consumed motion, then the explicit update rebuilt a screen basis and temporary vectors. Idle follow-up updates now check live distance limits first: 10,000 screen-basis builds become zero. Raw camera bytes and change events match the parent replay, including damping and live limits. Fix: perf(controls): avoid consumed-motion and carried-list work. Timing pending the quiet rerun. |
 | 15.1 | GridHelper, PolarGridHelper, AxesHelper, BoxHelper, Box3Helper, ArrowHelper, Cam | faster | faster | `p-helpers` |  |
 | 15.2 | PointLightHelper, SpotLightHelper, DirectionalLightHelper, HemisphereLightHelper | slower | slower | `p-light-helpers` |  |
 | 15.3 | SkeletonHelper | slower | slower | `p-skeleton-helper` |  |

@@ -231,6 +231,25 @@ on the plane through the target, within `minDistance` and `maxDistance`. Under a
 `CameraProjection` the zoom changes `projection.zoom` instead (within `minZoom` and `maxZoom`), still about the cursor.
 With `enableDamping`, rotation, pan and zoom ease out after release (a fling keeps spinning and slows to rest).
 
+An update with no pending motion returns `false` without rebuilding the camera basis when the distance is within
+the live limits. Changing `minDistance` or `maxDistance` still takes effect on the next update. Immediate pointer
+updates and a following frame update can both be used; the latter does no camera work when the motion is consumed.
+
+```ts
+import {Camera} from '@margoengine/core';
+import {ArcballControls} from '@margoengine/controls/arcball';
+
+const canvas = document.createElement('canvas');
+document.body.append(canvas);
+const camera = new Camera({position: [0, 0, 10], target: [0, 0, 0]});
+const controls = new ArcballControls(camera, canvas);
+console.assert(controls.update() === false);
+controls.maxDistance = 5;
+console.assert(controls.update() === true); // applies a live limit even without input
+controls.dispose();
+canvas.remove();
+```
+
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
