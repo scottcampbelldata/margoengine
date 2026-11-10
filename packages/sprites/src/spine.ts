@@ -486,7 +486,14 @@ export class SpineSkeleton extends Skeleton2D {
         const keys = objects(timeline),
           pair = keyPair(keys, t);
         if (!pair) continue;
-        const fields = new Set([...Object.keys(pair[0]), ...Object.keys(pair[1])]);
+        // An IK key that leaves out mix means 1 and softness 0 (JSON export format, IK constraint keyframes), not
+        // the setup values; other numeric key fields the format documents default to 1. Listed first, they also keep
+        // their curve channels (mix 0, softness 1) when a key names only one of them.
+        const fields = new Set([
+          ...(kind === 'ik' ? ['mix', 'softness'] : []),
+          ...Object.keys(pair[0]),
+          ...Object.keys(pair[1]),
+        ]);
         fields.delete('time');
         fields.delete('curve');
         for (const field of fields) {
@@ -497,7 +504,7 @@ export class SpineSkeleton extends Skeleton2D {
               keys,
               t,
               field,
-              1,
+              kind === 'ik' && field === 'softness' ? 0 : 1,
               [...fields].indexOf(field),
               this.absoluteCurves,
             )!;

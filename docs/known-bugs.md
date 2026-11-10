@@ -5443,3 +5443,31 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 
 ### Fixed: J6 product implicit-sampler footprint
 The red 121 versus 120 product probe came from webgl2-compat replacing implicit textureSample footprint selection with a Euclidean derivative LOD estimate. The first resolved scene HDR red was binary16 0x3329 on native and 0x3321 on both ANGLE backends. Keeping hardware implicit sampling repairs the owning emitter; explicit mip interpolation stays unchanged. The glsl.test.js regression fails before repair; the oblique implicitFootprint GPU case changes from native 0x3e99f89a versus old compatibility 0x3ed98258 to 0x3e99f89a on all three paths. Product's existing exact cross-backend and restoration probes now pass, with zero tracked allocations after disposal. Intermediate HDR bit equality is not claimed. Reproduction and raw centre copies: docs/integration-product.md.
+
+## Batch 132 audit: sprites (fixed and open)
+
+Fixed with regressions in `packages/sprites/tests/audit-132.test.js` (all 8 fail on the code before the fix):
+`SpriteLayer`, `BillboardLayer` and `SkeletalLayer` `dispose()` removed the active scene's plugin of the same name
+(a layer attached to a second scene stayed registered, its pass drawing a disposed layer, and the default scene lost
+its `hud`); they now leave through `sceneOf(this)`. `SkeletalLayer` skinned only on view index 0, so a layer that
+view 0 leaves out by `layers` drew nothing in view 1 (count 0 from a frame that never built); a `SpriteLayer` with
+its own `target` likewise skipped every view after index 0, and its normals target cleared only on index 0. A frame
+flag set in `onPreUpdate` now marks the first view the layer draws. `packSprites` and `packBillboards` compared a
+float32 slot with the double they wrote, so any value such as rotation 0.1 counted as changed and uploaded every
+frame; they compare `Math.fround(value)`. A linked Aseprite cel took the z-index of the cel it links to (spec NOTE.5
+orders by each cel's own z). A Spine IK key without `mix` kept the setup mix (0 stayed 0; the JSON export format
+says assume 1) and one without `softness` interpolated toward 1 (format: assume 0).
+
+### Open: sprites findings not fixed in the audit
+
+- Nine-slice with squeezed or fractional borders leaves a one-pixel gap under `snap`: borders [4, 0, 4, 0] on an
+  8-wide rect drawn 7 wide at x 0 put the left part over [0, 3.5) and the right part, snapped on its own, over
+  [4, 7.5), so pixel 3 is empty and the right edge overshoots by half a pixel (slice.ts sliceParts with
+  sprite.ts snapToPixel). Worked out from the arithmetic; not rendered.
+- Spine IK keys that leave out `bendPositive`, `compress` or `stretch` keep the setup values; the JSON export format
+  page says "Assume false if omitted" for keys, but it shows a 3.8 export and the 4.x default was not confirmed from a
+  specification, so this is left as it is (spine.ts applyAnimation constraint loop).
+- `sortBillboards` sorts by distance from the eye, which is not view depth under an orthographic camera.
+- `BlendLayer` and `SkeletalLayer` multiply issue two draws per sprite or triangle; speed unmeasured.
+- Aseprite group compositing: header flag 2 says groups composite separately first; the parser multiplies a group's
+  opacity into its children (documented in the README, not fixed).

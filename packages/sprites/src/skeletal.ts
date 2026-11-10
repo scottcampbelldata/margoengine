@@ -678,6 +678,7 @@ export class SkeletalLayer implements EnginePlugin {
     });
   }
   onPreUpdate(delta: number): void {
+    this.frameStart = true;
     if (delta > 0) this.states.prune();
   }
   onDeviceRestored(): void {
@@ -697,7 +698,8 @@ export class SkeletalLayer implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    // The scene this layer was attached to, not whichever scene is active now.
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     for (const mesh of this.list) mesh.owner = undefined;
     this.list.length = 0;
@@ -818,8 +820,10 @@ export class SkeletalLayer implements EnginePlugin {
       });
       this.module = device.createShaderModule({ label: 'skeletal', code: shader });
     }
-    // Several views of a frame skin once: the first builds, later ones reuse its buffers.
-    const count = view?.index ? this.lastCount : (this.lastCount = this.build(device));
+    // Several views of a frame skin once: the first this layer draws builds (view 0 may leave it out by its layers),
+    // later ones reuse its buffers.
+    const count = this.frameStart || !view?.index ? (this.lastCount = this.build(device)) : this.lastCount;
+    this.frameStart = false;
     const samples = c.descriptor.multisample?.count ?? 1;
     const pipelineFor = (mode: SkinnedMesh['blendMode'], correction = false) => {
       const key = `${c.format}/${samples}/${mode}/${correction}`;
@@ -911,4 +915,6 @@ export class SkeletalLayer implements EnginePlugin {
     pass.end();
   }
   private lastCount = 0;
+  /** Set once a frame by onPreUpdate. */
+  private frameStart = true;
 }

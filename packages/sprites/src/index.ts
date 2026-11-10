@@ -292,7 +292,6 @@ export class SpriteLayer implements EnginePlugin {
   private readonly mipCache = new Map<unknown, unknown>();
   private atlas: SpriteAtlas | readonly SpriteAtlas[];
   private engine?: Engine;
-  private removePass?: () => void;
   private device?: GPUDevice;
   private colorAtlas?: OwnedAtlas;
   private normalAtlas?: OwnedAtlas;
@@ -308,6 +307,8 @@ export class SpriteLayer implements EnginePlugin {
   private generation = 0;
   private uploadAll = true;
   private disposed = false;
+  /** Set once a frame by onPreUpdate: the next drawn view is the frame's first, whatever its index. */
+  private frameStart = true;
   private readonly states = new ViewStates<ViewState>(
     () => {
       const uniform = this.device!.createBuffer({
@@ -415,7 +416,7 @@ export class SpriteLayer implements EnginePlugin {
         this.disposed ? 'disposed' : 'webgpu',
       );
     this.engine = engine;
-    this.removePass = engine.frameGraph.add({
+    engine.frameGraph.add({
       name: this.name,
       order: this.order,
       execute: (c) => {
@@ -424,6 +425,7 @@ export class SpriteLayer implements EnginePlugin {
     });
   }
   onPreUpdate(delta: number): void {
+    this.frameStart = true;
     if (delta > 0) {
       this.states.prune();
       this.time += delta;
@@ -439,8 +441,8 @@ export class SpriteLayer implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.removePass = undefined;
-    this.engine?.removePlugin(this.name);
+    // The scene this layer was attached to, not whichever scene is active now.
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.clearSprites();
     this.engine = undefined;
@@ -693,8 +695,11 @@ export class SpriteLayer implements EnginePlugin {
     const view = c.view;
     if (view?.layers !== undefined && !(view.layers & this.layerMask)) return;
     const own = this.target && (typeof this.target === 'function' ? this.target() : this.target);
+    // The first view this layer draws in a frame: view 0 may leave it out by its layers.
+    const first = this.frameStart || !view?.index;
+    this.frameStart = false;
     // A layer with its own target draws once a frame, however many views the frame has.
-    if (own && view?.index) return;
+    if (own && !first) return;
     const device = c.device;
     this.prepare(device);
     const count = this.upload(device);
@@ -740,7 +745,7 @@ export class SpriteLayer implements EnginePlugin {
       this.attachments.push({
         view: this.normalView!,
         // Only the first view of a frame clears: a later view keeps what the first wrote.
-        loadOp: clear && !view?.index ? 'clear' : 'load',
+        loadOp: clear && first ? 'clear' : 'load',
         // 128 in bytes: 0.5 lands between 127 and 128, and which one is up to the driver.
         clearValue: [128 / 255, 128 / 255, 1, 0],
         storeOp: 'store',

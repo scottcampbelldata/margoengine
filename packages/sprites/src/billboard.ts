@@ -108,8 +108,9 @@ export function packBillboards(
   let at = 0,
     start = -1,
     end = 0;
+  // Compared as stored: a float32 slot never equals a double such as 0.1, which would upload it every frame.
   const put = (value: number) => {
-    if (data[at] !== value) {
+    if (data[at] !== Math.fround(value)) {
       data[at] = value;
       if (start < 0) start = at;
       end = at + 1;
@@ -396,7 +397,8 @@ export class BillboardLayer implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    // The scene this layer was attached to, not whichever scene is active now.
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.clearBillboards();
     this.engine = undefined;
@@ -510,7 +512,7 @@ export class BillboardLayer implements EnginePlugin {
         f[17] = 0;
         f[18] = v[8] / length;
       } else {
-        // Looking straight down or up: the camera's up axis lies flat and gives the turn.
+        // The camera's right axis stands vertical (a camera rolled a quarter turn): its up axis lies flat instead.
         const up = Math.hypot(v[1], v[9]);
         f[16] = v[9] / up;
         f[17] = 0;

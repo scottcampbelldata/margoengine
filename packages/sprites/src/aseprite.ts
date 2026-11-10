@@ -300,7 +300,8 @@ export async function parseAseprite(bytes: Uint8Array, options: AsepriteOptions 
           const target = r.u16(),
             linked = target < frame ? celsByFrame[target].find((cel) => cel.layer === layer) : undefined;
           if (target >= frame) fail('a linked cel that points forward');
-          if (linked) cels.push(linked);
+          // The image, place and opacity are the linked cel's; the z-index belongs to this cel (spec NOTE.5).
+          if (linked) cels.push({ ...linked, z });
         } else if (celType === 0 || celType === 2) {
           const w = r.u16(),
             h = r.u16(),

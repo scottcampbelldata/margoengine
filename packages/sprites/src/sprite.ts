@@ -158,8 +158,9 @@ export function packSprites(
   let at = 0,
     start = -1,
     end = 0;
+  // Compared as stored: a float32 slot never equals a double such as 0.1, which would upload it every frame.
   const put = (value: number) => {
-    if (data[at] !== value) {
+    if (data[at] !== Math.fround(value)) {
       data[at] = value;
       if (start < 0) start = at;
       end = at + 1;
