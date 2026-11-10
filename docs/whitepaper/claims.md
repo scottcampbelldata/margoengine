@@ -4524,6 +4524,9 @@ Claim: sciviz/tensor supplies symmetric tensor eigensystems on CPU/GPU, ellipsoi
 ## Scene-state shadow property identity (2026-11-10)
 Shadow settings restored by save/scene-state retain their bound ordinary or null prototype, including when a snapshot owns __proto__. Proof: packages/save/tests/scene-state.test.js requires own data descriptors, exact detached recapture and prototype-preserving rollback after a later binding refuses its new property. Both new regressions fail on the previous Object.assign implementation. This claim covers shadow setting replacement; it makes no general security certification claim.
 
+## Audio voice registration failure (2026-11-10)
+AudioVoiceManager.add preserves the caller's existing playback/source and releases registration ownership when gain estimation rejects or throws. A stale disposed handle cannot release a later handle for the same sound. Proof: packages/audio/tests/voice-manager.test.js checks NaN, negative, infinite and throwing estimates, exact phase/source identity, other active voices and repeat registration. The three regressions fail before their repairs; valid-input offline/live waveform checks remain unchanged. This guarantee covers gain estimation and ownership, not arbitrary graph mutation inside caller callbacks.
+
 ## Behavior tree text option inference (2026-11-10)
 General TreeTextOptions variables preserve possible subtree references in the inferred SubtreeDocument result; statically absent registrations retain TreeDocument. Proof: packages/behavior/tests/text-types.test.js compiles six inference cases and requires unsafe ordinary-tree assignment to reject. The original declaration fails with false type-equality checks and an unused expected-error diagnostic. Runtime syntax and validation are unchanged.
 ### Batch 176 molecules

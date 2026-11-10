@@ -1377,6 +1377,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/save: document own-data shadow setting restoration, special-key round trips and prototype-preserving rollback in scene-state.
 
+- @margoengine/audio: document gain-estimation failure preserving caller playback and ownership, plus idempotent stale-handle disposal for voices.
+
 - @margoengine/behavior: cover parseTreeText inference for ordinary options, explicit registrations and TreeTextOptions variables; use BlackboardKey objects for shared subtree state.
 - @margoengine/loaders (batch 176 job 6): document loaders/mmcif and PDB residue insertion/alternate metadata, first-model/conformer policy and struct_conn limits.
 - @margoengine/sciviz (batch 176 job 6): document molecule representations/defaults, element-radius fallbacks, residue picking and resource lifetime with a runnable example in the README phase.

@@ -4382,8 +4382,16 @@ Outside the batch 262 single-aspect viewer: simultaneous depth and stencil bindi
 
 Fixed 2026-11-10: Outside batch 262. scoped API merging rejects marked or duplicated input (6cf48539f). tests/api-report-scope.test.js passes all five checks.
 
-### Batch 254 voice registration callback rollback (fix phase)
-Repro: start a decoded Audio, then manager.add(sound,{gain:()=>NaN}) throws for invalid gain; a second manager.add(sound) raises attached and the original sound remains paused. Cause: registration pauses the sound and inserts ownership before update evaluates the user gain callback, with no rollback on that error. Valid-input voice budgeting/phase tests pass. Per build-phase rules 21/22 this invalid-callback edge waits for the fix phase; restore the prior playback/ownership on failed registration with a regression test.
+### Fixed: batch 254 voice registration callback rollback
+Registration now defers its first source change until all gain estimates have
+validated; failed estimation releases its own registry/owner entries and
+propagates the original error. The caller's playing source, exact phase and other
+allocated voices survive NaN, negative, infinite and throwing gain callbacks.
+Removal also checks registration identity, so disposing a stale handle twice
+cannot release a replacement handle. Regression:
+packages/audio/tests/voice-manager.test.js; all three new lifecycle regressions
+fail without their corresponding repairs. Valid transport, ranking and waveform
+checks retain their existing assertions.
 - Batch 260 HTMLBlend inherited custom view: with `HTMLBlend.attach(engine, {view: {viewport: [0.5, 0, 0.5, 1]}})`, the DOM projects into that rectangle while the aperture uses the active render context's camera/viewport. Cause: mask draw consumes PassContext rather than LabelRenderer.view. Ordinary full-canvas blending passes on all three backends; synchronize explicit view/scissor/camera in the fix phase.
 
 

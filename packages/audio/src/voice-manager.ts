@@ -100,7 +100,13 @@ export class AudioVoiceManager {
     const voice = new AudioManagedVoice(this, sound, options);
     owners.set(sound, voice);
     this.voices.add(voice);
-    this.update();
+    try {
+      this.update();
+    } catch (error) {
+      this.voices.delete(voice);
+      if (owners.get(sound) === voice) owners.delete(sound);
+      throw error;
+    }
     return voice;
   }
 
@@ -127,8 +133,8 @@ export class AudioVoiceManager {
   }
   /** @internal Remove a released registration. */
   remove(voice: AudioManagedVoice): void {
-    this.voices.delete(voice);
-    owners.delete(voice.sound);
+    if (!this.voices.delete(voice)) return;
+    if (owners.get(voice.sound) === voice) owners.delete(voice.sound);
     this.update();
   }
   /** Stop and release registrations, preserving caller-owned sounds/buffers. Idempotent. */
@@ -159,6 +165,7 @@ export class AudioManagedVoice {
   private clock: number;
   private rank: number;
   private allocated = false;
+  private pending = true;
   private rate: number;
   private cents: number;
   private readonly extraGain: () => number;
@@ -175,7 +182,6 @@ export class AudioManagedVoice {
     this.rate = sound.playbackRate;
     this.cents = sound.detune;
     this.status = sound.isPlaying ? 'playing' : 'stopped';
-    sound.pause();
   }
   /** Greater priority wins before gain. */
   get priority(): number {
@@ -305,6 +311,11 @@ export class AudioManagedVoice {
     if (this.sound.isDisposed) {
       this.allocated = false;
       return;
+    }
+    // Ranking evaluates caller gain functions before committing source changes.
+    if (this.pending) {
+      this.pending = false;
+      this.sound.pause();
     }
     if (active && !this.allocated) {
       this.sound.seek(this.phase).play();

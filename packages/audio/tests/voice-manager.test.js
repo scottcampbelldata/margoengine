@@ -14,6 +14,78 @@ function setup(options = {}) {
 }
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-10, `${a} != ${b}`);
 
+test('failed registration gain evaluation preserves playback, phase and source ownership', () => {
+  const thrown = new Error('gain callback failed');
+  for (const gain of [
+    () => NaN,
+    () => -1,
+    () => Infinity,
+    () => {
+      throw thrown;
+    },
+  ]) {
+    const s = setup();
+    try {
+      const sound = s.sound({ offset: 1 }).play();
+      s.context.currentTime = 0.25;
+      const phase = sound.currentTime;
+      const source = s.context.bufferSources.at(-1);
+      assert.throws(() => s.manager.add(sound, { gain }));
+      assert.equal(sound.isPlaying, true);
+      assert.equal(source.stopped, null, 'a failed estimate does not stop the caller source');
+      assert.equal(s.context.bufferSources.length, 1, 'a failed estimate creates no replacement source');
+      near(sound.currentTime, phase);
+      assert.equal(s.manager.activeCount, 0);
+      assert.equal(s.manager.virtualCount, 0);
+      const voice = s.manager.add(sound);
+      assert.equal(voice.isPlaying, true);
+      near(voice.currentTime, phase);
+      voice.dispose();
+    } finally {
+      s.listener.dispose();
+    }
+  }
+});
+
+test('failed registration of a playing voice leaves other managed sources allocated', () => {
+  const s = setup();
+  try {
+    const first = s.manager.add(s.sound()).play();
+    const source = s.context.bufferSources.at(-1);
+    const sound = s.sound().play();
+    assert.throws(() => s.manager.add(sound, { priority: 1, gain: () => NaN }));
+    assert.equal(first.isVirtual, false);
+    assert.equal(source.stopped, null);
+    assert.equal(s.manager.activeCount, 1);
+    const registered = s.manager.add(sound, { priority: 1 });
+    assert.equal(first.isVirtual, true);
+    assert.equal(registered.isVirtual, false);
+  } finally {
+    s.listener.dispose();
+  }
+});
+
+test('disposing a stale handle again cannot release a replacement registration', () => {
+  const s = setup();
+  try {
+    const sound = s.sound();
+    const old = s.manager.add(sound);
+    old.dispose();
+    const current = s.manager.add(sound).play();
+    old.dispose();
+    assert.throws(
+      () => s.manager.add(sound),
+      (error) => error.code === 'attached',
+    );
+    assert.equal(s.manager.activeCount, 1);
+    assert.equal(current.isVirtual, false);
+    current.dispose();
+    s.manager.add(sound).dispose();
+  } finally {
+    s.listener.dispose();
+  }
+});
+
 test('global cap, deterministic ties, priority, threshold and zero-source virtualization', () => {
   const s = setup(),
     a = s.manager.add(s.sound()),

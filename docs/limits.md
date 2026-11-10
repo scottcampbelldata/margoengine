@@ -3920,6 +3920,14 @@ Input/output limit: 1 MiB UTF-8; 10,000 XML elements; 128 XML nesting levels; ex
 
 Batch 250 job 5: fsm/scxml 0 to 4970 B min+gzip, ceiling 5226 B. Optional runtime is not loaded by the FSM root or core/stage.
 
+## Audio voice registration failure (2026-11-10)
+The optional voices manager evaluates caller gain estimates before changing a
+new registration's physical source. Failed estimation releases ownership and
+preserves the original playing source and phase. Gain callbacks must not mutate
+the audio graph. Disposing an old handle again leaves a replacement registration
+owned. Regression: packages/audio/tests/voice-manager.test.js. Public signatures,
+voice budgets, ranking and valid-input waveform references are unchanged.
+
 ## Behavior tree text (batch 251)
 
 `parseTreeText` infers `TreeDocument` only when its options exclude subtree
