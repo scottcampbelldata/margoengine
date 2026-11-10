@@ -33,10 +33,17 @@ export interface GlobalLightmapOptions extends LightmapOptions {
   areaSamples?: number;
   /** Emissive quads light the others; with a `surface` callback each emitting texel is its own small light. */
   emissiveLights?: boolean;
-  /** Diffuse bounces after the direct light, 0 to 2. Default 0. */
+  /** Diffuse bounces after the direct light: 0 to 2, or 0 to 8 with `bounceMode: 'path'`. Default 0. */
   bounces?: number;
-  /** Cosine rays per texel per bounce, 1 to 32. Default 8. */
+  /** Cosine rays per texel per bounce (paths per texel with `bounceMode: 'path'`), 1 to 32. Default 8. */
   bounceRays?: number;
+  /**
+   * How indirect light is gathered. 'quad' (default): coarse radiosity, each bounce ray reads the mean light of the
+   * quad it hits. 'path': each ray continues as a diffuse path of up to `bounces` segments, and every vertex reads the
+   * direct, area and emissive light of the exact texel it reaches (next-event estimation cached per texel), so
+   * indirect light varies across a quad as its light source does.
+   */
+  bounceMode?: 'quad' | 'path';
   /** Quads whose albedo alpha is below 1 cast no shadows (bounce rays still see them). Default false. */
   transmission?: boolean;
   /** At most 32 convex glass volumes; light passes through them in straight lines, without refraction. */
@@ -142,11 +149,125 @@ function glassDirect(
   return out;
 }
 
+/**
+ * A cosine-weighted direction about texel `i`'s normal: Malley's method (PBRT 4e sec. A.5) in a branchless basis (Duff
+ * et al. 2017). Two random numbers per call, u then phi.
+ */
+function cosine(normals: Float32Array, i: number, random: () => number): number[] {
+  const [rx, ry, rz] = normals.subarray(i * 3, i * 3 + 3),
+    sign = rz >= 0 ? 1 : -1,
+    k = -1 / (sign + rz || 1),
+    m = rx * ry * k,
+    u = random(),
+    phi = 2 * Math.PI * random(),
+    x = Math.sqrt(u) * Math.cos(phi),
+    y = Math.sqrt(u) * Math.sin(phi),
+    z = Math.sqrt(Math.max(0, 1 - u));
+  return [
+    (1 + sign * rx * rx * k) * x + m * y + rx * z,
+    sign * m * x + (sign + ry * ry * k) * y + ry * z,
+    -sign * rx * x - ry * y + rz * z,
+  ];
+}
+
+/**
+ * Path-traced bounces: from each texel, `bounceRays` cosine-sampled paths of up to `bounces` diffuse segments through
+ * every quad. At each vertex the path adds its throughput times the outgoing radiance of the texel it hit (emission
+ * and the reflected direct, area and emissive light of that texel: next-event estimation cached per texel, Kajiya
+ * 1986), then continues from that texel with throughput times its diffuse albedo. Cosine sampling cancels the cosine
+ * and the 1/pi of the Lambert BRDF, so irradiance is pi times the mean path radiance (legacy drops the pi, as the quad
+ * gather does). The 1e-3 ray offset is Margo's.
+ */
+async function paths(
+  t: Texels,
+  input: BakeInput,
+  o: { emissive: boolean; bounces: number; bounceRays: number },
+  added: Float64Array,
+  random: () => number,
+) {
+  const { light, emitted, albedo, metal, owner: quad, points, normals, physical } = t,
+    samples = quad.length,
+    radiance = new Float64Array(samples * 3),
+    reflect = new Float64Array(samples * 3),
+    gathered = new Float64Array(samples * 3);
+  for (let i = 0; i < samples * 3; i++) {
+    const texel = (i / 3) | 0;
+    reflect[i] = albedo[i] * (1 - metal[texel]);
+    const reflected = (light[i] + added[i]) * reflect[i];
+    // Emissive rectangles already carried emission to the receivers; physical paths must not add it again.
+    radiance[i] = (physical && o.emissive ? 0 : emitted[i]) + (physical ? reflected / Math.PI : reflected);
+  }
+  // Texel lookup: the hit's coordinates along p0 -> p1 and p0 -> p3 pick the texel of the quad's chart (bake order).
+  const start = new Uint32Array(input.count),
+    frame = new Float64Array(input.count * 9);
+  for (let q = 0, at = 0; q < input.count; q++) {
+    start[q] = at;
+    at += input.frames[q].w * input.frames[q].h;
+    for (let a = 0; a < 3; a++) {
+      frame[q * 9 + a] = input.positions[q * 12 + a];
+      frame[q * 9 + 3 + a] = input.positions[q * 12 + 3 + a] - input.positions[q * 12 + a];
+      frame[q * 9 + 6 + a] = input.positions[q * 12 + 9 + a] - input.positions[q * 12 + a];
+    }
+  }
+  const texelAt = (q: number, p: ArrayLike<number>) => {
+    const f = frame.subarray(q * 9, q * 9 + 9),
+      d = [p[0] - f[0], p[1] - f[1], p[2] - f[2]],
+      uu = f[3] * f[3] + f[4] * f[4] + f[5] * f[5],
+      uv = f[3] * f[6] + f[4] * f[7] + f[5] * f[8],
+      vv = f[6] * f[6] + f[7] * f[7] + f[8] * f[8],
+      du = d[0] * f[3] + d[1] * f[4] + d[2] * f[5],
+      dv = d[0] * f[6] + d[1] * f[7] + d[2] * f[8],
+      det = uu * vv - uv * uv,
+      { w, h } = input.frames[q],
+      x = Math.min(w - 1, Math.max(0, Math.floor(((du * vv - dv * uv) / det) * w))),
+      y = Math.min(h - 1, Math.max(0, Math.floor(((dv * uu - du * uv) / det) * h)));
+    return start[q] + y * w + x;
+  };
+  const through = [1, 1, 1];
+  for (let i = 0; i < samples; i++) {
+    if (!(i & 31)) await checkpoint(t.signal);
+    for (let n = 0; n < o.bounceRays; n++) {
+      let from = i,
+        q = quad[i],
+        origin = [0, 1, 2].map((a) => points[i * 3 + a] + normals[i * 3 + a] * 1e-3);
+      through.fill(1);
+      for (let depth = 0; depth < o.bounces; depth++) {
+        const direction = cosine(normals, from, random),
+          // No near cutoff: the origin is already off the surface, and a cutoff lets a ray born within it of a
+          // neighbouring wall skip that wall and leak out at the corner (the furnace test's regression).
+          hit = t.all.raycastFirst({ origin, direction }, { far: 1e6, side: 'front' }),
+          seen = hit ? hit.faceIndex >> 1 : -1;
+        // A miss, or the path's own planar quad (only by rounding), ends the path.
+        if (seen < 0 || seen === q) break;
+        const j = texelAt(seen, hit!.point);
+        for (let c = 0; c < 3; c++) {
+          gathered[i * 3 + c] += through[c] * radiance[j * 3 + c];
+          through[c] *= reflect[j * 3 + c];
+        }
+        if (!(through[0] > 0 || through[1] > 0 || through[2] > 0)) break;
+        from = j;
+        q = seen;
+        origin = [0, 1, 2].map((a) => hit!.point[a] + normals[j * 3 + a] * 1e-3);
+      }
+    }
+  }
+  const scale = (physical ? Math.PI : 1) / o.bounceRays;
+  for (let i = 0; i < samples * 3; i++) added[i] += gathered[i] * scale;
+}
+
 /** Area, emissive and bounce light, added to the direct term in `t.light`. */
 async function finish(
   t: Texels,
   input: BakeInput,
-  o: { rects: Rect[]; side: number; emissive: boolean; perTexel: boolean; bounces: number; bounceRays: number },
+  o: {
+    rects: Rect[];
+    side: number;
+    emissive: boolean;
+    perTexel: boolean;
+    bounces: number;
+    bounceRays: number;
+    path: boolean;
+  },
   transport?: Transport,
 ) {
   const { light, emitted, albedo, metal, owner: quad, points, normals, physical } = t,
@@ -218,6 +339,11 @@ async function finish(
         }
     }
   }
+  if (o.path) {
+    if (o.bounces) await paths(t, input, o, added, random);
+    for (let i = 0; i < light.length; i++) light[i] += added[i];
+    return;
+  }
   // Coarse radiosity: each quad's mean outgoing radiance lights the texels whose bounce rays hit it.
   let outgoing = new Float64Array(input.count * 3);
   const weight = new Uint32Array(input.count);
@@ -237,24 +363,11 @@ async function finish(
       tried = new Uint32Array(input.count);
     for (let i = 0; i < samples; i++) {
       if (!(i & 31)) await checkpoint(t.signal);
-      // Bounce gather: cosine-weighted hemisphere rays by Malley's method (PBRT 4e sec. A.5) in a branchless basis (Duff
-      // et al. 2017); the 1e-3 ray offset is Margo's.
-      const [rx, ry, rz] = normals.subarray(i * 3, i * 3 + 3),
-        sign = rz >= 0 ? 1 : -1,
-        k = -1 / (sign + rz || 1),
-        m = rx * ry * k,
-        tangent = [1 + sign * rx * rx * k, sign * m, -sign * rx],
-        bitangent = [m, sign + ry * ry * k, -ry],
-        origin = [0, 1, 2].map((a) => points[i * 3 + a] + normals[i * 3 + a] * 1e-3),
+      const origin = [0, 1, 2].map((a) => points[i * 3 + a] + normals[i * 3 + a] * 1e-3),
         q = quad[i];
       for (let n = 0; n < o.bounceRays; n++) {
-        const u = random(),
-          phi = 2 * Math.PI * random(),
-          x = Math.sqrt(u) * Math.cos(phi),
-          y = Math.sqrt(u) * Math.sin(phi),
-          z = Math.sqrt(Math.max(0, 1 - u)),
-          direction = [0, 1, 2].map((a) => tangent[a] * x + bitangent[a] * y + normals[i * 3 + a] * z),
-          hit = t.all.raycastFirst({ origin, direction }, { near: 1e-3, far: 1e6, side: 'front' }),
+        const direction = cosine(normals, i, random),
+          hit = t.all.raycastFirst({ origin, direction }, { far: 1e6, side: 'front' }),
           seen = hit ? hit.faceIndex >> 1 : -1;
         tried[q]++;
         for (let c = 0; c < 3; c++) {
@@ -275,13 +388,17 @@ async function finish(
  * Bakes like `bakeLightmap` and adds rectangle lights, emissive quads (or texels), up to two diffuse bounces, alpha
  * shadow omission (`transmission`) and coloured shadows through convex glass. Physical radiometry integrates
  * L cos cos A / d^2 for rectangles; legacy keeps its historical /pi scaling. Bounces are per-quad means (coarse
- * radiosity). Glass is straight-line visibility only: no refraction or caustics (see `@margoengine/lightmap/refracted`).
+ * radiosity) by default, or per-texel path-traced bounces with `bounceMode: 'path'`. Glass is straight-line visibility only: no refraction or caustics (see `@margoengine/lightmap/refracted`).
  * Every budget except the rays of callback emissive texels is checked before work starts; those are checked once the
  * callback has run, before any of them is traced.
  */
 export async function bakeGlobalLightmap(quads: LightmapQuads, options: GlobalLightmapOptions = {}): Promise<Lightmap> {
+  const mode = options.bounceMode ?? 'quad';
+  if (mode !== 'quad' && mode !== 'path')
+    throw new RangeError("bakeGlobalLightmap bounceMode must be 'quad' or 'path'");
   const area = (options.areaLights ?? []).map((light) => rectOf(light, 'bakeGlobalLightmap area light')),
-    bounces = inRange(options.bounces ?? 0, 0, 2, 'bakeGlobalLightmap bounces'),
+    path = mode === 'path',
+    bounces = inRange(options.bounces ?? 0, 0, path ? 8 : 2, 'bakeGlobalLightmap bounces'),
     bounceRays = inRange(options.bounceRays ?? 8, 1, 32, 'bakeGlobalLightmap bounceRays'),
     side = Math.ceil(Math.sqrt(inRange(options.areaSamples ?? 4, 1, 16, 'bakeGlobalLightmap areaSamples'))),
     emissive = !!options.emissiveLights,
@@ -345,7 +462,7 @@ export async function bakeGlobalLightmap(quads: LightmapQuads, options: GlobalLi
             finish(
               Object.assign(t, { light, emitted, raysLeft }),
               input,
-              { rects: area, side, emissive, perTexel, bounces, bounceRays },
+              { rects: area, side, emissive, perTexel, bounces, bounceRays, path },
               glass?.transport,
             )
         : undefined,

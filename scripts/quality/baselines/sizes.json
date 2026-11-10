@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13366786,
+  "total": 13366313,
   "history": [
     {
       "date": "2026-10-24",
@@ -6834,6 +6834,12 @@
       "commit": "batch-217-job-1",
       "reason": "New optional curve graph with validated atomic key edits and clip edge gestures; no core or stage changes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "8528ee948",
+      "reason": "batch 54 job 5: path-traced bounces in @margoengine/lightmap/global",
+      "grew": 1
     }
   ],
   "items": {
@@ -7272,7 +7278,7 @@
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/denoise": 3520,
     "@margoengine/lightmap/directional": 4471,
-    "@margoengine/lightmap/global": 7409,
+    "@margoengine/lightmap/global": 8007,
     "@margoengine/lightmap/gpu": 7965,
     "@margoengine/lightmap/imported": 1535,
     "@margoengine/lightmap/mesh": 3272,
@@ -8076,7 +8082,6 @@
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
     "margoengine/game": 996,
-    "margoengine/mixer/stereo": 1071,
     "margoengine/viz": 800,
     "margoengine/web": 577
   }

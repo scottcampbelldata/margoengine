@@ -4,6 +4,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | Package | What its README must cover | Added by |
 |---|---|---|
+| @margoengine/lightmap | global: bounceMode 'path' with bounces up to 8 and a furnace example | batch-54 job 5 |
 | @margoengine/lightmap | probes: bakeLightProbes over a baked room and probeIrradiance | batch 54 job 7 |
 | @margoengine/lightmap | denoise: denoiseLightmap, denoiseMeshLightmap, denoiseTexels with options and defaults | batch-54 job 4 |
 | margoengine | Generated lightmap/denoise alias | batch-54 job 4 |
@@ -633,25 +634,16 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/terrain | overlays: metre-width strokes, polygon holes, all GeoJSON families, projection/style callbacks and atomic live edits; RVT addSurface/refreshSurfaces and imagery virtualTexture ordering/ownership | batch-229 job 2 |
 | margoengine | Generated terrain/overlays facade | batch-229 job 2 |
 - @margoengine/lighting2d (batch 247 job 2): document painted diffuse faces/albedo, exact temporal reuse default true, resetHistory(), source/scene edit invalidation, per-encoder snapshot sharing, memory/lifetime, and replace stale no-history/GI correctness-exception language with the documented fixture bounds.
-<<<<<<< HEAD
 
 - cinematic: document ortho camera height, existing rigStage follow, framing/group stages, projection output, size blends, zones and mixed-mode endpoints (batch 216 job 2).
 - margoengine: document cinematic/ortho alias (batch 216 job 2).
-<<<<<<< HEAD
-<<<<<<< HEAD
 - @margoengine/react and margoengine: effects-extra Stars/Sparkles attributes and seed, native Trail options and explicit target=null manual mode, Edges threshold, Decal projector/material maps and parent-space coordinates.
 
-=======
-=======
 - @margoengine/mixer (batch 212 stereo): document Bus.insert ownership and createStereo/createBusStereo, normalized width, automation, post-send placement and disposal.
 
 - margoengine (batch 212 stereo): document the generated mixer/stereo alias.
->>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
->>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
-=======
 
 
 
 - @margoengine/cutscene (batch 217 job 1): document curve-editor CurveEditor/CurveModel, scalar/vector channels, normalized handles, graph dragging, clip trims, shared undo, keyboard and disposal; examples deferred.
 - margoengine (batch 217 job 1): document generated cutscene/curve-editor alias.
->>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)

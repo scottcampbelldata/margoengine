@@ -13,6 +13,7 @@ export interface GlobalLightmapOptions extends LightmapOptions {
     emissiveLights?: boolean;
     bounces?: number;
     bounceRays?: number;
+    bounceMode?: 'quad' | 'path';
     transmission?: boolean;
     glassVolumes?: readonly LightmapGlassVolume[];
 }

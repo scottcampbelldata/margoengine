@@ -3464,6 +3464,14 @@ absolute deviation); smooth gradients count partly as noise and are smoothed sli
 firefly) is averaged into its neighbours but not clamped. The quad atlas path reads the 8-bit lightmap, so its input
 carries 8-bit quantisation; the mesh path reads the float `irradiance`.
 
+## Path-traced lightmap bounces (batch 54)
+
+`bakeGlobalLightmap({ bounceMode: 'path' })` traces at most 8 diffuse bounces, `bounceRays` (1 to 32) paths per texel,
+on the CPU, within `maxRays`. Each path vertex reads the direct light of the texel it hits, at that texel's centre, so
+light varying inside one texel is averaged (texel-sized bias); there is no Russian roulette (paths stop at `bounces`),
+no glossy or metallic bounce (metals reflect nothing) and no light through glass on bounce paths. Quad charts are the
+only input: triangle meshes (`./mesh`) have no bounces yet.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.
@@ -5073,24 +5081,16 @@ Painted occupied cells have four outward surface slots; internal faces are inact
 SDF adds 32 B/pixel exact RGBA history and a 16 B change flag to its previous 48 B/pixel transform storage (80 B/pixel plus 48 B fixed uniforms/flag). Painted GI surface buffers use 192 B/source pixel (two persistent fields and immutable zero order, four vec4 faces each), plus analytic patch geometry and cascade storage. Analytic surface fields use 96 B/patch including zero order, replacing the earlier 64 B/patch. Changed-input comparisons and distance generation still run every frame; presentation traces the near connectors. Reuse avoids surface gathers and upper-cascade interval traces, not every GPU operation.
 
 Batch 247 job 2 sizes: SDF 2,667 to 2,911 B min+gzip, inside its 2,923 B ceiling; GI 9,670 to 10,348 B, ceiling raised 9,961 to 10,659 B under Scott's optional-size ruling. The bytes buy painted diffuse face transport, exact temporal change detection/reuse and owning-scene disposal. Splitting the trace/bounce contract into another entry would add synchronous adapters without removing that work. Core plus stage remains 24,209 B with no source changes.
-<<<<<<< HEAD
 
 ### Cinematic orthographic
 cinematic/ortho is new: 0 to 2877 B minified gzip, budget 3133 B. Optional brain changes 3089 to 3161 B, budget 3262 B; core plus stage remains 24209 B. OrthographicCamera defaults to full world height 10; width is height times aspect. Existing rigStage supplies follow and look-at, preserving height. OrthographicFraming translates camera and target together, preserving direction and distance, including roll and arbitrary up. Options/defaults match composer: screen [0.5,0.5], deadZone [0.1,0.1], softZone [0.8,0.8], damping 4, lookahead 0, smoothing 6, vertical true. Group defaults: padding 0.1, minHeight 0.01, maxHeight Infinity, damping 4. Finite nonnegative radii/weights, weight 0 omits; fits reports the actual padded screen fit, including smoothing/size limits. Empty groups write nothing and restart smoothing on repopulation. Size is full world height, not half-height or a zoom multiplier. orthographicOutput replaces projection bounds and sets zoom 1 so size has one meaning. Frustum clipping remains CameraProjection's responsibility. Two orthographic cameras blend height through live/interrupted blends; mixed perspective/orthographic modes switch projection at the endpoint. Neither core nor stage gains an API.
-<<<<<<< HEAD
-<<<<<<< HEAD
 ### React effects helpers (batch 266 job 4)
 Effects-extra is optional: 0 -> 8,131 B min+gzip, ceiling 8,387 B. Core plus stage remains 24,209 B. Stars defaults: count 5000, radius 100, depth 50, size factor 4, speed 1, seed 1; shell samples are uniform in volume. Sparkles defaults: count 100, scale 1, size 6 pixels, speed/opacity/noise 1, seed 1. Counts are whole numbers 0..1000000. Size/speed/opacity arrays have count values, RGB and per-point noise arrays count*3. Point phase and float RGBA are updated on the CPU; stars upload 16*count colour bytes per animated frame, sparkles also update 12*count position bytes. Sparkle displacement is at most 0.1*noise*scale per axis beyond its initial half-scale box. Trail and Edges retain native line options; Decal clips in target-local coordinates and inherits its transform once. Native point, line and material GPU paths apply. No timing or shader-only animation claim.
 
-=======
-=======
 Stereo entry: 815 B gzip, budget 1,071 B.
 
 ## Batch 212 job 1: mixer stereo
 Optional mixer/stereo: pan -1..1, width 0..1 (default 0.5 identity, 0 all mid, 1 all side). Width precedes pan; speaker stereo input duplicates mono. Width extremes can add up to 6 dB or cancel correlated audio; caller owns headroom. Native AudioParams support audio-rate automation; setters validate before cancellation and default to immediate, exponential fades settle about 98% over seconds. Bus.insert owns serial stages after mute/solo and before post sends; detach leaves stage alive, bus teardown disposes it. createBusStereo disposal detaches and restores routing. Existing pre sends stay before these stages. SetEffects preserves inserts. Tested in Edge on both backends; no other-browser or perceptual certification. Root grows 6901 -> 7084 B for insert lifecycle; stereo 0 -> 815 B, ceilings 7340 and 1071 B. Splitting bus ownership would duplicate routing/lifetime. No core/stage changes.
->>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
->>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
-=======
 
 
 
@@ -5099,4 +5099,3 @@ Optional mixer/stereo: pan -1..1, width 0..1 (default 0.5 identity, 0 all mid, 1
 Optional cutscene/curve-editor adds an SVG value graph attached to TimelineEditor. Defaults: 800 by 240 view box, responsive width, first numeric channel, 20 percent fit margin. Select channels independently; time clamps to document bounds, clip edges hold their opposite edge and reject empty spans or invalid overlaps. Handles store CSS x in [0,1], y unbounded, on the destination key; a key's ease remains shared by its channels. Flat-value segments have no geometric vertical handle leverage; normalized handles remain editable by keyboard or CurveModel. Rotation components remain unit-quaternion validated; graph sampling uses runtime interpolation. No new core or stage functionality.
 
 Measured gzip entries: cutscene 6,859 B; editor 11,058 B; new curve-editor 0 to 3,537 B, ceiling 3,793 B. This optional entry buys the full authoring panel and edge interaction together; splitting the model from its gesture owner would add API/lifecycle complexity. Core plus stage is unchanged at 24,209 B, below 25,000 B.
->>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)

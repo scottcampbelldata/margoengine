@@ -20,3 +20,6 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 | 54.4 | @margoengine/lightmap | ./denoise has no firefly clamp and no per-texel variance from the bakers; the bakes could output sample variance for the luminance weight |
 | 54.4 | @margoengine/lightmap | SVGF (Schied et al. 2017) equations of sections 4.2 to 4.4 did not extract from the PDF; read them from a clean copy and recheck the variance filter |
 | 54.4 | @margoengine/lightmap | ./denoise not measured on a real scene or against a rival denoiser (OIDN, OptiX); only synthetic and hand-made scenes |
+| 54.5 | @margoengine/lightmap | path bounces run on the CPU only; move them to the GPU baker (@margoengine/lightmap/gpu, 54.2) once it is on main |
+| 54.5 | @margoengine/lightmap | path bounces for triangle meshes (./mesh) and light through glass on bounce paths are not built |
+| 54.5 | @margoengine/lightmap | path mode not compared with Cycles on the Cornell scene (rival-bench.mjs runs quad mode); Kajiya 1986 not read this job |

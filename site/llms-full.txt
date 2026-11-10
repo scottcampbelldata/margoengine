@@ -4017,7 +4017,7 @@ module registration is shared per context and can still complete. Real OfflineAu
 renders with generated signals pass beside WebGPU and WebGL2 on RTX A6000/Edge. Unit stand-ins
 check envelopes, hold across quanta, key isolation, disposal, validation and cancellation.
 Other browsers, real dialogue and speed/latency unmeasured. LIM-583.
-Sidechain entry: 1,565 B gzip, budget 1,815 B; core plus stage remains 23,837 B.
+Sidechain entry: 1,565 B gzip, budget 1,815 B. core plus stage remains 23,837 B.
 
 ## Mixer snapshots (batch 111)
 
@@ -4132,7 +4132,7 @@ membership may prevent the requested loudness, and the after report exposes the 
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
 Loudness entry: 2,107 B gzip, budget 2,363 B.
-Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,837 B gzip.
+Mixer root entry: 7,084 B gzip, budget 7,340 B. Core plus stage remains 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)
@@ -6054,6 +6054,14 @@ absolute deviation); smooth gradients count partly as noise and are smoothed sli
 firefly) is averaged into its neighbours but not clamped. The quad atlas path reads the 8-bit lightmap, so its input
 carries 8-bit quantisation; the mesh path reads the float `irradiance`.
 
+## Path-traced lightmap bounces (batch 54)
+
+`bakeGlobalLightmap({ bounceMode: 'path' })` traces at most 8 diffuse bounces, `bounceRays` (1 to 32) paths per texel,
+on the CPU, within `maxRays`. Each path vertex reads the direct light of the texel it hits, at that texel's centre, so
+light varying inside one texel is averaged (texel-sized bias); there is no Russian roulette (paths stop at `bounces`),
+no glossy or metallic bounce (metals reflect nothing) and no light through glass on bounce paths. Quad charts are the
+only input: triangle meshes (`./mesh`) have no bounces yet.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.
@@ -7663,6 +7671,24 @@ Painted occupied cells have four outward surface slots; internal faces are inact
 SDF adds 32 B/pixel exact RGBA history and a 16 B change flag to its previous 48 B/pixel transform storage (80 B/pixel plus 48 B fixed uniforms/flag). Painted GI surface buffers use 192 B/source pixel (two persistent fields and immutable zero order, four vec4 faces each), plus analytic patch geometry and cascade storage. Analytic surface fields use 96 B/patch including zero order, replacing the earlier 64 B/patch. Changed-input comparisons and distance generation still run every frame; presentation traces the near connectors. Reuse avoids surface gathers and upper-cascade interval traces, not every GPU operation.
 
 Batch 247 job 2 sizes: SDF 2,667 to 2,911 B min+gzip, inside its 2,923 B ceiling; GI 9,670 to 10,348 B, ceiling raised 9,961 to 10,659 B under Scott's optional-size ruling. The bytes buy painted diffuse face transport, exact temporal change detection/reuse and owning-scene disposal. Splitting the trace/bounce contract into another entry would add synchronous adapters without removing that work. Core plus stage remains 24,209 B with no source changes.
+
+### Cinematic orthographic
+cinematic/ortho is new: 0 to 2877 B minified gzip, budget 3133 B. Optional brain changes 3089 to 3161 B, budget 3262 B; core plus stage remains 24209 B. OrthographicCamera defaults to full world height 10; width is height times aspect. Existing rigStage supplies follow and look-at, preserving height. OrthographicFraming translates camera and target together, preserving direction and distance, including roll and arbitrary up. Options/defaults match composer: screen [0.5,0.5], deadZone [0.1,0.1], softZone [0.8,0.8], damping 4, lookahead 0, smoothing 6, vertical true. Group defaults: padding 0.1, minHeight 0.01, maxHeight Infinity, damping 4. Finite nonnegative radii/weights, weight 0 omits; fits reports the actual padded screen fit, including smoothing/size limits. Empty groups write nothing and restart smoothing on repopulation. Size is full world height, not half-height or a zoom multiplier. orthographicOutput replaces projection bounds and sets zoom 1 so size has one meaning. Frustum clipping remains CameraProjection's responsibility. Two orthographic cameras blend height through live/interrupted blends; mixed perspective/orthographic modes switch projection at the endpoint. Neither core nor stage gains an API.
+### React effects helpers (batch 266 job 4)
+Effects-extra is optional: 0 -> 8,131 B min+gzip, ceiling 8,387 B. Core plus stage remains 24,209 B. Stars defaults: count 5000, radius 100, depth 50, size factor 4, speed 1, seed 1; shell samples are uniform in volume. Sparkles defaults: count 100, scale 1, size 6 pixels, speed/opacity/noise 1, seed 1. Counts are whole numbers 0..1000000. Size/speed/opacity arrays have count values, RGB and per-point noise arrays count*3. Point phase and float RGBA are updated on the CPU; stars upload 16*count colour bytes per animated frame, sparkles also update 12*count position bytes. Sparkle displacement is at most 0.1*noise*scale per axis beyond its initial half-scale box. Trail and Edges retain native line options; Decal clips in target-local coordinates and inherits its transform once. Native point, line and material GPU paths apply. No timing or shader-only animation claim.
+
+Stereo entry: 815 B gzip, budget 1,071 B.
+
+## Batch 212 job 1: mixer stereo
+Optional mixer/stereo: pan -1..1, width 0..1 (default 0.5 identity, 0 all mid, 1 all side). Width precedes pan; speaker stereo input duplicates mono. Width extremes can add up to 6 dB or cancel correlated audio; caller owns headroom. Native AudioParams support audio-rate automation; setters validate before cancellation and default to immediate, exponential fades settle about 98% over seconds. Bus.insert owns serial stages after mute/solo and before post sends; detach leaves stage alive, bus teardown disposes it. createBusStereo disposal detaches and restores routing. Existing pre sends stay before these stages. SetEffects preserves inserts. Tested in Edge on both backends; no other-browser or perceptual certification. Root grows 6901 -> 7084 B for insert lifecycle; stereo 0 -> 815 B, ceilings 7340 and 1071 B. Splitting bus ownership would duplicate routing/lifetime. No core/stage changes.
+
+
+
+### Batch 217 job 1: cutscene curve editor
+
+Optional cutscene/curve-editor adds an SVG value graph attached to TimelineEditor. Defaults: 800 by 240 view box, responsive width, first numeric channel, 20 percent fit margin. Select channels independently; time clamps to document bounds, clip edges hold their opposite edge and reject empty spans or invalid overlaps. Handles store CSS x in [0,1], y unbounded, on the destination key; a key's ease remains shared by its channels. Flat-value segments have no geometric vertical handle leverage; normalized handles remain editable by keyboard or CurveModel. Rotation components remain unit-quaternion validated; graph sampling uses runtime interpolation. No new core or stage functionality.
+
+Measured gzip entries: cutscene 6,859 B; editor 11,058 B; new curve-editor 0 to 3,537 B, ceiling 3,793 B. This optional entry buys the full authoring panel and edge interaction together; splitting the model from its gesture owner would add API/lifecycle complexity. Core plus stage is unchanged at 24,209 B, below 25,000 B.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -12248,6 +12274,27 @@ The eight requested transition presets and their finite parameter contracts are 
 No open defect identified in the job: the new entry covers metre widths, polygon holes, projection, live updates, imagery ordering and exact restoration on both GPU backends. CPU tests reject coerced numeric strings and preserve old state after malformed/over-budget updates. A draft display-pixel classifier incorrectly assumed that PBR Neutral kept saturated primary channels at zero; the fixture now uses independently rendered primary references through the actual display transform, retaining exact color matching.
 ### Fixed: GI owning-scene disposal; completed painted/temporal coverage (batch 247 job 2)
 GILighting2D previously removed a plugin by name on its saved engine, which can name another active scene. It now resolves its own registration with sceneOf(this) before removal and leaves detached or same-name plugins alone. sdf.test.js contains a regression that fails on the former dispatch. Painted surfaces now carry reflected radiance for every finite bounce order, and exact change detection guards persistent intervals; gi-history-regressions.js compares against independently authored analytic faces, checks cached GPU data remains untouched on static frames, and rejects stale history after scene edits. Earlier GI visibility/energy repairs remain tested without changed tolerances. Historical README correctness exceptions are explicitly owed, with no README edits during build phase.
+<<<<<<< HEAD
+
+Batch 216 job 2: no open defect found in orthographic follow, screen framing, projected-sphere group fit or height blends. Mixed projection transitions switch mode at the endpoint, as documented in limits; continuous interpolation between projection families is outside this orthographic job.
+<<<<<<< HEAD
+<<<<<<< HEAD
+
+Batch 266 effects regressions: explicit Trail target=null stays in native manual mode; new source hooks retain decal parent transforms exactly once. effects-extra.test.js and the native pixel-oracle fixture cover these cases. The kit test fake now declares the existing meshRuntime export used by the new entry; none of its behavior assertions changed.
+
+=======
+=======
+Batch 212 stereo: no open defect found in the tested pan/width matrix or bus lifecycle.
+>>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
+=======
+
+
+
+### Fixed: batch 217 cutscene compatibility replay fixture
+
+The VFX replay fixture recorded early frames on the CPU fallback while the lazy WebGL2 GPU route was loading, then replayed on that route. Frame 40 differed in 182 particle words by a few float ulps, with identical picture and live count. The fixture now waits for actual route and pipeline readiness before reset and capture. The unchanged exact-byte and pixel assertions in packages/cutscene/tests/vfx-browser.mjs are the regression; no engine arithmetic or tolerance changed.
+>>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

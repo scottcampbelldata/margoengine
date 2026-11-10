@@ -2885,6 +2885,7 @@ removal and speed-phase timing debt remain open.
 | `@margoengine/lightmap/gpu` bakes progressively on the GPU, matching the CPU bake | `packages/lightmap/tests/gpu.browser.mjs` on the M6 Mac mini (Metal): direct light equal to `./mesh` on 1,024 of 1,024 texels; AO converges (RMS 0.132 at 4 passes, 0.025 at 516); one bounce within 0.019 of the exact form factor | no speed claim (build phase); Metal only measured |
 | `@margoengine/lightmap/probes` lights moving objects like the baked room | `packages/lightmap/tests/probes.test.js`: a probe over a floor baked by `bakeMeshLightmap` (sun overhead plus ambient) gives the floor's own irradiance facing up within 3% and albedo times it (plus the sun's known order-3 ringing) facing down within 3%; a lone directional light is exact facing it and matches the order-3 delta-light curve within 1e-5 at five angles | CPU; order-3 SH rings around strong lights (up to about 9% of a delta light at 90 degrees); stand-in scenes |
 | `@margoengine/lightmap/denoise` brings a 4-AO-ray bake at least twice as close to a 128-ray bake | `packages/lightmap/tests/denoise.test.js`: RMS error to the 128-ray bake halves or better on a mesh bake and on a quad atlas; flat noise falls fourfold | CPU, synthetic noise and hand-made scenes; no real scene or rival denoiser compared |
+| `bounceMode: 'path'` gives per-texel multi-bounce light | `packages/lightmap/tests/global-path.test.js`: a closed furnace gives the exact geometric series for 8 bounces on every texel (physical and legacy); an emitting strip's first bounce on two walls matches a numerical form-factor integral within 5% and 15%, where quad means miss by over 25% and 2x | CPU, hand-made scenes; no Cornell or rival comparison of the path mode yet |
 | The denoiser keeps edges: shadow steps, chart borders, creases and ledges | same test file: each side of a 1 to 0.1 shadow step stays within 0.02, charts never mix, normals stop a crease and positions a ledge | edges must be wider than the 5 x 5 noise window's half |
 
 Batch133 resource/inventory observations: full 3,881 and glTF 1,003 accepted
@@ -3823,26 +3824,17 @@ Eight clean-room presets support validated direction, edge softness, easing and 
 terrain/overlays supplies the requested metre-width polylines, filled polygons with holes and projected GeoJSON features with live updates. It paints the actual RVT and its steep/far fallback, and other materials can read the cached result. Cached imagery can sit below vectors. Evidence: overlays.test.js, overlays.browser.mjs, full terrain CPU/GPU suites and dependent CPU tests. The native fixture invalidates 20852 texels for first vector edits and 16548 for a width edit, against 262144 texels for all four whole levels; a still frame bakes zero. These are deterministic work counts without a timing or engine-speed claim. Limits and unclaimed options are in docs/terrain-overlays.md.
 ### Batch 247 job 2: GI correctness coverage
 The GI entry now includes painted finite-order diffuse interreflection and temporal reuse guarded by exact input equality. Named analytic/painted visibility and energy tests apply; static frames reuse computed intervals and changed frames match forced-fresh output. Direct buffer observations prove reuse, while independently constructed analytic boundary faces prove painted bounce orders 0/1/2/4. Source: packages/lighting2d/tests/gi-history-regressions.js and sdf.test.js, alongside the unchanged gi-regressions suite. Native and full WebGL2 compatibility run the same assertions. No arbitrary-scene physical-exactness, converged solution, noise-reduction or timing claim.
-<<<<<<< HEAD
 
 ### Orthographic cinematic cameras (batch 216 job 2)
 The optional ortho entry supports follow through the existing spring rig, screen-space framing with dead/soft zones and lookahead, sphere group framing by full visible height, and live/interrupted orthographic height blends. CPU proof: cinematic/test/ortho.test.js checks independent projection geometry, depth independence, roll, portrait aspect, custom up, damping subdivision, membership/weight/size limits, cuts and mode endpoints. ortho-browser.mjs checks actual picks at authored screen points at two depths, group endpoints, rendered pixels and blend heights on native WebGPU and WebGL2. No claim about continuous mixed-projection blends or speed.
-<<<<<<< HEAD
-<<<<<<< HEAD
 ### Batch 266 effect helpers
 Stars, Sparkles, Trail, Decal and Edges are available from the optional React effects-extra entry. Each uses native owning-package rendering and geometry. Proof: effects-extra.test.js plus test-effects-extra-browser.mjs in packages/react, with exact native pixel comparisons for all five helpers on WebGPU and compatibility WebGL2. Animated point attributes use the CPU and native partial update API; there is no GPU-only simulation or speed claim.
 
-=======
-=======
 ## Batch 212 job 1: stereo controls
 Optional mixer/stereo matches the documented equal-power pan and normalized mid/side width behaviour. Proof: stereo.test.js checks ownership and atomic setters; browser.js checks 25 pan/width combinations against independent equations in OfflineAudioContext beside WebGPU and WebGL2. No performance or listening-quality claim.
->>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
->>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)
-=======
 
 
 
 ### Batch 217 job 1: graph authoring
 
 cutscene/curve-editor provides numeric key graphs with editable Bezier controls, value/time dragging and clip edge trimming over the editor's validated undo model. Evidence: packages/cutscene/tests/curve-editor.test.js and curve-browser.mjs. Comparison is to the value/handle authoring behavior documented by Theatre.js and Babylon's curve editor, recorded in docs/clean-room.md. This is a feature-coverage claim, not a speed or whole-editor superiority claim.
->>>>>>> 492edc909 (feat(cutscene): add curve graph and clip edge editing)

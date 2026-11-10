@@ -153,6 +153,9 @@ room's baked lightmap where they hit it (`albedo * irradiance / pi`) and the amb
   `areaSamples` shadow rays per texel.
 - `emissiveLights`: emissive quads light the others; with a `surface` callback, each emitting texel is its own light.
 - `bounces` (0 to 2) and `bounceRays`: diffuse indirect light, as per-quad averages (coarse radiosity).
+- `bounceMode: 'path'`: per-texel path-traced bounces instead, up to 8. Each of `bounceRays` paths per texel continues
+  through up to `bounces` diffuse hits, and every hit reads the direct, area and emissive light of the exact texel it
+  reaches, so bounce light follows where the light falls on a quad. A closed furnace gives the exact geometric series.
 - `transmission`: quads with albedo alpha below 1 cast no shadows.
 - `glassVolumes`: closed convex volumes made of bake quads cast coloured shadows (Fresnel at each boundary, Beer
   absorption inside). Light goes straight through: no refraction or caustics.

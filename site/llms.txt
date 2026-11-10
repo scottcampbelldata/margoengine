@@ -232,8 +232,8 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 3 entry points
 - [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 14 entry points
 - [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 11 entry points
-- [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 9 entry points
-- [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 7 entry points
+- [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 10 entry points
+- [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 8 entry points
 - [@margoengine/controls API](https://margoengine.com/llms/api/controls.md): 16 entry points
 - [@margoengine/cameras API](https://margoengine.com/llms/api/cameras.md): 7 entry points
 - [@margoengine/input API](https://margoengine.com/llms/api/input.md): 11 entry points
@@ -241,7 +241,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 2 entry points
 - [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 6 entry points
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 11 entry points
-- [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 6 entry points
+- [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 7 entry points
 - [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 3 entry points
 - [@margoengine/physics2d API](https://margoengine.com/llms/api/physics2d.md): 2 entry points
 - [@margoengine/ragdoll API](https://margoengine.com/llms/api/ragdoll.md): 6 entry points
@@ -260,7 +260,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 13 entry points
 - [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 24 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 10 entry points
-- [@margoengine/react API](https://margoengine.com/llms/api/react.md): 37 entry points
+- [@margoengine/react API](https://margoengine.com/llms/api/react.md): 38 entry points
 
 ## Optional
 
