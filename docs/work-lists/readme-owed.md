@@ -993,3 +993,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 
 - @margoengine/exporters (batch 136): document the clean-room lazy Draco SIMD encoder, sequential and EdgeBreaker modes, speed budgets, quantization and prediction, preserved custom encoderPath compatibility, and input limits during the README phase.
+- @margoengine/post: document Curvature ridge/valley controls, screen-space units, depth rejection, owned/model normals, world/view inputs, normal-provider setup and disposal.

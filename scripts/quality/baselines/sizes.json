@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14141575,
+  "total": 14150784,
   "history": [
     {
       "date": "2026-10-24",
@@ -7471,6 +7471,12 @@
       "commit": "batch-186-job2",
       "reason": "New optional screen-sized shadow atlas, 0 to 14027 B min+gzip. Reuses complete LocalShadows caster ownership; splitting would duplicate lifecycle and filtering. Shadows 11791 to 12052 B within its ceiling.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-191-job-6",
+      "reason": "New optional post/curvature: 0 to 8940 B gzip. Keep normal capture, view-basis conversion and depth-aware ridge/valley shading in one owner; splitting duplicates capture lifecycle and configuration. Core plus stage stays 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8825,6 +8831,7 @@
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/staging/caustics": 5703,
     "@margoengine/sciviz/link": 4800,
-    "@margoengine/clustered/shadow-atlas": 14448
+    "@margoengine/clustered/shadow-atlas": 14448,
+    "@margoengine/post/curvature": 9209
   }
 }
