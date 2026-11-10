@@ -609,3 +609,5 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 Screen `UiRenderer` keeps its real preview renderer. `WorldPanels` requires a complete tier.
+
+`GlWorldPanels` (`@margoengine/ui/world-gl`) is a reviewed preview route in `scripts/check-preview-contract.mjs` (2026-11-10, 2 `backend` tests): on the small WebGL2 preview it draws world panels with raw WebGL2, on WebGPU it defers to `WorldPanels`. Pixel evidence: `tests/world-gl-browser.js`, run by `npm run test:browser:world-gl` (8 checks each for plane, cylinder and sphere on the preview, 7 each on WebGPU, also under `MARGO_COMPAT=1`). Unit evidence: `tests/world-gl.test.js`. No behaviour changed; the missing row kept `npm run verify` red.

@@ -21,6 +21,7 @@ export const previewRoutes = {
   'packages/stats/src/index.ts:Stats': [2, 'packages/stats/test/stats.test.js'],
   'packages/stats/src/phases.ts:FramePhases': [1, 'packages/stats/test/phases.test.js'],
   'packages/ui/src/renderer.ts:UiRenderer': [2, 'packages/ui/tests/webgl2.test.js'],
+  'packages/ui/src/world-gl.ts:GlWorldPanels': [2, 'packages/ui/tests/world-gl-browser.js'],
 };
 
 const children = (node) =>

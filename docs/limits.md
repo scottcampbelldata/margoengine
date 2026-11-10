@@ -6737,4 +6737,5 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | html `HTMLBlend`, `HTMLTextureGL`, `HTMLTexture` | Preview route | None: routes added to `previewRoutes` (1 backend test each); plain `HTMLTexture` still refuses and its subclass draws | `packages/html/test/html-browser.js` (pixels on WebGL2 preview and WebGPU), `test/texture.test.js` |
 | inspector `GLInspector` | Preview route | None: route added (3 backend tests) | `packages/inspector/test/gl-browser.mjs` (preview overlay pixels), `test/gl.test.js` |
 | labels `GPULabelLayer` | Preview route | None: route added (1 backend test) | `packages/labels/tests/gpu-browser.js` (pixels on WebGPU, preview and compat) |
+| ui `GlWorldPanels` | Preview route | None: route added (2 backend tests) | `packages/ui/tests/world-gl-browser.js` (preview and WebGPU pixels), `tests/world-gl.test.js` |
 
