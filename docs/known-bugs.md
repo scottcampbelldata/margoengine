@@ -4957,8 +4957,8 @@ Batch 243 job 3 cold compatibility compilation defect: canonical mesh-pbr-lobes-
 
 Batch 212 pitch: no open defect found in transposition ratios, source-clock/quantum invariance, feedback, prefilter or lifecycle tests. Window coloration and residual aliases are documented algorithm limits.
 
-Build-phase follow-up (batch 212, outside pitch landing): hold a disposed Bus after inserting a stage; Bus.teardown clears inserts but retains its insertEdges node-reference array. Clear those references in the fix phase and prove released ownership.
-Build-phase follow-up (batch 212 analyser): queue a meter report, call reset(), then deliver the queued report; read() can briefly show pre-reset frames because messages carry no reset generation. Add generation-tagged reset/report handling in the fix phase.
+Fixed 2026-11-10: batch 212 retained mixer insert references. Bus.teardown now clears its insert-edge references after disposing stages. packages/mixer/tests/mixer.test.js traverses the held bus's owned JavaScript object graph, excluding borrowed mixer/context owners, and proves that former stage objects and nodes are unreachable after bus or mixer disposal. The regression fails on the parent; node disconnection and idempotent disposal remain checked without garbage-collection timing assumptions.
+Fixed upstream: batch 212 stale meter reports after reset (f1596f19f). Audio-thread reports carry the reset generation and the main thread rejects stale reports. Rechecked 2026-11-10: the unchanged analyser.test.js in-flight-report regression delivers the old report after reset, retains zero frames/levels, then accepts the current generation's new audio samples.
 
 ### Batch 214 scope
 Chain avoidance has no known defect from its correctness cases; bounded search and static-only limitations are documented in limits.md.

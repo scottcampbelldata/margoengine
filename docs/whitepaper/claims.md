@@ -4562,6 +4562,9 @@ Concurrent tools/call requests cannot overwrite an active direct-server cancella
 ## Scientific picking and transfer initialization (2026-11-10)
 CPU nearestPoint chooses the nearer projected point on its existing half-pixel screen-distance tie, using projectPoint's normalized depth convention. Proof: packages/sciviz/tests/pick.test.js checks an actual perspective camera in both input orders and an independent identity projection. bindTransfer restores its prior classifier and removes listeners if the initial render callback aborts or throws; dual failure reports both errors with code failed. Proof: packages/sciviz/tests/transfer.test.js; all new cases fail on the parent. GPU clip depth, the distance tie rule, default LUT dimensions and numerical acceptance bounds are unchanged.
 
+## Mixer disposed insert ownership (2026-11-10)
+A held disposed Bus releases its former optional stage/node references from its owned JavaScript containers. Proof: packages/mixer/tests/mixer.test.js traverses that ownership graph for bus and whole-mixer disposal, detects the retained nodes on the parent, and checks exact-once stage disposal and disconnected outputs. The probe excludes borrowed mixer/context owners and treats native node wrappers as leaves. No physical heap reclamation, GC timing, speed or DSP-quality claim is made.
+
 ## Audio listener registration disposal (2026-11-10)
 Direct AudioListener disposal releases its own scene registration, making the name reusable without removing another scene's same-name listener. Proof: packages/audio/tests/audio.test.js checks replacement, stale-handle disposal, owner isolation, owned-context closure and lazy context preservation; both new regressions fail on the parent. packages/audio/tests/listener-disposal-browser.mjs checks the real engine on native WebGPU and WebGL2, including rendering after removal. No new core API or audio/rendering quality claim is introduced.
 

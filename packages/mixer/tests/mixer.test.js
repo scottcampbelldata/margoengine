@@ -21,6 +21,52 @@ const random = (seed) => () => {
 };
 const gateOf = (mixer, name) => mixer.bus(name).gate.gain.last();
 
+test('a retained disposed bus releases its owned insert references after bus or mixer disposal', () => {
+  for (const disposeMixer of [false, true]) {
+    const context = new FakeContext(),
+      mixer = new Mixer(context),
+      bus = mixer.createBus('insert owner');
+    let disposed = 0;
+    const stage = {
+      input: context.createGain(),
+      output: context.createGain(),
+      dispose() {
+        disposed++;
+        this.input.disconnect();
+        this.output.disconnect();
+      },
+    };
+    stage.input.connect(stage.output);
+    const detach = bus.insert(stage);
+    const retainsInsert = () => {
+      const seen = new Set();
+      const visit = (value) => {
+        if (value === stage || value === stage.input || value === stage.output) return true;
+        // Context and mixer are borrowed owners; native nodes are leaves, not JavaScript owner containers.
+        if (!value || typeof value !== 'object' || value === context || value === mixer || value instanceof FakeNode || seen.has(value))
+          return false;
+        seen.add(value);
+        const children = value instanceof Map ? [...value.keys(), ...value.values()]
+          : value instanceof Set ? [...value] : Object.values(value);
+        return children.some(visit);
+      };
+      return visit(bus);
+    };
+    assert.equal(retainsInsert(), true, 'the probe observes active insert ownership');
+    if (disposeMixer) mixer.dispose();
+    else bus.dispose();
+    assert.equal(disposed, 1);
+    assert.equal(stage.input.outputs.size, 0);
+    assert.equal(stage.output.outputs.size, 0);
+    assert.equal(retainsInsert(), false, 'holding the dead bus must not retain its former insert or nodes');
+    detach();
+    bus.dispose();
+    mixer.dispose();
+    assert.equal(disposed, 1);
+    assert.equal(retainsInsert(), false);
+  }
+});
+
 test('buses connect child to parent and master to the destination', () => {
   const context = new FakeContext(),
     mixer = new Mixer(context, { buses: { music: {}, sfx: {}, footsteps: { parent: 'sfx' } } });

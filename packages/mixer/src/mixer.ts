@@ -373,6 +373,7 @@ export class Bus implements Disposable {
     this.disposed = true;
     for (const stage of this.inserts) stage.dispose();
     this.inserts.clear();
+    this.insertEdges = [];
     for (const effect of this.effectList) effect.dispose();
     for (const send of this.sends) send.node.disconnect();
     for (const node of [this.input, this.preTap, this.fader, this.duckNode, this.gate, this.output]) node.disconnect();
