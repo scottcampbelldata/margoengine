@@ -1,4 +1,4 @@
-// Clean room: HTML messaging/structured serialization, DOM cancellation, and coarse task scheduling (Dryad, 2007).
+// Clean room: HTML messaging/structured serialization and DOM cancellation; the pool is a plain FIFO over fixed workers.
 import { fault, rangeError } from '../../shared/errors.js';
 
 const TAG = 'margo-worker-rpc';

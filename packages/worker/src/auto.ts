@@ -1,4 +1,4 @@
-// Clean room: HTML canvas transfer and workers, DOM cancellation, capability-first execution (Dryad, 2007).
+// Clean room: HTML canvas transfer and workers, DOM cancellation; capability checks before choosing worker or page.
 import type { EngineKernel } from '@margoengine/core';
 import { transferCanvas, workerCanvasSupported, type WorkerCanvas } from './index.js';
 import { RpcClient } from './rpc.js';
