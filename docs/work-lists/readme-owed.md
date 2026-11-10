@@ -1354,3 +1354,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/viz (batch 175 job 4): document generated sciviz/series optional alias.
 - @margoengine/sciviz (batch 178 job 6): themes, validated style tokens, scoped CSS refresh/disposal, author overrides, journal column/media presets and print/font limits.
 - margoengine and @margoengine/viz (batch 178 job 6): generated sciviz/themes alias.
+# Batch 175 job 6
+
+- @margoengine/sciviz: document /workers readInWorker argument tuples, disposable sessions, lazy proxies, input ownership, progress milestones, custom stores and cancellation.
+- @margoengine/worker: document /rpc onProgress and RpcContext.progress, transferable progress payloads, observer failures and channel isolation.
+- margoengine: document the generated /sciviz/workers alias after the build phase.
+- @margoengine/viz: document the generated /sciviz/workers alias after the build phase.

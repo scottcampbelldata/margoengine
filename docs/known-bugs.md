@@ -5040,3 +5040,8 @@ Batch 180 job 4: no open correctness defect found in the implemented climate/pro
 Batch 180 job 4 GPU observation (2026-11-10): the existing atmosphere spec demo reproduced the recorded ANGLE D3D11 nondeterminism under the shared queue: 50 bytes differed, including 50 between two unchanged source captures (test-results/batch180-job4-gpu-all.log). No CF/projection scene failed. The unchanged atmosphere/surface/volume/points spec assertions are exact on the documented ANGLE Vulkan backend (test-results/batch180-job4-gpu-remaining.log). D3D11 remains the existing release blocker above; this is not a repaired driver claim or a widened pixel bound.
 
 - Batch 175 job 4 landing gate: the unchanged geo-lod exact restoration assertion observed one-level differences, 1 native channel and 46 WebGL2 channels. This matches the documented ANGLE D3D11/NVIDIA resolve defect above and Scott's 2026-11-10 landing exception. The test and assertion remain unchanged. Evidence: test-results/b175-j4-package-gpu.log and b175-j4-geo-probe-direct.log; /series passes both backends.
+
+
+## Batch 175 job 6: known driver exception
+
+The sciviz GPU gate encountered the known ANGLE D3D11 MSAA resolve defect documented above: geo-lod-browser.mjs:85 reported max red-channel difference 1; diagnostic evidence found 47 one-level channel differences, no GPU errors, and exact native WebGPU pixels. Scott authorized continuing the gate on 2026-11-10. No geo-lod or compatibility source or assertion changed. Evidence: lane U test-results/job6-gpu.log, job6-geodebug2.log and job6-geodebug3.log.

@@ -448,3 +448,6 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 - Batch 175 job 5, sciviz/graph-gpu: quiet-machine layout/drawing rates for FR and FA2 at a million nodes and OpenAlex citation topology, against Cosmograph public API with equivalent work; report sorting/tree/adjacency counts, FDEB E-squared costs and convergence quality. No timing benchmark ran during build.
 
 - Batch 175 job 4, /series: quiet-machine remote CSV/Arrow/Parquet throughput, progressive first draw, M4/min-max/LTTB and original-data FFT/STFT at larger row counts. No timing run/assertion in build phase; current proof uses original row counts, bounded request bytes, display vertex counts and independent output equality.
+# Batch 175 job 6: reader worker timings owed
+
+On a quiet machine after Scott resumes speed work, record worker startup, loading and parsing times per format and input byte size for the existing head.nrrd, zstat1.nii.gz, CT_small.dcm, NOAA wind-classic.nc, wind.vti, wind.vtk and the equivalent NOAA Zarr store. Compare output-identical direct and worker reads and record snapshot/transfer bytes. Only consider a feature-local Rust/Wasm inflater after a permitted paired A/B demonstrates a gain; the existing inflater remains unchanged. The correctness suites do not measure or assert speed.

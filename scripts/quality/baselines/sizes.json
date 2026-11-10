@@ -7972,6 +7972,12 @@
       "commit": "batch178-job6",
       "reason": "Complete scientific themes: resolved native/HTML/vector typography, line/frame/grid/tick styles, scoped CSS bindings, print palettes, publisher column/media presets and portable state. Measured before/after: {\"index\": [61327, 62735], \"themes\": [0, 19428], \"format\": [7598, 7838], \"a11y\": [6233, 6260], \"spec\": [27443, 27463]}. Optional ceilings: {\"@margoengine/sciviz\": {\"previousCeiling\": 61750, \"after\": 62735, \"ceiling\": 64619}, \"@margoengine/sciviz/themes\": {\"previousCeiling\": 0, \"after\": 19428, \"ceiling\": 20015}, \"@margoengine/sciviz/format\": {\"previousCeiling\": 7826, \"after\": 7838, \"ceiling\": 8085}}. The new entry retains full named-map validation and immutable presentation defaults; splitting would add registration/validation glue and duplicate ownership. Font-only consumers have no scalar validation import. Core + stage stays 24209 B. Final integrated size: {\"entries\": {\"index\": 62821, \"themes\": 19428, \"format\": 7838, \"a11y\": 6343, \"spec\": 27563}, \"viz\": 264713, \"coreStage\": 24209}. Original before figures above are the starting snapshot; integration includes intervening main work.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-175-j6",
+      "reason": "New optional sciviz/workers: 0 to 1589 B gzip, ceiling 1845 B; its bundled reader worker: 0 to 41506 B, ceiling 42752 B (41409 B served gzip). One optional worker preserves every named reader, lazy sessions, custom stores and compression behavior. Splitting it would duplicate RPC and complicate session ownership. worker/rpc adds progress within its existing 2408 B ceiling, measured 2253 B after. Core plus stage remains 24209 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -9407,7 +9413,9 @@
     "@margoengine/sciviz/cf": 14872,
     "@margoengine/sciviz/projections": 2584,
     "@margoengine/sciviz/series": 14169,
-    "@margoengine/sciviz/themes": 20015
+    "@margoengine/sciviz/themes": 20015,
+    "@margoengine/sciviz/workers": 1845,
+    "@margoengine/sciviz dist/workers/readers.js": 42752
   },
-  "total": 15430194
+  "total": 15474791
 }

@@ -2206,6 +2206,10 @@
     "./stage": {
       "types": "./dist/stage.d.ts",
       "import": "./dist/stage.js"
+    },
+    "./sciviz/workers": {
+      "types": "./dist/sciviz/workers.d.ts",
+      "import": "./dist/sciviz/workers.js"
     }
   },
   "dependencies": {

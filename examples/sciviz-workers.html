@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Scientific readers in workers | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
+<body>
+  <header><h1>Scientific readers in workers</h1><p>Read the existing scientific demo files in a dedicated worker, then transfer their samples into a figure. Metadata and lazy reads keep their worker session until you change files.</p></header>
+  <div class="controls"><label>File <select id="format"><option value="netcdf">NOAA wind / NetCDF</option><option value="vtkxml">NOAA wind / VTK XML</option><option value="vtk">NOAA wind / legacy VTK</option><option value="zarr">NOAA wind / Zarr store</option><option value="nrrd">Head / NRRD</option><option value="nifti">FSL statistics / NIfTI</option><option value="dicom">CT sample / DICOM</option></select></label><button id="export" type="button">Save PNG</button></div>
+  <div class="view"><canvas id="viewport" aria-label="Scientific samples decoded in a worker"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Opening reader worker...</p>
+  <footer>Wind: NOAA PSL, US government public domain. Head: OpenNeuro ds000030, CC0. NIfTI: NIMH FSL example statistics map, public domain. DICOM: pydicom CT test data, unrestricted use. These are existing repository fixtures; their exact sources and licences are linked in <a href="../docs/sciviz-workers.md">the worker reader notes</a>. Milestones report operation boundaries and buffer bytes, not parsing percentages. Load-time comparisons await the quiet speed phase.</footer>
+  <script type="module">import { needsWebGPU } from './needs-webgpu.js'; needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-workers.ts'));</script>
+</body>
+</html>

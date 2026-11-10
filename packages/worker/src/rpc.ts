@@ -21,6 +21,8 @@ export interface RpcEndpoint {
 
 /** Per-call cancellation and transport options. */
 export interface RpcCallOptions {
+  /** Receives ordered progress messages before settlement. Default none. Exceptions reject and cancel the call. */
+  onProgress?: (value: unknown) => void;
   /** Cancels queued or running work. Running handlers receive an aborted context signal. Default none. */
   signal?: AbortSignal;
   /** Input ownership moves only when dispatched. Default none. */
@@ -31,6 +33,8 @@ export interface RpcCallOptions {
 
 /** Context appended to each exposed handler's arguments. Cancellation is cooperative. */
 export interface RpcContext {
+  /** Sends cloneable progress while the handler is active; optionally transfers owned buffers. */
+  progress(value: unknown, transfer?: Transferable[]): void;
   /** Aborted on caller cancellation or server disposal. A synchronous loop must yield to receive cancellation. */
   signal: AbortSignal;
 }
@@ -68,6 +72,7 @@ interface Wire {
   error?: { name: string; message: string; code?: string; stack?: string };
 }
 interface Pending {
+  progress(value: unknown): void;
   finish(value?: unknown, error?: unknown): void;
   cancel(): void;
 }
@@ -95,7 +100,12 @@ export class RpcClient<T extends object> {
   private closed?: unknown;
   private readonly message = ((event: MessageEvent<Wire>) => {
     const data = event.data;
-    if (data?.tag !== TAG || data.channel !== this.channel || data.type !== 'result') return;
+    if (data?.tag !== TAG || data.channel !== this.channel) return;
+    if (data.type === 'progress') {
+      this.pending.get(data.id)?.progress(data.value);
+      return;
+    }
+    if (data.type !== 'result') return;
     this.pending
       .get(data.id)
       ?.finish(data.value, data.error && Object.assign(new Error(data.error.message), data.error));
@@ -121,7 +131,7 @@ export class RpcClient<T extends object> {
   dispatch<K extends Method<T>>(
     method: K,
     args: Arguments<T[K]>,
-    { signal, transfer = [], timeout = 30_000 }: RpcCallOptions,
+    { signal, transfer = [], timeout = 30_000, onProgress }: RpcCallOptions,
   ): { result: Promise<Result<T[K]>>; done: Promise<void> } {
     let completed!: () => void;
     const done = new Promise<void>((resolve) => {
@@ -168,7 +178,25 @@ export class RpcClient<T extends object> {
         if (error !== undefined) reject(error);
         else resolve(value as Result<T[K]>);
       };
-      this.pending.set(id, { finish, cancel: () => send('cancel') });
+      let cancelled = false;
+      this.pending.set(id, {
+        finish,
+        cancel: () => send('cancel'),
+        progress: (value) => {
+          if (cancelled || signal?.aborted) return;
+          try {
+            onProgress?.(value);
+          } catch (error) {
+            cancelled = true;
+            reject(error);
+            try {
+              send('cancel');
+            } catch (failure) {
+              this.close(failure);
+            }
+          }
+        },
+      });
       signal?.addEventListener('abort', abort, { once: true });
       try {
         this.endpoint.postMessage({ tag: TAG, channel: this.channel, type: 'call', id, method, args }, transfer);
@@ -250,7 +278,11 @@ export function exposeRpc<T extends object>(
           throw fault('state', `Unknown RPC method ${data.method}; expose a named handler`, 'worker');
         if (!Array.isArray(data.args)) throw fault('state', 'RPC arguments must be an array', 'worker');
         const handler = handlers[data.method as Method<T>] as (...args: unknown[]) => unknown;
-        const value = await handler.apply(handlers, [...data.args, { signal: controller.signal }]);
+        const progress = (value: unknown, transfer: Transferable[] = []) => {
+          if (!running.has(key) || controller.signal.aborted) return;
+          endpoint.postMessage({ tag: TAG, channel: data.channel, id: data.id, type: 'progress', value }, transfer);
+        };
+        const value = await handler.apply(handlers, [...data.args, { signal: controller.signal, progress }]);
         reply(value);
       } catch (error) {
         reply(undefined, errorRecord(error));

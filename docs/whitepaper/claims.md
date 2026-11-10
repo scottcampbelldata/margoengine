@@ -4515,3 +4515,6 @@ Optional keyboard series/record focus, complete pageable tables, generated count
 
 ### Batch 178 job 6: scientific style tokens
 Optional named print/presentation styles, scoped CSS bindings and publisher final-column presets feed native chrome and publication paths, with explicit scientific encodings preserved. [Contract and primary sources](../sciviz-themes.md), [native/compatibility and physical-export ledger](results/batch178-themes.json). No universal printer/CMYK, font-substitution or publisher-compliance claim.
+# Batch 175 job 6: scientific reader workers
+
+The optional sciviz/workers entry executes NRRD, NIfTI, DICOM, Zarr, legacy VTK, NetCDF and VTK XML readers off the page through worker/rpc. Dedicated sessions preserve lazy methods, explicit inputs and output snapshots transfer buffers, progress is channel-isolated, and abort terminates synchronous work. CPU comparisons against the direct readers and the dual-backend real-data demo are the evidence; see docs/sciviz-workers.md and packages/sciviz/tests/workers{.test.js,-browser.mjs}. No speed, network throughput or zero-copy parsing claim is made. Reader feature/format limits remain the same.

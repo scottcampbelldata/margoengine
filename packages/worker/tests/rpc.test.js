@@ -25,6 +25,41 @@ const worker = () => {
   return endpoint;
 };
 
+test('RPC progress is ordered, channel-isolated, transferable and stops after settlement or abort', {
+  timeout: 3000,
+}, async (t) => {
+  let report;
+  const { client, port1 } = pair(t, {
+    run({ progress }) {
+      report = progress;
+      const bytes = new Uint8Array([17]);
+      progress(bytes, [bytes.buffer]);
+      assert.equal(bytes.byteLength, 0);
+      progress('done');
+      return 42;
+    },
+  });
+  const other = new RpcClient(port1);
+  t.after(() => other.dispose());
+  const events = [],
+    unrelated = [];
+  assert.equal(await client.call('run', [], { onProgress: (value) => events.push(value) }), 42);
+  assert.deepEqual(events, [new Uint8Array([17]), 'done']);
+  report('late');
+  await other.call('run', [], { onProgress: (value) => unrelated.push(value) });
+  assert.equal(events.length, 2);
+  assert.equal(unrelated.length, 2);
+  await assert.rejects(
+    client.call('run', [], {
+      onProgress: () => {
+        throw new Error('observer failed');
+      },
+    }),
+    /observer failed/,
+  );
+  assert.equal(await client.call('run', []), 42, 'observer failure remains local to its call');
+});
+
 test('RPC resolves typed-shape calls, preserves this, multiplexes clients and leaves unrelated traffic alone', {
   timeout: 3000,
 }, async (t) => {

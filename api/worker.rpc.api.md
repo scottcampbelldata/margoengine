@@ -4,6 +4,7 @@
 
 ```ts
 export interface RpcCallOptions {
+    onProgress?: (value: unknown) => void;
     signal?: AbortSignal;
     transfer?: Transferable[];
     timeout?: number;
@@ -18,6 +19,7 @@ export class RpcClient<T extends object> {
 }
 
 export interface RpcContext {
+    progress(value: unknown, transfer?: Transferable[]): void;
     signal: AbortSignal;
 }
 

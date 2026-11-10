@@ -9230,6 +9230,14 @@
       "./series": {
         "raw": 36375,
         "gzip": 13801
+      },
+      "./workers": {
+        "raw": 3645,
+        "gzip": 1589
+      },
+      "dist/workers/readers.js": {
+        "raw": 117675,
+        "gzip": 41506
       }
     },
     "@margoengine/selection": {
@@ -14818,8 +14826,8 @@
         "gzip": 1859
       },
       "./rpc": {
-        "raw": 5522,
-        "gzip": 2156
+        "raw": 5842,
+        "gzip": 2253
       },
       "./auto": {
         "raw": 11823,
@@ -15247,6 +15255,11 @@
       "raw": 4335248,
       "gzip": 1644912,
       "brotli": 1196116
+    },
+    "packages/sciviz/dist/workers/readers.js": {
+      "raw": 116841,
+      "gzip": 41409,
+      "brotli": 36255
     }
   },
   "splits": {
