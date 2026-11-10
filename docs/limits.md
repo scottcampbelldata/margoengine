@@ -3423,6 +3423,14 @@ are in `./global` for quads only. Overlapping UV charts are counted (`overlaps`)
 light is kept where both centres fall. Dilation averages neighbours across a gutter narrower than twice `dilate`, so
 two charts closer than that blend in the gutter (never inside a chart). Overlaps under 1e-3 texels count as touching.
 
+## Directional lightmaps (batch 54)
+
+`bakeDirectionalLightmap` (`@margoengine/lightmap/directional`) stores one main light direction and one directional
+colour per texel (world space), not SH or the H-basis: with several lights it is exact only at the unmapped normal and
+approximate under a normal map (exact for one light plus ambient). Ambient light and AO are not directional. It takes
+the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
+quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.

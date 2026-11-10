@@ -1154,6 +1154,10 @@
       "types": "./dist/exporters/materials.d.ts",
       "import": "./dist/exporters/materials.js"
     },
+    "./exporters/splats": {
+      "types": "./dist/exporters/splats.d.ts",
+      "import": "./dist/exporters/splats.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"
@@ -1577,6 +1581,10 @@
     "./lightmap/mesh": {
       "types": "./dist/lightmap/mesh.d.ts",
       "import": "./dist/lightmap/mesh.js"
+    },
+    "./lightmap/directional": {
+      "types": "./dist/lightmap/directional.d.ts",
+      "import": "./dist/lightmap/directional.js"
     },
     "./lines": {
       "types": "./dist/lines.d.ts",

@@ -87,6 +87,17 @@ baked.irradiance; // Float32 RGB per texel, HDR
   bytes are checked before tracing; inputs are copied before the first await; `signal` and `onProgress` run every
   256 texels.
 
+## Directional lightmaps: `@margoengine/lightmap/directional`
+
+`bakeDirectionalLightmap(mesh, options)` takes the `bakeMeshLightmap` mesh and options and returns the same lightmap
+plus, per texel, the main light direction (world space; `directionMap` stores it 0.5-biased with the directionality in
+alpha) and a directional colour (`directionalMap`, divided by `directionalScale`). Normal maps then still answer baked
+light: `directionalIrradiance(baked, texel, mappedNormal, vertexNormal)` gives `irradiance + directional *
+(max(0, n . d) - max(0, n0 . d))`, exact at the vertex normal and exact for any normal when one light plus ambient
+reaches the texel. The direction is the luminance-weighted mean of the light directions (Sloan 2008's optimal linear
+direction); ambient light and AO stay non-directional. The flat `lightmap` is the one `bakeMeshLightmap` bakes, with
+no extra rays.
+
 ## More light: `@margoengine/lightmap/global`
 
 `bakeGlobalLightmap(quads, options)` takes every `bakeLightmap` option and adds:

@@ -350,7 +350,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/environment`](packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
+| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh) with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/weather`](packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
@@ -6013,6 +6013,14 @@ are in `./global` for quads only. Overlapping UV charts are counted (`overlaps`)
 light is kept where both centres fall. Dilation averages neighbours across a gutter narrower than twice `dilate`, so
 two charts closer than that blend in the gutter (never inside a chart). Overlaps under 1e-3 texels count as touching.
 
+## Directional lightmaps (batch 54)
+
+`bakeDirectionalLightmap` (`@margoengine/lightmap/directional`) stores one main light direction and one directional
+colour per texel (world space), not SH or the H-basis: with several lights it is exact only at the unmapped normal and
+approximate under a normal map (exact for one light plus ambient). Ambient light and AO are not directional. It takes
+the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
+quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
+
 ### Batch 133 resource and historical acceptance inventory
 
 Fresh-process collection completed all 3,881 inputs for each opaque build.
@@ -6799,6 +6807,12 @@ Batch 220 job 1: import Matrix4, Vector3, Quaternion, Ray, Plane, Box3 and Color
 Batch 220 job 1 size: math/compat 0 to 9929 B min+gzip, ceiling 10227 B. The entry includes seven interoperable opt-in classes and avoids weakening the original Vector3 1600 B test; splitting would require multiple porting imports. Original math root and seven per-type measurements are unchanged. Core + stage remains 24209 B, below 25000 B.
 # Batch 204 optional exporter optimization
 
+Optional exporters `/splats`: 2,800 B gzip, ceiling 3,056 B, with a lazily loaded
+splats data-codec peer. GLB retains degree 0..3 SH in linear Rec.709; raw .splat
+uses 32-byte records and its standard color/rotation byte quantization with no
+SH. Input limit 3,000,000 Gaussians; default maxBytes 4,294,967,295, checked for
+both formats. Core and stage unchanged. [Full contract](exporter-splats.md).
+
 Optional `/materials`: `exportMaterialGLB` adds glTF-shaped KHR material payloads
 and per-primitive named variants to data scenes. New entry 17,967 B minified gzip,
 ceiling 18,507 B. The writer finalization hook changes the exporters root from
@@ -6814,6 +6828,8 @@ are enforced. Variants require hierarchy mode. [Details](exporter-materials.md).
 ## WFC grid assembly (batch 237)
 Optional wfc/assemble places up to 1,000,000 X-fast cells. Loaded glTF/glTF-pro templates remain caller-owned; static primitive ancestry, local TRS, shared materials and geometry, visibility and shadow flags are retained. Orthogonal 3x3 orientations include all socket cube rotations and reflections; spacing is positive and defaults to unit, origin to zero. No skin/morph animation cloning or glTF extension-specific runtime controllers. Mesh-store capacity and hierarchy limits still apply; allocation, invalid placement and cancellation roll back created handles. Hidden source roots produce hidden cloned roots; set clone visibility when using hidden templates. CPU transforms are float32 in core.
 Entry size: wfc/assemble 1,465 B min+gzip (new entry, previous 0 B); ceiling 1,721 B. Core + stage root remains 23,950 B. The entry owns placement and resource cleanup, with no runtime loader dependency.
+
+
 
 
 
@@ -6849,6 +6865,28 @@ Optional bvh/parallel adds buildParallel(source, options). workers defaults to m
 
 Initial standalone min+gzip: bvh/parallel 11072 B (new; ceiling 11405 B), coordinator 3957 B, leaf worker 2985 B. These worker files are separate assets; the entry's worker assets must also be deployed. Existing bvh root 23362 B and tree 10381 B are unchanged. Core plus stage remains 24209 B, below 25000 B. The optional bytes provide worker lifecycle, cancellation, frontier scheduling and exact packing without adding to root entry imports; splitting the public entry further would defer the same tree needed to return MeshBVH and add another loading boundary.
 Batch273 integration repair restores28 previously approved ceilings lost by the incoming metadata merge, exactly from10bf82909. Core remains21775 B with the same21775 B quality budget; core plus stage24209 B stays below25000 B. The core guard and SNORM runtime fixes were never removed from source. All restored values, including optional water and lazy compute, are in whitepaper/results/batch-273-restored-budgets.json. These restore prior approvals rather than introduce new growth or split packages.
+
+Batch 249 serialize: version-1 ECS snapshot/delta packets use native deflate, JSON identity tables and native base64 for typed bytes. Default maxBytes is 64 MiB for both packet and expanded text; JS arrays and object tables are capped at 1000000, graph nesting at 256. Typed memory packets require matching host endianness; incompatible snapshots reject before mutation. Component numbers must be finite as in Component.add; object values support special numbers. Unsupported prototypes, symbols, functions and platform resources require explicit named app codecs; custom cycles use app keys. All live ids and selected memberships/fields are saved; arbitrary numeric entity-reference fields are remapped by the app using the returned map. Restore preserves unselected components on survivors and destroys missing entities. Validation/capacity/cancellation failures precede membership mutation; user observer failures propagate after their underlying mutation, as with component writes. Snapshot compression/hashing is asynchronous, AbortSignal is optional, and callers must not structurally change a world while restoring. No save dependency or GPU work.
+ecs/serialize: 4004 B min+gzip, previously 0 B, ceiling 4260 B. Core plus stage unchanged at 23950 B. Native compression and graph validation remain one optional entry to keep resource ownership and validation together.
+ECS root for serializer support: 4538 B (parent-source replay) to 4559 B min+gzip; ceiling 4554 to 4815 B. Allocation preflight and live enumeration belong to ECS World; splitting would duplicate allocator state. Core and stage remain unchanged.
+
+| Optional entry | Limits (batch 267 job 3) |
+| --- | --- |
+| `@margoengine/mcp/http` | MCP 2026-07-28 plus 2025-11-25, 2025-06-18 and 2025-03-26 Streamable HTTP, JSON POST reply mode; optional SSE/GET listening declines with 405. One JSON-RPC object per POST, both JSON and SSE Accept types required. Legacy sessions have fresh servers, bound principals and isolated request ids; DELETE closes them. Current requests each have a fresh server, required protocol/client-capability metadata, matching version/method/name/custom parameter headers and server/discover; no session is created. Encoded headers use strict UTF-8 Base64 sentinels. Defaults: /mcp, 1 MiB body, 32 MiB reply, 128 sessions including initializations, 120 s request deadline, 30 minute idle lifetime. Legacy explicit cancellation/deadlines abort tools; its network disconnect alone does not. Current response disconnect cancels only that request. The session capacity also bounds active current requests. Exact Host and Origin allow lists, no default browser origins. Local listener binds 127.0.0.1 with a random bearer token. Remote listeners require an authorizer and exact hosts; createHttpTransport mounts on an application HTTPS server. OAuth token verification/discovery and TLS belong to that deployment, not an issuer inside the engine. No import side effects. |
+
+Batch 267 job 3 entry size: mcp/http new 4872 B gzip, ceiling 5128 B. The cohesive current/legacy protocol adapter, metadata validation, authorization and bounded request/session lifecycle justify this optional entry; splitting it would duplicate lifecycle state. Core plus stage is unchanged by this job at 24209 B.
+
+Batch 267 final baseline merge repair: @margoengine/water: measured 20210 B before and after this metadata repair, ceiling 20185 to 20817 B; @margoengine/webgl2-compat lazy compute runtime and read-back: measured 31756 B before and after this metadata repair, ceiling 31741 to 32709 B. No runtime bytes are introduced by these metadata repairs. Existing upstream rendering/compute behavior remains intact; a split for 25/15 B would add complexity without a quality benefit. The core plus stage limit is unchanged. Other restored ceilings come from the already validated batch-267-http build record, rather than new growth.
+Batch 208 job 1: cache/stream exports StreamingAssetCache, with all AssetCache options and pull-driven full-file 200 miss/replacement responses. Consume or cancel every body before flush or disposal can finish. Successful EOF commits the complete response; cancel/abort/error commits nothing and leaves an older copy intact. Already delivered bytes cannot be replaced with an offline fallback if a changed response fails later. Ranged replacements retain the existing buffered range behavior. In-memory retained bytes stop at maxBytes; complete cacheable assets still require one full retained body. New entry 3,398 B min+gzip including cache implementation (previously absent); cache root 3,005 B, core + stage 24,209 B, unchanged. Optional entry budget includes the complete cache because the subclass must inherit its storage semantics; splitting would add a second cache API without reducing the required work.
+### Scientific filter pipeline (batch 172 job 1)
+
+Optional sciviz/pipeline: finite JSON params, append-only acyclic topology, one cached output/time per node, serialized demands, cooperative cancellation. Operators own their outputs and release them synchronously without throwing; borrowed inputs remain immutable. Rewiring uses an edited JSON snapshot and a new graph. The NASA demo displays 447 original FUN3D surface samples, not the volume mesh or a time series. See [analysis contract](sciviz-analysis.md). Entry size is recorded with this job's gate evidence; core/stage are unchanged.
+
+Batch 172 pipeline entry: 1830 B gzip (new, previously absent), ceiling 2086 B; the scheduler, JSON validation and resource ownership stay together. Core plus stage remains 24209 B, below 25000 B.
+
+- Inspector `/tools`: application cameras are registered explicitly; live glTF model cameras are discovered automatically. Switching preserves the engine camera object and disposal restores its original pose/projection. Screenshots serialize the canvas only, excluding DOM overlays, and default to PNG with a 10000 ms timeout. Browser recording uses video/record, defaults to WebM/30 fps and retains the encoded file in memory until stop. glTF export defaults to scene GLB; selected loaded models use the full model exporter and attached animation clips. Exporter, video and glTF camera code load only on their respective actions. Origin/codec constraints remain the browser APIs' constraints.
+
+- Batch 263 job 3 entry: inspector/tools 3,184 B min+gzip, ceiling 3,440 B. Video, exporter and loaded-camera dependencies are lazy. Core/stage bytes added: zero.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -11183,6 +11221,27 @@ separator boundaries. Future local landing commands check child status before
 commit/push; no repository hook or landing queue is introduced.
 
 The same incoming metadata merge reset28 approved size ceilings while leaving their runtime fixes present. Restore the exact approvals from10bf82909 and recompute the total; quality sizes is the regression for the resulting mismatch. No runtime change or newly raised allowance.
+
+
+Batch 267 job 3: no open HTTP transport defect found in the real-network correctness suite; supported revisions, JSON reply mode and deployment ownership are stated in docs/limits.md.
+
+Build-phase follow-up outside batch 267 HTTP: direct stdio/createMcpServer calls with concurrent tools/call messages reusing one id overwrite the running cancellation map, and the first finalizer can delete the second entry. Repro: send two pending calls with id 7, then notifications/cancelled for id 7. Cause: server.ts running.set/delete has no duplicate ownership check. HTTP legacy now rejects duplicate active ids before dispatch; direct/stdin ownership repair is deferred under lane rule 21.
+
+Outside batch 267: node scripts/gpu-package-tests.mjs --no-build planning rejects packages/webgl2-compat/test/support/firefox-bidi.mjs and packages/worker/tests/browser-matrix.mjs as browser-driving files absent from registered scripts. Cause: the browser-file registry has no matching commands/helper classification for those two files. MCP leaves are registered; this pre-existing registry issue is deferred to its owners under lane rule 21.
+- Upstream notices generator omits the appended WebXR generic-hand provenance on main bae4fcbf8: `node scripts/supply-chain.mjs --check` fails; preserve the credits and move them into the generator in the owning XR job.
+
+### Batch 172 pipeline regression coverage
+
+Independent time-aware branches keep separate cached times; requesting one branch does not invalidate the other. Sparse parameter arrays reject before changing the graph so JSON restoration cannot silently substitute nulls. Regression: packages/sciviz/tests/pipeline.test.js. Operator cancellation and resource ownership limits are explicit in docs/sciviz-analysis.md.
+
+Fixed during batch 172 landing: formats-browser.mjs used the workspace current directory as the Vite root and returned HTTP failure for /examples/sciviz-formats.html under npm run test:browser --workspace @margoengine/sciviz. Both format and pipeline runners now resolve the repository root from their module URL. The unchanged both-backend format pixel checks, invoked from packages/sciviz, are the regression.
+
+Batch 172 landing also restores the exact approved version-guard ceilings from the sizes baseline history record for 57750c4d6. The history survived a merge while its item values reverted to ceilingBefore, causing fresh builds to fail the existing size assertions. No new growth allowance is introduced; the history supplies each before/after figure.
+
+The same baseline merge lost water 20817 B (batch-225), XR 9158 B (version-guard) and lazy compute/readback 31756 B (snorm-storage). Restore those exact retained approvals. Existing quality assertions reproduce all three failures on a fresh build and pass after the data repair; no source algorithm, test or tolerance changes.
+
+The final dependent umbrella test also found the already-landed exporters/materials entry absent from the generated umbrella map. Regenerate with scripts/umbrella.mjs, preserving the sciviz pipeline facade; tests/umbrella.test.js exercises both current generation and binding identity. No exporter source changes.
+- Outside batch 263: video/record can resolve a header-only WebM when stopped before Chromium encodes its first frame. Repro: record a native WebGPU canvas at 30 fps, render 12 requestAnimationFrame ticks, then stop; observed 110-byte video/webm;codecs=vp8, decoder rejects DEMUXER_ERROR_COULD_NOT_OPEN. Cause: recordCanvas validates only nonzero Blob size, which also accepts container headers. A 1.2-second recording decodes correctly on WebGPU and preview WebGL2. Fix phase should add first-encoded-frame readiness or structural stream validation in video/record with a short-recording regression.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

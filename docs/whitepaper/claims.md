@@ -2879,6 +2879,7 @@ removal and speed-phase timing debt remain open.
 | --- | --- | --- |
 | `@margoengine/lightmap/mesh` bakes any triangle mesh at its own UV1 | `packages/lightmap/tests/mesh.test.js`: two triangles match the quad baker texel for texel within one RGB8 step; a 12-triangle cube matches Lambert irradiance on all 1,176 chart texels within 1e-5 | CPU, direct light and AO; hand-made test meshes, no real glTF file baked yet |
 | Conservative coverage reaches every texel a triangle touches | same test file: a sliver covering no texel centre still bakes its row | overlaps under 1e-3 texels count as touching |
+| `@margoengine/lightmap/directional` keeps baked light responsive to normal maps | `packages/lightmap/tests/directional.test.js`: with one directional light plus ambient, `directionalIrradiance` matches exact Lambert light for five mapped normals on all 64 texels within 1e-4; the flat lightmap equals `bakeMeshLightmap` texel for texel within 1e-5; point-light texels point at the light within 1e-5 | CPU, direct lights only; several lights are approximated by one main direction (exact only at the unmapped normal); stand-in meshes |
 
 Batch133 resource/inventory observations: full 3,881 and glTF 1,003 accepted
 geometry fingerprints remain exact. Strict per-file RSS fails116/113; no

@@ -4,6 +4,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | Package | What its README must cover | Added by |
 |---|---|---|
+| @margoengine/lightmap | directional: bakeDirectionalLightmap and directionalIrradiance (direction and directional maps, evaluating with a mapped normal) | batch 54 job 6 |
 | `@margoengine/webgl2-compat` | Compute binding limits across automatic/explicit layouts, validation scopes, async `GPUPipelineError` and recovery example. | Batch 273 failure 18 |
 | @margoengine/fsm | events: EventMachine send/plan data, EventState/Transition hooks and guards, EventTrace capacity and disposal; payloads are references | batch-250 job 1 |
 | margoengine | Generated fsm/events alias and payload entry availability | batch-250 job 1 |
