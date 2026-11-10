@@ -2896,3 +2896,5 @@ Batch 208 job 1: build cache with npm run build --workspace=@margoengine/cache, 
 ## Batch 172 job 1
 
 Build packages, then run node --test --test-timeout=120000 packages/sciviz/tests/pipeline.test.js. Run node scripts/gpu-lock.mjs run --owner=sciviz-pipeline --wait-max=60 --max=3 -- node packages/sciviz/tests/pipeline-browser.mjs for the real NASA solution on both backends. Serve examples/sciviz-pipeline.html to change the cutoff and save the graph JSON. No benchmarks or README checks are required.
+
+- Batch 263 tools: build packages; run `node --test --test-timeout=30000 packages/inspector/test/tools.test.js`. Under the shared GPU lock run `node packages/inspector/test/tools-browser.mjs` and the same command with `--compat`. Tests use the existing CC0 BoxVertexColors geometry, check camera state, real downloads, encoded image signatures, glTF scene contents and decoded video dimensions.

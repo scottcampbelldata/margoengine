@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><title>Camera and capture tools</title>
+<canvas width="400" height="300" style="width:400px;height:300px"></canvas><main></main>
+<script type="module">
+import {Engine,Geometry} from '@margoengine/core';
+import {Camera} from '@margoengine/core/extension';
+import {GLTFAsset} from '@margoengine/gltf-pro/model';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+import {CameraTools} from '@margoengine/inspector/tools';
+window.setup=async(backend)=>{
+  window.engine?.dispose(); const old=document.querySelector('canvas'),canvas=old.cloneNode();old.replaceWith(canvas);
+  const engine=window.engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:{position:[3,2,5],target:[0,0,0]}});
+  const bytes=await(await fetch('/examples/assets/khronos/BoxVertexColors/BoxVertexColors.glb')).arrayBuffer(),view=new DataView(bytes),length=view.getUint32(12,true),
+    doc=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,20,length))),asset=new GLTFAsset(doc,[],new Uint8Array(bytes,28+length)),p=doc.meshes[0].primitives[0];
+  window.mesh=engine.createMesh().setGeometry(new Geometry(asset.accessor(p.attributes.POSITION,'VEC3'),asset.accessor(p.attributes.NORMAL,'VEC3'),asset.accessor(p.indices,'SCALAR')));
+  window.panel=CameraTools.attach(engine,{parent:document.querySelector('main'),cameras:[{id:'side',label:'Side view',camera:new Camera({position:[-4,1,3],target:[0,0,0],fov:45})}]});
+  engine.start();return engine.backend;
+};
+window.inspectScreenshot=async()=>{const blob=await window.panel.screenshot(),image=await createImageBitmap(blob),result={type:blob.type,width:image.width,height:image.height,bytes:Array.from(new Uint8Array(await blob.arrayBuffer()).slice(0,8))};image.close();return result;};
+window.startVideo=async()=>{window.recording=await window.panel.startRecording();window.frames=0;};
+window.finishVideo=async()=>{const blob=await window.panel.stopRecording();const video=document.createElement('video'),url=URL.createObjectURL(blob);video.src=url;video.muted=true;
+  try{await video.play();return {type:blob.type,size:blob.size,width:video.videoWidth,height:video.videoHeight};}finally{video.pause();video.removeAttribute('src');video.load();URL.revokeObjectURL(url);}};
+</script>

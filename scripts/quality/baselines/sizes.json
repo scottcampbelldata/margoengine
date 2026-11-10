@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12596720,
+  "total": 12600160,
   "history": [
     {
       "date": "2026-10-24",
@@ -6190,6 +6190,12 @@
       "commit": "batch-172-landing",
       "reason": "Restore three further already-recorded item ceilings lost in the same merge: water 20185 to 20817 (batch-225), XR 8967 to 9158 (version-guard), lazy compute/readback 31741 to 31756 (snorm-storage). All source changes and allowances were approved and recorded previously; no new allowance.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "3f8c609d9",
+      "reason": "Optional inspector/tools: absent to 3184 B gzip. Camera controls, screenshot lifecycle and lazy video/export actions stay together; heavy modules load only for their actions. No core or stage changes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7313,6 +7319,7 @@
     "@margoengine/mcp/http": 5128,
     "@margoengine/cache/stream": 3654,
     "@margoengine/sciviz/pipeline": 2086,
-    "@margoengine/exporters/splats": 3056
+    "@margoengine/exporters/splats": 3056,
+    "@margoengine/inspector/tools": 3440
   }
 }

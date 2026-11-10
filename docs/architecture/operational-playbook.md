@@ -5729,3 +5729,7 @@ Section 5 batch 267 CI follow-through: the live/native, live/full-compat and rea
 ### Section 5 evidence: scientific pipeline (batch 172 job 1)
 
 The optional sciviz/pipeline entry changes no GPU math or rendering backend. Its gate adds a real NASA FUN3D source/filter/layer demo on WebGPU and WebGL2 compatibility: coloured output, downstream-only call counts and owned layer removal. CPU tests cover lazy diamonds, inherited/independent times, serialization, exact abort reasons, stale work rejection, JSON validation and reverse resource release. Cancellation requires operators to observe AbortSignal; no external callback can be forcibly preempted. No speed evidence or full volume-mesh demo is asserted. See docs/sciviz-analysis.md.
+
+### Section 5 evidence: inspector camera/capture tools, batch 263
+
+The tools entry preserves the engine camera identity, delegates loaded projection maths to the existing glTF camera helper and restores the initial projection on disposal. It changes no rendering backend, core or stage code. CPU evidence covers application and loaded orthographic cameras, model removal during an asynchronous switch, camera replacement, screenshot cancellation/failure/timeout, and actual glTF encoding. Native WebGPU and preview WebGL2 browser checks decode screenshots and recordings and exercise PNG/GLB download actions. Heavy modules remain lazy; the compatibility launch runs the same checks.

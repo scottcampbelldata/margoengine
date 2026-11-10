@@ -1510,6 +1510,10 @@
       "types": "./dist/inspector/gl.d.ts",
       "import": "./dist/inspector/gl.js"
     },
+    "./inspector/tools": {
+      "types": "./dist/inspector/tools.d.ts",
+      "import": "./dist/inspector/tools.js"
+    },
     "./kinematics-constraints": {
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"

@@ -3395,3 +3395,5 @@ Batch 208 job 1: cache/stream delivers a cold full-file response before the serv
 ## Batch 172 job 1: demand-driven scientific pipeline
 
 Claim: optional sciviz/pipeline reuses unchanged ancestors and executes only downstream nodes after a parameter change; temporal dependency is inherited and independent branches retain their times. Proof: packages/sciviz/tests/pipeline.test.js, with deterministic call counts, JSON round trips, cancellation and ownership assertions. Real NASA FUN3D source/subset/chart integration renders on WebGPU and WebGL2 compatibility in packages/sciviz/tests/pipeline-browser.mjs. This is a behavioral claim, not a throughput or full external-tool parity claim. Contract and limits: docs/sciviz-analysis.md.
+
+- Batch 263 camera tools: list/switch live application and loaded-model cameras, restore the original view, download screenshots, record canvas video, and export scene or loaded-model glTF. Evidence: packages/inspector/test/tools.test.js and tools-browser.mjs. The browser check decodes PNG and 1.2-second WebM output, validates GLB download and glTF JSON, and runs both rendering backends. No performance claim.
