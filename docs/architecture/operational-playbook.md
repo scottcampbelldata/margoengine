@@ -684,6 +684,22 @@ mutex, and a live claimant is allowed to finish without interference.
 
 Research guiding the remaining queue and phase work, read before implementation:
 
+The 2026-11-10 known-bugs sweep reproduced a stale-capacity FIFO fixture:
+three holders did not fill the new five-slot default, so its queue observation
+could never complete. The CPU-only regression now fills `gpu.slots()` and checks
+tied-ticket ordering at capacities one, three and five, with a 30-second bound.
+No actual GPU allocation or scheduler behavior changes. Research compared
+Leslie Lamport, [A New Solution of Dijkstra's Concurrent Programming Problem
+(1974)](https://lamport.azurewebsites.net/pubs/bakery.pdf), on arrival ordering,
+with Nhat Minh Le, Adrien Guatto, Albert Cohen and Antoniu Pop,
+[Correct and Efficient Bounded FIFO Queues
+(2013)](https://www.irif.fr/~guatto/publications/sbac13.pdf), on capacity-dependent
+queue state. The fixture uses the existing filesystem scheduler, not either
+paper's implementation. The Node.js contributors' [Test runner documentation
+(2026)](https://nodejs.org/api/test.html) distinguishes test cancellation from
+termination of outstanding activity; the diagnostic also had an outer process
+tree deadline. No external implementation source was read or copied.
+
 - [Mellor-Crummey and Scott, reader/writer synchronization (1991)](https://www.cs.rochester.edu/u/scott/papers/1991_PPoPP_read_write.pdf)
   distinguishes preference from fairness. Writer preference blocks incoming
   readers, explaining why an unnecessary exclusive waiter stalls free slots.

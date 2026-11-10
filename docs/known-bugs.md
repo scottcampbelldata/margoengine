@@ -4172,10 +4172,10 @@ cycles and bounded expansion reject during construction (subtrees.test.js).
 
 Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
 
-## tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
+## Fixed: tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
 
 - **Repro:** `node --test --test-reporter=tap tests/gpu-lock.test.js` on origin/main 896ebf844 while other lanes hold the shared GPU lock: five tests pass, then the file exits 1 with no failing subtest named (about 78 s). Selected tests (`--test-name-pattern`) pass.
-- **Cause:** not yet found; the file-level exit happens before the sixth test reports. Owner: scripts/gpu-lock.mjs and its tests. Waits for the fix phase (Scott 2026-11-09, build first).
+- **Cause and repair (2026-11-10):** the sixth fixture filled three holders after b7d02c892 raised the default capacity to five, then waited forever for a request that had already acquired a free slot to appear in the queue. Current-main reproduction reaches the test's 20-second diagnostic bound; the process tree was terminated at the 35-second hard limit. The FIFO regression now fills the configured capacity and checks identical tied-timestamp, reverse-name admission ordering at one, three and five slots, under its existing 30-second bound. Scheduler policy, deadlines and assertions are unchanged.
 Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
 text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 

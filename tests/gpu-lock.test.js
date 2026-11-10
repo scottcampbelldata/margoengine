@@ -182,37 +182,52 @@ async function withLock(body, envOrFn = {}) {
 }
 
 test('a command publishes its bounded compile idle window for the independent heartbeat', { timeout: 15000 }, () =>
-  withLock(async (gpu) => {
-    const release = await gpu.acquire({ owner: 'compile-window', max: 8, log: quiet });
-    try {
-      const directory = join(gpu.lockDir, 'shared');
-      const entry = JSON.parse(readFileSync(join(directory, readdirSync(directory)[0]), 'utf8'));
-      assert.equal(entry.idleMs, 240_000);
-      assert.equal(entry.maxMinutes, 8);
-    } finally {
-      release();
-    }
-  }, { MARGO_GPU_IDLE_MIN: '4' }));
+  withLock(
+    async (gpu) => {
+      const release = await gpu.acquire({ owner: 'compile-window', max: 8, log: quiet });
+      try {
+        const directory = join(gpu.lockDir, 'shared');
+        const entry = JSON.parse(readFileSync(join(directory, readdirSync(directory)[0]), 'utf8'));
+        assert.equal(entry.idleMs, 240_000);
+        assert.equal(entry.maxMinutes, 8);
+      } finally {
+        release();
+      }
+    },
+    { MARGO_GPU_IDLE_MIN: '4' },
+  ),
+);
 
-test('shared FIFO tickets preserve arrival order when timestamps tie and owner names sort backwards', () =>
-  withLock(async (gpu) => {
-    const held = [await take(gpu, 'hold-1'), await take(gpu, 'hold-2'), await take(gpu, 'hold-3')];
-    const options = { queuedAt: 123, poll: 1, waitMax: 0.2, max: 1, log: quiet };
-    const first = gpu.acquire({ ...options, owner: 'z-first', worktree: join(gpu.lockDir, '..', 'fake-z') });
-    while (!gpu.status()?.waiting?.length) await sleep(1);
-    const second = gpu.acquire({ ...options, owner: 'a-second', worktree: join(gpu.lockDir, '..', 'fake-a') });
-    assert.equal(await settled(second), 'waiting');
-    assert.deepEqual(
-      gpu.status().waiting.map((w) => w.owner),
-      ['z-first', 'a-second'],
-    );
-    held.pop()();
-    const firstRelease = await first;
-    assert.equal(await settled(second), 'waiting');
-    firstRelease();
-    (await second)();
-    for (const release of held) release();
-  }));
+for (const capacity of [1, 3, 5]) {
+  test(
+    `shared FIFO tickets preserve arrival order when timestamps tie and owner names sort backwards (${capacity} slots)`,
+    { timeout: BOUND },
+    () =>
+      withLock(
+        async (gpu) => {
+          const held = [];
+          for (let i = 0; i < gpu.slots(); i++) held.push(await take(gpu, `hold-${i}`));
+          assert.equal(gpu.status().holders.length, capacity);
+          const options = { queuedAt: 123, poll: 1, waitMax: 0.2, max: 1, log: quiet };
+          const first = gpu.acquire({ ...options, owner: 'z-first', worktree: join(gpu.lockDir, '..', 'fake-z') });
+          while (!gpu.status()?.waiting?.length) await sleep(1);
+          const second = gpu.acquire({ ...options, owner: 'a-second', worktree: join(gpu.lockDir, '..', 'fake-a') });
+          assert.equal(await settled(second), 'waiting');
+          assert.deepEqual(
+            gpu.status().waiting.map((w) => w.owner),
+            ['z-first', 'a-second'],
+          );
+          held.pop()();
+          const firstRelease = await first;
+          assert.equal(await settled(second), 'waiting');
+          firstRelease();
+          (await second)();
+          for (const release of held) release();
+        },
+        { MARGO_GPU_SLOTS: String(capacity) },
+      ),
+  );
+}
 
 test('shared holders share: up to the slot count at once, the next waits for a free slot', () =>
   withLock(async (gpu) => {
