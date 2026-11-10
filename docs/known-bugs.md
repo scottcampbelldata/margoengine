@@ -5701,7 +5701,25 @@ as unsupported by the light loader.
   1.9x. Changing it changes every Hillaire sky and aerial picture, and test/aerial.test.js:92 pins 0.00444.
 - Open (Mac bug, M6, MARGO_COMPAT=1): `node packages/sky/test/browser-check.mjs` fails at "meadow 4x frame 1 scene vs
   narrow: differing 2, max 0.0009765625" every run, also on the source before the dispose fix; native passes. The full
-  `Sky` and the base entry with only meadow's features differ by one half-float ulp in two pixels; root cause not found.
+  `Sky` and the base entry with only meadow's features differ by one half-float ulp in two pixels.
+  Narrowed (lane N, 2026-11-10, M6, Chrome 156, MARGO_COMPAT=1): the two pixels are cloud pixels of frame 1 (coverage
+  0.7) at (51, 5) and (135, 55) of the 256-wide scene texture, blue channel only: 0.84765625 vs 0.84716796875 and
+  1.1298828125 vs 1.12890625, one half-float step each, so a float32 result a hair apart lands on either side of a
+  half rounding boundary. The trigger is the `night` feature's text alone: with the narrow list
+  [bruneton, clouds, lighting] plus `night` all three frames are bit-identical to the full `Sky`; plus `preetham`, `fog`
+  or `reflection` instead, the same 2 pixels differ. meadow never enables the stylized night and its sun blend is 0 at
+  16 h, so the night code (stylizedNight and the uniform branch at the top of nightSky, base.ts compose) does not
+  change any value these pixels compute. Both WGSL texts give identical pixels on native WebGPU. Cause: the two
+  programs differ in text, and on the WebGL2 layer (ANGLE on Metal) the driver compiles the live arithmetic of the
+  cloud pixels differently when that dead branch is present; floating-point contraction or reassociation by the
+  compiler is the likely mechanism, not checked (ANGLE's code is out of bounds for this project, and no
+  documented switch to test it was found). Not fixed: no change to the sky's arithmetic would make two different
+  programs bit-identical under such a compiler, and adding a dead branch to the narrow program only to steer the
+  compiler would be a stand-in. The test is not loosened, so browser-check stays red under MARGO_COMPAT=1 on the M6.
+  Repro: `MARGO_COMPAT=1 node packages/sky/test/browser-check.mjs`; to see the trigger, open
+  /packages/sky/test/browser-check.html under the compat shim, run `check.run('meadow','full')`, then
+  `(await import('/packages/sky/test/configs.js')).configs.meadow.features.push('night')`, `check.run('meadow','narrow')`
+  and `check.compare('full','narrow')` (0 differing); without the push, 2 differing in frame 1.
 
 ## Batch 132 audit: viewcube (fixed)
 
