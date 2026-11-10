@@ -5486,3 +5486,12 @@ slice.test.js and slice-check.mjs; both GPU backends are required before landing
 The optional controls/box-gizmo reuses controls' OverlayRenderer and tessellate paths for WebGPU and WebGL2. Exact local mesh bounds feed transformed wireframe edges and fixed CSS-size handle triangles; no core or stage change. Its optional-browser fixture checks both backend colors, triangle counts and edited transforms. Original-pose CPU tests cover parent-frame pivot preservation, three rotation axes, snapping and cancellation. Device restoration releases overlay GPU resources through the package plugin. Bounds do not include child meshes, skinning or morph deformation.
 ### Section 5 evidence: optional FSM views and SCXML (batch 250)
 FSM optional entries retain CPU state-machine semantics and add no core/stage or shader dependency. Unit evidence covers payload delivery, final/always macrosteps, task cancellation/generation isolation, DOM view ownership and bounded XML conversion. The package browser gate renders the Inspector-compatible view and checks default DOMParser round trips in normal Chromium and forced compatibility mode. The view has no backend-specific GPU math; these captures establish DOM placement, live trace/history updates and cleanup, rather than renderer numerical accuracy. XML execution, a complete SCXML processor and remote actor inspection are outside these claims. README work is recorded in the build-phase owed list.
+
+### Section 5 evidence: sprite rigging (batch 245 job 2)
+The optional skeletal entry owns all new transforms, IK, slots and timeline
+math. There are no core/stage changes. The two-bone solver uses the cosine law
+where the first bone has uniform magnitude scale; general affine hierarchies
+use bounded coordinate descent and report their residual. Bezier time is inverted
+before evaluating the channel value. Slot order is independent of bone order.
+CPU evidence: rigging.test.js, including skin conversion regressions. GPU evidence:
+rigging-check.mjs plus the existing skeletal-check.mjs, on both backends.

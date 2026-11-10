@@ -2594,3 +2594,9 @@ SCXML proof: build packages, then node --test --test-timeout=120000 packages/fsm
 Batch 251 text trees: build behavior, then run
 `node --test --test-timeout=120000 packages/behavior/tests/text.test.js`.
 The generated round trips compare exact JSON fields and canonical printed text.
+
+### 2D rigging (batch 245 job 2)
+CPU proof: node --test --test-timeout=120000 packages/sprites/tests/rigging.test.js.
+Rendered proof: node scripts/gpu-lock.mjs run --owner=rigging-proof --gpu="Skeletal attachment and IK pixel readback" --max=3 --wait-max=60 -- node packages/sprites/tests/rigging-check.mjs (append --compat for WebGL2).
+No speed measurement is asserted. Rigging fixtures are synthetic overlapping atlas
+regions and bone chains with known targets, not externally sourced demo data.

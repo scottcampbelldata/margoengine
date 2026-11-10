@@ -3726,3 +3726,14 @@ There is one root; maximum source length is 8,388,608 UTF-16 code units, depth 2
 existing size/depth bounds. Subtree registrations are supplied externally, without
 globals. The printer retains semantic fields and references; comments, whitespace
 and input key order are not preserved. No MDSL import compatibility or editor.
+
+### 2D skeletal rigging (batch 245 job 2)
+The optional skeletal entry adds bone length (default 0), solveTwoBoneIK and
+solveChainIK. IK defaults: mix 1, positive bend, tolerance 0.001 world units and
+64 sweeps (maximum 1024). Nonuniform first-bone scales use the bounded chain
+solver. Unreachable targets return residual distance and converged false.
+Slots select one named mesh or null; a mesh belongs to one slot. Slot draw order
+is independent of bones, among equal mesh z values. Curves are linear by default,
+stepped or cubic Bezier with x controls in [0,1] and unrestricted finite y.
+Discrete timelines seek back to setup state before their first key. No core or
+stage changes. The entry grows from 5,270 to 7,369 B gzip; its optional ceiling is 7,625 B. Keeping the complete rig API together avoids duplicated transforms and skinning. Core + stage stays 23,950 B.

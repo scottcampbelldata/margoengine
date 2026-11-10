@@ -3059,3 +3059,12 @@ options, weights and labels round trip. With explicit subtree registrations,
 references also round trip and execute through SubtreeTree. Tests in
 packages/behavior/tests/text.test.js cover all node types, 200 generated trees,
 syntax location errors, semantic paths, comments and bounded hostile inputs.
+
+### 2D rigging correctness (batch 245 job 2)
+The optional sprites/skeletal entry supports analytic two-bone IK and bounded
+chain IK, slot attachment swaps, discrete draw-order keys and cubic Bezier clip
+segments. Tests cover reflected/anisotropic ancestors, bend direction, unreachable
+targets, mixing and backwards timeline seeks. Skin-data regressions reject
+non-finite weights and fractional indices, preserve bone 65536 and normalize
+large finite weights without float32 overflow. Proof: rigging.test.js and the
+rendered overlapping-slot/IK fixture rigging-check.mjs. No speed claim.

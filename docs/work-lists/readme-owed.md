@@ -69,3 +69,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated netcode/generate-rust alias | batch-256 job 3 |
 | @margoengine/behavior | text: parseTreeText/printTreeText syntax, utilities, JSON attributes, comments, external subtree registry, diagnostics and bounds | batch-251 job 4 |
 | margoengine | Generated behavior/text alias | batch-251 job 4 |
+| @margoengine/sprites | skeletal IK controls, bone lengths, slot attachments, addSkeleton, draw-order/attachment keys and Bezier curves | batch-245 job 2 |

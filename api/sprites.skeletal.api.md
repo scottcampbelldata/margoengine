@@ -14,10 +14,13 @@ export class Bone {
     rotation: number;
     scaleX: number;
     scaleY: number;
+    length: number;
     readonly world: Float64Array<ArrayBuffer>;
     readonly setup: [number, number, number, number, number];
     constructor(options: BoneOptions, parent: Bone | null);
 }
+
+export type BoneCurve = readonly [number, number, number, number] | 'linear' | 'stepped';
 
 export type BoneKeys = readonly (readonly number[])[];
 
@@ -29,6 +32,20 @@ export interface BoneOptions {
     rotation?: number;
     scaleX?: number;
     scaleY?: number;
+    length?: number;
+}
+
+export interface IKOptions2D {
+    mix?: number;
+    iterations?: number;
+    tolerance?: number;
+    bendPositive?: boolean;
+}
+
+export interface IKResult2D {
+    distance: number;
+    iterations: number;
+    converged: boolean;
 }
 
 export class SkeletalLayer implements EnginePlugin {
@@ -38,6 +55,8 @@ export class SkeletalLayer implements EnginePlugin {
     static attach(instance: EngineKernel, options: SkeletalLayerOptions): SkeletalLayer;
     get meshes(): readonly SkinnedMesh[];
     add(mesh: SkinnedMesh): SkinnedMesh;
+    addSkeleton(skeleton: Skeleton2D): Skeleton2D;
+    removeSkeleton(skeleton: Skeleton2D): boolean;
     remove(mesh: SkinnedMesh): boolean;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
@@ -57,6 +76,11 @@ export interface SkeletalLayerOptions {
 
 export class Skeleton2D {
     readonly bones: readonly Bone[];
+    get slots(): readonly SkeletonSlot[];
+    get drawOrder(): readonly SkeletonSlot[];
+    addSlot(options: SkeletonSlotOptions): SkeletonSlot;
+    slot(name: string): SkeletonSlot | undefined;
+    setDrawOrder(names: readonly string[]): void;
     constructor(bones: readonly BoneOptions[]);
     bone(name: string): Bone | undefined;
     resetPose(): void;
@@ -66,6 +90,33 @@ export class Skeleton2D {
 export interface SkeletonClip {
     duration: number;
     bones: Readonly<Record<string, Partial<Record<'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY', BoneKeys>>>>;
+    curves?: Readonly<Record<string, Partial<Record<'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY', readonly BoneCurve[]>>>>;
+    slots?: Readonly<Record<string, readonly {
+        time: number;
+        attachment: string | null;
+    }[]>>;
+    drawOrder?: readonly {
+        time: number;
+        slots: readonly string[];
+    }[];
+}
+
+export class SkeletonSlot {
+    readonly name: string;
+    readonly bone: Bone;
+    readonly attachments: ReadonlyMap<string, SkinnedMesh>;
+    readonly setupAttachment: string | null;
+    constructor(skeleton: Skeleton2D, options: SkeletonSlotOptions);
+    get attachment(): string | null;
+    get mesh(): SkinnedMesh | undefined;
+    setAttachment(name: string | null): void;
+}
+
+export interface SkeletonSlotOptions {
+    name: string;
+    bone: string;
+    attachments: Readonly<Record<string, SkinnedMesh>>;
+    attachment?: string | null;
 }
 
 export interface SkinOptions {
@@ -106,6 +157,10 @@ export function gridMesh(rect: readonly [number, number, number, number], column
 };
 
 export function poseSkeleton(skeleton: Skeleton2D, clip: SkeletonClip, time: number, loop?: boolean): void;
+
+export function solveChainIK(s: Skeleton2D, names: readonly string[], target: readonly [number, number], options?: IKOptions2D): IKResult2D;
+
+export function solveTwoBoneIK(s: Skeleton2D, rootName: string, tipName: string, target: readonly [number, number], options?: IKOptions2D): IKResult2D;
 
 // Not exported from this entry, but used by the exports above:
 

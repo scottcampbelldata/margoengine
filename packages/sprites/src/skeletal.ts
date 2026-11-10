@@ -10,6 +10,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
 import type { SpriteAtlas } from './index.js';
 import { parseTint, type SpriteCamera } from './sprite.js';
+export { solveChainIK, solveTwoBoneIK, type IKOptions2D, type IKResult2D } from './skeletal-ik.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; VERTEX: number; INDEX: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -25,6 +26,8 @@ export interface BoneOptions {
   rotation?: number;
   scaleX?: number;
   scaleY?: number;
+  /** Length along local +x, used by IK. Default 0. */
+  length?: number;
 }
 
 /** One bone. Change `x`, `y`, `rotation`, `scaleX` and `scaleY` freely; {@link Skeleton2D.update} reads them. */
@@ -36,6 +39,8 @@ export class Bone {
   rotation: number;
   scaleX: number;
   scaleY: number;
+  /** Length along local +x. Default 0. */
+  length: number;
   /** World transform `[a, b, c, d, tx, ty]` after the last update: a point (x, y) maps to (a x + c y + tx, b x + d y + ty). */
   readonly world = new Float64Array([1, 0, 0, 1, 0, 0]);
   /** @internal */
@@ -49,6 +54,8 @@ export class Bone {
     this.rotation = options.rotation ?? 0;
     this.scaleX = options.scaleX ?? 1;
     this.scaleY = options.scaleY ?? 1;
+    this.length = options.length ?? 0;
+    if (!Number.isFinite(this.length) || this.length < 0) throw rangeError('Invalid bone length', 'sprite-options');
     this.setup = [this.x, this.y, this.rotation, this.scaleX, this.scaleY];
   }
 }
@@ -57,6 +64,40 @@ export class Bone {
 export class Skeleton2D {
   readonly bones: readonly Bone[];
   private readonly byName = new Map<string, Bone>();
+  private readonly slotList: SkeletonSlot[] = [];
+  private drawList: SkeletonSlot[] = [];
+
+  /** Slots in setup order. */
+  get slots(): readonly SkeletonSlot[] {
+    return this.slotList;
+  }
+  /** Slots in the current animated draw order. */
+  get drawOrder(): readonly SkeletonSlot[] {
+    return this.drawList;
+  }
+  /** Adds a named slot with immutable named mesh attachments. */
+  addSlot(options: SkeletonSlotOptions): SkeletonSlot {
+    if (this.slotList.some((s) => s.name === options.name))
+      throw rangeError('Duplicate skeleton slot', 'sprite-options');
+    const slot = new SkeletonSlot(this, options);
+    this.slotList.push(slot);
+    this.drawList = [...this.slotList];
+    return slot;
+  }
+  /** Looks up a slot by name. */
+  slot(name: string): SkeletonSlot | undefined {
+    return this.slotList.find((s) => s.name === name);
+  }
+  /** A complete permutation of slot names, drawn back to front. */
+  setDrawOrder(names: readonly string[]): void {
+    if (
+      names.length !== this.slotList.length ||
+      new Set(names).size !== names.length ||
+      names.some((n) => !this.slot(n))
+    )
+      throw rangeError('Draw order must name every slot exactly once', 'sprite-options');
+    this.drawList = names.map((n) => this.slot(n)!);
+  }
 
   /** @throws TypeError / RangeError for a missing or repeated name, an unknown parent, a cycle or a non-finite value. */
   constructor(bones: readonly BoneOptions[]) {
@@ -119,6 +160,49 @@ export class Skeleton2D {
   }
 }
 
+/** Named mesh attachments sharing one bone and one draw-order position. */
+export interface SkeletonSlotOptions {
+  name: string;
+  bone: string;
+  attachments: Readonly<Record<string, SkinnedMesh>>;
+  /** Setup attachment, or null for no image. Default null. */
+  attachment?: string | null;
+}
+
+/** One visible attachment at a time. Use meshes weighted to the slot's bone for rigid images. */
+export class SkeletonSlot {
+  readonly name: string;
+  readonly bone: Bone;
+  readonly attachments: ReadonlyMap<string, SkinnedMesh>;
+  readonly setupAttachment: string | null;
+  private selected: string | null = null;
+  constructor(skeleton: Skeleton2D, options: SkeletonSlotOptions) {
+    const bone = skeleton.bone(options.bone);
+    if (!options.name || !bone) throw rangeError('Slot needs a name and an existing bone', 'sprite-options');
+    this.name = options.name;
+    this.bone = bone;
+    this.attachments = new Map(Object.entries(options.attachments));
+    for (const mesh of this.attachments.values())
+      if (!(mesh instanceof SkinnedMesh) || mesh.skeleton !== skeleton)
+        throw rangeError('Slot attachments must use its skeleton', 'sprite-options');
+    this.setupAttachment = options.attachment ?? null;
+    this.setAttachment(this.setupAttachment);
+  }
+  /** Selected attachment name, null for an empty slot. */
+  get attachment(): string | null {
+    return this.selected;
+  }
+  /** Selected mesh, or undefined for an empty slot. */
+  get mesh(): SkinnedMesh | undefined {
+    return this.selected === null ? undefined : this.attachments.get(this.selected);
+  }
+  /** Swaps attachments without changing draw order. */
+  setAttachment(name: string | null): void {
+    if (name !== null && !this.attachments.has(name)) throw rangeError('Unknown slot attachment', 'sprite-options');
+    this.selected = name;
+  }
+}
+
 const invert = (m: Float64Array): Float64Array => {
   const det = m[0] * m[3] - m[1] * m[2];
   if (!(Math.abs(det) > 1e-12)) throw rangeError('A bone is scaled to zero at bind time', 'sprite-options');
@@ -169,7 +253,7 @@ export class SkinnedMesh {
   /** @internal */
   owner?: object;
   private readonly bind: Float32Array;
-  private readonly joints: Uint16Array;
+  private readonly joints: Uint32Array;
   private readonly weights: Float32Array;
   private readonly inverse: Float64Array[];
   private readonly skin = new Float64Array(0);
@@ -188,23 +272,28 @@ export class SkinnedMesh {
     this.bind = Float32Array.from(positions);
     this.uvs = Float32Array.from(uvs);
     this.indices = Uint32Array.from(indices);
-    this.joints = Uint16Array.from(joints);
+    this.joints = Uint32Array.from(joints);
     this.weights = Float32Array.from(weights);
     if (!this.bind.every(Number.isFinite) || !this.uvs.every(Number.isFinite))
       throw rangeError('SkinnedMesh has a non-finite position or uv', 'sprite-options');
-    for (const i of this.indices) if (i >= n) throw rangeError('SkinnedMesh index out of range', 'sprite-options');
+    for (let k = 0; k < indices.length; k++)
+      if (!Number.isInteger(indices[k]) || indices[k] < 0 || indices[k] >= n)
+        throw rangeError('SkinnedMesh index out of range', 'sprite-options');
     for (let v = 0; v < n; v++) {
-      let sum = 0;
+      let maximum = 0;
       for (let k = 0; k < 4; k++) {
         const j = joints[v * 4 + k],
           w = weights[v * 4 + k];
         if (!Number.isInteger(j) || j < 0 || j >= skeleton.bones.length)
           throw rangeError('SkinnedMesh joint out of range', 'sprite-options');
-        if (!(w >= 0)) throw rangeError('SkinnedMesh weight below 0', 'sprite-options');
-        sum += w;
+        if (!Number.isFinite(w) || !(w >= 0))
+          throw rangeError('SkinnedMesh weight below 0 or non-finite', 'sprite-options');
+        maximum = Math.max(maximum, w);
       }
-      if (!(sum > 0)) throw rangeError('SkinnedMesh vertex has no weight', 'sprite-options');
-      for (let k = 0; k < 4; k++) this.weights[v * 4 + k] /= sum;
+      if (!(maximum > 0)) throw rangeError('SkinnedMesh vertex has no weight', 'sprite-options');
+      let sum = 0;
+      for (let k = 0; k < 4; k++) sum += weights[v * 4 + k] / maximum;
+      for (let k = 0; k < 4; k++) this.weights[v * 4 + k] = weights[v * 4 + k] / maximum / sum;
     }
     skeleton.update();
     this.inverse = skeleton.bones.map((b) => invert(b.world));
@@ -284,14 +373,39 @@ export function gridMesh(
 
 /** Keys of one bone channel: `[time in seconds, value]` pairs, times increasing. Plain `number[][]` literals fit. */
 export type BoneKeys = readonly (readonly number[])[];
+/** Cubic Bezier controls (x1/y1/x2/y2), a held segment, or linear interpolation. */
+export type BoneCurve = readonly [number, number, number, number] | 'linear' | 'stepped';
 /** A clip: per bone name, keys for any of `x`, `y`, `rotation`, `scaleX`, `scaleY` (local values, as on {@link Bone}). */
 export interface SkeletonClip {
   duration: number;
   bones: Readonly<Record<string, Partial<Record<'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY', BoneKeys>>>>;
+  /** One curve per key interval. Omitted channels are linear. */
+  curves?: Readonly<
+    Record<string, Partial<Record<'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY', readonly BoneCurve[]>>>
+  >;
+  /** Discrete attachment keys. Before the first key the setup attachment is used. */
+  slots?: Readonly<Record<string, readonly { time: number; attachment: string | null }[]>>;
+  /** Discrete complete slot permutations. Before the first key setup order is used. */
+  drawOrder?: readonly { time: number; slots: readonly string[] }[];
 }
 
 const TAU = Math.PI * 2;
-const sample = (keys: BoneKeys, time: number, angle: boolean): number => {
+const ease = (f: number, curve: BoneCurve = 'linear'): number => {
+  if (curve === 'linear') return f;
+  if (curve === 'stepped') return f < 1 ? 0 : 1;
+  const [x1, y1, x2, y2] = curve;
+  const cubic = (t: number, a: number, b: number) =>
+    3 * (1 - t) * (1 - t) * t * a + 3 * (1 - t) * t * t * b + t * t * t;
+  let lo = 0,
+    hi = 1;
+  for (let i = 0; i < 48; i++) {
+    const m = (lo + hi) / 2;
+    if (cubic(m, x1, x2) < f) lo = m;
+    else hi = m;
+  }
+  return cubic((lo + hi) / 2, y1, y2);
+};
+const sample = (keys: BoneKeys, time: number, angle: boolean, curves?: readonly BoneCurve[]): number => {
   if (time <= keys[0][0]) return keys[0][1];
   for (let i = 1; i < keys.length; i++) {
     const [t1, v1] = keys[i];
@@ -300,7 +414,7 @@ const sample = (keys: BoneKeys, time: number, angle: boolean): number => {
       f = t1 > t0 ? (time - t0) / (t1 - t0) : 1;
     // Rotations take the shorter way round.
     const delta = angle ? ((((v1 - v0) % TAU) + TAU + Math.PI) % TAU) - Math.PI : v1 - v0;
-    return v0 + delta * f;
+    return v0 + delta * ease(f, curves?.[i - 1]);
   }
   return keys[keys.length - 1][1];
 };
@@ -312,7 +426,8 @@ const sample = (keys: BoneKeys, time: number, angle: boolean): number => {
  * @throws RangeError for a non-positive duration, an unknown bone or keys not in time order.
  */
 export function poseSkeleton(skeleton: Skeleton2D, clip: SkeletonClip, time: number, loop = true): void {
-  if (!(clip?.duration > 0) || !Number.isFinite(time)) throw rangeError('Invalid skeleton clip', 'sprite-options');
+  if (!(clip?.duration > 0) || !Number.isFinite(clip.duration) || !Number.isFinite(time))
+    throw rangeError('Invalid skeleton clip', 'sprite-options');
   const t = loop
     ? ((time % clip.duration) + clip.duration) % clip.duration
     : Math.min(Math.max(time, 0), clip.duration);
@@ -325,8 +440,60 @@ export function poseSkeleton(skeleton: Skeleton2D, clip: SkeletonClip, time: num
         keys.some((k, i) => k?.length !== 2 || !Number.isFinite(k[0] + k[1]) || (i && k[0] < keys[i - 1][0]))
       )
         throw rangeError(`Invalid keys for ${name}.${channel}`, 'sprite-options');
-      bone[channel] = sample(keys, t, channel === 'rotation');
+      const curves = clip.curves?.[name]?.[channel];
+      if (
+        curves &&
+        (curves.length !== keys.length - 1 ||
+          curves.some(
+            (c) =>
+              c !== 'linear' &&
+              c !== 'stepped' &&
+              (!Array.isArray(c) ||
+                c.length !== 4 ||
+                !c.every(Number.isFinite) ||
+                c[0] < 0 ||
+                c[0] > 1 ||
+                c[2] < 0 ||
+                c[2] > 1),
+          ))
+      )
+        throw rangeError('Invalid skeleton Bezier curves', 'sprite-options');
+      bone[channel] = sample(keys, t, channel === 'rotation', curves);
     }
+  }
+  for (const [name, keys] of Object.entries(clip.slots ?? {})) {
+    const slot = skeleton.slot(name);
+    if (!slot) throw rangeError('Clip names unknown slot', 'sprite-options');
+    if (
+      keys.some(
+        (k, i) =>
+          !Number.isFinite(k.time) ||
+          k.time < 0 ||
+          (i > 0 && k.time < keys[i - 1].time) ||
+          (k.attachment !== null && !slot.attachments.has(k.attachment)),
+      )
+    )
+      throw rangeError('Invalid slot attachment keys', 'sprite-options');
+    let selected = slot.setupAttachment;
+    for (const k of keys) if (k.time <= t) selected = k.attachment;
+    slot.setAttachment(selected);
+  }
+  if (clip.drawOrder) {
+    if (
+      clip.drawOrder.some(
+        (k, i) =>
+          !Number.isFinite(k.time) ||
+          k.time < 0 ||
+          (i > 0 && k.time < clip.drawOrder![i - 1].time) ||
+          k.slots.length !== skeleton.slots.length ||
+          new Set(k.slots).size !== k.slots.length ||
+          k.slots.some((n) => !skeleton.slot(n)),
+      )
+    )
+      throw rangeError('Invalid slot draw-order keys', 'sprite-options');
+    let order = skeleton.slots.map((s) => s.name);
+    for (const key of clip.drawOrder) if (key.time <= t) order = [...key.slots];
+    skeleton.setDrawOrder(order);
   }
   skeleton.update();
 }
@@ -396,6 +563,8 @@ export class SkeletalLayer implements EnginePlugin {
   private indexData = new Uint32Array(0);
   private list: SkinnedMesh[] = [];
   private added = 0;
+  private readonly rigs = new Map<Skeleton2D, number>();
+  private readonly rigMeshes = new Set<SkinnedMesh>();
   private generation = 0;
   private disposed = false;
   private readonly states = new ViewStates<ViewState>(
@@ -436,6 +605,33 @@ export class SkeletalLayer implements EnginePlugin {
     mesh.index = this.added++;
     this.list.push(mesh);
     return mesh;
+  }
+  /** Draws active slot attachments, following attachment and draw-order keys each frame. */
+  addSkeleton(skeleton: Skeleton2D): Skeleton2D {
+    if (this.disposed) throw fault('disposed', 'SkeletalLayer disposed', 'disposed');
+    if (this.rigs.has(skeleton)) throw fault('attached', 'Skeleton already in layer', 'sprite-state');
+    this.claimSkeleton(skeleton);
+    this.rigs.set(skeleton, this.added++);
+    return skeleton;
+  }
+  /** Removes the skeleton and releases all its slot attachments. */
+  removeSkeleton(skeleton: Skeleton2D): boolean {
+    if (!this.rigs.delete(skeleton)) return false;
+    for (const mesh of this.rigMeshes)
+      if (mesh.skeleton === skeleton) {
+        mesh.owner = undefined;
+        this.rigMeshes.delete(mesh);
+      }
+    return true;
+  }
+  private claimSkeleton(skeleton: Skeleton2D): void {
+    const meshes = skeleton.slots.flatMap((s) => [...new Set(s.attachments.values())]);
+    if (new Set(meshes).size !== meshes.length || meshes.some((m) => m.owner && !this.rigMeshes.has(m)))
+      throw fault('attached', 'Slot mesh already attached; use a separate mesh for each slot', 'sprite-state');
+    for (const mesh of meshes) {
+      mesh.owner = this;
+      this.rigMeshes.add(mesh);
+    }
   }
   /** Takes a mesh out; false when it is not in this layer. */
   remove(mesh: SkinnedMesh): boolean {
@@ -484,6 +680,9 @@ export class SkeletalLayer implements EnginePlugin {
     this.release();
     for (const mesh of this.list) mesh.owner = undefined;
     this.list.length = 0;
+    for (const mesh of this.rigMeshes) mesh.owner = undefined;
+    this.rigMeshes.clear();
+    this.rigs.clear();
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
@@ -501,7 +700,18 @@ export class SkeletalLayer implements EnginePlugin {
   }
   /** Skins every visible mesh into one vertex list; returns the index count. */
   private build(device: GPUDevice): number {
-    const meshes = this.list.filter((m) => m.visible).sort((a, b) => a.z - b.z || a.index - b.index);
+    const records = this.list.map((mesh) => ({ mesh, index: mesh.index, slot: 0 }));
+    for (const [skeleton, index] of this.rigs) {
+      this.claimSkeleton(skeleton);
+      skeleton.update();
+      skeleton.drawOrder.forEach((s, slot) => {
+        if (s.mesh) records.push({ mesh: s.mesh, index, slot });
+      });
+    }
+    const meshes = records
+      .filter((r) => r.mesh.visible)
+      .sort((a, b) => a.mesh.z - b.mesh.z || a.index - b.index || a.slot - b.slot)
+      .map((r) => r.mesh);
     let vertices = 0,
       indices = 0;
     for (const m of meshes) {
