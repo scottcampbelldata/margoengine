@@ -4948,7 +4948,6 @@ Batch 177 job 5: no open correctness defect in the checked live-data paths. Sour
 ### Fixed: water query browser check rewrote a tracked record (list 3 batch 66 job 5)
 
 packages/water/test/query.browser.mjs wrote docs/whitepaper/results/batch234-water-query-<mode>.json on every GPU run, so a landing's refresh found a tracked file changed and stopped. It now writes test-results/water-query-<mode>.json; the committed record stays as recorded. Regression: packages/water/test/results-path.test.js fails on any water browser check that writes under docs/.
-Review 3 P1 (05a866cce): PixelFollow.update accepts every finite nonnegative delta, but with lerp=0 and delta=Number.MAX_VALUE, delta*60 overflows and 1**Infinity is NaN, publishing [NaN,NaN] instead of keeping the camera fixed. Repro: PixelCamera({width:16,height:16}), PixelFollow({camera,target:{x:30,y:40},lerp:0}), update(Number.MAX_VALUE). Cause: overflow in the smoothing exponent. Private failing regression: lane Q private/review-3-pixel-follow.test.js. Fix the smoothing calculation without narrowing accepted deltas; cover zero/unit lerp and extreme finite inputs. Awaiting the next review context.
 
 
 ### Open: Water's own coast flow is unbounded on steep falls (list 3 batch 66 job 8)
@@ -4958,3 +4957,4 @@ Water's built-in surface-driven pipe drives each pipe with the full surface diff
 ### Fixed: water/rivers sources narrower than a cell fed nothing (list 3 batch 63 job 2)
 
 A Rivers source with radius 0 (the default) or below half a cell, off a cell centre, had an empty footprint, so it added no water. The footprint now always includes the cell under the position (a position off the map still feeds nothing), in the shader and the float64 model. Regression: packages/water/test/rivers.test.js "a source narrower than a cell feeds the one cell under it", and a radius-0 source in rivers.browser.mjs.
+

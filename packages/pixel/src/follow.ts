@@ -137,7 +137,8 @@ export class PixelFollow extends ScreenPass {
       if (target) {
         const difference = finite(target[key], `target.${key}`) + offset - position - size * unit / 2;
         const distance = difference - clamp(difference, -zone, zone);
-        position += distance * (delta === 0 ? 0 : 1 - (1 - lerp) ** (delta * 60));
+        // Keep tiny fractions and long finite intervals representable before converting seconds to frames.
+        position += distance * (delta === 0 ? 0 : -Math.expm1(Math.log1p(-lerp) * delta * 60));
       }
       let low = -Infinity, high = Infinity;
       if (this.bounds) {

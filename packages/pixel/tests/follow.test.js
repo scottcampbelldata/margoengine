@@ -31,6 +31,29 @@ test('world bounds use view extents and units, including negative and undersized
   follow.bounds = {x: 0, y: 0, width: 20, height: 20}; follow.update(1/60);
   assert.deepEqual([follow.camera.x,follow.camera.y], [-90,-50]);
 });
+test('smoothing endpoints remain finite across the full accepted delta range', () => {
+  for (const lerp of [0, 1, 0.5, [0, 1], [1, 0], Number.MIN_VALUE, [1e-20, 0]]) {
+    const follow = rig({target: {x: 150, y: 230}, lerp});
+    for (const delta of [0, Number.MIN_VALUE, 1/60, Number.MAX_VALUE / 60, Number.MAX_VALUE]) {
+      follow.camera.x = 0; follow.camera.y = 0;
+      follow.update(delta);
+      const pair = typeof lerp === 'number' ? [lerp, lerp] : lerp;
+      for (const [axis, distance] of [[0, 100], [1, 200]]) {
+        const position = axis === 0 ? follow.camera.x : follow.camera.y;
+        assert.ok(Number.isFinite(position), `lerp=${pair[axis]}, delta=${delta}`);
+        if (delta === 0 || pair[axis] === 0) assert.equal(position, 0);
+        else if (pair[axis] === 1 || (pair[axis] >= 0.5 && delta > 1)) assert.equal(position, distance);
+      }
+    }
+    follow.dispose();
+  }
+});
+test('very small smoothing fractions preserve time-correct motion over long finite intervals', () => {
+  const follow = rig({target: {x: 150, y: 230}, lerp: 1e-20});
+  follow.update(1e20 / 60);
+  assert.deepEqual([follow.camera.x, follow.camera.y], [63, 126]);
+  follow.dispose();
+});
 test('seeded shakes are whole-pixel, bounded and do not drift the tracking position', () => {
   const a = rig(), b = rig(); a.shake(1, [10,5], 123); b.shake(1, [10,5], 123);
   const samples = [];

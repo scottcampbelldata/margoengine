@@ -1222,3 +1222,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/clustered | contact: copy-paste example of `ContactLights.attach(engine, {lights})`, `setStrengths`, and `depth: () => stack.depthTexture` beside SSAO | batch-53 job 1 |
 | margoengine | Generated clustered/contact alias | batch-53 job 1 |
 | @margoengine/clustered | Many lights: example of `Clustered.attach(engine, {maxLights: 20000})` and `AreaLights.attach(engine, {lights, maxLights: 256})` | batch-53 job 2 |
+
+- @margoengine/pixel (review 3 P1): document zero-lerp stationary axes across the full finite nonnegative update delta domain; examples deferred.
