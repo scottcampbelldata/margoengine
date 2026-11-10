@@ -1758,7 +1758,7 @@ Batch 132 audit (lane N, 2026-11-10). "Read" means the PDF or specification text
 | E8 | IBL shade with multiple-scattering energy compensation | environment/src/ibl.ts | Fdez-Aguera 2019, JCGT 8(1); F0 from glTF 2.0 Appendix B (ior 1.5) |
 | E9 | bilinear read of the LUT from a storage buffer | environment/src/ibl.ts | Margo-own: Margo design choice |
 | E10 | roughness to mip: linear, r (mips-1); default mip count log2(size)-2, at least 2 | environment/src/environment.ts | Margo-own: Margo design choice |
-| E11 | background pass, exposure multiply, display transform | environment/src/shaders.ts | Margo-own: display = Khronos PBR Neutral + sRGB (shared/display.js). NOTE: comments at shaders.ts:199 and background.ts:61 still say "Reinhard" (stale) |
+| E11 | background pass, exposure multiply, display transform | environment/src/shaders.ts | Margo-own: display = Khronos PBR Neutral + sRGB (shared/display.js); the shaders.ts and background.ts comments say so (batch 132 audit) |
 | E12 | 8-bit image background, sRGB encode, cylinder mapping, default height 2pi h/w | environment/src/shaders.ts, environment/src/background.ts | IEC 61966-2-1 (sRGB) |
 | E13 | scene fog: linear, exp2, times exponential height thinning | environment/src/lighting.ts | OpenGL 1.x fog equations (linear, EXP2); exponential height density is the standard exponential atmosphere |
 | E14 | Henyey-Greenstein phase | environment/src/volumetric.ts | Henyey & Greenstein 1941 |
