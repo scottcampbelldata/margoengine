@@ -1394,6 +1394,10 @@
       "types": "./dist/input/xr.d.ts",
       "import": "./dist/input/xr.js"
     },
+    "./input/lock": {
+      "types": "./dist/input/lock.d.ts",
+      "import": "./dist/input/lock.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12291402,
+  "total": 12293018,
   "history": [
     {
       "date": "2026-10-24",
@@ -5581,6 +5581,12 @@
       "commit": "501c04f13",
       "reason": "Batch 252 job 6: @margoengine/navmesh/build: 12519 B gzip (ceiling 12727 -> 12727 B); @margoengine/navmesh/tiles: 14985 B gzip (ceiling 15113 -> 15113 B); @margoengine/navmesh/wasm: 17357 B gzip (ceiling 17808 -> 17808 B); @margoengine/navmesh dist/workers/navmesh-build.js: 17511 B gzip (ceiling 17951 -> 17951 B). Optional navigation behavior retains one shared implementation; splitting would duplicate graph traversal and controller ownership. Core/stage source unchanged.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-253",
+      "reason": "New optional @margoengine/input/lock: absent to 1360 B gzip, ceiling 1616 B. Cohesive device/action lifecycle stays together; splitting would add coordination without saving consumer bytes. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6636,6 +6642,7 @@
     "@margoengine/sciviz/atmosphere": 33055,
     "@margoengine/sky/planet": 4943,
     "@margoengine/ui/image": 2700,
-    "leak @margoengine/ui/image -> @margoengine/text": 1
+    "leak @margoengine/ui/image -> @margoengine/text": 1,
+    "@margoengine/input/lock": 1616
   }
 }

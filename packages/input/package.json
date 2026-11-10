@@ -53,6 +53,10 @@
     "./xr": {
       "types": "./dist/xr.d.ts",
       "import": "./dist/xr.js"
+    },
+    "./lock": {
+      "types": "./dist/lock.d.ts",
+      "import": "./dist/lock.js"
     }
   },
   "files": [
@@ -72,6 +76,10 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js input",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser": "cd ../.. && node packages/input/test/input-browser.mjs"
+  },
+  "margo": {
+    "gpuTestTimeoutMinutes": 2
   }
 }

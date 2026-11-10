@@ -2682,3 +2682,4 @@ After build:packages, run node --test --test-timeout=120000 packages/ui/tests/im
 
 
 Batch 252 job 6: after building, run node --test --test-timeout=120000 packages/navmesh/test/border.test.js packages/navmesh/test/wasm.test.js. A 32x32-cell floor with borderSize=3 must allocate 38x38 columns with empty outer padding, retain byte-identical walkable polygons and match the Rust worker. Tile tests inspect bounds and all interior cell centers, not timings.
+Batch 253 pointer lock: build packages, run node --test --test-timeout=30000 packages/input/test/lock.test.js. Under a shared GPU lock, run node packages/input/test/input-browser.mjs and the same command with --compat. The browser fixture uses a click to acquire native lock, feeds vector/locked counts into a mesh transform and compares red-pixel centroids before movement, after movement and after release. It uses generated primitive geometry as a test fixture, no public demo asset.

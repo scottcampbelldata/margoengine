@@ -123,3 +123,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/react | Review UI image usage from the React canvas during the README phase; no public React API change. | batch-258 job 2 |
 
 | @margoengine/navmesh | build/tiles borderSize now pads grids, rounds up, combines with automatic clearance and counts toward the padded cell budget; remove former no-effect statement | batch-252 job 6 |
+| @margoengine/input | lock: request/release, raw negotiation, legacy raw null, activation, timeouts/AbortSignal, x/y and control publication | batch-253 job 3 |
+| margoengine | Generated input/lock alias | batch-253 job 3 |
