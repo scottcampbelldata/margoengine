@@ -75,6 +75,10 @@
     "./autotune": {
       "types": "./dist/autotune.d.ts",
       "import": "./dist/autotune.js"
+    },
+    "./shape": {
+      "types": "./dist/shape.d.ts",
+      "import": "./dist/shape.js"
     }
   },
   "files": [
@@ -101,6 +105,7 @@
     "test:browser:reassociate": "npm run build && node tests/compute-browser.mjs --reassociate-math",
     "test:browser:sweep": "npm run build && node tests/compute-precise-sweep.mjs",
     "test:gpu:owners": "cd ../.. && node packages/compute/tests/scene-owner-browser.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:shape": "node tests/shape-browser.mjs"
   }
 }

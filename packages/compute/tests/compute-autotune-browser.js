@@ -146,8 +146,30 @@ window.runAutotuneTests = async () => {
         running = data.reduce((list, v, i) => ((list[i] = (list[i - 1] ?? 0) + v), list), new Int32Array(count)),
         total = running[count - 1];
       for (const threads of [64, 128, 256, 512, 1024]) {
+        const limit = Math.min(
+          gpu.device.limits.maxComputeWorkgroupSizeX,
+          gpu.device.limits.maxComputeInvocationsPerWorkgroup,
+        );
+        if (threads > limit) {
+          let rejection;
+          try {
+            const invalid = await createCompute({
+              device: gpu.device,
+              tuned: { reduce: threads, scan: threads, sort: threads },
+            });
+            invalid.dispose();
+          } catch (error) {
+            rejection = error;
+          }
+          assert(
+            rejection instanceof RangeError && rejection.message.includes(`limit of ${limit}`),
+            `unsupported ${threads} must reject against the real device limit`,
+          );
+          continue;
+        }
         const other = await createCompute({
           backend: 'webgpu',
+          device: gpu.device,
           tuned: { reduce: threads, scan: threads, sort: threads },
         });
         try {

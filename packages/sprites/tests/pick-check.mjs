@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-const c = await openBrowser({ startPath: '/packages/sprites/tests/pick-check.html', port: 5297 }),
+const c = await openBrowser({ startPath: '/packages/sprites/tests/pick-check.html', port: 'free' }),
   errors = [];
 c.page.on('pageerror', (e) => errors.push(e.message));
 try {

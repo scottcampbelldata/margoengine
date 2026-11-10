@@ -26,7 +26,8 @@
   "scripts": {
     "test:gpu": "cd ../.. && node packages/splats/test/gpu/check.mjs",
     "test": "node --test test/*.test.js ../../tests/modern-temporal.test.js ../../tests/modern-data-subpaths.test.js",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu:formats": "cd ../.. && node packages/splats/test/gpu/formats-check.mjs && node packages/splats/test/gpu/formats-check.mjs --compat"
   },
   "sideEffects": false,
   "exports": {

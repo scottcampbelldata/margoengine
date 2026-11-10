@@ -80,7 +80,9 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:real-ffmpeg": "npm run build && node scripts/test-real-ffmpeg.mjs",
     "test:gpu": "cd ../.. && node packages/headless/tests/browser-check.mjs && node packages/headless/tests/node-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:gif": "cd ../.. && node packages/headless/tests/gif-gpu.mjs",
+    "test:gpu:tiles": "cd ../.. && node packages/headless/tests/tiles-gpu.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/stage": {

@@ -124,7 +124,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/rigging-browser.mjs",
     "prepack": "npm run build",
-    "test:mtoon:browser": "node tests/mtoon-browser.mjs",
+    "test:mtoon:browser": "node tests/mtoon-light.browser.mjs && node tests/mtoon-replica.browser.mjs && node tests/mtoon-matcap.browser.mjs && node tests/mtoon-uv.browser.mjs && node tests/mtoon-uv-animation.browser.mjs && node tests/mtoon-expressions.browser.mjs && node tests/mtoon-local-rim.browser.mjs && node tests/mtoon-gbuffer.browser.mjs && node tests/mtoon-outline.browser.mjs && node tests/mtoon-avatar.browser.mjs && node tests/mtoon-avatar.browser.mjs --vrm1",
     "test:constraints:browser": "node tests/vrm-constraints.browser.mjs"
   }
 }

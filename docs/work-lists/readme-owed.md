@@ -667,3 +667,15 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/mixer (batch 212 analyser): document createAnalyser/createBusAnalyser, per-channel FFT/waveform buffer reuse, live audio-clock RMS/peak/LUFS windows and reset/disposal.
 
 - margoengine (batch 212 analyser): document generated mixer/analyser alias.
+- @margoengine/compute: document /shape concatenate, stack, five pad modes, tile, flip, repeat, axes/dtypes, output ownership and empty-array behavior (batch 274 job 1).
+- margoengine: document the generated compute/shape alias (batch 274 job 1).
+
+- @margoengine/headless: document registered GIF and tile GPU correctness scripts (batch 274 landing-gate repair).
+- @margoengine/rigging: document explicit bounded MToon browser case registration (batch 274 landing-gate repair).
+- @margoengine/worker: document registered browser matrix correctness script (batch 274 landing-gate repair).
+
+- @margoengine/sprites: note dynamic-port picking browser correctness check (batch 274 gate repair).
+
+- margoengine: include the pre-existing clustered/shapes alias found missing by umbrella regeneration after the batch 274 rebase.
+
+- @margoengine/splats: document the existing formats-check GPU script on native and compatibility backends, registered by batch 274 to repair the global plan gate.

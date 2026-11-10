@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13398880,
+  "total": 13402616,
   "history": [
     {
       "date": "2026-10-24",
@@ -6876,6 +6876,12 @@
       "commit": "batch212-analyser",
       "reason": "Optional analyser; @margoengine/mixer/analyser: ceiling 0 to 3167, measured 2911. Keep one shared routing lifetime and K-weighting design rather than duplicate state. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-274",
+      "reason": "Batch 274 job 1: new optional compute/shape entry, 0 to 3480 B gzip, ceiling 3736 B. Six array building operations compose existing gather/scatter; splitting would duplicate shape validation and index construction. Core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7038,6 +7044,7 @@
     "@margoengine/compute/linalg": 5745,
     "@margoengine/compute/nn": 19137,
     "@margoengine/compute/random": 8328,
+    "@margoengine/compute/shape": 3736,
     "@margoengine/compute/signal": 7496,
     "@margoengine/compute/sparse": 7238,
     "@margoengine/compute/stream": 1324,
@@ -7071,6 +7078,7 @@
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 14096,
     "@margoengine/culling/bounds": 19473,
+    "@margoengine/culling/depth": 6320,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/lod": 4010,
     "@margoengine/culling/meshlets": 17631,
@@ -7442,6 +7450,7 @@
     "@margoengine/mesh-edit/section": 5555,
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 7340,
+    "@margoengine/mixer/analyser": 3167,
     "@margoengine/mixer/loudness": 2363,
     "@margoengine/mixer/reflections": 3483,
     "@margoengine/mixer/sidechain": 1815,
@@ -7497,6 +7506,7 @@
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/crt": 3072,
+    "@margoengine/pixel/follow": 3861,
     "@margoengine/pixel/palette": 5201,
     "@margoengine/pixel/render3d": 3866,
     "@margoengine/pixel/scale": 3367,
@@ -7639,6 +7649,7 @@
     "@margoengine/scatter": 19518,
     "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3574,
+    "@margoengine/scatter/occlusion": 1433,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
     "@margoengine/scatter/surface": 1515,
@@ -7804,6 +7815,7 @@
     "@margoengine/text": 17109,
     "@margoengine/text/animate": 11783,
     "@margoengine/text/extrude": 11160,
+    "@margoengine/text/fit": 10636,
     "@margoengine/text/msdf": 4502,
     "@margoengine/text/rich": 11403,
     "@margoengine/tilemap": 7435,
@@ -7974,6 +7986,7 @@
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 1714,
+    "@margoengine/weather/gltf": 5203,
     "@margoengine/weather/hail": 5489,
     "@margoengine/weather/puddles": 4070,
     "@margoengine/weather/regions": 2504,
@@ -8119,12 +8132,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/text/fit": 10636,
-    "@margoengine/culling/depth": 6320,
-    "@margoengine/scatter/occlusion": 1433,
-    "@margoengine/pixel/follow": 3861,
-    "@margoengine/weather/gltf": 5203,
-    "@margoengine/mixer/analyser": 3167
+    "margoengine/web": 577
   }
 }

@@ -499,7 +499,7 @@ function opCode(op: string, args: string[], t: DType, out: DType, precise?: Set<
     const f = (x: string) => (t === 'f32' ? x : `f32(${x})`),
       call = `${name}(${args
         .slice(0, op === 'pow' || op === 'atan2' ? 2 : 1)
-        .map(f)
+        .map((x) => `operandF32(${f(x)})`)
         .join(', ')})`;
     return out === 'f32' ? call : `${out}(${call})`;
   }
@@ -767,7 +767,17 @@ export function fuse(operand: Operand, binding: number, maxStorage: number, temp
   values.set(consts);
   declarations += `@group(0) @binding(${next++}) var<uniform> fused: array<vec4u, ${slots}>;\n`;
   resources.fused = values;
-  const helpers = precise?.size ? preciseMathWgsl([...precise]) : '';
+  // The caller's arithmetic must round to f32 before argument reduction. An
+  // inlining compiler can otherwise contract x*k with the reduction subtraction.
+  // Keep nonfinite payloads intact: pmHide reconstructs finite values only.
+  const helpers = precise?.size
+    ? `${preciseMathWgsl([...precise])}
+fn operandF32(v: f32) -> f32 {
+  if ((bitcast<u32>(v) & 0x7f800000u) == 0x7f800000u) { return v; }
+  return pmHide(v);
+}
+`
+    : '';
   const fn = `${helpers}fn value(i: u32) -> ${operand.dtype} {\n  ${lets.join('\n  ')}\n  return ${result};\n}`;
   return {
     enables: f16 ? 'enable f16;\n' : '',

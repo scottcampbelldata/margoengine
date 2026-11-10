@@ -174,6 +174,12 @@ const TOOLS = {
 const DRIVES_BROWSER =
   /\bopenBrowser\(|\bchromium\.launch\(|\blaunchBrowser\(|\bchromiumLaunchOptions\(|from '@playwright\/test'|from 'playwright'/;
 
+/** Calls drive a browser; a reusable function declaration alone does not launch one. */
+export const drivesBrowser = (text) =>
+  DRIVES_BROWSER.test(
+    text.replace(/\bfunction\s+(?:openBrowser|launchBrowser|chromiumLaunchOptions)\s*\(/g, 'function helper('),
+  );
+
 /** A package script this check runs: `test:browser`, `test:browser:walk`, `test:probes:browser`, `test:gpu`, ... */
 export const isGpuScript = (name) => /^test:/.test(name) && /(^|:)(browser|gpu)(:|$)/.test(name);
 
@@ -192,7 +198,7 @@ export function unrunReleaseGates(scripts, read, inChecks = ROOT, releaseOnly = 
         !(name in inChecks) &&
         !(name in releaseOnly) &&
         !merge.includes(`npm run ${name}`) &&
-        DRIVES_BROWSER.test(read(/^node (?:--\S+ )*(\S+\.m?js)/.exec(scripts[name] ?? '')?.[1]) ?? ''),
+        drivesBrowser(read(/^node (?:--\S+ )*(\S+\.m?js)/.exec(scripts[name] ?? '')?.[1]) ?? ''),
     );
 }
 
@@ -215,7 +221,7 @@ export function unrunBrowserSuites(scripts, read, inChecks = ROOT, exempt = NOT_
       !commands.has(scripts[name]) &&
       !covered.includes(file) &&
       !merge.includes(`npm run ${name}`) &&
-      DRIVES_BROWSER.test(read(file) ?? '')
+      drivesBrowser(read(file) ?? '')
     );
   });
 }
@@ -427,7 +433,7 @@ function browserFiles() {
       if (entry.isDirectory()) {
         if (entry.name !== 'node_modules' && entry.name !== 'fixtures') walk(path);
       } else if (/\.m?js$/.test(entry.name) && !entry.name.endsWith('.test.js')) {
-        if (DRIVES_BROWSER.test(readFileSync(join(root, path), 'utf8'))) found.push(path);
+        if (drivesBrowser(readFileSync(join(root, path), 'utf8'))) found.push(path);
       }
     }
   };

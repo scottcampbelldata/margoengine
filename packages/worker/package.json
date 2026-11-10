@@ -28,7 +28,8 @@
     "build": "node ../../scripts/build-optional.js worker",
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/worker/tests/browser-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:matrix": "node tests/browser-matrix.mjs --browser=chromium"
   },
   "sideEffects": false,
   "exports": {

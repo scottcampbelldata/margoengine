@@ -4610,3 +4610,5 @@ Outside batch 244: GPU-suite dispatcher preflight on 78c0082ce rejects existing 
 
 - Batch 236: origin/main 42c1cbdac already contains conflict markers in known-bugs.md and whitepaper/reproduce.md; reproduce with rg for conflict markers. Cause: committed shared-doc merge text. Outside weather scope, deferred under rule 21.
 Batch 212 analyser: repaired bus insertion deleting internal output taps and shared-document merge markers, both covered by regression tests. No open tested defect.
+### Batch 274 gate environment: Firefox worker matrix
+Repro: node packages/worker/tests/browser-matrix.mjs (default Firefox). On this Windows host the existing Playwright firefox-1555 executable fails to spawn with UNKNOWN before any page or engine code runs. Cause is the browser launch environment, not a worker assertion; the executable is present. Chromium runs the same unchanged worker/mode, buffer-transfer, red-pixel and disposal assertions through the registered script. Firefox launch diagnosis remains owed.

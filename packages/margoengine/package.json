@@ -666,6 +666,10 @@
       "types": "./dist/compute/autotune.d.ts",
       "import": "./dist/compute/autotune.js"
     },
+    "./compute/shape": {
+      "types": "./dist/compute/shape.d.ts",
+      "import": "./dist/compute/shape.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"

@@ -164,12 +164,18 @@ test('no element-wise kernel holds a sum cancelled by its own operand, which WGS
     const gpu = await createCompute({ device: stand, fastMath });
     const x = gpu.array([1e-6, 0.5, 3]);
     codes.length = 0;
-    for (const op of ['log1p', 'expm1', 'exp', 'log', 'sin', 'cos', 'tanh', 'sqrt']) await x[op]().read();
+    for (const op of ['log1p', 'expm1', 'exp', 'log', 'sin', 'cos', 'tanh', 'sqrt']) await x.mul(100)[op]().read();
     await x.pow(x).read();
     assert.ok(
       codes.some((c) => (fastMath ? /log\(/ : /preciseLog1p/).test(c)),
       'the kernels were built',
     );
+    for (const code of codes) {
+      if (!fastMath) {
+        assert.match(code, /precise\w+\(operandF32\(v\d+\)/, 'round fused arguments before precise reduction');
+        assert.match(code, /bitcast<u32>\(v\) & 0x7f800000u/, 'preserve nonfinite input bits');
+      } else assert.doesNotMatch(code, /operandF32/, 'fast math keeps its builtin route');
+    }
     kernels.push(...codes);
   }
   const previous = globalThis.GPUDevice;

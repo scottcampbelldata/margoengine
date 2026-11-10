@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
+import { wgslGuard } from '../../../scripts/support/wgsl-guard.js';
 
 // The dev server serves the repository root, whichever folder `npm run test:browser` starts in.
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -29,6 +30,14 @@ page.on('console', (m) => {
 });
 page.setDefaultTimeout(600_000);
 try {
+  // Adapter selection installs the compatibility device class lazily. Instrument
+  // that class before any shader is compiled, as the init hook does for native.
+  if (hardware.compat) {
+    await page.evaluate(async () => {
+      await navigator.gpu.requestAdapter();
+    });
+    await page.evaluate(wgslGuard);
+  }
   await page.waitForFunction(
     () =>
       typeof window.runComputeTests === 'function' &&
