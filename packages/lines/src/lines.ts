@@ -110,6 +110,9 @@ export class Lines implements EnginePlugin {
   private frameBuffer?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
   private readonly frameData = new Float32Array(28);
+  private readonly frameBits = new Uint32Array(this.frameData.buffer);
+  private readonly frameWritten = new Uint32Array(28);
+  private frameValid = false;
   /** This frame's lines in draw order: depth-tested writers, depth-tested, on-top writers, on-top. */
   private readonly drawLists: Array<Array<[Line, Resources]>> = [[], [], [], []];
   /** This frame's lines with solid triangles: depth-tested, on-top. */
@@ -201,6 +204,7 @@ export class Lines implements EnginePlugin {
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
     this.module(0);
     this.frameBuffer = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.frameValid = false;
     this.frameGroup = device.createBindGroup({
       layout: frame,
       entries: [{ binding: 0, resource: { buffer: this.frameBuffer } }],
@@ -502,7 +506,13 @@ export class Lines implements EnginePlugin {
       context.height,
       context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1,
     );
-    device.queue.writeBuffer(this.frameBuffer!, 0, data);
+    let changed = !this.frameValid;
+    for (let i = 0; !changed && i < this.frameBits.length; i++) changed = this.frameBits[i] !== this.frameWritten[i];
+    if (changed) {
+      device.queue.writeBuffer(this.frameBuffer!, 0, data);
+      this.frameWritten.set(this.frameBits);
+      this.frameValid = true;
+    }
     const fog = this.fogSource;
     let fogged = false;
     if (fog) for (const list of lists) for (const [line] of list) fogged ||= line.material.fog;
@@ -588,9 +598,16 @@ export class Lines implements EnginePlugin {
         );
       if (next !== current) pass.setPipeline((current = next));
       pass.setBindGroup(1, r.group);
-      pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);
+      pass.draw(this.vertexCount(line), line.segmentCount);
       this.stats.drawCalls++;
     }
+  }
+
+  /** Independent non-round segments have no joins or cap fans. Extensions keep their full vertex contract. */
+  private vertexCount(line: Line): number {
+    return line.mode === 'segments' && line.material.cap !== 'round' && !line['extension']
+      ? 6
+      : VERTICES_PER_SEGMENT;
   }
 
   onDeviceRestored(engine: Engine): void {

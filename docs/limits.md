@@ -6845,3 +6845,6 @@ a `compat:` note. On WebGPU nothing changed. All nine pass on the M6 Mac mini on
 ### Materials wireframe compatibility replacement
 
 ANGLE D3D11 can retain retired index storage across a VAO element-buffer replacement. The optional backend detaches the old element binding before selecting a different buffer; unchanged draws retain their cache hits. Exact indices and pixels are preserved, with no GPU wait or changed resource count. Raw replay and 285-check native/compat 1x/4x material grids are documented in whitepaper/materials-compat-hunt.md. This closes wireframe replacement failures, not the historical dispersion reset defect.
+### Batch 163 line retained data
+
+Lines keeps 112 bytes of last-uploaded frame words plus typed views and a validity flag per plugin. Six-vertex submission applies only to independent non-round segments without shader extensions; other lines and picking retain 78. Timing pending the quiet rerun. [Proof](whitepaper/bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).

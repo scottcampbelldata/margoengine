@@ -1,6 +1,6 @@
 // Real-GPU checks of the optional line features, on a canvas of their own. Each check returns a line for the report.
 import { Engine, box } from '@margoengine/core';
-import { Lines, Line, ArrowHelper, PlaneHelper } from '@margoengine/lines';
+import { Lines, Line, ArrowHelper, PlaneHelper, SkeletonHelper } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
 import { TexturedLine, LineTexture, loadLineTexture } from '@margoengine/lines/texture';
 import { DebugLines, ArcLine } from '@margoengine/lines/debug';
@@ -632,6 +632,37 @@ async function debugLines() {
   return 'Immediate debug queue: zero-delta clear, depth, picks, arcs, multi-view and device restore; persistent arcs pick';
 }
 
+async function renderWork() {
+  const { lines, frame, done } = await rig();
+  const vertexCount = lines.vertexCount;
+  try {
+    const matrices = new Float32Array(32);
+    matrices[28] = 2;
+    lines.add(new SkeletonHelper({ parents: [-1, 0], matrices }, { width: 8 }));
+    const line = lines.add(new Line({ mode: 'segments', cap: 'butt', width: 12,
+      positions: [-3, -2, 0, 3, 2, 0, -2, 3, 9.95, 2, -3, 0, 1, 1, 0, 1, 1, 0] }));
+    for (const cap of ['butt', 'square'])
+      for (const depthWrite of [false, true])
+        for (const dashed of [false, true]) {
+          line.material.set({ cap, depthWrite, dashed, opacity: 0.6, dashSize: 0.4, gapSize: 0.2 });
+          matrices[29] += 0.1;
+          lines.vertexCount = vertexCount;
+          const optimized = (await frame()).bytes;
+          lines.vertexCount = () => 78;
+          lines.frameValid = false;
+          const original = (await frame()).bytes;
+          assert(optimized.every((v, i) => v === original[i]), `Full fan pixel identity: ${cap}/${depthWrite}/${dashed}`);
+          lines.vertexCount = vertexCount;
+          const cached = (await frame()).bytes;
+          assert(cached.every((v, i) => v === original[i]), 'Resident uniform pixel identity');
+        }
+  } finally {
+    lines.vertexCount = vertexCount;
+    done();
+  }
+  return 'Six-vertex segments and resident frame uniforms match every pixel of full 78-vertex forced-upload control';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
   for (const check of [
@@ -647,6 +678,7 @@ window.runLineFeatures = async () => {
     stroke,
     textured,
     debugLines,
+    renderWork,
   ])
     checks.push(await check());
   return checks;

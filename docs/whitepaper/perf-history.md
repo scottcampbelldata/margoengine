@@ -3629,3 +3629,6 @@ rules (no `git stash` and no `npx` in any form). None changed the repository.
 ## Batch 164 Tonemap capture resolve (2026-11-10)
 
 `perf(tonemap): skip the unread depth copy in the final capture resolve` removes one render pass and one draw per 4x frame (four depth samples read, one written, per pixel), with every other GPU command identical at 1x and 4x. Row 13.17's velocity-only path is recorded as its like-for-like row. Batch 164 is complete. Timing pending the quiet rerun. [Reproduce](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
+### Batch 163 job 3: line and skeleton work (2026-11-10)
+
+`perf(lines): avoid redundant frame and empty fan work` reduces static frame uploads from 101 to one and independent butt/square segment vertices from 78 to 6. Exact uniform bytes and GPU pixel controls retain output. Timing pending the quiet rerun. [Sources and commands](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).

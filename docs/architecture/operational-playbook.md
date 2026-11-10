@@ -7414,3 +7414,6 @@ Section 5, batch 164 Tonemap: `SceneTarget.resolve(encoder, final, depth)` lets 
 ### Section 5 evidence addendum: materials wireframe index replacement
 
 The optional WebGL2 backend detaches a VAO element buffer before binding a different one. Raw GL replay on ANGLE D3D11 reproduced retired reference indices in a correctly bound replacement, with zero GL errors; detaching repairs exact bytes without a GPU wait. The CPU replay regression checks changed and unchanged bindings; the canonical material wireframe gate adds repeated transparent/mirrored replacements at 1x and 4x and passes 285 checks on each backend. Dispersion remains unproven despite two passing full compat runs. See docs/whitepaper/materials-compat-hunt.md. No core/stage or shader math change.
+### Section 5 evidence: batch 163 line work
+
+Lines omits identical frame uploads using exact Uint32 word comparison and invalidates on GPU buffer recreation. Independent butt/square segments omit only endpoint-degenerate fan triangles. CPU tests assert work counts and exact uniform bytes; package GPU tests compare every pixel against forced original work at 1x/4x MSAA. No core, stage or shared implementation change. [Method](../whitepaper/bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).

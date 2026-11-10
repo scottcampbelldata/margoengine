@@ -85,3 +85,43 @@ Math.cos](https://tc39.es/ecma262/2025/multipage/numbers-and-dates.html#sec-math
 specifies implementation-approximated Number results. Values are retained at
 runtime in Float64, never rounded to Float32, precomputed offline or derived
 through a recurrence, so each runtime retains its own original results.
+
+
+## Job 3: line and skeleton draw work
+
+`p-lines` queued its unchanged 112-byte frame uniform every view. Skeleton
+helpers use independent butt segments but submitted 78 vertices per bone:
+the 72 cap/join vertices all collapse to their segment endpoint. In
+`perf(lines): avoid redundant frame and empty fan work`, lines retains a
+112-byte Uint32 snapshot per plugin, invalidated whenever its GPU frame buffer
+is recreated. Unchanged frames queue no write. Independent butt and square
+segments without a custom shader extension submit six vertices. The remaining
+shader, dash, clipping, colour, depth, body and point order are unchanged.
+Extensions retain their original vertex contract; connected and round-cap lines
+still submit 78 vertices. Picking keeps its existing full vertex contract.
+
+After `npm run build:packages`, run:
+
+```powershell
+node --test --test-timeout=120000 packages/lines/tests/render-work.test.js
+$env:MARGO_GPU_SLOTS='3'
+node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp163-r2-lines -- node packages/lines/scripts/test-browser.js
+node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp163-r2-lines -- node packages/lines/scripts/test-browser.js --compat
+```
+
+The CPU test proves 101 static frames use one upload (112 bytes versus 11,312)
+and skeleton bones submit 6 versus 78 vertices. It checks exact reference
+uniform bytes, unchanged other commands, moving geometry, alternating view
+sizes, output formats, signed zero and resource restoration. GPU controls
+force the original 78 vertices and unconditional frame write and compare every
+pixel byte, with butt/square caps, dash gaps, translucent lines, depth-writing,
+a moving skeleton, a zero-length segment and a near-plane crossing, at 1x/4x
+MSAA. Existing tiled capture and picking tests remain enabled.
+
+Rougier (2013, cited above) describes separating the stroke body and caps/joins;
+replacing the full tessellation or distance function would risk different
+coverage. WebGPU (Ninomiya, Jones and Blandy, 2026, cited above) defines
+triangle-list primitives and queue writes; zero-area endpoint triangles cannot
+cover samples. Keeping the original six body vertices and shader arithmetic
+avoids that risk. This is clean-room Margo code, with no rival source read.
+Timing pending the quiet rerun; the historical slower classifications remain.

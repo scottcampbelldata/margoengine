@@ -4840,3 +4840,6 @@ Batch 164 Tonemap: the final 4x capture resolve skips a depth copy that nothing 
 ### Materials wireframe index replacement correctness (2026-11-10)
 
 On the tested NVIDIA RTX A6000 / ANGLE D3D11, detaching the prior VAO element binding before replacement eliminates stale retired index bytes. Proof: raw engine-free replay, a CPU replay regression that fails before the change, and the expanded exact native/compat 285-check wireframe grids. Evidence and reproduction: materials-compat-hunt.md. No speed claim; dispersion is still open.
+### Batch 163 line work counts
+
+101 static line frames use one 112-byte frame upload. Independent butt/square segments without extensions use 6 vertices instead of 78, omitting only zero-area fan triangles. No timing or rival-speed claim. [Proof and scope](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).

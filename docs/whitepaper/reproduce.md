@@ -4142,3 +4142,6 @@ Batch 164 Tonemap and velocity: [capture resolve work count and the velocity-onl
 ### Materials compatibility index replacement
 
 After building packages, run scripts/material-wireframe-gpu-check.js with and without --compat under the shared GPU lock. Both cover 1x and 4x, repeated transparent/mirrored replacements and exact hashes. The raw /tests/material-index-rebind-raw.html dev-server page exposes indexRebindRaw(false) and indexRebindRaw(true), returning all eight draws and exact uploaded-byte comparisons. The original may be correct on unaffected drivers; the detached path must remain exact. The capture SHA-256, observed failing indices and source comparison are in materials-compat-hunt.md.
+### Batch 163 line work counts
+
+See [the batch record](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work) for the build, deterministic work-count test, native/compat GPU commands and original-work controls. No benchmark runs are required.

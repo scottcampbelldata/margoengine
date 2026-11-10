@@ -65,7 +65,7 @@ circle table. This is a work-count result; timing pending the quiet rerun.
 
 ## How it works
 
-- **Instanced screen-space quads.** Each segment is one instance of 78 vertices drawn from a storage buffer of points; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.
+- **Instanced screen-space quads.** Each independent butt or square segment uses six vertices (two body triangles); round caps, connected lines and custom shader extensions keep all 78 vertices. Points come from a storage buffer; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.
 - **Widths.** Pixel widths are CSS pixels, scaled by the ratio of the render target to the canvas client size. World-unit widths are converted per endpoint from the camera's focal length and the clip w, so thick lines taper with perspective. Lines thinner than one pixel are drawn one pixel wide with proportionally lower alpha.
 - **Antialiasing.** Geometry grows by one pixel and the fragment shader ramps coverage over the last pixel of every edge, butt or square cap end and dash end (dash ends use `fwidth` of the distance). This coverage ramp works alongside 4× MSAA on the WebGPU canvas path.
 - **Dashes.** Distances accumulate along the line in world space (after the model or mesh matrix) on the CPU, are recomputed only when the points or the matrix change, and are interpolated perspective-correctly. Segment lists accumulate across segments.
@@ -504,3 +504,23 @@ Apache-2.0 licensed.
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.
+
+
+## Retained frame data
+
+Unchanged camera uniforms stay on the GPU: 101 identical frames queue one
+112-byte frame write instead of 101. Independent butt and square segments,
+including default skeleton bones, omit 72 zero-area fan vertices. All visible
+triangles, dashes and pixel coverage stay the same. No options are required.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Lines, Line} from '@margoengine/lines';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+lines.add(new Line({mode: 'segments', cap: 'butt', width: 3,
+  positions: [-1, 0, 0, 1, 0, 0]}));
+engine.render();
+engine.render(); // Same camera bytes remain resident; the line still draws.
+engine.dispose();
+```
