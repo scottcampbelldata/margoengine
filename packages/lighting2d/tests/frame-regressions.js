@@ -137,7 +137,7 @@ export async function frameRegressions({ instance, engine, texture, read, compar
   }
   for (const [label, lightOptions, wall, camera] of [
     ['F17 receiver within source radius', { x: 8.5, y: 4.5, sourceRadius: 8 }, [{ shape: 'segment', from: [6, -100], to: [6, 100] }], { x: 0, y: 0, zoom: 1 }],
-    ['F18 zero radius directional hard shadow', { kind: 'directional', angle: 0, sourceRadius: 0 }, [{ shape: 'segment', from: [0, 0], to: [0, 100] }], { x: 0, y: -0.4995, zoom: 1 }],
+    ['F18 zero radius directional hard shadow', { kind: 'directional', angle: 0, sourceRadius: 0, angularRadius: 0 }, [{ shape: 'segment', from: [0, 0], to: [0, 100] }], { x: 0, y: -0.4995, zoom: 1 }],
   ]) {
     const target = texture(), pass = SoftLighting2D.attach(instance, { target, camera, occluders: wall });
     const light = pass.addLight(lightOptions); frame();

@@ -103,6 +103,8 @@ lamp.x += 1;
 
 `@margoengine/lighting2d/soft` provides soft penumbra shadows that soften with distance from the occluder. Near the occluder,
 shadow edges remain crisp; as distance increases, the penumbra widens proportionally to the light's emitter radius (`sourceRadius`).
+A directional light has no distance, so it softens by `angularRadius` instead, the source's angular radius in radians
+(0 to pi / 2, default `SUN_ANGULAR_RADIUS`, the Sun's 0.0046505); `sourceRadius` applies to point and spot lights only.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';

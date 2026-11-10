@@ -67,6 +67,6 @@ test('F23 rejects invalid bloom, rotation, mutated lights and fractional soft sa
 });
 
 test('F18 zero radius directional visibility is the exact hard shadow limit', () => {
-  const light = new SoftLight2D({ kind: 'directional', angle: 0, sourceRadius: 0 });
+  const light = new SoftLight2D({ kind: 'directional', angle: 0, sourceRadius: 0, angularRadius: 0 });
   assert.equal(softShadowFactor(light, [0, 0, 0, 100], 10, 0.0005), 0);
 });

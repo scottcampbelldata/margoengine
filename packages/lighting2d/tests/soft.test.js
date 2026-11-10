@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { Light2D, occluderEdges } from '../dist/index.js';
 import {
   SoftLight2D,
+  SUN_ANGULAR_RADIUS,
   SoftLighting2D,
   SoftShadows2D,
   softShadowFactor,
@@ -138,5 +139,23 @@ test('SoftLighting2D plugin management and WebGL2 fallback refusal', () => {
   assert.equal(SoftShadows2D, SoftLighting2D);
 
   soft.dispose();
-  assert.throws(() => soft.setup(fakeWebGLEngine), (err) => err.code === 'disposed');
+  assert.throws(
+    () => soft.setup(fakeWebGLEngine),
+    (err) => err.code === 'disposed',
+  );
+});
+
+// Batch 132 audit: a directional light read its default sourceRadius of 4 (world units) as an angular half-width of 4
+// radians, so its rays swept more than a full turn: a wall in front of the sun let 75% through, one behind it cut 50%.
+test('a directional light softens by its angular radius, not by sourceRadius', () => {
+  const wall = [-20, -50, -20, 50];
+  const toward = new SoftLight2D({ kind: 'directional', angle: 0 });
+  const away = new SoftLight2D({ kind: 'directional', angle: Math.PI });
+  assert.equal(toward.angularRadius, SUN_ANGULAR_RADIUS);
+  assert.equal(softShadowFactor(toward, wall, 0, 0), 0);
+  assert.equal(softShadowFactor(away, wall, 0, 0), 1);
+  // A wide source across the wall's end: half of the rays pass the end at (-20, 50) seen from (0, 30) at 45 degrees.
+  const end = new SoftLight2D({ kind: 'directional', angle: -Math.PI / 4, angularRadius: 0.2, samples: 64 });
+  assert.equal(softShadowFactor(end, wall, 0, 30), 0.5);
+  assert.throws(() => new SoftLight2D({ kind: 'directional', angularRadius: 4 }), /angularRadius/);
 });

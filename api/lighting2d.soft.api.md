@@ -6,14 +6,18 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
 
+export const SUN_ANGULAR_RADIUS = 0.0046505;
+
 export class SoftLight2D extends Light2D {
     sourceRadius: number;
+    angularRadius: number;
     samples: number;
     constructor(options?: SoftLight2DOptions);
 }
 
 export interface SoftLight2DOptions extends Light2DOptions {
     sourceRadius?: number;
+    angularRadius?: number;
     samples?: number;
 }
 
@@ -47,6 +51,7 @@ export interface SoftLighting2DOptions extends Lighting2DOptions {
 
 export interface SoftShadowOptions {
     sourceRadius?: number;
+    angularRadius?: number;
     samples?: number;
 }
 

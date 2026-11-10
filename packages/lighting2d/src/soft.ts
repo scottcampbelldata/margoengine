@@ -22,33 +22,45 @@ declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 /** Options for one {@link SoftLight2D}: the plain light options plus its penumbra size and ray samples. */
 export interface SoftLight2DOptions extends Light2DOptions {
-  /** Light emitter radius in world units for penumbra softening; 0 is hard shadow. Default 4. */
+  /** Point and spot lights: emitter radius in world units for penumbra softening; 0 is hard shadow. Default 4. */
   sourceRadius?: number;
+  /**
+   * Directional lights: angular radius of the source in radians, 0 to pi / 2; 0 is hard shadow. A directional light
+   * has no distance, so `sourceRadius` does not apply to it. Default {@link SUN_ANGULAR_RADIUS}.
+   */
+  angularRadius?: number;
   /** Filter ray samples across the penumbra on GPU and CPU. Default 16. */
   samples?: number;
 }
 
+/** The Sun's angular radius seen from Earth, 695,700 km over 149,597,870.7 km (IAU 2015 nominal solar radius, 1 au). */
+export const SUN_ANGULAR_RADIUS = 0.0046505;
+
 /** One 2D light with soft penumbra properties. */
 export class SoftLight2D extends Light2D {
   declare sourceRadius: number;
+  declare angularRadius: number;
   declare samples: number;
   constructor(options: SoftLight2DOptions = {}) {
     super(options);
     this.sourceRadius = options.sourceRadius ?? 4;
+    this.angularRadius = options.angularRadius ?? SUN_ANGULAR_RADIUS;
     this.samples = options.samples ?? 16;
     checkSoftLight(this);
   }
 }
 
-function checkSoftOptions(sourceRadius: number, samples: number): void {
+function checkSoftOptions(sourceRadius: number, samples: number, angularRadius = 0): void {
   checkNumber(sourceRadius, 'sourceRadius', 0);
+  if (!(angularRadius >= 0 && angularRadius <= Math.PI / 2))
+    throw rangeError('Invalid angularRadius: pass radians from 0 to pi / 2 (the Sun is 0.0046505)', 'pixel-lighting');
   if (!Number.isInteger(samples) || samples < 1 || samples > 64)
     throw rangeError('Invalid samples: must be an integer in [1, 64]', 'pixel-lighting');
 }
 
 function checkSoftLight(l: SoftLight2D): void {
   checkLight(l);
-  checkSoftOptions(l.sourceRadius, l.samples);
+  checkSoftOptions(l.sourceRadius, l.samples, l.angularRadius);
 }
 
 /** Where a directional light comes from, as a unit vector. */
@@ -60,8 +72,10 @@ const towards = (l: Light2D): [number, number, number] => [
 
 /** Options for evaluating soft shadow factor. */
 export interface SoftShadowOptions {
-  /** Radius of the light emitter in world units; 0 yields hard shadows. Default 4. */
+  /** Point and spot lights: radius of the light emitter in world units; 0 yields hard shadows. Default 4. */
   sourceRadius?: number;
+  /** Directional lights: angular radius of the source in radians, 0 to pi / 2. Default {@link SUN_ANGULAR_RADIUS}. */
+  angularRadius?: number;
   /** Number of radial ray samples. Default 16. */
   samples?: number;
 }
@@ -78,12 +92,11 @@ export function softShadowFactor(
   options?: SoftShadowOptions,
 ): number {
   checkLight(light);
-  const value = options?.samples ?? (light as SoftLight2D).samples ?? 16;
-  const source = options?.sourceRadius ?? (light as SoftLight2D).sourceRadius ?? 4;
-  checkSoftOptions(source, value);
-  if (!light.shadows || edges.length < 4) return 1;
+  const samples = options?.samples ?? (light as SoftLight2D).samples ?? 16;
   const radius = options?.sourceRadius ?? (light as SoftLight2D).sourceRadius ?? 4;
-  const samples = Math.max(1, Math.min(64, Math.round(options?.samples ?? (light as SoftLight2D).samples ?? 16)));
+  const angular = options?.angularRadius ?? (light as SoftLight2D).angularRadius ?? SUN_ANGULAR_RADIUS;
+  checkSoftOptions(radius, samples, angular);
+  if (!light.shadows || edges.length < 4) return 1;
   const isPoint = light.kind !== 'directional';
   let thetaL = 0;
   let dL = 0;
@@ -105,7 +118,7 @@ export function softShadowFactor(
       alphaL = Math.asin(Math.min(0.9999, radius / dL));
     }
   } else {
-    alphaL = radius;
+    alphaL = angular;
   }
 
   if (alphaL <= 0 || samples === 1) {
@@ -624,7 +637,7 @@ export class SoftLighting2D implements EnginePlugin {
           rgb[1] * l.intensity,
           rgb[2] * l.intensity,
           l.radius,
-          l.sourceRadius,
+          l.kind === 'directional' ? l.angularRadius : l.sourceRadius,
           edgeCount,
           l.samples,
           l.shadows ? 1 : 0,
