@@ -6717,3 +6717,12 @@ The [volume controls](sciviz-rivals.md) record full 64/128 cubes at 256 x 256. T
 
 
 The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)) draws every scene at 256 x 256. Rows past a source table repeat its rows and are labelled replicated; the volume scenes share one nearest-neighbour resample of the MRI head. Image differences are observations, never pass marks. Cosmograph keeps its own animation loop, which also runs during Margo's samples. The analytic references converge at second order (sphere area error 0.062 %, volume 0.12 %, ABC streamline 0.0013, isoline 0.00024 at 65 samples per axis). Timing pending the quiet rerun.
+
+## Preview contract owners restored (lane E, 2026-11-10)
+
+`npm run verify` stopped at `npm run check:preview-contract` from `4e3337946` (html texture-gl) onward; the last pass was `c971ad250`. About 20 frame-graph pass owners with a `backend` test had neither a setup refusal nor a reviewed preview route. Each owner was read and put in one class. The gate itself (`scripts/check-preview-contract.mjs`) is unchanged apart from new `previewRoutes` rows, each naming its backend-test count and the test that proves the route. The three sciviz owners (`TileClear`, `ProgressiveRendering`, `VolumeDepthCapture`) belong to the dev PC and stay red; see docs/known-bugs.md.
+
+| Owner | Class | What changed on the small preview | Evidence |
+|---|---|---|---|
+| clustered `CubeProjectorLights` | WebGPU-only | Refuses in its own setup (`unsupported`, help link); it already refused through `ProjectorLights` with the parent's name | `packages/clustered/test/cube-projector.test.js` |
+

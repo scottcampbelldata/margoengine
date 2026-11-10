@@ -70,3 +70,13 @@ test('spot images removed while cube cookies keep the hook are cleared on the GP
  assert.deepEqual([gpu()[0],gpu()[1]],[0,0],'no spot entries or images left on the GPU');
  cookies.dispose();lights.dispose();
 });
+
+test('the small WebGL2 preview is refused during setup with a coded WebGPU error and no retained plugin',async()=>{
+ const {Engine,TransformStore}=await import('../../core/dist/extension.js');
+ const engine=new Engine({width:8,height:8},await TransformStore.create(8),{backend:'webgl2',add(){},remove(){},render(){},dispose(){}});
+ try{
+  assert.throws(()=>engine.use(new CubeProjectorLights({lights:new Clustered()})),
+   e=>e.code==='unsupported'&&/CubeProjectorLights needs WebGPU/.test(e.message)&&/https:\/\/margoengine\.com\/errors#webgpu/.test(e.message));
+  assert.equal(engine.plugins.size,0);
+ }finally{engine.dispose();}
+});

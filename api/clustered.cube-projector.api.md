@@ -25,6 +25,7 @@ export class CubeProjectorLights extends ProjectorLights {
     protected sync(): void;
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

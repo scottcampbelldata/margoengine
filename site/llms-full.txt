@@ -2854,6 +2854,12 @@ features add no core or stage functionality.
 
 # Design envelope
 
+- Batch 170 stats: accepted difference in drawing against stats.js 0.17.0. Margo redraws a 120-sample frame-time
+  line and four text rows each 150 ms (7,617 canvas commands in 10 s at 60 Hz); stats.js scrolls a bar graph with
+  one image copy per frame (6,090 commands). Command counts are not costs. Both do nothing while idle.
+  The change key adds 50 B gzip to the stats root entry (4,934 to 4,984 B, quality baseline updated with the reason).
+  [Counts](whitepaper/batch-170-stats.md). Timing pending the quiet rerun.
+
 - Batch 164 SSAO/GTAO: 4x removes one early colour resolve; 1x is unchanged.
   The 40 B/pixel reduction counts logical rgba16float resolve source reads and
   destination writes, not physical bandwidth. No shader, quality, target-size,
@@ -9566,6 +9572,14 @@ The [volume controls](sciviz-rivals.md) record full 64/128 cubes at 256 x 256. T
 
 The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)) draws every scene at 256 x 256. Rows past a source table repeat its rows and are labelled replicated; the volume scenes share one nearest-neighbour resample of the MRI head. Image differences are observations, never pass marks. Cosmograph keeps its own animation loop, which also runs during Margo's samples. The analytic references converge at second order (sphere area error 0.062 %, volume 0.12 %, ABC streamline 0.0013, isoline 0.00024 at 65 samples per axis). Timing pending the quiet rerun.
 
+## Preview contract owners restored (lane E, 2026-11-10)
+
+`npm run verify` stopped at `npm run check:preview-contract` from `4e3337946` (html texture-gl) onward; the last pass was `c971ad250`. About 20 frame-graph pass owners with a `backend` test had neither a setup refusal nor a reviewed preview route. Each owner was read and put in one class. The gate itself (`scripts/check-preview-contract.mjs`) is unchanged apart from new `previewRoutes` rows, each naming its backend-test count and the test that proves the route. The three sciviz owners (`TileClear`, `ProgressiveRendering`, `VolumeDepthCapture`) belong to the dev PC and stay red; see docs/known-bugs.md.
+
+| Owner | Class | What changed on the small preview | Evidence |
+|---|---|---|---|
+| clustered `CubeProjectorLights` | WebGPU-only | Refuses in its own setup (`unsupported`, help link); it already refused through `ProjectorLights` with the parent's name | `packages/clustered/test/cube-projector.test.js` |
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -15306,6 +15320,10 @@ and a standalone pass over all 1,312 entry `.d.ts` files found every source file
   import's await used to land in the default scene; tiles now attaches its points plugin to the renderer's scene,
   usdz is in finish-later.md.
 
+### sciviz preview-contract owners left red (lane E, 2026-11-10)
+
+`node scripts/check-preview-contract.mjs` on `fbd9b0480` still lists three sciviz owners after the lane E fixes: `packages/sciviz/src/media-tiles.ts:TileClear` (1 backend test), `packages/sciviz/src/progressive.ts:ProgressiveRendering` (2) and `packages/sciviz/src/volume-depth.ts:VolumeDepthCapture` (2). Each registers frame-graph passes gated on `backend` with neither a `requireWebGPU` refusal in setup nor a `previewRoutes` row. sciviz is owned by the dev PC, so lane E did not edit it; `npm run verify` stays red at this step until the dev PC classifies them (refusal, or a tested preview route). The other owners are listed in docs/limits.md, "Preview contract owners restored".
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -15919,7 +15937,8 @@ Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stat
 
 Depends on `@margoengine/math`, with `@margoengine/core` as a peer. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;
-DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
+DOM strings and canvas drawing refresh separately every 150 ms. A timer refresh is skipped when nothing it draws
+has changed, so an idle page (no frames) does no DOM or canvas work; `refresh()` always redraws. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
 
 `Stats`, `FramePhases`, `PipelineCompiles` and `FrameBeacon` detach from the scene
@@ -15997,12 +16016,6 @@ console.log(compiles.toJSON().count, 'compiles so far');
 It follows the engine's device through a device restore and sees only what is compiled after `attach`, or after `trackNext`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
 
 The CPU phase breakdown times the kernel tick, culling, encoding and submit of each frame:
-
-```ts
-import {Engine} from 'margoengine/core';
-import {Stats} from 'margoengine/stats';
-import {FramePhases} from 'margoengine/stats/phases';
-```
 
 [README continues: https://margoengine.com/llms/packages/stats.md]
 

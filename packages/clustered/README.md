@@ -467,3 +467,5 @@ their stack's `depthTexture` then). It works with or without shadow maps and add
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+`CubeProjectorLights` now refuses the preview in its own `setup` (`CubeProjectorLights needs WebGPU`, code `unsupported`). Before 2026-11-10 it inherited `ProjectorLights`' refusal, whose message named the parent class; the preview-contract gate could not see an inherited refusal and failed `npm run verify`. Behaviour on native WebGPU and the full compatibility layer is unchanged. Regression: `test/cube-projector.test.js`.

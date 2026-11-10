@@ -1,6 +1,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type FrameGraph } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { ProjectorLights, type ProjectorImage, type ProjectorLightOptions } from './projector.js';
 /** Six equal square RGBA8 faces, ordered +X, -X, +Y, -Y, +Z, -Z; rows run top to bottom. */
 export interface CubeProjectorImage { readonly faces: readonly [ProjectorImage, ProjectorImage, ProjectorImage, ProjectorImage, ProjectorImage, ProjectorImage]; }
@@ -142,6 +143,8 @@ export class CubeProjectorLights extends ProjectorLights {
   /** Storage bindings for active cube cookies and inherited spot images. */
   override bindings():GPUBindGroupEntry[]{const base=super.bindings();if(!this.cubesActive)return base;
     if(base!==this.cubeBase||!this.joined){this.cubeBase=base;this.joined=[...base,...this.cubeEntries];}return this.joined;}
+  /** Refuse the small WebGL2 preview before inheriting GPU storage: cube cookies upload through a WebGPU queue. */
+  override setup(engine:Engine):void{requireWebGPU(engine,'CubeProjectorLights');super.setup(engine);}
   /** Upload changed cube pixels before the clustered light loop. */
   override registerPasses(graph:FrameGraph):void {super.registerPasses(graph);graph.add({name:'clustered:cube-cookie-upload',order:-3.6,execute:c=>{
     if(c.backend==='webgpu'&&this.cubeBuffer&&this.cubesActive&&this.cubesDirty){c.device.queue.writeBuffer(this.cubeBuffer,0,this.cubeWords as Uint32Array<ArrayBuffer>);this.cubesDirty=false;}

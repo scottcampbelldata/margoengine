@@ -5735,3 +5735,7 @@ and a standalone pass over all 1,312 entry `.d.ts` files found every source file
   `pointcloud.ts:374` have the same pattern. Also open: tiles' points plugin and usdz `curves()` attached after an
   import's await used to land in the default scene; tiles now attaches its points plugin to the renderer's scene,
   usdz is in finish-later.md.
+
+### sciviz preview-contract owners left red (lane E, 2026-11-10)
+
+`node scripts/check-preview-contract.mjs` on `fbd9b0480` still lists three sciviz owners after the lane E fixes: `packages/sciviz/src/media-tiles.ts:TileClear` (1 backend test), `packages/sciviz/src/progressive.ts:ProgressiveRendering` (2) and `packages/sciviz/src/volume-depth.ts:VolumeDepthCapture` (2). Each registers frame-graph passes gated on `backend` with neither a `requireWebGPU` refusal in setup nor a `previewRoutes` row. sciviz is owned by the dev PC, so lane E did not edit it; `npm run verify` stays red at this step until the dev PC classifies them (refusal, or a tested preview route). The other owners are listed in docs/limits.md, "Preview contract owners restored".
