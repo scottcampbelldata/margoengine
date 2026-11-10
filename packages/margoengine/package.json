@@ -639,6 +639,10 @@
       "types": "./dist/clustered/cube-projector.d.ts",
       "import": "./dist/clustered/cube-projector.js"
     },
+    "./clustered/area-texture": {
+      "types": "./dist/clustered/area-texture.d.ts",
+      "import": "./dist/clustered/area-texture.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"

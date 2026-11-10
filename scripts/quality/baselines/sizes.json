@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14505973,
+  "total": 14509935,
   "history": [
     {
       "date": "2026-10-24",
@@ -7709,6 +7709,12 @@
       "commit": "56e1f949e",
       "reason": "landed with push-anyway: feat(water): add water bodies from outlines and river splines",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "8615c5ebe",
+      "reason": "landed with push-anyway: feat(clustered): textured rectangle area lights (new entry @margoengine/clustered/area-texture)",
+      "grew": 1
     }
   ],
   "items": {
@@ -7856,6 +7862,7 @@
     "@margoengine/clustered": 14448,
     "@margoengine/clustered/area": 11229,
     "@margoengine/clustered/area-shapes": 13202,
+    "@margoengine/clustered/area-texture": 3962,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/cube-projector": 4716,
     "@margoengine/clustered/directional": 2535,

@@ -36,7 +36,8 @@
     "test:gpu:stochastic": "cd ../.. && node scripts/stochastic-lights-gpu-check.js",
     "test:gpu:area-shapes": "cd ../.. && node scripts/clustered-area-shapes-gpu.mjs",
     "test:gpu:atlas": "cd ../.. && node scripts/clustered-shadow-atlas-gpu.mjs",
-    "test:gpu:cube-projector": "cd ../.. && node scripts/clustered-cube-projector-gpu.mjs"
+    "test:gpu:cube-projector": "cd ../.. && node scripts/clustered-cube-projector-gpu.mjs",
+    "test:gpu:images": "cd ../.. && node scripts/clustered-light-images-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {
@@ -99,6 +100,10 @@
     "./cube-projector": {
       "types": "./dist/cube-projector.d.ts",
       "import": "./dist/cube-projector.js"
+    },
+    "./area-texture": {
+      "types": "./dist/area-texture.d.ts",
+      "import": "./dist/area-texture.js"
     }
   },
   "files": [

@@ -3352,7 +3352,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-649). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-650). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -5085,6 +5085,24 @@ cheaper direct rule. Counts exclude initialization, copies and allocation. No
 elapsed-time, SIMD, geological realism, rival-speed or cross-device rendering claim.
 
 Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 23837 B gzip, strictly below 25000 B.
+
+### LIM-650: textured rectangle area lights
+
+Optional `@margoengine/clustered/area-texture` (`AreaLightTextures`): an RGBA8 image on each `AreaLights` rectangle,
+sRGB by default, alpha premultiplied. Enforced: at most 16 distinct images, 1,024 texels a side, 4,194,304 texels in all
+with their level chains (`RangeError`); one entry per area light (64). The image is stored as half-float linear RGB in a
+storage buffer (binding 153), so it adds no sampled texture or sampler. By method: the scalar LTC integral of each lobe
+is multiplied by the image filtered over what that lobe sees: the lookup point is where the transformed rectangle's
+vector form factor meets its plane, the level is the one whose texel spans the clamped cosine's half-peak footprint
+(diameter 1.287 h over the square root of the area, both in the lobe's space), read trilinearly from a box-filtered
+chain. It is an approximation: a one-colour image is exact (within half-float rounding, 2^-11), but a detailed image
+under a wide lobe is the filtered mean around one point, not the exact integral of the image under the lobe; the
+vector form factor ignores the horizon clip; level-0 texels are bilinear with clamped edges, and the chain is
+isotropic, so a lobe stretched along one axis of the light reads one blur for both. Built from the LTC paper's integral
+and the cosine footprint; the paper's own textured-light section could not be read (docs/clean-room.md, C17).
+Proved on stand-ins: the CPU mirror (`packages/clustered/test/area-texture.test.js`) and a real-WebGPU frame check
+(`scripts/clustered-light-images-gpu-check.js`: one-colour image against the plain light within 2/255, a split image
+lights each side of the floor). No reference against a path tracer yet. Sizes: `npm run quality -- --gate=sizes`.
 
 ### Product-floor capture audit (batch 56)
 

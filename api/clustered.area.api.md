@@ -12,6 +12,11 @@ export interface AreaLightOptions {
 
 export { AreaLightShadow } from "@margoengine/math";
 
+export interface AreaLightTexture {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 export class AreaLights implements EnginePlugin, ClusteredArea {
     readonly name = "clustered:area";
     readonly lights: Clustered;
@@ -20,6 +25,8 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     static attach(instance: EngineKernel, options: AreaLightOptions): AreaLights;
     get list(): readonly RectAreaLight[];
     setLights(lights: readonly RectAreaLight[]): this;
+    get texture(): AreaLightTexture | undefined;
+    set texture(hook: AreaLightTexture | undefined);
     shadowLights(): readonly AreaShadowLight[];
     declarations(group: number, shadow?: string): string;
     bindings(): GPUBindGroupEntry[];

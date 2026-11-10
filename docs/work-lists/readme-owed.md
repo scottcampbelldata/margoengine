@@ -32,6 +32,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/fsm | final: FinalMachine, final leaf constraints, done.state.parent, always guards, macrostep bound, stopped top-level final and goto restart | batch-250 job 2 |
 | @margoengine/netcode | lobby: LobbyRoom metadata/privacy, RoomLobby filters, reservation lifetime/cancel, one-time joinById seatToken and server-held join identity; correct stale limits | batch-256 job 1 |
 | margoengine | Generated netcode/lobby alias | batch-256 job 1 |
+| @margoengine/clustered | area-texture: AreaLightTextures.attach({ area }), setTextures per area light, sRGB/linear, alpha, limits and what the filtered lookup approximates | batch-52 job 5 |
+| margoengine | Generated clustered/area-texture alias | batch-52 job 5 |
 | margoengine | Generated fsm/final alias | batch-250 job 2 |
 | @margoengine/tiles | tiles/style expressions, conditions/defines, renderer decorator and model/instance/point binding lifecycle | batch 239 job 1 |
 | margoengine | tiles/style generated optional re-export | batch 239 job 1 |

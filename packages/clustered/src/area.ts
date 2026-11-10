@@ -20,6 +20,14 @@ export interface AreaLightOptions {
 }
 /** Area lights per {@link AreaLights.setLights} call. */
 export const MAX_AREA_LIGHTS = 64;
+/**
+ * The `AreaLights.texture` hook (`AreaLightTextures` from `@margoengine/clustered/area-texture`): WGSL defining
+ * `clusterAreaTexture(j, m, c, r, u, side)`, a vec3f factor of light j under the lobe transform m, and its bindings.
+ */
+export interface AreaLightTexture {
+  declarations(group: number): string;
+  bindings(): GPUBindGroupEntry[];
+}
 const LIGHT_FLOATS = 16,
   HEADER = 4,
   LUT_OFFSET = (HEADER + MAX_AREA_LIGHTS * LIGHT_FLOATS) * 4;
@@ -30,7 +38,12 @@ const LIGHT_FLOATS = 16,
 // LTC: Heitz, Dupuy, Hill & Neubelt 2016; Fresnel split f0 x magnitude + (1 - f0) x fresnel: Hill & Heitz 2016 course
 // notes. Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a published engine
 // standard.
-const sampling = (group: number, shadow?: string) => /* wgsl */ `
+const sampling = (group: number, shadow?: string, texture?: AreaLightTexture) => {
+  const radiance = shadow ? 'radiance' : 'light.color.rgb',
+    lit = (m: string) => (texture ? `${radiance}*clusterAreaTexture(j,${m},c,r,u,side)` : radiance);
+  return (
+    (texture ? texture.declarations(group) : '') +
+    /* wgsl */ `
 struct AreaLight {center:vec4f,right:vec4f,up:vec4f,color:vec4f}
 struct AreaLightData {count:vec4u,lights:array<AreaLight,${MAX_AREA_LIGHTS}>,lut:array<u32>}
 @group(${group}) @binding(17) var<storage,read> areaLights:AreaLightData;
@@ -44,12 +57,14 @@ ${ltcPolygonWgsl('area')}fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,n
     let light=areaLights.lights[j];let c=light.center.xyz-position;let r=light.right.xyz;let u=light.up.xyz;
     var side=1.0;if(dot(cross(r,u),c)>0){if(light.center.w<0.5){continue;}side=-1.0;}
     let a=c-r-u;let b=c-r+u;let e=c+r+u;let d=c+r-u;${shadow ? `let radiance=light.color.rgb${shadow};` : ''}
-    specular+=${shadow ? 'radiance' : 'light.color.rgb'}*max(side*areaIntegral(lobe,a,b,e,d),0.0);diffuse+=${shadow ? 'radiance' : 'light.color.rgb'}*max(side*areaIntegral(local,a,b,e,d),0.0);
+    specular+=${lit('lobe')}*max(side*areaIntegral(lobe,a,b,e,d),0.0);diffuse+=${lit('local')}*max(side*areaIntegral(local,a,b,e,d),0.0);
   }
   let f0=mix(dielectricF0,base,metal);
   return (f0*t2.x+(mix(dielectricF90,1.0,metal)-f0)*t2.y)*specular+(1-metal)*base*diffuse;
 }
-`;
+`
+  );
+};
 /**
  * Rectangular area lights for clustered lighting, shaded with Linearly Transformed Cosines (Heitz
  * et al. 2016): GGX specular and Lambert diffuse, the quad clipped exactly to each surface's horizon. Core meshes and every
@@ -70,6 +85,9 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   private readonly data = new Float32Array(HEADER + MAX_AREA_LIGHTS * LIGHT_FLOATS);
   private readonly count = new Uint32Array(this.data.buffer, 0, 1);
   private listValue: readonly RectAreaLight[] = Object.freeze([]);
+  private textureHook?: AreaLightTexture;
+  /** `entries` and the texture hook's, joined (rebuilt when either array changes). */
+  private joined?: [GPUBindGroupEntry[], GPUBindGroupEntry[], GPUBindGroupEntry[]];
   private shadowList: readonly AreaShadowLight[] = Object.freeze([]);
   private dirty = true;
   private disposed = false;
@@ -157,19 +175,33 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     this.sync();
     return this;
   }
+  /** Images on the rectangles (`AreaLightTextures` from `@margoengine/clustered/area-texture`); undefined: plain lights. */
+  get texture(): AreaLightTexture | undefined {
+    return this.textureHook;
+  }
+  set texture(hook: AreaLightTexture | undefined) {
+    this.textureHook = hook;
+    this.joined = undefined;
+    // The Clustered setter drops its cached shaders, so they are rebuilt with (or without) the texture code.
+    if (this.lights.area === this) this.lights.area = this;
+  }
   /** @internal ClusteredArea: the castShadow lights, in list order, for LocalShadows. */
   shadowLights(): readonly AreaShadowLight[] {
     return this.shadowList;
   }
   /** @internal ClusteredArea: WGSL defining `clusterAreaLighting`; `shadow` multiplies each light (a `*` factor in `j`). */
   declarations(group: number, shadow?: string): string {
-    return sampling(group, shadow);
+    return sampling(group, shadow, this.textureHook);
   }
   /** @internal ClusteredArea: binding 17 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
     if (!this.buffer || this.disposed)
       throw new MargoError('state', 'Area lights are not attached; attach them to an engine first');
-    return this.entries;
+    if (!this.textureHook) return this.entries;
+    const more = this.textureHook.bindings();
+    if (this.joined?.[0] !== this.entries || this.joined[1] !== more)
+      this.joined = [this.entries, more, [...this.entries, ...more]];
+    return this.joined[2];
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)

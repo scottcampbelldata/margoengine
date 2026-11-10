@@ -45,3 +45,12 @@ Build phase (Scott, 2026-11-10): what a job left unfinished, one line each, `| <
 | 52.4 | @margoengine/clustered | Shadow atlas: GPU timing of cached against full redraws with many still lights on this Mac and the dev PC; only work counts are claimed. |
 | 64.5 | @margoengine/scatter | simplify: lock the blade root and tip so a collapse can never lower a grass mesh's top (Scatter blades need it above the root); pick ring ratios from a target on-screen error instead of fixed fractions; GPU picture proof of the rings in a Scatter. |
 | 67.1 | @margoengine/water | Bodies: holes and islands in an outline; per-body foam, flow and coastal settings; a Water grid that centres on `bodies.bounds` (needs a grid origin shared with WaveQuery's capture); river ends are round caps, not authored mouths; GPU time per body count not measured. |
+
+Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, one line each, what it left unfinished.
+
+| Job | Package | What is left |
+|---|---|---|
+| 52.5 | @margoengine/clustered | area-texture: read the LTC paper's textured-light section and the Hill and Heitz 2016 slides (not fetchable this job) and compare the lookup and level rule with theirs |
+| 52.5 | @margoengine/clustered | area-texture: prove against a path-traced reference of a detailed image under rough and sharp lobes, and measure the error of the single filtered lookup |
+| 52.5 | @margoengine/clustered | area-texture: clip the vector form factor at the horizon as the scalar integral is, and filter anisotropically for lobes stretched along one axis of the light |
+| 52.5 | @margoengine/clustered | area-texture: images from GPU textures or video (today CPU RGBA8 pixels, copied and filtered on setTextures) |
