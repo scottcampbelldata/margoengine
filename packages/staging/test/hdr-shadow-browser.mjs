@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
+import {mkdir, writeFile} from 'node:fs/promises';
 import {openBrowser} from '../../../scripts/browser.js';
 import {decodePNG} from '../../../tests/support/png.js';
-const context=await openBrowser({startPath:'/packages/staging/test/hdr-shadow-browser.html',port:'free'}),{page}=context,errors=[];
+const compat=process.argv.includes('--compat');
+const context=await openBrowser({startPath:'/packages/staging/test/hdr-shadow-browser.html'+(compat?'?compat':''),port:'free',...(compat&&process.platform==='win32'?{args:['--use-angle=vulkan']}:{})}),{page}=context,errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 try{
  await page.waitForFunction(()=>window.ready,null,{timeout:60000});
@@ -29,6 +30,7 @@ try{
  assert.equal((await page.evaluate(()=>window.check.remove())).count,0);
  assert.deepEqual(await page.evaluate(()=>window.check.dispose()),[]);assert.deepEqual(errors,[]);
  const result={hardware:context.hardware,triangles:info.triangles,rows};
+ await mkdir('test-results/56fix',{recursive:true});
  await writeFile(`test-results/56fix/hdr-shadow${process.argv.includes('--compat')?'-compat':''}.json`,JSON.stringify(result,null,2)+'\n');
  console.log('HDR shadow rotation passed',JSON.stringify(rows));
 }finally{await context.close();}

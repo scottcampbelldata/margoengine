@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13923234,
+  "total": 13925050,
   "history": [
     {
       "date": "2026-10-24",
@@ -7346,6 +7346,12 @@
       "commit": "batch-270-job5",
       "reason": "Versioned authoring JSON: new json entry 0 to 2604 B gzip, root 35448 B and base 11398 B. The public root constructor remains the single validator and is shared through the self-package entry. Typed assets, bindings, fog and URL loading stay together; splitting would duplicate validation/ownership. Optional size accepted by Scott; core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "64b7ad4d7",
+      "reason": "Batch272-new-textured-still-entry-1560B-reuses-existing-PBR-transport",
+      "grew": 1
     }
   ],
   "items": {
@@ -8679,6 +8685,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/post/pixelate": 9018,
-    "@margoengine/vfx/json": 2860
+    "@margoengine/vfx/json": 2860,
+    "@margoengine/staging/pathtrace-materials": 1816
   }
 }

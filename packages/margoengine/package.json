@@ -3746,6 +3746,10 @@
       "types": "./dist/staging/ground.d.ts",
       "import": "./dist/staging/ground.js"
     },
+    "./staging/pathtrace-materials": {
+      "types": "./dist/staging/pathtrace-materials.d.ts",
+      "import": "./dist/staging/pathtrace-materials.js"
+    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"

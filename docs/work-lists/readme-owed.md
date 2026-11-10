@@ -914,3 +914,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/post: document Pixelate defaults, LDR stack order, pixel-size/edge controls, optional model normal capture, supplied normal textures and disposal.
 - @margoengine/vfx (batch 270 job 5): document /json format/version, serialize/parse/create/load, typed assets and signed zero, explicit resource binding ownership, fog, validation budgets, AbortSignal and authoring-state scope; examples deferred.
 - margoengine (batch 270 job 5): document generated vfx/json alias; examples deferred.
+
+- @margoengine/staging (batch 272 job 1): document pathtrace-materials TexturedStill, glTF snapshots, maps/cutouts, idle lifecycle, captures, compatibility and static-scene limits; examples deferred.
+- margoengine (batch 272 job 1): document generated staging/pathtrace-materials alias; examples deferred.

@@ -33,8 +33,8 @@ export class ProgressiveStill implements EnginePlugin {
   private rasterCamera?: PassContext['camera'];
   private elapsed = 0;
   private disposed = false;
-  private constructor(
-    private tracer: MeshPathTracer,
+  protected constructor(
+    private tracer: Pick<MeshPathTracer, 'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'>,
     idleDelay: number,
   ) {
     this.idleDelay = idleDelay;
@@ -64,10 +64,9 @@ export class ProgressiveStill implements EnginePlugin {
     keys.forEach((key, index) => {
       if (key !== undefined) snapshot.scene.models[index].contentKey = key;
     });
-    const { MeshPathTracer } = await import('@margoengine/voxel-pathtracer/mesh');
-    const tracer = await MeshPathTracer.create(engine, { ...snapshot, signal, order: 20 });
+    const tracer = await this.createTracer(engine, { ...snapshot, signal, order: 20 });
     tracer.enabled = false;
-    const still = new ProgressiveStill(tracer, idleDelay);
+    const still = new this(tracer, idleDelay);
     try {
       engineRuntime(engine).use(still);
     } catch (error) {
@@ -75,6 +74,11 @@ export class ProgressiveStill implements EnginePlugin {
       throw error;
     }
     return still;
+  }
+  /** Optional still entries select transport without loading it from the ordinary controller. */
+  protected static async createTracer(engine: EngineKernel, options: MeshPathTracerOptions): Promise<Pick<MeshPathTracer, 'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'>> {
+    const { MeshPathTracer } = await import('@margoengine/voxel-pathtracer/mesh');
+    return MeshPathTracer.create(engine, options);
   }
   /** Pipeline readiness, including actual device restoration. */
   get ready(): Promise<void> {

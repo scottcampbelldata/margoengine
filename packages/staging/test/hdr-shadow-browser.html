@@ -5,6 +5,7 @@ import {GroundProjectedBackground} from '/packages/environment/dist/ground.js';
 import {GroundShadows} from '/packages/staging/dist/ground.js';
 import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {worldTriangles} from '/packages/bvh/dist/index.js';
+if(new URLSearchParams(location.search).has('compat'))await(await import('/packages/webgl2-compat/dist/index.js')).install({force:true});
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,30,0],target:[0,0,0]}});
 engine.camera.up=[0,0,-1];
 const errors=[];engine.onError=e=>errors.push(e.message);engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));

@@ -1,0 +1,51 @@
+<!doctype html><meta charset="utf-8"><title>Textured still correctness</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {TexturedStill,texturedSceneFromGLTF} from '/packages/staging/dist/pathtrace-materials.js';
+window.run=async compat=>{
+ if(compat)await(await import('/packages/webgl2-compat/dist/index.js')).install({force:true});
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const errors=[], watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));watch();
+ const scene={revision:1,models:[],instances:[],materials:[],meshes:[{id:'analytic',material:1,
+  positions:new Float32Array([-20,-20,0,20,-20,0,0,20,0]),indices:new Uint32Array([0,1,2]),
+  uvs:new Float32Array([0,0,1,0,.5,1])}],pbrMaterials:[{id:1,metallicFactor:0}],
+  environment:{ground:false,skyIntensity:0,sunIntensity:Math.PI,sunAngularSize:0,sunDirection:[0,0,1]}};
+ const still=await TexturedStill.attach(engine,{scene,idleDelay:.25,maxSamples:2,denoise:false,maxBounces:2});
+ const frame=async()=>{engine.render({delta:.125});await engine.gpu.queue.onSubmittedWorkDone();};
+ const render=async s=>{await still.setScene(s);return still.renderImage({width:8,height:8,samples:4,jitter:false,seed:17,aovs:true,signal:AbortSignal.timeout(120000)});};
+ const rows=[],texture=data=>({width:1,height:1,data:new Uint8Array(data)});
+ const compare=async(name,a,b)=>{const x=await render(a),y=await render(b);let error=0;
+  for(let i=0;i<x.color.length;i++)error=Math.max(error,Math.abs(x.color[i]-y.color[i]));
+  rows.push({name,error,finite:x.color.every(Number.isFinite)&&y.color.every(Number.isFinite)});};
+ try{
+  await still.ready;await frame();await frame();const waiting=!still.active;
+  const deadline=performance.now()+120000;
+  while(!still.stats.converged){if(performance.now()>deadline)throw Error('Textured still did not converge within 120s');await frame();}
+  const idle=still.active&&still.stats.converged;
+  const copy=()=>structuredClone(scene),linear=x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4;
+  let a=copy(),b=copy();a.pbrMaterials[0].baseColorTexture=texture([128,64,32,255]);b.pbrMaterials[0].baseColorFactor=[linear(128/255),linear(64/255),linear(32/255),1];
+  await compare('base colour in linear light',a,b);
+  a=copy();b=copy();Object.assign(a.pbrMaterials[0],{metallicFactor:.8,roughnessFactor:.6,metallicRoughnessTexture:texture([0,128,64,255])});Object.assign(b.pbrMaterials[0],{metallicFactor:.8*64/255,roughnessFactor:.6*128/255});
+  await compare('roughness and metal channels',a,b);
+  a=copy();b=copy();a.pbrMaterials[0].normalTexture=texture([255,128,255,255]);const len=Math.hypot(1,1/255,1),n=[1/len,1/(255*len),1/len];b.meshes[0].normals=new Float32Array([...n,...n,...n]);
+  await compare('normal map and shading normals',a,b);
+  a=copy();b=copy();Object.assign(a.pbrMaterials[0],{alphaMode:'MASK',baseColorTexture:texture([255,255,255,127])});b.meshes=[];
+  await compare('cutouts transmit camera and shadow rays',a,b);
+  // Licensed real photographed textures and interpolated vertex normals, no stand-in material.
+  engine.camera.position=[0,.3,.85];engine.camera.target=[0,.25,0];
+  const model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb',{signal:AbortSignal.timeout(30000)});
+  await frame();const gltf=await texturedSceneFromGLTF(model,{signal:AbortSignal.timeout(30000)});model.dispose();
+  gltf.environment={ground:false,skyIntensity:.3,sunIntensity:3,sunDirection:[-1,2,2]};
+  const textured=await render(gltf);const before=textured.color.slice();
+  const maps=gltf.pbrMaterials.filter(m=>m.baseColorTexture&&m.normalTexture&&m.metallicRoughnessTexture).length;
+  const flat=structuredClone(gltf);for(const m of flat.pbrMaterials){delete m.baseColorTexture;delete m.normalTexture;delete m.metallicRoughnessTexture;}
+  const untextured=await render(flat);let difference=0;for(let i=0;i<before.length;i++)difference+=Math.abs(before[i]-untextured.color[i]);
+  const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();await still.ready;
+  const after=await render(gltf);let restoreError=0;for(let i=0;i<before.length;i++)restoreError=Math.max(restoreError,Math.abs(before[i]-after.color[i]));
+  let aborted=false;try{await still.capture({width:8,height:8,samples:1,signal:AbortSignal.abort()});}catch(e){aborted=e.name==='AbortError';}
+  const png=await still.capture({width:8,height:8,samples:1,signal:AbortSignal.timeout(120000)});
+  return {rows,waiting,idle,maps,difference,hits:textured.instance.filter(v=>v<=-4).length,restoreError,aborted,png:png.type,errors};
+ }finally{still.dispose();still.dispose();engine.dispose();}
+};window.ready=true;
+</script>

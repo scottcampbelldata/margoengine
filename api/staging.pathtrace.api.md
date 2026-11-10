@@ -11,8 +11,9 @@ import { MeshPathTracer, MeshPathTracerOptions, MeshTraceImage, MeshTraceScene }
 export class ProgressiveStill implements EnginePlugin {
     readonly name = "progressive-still";
     readonly idleDelay: number;
-    private constructor();
+    protected constructor(tracer: Pick<MeshPathTracer, 'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'>, idleDelay: number);
     static attach(engine: EngineKernel, options: ProgressiveStillOptions): Promise<ProgressiveStill>;
+    protected static createTracer(engine: EngineKernel, options: MeshPathTracerOptions): Promise<Pick<MeshPathTracer, 'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'>>;
     get ready(): Promise<void>;
     get status(): MeshPathTracer['status'];
     get stats(): MeshPathTracer['stats'];
