@@ -151,7 +151,8 @@ export class TexturedScatter implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine.removePlugin(this.name);
+    // The scene this attachment was attached to, not whichever scene is active now.
+    this.engine.sceneOf(this)?.removePlugin(this.name);
     for (const p of this.parts) {
       if (p.primitive.instances === p.rows) p.primitive.instances = p.original;
       p.rows.dispose();

@@ -1763,6 +1763,10 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   variant sets C=1 only when core would draw the frame with its own C=1 pipeline" in packages/culling/test/culling.test.js
   (fails on the old code). Not run here: Playwright WebKit. Open, same cause, outside culling: `packages/scatter/src/index.ts`
   sets `C: 1` on its lit pipeline whenever the shader keeps the switch, patched or not.
+  Scatter fixed (2026-11-10, Mac lane E): `Scatter` records core's frame state the same way and sets `C=1` only on its
+  back-culled lit pipeline when core would draw the frame with its own `C=1` pipeline; double-sided and patched frames
+  keep `C` false. Regression: "the back-culled lit pipeline sets C=1 only when core would draw the frame with its own
+  C=1 pipeline" in packages/scatter/test/scatter.test.js (fails on the old code).
 - **`visual:check` on the RTX A6000: 16 of 81 views fail against baselines last recorded on 2026-10-31.** `npm run visual:check -- --runs=1`, Edge 156.0.4314.58. All 16 pass at 47e4d7c9c on the
   same browser, so neither the browser nor the GPU moved them. A pass/fail search of the 317 code commits since names three, each a deliberate look change that recorded no baseline: cd345c483
   (shoreline foam cap: `night-citadel`, `gameplay-sandbox`), 6f0836ee3 (the tint draw reads the surface: `flight-helmet`, `FlightHelmet`, `ABeautifulGame`, `IridescenceLamp`, `LightsPunctualLamp`) and

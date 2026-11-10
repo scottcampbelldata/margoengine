@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14693681,
+  "total": 14693676,
   "history": [
     {
       "date": "2026-10-24",
@@ -8913,12 +8913,12 @@
     "@margoengine/react/effects-extra": 8387,
     "@margoengine/react/environment": 3131,
     "@margoengine/react/fbx": 3843,
-    "@margoengine/react/geometry": 5658,
+    "@margoengine/react/geometry": 5656,
     "@margoengine/react/gltf-pro": 3809,
     "@margoengine/react/helpers": 3799,
     "@margoengine/react/html": 1529,
     "@margoengine/react/instances": 2928,
-    "@margoengine/react/jsx-dev-runtime": 2992,
+    "@margoengine/react/jsx-dev-runtime": 2990,
     "@margoengine/react/jsx-runtime": 2987,
     "@margoengine/react/lines": 1747,
     "@margoengine/react/lod": 3020,
@@ -8927,7 +8927,7 @@
     "@margoengine/react/performance": 5769,
     "@margoengine/react/physics": 6167,
     "@margoengine/react/points": 1460,
-    "@margoengine/react/portals": 4235,
+    "@margoengine/react/portals": 4234,
     "@margoengine/react/post": 4243,
     "@margoengine/react/selection": 1412,
     "@margoengine/react/shadows": 3839,

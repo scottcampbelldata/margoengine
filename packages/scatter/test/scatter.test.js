@@ -312,7 +312,8 @@ test('PBR scatter reuses standard lighting and shadow bindings without rebuildin
   assert.match(code, /let linear=direct\*0\.75\*/);
   assert.doesNotMatch(code, /i\.m0/);
   assert.doesNotMatch(code, /lodVisible|lodFade/, 'one shared mesh never fades: no dither discard');
-  assert.deepEqual(render.fragment.constants, { C: 1 }, "core's back-face discard is compiled out");
+  // Double-sided, under a patched shader and a shadow binding: core draws it with its plain pipeline (C false).
+  assert.equal(render.fragment.constants, undefined, "C follows core's plain pipeline");
   assert.equal(render.primitive, undefined, 'double-sided: nothing culled');
   assert.ok(h.groups.some((g) => g.entries.some((e) => e.resource === h.context.bindings[0].resource)));
   const created = { ...h.counts };
@@ -386,5 +387,43 @@ test('Scatter reads lodFade from the tier preset (margoPreset.scatter) only when
     assert.equal(new Scatter(geometries, { lodFade: 2 }).values[31], 2, 'explicit options win');
   } finally {
     delete globalThis.margoPreset;
+  }
+});
+
+// As culling's c89c0186c: under a shader patched by Shadows core draws single-sided meshes with its plain pipeline
+// (C false), and Metal rounds the C=1 and C false specializations of one shader apart.
+test('the back-culled lit pipeline sets C=1 only when core would draw the frame with its own C=1 pipeline', () => {
+  for (const [label, patch, own] of [
+    ['unpatched', () => {}, true],
+    [
+      'shader and bindings patched, as Shadows does',
+      (c) => {
+        c.shader = `${c.shader}\n// patched`;
+        c.bindings.push({ binding: 1, resource: { buffer: {} } });
+      },
+      false,
+    ],
+    ['shader patched alone', (c) => (c.shader = `${c.shader}\n// patched`), false],
+    ['a binding alone', (c) => c.bindings.push({ binding: 1, resource: { buffer: {} } }), false],
+  ]) {
+    const h = optionalGPU();
+    h.engine.lighting = {
+      direction: new Float32Array([-1, 0.13, 0, 1]),
+      radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+    };
+    h.context.bindings = [];
+    const effect = new Scatter(box(), { count: 64, material: new PbrMaterial({ doubleSided: false }) });
+    h.engine.use(effect);
+    h.engine.frameGraph.add({ name: 'patch', order: -5, execute: patch });
+    // Core resets the shader and bindings at the start of every frame.
+    for (let i = 0; i < 2; i++) {
+      h.context.shader = wgsl;
+      h.context.bindings.length = 0;
+      h.engine.frameGraph.execute(h.context);
+    }
+    const culled = h.pipelines.filter((p) => p.primitive?.cullMode === 'back');
+    assert.equal(culled.length, 1, `${label}: one back-culled pipeline`);
+    assert.equal(culled[0].fragment.constants?.C, own ? 1 : undefined, `${label}: C follows core's choice`);
+    effect.dispose();
   }
 });

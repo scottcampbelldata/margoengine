@@ -456,6 +456,11 @@ export class Scatter implements EnginePlugin {
   private materialUniform?: GPUBuffer;
   private readonly pbrValues = new Float32Array(32);
   private pbrShader = '';
+  // Core's frame state before any plugin patches it, read by a pass at the lowest order.
+  private readonly base: { shader: string; format: string; descriptor?: GPURenderPipelineDescriptor } = {
+    shader: '',
+    format: '',
+  };
   private pbrBindings: GPUBindGroupEntry[] = [];
   private readonly pbrGroups = new Map<GPURenderPipeline, GPUBindGroup>();
   private readonly presentation = overlayDepthPass();
@@ -747,6 +752,17 @@ export class Scatter implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
+      name: this.name + ':base',
+      order: -Number.MAX_VALUE,
+      execute: (c) => {
+        if (c.backend !== 'webgpu') return;
+        const base = this.base;
+        base.shader = c.shader;
+        base.format = c.format;
+        base.descriptor = c.descriptor;
+      },
+    });
+    graph.add({
       name: this.name + ':distribute',
       order: -10,
       execute: (c) => {
@@ -910,18 +926,28 @@ export class Scatter implements EnginePlugin {
       if (this.engine!.lighting.ambient) this.pbrValues.set(this.engine!.lighting.ambient, 28);
       c.device.queue.writeBuffer(this.pbrUniform!, 0, this.pbrValues as Float32Array<ArrayBuffer>);
     }
-    // Without the fade, the lit shader also drops core's back-face discard: override C=1 removes it at pipeline
-    // creation (as core's culled pipeline does), and single-sided materials cull back faces in the rasterizer
-    // instead. Toggling `doubleSided` later picks the other cached pipeline.
+    // Without the fade, single-sided materials cull back faces in the rasterizer. Override C=1 (which compiles out
+    // core's back-face discard) is set only where core sets it, on its own back-culled pipeline: core's shader, format
+    // and descriptor unpatched and no extra bindings. Otherwise core draws with C false, and so does this: the two
+    // specializations of one shader can round apart on Metal (culling's c89c0186c; known-bugs.md). Toggling
+    // `doubleSided` later picks the other cached pipeline.
     const solid = lit && !this.fade && c.shader.includes('override C='),
-      culled = solid && this.options.material!.data[6] < 0.5;
+      culled = solid && this.options.material!.data[6] < 0.5,
+      base = this.base,
+      own =
+        culled &&
+        !c.bindings.length &&
+        c.shader === base.shader &&
+        c.format === base.format &&
+        c.descriptor === base.descriptor;
     const key =
       c.format +
       ':' +
       c.descriptor.multisample?.count +
       ':' +
       c.descriptor.depthStencil!.format +
-      (culled ? ':culled' : '');
+      (culled ? ':culled' : '') +
+      (own ? ':own' : '');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const blades = this.values[78] > 0,
@@ -981,7 +1007,7 @@ export class Scatter implements EnginePlugin {
           module,
           entryPoint: 'fragment',
           targets: [{ format: c.format }],
-          ...(solid ? { constants: { C: 1 } } : {}),
+          ...(own ? { constants: { C: 1 } } : {}),
         },
         ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
         multisample: c.descriptor.multisample,

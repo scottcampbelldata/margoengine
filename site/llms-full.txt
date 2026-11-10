@@ -9517,6 +9517,19 @@ Batch 162 lathe/tube angular reuse: per-call Float64 tables add 16 bytes per ang
 
 Batch 162 primitive angular reuse: sphere/cylinder/capsule/torus allocate a temporary Float64 sin/cos table of 16 bytes per angular column including the seam (at most 1,040 bytes per affected p-primitives builder). No cache survives a call. Geometry buffers and groups match the parent byte for byte on the same JavaScript runtime; cross-runtime transcendental bit identity is not promised. Operation counts are not a runtime or competitive speed claim. [Evidence](whitepaper/batch-162-workcounts.md).
 
+### Terrain clipmap triangulation error (batch 169, 2026-11-10)
+
+`TerrainQuery` answers the bilinear heightmap surface exactly (66049 of 66049 samples equal
+the source). The clipmap draws each ring as two triangles per cell at that ring's spacing,
+so the drawn surface differs from the bilinear one. On a 257 x 257 fbm fixture spanning 100
+height units, the measured max error is 2.27 at the finest ring and 8.14, 15.97, 27.17 and
+62.39 at 2, 4, 8 and 16 cell spacing (RMS 0.22 to 12.89). Coarse rings sit far from the
+camera by design. [Values](whitepaper/batch-169.md#job-5-terrain-uniform-uploads).
+
+Entry size: @margoengine/terrain 13,295 to 13,310 B gzip (+15 B) for the changed-only
+uniform uploads; recorded as deliberate growth in the sizes baseline. Core and stage
+unchanged.
+
 ### Subdivision face counts against Blender (batch 169, 2026-11-10)
 
 `subdivideMesh` keeps every face planar, so each curved quad of the result is stored as
@@ -9556,6 +9569,8 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+Batch 170 React harness (2026-11-10): when an external engine module fails to evaluate (seen with an R3F build whose React bundle read `process.env`), `bench/scenes/page.js` top-level `await import(...)` rejects without setting `window.result`, so `bench/lib/browser.mjs` waits its full 600 s before the case errors. Repro: an engines.json entry whose module throws on import, then `scripts/parity-smoke-browser.mjs --standard=react --engines=margo,<that engine>`. Cause: the engine import is outside the harness's error reporting. Fix in the fix phase: report the import error as the case result, with a test that loads a throwing module.
 
 Lane B controls README (2026-11-10): strict TypeScript rejects a Spline passed directly as PathControls ControlPath because packages/splines/src/index.ts annotates at/tangent/atDistance as typeof output; declaration emission makes the defaulted output parameter optional, so the public return type includes undefined although every call returns an array. Repro: new PathControls(engine, new Spline([[0,0,0],[1,1,1]])) with strict checking of built declarations. The README uses explicit caller-owned output buffers through a ControlPath adapter; repair the owning splines return declarations with a consumer type regression in the fix phase.
 
@@ -11318,6 +11333,10 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   variant sets C=1 only when core would draw the frame with its own C=1 pipeline" in packages/culling/test/culling.test.js
   (fails on the old code). Not run here: Playwright WebKit. Open, same cause, outside culling: `packages/scatter/src/index.ts`
   sets `C: 1` on its lit pipeline whenever the shader keeps the switch, patched or not.
+  Scatter fixed (2026-11-10, Mac lane E): `Scatter` records core's frame state the same way and sets `C=1` only on its
+  back-culled lit pipeline when core would draw the frame with its own `C=1` pipeline; double-sided and patched frames
+  keep `C` false. Regression: "the back-culled lit pipeline sets C=1 only when core would draw the frame with its own
+  C=1 pipeline" in packages/scatter/test/scatter.test.js (fails on the old code).
 - **`visual:check` on the RTX A6000: 16 of 81 views fail against baselines last recorded on 2026-10-31.** `npm run visual:check -- --runs=1`, Edge 156.0.4314.58. All 16 pass at 47e4d7c9c on the
   same browser, so neither the browser nor the GPU moved them. A pass/fail search of the 317 code commits since names three, each a deliberate look change that recorded no baseline: cd345c483
   (shoreline foam cap: `night-citadel`, `gameplay-sandbox`), 6f0836ee3 (the tint draw reads the surface: `flight-helmet`, `FlightHelmet`, `ABeautifulGame`, `IridescenceLamp`, `LightsPunctualLamp`) and
@@ -22281,6 +22300,10 @@ without the optional peers; options typed by a peer you have not installed are `
 
 A box lit by the default sun, with a click handler:
 
+`Mesh` keeps the immutable React props for live pointer-handler lookup rather than copying a handler record on
+every render. Replacing a callback still takes effect without re-registering the mesh. All transform effects run
+as before. This removes prop-copy work; no measured speedup or comparison win is claimed.
+
 ```tsx
 import { createRoot } from 'react-dom/client';
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from 'margoengine/react';
@@ -22289,7 +22312,7 @@ export function App() {
   return (
     <Canvas style={{ height: 400 }}>
       <Stage camera={{ position: [0, 2, 5] }}>
-        <Mesh position={[0, 1, 0]} onClick={() => {}}>
+        <Mesh position={[0, 1, 0]} onClick={event => console.log('Selected mesh', event.object)}>
           <BoxGeometry args={[1, 1, 1]} />
           <PbrMaterial color="#84d6bd" />
         </Mesh>
@@ -22307,10 +22330,6 @@ This first scene needs no model or texture files. For a reader moving from anoth
 ## Components
 
 `Stage` configures the existing canvas stage and renders its children once that stage is available. Its `camera` prop updates the active camera; `shadows` uses the canvas's existing optional `@margoengine/shadows` lifecycle. Install that peer when enabling shadows. Canvas still creates and disposes the single engine and stage.
-
-`Mesh` and `Model` accept `onClick`, `onPointerOver`, and `onPointerOut`. The canvas dispatches hits from its existing `engine.pick`; a click requires no more than three CSS pixels of total pointer movement, so OrbitControls drags do not click. Handlers receive `nativeEvent`, the hit mesh as `object`, `mesh`, and `target`, canvas-local `x`/`y` (CSS pixels from the canvas padding edge, inside any border, the same as `engine.pick` takes), and `clientX`/`clientY`.
-
-`Group` is a geometry-free `Mesh` for parent transforms. Lowercase exports are aliases of the same hook-based components: `mesh === Mesh`, `group === Group`, `boxGeometry === BoxGeometry`, and `meshStandardMaterial === PbrMaterial`. Use a namespace in JSX:
 
 [README continues: https://margoengine.com/llms/packages/react.md]
 

@@ -95,3 +95,25 @@ test('textured scatter preserves embedded instances, tints and UVs, and rejects 
   model.dispose();
   engine.dispose();
 });
+
+// Wrong-scene dispose: `engine.removePlugin(name)` acts on the active scene, so disposing an attachment made from
+// another scene removed the active scene's same-name plugin and left the attachment registered.
+test("dispose removes it from its own scene, not the active scene's same-name plugin", async () => {
+  const { engine, model } = await fixture(),
+    other = engine.createScene('other');
+  let scatter;
+  other.use({
+    name: 'within',
+    setup() {
+      scatter = TexturedScatter.attach(engine, model, identity());
+    },
+  });
+  other.removePlugin('within');
+  const kept = { name: scatter.name, disposed: 0, setup() {}, dispose: () => kept.disposed++ };
+  engine.use(kept);
+  scatter.dispose();
+  assert.equal(engine.plugins.get(scatter.name), kept, 'the active scene lost its own same-name plugin');
+  assert.equal(kept.disposed, 0);
+  assert.equal(other.plugins.has(scatter.name), false, 'the disposed attachment stayed in its scene');
+  engine.dispose();
+});
