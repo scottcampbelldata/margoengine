@@ -453,3 +453,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 202 job 3): document loaders/geo and the regenerated selection/area alias for the already-landed entry.
 - @margoengine/road (batch 233 job 2): lanes widths, boundary styles/dashes/phase, curved arrows, reverse direction, junction connector curves/exclusions, height, defaults and runnable example after build phase.
 - margoengine (batch 233 job 2): road/lanes alias after build phase.
+- @margoengine/ui (batch 259 job 4): document /editor LayoutDocument/LayoutEditor, app-owned preview renderer, source/property/tree edits, history, validation, save/open and disposal in the README phase.
+- margoengine (batch 259 job 4): document ui/editor alias and browser editor entry page in the README phase.

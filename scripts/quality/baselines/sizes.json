@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12954284,
+  "total": 12959191,
   "history": [
     {
       "date": "2026-10-24",
@@ -6451,6 +6451,12 @@
       "commit": "cc7fd3c6b",
       "reason": "Batch 233 job 2: new optional road/lanes entry 0 to 2323 B gzip, standard ceiling 2579 B. Distance-based line and arrow construction shares frames and clipping; splitting duplicates road-coordinate ownership.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-259",
+      "reason": "Optional ui/editor: absent to 4650 B gzip, ceiling 0 to 4906 B. Reuse shared widget/text ownership and existing engine renderers instead of duplicating rendering, focus or layout. Splitting would complicate the optional API and require duplicate state. Core/stage untouched.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7638,6 +7644,8 @@
     "@margoengine/loaders/geo": 8502,
     "margoengine/loaders/geo": 314,
     "margoengine/selection/area": 317,
-    "@margoengine/road/lanes": 2579
+    "@margoengine/road/lanes": 2579,
+    "@margoengine/ui/editor": 4906,
+    "leak @margoengine/ui/editor -> @margoengine/text": 1
   }
 }

@@ -3666,6 +3666,10 @@
       "types": "./dist/ui/i18n.d.ts",
       "import": "./dist/ui/i18n.js"
     },
+    "./ui/editor": {
+      "types": "./dist/ui/editor.d.ts",
+      "import": "./dist/ui/editor.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

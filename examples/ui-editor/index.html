@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Edit Margo UI markup and styles with a live engine preview, visual properties and portable projects.">
+<title>Margo UI layout editor</title>
+<link rel="icon" href="data:,">
+<style>body{margin:0;background:#13181d}#preview{width:640px;height:360px}footer{padding:16px 24px;color:#9cabb5;font:12px system-ui}a{color:#8fd3ff}</style>
+<div id="editor"></div><canvas id="preview" width="640" height="360" aria-label="Editable layout preview"></canvas>
+<footer>Planet name: <a href="https://www.wikidata.org/wiki/Q111">Wikidata Q111</a>, CC0.</footer>
+<script type="module">
+import { Engine } from '@margoengine/core';
+import { Ui, UiRenderer } from '@margoengine/ui';
+import { LayoutEditor } from '@margoengine/ui/editor';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas);
+engine.scene.background='#080b0e';
+const ui=new Ui({width:640,height:360,scale:{reference:[640,360],match:0},safeArea:[0,0,0,0],reducedMotion:true});
+const renderer=UiRenderer.attach(engine,ui);
+const editor=new LayoutEditor(document.querySelector('#editor'),{ui,canvas,
+  markup:'<panel id="menu" class="menu" anchor="center">\n  <label id="planet" size="title">Mars</label>\n  <label id="detail">Choose your destination</label>\n  <button id="explore" variant="primary">Explore</button>\n</panel>',
+  styles:'.menu { width: 320; padding: 24; gap: 12; background: surface; }\n#explore { height: 48; }',
+});
+await ui.ready;
+let running=true;
+function tick(){if(running){engine.render(0);requestAnimationFrame(tick)}}tick();
+window.layoutEditor={editor,ui,engine,renderer,close(){running=false;editor.dispose();engine.dispose();ui.dispose()}};
+addEventListener('pagehide',()=>window.layoutEditor.close(),{once:true});
+</script>
+</html>
