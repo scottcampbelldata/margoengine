@@ -624,6 +624,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/lines (batch 227 job 3): document /debug immediate lifetime, depth/width/colour grouping, limits, persistent ArcLine, planar tilt and spherical arc defaults and degeneracies; examples deferred.
 - margoengine (batch 227 job 3): document lines/debug forwarding; generator also restores the missing clustered/shapes forwarding file required by umbrella consistency tests.
 
+<<<<<<< HEAD
 - @margoengine/splats and margoengine: document /formats parseKsplat, parseCompressedPly and encodePly, supported revisions, SH, colour conversion, binary/ASCII export, opacity endpoints, synchronous decoding and existing covariance regularization.
 
 
@@ -633,7 +634,18 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/terrain | overlays: metre-width strokes, polygon holes, all GeoJSON families, projection/style callbacks and atomic live edits; RVT addSurface/refreshSurfaces and imagery virtualTexture ordering/ownership | batch-229 job 2 |
 | margoengine | Generated terrain/overlays facade | batch-229 job 2 |
 - @margoengine/lighting2d (batch 247 job 2): document painted diffuse faces/albedo, exact temporal reuse default true, resetHistory(), source/scene edit invalidation, per-encoder snapshot sharing, memory/lifetime, and replace stale no-history/GI correctness-exception language with the documented fixture bounds.
+<<<<<<< HEAD
 
 - cinematic: document ortho camera height, existing rigStage follow, framing/group stages, projection output, size blends, zones and mixed-mode endpoints (batch 216 job 2).
 - margoengine: document cinematic/ortho alias (batch 216 job 2).
+<<<<<<< HEAD
 - @margoengine/react and margoengine: effects-extra Stars/Sparkles attributes and seed, native Trail options and explicit target=null manual mode, Edges threshold, Decal projector/material maps and parent-space coordinates.
+=======
+=======
+=======
+- @margoengine/mixer (batch 212 stereo): document Bus.insert ownership and createStereo/createBusStereo, normalized width, automation, post-send placement and disposal.
+
+- margoengine (batch 212 stereo): document the generated mixer/stereo alias.
+>>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)

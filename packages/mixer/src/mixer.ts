@@ -157,6 +157,7 @@ export class Bus implements Disposable {
   state: BusState;
   private gainDb: number;
   private effectList: Effect[] = [];
+  private readonly inserts = new Set<{ input: AudioNode; output: AudioNode; dispose(): void }>();
   private readonly ducks = new Set<{ depth: number }>();
   private readonly sends = new Set<{ node: GainNode; target: Bus }>();
   private analyser: AnalyserNode | undefined;
@@ -200,6 +201,32 @@ export class Bus implements Disposable {
   /** The effects now in the chain. */
   get effects(): readonly Effect[] {
     return this.effectList;
+  }
+
+  /** Inserts an owned optional stage after the mute gate, before output/sends. Returns an idempotent detach (no disposal). */
+  insert(stage: { input: AudioNode; output: AudioNode; dispose(): void }): () => void {
+    this.alive();
+    if (stage.input.context !== this.input.context || stage.output.context !== this.input.context)
+      throw new TypeError('Insert nodes need the bus context; create the stage on bus.input.context');
+    if (this.inserts.has(stage)) throw new TypeError('Stage is already inserted; create a separate stage for each insert');
+    this.inserts.add(stage);
+    this.wireInserts();
+    return () => {
+      if (!this.inserts.delete(stage)) return;
+      stage.output.disconnect();
+      if (!this.disposed) this.wireInserts();
+    };
+  }
+
+  private wireInserts(): void {
+    this.gate.disconnect();
+    let tail: AudioNode = this.gate;
+    for (const stage of this.inserts) {
+      stage.output.disconnect();
+      tail.connect(stage.input);
+      tail = stage.output;
+    }
+    tail.connect(this.output);
   }
 
   private alive(): void {
@@ -341,6 +368,8 @@ export class Bus implements Disposable {
   teardown(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const stage of this.inserts) stage.dispose();
+    this.inserts.clear();
     for (const effect of this.effectList) effect.dispose();
     for (const send of this.sends) send.node.disconnect();
     for (const node of [this.input, this.preTap, this.fader, this.duckNode, this.gate, this.output]) node.disconnect();

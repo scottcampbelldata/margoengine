@@ -1427,7 +1427,7 @@ module registration is shared per context and can still complete. Real OfflineAu
 renders with generated signals pass beside WebGPU and WebGL2 on RTX A6000/Edge. Unit stand-ins
 check envelopes, hold across quanta, key isolation, disposal, validation and cancellation.
 Other browsers, real dialogue and speed/latency unmeasured. LIM-583.
-Sidechain entry: 1,565 B gzip, budget 1,815 B; core plus stage remains 23,837 B.
+Sidechain entry: 1,565 B gzip, budget 1,815 B. core plus stage remains 23,837 B.
 
 ## Mixer snapshots (batch 111)
 
@@ -1542,7 +1542,7 @@ membership may prevent the requested loudness, and the after report exposes the 
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
 Loudness entry: 2,107 B gzip, budget 2,363 B.
-Mixer root entry: 6,901 B gzip, budget 6,926 B. Core plus stage remains 23,837 B gzip.
+Mixer root entry: 7,084 B gzip, budget 7,340 B. Core plus stage remains 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)
@@ -5053,6 +5053,7 @@ GPU label finish-phase limits: CSS borders currently enter the outer-rectangle s
 @margoengine/lines/debug exports DebugLines, ArcLine and arcPositions. DebugLines drawLine/drawLines/drawArc queue for the next rendered frame and clear on the following rendered frame, including zero delta. Picks never consume queued commands; extra views/targets reuse the active frame. Equal width/depth styles share one LineBatch draw (subject to device buffer splits), with endpoint colour gradients. Default width 1 CSS px, colour white, depthTest true; maximum queued segments defaults to 1,000,000 and is configurable up to 67,108,864. Debug segments retain the batch renderer's square ends and have no picking, dashes or joins. Persistent ArcLine uses ordinary Line materials and picking.
 Arc coordinates are XYZ in engine units. Default 64 segments, permitted 2..8192; planar midpoint height defaults to chord length/4, up +Y and tilt 0 radians. Great-circle arcs default to height 0 and center [0,0,0], interpolate endpoint radii linearly, and use radial midpoint height. Coincident directions and antipodes are deterministic; an endpoint at the center rejects. These are spherical paths, not ellipsoid/geographic projections. Endpoint float32 positions are exact copies. Entry gzip 9,549 B, ceiling 9,836 B; other line entries and core plus stage (24,209 B) are unchanged. No speed measurement or claim.
 
+<<<<<<< HEAD
 ### Splat interchange formats (batch 238)
 splats/formats reads KSplat 0.1 compression 0/1/2, multiple sections and capacities, full and partial spatial buckets and SH degrees 0 to 2 (the supported writer's maximum). It promotes mixed section degrees with neutral missing higher bands. SuperSplat compressed binary little-endian PLY supports 256-record chunks, position/scale 11-10-11 words, smallest-three rotations, old full-range or current per-chunk RGB, and uchar SH through degree 3. Count is capped at 3,000,000, PLY header at 64 KiB; malformed schemas, lengths and bucket ranges reject before reading attributes. These are synchronous CPU readers; no worker or reduced peak-memory claim. Standard Gaussian PLY export defaults to binary little-endian and optionally writes ASCII, including normals (zero), every SH coefficient, log scales, wxyz rotations and opacity logits. Exact opacity 0/1 writes limiting IEEE infinity logits. Colour and SH use the existing display/linear first-order mapping; quaternions are normalized and covariances use the existing Float32 floor, matching other Margo readers. GPU rendering uses the existing Splats pipeline unchanged.
 
@@ -5073,8 +5074,20 @@ Painted occupied cells have four outward surface slots; internal faces are inact
 SDF adds 32 B/pixel exact RGBA history and a 16 B change flag to its previous 48 B/pixel transform storage (80 B/pixel plus 48 B fixed uniforms/flag). Painted GI surface buffers use 192 B/source pixel (two persistent fields and immutable zero order, four vec4 faces each), plus analytic patch geometry and cascade storage. Analytic surface fields use 96 B/patch including zero order, replacing the earlier 64 B/patch. Changed-input comparisons and distance generation still run every frame; presentation traces the near connectors. Reuse avoids surface gathers and upper-cascade interval traces, not every GPU operation.
 
 Batch 247 job 2 sizes: SDF 2,667 to 2,911 B min+gzip, inside its 2,923 B ceiling; GI 9,670 to 10,348 B, ceiling raised 9,961 to 10,659 B under Scott's optional-size ruling. The bytes buy painted diffuse face transport, exact temporal change detection/reuse and owning-scene disposal. Splitting the trace/bounce contract into another entry would add synchronous adapters without removing that work. Core plus stage remains 24,209 B with no source changes.
+<<<<<<< HEAD
 
 ### Cinematic orthographic
 cinematic/ortho is new: 0 to 2877 B minified gzip, budget 3133 B. Optional brain changes 3089 to 3161 B, budget 3262 B; core plus stage remains 24209 B. OrthographicCamera defaults to full world height 10; width is height times aspect. Existing rigStage supplies follow and look-at, preserving height. OrthographicFraming translates camera and target together, preserving direction and distance, including roll and arbitrary up. Options/defaults match composer: screen [0.5,0.5], deadZone [0.1,0.1], softZone [0.8,0.8], damping 4, lookahead 0, smoothing 6, vertical true. Group defaults: padding 0.1, minHeight 0.01, maxHeight Infinity, damping 4. Finite nonnegative radii/weights, weight 0 omits; fits reports the actual padded screen fit, including smoothing/size limits. Empty groups write nothing and restart smoothing on repopulation. Size is full world height, not half-height or a zoom multiplier. orthographicOutput replaces projection bounds and sets zoom 1 so size has one meaning. Frustum clipping remains CameraProjection's responsibility. Two orthographic cameras blend height through live/interrupted blends; mixed perspective/orthographic modes switch projection at the endpoint. Neither core nor stage gains an API.
+<<<<<<< HEAD
 ### React effects helpers (batch 266 job 4)
 Effects-extra is optional: 0 -> 8,131 B min+gzip, ceiling 8,387 B. Core plus stage remains 24,209 B. Stars defaults: count 5000, radius 100, depth 50, size factor 4, speed 1, seed 1; shell samples are uniform in volume. Sparkles defaults: count 100, scale 1, size 6 pixels, speed/opacity/noise 1, seed 1. Counts are whole numbers 0..1000000. Size/speed/opacity arrays have count values, RGB and per-point noise arrays count*3. Point phase and float RGBA are updated on the CPU; stars upload 16*count colour bytes per animated frame, sparkles also update 12*count position bytes. Sparkle displacement is at most 0.1*noise*scale per axis beyond its initial half-scale box. Trail and Edges retain native line options; Decal clips in target-local coordinates and inherits its transform once. Native point, line and material GPU paths apply. No timing or shader-only animation claim.
+=======
+=======
+=======
+Stereo entry: 815 B gzip, budget 1,071 B.
+
+## Batch 212 job 1: mixer stereo
+Optional mixer/stereo: pan -1..1, width 0..1 (default 0.5 identity, 0 all mid, 1 all side). Width precedes pan; speaker stereo input duplicates mono. Width extremes can add up to 6 dB or cancel correlated audio; caller owns headroom. Native AudioParams support audio-rate automation; setters validate before cancellation and default to immediate, exponential fades settle about 98% over seconds. Bus.insert owns serial stages after mute/solo and before post sends; detach leaves stage alive, bus teardown disposes it. createBusStereo disposal detaches and restores routing. Existing pre sends stay before these stages. SetEffects preserves inserts. Tested in Edge on both backends; no other-browser or perceptual certification. Root grows 6901 -> 7084 B for insert lifecycle; stereo 0 -> 815 B, ceilings 7340 and 1071 B. Splitting bus ownership would duplicate routing/lifetime. No core/stage changes.
+>>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)

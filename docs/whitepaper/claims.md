@@ -3811,6 +3811,7 @@ Balanced planar matching assigns projected anchors to separated column ports, th
 ### Immediate debug and endpoint arcs (batch 227 job 3)
 Immediate lines batch by style and expire on the next rendered frame while all views share the current frame; picking preparation preserves queued commands. Persistent arcs expose ordinary Line picking and materials. Planar and spherical arc sampling keeps exact endpoints and finite coincident/antipodal cases. Proof: packages/lines/tests/debug.test.js and debugLines in packages/lines/tests/features-browser.js, run on both backends at 1x/4x MSAA. Tests prove draw counts, not timing; speed measurements remain deferred.
 
+<<<<<<< HEAD
 ### Batch 238 capture formats
 The optional formats entry reads KSplat 0.1 levels 0/1/2 and SuperSplat compressed PLY, and writes standard Gaussian PLY in binary little-endian or ASCII. packages/splats/test/formats.test.js compares the real MIT raccoon capture against 64 black-box getter samples per KSplat level, checks all compressed-PLY word fields and SH degrees 0-3 against independent attributes, rejects malformed layouts and round-trips the real capture's positions exactly and colour/SH/covariance within float32 conversion bounds. The GPU formats-check renders the three KSplat derivatives and PLY export on each backend. Covariance normalization/floor and the display/linear SH approximation are retained accepted differences. No runtime or compression-quality claim.
 
@@ -3823,8 +3824,18 @@ Eight clean-room presets support validated direction, edge softness, easing and 
 terrain/overlays supplies the requested metre-width polylines, filled polygons with holes and projected GeoJSON features with live updates. It paints the actual RVT and its steep/far fallback, and other materials can read the cached result. Cached imagery can sit below vectors. Evidence: overlays.test.js, overlays.browser.mjs, full terrain CPU/GPU suites and dependent CPU tests. The native fixture invalidates 20852 texels for first vector edits and 16548 for a width edit, against 262144 texels for all four whole levels; a still frame bakes zero. These are deterministic work counts without a timing or engine-speed claim. Limits and unclaimed options are in docs/terrain-overlays.md.
 ### Batch 247 job 2: GI correctness coverage
 The GI entry now includes painted finite-order diffuse interreflection and temporal reuse guarded by exact input equality. Named analytic/painted visibility and energy tests apply; static frames reuse computed intervals and changed frames match forced-fresh output. Direct buffer observations prove reuse, while independently constructed analytic boundary faces prove painted bounce orders 0/1/2/4. Source: packages/lighting2d/tests/gi-history-regressions.js and sdf.test.js, alongside the unchanged gi-regressions suite. Native and full WebGL2 compatibility run the same assertions. No arbitrary-scene physical-exactness, converged solution, noise-reduction or timing claim.
+<<<<<<< HEAD
 
 ### Orthographic cinematic cameras (batch 216 job 2)
 The optional ortho entry supports follow through the existing spring rig, screen-space framing with dead/soft zones and lookahead, sphere group framing by full visible height, and live/interrupted orthographic height blends. CPU proof: cinematic/test/ortho.test.js checks independent projection geometry, depth independence, roll, portrait aspect, custom up, damping subdivision, membership/weight/size limits, cuts and mode endpoints. ortho-browser.mjs checks actual picks at authored screen points at two depths, group endpoints, rendered pixels and blend heights on native WebGPU and WebGL2. No claim about continuous mixed-projection blends or speed.
+<<<<<<< HEAD
 ### Batch 266 effect helpers
 Stars, Sparkles, Trail, Decal and Edges are available from the optional React effects-extra entry. Each uses native owning-package rendering and geometry. Proof: effects-extra.test.js plus test-effects-extra-browser.mjs in packages/react, with exact native pixel comparisons for all five helpers on WebGPU and compatibility WebGL2. Animated point attributes use the CPU and native partial update API; there is no GPU-only simulation or speed claim.
+=======
+=======
+=======
+## Batch 212 job 1: stereo controls
+Optional mixer/stereo matches the documented equal-power pan and normalized mid/side width behaviour. Proof: stereo.test.js checks ownership and atomic setters; browser.js checks 25 pan/width combinations against independent equations in OfflineAudioContext beside WebGPU and WebGL2. No performance or listening-quality claim.
+>>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)

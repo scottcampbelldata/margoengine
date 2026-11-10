@@ -2262,6 +2262,10 @@
       "types": "./dist/mixer/loudness.d.ts",
       "import": "./dist/mixer/loudness.js"
     },
+    "./mixer/stereo": {
+      "types": "./dist/mixer/stereo.d.ts",
+      "import": "./dist/mixer/stereo.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"

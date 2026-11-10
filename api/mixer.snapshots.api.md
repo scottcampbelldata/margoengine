@@ -45,6 +45,11 @@ class Bus implements Disposable {
     get muted(): boolean;
     get solo(): boolean;
     get effects(): readonly Effect[];
+    insert(stage: {
+        input: AudioNode;
+        output: AudioNode;
+        dispose(): void;
+    }): () => void;
     setGain(db: number, options?: RampOptions): this;
     setMuted(muted: boolean, options?: RampOptions): this;
     setSolo(solo: boolean, options?: RampOptions): this;

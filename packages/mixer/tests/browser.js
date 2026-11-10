@@ -16,6 +16,7 @@ import { captureSnapshot, recallSnapshot } from '@margoengine/mixer/snapshots';
 import { createDynamics, measureTruePeak } from '@margoengine/mixer/worklet';
 import { createRoomReverb, roomImpulseResponse } from '@margoengine/mixer/reflections';
 import { measureLoudness, normalizeLoudness } from '@margoengine/mixer/loudness';
+import { createBusStereo } from '@margoengine/mixer/stereo';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -352,6 +353,23 @@ export async function runChecks() {
     near(adjusted.after.integrated, -20, 1e-5, 'normalised LUFS');
     assert(!adjusted.peakLimited, 'ordinary target is reachable by gain');
     assert(adjusted.after.truePeak <= dbToGain(-1), 'normalisation respects its peak cap');
+  });
+  await check('bus stereo follows normalized mid/side width and the specified equal-power stereo pan', async () => {
+    for (const width of [0, 0.25, 0.5, 0.75, 1]) for (const pan of [-1, -0.5, 0, 0.5, 1]) {
+      const context = new OfflineAudioContext(2, 128, rate);
+      using mixer = new Mixer(context, { buses: { x: {} } });
+      using stage = createBusStereo(mixer.bus('x'), { width, pan });
+      const b = context.createBuffer(2, 128, rate);
+      b.getChannelData(0).fill(0.2); b.getChannelData(1).fill(-0.1);
+      const source = new AudioBufferSourceNode(context, { buffer: b });
+      source.connect(mixer.bus('x').input); source.start();
+      const out = await context.startRendering();
+      const l = 0.2 + (1 - 2 * width) * -0.1, r = -0.1 + (1 - 2 * width) * 0.2;
+      const x = pan <= 0 ? pan + 1 : pan;
+      const expected = pan <= 0 ? [l + r * Math.cos(x * Math.PI / 2), r * Math.sin(x * Math.PI / 2)]
+        : [l * Math.cos(x * Math.PI / 2), r + l * Math.sin(x * Math.PI / 2)];
+      for (let c = 0; c < 2; c++) near(out.getChannelData(c)[64], expected[c], 1e-7, `width ${width}, pan ${pan}, channel ${c}`);
+    }
   });
   device?.destroy();
   return { checks, backend };

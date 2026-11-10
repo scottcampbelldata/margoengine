@@ -3274,6 +3274,7 @@ After build, run node --test --test-timeout=120000 packages/labels/tests/callout
 ### Immediate debug and arc correctness (batch 227 job 3)
 After building, run node --test --test-timeout=120000 packages/lines/tests/debug.test.js. Under a shared GPU lock run node packages/lines/scripts/test-browser.js and then the same command with --compat. The debug check verifies one-frame pixels, zero-delta clearing, depthTest behavior, pick-safe queues, immediate/persistent arc apex pixels, persistent picking, multi-view retention and restoration. CPU checks include buffer reuse, style draw counts, queue overflow, tilted/vertical planar arcs, spherical radii, coincident directions and exact/near antipodes. Fixtures are authored synthetic correctness data, with no downloaded demo assets.
 
+<<<<<<< HEAD
 ### Batch 238 formats
 Build packages, then node --test --test-timeout=120000 packages/splats/test/formats.test.js. The KSplat fixture source and exact regeneration arguments are in packages/splats/test/fixtures/NOTICE.md; rivals run in their external benchmark folder only. GPU: use gpu-lock run --owner=codex-batch238 --gpu=splats-format-render --max=2 --wait-max=60 -- node packages/splats/test/gpu/formats-check.mjs, normally and with --compat. All four render inputs derive from the existing MIT raccoon capture. No timed suite.
 
@@ -3286,7 +3287,17 @@ The transitions package GPU command documented for job 1 now also runs presets-b
 Build with npm run build:packages. Run node --test --test-timeout=300000 packages/terrain/test/overlays.test.js and the terrain package CPU suite. Render with node scripts/gpu-lock.mjs run --owner=overlays-repro --wait-max=60 --max=4 -- node packages/terrain/test/overlays.browser.mjs; append --compat to repeat on the compatibility layer. test-results/terrain-overlays.json contains coverage probes, exact baseline/restored values, display references and bake work counts. The package test:gpu script includes both imagery and overlay regressions; run it separately on each backend in a shared slot. No wall-clock benchmark, full verify or README gate is used.
 ### Batch 247 job 2
 Use the lighting2d CPU and shared-lock native/--compat browser commands listed for job 1. GI history checks appear as GI temporal, GI resetHistory, GI painted diffuse order and invalidation checks in test-results/lighting2d-browser.json. The test wraps only its own GPU allocations with COPY_SRC to observe cached intervals, then forces fresh computation for comparison. Painted-reflection oracles are independent analytic boundary segments of a generated seven-pixel U-shaped enclosure, not rival source or imported assets. Existing opaque-energy, wall and finite-order fixtures retain their bounds. No speed suite is run during the build phase.
+<<<<<<< HEAD
 
 Batch 216 orthographic: after build:packages, run node --test packages/cinematic/test/ortho.test.js; run node packages/cinematic/test/ortho-browser.mjs under the shared GPU lock, then with --compat. The diagnostic checks the subject at quarter-width/three-quarter-height before and after a depth move, interpolated world height 15 between 10 and 20, and a two-sphere group at height 5.625. No external data or timing run.
+<<<<<<< HEAD
 ### Batch 266 effect helpers
 After build:packages, run node --experimental-test-module-mocks --test --test-timeout=60000 packages/react/tests/effects-extra.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-effects-extra-browser.mjs, then repeat with --compat appended. All five native pixel oracles must be exact.
+=======
+=======
+=======
+## Batch 212 job 1: stereo controls
+Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch212 --wait-max=60 --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
+>>>>>>> 2afaa9f59 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 64145aa15 (feat(mixer): add optional stereo pan and width per bus)
+>>>>>>> 9a4df0069 (feat(mixer): add optional stereo pan and width per bus)

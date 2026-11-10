@@ -50,6 +50,10 @@
     "./loudness": {
       "types": "./dist/loudness.d.ts",
       "import": "./dist/loudness.js"
+    },
+    "./stereo": {
+      "types": "./dist/stereo.d.ts",
+      "import": "./dist/stereo.js"
     }
   },
   "files": [

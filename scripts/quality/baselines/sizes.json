@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13360437,
+  "total": 13362993,
   "history": [
     {
       "date": "2026-10-24",
@@ -6822,6 +6822,12 @@
       "commit": "099353d5f",
       "reason": "Batch 266 new optional React effects helpers: 0 to 8131 B gzip, ceiling 8387 B. Native points, lines and geometry remain lazy peers; no core/stage growth.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch212-stereo",
+      "reason": "Optional stereo controls and owned bus inserts; @margoengine/mixer 6926 -> 7340, measured 7084; @margoengine/mixer/stereo 0 -> 1071, measured 815. A separate bus lifecycle would duplicate routing ownership; core/stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -7385,7 +7391,7 @@
     "@margoengine/mesh-edit/sculpt-view": 790,
     "@margoengine/mesh-edit/section": 5555,
     "@margoengine/mesh-edit/weights": 4033,
-    "@margoengine/mixer": 6926,
+    "@margoengine/mixer": 7340,
     "@margoengine/mixer/loudness": 2363,
     "@margoengine/mixer/reflections": 3483,
     "@margoengine/mixer/sidechain": 1815,
@@ -8063,6 +8069,8 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/cinematic/ortho": 3133,
-    "@margoengine/react/effects-extra": 8387
+    "@margoengine/react/effects-extra": 8387,
+    "@margoengine/mixer/stereo": 1071,
+    "margoengine/mixer/stereo": 1071
   }
 }
