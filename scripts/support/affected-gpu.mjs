@@ -446,6 +446,10 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
         print.files.add('tests/composition/generated.json');
         print.files.add('scripts/generate-composition.mjs');
       }
+      if (test.name === 'test:integration:browser') {
+        const pages = readdirSync(join(root, 'examples/test-pages')).filter((f) => /^integration-.*\.html$/.test(f));
+        print = merge(print, ...pages.map((page) => ofScript(`examples/test-pages/${page}`)));
+      }
       // A suite whose sources name no package at all cannot be mapped: run it whenever a package is affected.
       if (!(print.packages.size || print.files.size)) print = everything(print);
     } else {

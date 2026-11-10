@@ -4584,3 +4584,7 @@ listed settings/probes are proven, XR delivery is simulated, and C1/C3-C10,
 physical headsets, every option/pixel and higher-order interactions are outside
 scope. The known ANGLE D3D11 tracer shader-link defect remains parked; no
 assertion exception was used. No package source/API, core/stage or speed claim.
+
+### J6 game integration
+
+One README-composed game scene passes on native WebGPU and full WebGL2, with four exact RGBA probes, five scene draws unchanged after device destruction/recovery, and zero tracked device allocations after disposal. Evidence: results/integration-j6-game.json; reproduction and scope: ../integration-everything.md. No speed or universal-composition claim.

@@ -108,7 +108,9 @@ test('check:merge runs the example projects a change can reach, all of them for 
   assert.deepEqual(ids(['examples/vite/src/main.tsx']), ['vite']);
   // A package an example imports runs that example; one nothing in examples/ imports runs none. The package here needs
   // few enough dependents to stay under the full-run threshold of affected-gpu.mjs, or the plan names no projects.
-  assert.ok(ids(['packages/cameras/src/index.ts']).includes('examples'));
+  assert.ok(ids(['packages/sciviz/src/index.ts']).includes('examples'));
+  // Cameras now has 14 affected workspaces and correctly crosses the existing 12-package safety threshold.
+  assert.deepEqual(ids(['packages/cameras/src/index.ts']), ['all']);
   assert.deepEqual(
     ids(['packages/dof/src/index.ts']).filter((id) => id === 'examples'),
     [],

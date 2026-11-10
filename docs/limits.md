@@ -6483,3 +6483,7 @@ and the full GPU hold is 10 minutes. No timing assertion, speed claim, package A
 or package source/size change. Evidence and reproduction:
 [integration composition](integration-composition.md) and
 [raw results](whitepaper/results/integration-j2-composition.json).
+
+## J6 game integration
+
+The game test page composes 13 optional packages on native WebGPU and full WebGL2. Four RGBA probes and five scene draws survive an actual device destruction/replacement unchanged. Teardown leaves zero tracked live device allocations, meshes, plugins, physics bodies and crowd agents. The silent audio source is exercised without an acoustic-quality claim. This is one deterministic scene, not every option or every package pair. Reproduction and instrumentation limits: [everything scenes](integration-everything.md).

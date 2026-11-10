@@ -276,7 +276,8 @@
     "build:physics-kernel": "node packages/physics/scripts/build-kernel.mjs",
     "fuzz": "node scripts/fuzz/run.js",
     "modern:test:bundlers": "node scripts/bundler-matrix.mjs",
-    "test:speed": "node scripts/speed-suite.mjs"
+    "test:speed": "node scripts/speed-suite.mjs",
+    "test:integration:browser": "node scripts/integration-browser-tests.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

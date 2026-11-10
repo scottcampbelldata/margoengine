@@ -57,6 +57,7 @@ const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
 
 /** Root suites run here. */
 export const ROOT = {
+  'test:integration:browser': 'README everything scenes, both backends, device loss and disposal',
   'test:composition:browser': 'C2 pairwise render-pass composition, native and WebGL2 compatibility, 1x and 4x MSAA',
   'modern:test:browser': 'WebGL2 and WebGPU modern pages, starters and wrappers',
   'modern:test:browser:slow-compile': 'the same with every pipeline 300 ms slower (a slow driver compiler)',

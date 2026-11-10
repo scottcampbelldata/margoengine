@@ -56,4 +56,9 @@ export const PROJECTS = [
     config: 'examples/voxel-sandbox/tsconfig.json',
     entries: () => ['examples/voxel-sandbox/src', 'examples/voxel-sandbox/vite.config.ts'],
   },
+  {
+    id: 'integration-game',
+    config: 'examples/integration/game/tsconfig.json',
+    entries: () => ['examples/integration/game.ts'],
+  },
 ];
