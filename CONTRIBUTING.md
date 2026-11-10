@@ -32,9 +32,16 @@ npm ci
 npm test
 ```
 
-Rust is only needed if you change `packages/kernel`. The toolchain is pinned in `rust-toolchain.toml`; `rustup`
-picks it up. After a kernel change, run `npm run test:kernel` and `npm run modern:build` to rebuild the checked-in
-Wasm.
+Rust is only needed to change the Wasm crates. Every Rust crate that ships as Wasm (the core kernel in
+`packages/kernel` and the feature crates such as the decoders' Draco, HDR and AVIF modules, the physics kernel and the
+procedural, sciviz and compute kernels) has its built `.wasm` committed beside its package, so `npm ci`,
+`npm run build:packages` and `npm test` work without a Rust toolchain. `scripts/wasm-blueprints.mjs` lists them all.
+
+The toolchain is pinned in `rust-toolchain.toml`; `rustup` picks it up. After changing a crate, rebuild its
+blueprint and record with `npm run wasm:rebuild -- --only=<name>` (names in `scripts/wasm-blueprints.mjs`) and run
+`npm run check:rust-kernels` (`npm run test:kernel` for the core kernel). Each blueprint has a record of the sources
+it was built from; `npm run hygiene` fails when a crate changed without a rebuild. `npm run wasm:rebuild -- --compare`
+rebuilds from source and fails if any committed blueprint differs, which proves they are current and reproducible.
 
 ## Before you open a pull request
 

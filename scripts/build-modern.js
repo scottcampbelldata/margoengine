@@ -4,7 +4,7 @@ import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
-import { gzipSync, deflateRawSync, inflateRawSync } from 'node:zlib';
+import { gzipSync, inflateRawSync } from 'node:zlib';
 import { compactPackage } from './compact-package.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 import { buildInDependencyOrder, packageDependencies, packageOrder } from './package-order.js';
@@ -16,70 +16,27 @@ import { copyLegal } from './package-legal.js';
 import { declarePackageCore } from './core-requirements.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
 import { clearStamp, packageStamps, writeStamp } from './package-stamps.mjs';
+import { buildCoreKernel, deflateKernel } from './build-core-kernel.mjs';
+import { BLUEPRINTS, blueprintBytes } from './wasm-blueprints.mjs';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
   .find((arg) => arg.startsWith('--only='))
   ?.slice('--only='.length)
   .split(',');
-const wasmPath = 'packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm',
-  optimizedPath = wasmPath.replace('.wasm', '.optimized.wasm');
-if (!precompiled)
-  execFileSync(
-    'cargo',
-    ['build', '--manifest-path', 'packages/kernel/Cargo.toml', '--target', 'wasm32-unknown-unknown', '--release'],
-    {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        CARGO_TARGET_DIR: resolve('packages/kernel/target'),
-        RUSTFLAGS: '-C target-feature=+simd128',
-      },
-    },
-  );
-// -ocimfs 300: keep the kernel's recompute path out of line so the per-entity unchanged path stays small (parts assembly, 100k entities: 3.5 vs 4.8 ms per tick).
-if (!precompiled)
-  execFileSync(
-    process.execPath,
-    [
-      'node_modules/binaryen/bin/wasm-opt',
-      wasmPath,
-      '-Oz',
-      '-ocimfs',
-      '300',
-      '--enable-simd',
-      '--enable-bulk-memory',
-      '--enable-bulk-memory-opt',
-      '--enable-nontrapping-float-to-int',
-      '--strip-debug',
-      '--strip-producers',
-      '--strip-target-features',
-      '--converge',
-      '-o',
-      optimizedPath,
-    ],
-    { stdio: 'inherit' },
-  );
+// Every Rust crate that ships as Wasm has a committed blueprint (scripts/wasm-blueprints.mjs), so --precompiled needs no
+// Rust toolchain. Without it, the core kernel, the physics kernel and the decoders' native modules are rebuilt from
+// source first; the package builds read MARGOENGINE_WASM_FROM_SOURCE.
+if (!precompiled) process.env.MARGOENGINE_WASM_FROM_SOURCE = '1';
+if (!precompiled) buildCoreKernel();
 // The physics kernel has its own blueprint, built the same way; --precompiled keeps the committed one.
 if (!precompiled) execFileSync(process.execPath, ['packages/physics/scripts/build-kernel.mjs'], { stdio: 'inherit' });
-const wasm = precompiled
-  ? inflateRawSync(
-      Buffer.from(
-        /wasmBase64(?::\s*string)?\s*=\s*'([^']+)'/.exec(await readFile('packages/core/src/wasm.ts', 'utf8'))[1],
-        'base64',
-      ),
-    )
-  : await readFile(optimizedPath);
+const wasm = blueprintBytes(BLUEPRINTS.find((entry) => entry.name === 'core-kernel'));
 assert.ok(wasm.length < 30 * 1024, `Kernel exceeds 30 KiB: ${wasm.length}`);
 assert.ok(WebAssembly.validate(wasm), 'Invalid Wasm artifact');
 // -Oz and raw deflate measured smallest for core + stage, with identical kernel output and speed (test-results/wasm-opt-bench.mjs).
-const compressedWasm = deflateRawSync(wasm, { level: 9, memLevel: 6, windowBits: 12 });
+const compressedWasm = deflateKernel(wasm);
 assert.deepEqual(inflateRawSync(compressedWasm), wasm, 'Kernel compression must be lossless');
-if (!precompiled)
-  await writeFile(
-    'packages/core/src/wasm.ts',
-    `// Generated raw-deflate blueprint; consumers need no Rust toolchain.\nexport const wasmBase64: string = '${compressedWasm.toString('base64')}';\n`,
-  );
 // Build every workspace package in dependency order (scripts/package-order.js reads package.json; a package that needs
 // another's dist at build time must declare it). A package with its own `build` script runs it; the rest use the
 // pipeline below: tsc + compaction for core and the stage facade, tsc for react, a Vite library build + tsc otherwise.
@@ -221,12 +178,13 @@ await buildInDependencyOrder(
   packageDependencies(manifests),
   jobs,
   // Under verify's recorder each package's reads form one job, so its build has its own content key, side by side too.
-  (name) => recordJob(`package:${name}`, async () => {
-    clearStamp(process.cwd(), name);
-    await buildPackage(name);
-    await declarePackageCore(resolve(`packages/${name}`));
-    writeStamp(process.cwd(), name, stamps.get(name));
-  }),
+  (name) =>
+    recordJob(`package:${name}`, async () => {
+      clearStamp(process.cwd(), name);
+      await buildPackage(name);
+      await declarePackageCore(resolve(`packages/${name}`));
+      writeStamp(process.cwd(), name, stamps.get(name));
+    }),
 );
 if (only) process.exit(0);
 recordScope('size-records');

@@ -1,5 +1,5 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -7,7 +7,7 @@ import { build } from 'vite';
 import { staticEmbind } from '../../../scripts/static-embind.js';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
-import { endTree } from '../../../scripts/support/shutdown.mjs';
+import { NATIVE_FEATURES, buildNative } from './build-native.mjs';
 
 // Plain TypeScript emit keeps every `new URL('./…', import.meta.url)` literal intact, so the consuming app's
 // bundler (Vite, webpack 5, Next.js) emits the worker and the Wasm decoders as its own assets.
@@ -23,51 +23,12 @@ execFileSync(
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
-// Build the optional clean-room asset from our crate, never from a registry codec.
-for (const feature of ['draco', 'hdr6', 'avif']) {
-  const native = spawn(
-    'cargo',
-    [
-      'build',
-      '--offline',
-      '--locked',
-      '--release',
-      '--target',
-      'wasm32-unknown-unknown',
-      '--manifest-path',
-      resolve(root, `native/${feature}/Cargo.toml`),
-    ],
-    {
-      windowsHide: true,
-      stdio: 'inherit',
-      env:
-        feature === 'avif'
-          ? { ...process.env, RUSTFLAGS: '-C target-feature=+simd128 -C link-arg=--max-memory=1073741824' }
-          : process.env,
-    },
-  );
-  let nativeTimeout = false,
-    nativeEnded = Promise.resolve([]);
-  const nativeTimer = setTimeout(() => {
-    nativeTimeout = true;
-    if (native.pid) nativeEnded = endTree(native.pid);
-  }, 120_000);
-  try {
-    const code = await new Promise((done, reject) => {
-      native.once('error', reject);
-      native.once('close', done);
-    });
-    const survivors = await nativeEnded;
-    if (nativeTimeout || code !== 0 || survivors.length)
-      throw new Error(`Clean-room ${feature} build failed or exceeded 120 s`);
-  } finally {
-    clearTimeout(nativeTimer);
-  }
-  await copyFile(
-    resolve(root, `native/${feature}/target/wasm32-unknown-unknown/release/margoengine_${feature}.wasm`),
-    resolve(dist, feature === 'draco' ? 'draco-native.wasm' : `${feature}.wasm`),
-  );
-}
+// The clean-room native decoders ship as committed blueprints (scripts/build-native.mjs builds them from native/), so
+// building the package needs no Rust toolchain. A from-source root build (`node scripts/build-modern.js` without
+// --precompiled) sets MARGOENGINE_WASM_FROM_SOURCE=1 and rebuilds them first, as does `--from-source` here.
+if (process.env.MARGOENGINE_WASM_FROM_SOURCE === '1' || process.argv.includes('--from-source'))
+  for (const feature of Object.keys(NATIVE_FEATURES)) await buildNative(feature);
+for (const { file } of Object.values(NATIVE_FEATURES)) await copyFile(resolve(root, 'src', file), resolve(dist, file));
 for (const worker of ['draco-native', 'hdr6', 'avif']) {
   await build({
     configFile: false,

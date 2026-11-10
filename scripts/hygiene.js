@@ -40,12 +40,15 @@ import { assertNoConflictMarkers } from './support/conflict-markers.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
 import { countMissingHelp, countNoFix } from './support/throw-messages.js';
 import { isUmbrellaAlias } from './umbrella.mjs';
+import { assertWasmBlueprintsCurrent } from './wasm-blueprints.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 // This safety check is fatal even while the scored gates remain in warn mode.
 assertNoConflictMarkers(root);
 assertValidTrackedManifests(root);
 assertCitedResultsTracked(root);
+// Every committed Wasm blueprint must match the crate sources it was built from (scripts/wasm-blueprints.mjs).
+assertWasmBlueprintsCurrent(root);
 const quick = process.argv.includes('--verify');
 const strict = process.argv.includes('--strict');
 const slash = (p) => p.replaceAll('\\', '/');

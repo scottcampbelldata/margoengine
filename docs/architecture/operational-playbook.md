@@ -1110,8 +1110,20 @@ package build can instead decode the checked-in payload. Both paths validate the
 30 KiB, compress with raw deflate at level 9, and verify a lossless round trip. At the audit snapshot the payload was
 9,011 bytes raw and 3,435 bytes before base64 after deflate.
 
-`npm run modern:build` rebuilds from Rust. `npm run build:packages` uses the checked-in payload. `npm run test:kernel`
-runs `cargo test --locked`. The `rlib` target lets native tests execute the same algorithms with owned vector storage.
+`npm run modern:build` rebuilds from Rust (`scripts/build-core-kernel.mjs`). `npm run build:packages` uses the checked-in
+payload and needs no Rust toolchain. `npm run test:kernel` runs `cargo test --locked`.
+
+Every Rust crate that ships as Wasm follows this pattern (2026-11-10): its built module is committed (a `.wasm` beside
+its entry, or a base64 `.ts` blueprint), `npm run build:packages` copies it and never runs cargo, and a record beside
+it holds a hash of the crate's sources, its `path =` dependencies, `rust-toolchain.toml` and the build script that
+sets its flags. `scripts/wasm-blueprints.mjs` lists all 23 shipped crates; `npm run hygiene` fails on a stale record
+or an unlisted crate, and `npm run wasm:rebuild -- --compare` rebuilds every blueprint from source and fails on any
+byte difference. Evidence: `tests/wasm-blueprints.test.js` (staleness rules); `packages/decoders/tests/build-without-rust.test.js`
+builds the decoders with cargo removed from PATH (it failed with `spawn cargo ENOENT` before the decoders' Draco, HDR
+and AVIF modules were committed). On 2026-11-10 two clean builds of every crate on one Windows PC (rustc 1.99.0) gave
+identical bytes; four committed modules (biomes erosion, compute decomp, procedural buildings, sciviz flow) differed
+from a fresh build of their current sources in 6 to 66 bytes near the end of the module and were rebuilt. Unmeasured: byte equality across
+operating systems. The `rlib` target lets native tests execute the same algorithms with owned vector storage.
 
 ### 1.2 Linear-memory contract
 
@@ -1285,7 +1297,7 @@ related functions are not promised to have the same final bits across JS engines
 
 Known kernel gaps:
 
-- No gate proves that checked-in `wasm.ts` was rebuilt from current Rust source.
+- Closed 2026-11-10: `npm run hygiene` fails when `wasm.ts` was not rebuilt from current Rust source (`packages/kernel/wasm.json`, `scripts/wasm-blueprints.mjs`; see 1.1).
 - Native Cargo tests do not execute the Wasm SIMD paths; JS tests execute the checked-in Wasm.
 - No direct cross-machine kernel-bit test and no focused kernel fuzz target.
 - `scripts/kernel-opt-experiment.js` expects the old compression and 70-float/5-flag layout; it must not be treated as
