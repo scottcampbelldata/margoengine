@@ -2209,6 +2209,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 208 cache/stream: the optional entry has a 3,654 B gzip ceiling for pull-driven network bodies and complete-body IndexedDB commits. Node tests exercise cancellation, abort, failed bodies and storage budgets; the cache browser check holds the attributed SheenChair response open until its prefix is received, then checks exact SHA-256 storage equality. This storage-only browser proof needs no GPU slot; no rendering backend behavior or timing claim changes.
+
 Batch 257 job 3: native Chromium pointer lock is proved across the canvas bridge with a trusted click, worker PointerLockControls rotation and worker-requested native exit. Six CPU cases cover state, exact deltas, permission/error paths, cancellation and ownership/disposal. This changes input forwarding only; rendering backends and core/stage remain unchanged.
 
 Batch 257 job 2: automatic worker/page selection is proved with one shared scene module and six rendered worker/page/fallback cases across WebGPU and WebGL2. Capability/module preparation precedes irreversible canvas transfer. Worker runtime failures propagate; cleanup is acknowledged over RPC before termination. Native Firefox/Safari evidence is the separate batch job 4.

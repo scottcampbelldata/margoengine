@@ -218,7 +218,8 @@ export class AssetCache {
     return true;
   }
 
-  private track<T>(work: Promise<T>): Promise<T> {
+  /** Includes subclass body work in flush() and disposal. */
+  protected track<T>(work: Promise<T>): Promise<T> {
     const done = work.finally(() => this.pending.delete(done));
     this.pending.add(done);
     return done;
@@ -341,7 +342,7 @@ export class AssetCache {
   }
 
   /** Stores a 200 response (unless `Cache-Control: no-store`) in the background and answers from its bytes. */
-  private async keep(
+  protected async keep(
     request: Request,
     key: string,
     response: Response,

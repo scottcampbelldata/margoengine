@@ -3,6 +3,7 @@
 import { AssetCache } from '../dist/index.js';
 import { evictionIndex } from '../dist/eviction.js';
 import { RangeCache } from '../dist/ranges.js';
+import { StreamingAssetCache } from '../dist/stream.js';
 
 const query = new URLSearchParams(location.search);
 
@@ -53,6 +54,28 @@ async function stream(ranges, url) {
 }
 
 window.cacheChecks = {
+  async beginMiss() {
+    const cache = new StreamingAssetCache({ name: 'stream-miss' });
+    const response = await cache.fetch('/cache-files/stream-chair.glb');
+    const reader = response.body.getReader(),
+      first = await reader.read();
+    window.finishMiss = async () => {
+      const chunks = [first.value];
+      for (;;) {
+        const next = await reader.read();
+        if (next.done) break;
+        chunks.push(next.value);
+      }
+      const bytes = await new Blob(chunks).arrayBuffer();
+      await cache.flush();
+      const stored = await (await cache.fetch('/cache-files/stream-chair.glb')).arrayBuffer();
+      const result = { digest: await hex(bytes), stored: await hex(stored), stats: { ...cache.stats } };
+      cache.dispose();
+      return result;
+    };
+    return { bytes: first.value.byteLength, files: (await cache.usage()).files };
+  },
+
   /** Loads the streaming code, so a later offline call needs no module from the server. */
   async preload() {
     await import(query.get('stream'));

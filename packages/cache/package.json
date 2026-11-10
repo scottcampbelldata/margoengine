@@ -53,6 +53,10 @@
     "./prefetch": {
       "types": "./dist/prefetch.d.ts",
       "import": "./dist/prefetch.js"
+    },
+    "./stream": {
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
     }
   },
   "files": [

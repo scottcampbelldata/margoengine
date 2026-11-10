@@ -39,6 +39,7 @@ const files = {
 const fileOf = (path) =>
   files[path] ??
   (/^\/cache-files\/tile\/\d+$/.test(path) ? Buffer.alloc(10, Number(path.split('/').pop()) & 255) : undefined);
+let releaseBody;
 
 const server = await createServer({
   root,
@@ -52,8 +53,15 @@ const server = await createServer({
       name: 'cache-files',
       configureServer(vite) {
         vite.middlewares.use((request, response, next) => {
-          const path = new URL(request.url, 'http://127.0.0.1').pathname,
-            body = fileOf(path);
+          const path = new URL(request.url, 'http://127.0.0.1').pathname;
+          if (path === '/cache-files/stream-chair.glb') {
+            response.setHeader('cache-control', 'max-age=3600');
+            response.setHeader('content-length', glb.length);
+            response.write(glb.subarray(0, 256));
+            releaseBody = () => response.end(glb.subarray(256));
+            return;
+          }
+          const body = fileOf(path);
           if (!body) return next();
           const range = request.headers.range;
           log.push({ path, range, etag: request.headers['if-none-match'] });
@@ -121,6 +129,16 @@ try {
 
   // 1. Cold: the stream reads the chair in ranges, every one fetched once and stored.
   await open();
+  const firstMiss = await call('beginMiss');
+  assert.equal(firstMiss.bytes, 256, 'first chunk delivered while the server holds the remainder');
+  assert.equal(firstMiss.files, 0, 'an incomplete response is never committed');
+  releaseBody();
+  const streamedMiss = await page.evaluate(() => window.finishMiss());
+  assert.equal(streamedMiss.digest, sha(glb));
+  assert.equal(streamedMiss.stored, sha(glb));
+  assert.equal(streamedMiss.stats.stored, 1);
+  assert.equal(streamedMiss.stats.hits, 1);
+  report.streamedMiss = { first: firstMiss, ...streamedMiss };
   let before = log.length;
   const cold = await call('streamRanges', 'chair', '/cache-files/chair.glb'),
     coldRequests = log.slice(before);

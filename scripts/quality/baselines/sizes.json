@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12587924,
+  "total": 12591578,
   "history": [
     {
       "date": "2026-10-24",
@@ -6139,6 +6139,12 @@
       "commit": "939a3d109",
       "reason": "Repair two inherited optional ceilings after the combined build; unchanged upstream runtime bytes are retained, without splitting code or reducing work. @margoengine/water: measured 20210 B before and after this metadata repair, ceiling 20185 to 20817 B; @margoengine/webgl2-compat lazy compute runtime and read-back: measured 31756 B before and after this metadata repair, ceiling 31741 to 32709 B",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-208",
+      "reason": "cache/stream new optional entry: absent to 3398 B gzip, complete pull-driven cache with cancellation and atomic EOF storage; splitting duplicates required storage semantics",
+      "grew": 1
     }
   ],
   "items": {
@@ -7259,6 +7265,7 @@
     "@margoengine/bvh/parallel": 11405,
     "margoengine/bvh/parallel": 11405,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/mcp/http": 5128
+    "@margoengine/mcp/http": 5128,
+    "@margoengine/cache/stream": 3654
   }
 }

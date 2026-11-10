@@ -454,6 +454,10 @@
       "types": "./dist/cache/prefetch.d.ts",
       "import": "./dist/cache/prefetch.js"
     },
+    "./cache/stream": {
+      "types": "./dist/cache/stream.d.ts",
+      "import": "./dist/cache/stream.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"
