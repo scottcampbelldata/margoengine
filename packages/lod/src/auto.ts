@@ -1,14 +1,21 @@
 // Builds levels of detail instead of taking them: simplified copies of a mesh (`autoLOD`) and one far mesh per cell of
 // many still meshes (`hierarchicalLOD`). @margoengine/mesh-edit does the simplifying, loaded when first needed;
 // @margoengine/materials makes the levels of its own meshes, loaded the same way.
-import { Geometry, type Mesh } from '@margoengine/core';
+import { Geometry, type EnginePlugin, type Mesh } from '@margoengine/core';
 import { meshRuntime } from '@margoengine/core/extension';
 import type { Animation } from '@margoengine/animation';
 import type { GLTFDocument, GLTFImage, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf-pro';
 import type { createMesh, Material, MaterialMesh, MeshGeometry, Texture } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
 import { normalMatrix, simplifyPacked, type Modeling, type PackedGeometry } from './attributes.js';
-import { bakeLevels, bakeOptions, levelImage, type AutoLODBake, type BakedLevels, type BakeWants } from './auto-bake.js';
+import {
+  bakeLevels,
+  bakeOptions,
+  levelImage,
+  type AutoLODBake,
+  type BakedLevels,
+  type BakeWants,
+} from './auto-bake.js';
 import type { LOD, LODLevel, LODObject, LODSystem } from './index.js';
 export type { PackedGeometry } from './attributes.js';
 export type { AutoLODBake } from './auto-bake.js';
@@ -166,7 +173,9 @@ async function modeling(signal?: AbortSignal): Promise<Modeling> {
   signal?.throwIfAborted();
   return loaded;
 }
-async function materialsPackage(signal?: AbortSignal): Promise<{ createMesh: typeof createMesh; Texture: typeof Texture }> {
+async function materialsPackage(
+  signal?: AbortSignal,
+): Promise<{ createMesh: typeof createMesh; Texture: typeof Texture }> {
   const loaded = await import('@margoengine/materials');
   signal?.throwIfAborted();
   return loaded;
@@ -231,7 +240,9 @@ const slotsOf = (model: MaterialMesh<Material | readonly Material[]> & PBRModel)
 /** The material of each primitive of a materials mesh, as one list. */
 const materialsOf = (model: MaterialMesh<Material | readonly Material[]> & PBRModel): Material[] => {
   const slots = slotsOf(model);
-  return model.primitives.map((_, i) => (slots ? (model.material as readonly Material[])[slots[i]] : (model.material as Material)));
+  return model.primitives.map((_, i) =>
+    slots ? (model.material as readonly Material[])[slots[i]] : (model.material as Material),
+  );
 };
 /**
  * What a level of a loaded model adds for its baked maps: a document with their textures and images, the images to hand
@@ -430,8 +441,7 @@ class LevelBuffer {
   packed({ vertices }: PackedGeometry, first: number, width: number, type: string): number {
     const count = vertices.length / 20,
       out = new Float32Array(count * width);
-    for (let i = 0; i < count; i++)
-      for (let k = 0; k < width; k++) out[i * width + k] = vertices[i * 20 + first + k];
+    for (let i = 0; i < count; i++) for (let k = 0; k < width; k++) out[i * width + k] = vertices[i * 20 + first + k];
     return this.add(out, width, type, 5126);
   }
   bytes(): Uint8Array {
@@ -596,7 +606,7 @@ function followNodes(model: PBRModel, made: readonly PBRModel[], lod: LOD): void
     name = 'lod-nodes:' + following++,
     t = engine.store.transforms,
     fields = [t.x, t.y, t.z, t.sx, t.sy, t.sz, t.qx, t.qy, t.qz, t.qw];
-  engine.use({
+  const follower: EnginePlugin = {
     name,
     setup() {},
     onPreUpdate() {
@@ -611,8 +621,10 @@ function followNodes(model: PBRModel, made: readonly PBRModel[], lod: LOD): void
           .setQuaternion([t.qx[a], t.qy[a], t.qz[a], t.qw[a]]);
       }
     },
-  });
-  model.onDispose(() => engine.removePlugin(name));
+  };
+  engine.use(follower);
+  // The scene it was attached to, not whichever scene is active when the model goes.
+  model.onDispose(() => engine.sceneOf(follower)?.removePlugin(name));
 }
 /** Radius of a model's bounds around their centre, in its root's units. */
 function modelRadius(model: PBRModel): number {
@@ -715,9 +727,7 @@ async function autoModelLOD(
         p.definition,
         simplifyPacked(simplify, p, ratios, signal, rigged(model, p) ? deformation(model, p) : undefined),
       );
-  const baked = bake
-      ? await bakeLevels(model.primitives, simplified, bakeWants(model), bake, signal)
-      : undefined,
+  const baked = bake ? await bakeLevels(model.primitives, simplified, bakeWants(model), bake, signal) : undefined,
     made = await modelLevels(model, simplified, ratios.length, baked, signal),
     levels: LODLevel[] = [{ object: ownNodes(model) }];
   made.forEach((object, i) => levels.push({ object, screen: screens[i] }));
@@ -752,12 +762,13 @@ export async function autoLOD(system: LODSystem, mesh: LODSource, options: AutoL
       throw new RangeError('autoLOD needs one screen size per ratio; give them the same length');
     return autoModelLOD(system, mesh, ratios, screens, bake, signal);
   }
-  if (bake) throw new TypeError('autoLOD bake needs UVs, which a core mesh has none of; pass a materials mesh or a loaded model');
+  if (bake)
+    throw new TypeError(
+      'autoLOD bake needs UVs, which a core mesh has none of; pass a materials mesh or a loaded model',
+    );
   const geometry = meshRuntime(mesh).geometry;
   if (!(geometry instanceof Geometry))
-    throw new TypeError(
-      'autoLOD needs a mesh with core geometry; call setGeometry first, or pass a materials mesh',
-    );
+    throw new TypeError('autoLOD needs a mesh with core geometry; call setGeometry first, or pass a materials mesh');
   if (screens.length !== ratios.length)
     throw new RangeError('autoLOD needs one screen size per ratio; give them the same length');
   const simplify = await simplifier(crease, signal),
@@ -959,43 +970,44 @@ export async function hierarchicalLOD(
     }
     for (const group of byMaterial.values()) {
       const merged = () => {
-      let vertexCount = 0,
-        indexCount = 0;
-      for (const mesh of group) {
-        const geometry = meshRuntime(mesh).geometry as Geometry;
-        vertexCount += geometry.vertices.length / 6;
-        indexCount += geometry.indices.length;
-      }
-      const positions = new Float32Array(vertexCount * 3),
-        normals = new Float32Array(vertexCount * 3),
-        indices = new Uint32Array(indexCount);
-      let v = 0,
-        n = 0;
-      for (const mesh of group) {
-        const runtime = meshRuntime(mesh),
-          geometry = runtime.geometry as Geometry,
-          m = runtime.matrix,
-          source = geometry.vertices,
-          { c, mirrored } = normalMatrix(m);
-        for (let i = 0; i < geometry.indices.length; i += 3) {
-          indices[n++] = geometry.indices[i] + v;
-          indices[n++] = geometry.indices[i + (mirrored ? 2 : 1)] + v;
-          indices[n++] = geometry.indices[i + (mirrored ? 1 : 2)] + v;
+        let vertexCount = 0,
+          indexCount = 0;
+        for (const mesh of group) {
+          const geometry = meshRuntime(mesh).geometry as Geometry;
+          vertexCount += geometry.vertices.length / 6;
+          indexCount += geometry.indices.length;
         }
-        for (let i = 0; i < source.length / 6; i++, v++) {
-          place(m, source[i * 6], source[i * 6 + 1], source[i * 6 + 2]);
-          for (let a = 0; a < 3; a++) {
-            positions[v * 3 + a] = point[a] - center[a];
-            normals[v * 3 + a] = c[a] * source[i * 6 + 3] + c[3 + a] * source[i * 6 + 4] + c[6 + a] * source[i * 6 + 5];
+        const positions = new Float32Array(vertexCount * 3),
+          normals = new Float32Array(vertexCount * 3),
+          indices = new Uint32Array(indexCount);
+        let v = 0,
+          n = 0;
+        for (const mesh of group) {
+          const runtime = meshRuntime(mesh),
+            geometry = runtime.geometry as Geometry,
+            m = runtime.matrix,
+            source = geometry.vertices,
+            { c, mirrored } = normalMatrix(m);
+          for (let i = 0; i < geometry.indices.length; i += 3) {
+            indices[n++] = geometry.indices[i] + v;
+            indices[n++] = geometry.indices[i + (mirrored ? 2 : 1)] + v;
+            indices[n++] = geometry.indices[i + (mirrored ? 1 : 2)] + v;
           }
-          radius = Math.max(radius, Math.hypot(positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]));
+          for (let i = 0; i < source.length / 6; i++, v++) {
+            place(m, source[i * 6], source[i * 6 + 1], source[i * 6 + 2]);
+            for (let a = 0; a < 3; a++) {
+              positions[v * 3 + a] = point[a] - center[a];
+              normals[v * 3 + a] =
+                c[a] * source[i * 6 + 3] + c[3 + a] * source[i * 6 + 4] + c[6 + a] * source[i * 6 + 5];
+            }
+            radius = Math.max(radius, Math.hypot(positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]));
+          }
         }
-      }
-      for (let i = 0; i < vertexCount; i++) {
-        const size = Math.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
-        for (let a = 0; a < 3; a++) normals[i * 3 + a] /= size;
-      }
-      return simplify ? simplify(positions, indices, [ratio])[0] : new Geometry(positions, normals, indices);
+        for (let i = 0; i < vertexCount; i++) {
+          const size = Math.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
+          for (let a = 0; a < 3; a++) normals[i * 3 + a] /= size;
+        }
+        return simplify ? simplify(positions, indices, [ratio])[0] : new Geometry(positions, normals, indices);
       };
       const first = meshRuntime(group[0]),
         mesh = (first.engine as unknown as { createMesh(): Mesh })
@@ -1042,13 +1054,15 @@ export async function hierarchicalLOD(
     },
     engine = meshRuntime(far0(meshes)).engine,
     name = 'lod-follow:' + following++;
-  if (follow) engine.use({ name, setup() {}, onPreUpdate: () => void refresh(1) });
+  const follower: EnginePlugin = { name, setup() {}, onPreUpdate: () => void refresh(1) };
+  if (follow) engine.use(follower);
   return {
     lods,
     meshes: [...made, ...models.map((model) => model.root)],
     update: () => refresh(),
     remove() {
-      if (follow) engine.removePlugin(name);
+      // The scene it was attached to, not whichever scene is active now.
+      if (follow) engine.sceneOf(follower)?.removePlugin(name);
       built.length = 0;
       for (const lod of lods) lod.remove();
       for (const mesh of made) mesh.dispose();
