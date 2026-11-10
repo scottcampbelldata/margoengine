@@ -1526,8 +1526,9 @@ export class VoxelServer {
     old.correction = old.step;
     old.loadedSent = false; // it may have been lost too; the client takes only the first
     old.cursor = 0;
-    const lost = old.chunksSent - resume.chunks;
-    if (lost < 0 || lost > RING) {
+    // Modulo 2^32, as the count travels: a client that claims more than was sent comes out above RING.
+    const lost = (((old.chunksSent - resume.chunks) % 2 ** 32) + 2 ** 32) % 2 ** 32;
+    if (lost > RING) {
       for (const key of [...old.sent.keys()]) if (this.#unsend(old, key)) old.resent++;
       this.metrics.fullResends++;
     } else for (let i = 1; i <= lost; i++) if (this.#unsend(old, old.ring[(old.chunksSent - i) % RING])) old.resent++;

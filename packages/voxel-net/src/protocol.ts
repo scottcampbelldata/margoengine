@@ -70,7 +70,7 @@ export interface InputRun {
 export interface ResumeHello {
   /** The token of its last welcome, {@link RESUME_TOKEN_BYTES} bytes. Good once. */
   token: Uint8Array;
-  /** Chunk messages it has received in all, so the server can tell which ones the dead socket lost. */
+  /** Chunk messages it has received in all, so the server can tell which ones the dead socket lost. Sent modulo 2^32. */
   chunks: number;
   /** Chunks (cx, cy, cz) of its latest edits, at most {@link MAX_STALE_CHUNKS}, which the server may never have seen. */
   stale: (readonly [cx: number, cy: number, cz: number])[];
@@ -300,7 +300,8 @@ export function encodeClientMessage(message: ClientMessage): Uint8Array {
         if (stale.length > MAX_STALE_CHUNKS)
           throw new RangeError(`Resume lists ${stale.length} stale chunks; send at most ${MAX_STALE_CHUNKS}`);
         w.raw(token);
-        w.varint(integer('resume chunks', chunks, 0, 2 ** 53 - 1));
+        // A varint holds 32 bits, so the count goes modulo 2^32 and the server compares it modulo 2^32.
+        w.varint(integer('resume chunks', chunks, 0, 2 ** 53 - 1) % 2 ** 32);
         w.varint(stale.length);
         for (const key of stale) for (const c of key) w.varint(zigzag(chunk('resume stale chunk', c)));
       }

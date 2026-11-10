@@ -186,6 +186,28 @@ test('the bytes a cut lost: only the chunks the client did not get go out again'
   assert.equal(s.server.metrics.chunksResent, again.length);
 });
 
+test('past 2^32 chunk messages a resume still resends only the lost ones (the count travels modulo 2^32)', async (t) => {
+  const s = await start(t, { maxView: 4, view: 4 }),
+    ann = await peer(s.proxy.port, 'ann', undefined, 4);
+  await ann.spawned();
+  // As if 2^32 chunk messages had gone out before these (2^32 is a whole number of rings, so the ring slots agree).
+  const wrap = 2 ** 32,
+    player = s.server.players.find((p) => p.name === 'ann');
+  player.chunksSent += wrap;
+  s.proxy.dropDown();
+  await until('the server to send its whole view', () => s.server.metrics.bytesOut.loaded > 0);
+  s.proxy.cut();
+  await s.parked();
+  const have = ann.chunkKeys(),
+    back = await peer(s.port, 'ann', backFrom(ann, ann.of('chunk').length + wrap), 4);
+  await back.spawned();
+  await back.loaded();
+  const again = back.chunkKeys();
+  assert.ok(again.length > 0, 'bytes were lost');
+  for (const key of again) assert.ok(!have.includes(key), `${key} had arrived and went out again`);
+  assert.equal(s.server.metrics.fullResends, 0, 'a full resend, as if the client had claimed more than was sent');
+});
+
 test('cut in the middle of the chunk stream: the view still arrives whole, and `loaded` too', async (t) => {
   const s = await start(t, { maxView: 4, view: 4 }),
     first = await peer(s.port, 'first', undefined, 4);

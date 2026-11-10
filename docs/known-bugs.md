@@ -5589,3 +5589,11 @@ as unsupported by the light loader.
   `other.plugins` and `engine.sceneOf(oit)` still returned `other`. Regression packages/oit/test/audit-132.test.js.
 - Open: packages/oit/test/gpu exact-check, vfx-check and real-check fail under MARGO_COMPAT=1 with the coded refusal
   "ExactOIT needs storage buffers in fragment shaders" (by design of the WebGL2 layer); they have no compat branch.
+
+## Batch 132 audit: voxel-net (fixed)
+
+- Fixed: a resume's chunk count (protocol.ts encodeClientMessage, accepted up to 2^53 - 1) went through
+  shared/bytes.js `ByteWriter.varint`, whose `>>>` keeps 32 bits, so it arrived modulo 2^32, and server.ts `#resume`
+  compared it with the unreduced `chunksSent`. Input: a session past 2^32 chunk messages, then a cut and a resume.
+  Wrong output: chunks the client had went out again (or a full resend). The count is now sent modulo 2^32 and
+  compared modulo 2^32. Regression in packages/voxel-net/tests/resume.test.js.

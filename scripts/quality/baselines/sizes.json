@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14664792,
+  "total": 14664791,
   "history": [
     {
       "date": "2026-10-24",
@@ -9306,7 +9306,7 @@
     "@margoengine/voxel-net/rewind": 2409,
     "@margoengine/voxel-net/rooms": 19966,
     "@margoengine/voxel-net/server": 18515,
-    "@margoengine/voxel-net/server-runtimes": 20060,
+    "@margoengine/voxel-net/server-runtimes": 20059,
     "@margoengine/voxel-net/shards": 9956,
     "@margoengine/voxel-net/sql-store": 1614,
     "@margoengine/voxel-net/webrtc": 7194,
