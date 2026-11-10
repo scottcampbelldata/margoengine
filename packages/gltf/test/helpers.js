@@ -56,7 +56,7 @@ function recordingDevice() {
   const buffers = new Set(),
     textures = new Set(),
     device = {
-      limits: { maxTextureDimension2D: 8192 },
+      limits: { maxTextureDimension2D: 8192, maxStorageBufferBindingSize: 1 << 27, maxBufferSize: 1 << 28 },
       vertexUploads: [],
       uniformUploads: [],
       createBuffer(descriptor) {
@@ -71,6 +71,9 @@ function recordingDevice() {
         const texture = {
           ...descriptor,
           format: descriptor.format,
+          width: descriptor.size[0],
+          height: descriptor.size[1] ?? 1,
+          mipLevelCount: descriptor.mipLevelCount ?? 1,
           createView: () => ({}),
           destroy: () => textures.delete(texture),
         };
@@ -79,10 +82,15 @@ function recordingDevice() {
       },
       createShaderModule: () => ({}),
       createRenderPipeline: () => ({ getBindGroupLayout: () => ({}) }),
+      createComputePipeline: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createPipelineLayout: () => ({}),
       createBindGroup: () => ({}),
       createSampler: (descriptor) => descriptor,
       createCommandEncoder: () => ({
         beginRenderPass: () => ({ setPipeline() {}, setBindGroup() {}, draw() {}, end() {} }),
+        beginComputePass: () => ({ setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, end() {} }),
+        copyBufferToTexture() {},
         finish: () => ({}),
       }),
       queue: {

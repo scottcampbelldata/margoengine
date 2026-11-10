@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14737072,
+  "total": 14765437,
   "history": [
     {
       "date": "2026-10-24",
@@ -8243,6 +8243,12 @@
       "commit": "40e6f183d",
       "reason": "exact vertex alpha in the solid caster path (shared/caster.js solidVertexDepth): 1 - alpha interpolation, rust-port job 2",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7b5fea95f",
+      "reason": "MASK base colour maps keep cut-out coverage per mip level (shared/alpha-mips.js compute chain); usdz worker bundles gltf-pro",
+      "grew": 7
     }
   ],
   "items": {
@@ -8635,7 +8641,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7210,
-    "@margoengine/gltf-pro": 82056,
+    "@margoengine/gltf-pro": 86524,
     "@margoengine/gltf-pro dist/workers/gltf.js": 36850,
     "@margoengine/gltf-pro dist/workers/progressive.js": 16713,
     "@margoengine/gltf-pro/asset": 5754,
@@ -8648,20 +8654,20 @@
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/material-draw": 683,
     "@margoengine/gltf-pro/metadata": 2432,
-    "@margoengine/gltf-pro/model": 62383,
+    "@margoengine/gltf-pro/model": 66635,
     "@margoengine/gltf-pro/physics": 8977,
     "@margoengine/gltf-pro/prepare": 32692,
-    "@margoengine/gltf-pro/progressive": 90997,
+    "@margoengine/gltf-pro/progressive": 95582,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/spec-gloss": 10477,
     "@margoengine/gltf-pro/splats": 2100,
-    "@margoengine/gltf-pro/worker": 82565,
-    "@margoengine/gltf/auto": 14750,
+    "@margoengine/gltf-pro/worker": 87006,
+    "@margoengine/gltf/auto": 17848,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/scene-data": 1782,
-    "@margoengine/gltf/textured": 6532,
+    "@margoengine/gltf/textured": 9381,
     "@margoengine/headless": 2864,
     "@margoengine/headless/compare": 3074,
     "@margoengine/headless/ffmpeg": 1434,
@@ -9389,7 +9395,7 @@
     "@margoengine/ui/world": 9836,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 13126,
-    "@margoengine/usdz dist/workers/usdz.js": 140245,
+    "@margoengine/usdz dist/workers/usdz.js": 144917,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/clips": 23845,
     "@margoengine/usdz/compose": 19970,

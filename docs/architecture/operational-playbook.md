@@ -1,3 +1,12 @@
+### Section 5 evidence: alpha-tested mip coverage (2026-11-10)
+
+`packages/shared/alpha-mips.js` builds the mips of `MASK` base colour maps (gltf-pro, gltf/textured) on the GPU: an
+area filter of the level above with alpha-weighted linear colour, then the alpha scale whose passing share is nearest
+to level 0's (64-candidate bisection, exact 64-bit share comparisons, unscaled state fed to the next level). Evidence:
+`packages/gltf-pro/scripts/test-mask-mips-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: every level's
+passing texel count equals a float64 CPU reference, alpha within 0 bytes and colour within 1; the plain chain kept 40
+of 1,024 texels at level 1 (259 expected) and none below. Missing: other GPU vendors, build time per map.
+
 ### Section 5 evidence: exact vertex alpha at an alpha cutoff (2026-11-10)
 
 Perspective-correct interpolation of a constant stage output of 1 is not exact (0.99999994 in some pixels); a

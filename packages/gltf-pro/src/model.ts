@@ -110,6 +110,7 @@ import { lightPBR } from '../../shared/pbr-hooks.js';
 export type { PBRLighting, PBRTransparency, PBRCapture, PBRTransmission, ExtendedPlan } from './shader.js';
 import { createKTX2Texture, getBytesPerRow } from '@margoengine/decoders/texture';
 import type { TranscodedKTX2Result } from '@margoengine/decoders';
+import { generateMaskMipmaps, maskKeepByte } from '../../shared/alpha-mips.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import {
   prepareMaterialExtension,
@@ -2976,10 +2977,17 @@ export class PBRModel implements EnginePlugin {
         size = image ? [image.width, image.height] : [1, 1];
       if (size.some((n) => n > device.limits.maxTextureDimension2D))
         throw new RangeError('Image exceeds device limit; load a smaller model, or reduce its textures and meshes');
-      const key = image ? source + ':' + format : 'default:' + i;
+      // A MASK base colour map sampled with mips keeps its cut-out coverage per level: its own copy per kept byte.
+      const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler'),
+        keep =
+          i === 0 && m.settings[0] === 1 && image && !compressed && ![9728, 9729].includes(s.minFilter!)
+            ? maskKeepByte(m.settings[1], m.base[3])
+            : 0,
+        mask = keep ? ':mask' + keep : '';
+      const key = image ? source + ':' + format + mask : 'default:' + i;
       let texture = live ? undefined : (cache.get(key) as GPUTexture | undefined);
       const shares = texture || live ? undefined : texturesOf(device, image ?? this.asset),
-        shareKey = image ? format : key,
+        shareKey = image ? format + mask : key,
         share = shares?.get(shareKey);
       if (share) {
         // Another model on this device holds the same image: count this one in (cloneModel copies upload nothing).
@@ -3028,12 +3036,13 @@ export class PBRModel implements EnginePlugin {
             { bytesPerRow: normalMaps.includes(i) ? 8 : 4 },
             [1, 1],
           );
-        if (!compressed) generateMipmaps(device, texture, levels, mipPipelines(device), mipSampler);
+        if (keep)
+          generateMaskMipmaps(device, texture, levels, mipPipelines(device), m.settings[1], m.base[3], mipSampler);
+        else if (!compressed) generateMipmaps(device, texture, levels, mipPipelines(device), mipSampler);
       }
       let view = live ?? textureViews.get(texture!);
       if (!view) textureViews.set(texture!, (view = texture!.createView()));
       r.views.push(view);
-      const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler');
       if (i < 5) {
         const resident = live ? streamed?.viewSize?.() : undefined;
         baseSources.push({

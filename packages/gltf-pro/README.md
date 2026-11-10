@@ -132,6 +132,13 @@ or disposal. Picking, CPU snapshots and glTF export retain the original filled t
 wireframe material flag. Directional sources registered with `Shadows.add(source, {static: true})` require the
 existing `Shadows.invalidate()` call after a live toggle; automatically cached casters update themselves.
 
+Cut-outs keep their density in the distance: the mip chain of a `MASK` base colour map (uncompressed, sampled with
+mips) is built on the GPU so each level passes the material's cutoff for the same share of texels as the full image,
+the nearest share that level's texels allow (Castano, "Computing Alpha Mipmaps", 2010). Colour is averaged in linear
+light weighted by alpha, so transparent texels lend no colour to leaf edges, and every texel of an odd-sized image is
+counted. The chain is fitted to the material's cutoff and base alpha at load; the same image under another cutoff gets
+its own copy. Nothing to set.
+
 `primitive.material.renderState` supplies beauty-only blend/depth overrides, polygon bias, stencil face states,
 masks/reference, `colorWrite` and `alphaToCoverage` (MASK materials on a multisampled target: edges cut by sample coverage). Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
 offsets away from the camera across main reverse-Z and forward-Z device views. `stencilReference` is live per draw

@@ -27,6 +27,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js && node --test --test-name-pattern=\"glTF loader|GLB,\" ../../tests/modern.test.js",
+    "test:gpu:mask-mips": "cd ../.. && node packages/gltf-pro/scripts/test-mask-mips-browser.mjs && node packages/gltf-pro/scripts/test-mask-mips-browser.mjs --compat",
     "test:gpu": "node ../../scripts/test-gltf-browser.mjs",
     "prepack": "npm --prefix ../.. run build:packages"
   },

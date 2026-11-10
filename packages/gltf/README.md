@@ -51,6 +51,7 @@ engine.start();
 light path. It reads any `TEXCOORD_n` set, in float or normalized form, applies `KHR_texture_transform`, multiplies by
 `baseColorFactor` and cuts at `alphaCutoff` (default 0.5). PNG and JPEG images come from the GLB, a data URI or a URL
 next to the file. Other maps, `BLEND`, and compressed or WebP textures still need `@margoengine/gltf-pro`.
+A cut-out's mip levels keep the share of texels that pass its cutoff, so leaves do not thin out in the distance.
 
 ```ts
 import { Engine } from 'margoengine/core';

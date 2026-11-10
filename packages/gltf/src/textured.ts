@@ -11,6 +11,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { setGeometrySurface } from '../../shared/mesh-source.js';
+import { generateMaskMipmaps, maskKeepByte } from '../../shared/alpha-mips.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { unitLight } from '../../shared/unit-light.js';
 import type { GLTFDocument, GLTFMaterial, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
@@ -157,7 +158,8 @@ class TexturedDraw implements EnginePlugin {
   private engine!: Engine;
   private frame?: GPUBuffer;
   private readonly values = new Float32Array(32);
-  private readonly textures = new Map<ImageBitmap, GPUTexture>();
+  // Per image, per kept alpha byte (0: no MASK coverage kept): a cut-out keeps its coverage in its own mip chain.
+  private readonly textures = new Map<ImageBitmap, Map<number, GPUTexture>>();
   private mips = new Map<unknown, unknown>();
   private white?: GPUTexture;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
@@ -210,13 +212,13 @@ class TexturedDraw implements EnginePlugin {
     part.block?.destroy();
     part.casterBuffer?.destroy();
     if (part.bitmap && ![...this.parts.values()].some((other) => other.bitmap === part.bitmap)) {
-      this.textures.get(part.bitmap)?.destroy();
+      for (const texture of this.textures.get(part.bitmap)?.values() ?? []) texture.destroy();
       this.textures.delete(part.bitmap);
     }
   }
-  private texture(bitmap: ImageBitmap | undefined): GPUTexture {
+  private texture(bitmap: ImageBitmap | undefined, surface?: Surface, keep = 0): GPUTexture {
     const device = this.engine.gpu!,
-      known = bitmap ? this.textures.get(bitmap) : this.white;
+      known = bitmap ? this.textures.get(bitmap)?.get(keep) : this.white;
     if (known) return known;
     const { width, height } = bitmap ?? { width: 1, height: 1 },
       limit = device.limits.maxTextureDimension2D;
@@ -231,8 +233,11 @@ class TexturedDraw implements EnginePlugin {
       });
     if (bitmap) {
       device.queue.copyExternalImageToTexture({ source: bitmap }, { texture }, [width, height]);
-      generateMipmaps(device, texture, levels, this.mips);
-      this.textures.set(bitmap, texture);
+      if (keep && surface) generateMaskMipmaps(device, texture, levels, this.mips, surface.cutoff, surface.alpha);
+      else generateMipmaps(device, texture, levels, this.mips);
+      let kept = this.textures.get(bitmap);
+      if (!kept) this.textures.set(bitmap, (kept = new Map()));
+      kept.set(keep, texture);
     } else {
       device.queue.writeTexture({ texture }, new Uint8Array([255, 255, 255, 255]), {}, [1, 1]);
       this.white = texture;
@@ -241,7 +246,12 @@ class TexturedDraw implements EnginePlugin {
   }
   private upload(part: Part): void {
     const device = this.engine.gpu!,
-      texture = this.texture(part.bitmap);
+      // Mips are sampled unless the sampler clamps to level 0 (NEAREST or LINEAR minification).
+      texture = this.texture(
+        part.bitmap,
+        part.surface,
+        part.bitmap && part.sampler.lodMaxClamp !== 0 ? maskKeepByte(part.surface.cutoff, part.surface.alpha) : 0,
+      );
     setGeometrySurface(part.geometry, {
       uv: part.uv,
       caster: part.surface.cutoff > 0 ? this.caster(part, texture) : undefined,
@@ -415,7 +425,7 @@ class TexturedDraw implements EnginePlugin {
     this.frame?.destroy();
     this.white?.destroy();
     this.white = undefined;
-    for (const texture of this.textures.values()) texture.destroy();
+    for (const kept of this.textures.values()) for (const texture of kept.values()) texture.destroy();
     this.textures.clear();
     // A new map, not clear(): it also holds the old device's sampler as a property.
     this.mips = new Map();
