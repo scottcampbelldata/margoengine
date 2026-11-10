@@ -78,6 +78,10 @@
     "./generate": {
       "types": "./dist/generate.d.ts",
       "import": "./dist/generate.js"
+    },
+    "./lobby": {
+      "types": "./dist/lobby.d.ts",
+      "import": "./dist/lobby.js"
     }
   },
   "files": [

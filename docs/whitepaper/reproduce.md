@@ -1,5 +1,10 @@
 # Reproducing Margo's numbers
 
+Batch 256 job 1: build packages, then run
+`node --test --test-timeout=120000 packages/netcode/tests/lobby.test.js`.
+All lobby correctness evidence uses CPU fixtures and the existing room wire
+protocol. No new GPU rendering path, benchmark or downloaded demo asset.
+
 Batch 273 failure 18: build packages, then run
 `node --test packages/webgl2-compat/test/compute-limits.test.js`.
 Run `node packages/shader/test/readback-check.mjs` in a shared GPU slot, first

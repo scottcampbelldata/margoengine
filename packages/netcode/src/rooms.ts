@@ -177,6 +177,10 @@ export abstract class Room<State = unknown> {
   get empty(): boolean {
     return !this.clients.length && !this.held.size;
   }
+  /** Admission extension point, called synchronously after authentication and immediately before seating. */
+  protected claimSeat(_options: RoomOptions): boolean {
+    return !this.locked;
+  }
   /** A small integer id for `client`, unique in this room (handy as a map key in the state). */
   idOf(client: RoomClient): number {
     return this.ids.get(client) ?? 0;
@@ -314,7 +318,14 @@ export abstract class Room<State = unknown> {
       auth = false;
     }
     // A client that left while onAuth ran is not seated: its close has already passed, so it would never leave.
-    if (auth === false || auth === undefined || auth === null || this.disposed || this.locked || !connection.open)
+    if (
+      auth === false ||
+      auth === undefined ||
+      auth === null ||
+      this.disposed ||
+      !connection.open ||
+      !this.claimSeat(options)
+    )
       return 'refused';
     client.auth = auth;
     this.ids.set(client, this.nextId++);

@@ -1966,6 +1966,10 @@
       "types": "./dist/netcode/generate.d.ts",
       "import": "./dist/netcode/generate.js"
     },
+    "./netcode/lobby": {
+      "types": "./dist/netcode/lobby.d.ts",
+      "import": "./dist/netcode/lobby.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"

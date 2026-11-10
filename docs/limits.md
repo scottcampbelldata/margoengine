@@ -1,5 +1,19 @@
 # Design envelope
 
+Batch 256 lobby: `@margoengine/netcode/lobby` provides `LobbyRoom` and `RoomLobby`.
+List results contain room id/name, detached scalar metadata, connected clients,
+reserved/reconnecting seats and capacity. Name and metadata filters are exact;
+locked, full and private rooms are omitted. Reservations default to 15 seconds,
+accept 1..2147483647 integer milliseconds, and hold capacity through async auth.
+Join with `RoomsClient.joinById(roomId, { seatToken }, joinOptions)`. Join options
+come from the server reservation, and the token is consumed once after successful
+authentication. Cancellation/expiry/disposal free holds. Applications expose the
+lobby over their own authenticated HTTP API and protect tokens with TLS; holding
+a token grants its reserved join identity. Ordinary Room subclasses can be listed
+but require LobbyRoom to reserve. Entry gzip is 4,183 B (new entry, previously
+absent); its size ceiling is 4,439 B. Keeping the capacity-safe reservation and
+listing together avoids a second room wrapper. Core and stage are unchanged.
+
 Compatibility compute pipeline binding counts obey `device.limits` on every
 compute route. Explicit layouts count all compute-visible entries across groups,
 even unused entries; external textures consume four sampled-texture slots, one

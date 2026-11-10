@@ -1,5 +1,12 @@
 # Claims and evidence
 
+Batch 256 job 1: lobby tests (`packages/netcode/tests/lobby.test.js`) establish
+metadata isolation/filtering, private/locked/full exclusion, capacity including
+reconnect holds, one-time credentials, immutable matched identity, cancellation,
+expiration during auth, concurrent redemption and real RoomsClient wire joins.
+These cover the requested listing/reservation row against the public Colyseus
+matchmaker behavior cited in clean-room.md. No throughput or GPU claim.
+
 Batch 273 failure 18: compatibility compute pipelines enforce device binding
 limits across groups before any compute route executes. Five regressions in
 `packages/webgl2-compat/test/compute-limits.test.js` cover automatic and explicit

@@ -47,6 +47,7 @@ export abstract class Room<State = unknown> {
     get locked(): boolean;
     get dropped(): RoomClient[];
     get empty(): boolean;
+    protected claimSeat(_options: RoomOptions): boolean;
     idOf(client: RoomClient): number;
     setState(state: State): void;
     setPatchRate(ms: number): void;

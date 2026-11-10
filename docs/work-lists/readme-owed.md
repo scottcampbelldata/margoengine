@@ -8,6 +8,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/fsm | events: EventMachine send/plan data, EventState/Transition hooks and guards, EventTrace capacity and disposal; payloads are references | batch-250 job 1 |
 | margoengine | Generated fsm/events alias and payload entry availability | batch-250 job 1 |
 | @margoengine/fsm | final: FinalMachine, final leaf constraints, done.state.parent, always guards, macrostep bound, stopped top-level final and goto restart | batch-250 job 2 |
+| @margoengine/netcode | lobby: LobbyRoom metadata/privacy, RoomLobby filters, reservation lifetime/cancel, one-time joinById seatToken and server-held join identity; correct stale limits | batch-256 job 1 |
+| margoengine | Generated netcode/lobby alias | batch-256 job 1 |
 | margoengine | Generated fsm/final alias | batch-250 job 2 |
 | @margoengine/tiles | tiles/style expressions, conditions/defines, renderer decorator and model/instance/point binding lifecycle | batch 239 job 1 |
 | margoengine | tiles/style generated optional re-export | batch 239 job 1 |

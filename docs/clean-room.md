@@ -1,5 +1,23 @@
 # Clean room
 
+## Batch 256 job 1: room lobby and one-time seats
+
+Research compared before implementation: Cary G. Gray and David R. Cheriton,
+*Leases: An Efficient Fault-Tolerant Mechanism for Distributed File Cache
+Consistency* (1989), https://www.cs.cmu.edu/afs/cs.cmu.edu/academic/class/15712-s12/www/papers/gray89.pdf
+(bounded holds); Michael Jones and Dick Hardt, *The OAuth 2.0 Authorization
+Framework: Bearer Token Usage*, RFC 6750 (2012), https://www.rfc-editor.org/rfc/rfc6750
+(scoped, short-lived credentials); Colyseus team, *Matchmaking* and *Room
+Visibility & Access* (accessed 2026-11-10), https://docs.colyseus.io/matchmaker
+and https://docs.colyseus.io/matchmaker/visibility (public rival behavior).
+Combined design: detached scalar metadata, exact filters, hidden/private and
+locked/full exclusion, server-held join options, 256-bit random credentials,
+bounded holds and synchronous token consumption after async authentication.
+The existing room admission path has one protected claim hook, so reservations
+and normal/reconnecting clients share the same capacity. No rival implementation
+or companion code was read. Tests use synthetic room states; no new asset demo
+or timing claim is made.
+
 ## Compatibility compute binding validation (batch 273 failure 18)
 
 Sources compared: W3C GPU for the Web Working Group, *WebGPU* (2026),
