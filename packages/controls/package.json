@@ -33,7 +33,8 @@
     "test:browser:globe": "npm run build && node scripts/test-optional-browser.js globe",
     "test:browser:collide": "npm run build && node scripts/test-optional-browser.js collide",
     "test:browser:box-gizmo": "npm run build && node scripts/test-optional-browser.js box-gizmo",
-    "test:browser:presentation": "npm run build && node scripts/test-optional-browser.js presentation"
+    "test:browser:presentation": "npm run build && node scripts/test-optional-browser.js presentation",
+    "test:browser:device-orientation": "npm run build && node scripts/test-optional-browser.js device-orientation"
   },
   "sideEffects": false,
   "exports": {
@@ -96,6 +97,10 @@
     "./presentation": {
       "types": "./dist/presentation.d.ts",
       "import": "./dist/presentation.js"
+    },
+    "./device-orientation": {
+      "types": "./dist/device-orientation.d.ts",
+      "import": "./dist/device-orientation.js"
     }
   },
   "files": [

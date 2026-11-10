@@ -5673,3 +5673,13 @@ inspector and both gizmo plugins.
 
 ### Batch 254 stereo pan (2026-11-10)
 Clean-room implementation from Web Audio API 1.1, W3C Audio Working Group (2026), https://www.w3.org/TR/webaudio-1.1/#stereopannernode and https://www.w3.org/TR/webaudio-1.1/#stereopanner-algorithm. Compared the mono equal-power and stereo balance equations with the existing sound graph; native StereoPannerNode preserves both cases and native AudioParam automation without a custom DSP loop. No rival source read. Browser PCM tests use generated constant signals as analytic stimuli, not demo recordings. Existing rain fixture remains CC BY 4.0.
+
+## Batch 197 job 6: device orientation look
+
+Sources compared before implementing the relevant design, accessed 2026-11-10:
+- Reilly Grant and Marcos Caceres (editors), *Device Orientation and Motion*, W3C Candidate Recommendation Draft (2026-10-26), https://www.w3.org/TR/2026/CRD-orientation-event-20261026/ . Intrinsic Z-X-Y degree angles, device/reference axes, nullable sensor readings, permission requests and transient activation define the adapter contract.
+- Khronos 3D Formats Working Group, *glTF 2.0 Specification*, v2.0.1 (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html . Camera -Z forward/+Y up and right-handed world axes define the output frame.
+- Ken Shoemake, *Animating Rotation with Quaternion Curves* (1985), https://doi.org/10.1145/325334.325242 . Use shortest-arc unit-quaternion smoothing via Margo's shared math; do not blend Euler sensor angles.
+- Daniel Laidig and Thomas Seel, *VQF: Highly Accurate IMU Orientation Estimation with Bias Estimation and Magnetic Disturbance Rejection* (2022 preprint, Information Fusion 2023), https://arxiv.org/abs/2203.17024 . Compared raw IMU fusion/filtering responsibilities with the browser's already fused orientation. This entry consumes browser orientations and does not implement that paper's estimator or claim its accuracy. No companion code read.
+
+Combined clean-room transform: Rx(-90 degrees) converts the reference frame to Y-up, then compose Rz(alpha) Rx(beta) Ry(gamma) Rz(-screenAngle). Camera forward/up derive from the same unit quaternion, preserving eye and look distance. Optional relative alignment and recenter factor out the current view and yaw offset. Permission is invoked synchronously before the first await; abort/timeout/disconnect suppress late results. Synthetic event and box fixtures are correctness checks, not an asset demo.

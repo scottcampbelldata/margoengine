@@ -3155,3 +3155,7 @@ preview and forced WebGL2 compatibility. CPU regressions cover cancellation,
 recycled slots, abort, toolbar and owner-scene disposal. No speed claim is made.
 
 Batch 254 stereo pan: @margoengine/audio/pan uses native StereoPannerNode for non-positional mono/stereo sounds. CPU graph/lifecycle tests and real browser Web Audio offline rendering check the six endpoint/centre cases against W3C equations. Device output and listening quality unmeasured.
+
+### Batch 197 device orientation camera
+
+The optional device-orientation entry converts standard device poses into a roll-aware Y-up camera frame, including screen rotation, relative recentering, yaw offset and quaternion smoothing. packages/controls/tests/device-orientation.test.js checks 120 poses against independent scalar matrix transforms, exact cardinal directions, finite vertical views, frame-rate agreement, nullable samples and permission lifecycles. device-orientation-browser.js replays native DOM events and checks north/west target pixels and listener cleanup on WebGPU and WebGL2. Evidence is deterministic replay rather than physical sensor accuracy or OS-dialog interaction.

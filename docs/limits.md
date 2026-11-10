@@ -3856,3 +3856,11 @@ resurrected by transform history and recycled slots are never targeted.
 
 ### Batch 254 stereo pan
 Optional @margoengine/audio/pan: 677 B minified gzip (new entry, previous 0 B). StereoAudio inherits Audio playback/filter/loop/seek features and routes volume through native StereoPannerNode. pan defaults to 0, finite -1..1, smoothed by listener.smoothing. No 3D positioning. The native panner is available for explicit automation. Browser PCM covers mono equal power and stereo balance at -1, 0 and 1. Other browsers and listening tests unmeasured. Core/stage unchanged.
+
+### Batch 197 device orientation look
+
+Optional controls/device-orientation exports DeviceOrientationControls and deviceOrientationQuaternion. Defaults source=window where available, smoothTime=0.1 seconds, relative=true, alphaOffset=0 radians. A Camera can listen without an element; an Engine updates before rendering. Relative mode aligns the first valid sample and recenter to the current view; false uses the sensor reference frame, which is not guaranteed magnetic north when event.absolute is false. Screen orientation is read on every update, including legacy window.orientation. Quaternion smoothing follows the shorter arc and leaves eye position and look distance unchanged. Null/nonfinite sensor samples are ignored.
+
+requestPermission must be called from a user gesture where the browser requires it; it returns granted/denied as a boolean and exposes permission state. It supports AbortSignal and a 10000 ms timeout by default. Disconnect/dispose/abort stop waiting and ignore a late grant; they cannot close an OS permission dialog. Browser secure-context and sensor permission policy still apply. Sensor fusion/heading accuracy is owned by the browser/device. Tests use deterministic sensor replay; physical phone hardware and native permission dialogs have not been exercised here. Disposing removes sensor listeners and the engine plugin.
+
+Entry size: controls/device-orientation 0 to 3514 B min+gzip, ceiling 3770 B. Permission lifecycle and orientation conversion share the controls base; core/stage unchanged.

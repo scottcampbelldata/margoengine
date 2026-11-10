@@ -2665,3 +2665,7 @@ exact local pose comparisons after undo/redo. Package test:browser:gizmo and
 test:browser:gizmo:compat expose both routes to check:gpu-packages.
 
 Batch 254 pan: build packages, run node --test --test-timeout=60000 packages/audio/tests/pan.test.js, then node scripts/gpu-lock.mjs run --owner=audio-pan --max=4 --wait-max=60 -- node packages/audio/scripts/test-browser.js. pan-browser.js compares PCM to W3C mono/stereo equations; test-results/audio-browser.json stores the browser report.
+
+### Batch 197 device orientation
+
+After build:packages, run node --test --test-timeout=30000 packages/controls/tests/device-orientation.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js device-orientation. Read packages/controls/test-results/device-orientation-browser.json for both backends' replay pixel and cleanup checks. Permission abort/timeout tests cover clock correctness, not a speed assertion.

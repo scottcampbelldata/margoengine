@@ -646,6 +646,10 @@
       "types": "./dist/controls/presentation.d.ts",
       "import": "./dist/controls/presentation.js"
     },
+    "./controls/device-orientation": {
+      "types": "./dist/controls/device-orientation.d.ts",
+      "import": "./dist/controls/device-orientation.js"
+    },
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
