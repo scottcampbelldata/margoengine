@@ -4459,7 +4459,7 @@ membership may prevent the requested loudness, and the after report exposes the 
 A programme with no qualifying complete 400 ms block raises coded state with help link.
 Peak cap/measurement uses the finite four-phase FIR model, not all DACs/codecs. LIM-596.
 Loudness entry: 2,106 B gzip, budget 2,362 B.
-Mixer root entry: 7,121 B gzip, budget 7,340 B. Core plus stage remains 23,837 B gzip.
+Mixer root entry: 7,121 B gzip, budget 7,340 B. At the original loudness landing, core plus stage measured 23,837 B gzip.
 Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio times/durations and float32 parameter/gain bounds before mutating state or cancelling automation. Invalid releases remain active; undefined release/gate durations retain 0.4/0.01 second defaults. Regression: mixer.test.js.
 
 ## 2D light masks and layers (batch 55)
@@ -6823,6 +6823,23 @@ previous classifier on failed setup, and leaves no change/abort subscriptions
 after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
+
+## HTMLBlend explicit views (2026-11-10)
+The aperture and live DOM use the same inherited LabelView camera and rectangle.
+Normalized rectangles scale with the active target; drawing-buffer-pixel views
+scale from the canvas into that target. An explicit view without a camera uses
+the engine camera, matching LabelRenderer. Mask scissors cover that rectangle
+and clip to the target. Preview restores its previous viewport/scissor state;
+its viewport coordinates follow OpenGL ES integer pixel conversion. Existing
+rectangular-mask, scene-depth and DOM pointer-routing limits remain unchanged.
+Regressions: packages/html/test/blend.test.js and blend-browser.js, including
+native WebGPU, full WebGL2 compatibility and alpha-enabled preview.
+Installed html/blend grows from 3,111 to 3,442 B min+gzip; its ceiling changes
+from 3,303 to 3,698 B under the optional-package size rule. The additional 331 B
+keep camera, viewport conversion, clipping and backend state restoration in the
+same aperture owner. Splitting them would duplicate mask/DOM lifecycle or require
+callers to coordinate backend state. The parent and current builds were emitted
+with identical settings; the isolated current result matches the canonical build.
 
 ## Mixer insert ownership after disposal (2026-11-10)
 A retained disposed Bus no longer holds its former optional stages through the
@@ -9424,6 +9441,10 @@ Sciviz notebook/share library entries use the installed backend when prepareBack
 
 ## J6 product integration
 The eleven optional product-viewer packages, including PostStack, compose with React ownership, exact RGBA8 restoration and shared cross-backend probes on RTX A6000 native WebGPU, ANGLE D3D11 and ANGLE Vulkan. Four draws and zero tracked teardown allocations are checked. webgl2-compat preserves hardware implicit footprint selection; explicit mip interpolation remains separate. Intermediate HDR bits and whole images are not promised equal. See [product methods and stored-bit proof](integration-product.md). No backend-specific probes or speed claim.
+
+## Review 5 biased implicit sampling
+
+Biased and unbiased implicit texture requests retain hardware filtering and footprint selection. Shader mip interpolation covers explicit levels and gradients only. Exact native bits are proven for the committed 20-probe bias fixture on RTX A6000, ANGLE D3D11 and Vulkan; no universal GPU filtering claim. See [methods and reproduction](review5-compat-bias.md).
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -13987,7 +14008,7 @@ cannot release a replacement handle. Regression:
 packages/audio/tests/voice-manager.test.js; all three new lifecycle regressions
 fail without their corresponding repairs. Valid transport, ranking and waveform
 checks retain their existing assertions.
-- Batch 260 HTMLBlend inherited custom view: with `HTMLBlend.attach(engine, {view: {viewport: [0.5, 0, 0.5, 1]}})`, the DOM projects into that rectangle while the aperture uses the active render context's camera/viewport. Cause: mask draw consumes PassContext rather than LabelRenderer.view. Ordinary full-canvas blending passes on all three backends; synchronize explicit view/scissor/camera in the fix phase.
+Fixed 2026-11-10: batch 260 HTMLBlend inherited custom view. Apertures now use the same explicit camera and view rectangle as the DOM, converting normalized or drawing-buffer-pixel coordinates into the current target's pixels. Both drawing paths set the matching scissor; preview restores its prior scissor rectangle and enable state. Four CPU regressions fail on the parent and cover engine-camera fallback, a custom camera, fractional edges and a scaled target. blend-browser.js checks live DOM centers, intact opaque control pixels outside both view and panel, input and GL state on native WebGPU, full compatibility and preview. Existing foreground, visibility, resize, removal and disposal assertions remain intact.
 
 
 Fixed immediately after batch 171 landing: a88cfd4fe contained unresolved boundaries in docs/api-surface.md after a native helper failed but its PowerShell caller continued. Authoritative api:update regenerates the summary; generated-metadata-conflicts.test.js fails on that published artifact and passes on the repair. No engine or atmosphere runtime source changed.
@@ -14990,6 +15011,18 @@ Open (not fixed in the audit):
   tiltY 30 gives pi), where the specification's informative `tilt2spherical` returns 0 ("not enough information"); the
   code inverts `spherical2tilt` instead, a deliberate difference.
 
+## Batch 132 audit: net (fixed and open)
+
+Fixed with a regression in `packages/net/test/audit-132.test.js` (fails on the code before the fix): `SnapshotBuffer.sample`
+drew the cubic Hermite position but returned the straight blend of the two snapshots' velocities, so the velocity was
+not the one the position moved at. On a cubic path p(t) = t^3 - 2t pushed at 0, 0.5 and 1.3 with exact velocities, the
+position came back exact and the velocity was off by 0.18 at t = 0.2 and 0.48 at t = 0.9. It is now the derivative of
+the Hermite curve (exact on that path; equal to the old value at the snapshots themselves).
+
+Open: the playout papers behind `net/delay` (Ramjee et al. 1994, Moon, Kurose and Towsley 1998) were read by the author
+but could not be fetched for this audit; `WARM` (8 arrivals before the measurement replaces `initial`) and the 0.9995
+slerp cut-over are Margo's own numbers (the nlerp error at that cut-over is below 1e-6 rad).
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -15771,10 +15804,11 @@ shader shows the WGSL of the latest WebGPU frame; both build their text only whi
 `EditHistory` from `margoengine/inspector/history`, `snapshotMeshes`/`restoreSnapshot`/`parseSnapshot` from
 `margoengine/inspector/snapshot` and `describeEngine` from `margoengine/inspector/resources`.
 
-Not included: creating or deleting entities, reparenting, shader editing and a GPU memory view (WebGPU does not report
-resource sizes). Other packages' lights, materials, shadows and effects are edited in the package panel below.
+Creation, deletion and reparenting use the optional `/edit` entry; WGSL editing uses `/shaders`.
+The root panel has no GPU memory view (WebGPU does not report resource sizes).
+Other packages' lights, materials, shadows and effects are edited in the package panel below.
 
-## Edit other packages' objects
+## Choose an optional editor
 
 [README continues: https://margoengine.com/llms/packages/inspector.md]
 
@@ -21172,7 +21206,7 @@ const output = createSnapshot();
 buffer.sample(renderTimeSeconds, output);
 ```
 
-Position interpolation is cubic Hermite using endpoint velocities; rotations use shortest-arc slerp. Ordered snapshots are copied into a preallocated ring, quaternions normalized, and duplicate/out-of-order timestamps return false. Extrapolation uses last velocity up to maxPrediction (default 0.25 seconds), then holds. Before the oldest sample, the oldest pose is held. Outputs are reused by default; supply your own to retain results. This is interpolation/prediction, not transport, authority, rollback or packet security.
+Position interpolation is cubic Hermite using endpoint velocities, and the sampled velocity is that curve's derivative; rotations use shortest-arc slerp. Ordered snapshots are copied into a preallocated ring, quaternions normalized, and duplicate/out-of-order timestamps return false. Extrapolation uses last velocity up to maxPrediction (default 0.25 seconds), then holds. Before the oldest sample, the oldest pose is held. Outputs are reused by default; supply your own to retain results. This is interpolation/prediction, not transport, authority, rollback or packet security.
 
 ## Adaptive render delay
 
@@ -21229,16 +21263,6 @@ buffer.push(10.1, {position: [0.1, 0, 0], tint: [0, 0, 1], clipTime: 0.05});
 const now = buffer.sample(10.05);
 console.log(now?.position, now?.tint, now?.clipTime);
 ```
-
-| Type | Blend | Past the newest snapshot |
-| --- | --- | --- |
-| `linear` | Straight line. One plain number, or `size` numbers | Holds |
-| `hermite` | Cubic through both ends, using its `velocity` field (a `linear` field of the same size) | Runs on, up to `maxPrediction` |
-| `angle` | Radians, the short way round | Holds |
-| `quaternion` | Shortest-arc slerp, normalized when pushed | Holds |
-| `color` | RGB or RGBA in linear light; `space` is `'srgb'` (default) or `'linear'`, alpha straight | Holds |
-| `time` | Animation time. `period` loops it through the seam; `clip` names a `step` field it never blends across | Runs on at its last rate, up to `maxPrediction` |
-| `step` | None: changes on the next snapshot's time | Holds |
 
 [README continues: https://margoengine.com/llms/packages/net.md]
 

@@ -90,7 +90,10 @@ test('wrapped timestamp search preserves linear-search Hermite and quaternion re
         (u3 - 2 * u2 + u) * span * a[8 + i] +
         (-2 * u3 + 3 * u2) * b[1 + i] +
         (u3 - u2) * span * b[8 + i];
-      output.velocity[i] = (1 - u) * a[8 + i] + u * b[8 + i];
+      output.velocity[i] =
+        ((6 * u2 - 6 * u) * (a[1 + i] - b[1 + i])) / span +
+        (3 * u2 - 4 * u + 1) * a[8 + i] +
+        (3 * u2 - 2 * u) * b[8 + i];
     }
     let dot = 0;
     for (let i = 0; i < 4; i++) dot += a[4 + i] * b[4 + i];

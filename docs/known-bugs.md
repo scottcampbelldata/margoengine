@@ -5560,3 +5560,15 @@ Open (not fixed in the audit):
 - `Pen` tilt to angles at |tilt| = 90 with the other tilt nonzero returns the azimuth of the leaning side (tiltX -90,
   tiltY 30 gives pi), where the specification's informative `tilt2spherical` returns 0 ("not enough information"); the
   code inverts `spherical2tilt` instead, a deliberate difference.
+
+## Batch 132 audit: net (fixed and open)
+
+Fixed with a regression in `packages/net/test/audit-132.test.js` (fails on the code before the fix): `SnapshotBuffer.sample`
+drew the cubic Hermite position but returned the straight blend of the two snapshots' velocities, so the velocity was
+not the one the position moved at. On a cubic path p(t) = t^3 - 2t pushed at 0, 0.5 and 1.3 with exact velocities, the
+position came back exact and the velocity was off by 0.18 at t = 0.2 and 0.48 at t = 0.9. It is now the derivative of
+the Hermite curve (exact on that path; equal to the old value at the snapshots themselves).
+
+Open: the playout papers behind `net/delay` (Ramjee et al. 1994, Moon, Kurose and Towsley 1998) were read by the author
+but could not be fetched for this audit; `WARM` (8 arrivals before the measurement replaces `initial`) and the 0.9995
+slerp cut-over are Margo's own numbers (the nlerp error at that cut-over is below 1e-6 rad).

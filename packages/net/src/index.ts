@@ -77,7 +77,8 @@ export class SnapshotBuffer {
     return true;
   }
   /**
-   * State at `time` seconds: Hermite position and slerped rotation between the surrounding snapshots, or
+   * State at `time` seconds: Hermite position, its derivative as velocity, and slerped rotation between the surrounding
+   * snapshots, or
    * linear extrapolation from the newest (up to `maxPrediction`). Before the oldest it returns the oldest.
    * Returns null while empty. The default output is reused by every call.
    * @throws RangeError for a non-finite time.
@@ -114,7 +115,11 @@ export class SnapshotBuffer {
         (u3 - 2 * u2 + u) * span * data[a + 8 + i] +
         (-2 * u3 + 3 * u2) * data[b + 1 + i] +
         (u3 - u2) * span * data[b + 8 + i];
-      output.velocity[i] = (1 - u) * data[a + 8 + i] + u * data[b + 8 + i];
+      // The derivative of that curve, so the velocity is the one the position moves at.
+      output.velocity[i] =
+        ((6 * u2 - 6 * u) * (data[a + 1 + i] - data[b + 1 + i])) / span +
+        (3 * u2 - 4 * u + 1) * data[a + 8 + i] +
+        (3 * u2 - 2 * u) * data[b + 8 + i];
     }
     slerpInto(output.rotation, 0, data, a + 4, b + 4, u);
     return output;
