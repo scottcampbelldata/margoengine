@@ -280,3 +280,22 @@ test('a physical-shading replacement receives no native volume helper or uniform
   assert.doesNotMatch(code,/fn margoVolumeTint\(/);
   assert.doesNotMatch(code,/f\.ext\./);
 });
+
+test('native volume upload retains explicit optical depth and legacy attenuation limits', async (t) => {
+  const f = await fixture();
+  t.after(() => f.engine.dispose());
+  const material = f.model.primitives[0].material;
+  Object.assign(material, {
+    tint: [0, 0, 1], attenuation: [0, 0, 1], opticalDepth: [400, 200, 0],
+    ext: [0, 1.5, 0, 0], physical: [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+  });
+  const lanes = () => {
+    f.frame();
+    const values = f.model.resources[0].values;
+    return [values[98], values[99], values[102]];
+  };
+  assert.deepEqual(lanes(), [400, 200, 0]);
+  delete material.opticalDepth;
+  material.attenuation = [0.25, 0, 1];
+  assert.deepEqual(lanes(), [Math.fround(Math.log(4)), -1, 0]);
+});

@@ -629,9 +629,9 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   values.set(floatsOf(write[3]), write[2] / 4);
   near(
     [values[98], values[99], values[102]],
-    [1, 1, 1],
+    [0, 0, 0],
     1e-6,
-    'tint lanes: volume attenuation alone, the rest comes from the surface',
+    'tint lanes: zero volume optical depth, the rest comes from the surface',
   );
   ibl.applyTo(model);
   log = draw();

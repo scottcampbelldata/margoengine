@@ -2641,6 +2641,12 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   the published comparison bypass this confound without changing geometry or drawing less work. A linear
   composition/output contract across the owning optional packages is still needed; this remains open.
 
+  Lane G current-main controls (2026-11-10): the complete five-pane weighted
+  picture still has MAE 1.5675188078703703 and max 15 on both backends. The
+  graded single-layer probe reads red 94 sorted and 93 weighted, against 137
+  for linear-light composition; opaque control is 188. Same-frame GPU buffer
+  copies retain the canvas before presentation expiry. Neither cause is closed.
+
 
 - **Default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`, perf history 110):
   297 directions across sun elevations 10/45/75 degrees and turbidity 2/3/6. Normalize each sky by its own
@@ -2649,6 +2655,10 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   with Margo horizon/turbidity clamps and daylight-locus chromaticity adjustment, not the newer fitted
   sunsky model. Absolute units are also not interchangeable. Repro under the shared GPU lock:
   `node packages/sky/scripts/rival-bench.mjs`. The normalized model loss remains open.
+
+  Lane G repeated only the original 297-direction value comparison against
+  the retained Mitsuba values, without timing: MAE 1.4392275140102735 and
+  max 70.6817830576387. The formulation difference remains.
 
 ### Audio Doppler (batch 110)
 
@@ -2666,6 +2676,10 @@ The first Doppler verify found the limits index still at LIM-602 and the generat
   versus 0.048351. Cause: `packages/staging/src/index.ts` keeps nearest-surface height and applies fixed
   Gaussian blur and opacity, which cannot integrate the directional hemispherical visibility field.
   Repro under the shared GPU lock: `node packages/staging/scripts/rival-bench.mjs`. Loss stays open.
+
+  Lane G's current-main correctness-only contact comparison retains all
+  15,472 pixels and 4096 rays: MAE 0.04817386029045438, mean darkness
+  0.00017742360646430213 against 0.048351283896918625. No shadow option changed.
 
 
 The batch 168 OIT image loss above is also confirmed against an independent Cycles path trace:
@@ -2723,6 +2737,10 @@ sampling/display resolution and BRDF effects need separate controls. No shader c
 guess about that residual, and recording a budget does not close the loss. No physical/path-traced parity
 is established by this first job; the environment/Cornell jobs remain outstanding.
 
+Lane G reran the complete frozen scene on both backends without capturing a
+new reference or changing a budget. Both integer gates pass with the same
+MAEs above; the measured picture loss remains open.
+
 ### Batch 160 clearcoat picture loss (open)
 
 Repro: `node scripts/reference-rendering/run.mjs --case=clearcoat` through the GPU lock, after
@@ -2736,6 +2754,14 @@ Fresnel uses VdotH, while the extension's nonnormative layering example uses Ndo
 None of these has been proved to explain the full image error. Base-material, texture-filtering,
 normal-map and silhouette errors are included, not removed by masking. No reference-specific
 shader adjustment or core change is justified by this measurement alone.
+
+Lane G current-main repro: native absolute error 1321923 exceeds 1321922 and
+square error 54029515 exceeds 54029506. Against the archived native picture,
+one blue component at (304,301) changed from 134 to 133. The compatibility
+image has 62142 foreground pixels against the unchanged minimum 62180.
+A 24-frame complete single-instance native control repeats exactly, which
+does not explain the cross-capture difference. Causes remain unisolated;
+no budget, assertion or renderer was changed to pass this comparison.
 
 ### Fixed 2026-11-09: WFC weight arithmetic overflow
 
@@ -2758,6 +2784,10 @@ sheen roughness at .03. The ratified extension permits simplified visibility, wh
 its energy-conservation tradeoff. No ablation yet attributes the complete picture loss to these
 choices; base shading, silhouettes and texture filtering remain included. No shader was tuned
 to this reference or changed without a demonstrated small root cause.
+
+Lane G current-main repro: native passes the frozen integer budgets;
+compatibility square error 33928555 exceeds 33927045. All other picture
+content remains included. The slight overrun is retained, not exempted.
 
 ### Fixed 2026-11-09: scatter tile input conversion and byte offsets
 
@@ -2906,6 +2936,13 @@ environment bake rejects vertical scattering depth above 6 before allocating, ke
 escape bound exp(-6 / 0.625) / 4 above Float32 subtraction error. This is an explicit bake domain limit,
 not a repair of the pre-existing raster model. Regression: sky-environment.test.js checks the domain refusal.
 
+Lane G current-main readback isolates the same defect inside the 32x32
+multiple-scattering table: 1600 of 4096 components are nonfinite on both
+native and compatibility devices, while the default control is finite.
+The later HDR scene capture instead saturates to finite 65504, so a finite
+display/readback does not establish finite internal transport. No clamp,
+scattering-order truncation or broader raster-domain refusal was substituted.
+
 ### Fixed while building batch 76 job 2: mask addressing and bitmap usage
 
 The new draft mask shader used interpolated UVs, whose rounding selected the adjacent texel at an exact boundary after an odd-size resize. The unchanged per-pixel oracle failed at pixel 0,1 in a 7x3 capture. It now uses integer centre mapping within explicit overflow-safe dimensions. The bitmap draft also lacked the RENDER_ATTACHMENT usage required by WebGPU external-image copies; both that usage and COPY_DST are now required by a unit regression and actual bitmap pixel proof. A reserved WGSL identifier found by the compile guard was corrected before delivery. packages/transitions/test/mask.test.js and test/gpu-browser.js retain these checks; no new open defect remains from these failures.
@@ -2933,6 +2970,13 @@ The previously open non-default-scene disposal defect was fixed separately in 18
 ### Batch 160 anisotropy and iridescence picture residuals (open)
 
 GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=iridescence, each with and without --compat, reproduce the complete-scene measured budgets. Full residual causes are not isolated. Anisotropy retains all strength/roughness rows and labels. Iridescence retains all 346 primitives in its three-dimensional material/film-IOR/thickness grid; this direct-light camera contains overlapping spheres and sparse highlights, with no IBL. Margo uses its shared anisotropic GGX and thin-film implementation; the figures alone do not attribute the loss to a particular formula. Silhouette, tone-map and filtering differences remain included, and no small shader fix is claimed without an isolating regression.
+
+Lane G current-main repro: anisotropy native absolute/square 819210/29848296
+exceed 819207/29848293, with RGB 132 to 133 at archived pixel (152,408);
+compatibility passes. Iridescence native absolute 454342 exceeds 454341,
+with five changed components against its archived picture. Compatibility
+iridescence has 64210 foreground pixels against 64280. Frozen budgets remain
+unchanged and these are not the sciviz/dispersion ANGLE exemption.
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 
@@ -2969,6 +3013,12 @@ Rechecked after the main rebase to bfa1aabc6, including the native physical-samp
 repairs: 24 complete frames still give 2 IOR variants and 4 volume variants, with the same
 error ranges above. The original parked jobs remain unchanged.
 
+Lane G current-main raw-API repro retains all 1280 triangles and captures
+400 frames per API across two browser processes: four WebGPU hashes and
+eight raw-WebGL2 hashes, no validation errors. Both exact-repeat assertions
+fail. This is still an external multisample-blend problem with an unknown
+closed-driver mechanism, not an attributed Margo repair.
+
 ### Fixed: medium boundary offsets shortened physical transport (Batch 99)
 
 Root cause: the voxel tracer used its 0.002-cell geometry offset as the next physical ray origin at
@@ -2989,11 +3039,19 @@ Repro: GPU-locked node scripts/reference-rendering/environment.mjs, then --compa
 
 Known structural causes: Margo's split-sum/SH IBL samples only the environment, so other scene geometry neither occludes it nor appears in reflections. Mitsuba traces geometric visibility in both references and up to eight vertices in the full reference. The direct-only image truncates continued surface paths at two vertices. Mitsuba principled maps the authored base/metal/rough parameters, but its BSDF is not a bit-exact glTF implementation. Margo's shared IBL approximations, finite 128-spp reference noise, different antialiasing and all-pixel silhouettes also remain in the metric. The constant-radiance case does not isolate their individual contributions or prove directional prefilter quality. No small package defect has been isolated, and this loss is not closed by recording a budget.
 
+Lane G current-main complete-scene comparison passes the existing direct/full
+integer budgets on both backends, with hash-checked retained references and no
+timing or reference regeneration. The transport/model loss remains open.
+
 ### Batch 160 job 8: Cornell clustered/shadow picture loss (open)
 
 Repro: GPU-locked node scripts/reference-rendering/cornell.mjs, and --point, each with and without --compat; --capture-reference regenerates a hash-checked Mitsuba candidate. Both retain the existing batch 168 fifteen-quad/thirty-triangle scene, winding, Float32 parallelogram snap and three-band reflectance. No lightmap bake or indirect term is used. Directional shadowed MAE is 0.7214571634928385 on both backends; point shadowed MAE is 0.9285901387532552 / 0.9285939534505209 (native/compatibility). Unshadowed negative controls are 48.63041687011719 both and 7.642925262451172 / 7.642930348714192 respectively; their missing visibility is intentional configuration, not a closed renderer loss.
 
 Known structural differences: default LocalShadows uses 512-square maps, 3x3 PCF, receiver bias 1 and normal bias 1.5 texels; Mitsuba uses hard ray visibility. Filtered edges, detached contacts and thin leakage along room/box edges remain visible, especially with directional light. The point path also applies its authored smooth finite-range window (clamp(1-(d/20)^4,0,1)^2) on top of inverse-square attenuation; Mitsuba's point emitter has no range window. These explain classes of residual without attributing every pixel. Different primary-ray sampling (128-spp box-filtered reference versus Margo MSAA) and finite reference noise remain included. No bias, map size, geometry or light was tuned to lower the frozen error. No isolated small package defect was found; contact/visibility fidelity remains an open loss.
+
+Lane G current-main directional and point comparisons pass all unchanged
+shadowed/unshadowed integer budgets on both backends. References remain
+hash-checked and all thirty triangles remain; the visibility loss is not closed.
 
 ### Batch 68 space colonisation
 
@@ -3431,9 +3489,15 @@ and bounce light absent from this default unshadowed Margo scene. The combined
 control removes both; it does not attribute the entire residual to shadows.
 Rough refraction, filtering, mesh-boundary versus slab paths and reference noise
 remain mixed causes. No physical-equivalence claim is made. Native thickness
-textures remain unsupported by this route. Extreme precomputed Beer tint can
-underflow before an inverse world scale shortens the path; raw extinction
-storage is needed to recover that numerical range. These are open limitations,
+textures remain unsupported by this route. The lane G native tint repair now
+retains natural optical depth until the world-space refracted path is known;
+the old thickness-200/scale-1/200 case draws black red/green channels before
+repair and exact [137,188,255,255] afterwards. Thickness 1200, instancing and
+mirrors are covered too. The existing public attenuation arrays retain their
+meaning; materials without opticalDepth derive it from attenuation. Binary32
+depth/transform bounds and the separate hooked per-unit-transmittance route
+remain outside this repair. See [native-volume-range.md](native-volume-range.md).
+The other transport and thickness-map gaps above remain open limitations,
 not accepted proof that the renderers are equivalent.
 
 NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
@@ -3704,6 +3768,12 @@ batch-273-culling-full-invariance and batch-273-culling-state-corrected under
 test-results; the clean-room section records the primary research. The prepared
 culling-causes script, separately owned teardown and voxel tracer are untouched.
 
+Lane G's current-main run of the original complete compatibility dynamic-check
+sequence passes every exact pixel and pick assertion, including shadowed move
+step 2. No repair commit or historical failure cause is established by this
+single passing control, so this is not claimed fixed. The KTX2 continuation's
+canonical FlightHelmet test is demo work and was not rerun during this sweep.
+
 The new optional tiers policy is not yet a completed parity row. Repro for the repaired
 copy class: on an LDR device, create two rgba32float textures, one
 sample-only (COPY_SRC | COPY_DST | TEXTURE_BINDING) and one additionally used as
@@ -3743,6 +3813,11 @@ comparison, outside this package lane's edit scope. The batch resumes verify's
 exported unit-test command from an owned .mjs runner with the same work and bounds.
 The tooling owner should guard the missing argument and add an eval-import
 regression; no exception is suppressed here.
+
+Lane G has a local guard repair with failing-parent eval/stdin regressions,
+but it is not on main: its expanded dependent preview-contract.test.js still
+fails twenty package-owner contracts. That unrelated check requires an owning
+repair; no allowlist or weaker assertion was added to land the import fix.
 
 New-tier creation now accepts AbortSignal with tested pre-abort, pending-wait,
 listener cleanup and concurrent ownership semantics. A cancelled native-adapter
@@ -3786,7 +3861,7 @@ length of a light, sun or light-record direction uniform, or on a raw frame writ
 own page task: the old shader fails it (pair 0, the same 24 components, 2^-12) and the fix
 passes 12 of 12 pairs at the exact-zero bar.
 
-### Batch 56 remaining terrain disposal repair
+### Fixed in 3982f1d7e: batch 56 remaining terrain disposal repair
 
 The seven remaining terrain EnginePlugin classes retained their secondary
 scene registrations on direct disposal and could remove default-scene names.
@@ -3804,7 +3879,7 @@ NVIDIA event 153, not a numerical assertion. Logs and event XML remain in
 step was started before the new source change; the changed package requires
 its own complete GPU/README sequence.
 
-### Batch 56 ComputeFrame registration repair
+### Fixed in ab70595e9: batch 56 ComputeFrame registration repair
 
 Repro: register a new ComputeFrame in a secondary scene, register a same-name
 default sentinel, then call frame.dispose(). Its arrays were freed but its
@@ -3812,6 +3887,10 @@ registration remained; the default sentinel was removed. The frame entry now
 resolves sceneOf(this). Its direct-disposal regression fails before repair and
 both direct and owner-removal cases pass after repair. Package units pass
 111/111. GPU/README acceptance and the wider audit remain pending.
+
+These owner repairs are already on main. Lane G reran both terrain owner files,
+ComputeFrame owner tests and its GPU-registration regression: all 26 pass.
+The completed GPU acceptance snapshot below supersedes the older pending note.
 
 ### Compute correctness gate ran deferred benchmarks
 
@@ -4042,6 +4121,9 @@ distinguishes IDs 1 and 2. No installation, binary, registry or setting was chan
 no Firefox pixel pass is claimed. Evidence with hashes, resource IDs, manifest
 text and event: docs/whitepaper/results/batch-273-firefox-diagnosis.json.
 
+Lane G's hidden current-installation `--version` control still fails before
+execution with native error 14001. No browser, DLL, manifest or setting changed.
+
 ### Video overlay scene/view ownership: resolved
 
 Direct secondary disposal and a missing viewport/scissor application are repaired
@@ -4181,6 +4263,10 @@ framing or raw preservation. All 1,445 in-bounds cases agree; 168 inputs exercis
 external padding, of which 146 happen to agree. No external-padding semantics
 have been proved, so default replacement and full UTF8 equivalence remain open.
 
+Lane G reran all 22 retained complete streams against the shipped native Wasm:
+all 22 still disagree with their frozen opaque string oracle. Raw metadata
+framing is unchanged; the public external-padding rule is still unproved.
+
 ### Fixed: glTF textured pass raw light alias
 
 The textured frame destructured engine.lighting.direction and copied it raw
@@ -4200,6 +4286,14 @@ Linear-memory peaks pass; physical-page, JIT and live-allocation contributions
 to the RSS excess are not yet isolated. This remains an unaccepted target
 requiring a root allocation diagnosis, not a busy-machine timing waiver.
 
+Lane G's one fresh pair per retained largest-loss input still fails RSS while
+matching output: full hash83a312e3fe is 77971456 native versus 73531392 old;
+glTF hasha22e31f28c is 78626816 versus 74055680. Native linear memory is
+1376256 versus 16777216 old in both controls. These two samples do not replace
+the full campaign or isolate physical pages/JIT/live allocations. An initial
+manifest used a missing relative input path and failed before sampling;
+the resolved-path run and setup failure are retained separately.
+
 Fixed in the lane G sweep: the native descriptor rejected widths above 16,
 and quantization, KD minima and prediction scratch also assumed 16 components.
 The descriptor now accepts nonzero UI8 counts; budgeted component-sized vectors
@@ -4215,6 +4309,10 @@ Historical predictor3 is absent from integer.rs's supported-method set. The
 record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
 UV bytes and intact canaries; native returns code5. The old-format reconstruction
 rule remains to be established by further crafted public-API observations.
+
+Lane G reran all twelve embedded historical predictor3 streams on the shipped
+Wasm; every stream still returns code5. The width repair above does not close
+this independent reconstruction gap.
 
 Outside this decoder repair: packageInputs in scripts/package-stamps.mjs omits native Rust folders (PACKAGE_INPUTS lists package.json, tsconfig.json, src and scripts), so a native-only edit can leave API freshness stamps unchanged. Repro: inspect packageInputs(root, 'decoders', manifest), then change native/draco/src/integer.rs; no listed input changes. Full builds still compile the crate. Tooling ownership; deferred under rule 6.
 

@@ -7,18 +7,19 @@ import {instancedGLTF} from '/tests/support/instanced-gltf.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 window.volumeSlabs=async()=>{
  const rows=[];
- for(const instanced of [false,true])for(const scale of [0.25,0.5,1,1.5,2])for(const mirror of [1,-1]){
+ const slabs=[...[0.25,0.5,1,1.5,2].map(scale=>({scale,thickness:1})),{scale:1/200,thickness:200},{scale:1/1200,thickness:1200}];
+ for(const instanced of [false,true])for(const {scale,thickness} of slabs)for(const mirror of [1,-1]){
   const canvas=document.body.appendChild(document.createElement('canvas'));
   const engine=await Engine.create(canvas,{backend:'webgpu',powerPreference:'low-power',camera:{position:[0,0,1],target:[0,0,0],fov:35}});
   try{
    engine.scene.background='#ffffff';engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([0,0,0,0]);
    const input=instancedGLTF([{s:[mirror,1,scale]}],{instanced,material:{extensions:{
     KHR_materials_transmission:{transmissionFactor:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior:1},
-    KHR_materials_volume:{thicknessFactor:1,attenuationColor:[0.25,0.5,1],attenuationDistance:1},
+    KHR_materials_volume:{thicknessFactor:thickness,attenuationColor:[0.25,0.5,1],attenuationDistance:1},
    }}});
    const model=parseGLTF(engine,input.doc,input.buffers,[],{instancing,materials:extendedMaterials});
    await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
-   rows.push({instanced,scale,mirror,material:model.primitives[0].material.tint,draws:engine.stats.drawCalls,width:canvas.width,height:canvas.height,png:canvas.toDataURL('image/png')});
+   rows.push({instanced,scale,thickness,mirror,material:model.primitives[0].material.tint,draws:engine.stats.drawCalls,width:canvas.width,height:canvas.height,png:canvas.toDataURL('image/png')});
   }finally{engine.dispose();canvas.remove();}
  }
  return rows;

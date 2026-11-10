@@ -23,10 +23,10 @@ async function material(volume) {
       KHR_materials_transmission: { transmissionFactor: 0.5 },
       KHR_materials_volume: volume,
     };
-    const { tint, volume: values } = parseGLTF(engine, fixture.doc, fixture.buffers, [], {
+    const { tint, volume: values, opticalDepth } = parseGLTF(engine, fixture.doc, fixture.buffers, [], {
       materials: extendedMaterials,
     }).primitives[0].material;
-    return { tint: [...tint], volume: [...values] };
+    return { tint: [...tint], volume: [...values], opticalDepth };
   } finally {
     engine.dispose();
   }
@@ -51,4 +51,17 @@ test('only white channels are exempt; other channels absorb fully', async () => 
 test('an overflowing thickness ratio keeps white tint white', async () => {
   const { tint } = await material({ thicknessFactor: 3e38, attenuationDistance: 2 ** -1023 });
   assert.deepEqual(tint, [0.25, 0.375, 0.5]);
+});
+
+test('native volume retains optical depth before binary32 or binary64 transmittance underflow', async () => {
+  for (const thicknessFactor of [200, 1200]) {
+    const value = await material({ thicknessFactor, attenuationColor: [0.25, 0.5, 1], attenuationDistance: 1 });
+    assert.deepEqual(value.opticalDepth, [Math.log(4) * thicknessFactor, Math.log(2) * thicknessFactor, 0]);
+  }
+});
+
+test('native optical depth preserves white, black, empty and unattenuated medium limits', async () => {
+  assert.deepEqual((await material({ thicknessFactor: 1, attenuationColor: [0, 0.5, 1], attenuationDistance: 1 })).opticalDepth, [Infinity, Math.log(2), 0]);
+  assert.deepEqual((await material({ thicknessFactor: 0, attenuationColor: [0, 0.5, 1], attenuationDistance: 1 })).opticalDepth, [0, 0, 0]);
+  assert.deepEqual((await material({ thicknessFactor: 1, attenuationColor: [0, 0.5, 1] })).opticalDepth, [0, 0, 0]);
 });

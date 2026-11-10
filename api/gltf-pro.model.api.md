@@ -319,6 +319,7 @@ export interface PBRMaterial extends GLTFMaterial {
     extended?: Omit<ExtendedPlan, 'slots'>;
     tint?: number[];
     attenuation?: number[];
+    opticalDepth?: number[];
     volume?: number[];
     renderState?: PBRRenderState;
     extension?: MaterialExtension;

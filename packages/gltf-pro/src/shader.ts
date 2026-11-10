@@ -471,7 +471,7 @@ export function texturedTintPBR(code: string): string {
     `@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {${resources}`,
   );
 }
-/** `code` with a tint draw that reads the whole surface: the same bindings as the lit draw, the base colour and transmission maps included. The tint lanes then hold the volume attenuation alone. */
+/** `code` with a tint draw that reads the whole surface: the same bindings as the lit draw, the base colour and transmission maps included. The tint lanes hold optical depth (-1 for an opaque channel). */
 export function surfaceTintPBR(code: string): string {
   let out = (
     texturedTintPBR(code) +
@@ -485,9 +485,9 @@ fn margoVolumeTint(i:Out,s:Surface,m:mat3x3f)->vec3f {
   let determinant=abs(dot(m[0],c0));
   let normal=normalize(vec3f(dot(m[0],i.normal),dot(m[1],i.normal),dot(m[2],i.normal)));
   let projected=abs(dot(vec3f(dot(c0,ray),dot(c1,ray),dot(c2,ray)),normal));
-  let tint=vec3f(f.coordsB.zw,f.ext.z);
-  if(projected==0.0){return select(vec3f(0),vec3f(1),tint==vec3f(1));}
-  return pow(tint,vec3f(determinant/projected));
+  let depth=vec3f(f.coordsB.zw,f.ext.z);
+  if(projected==0.0){return select(vec3f(0),vec3f(1),depth==vec3f(0));}
+  return select(exp(-max(depth,vec3f(0))*(determinant/projected)),vec3f(0),depth<vec3f(0));
 }
 `
   ).replace(

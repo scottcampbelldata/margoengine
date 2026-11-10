@@ -1014,6 +1014,8 @@ export interface PBRMaterial extends GLTFMaterial {
   tint?: number[];
   /** Volume attenuation at the thickness factor, for a tint draw that reads the rest from the surface (surfaceTintPBR). */
   attenuation?: number[];
+  /** Natural optical depth at mesh thickness, before world scaling. Parsed volumes retain this to avoid premature transmittance underflow. Default undefined derives it from attenuation. */
+  opticalDepth?: number[];
   volume?: number[];
   renderState?: PBRRenderState;
   extension?: MaterialExtension;
@@ -1823,6 +1825,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
       ? base.slice(0, 3).map((v, i) => v * transmission * attenuationPower(attenuation[i], depth))
       : undefined,
     attenuation: transmission ? attenuation.map((c) => attenuationPower(c, depth)) : undefined,
+    opticalDepth: transmission ? attenuation.map((c) => (c === 1 || depth === 0 ? 0 : -Math.log(c) * depth)) : undefined,
     // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
     volume: transmission ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
   };
@@ -4596,10 +4599,12 @@ export class PBRModel implements EnginePlugin {
     // Physical rows follow 26 UV rows (42 for extended materials); factor-only materials (five maps) use the same layout.
     // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
     if (!compact && m.tint) {
-      const lanes = surfaceTint(m) ? m.attenuation! : m.tint;
-      v[98] = lanes[0];
-      v[99] = lanes[1];
-      v[102] = lanes[2];
+      const volume = surfaceTint(m), lanes = volume ? m.attenuation! : m.tint;
+      for (let c = 0; c < 3; c++) {
+        const depth = volume ? (m.opticalDepth?.[c] ?? (lanes[c] === 1 ? 0 : -Math.log(lanes[c]))) : lanes[c];
+        // An opaque channel is a limit, not an infinite shader operand (including at a grazing ray).
+        v[c < 2 ? 98 + c : 102] = volume && depth === Infinity ? -1 : depth;
+      }
     }
     const source = p.extension ?? m.extension,
       // A normal map on UV1 or with a UV transform (glTF maps), or constructed material maps whose normal-slot affine

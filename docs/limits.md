@@ -2581,8 +2581,11 @@ and AttenuationTest (23 primitives), all pixels and original viewer/Cycles
 full/direct integer budgets. Native volume estimates a homogeneous refracted
 slab in mesh space with world-space Beer attenuation, including transforms and
 instancing. It does not trace mesh boundaries, add thickness maps or reproduce
-Cycles multiple scattering. Precomputed attenuation retains an extreme-depth
-underflow limit. Native WebGL2 explicitly refuses PBR; compatibility is actual
+Cycles multiple scattering. Native tint retains optical depth until the world
+path is known, avoiding intermediate transmittance underflow; binary32 depth
+and transform limits still apply. The separate hooked route retains its
+per-world-unit transmittance range limit. See [native volume range](native-volume-range.md).
+Native WebGL2 explicitly refuses PBR; compatibility is actual
 WebGL2. AMD Radeon(TM) Graphics / RDNA 2, Windows driver 32.0.21042.62, is the
 repeatability adapter because NVIDIA/Intel MSAA blending varies. The full Cycles
 volume absolute ceiling stays 13,792,000. No speed or equivalence claim.

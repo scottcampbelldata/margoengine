@@ -3,6 +3,16 @@
 - Batch 179 provenance/trace: packages/sciviz/tests/provenance.test.js proves runnable intermediate mutation/removal history, stable saved resource IDs and noncolliding future IDs, explicit recording limits, metadata hashes/versions, PNG image-chunk identity and CRC/cancellation bounds, safe namespaced SVG JSON, and full Unicode PDF information. packages/sciviz/tests/provenance-browser.mjs exercises PNG/SVG provenance and trace generation on all 24 existing scientific demos, MRI trace execution on both backends, and PDF provenance for MRI, NOAA wind and the surface scene. The record follows PROV-DM concepts but does not claim PROV-O graph conformance or cryptographic authorship. No speed result is claimed.
 
 
+### Native volume range repair
+
+Parsed native glTF volume tint preserves optical depth until world-path scaling,
+so mesh-space transmittance underflow no longer destroys recoverable light.
+Proof: beer-distance.test.js, native-volume-path.test.js and
+physical-map-renderer.test.js; test-native-volume.mjs retains twenty existing
+exact pixels and adds eight underflow cases on both GPU backends. This is a
+bounded slab/range repair, not full volume transport parity or a speed claim.
+See [research and limits](../native-volume-range.md).
+
 ### Fixes K2 job 1: linear native display glass
 
 Claim: native gltf-pro glass on display-encoded scene targets combines transmitted and lit light in linear values. The materials adapter snapshots each surface's background, decodes the two light contributions and encodes their sum. Proof: packages/materials/test/native-glass-browser.mjs fails before the fix and checks one/two overlapping surfaces at 1x/4x on both GPU backends against an independent transfer-function reference (one 8-bit quantization step). CPU ownership and shader regressions live in packages/materials/tests/native-glass.test.js. Scope: the native sightline-tint path, preserving its existing tone mapping; no equivalence claim for refracted HDR rendering or measured speed. Research sources and costs are in the operational playbook and limits.

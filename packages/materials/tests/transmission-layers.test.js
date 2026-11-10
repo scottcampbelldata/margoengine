@@ -269,7 +269,7 @@ test('the surface tint draw multiplies by the sampled base colour and transmissi
   const code = surfaceTintPBR(transmissiveShader());
   assert.ok(code.includes('let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz)));'));
   assert.ok(code.includes('fn margoVolumeTint('));
-  assert.ok(code.includes('return pow(tint,vec3f(determinant/projected));'));
+  assert.ok(code.includes('return select(exp(-max(depth,vec3f(0))*(determinant/projected)),vec3f(0),depth<vec3f(0));'));
   const film = extendedShader({ slots: Array(18).fill(-1), iridescence: true, anisotropy: false, diffuseTransmission: false });
   assert.ok(film.includes('mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'));
 });

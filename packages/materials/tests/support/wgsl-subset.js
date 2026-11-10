@@ -31,6 +31,7 @@ const builtins = {
   floor: (a) => map1(a, Math.floor),
   abs: (a) => map1(a, Math.abs),
   log2: (a) => map1(a, (x) => f32(Math.log2(x))),
+  exp: (a) => map1(a, (x) => f32(Math.exp(x))),
   inverseSqrt: (a) => map1(a, (x) => f32(1 / Math.sqrt(x))),
   min: (a, b) => map2(a, b, Math.min),
   max: (a, b) => map2(a, b, Math.max),

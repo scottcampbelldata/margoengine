@@ -7119,6 +7119,20 @@ The optional sciviz/molecule entry owns the sphere/capped-cylinder pipelines, co
 C2-007 Water depth-copy evidence (section 5): inside a 4x scene capture Water copies the capture depth into its surface depth in the surface depth's own format, so a capture in depth32float-stencil8 (TAA, mirroring the canvas) and a depth32float source (DepthTexture) no longer fail WebGPU attachment-state validation and drop the frame. CPU regression in packages/water/test/water.test.js; the TAA + Water pair and the full c2-007 member set read the analytic depth 0.018445 on native WebGPU at 1x and 4x. No core, stage or public API change.
 
 
+## Native volume range repair (section 5 evidence, 2026-11-10)
+
+The optional gltf-pro native tint retains natural optical depth until its
+existing refracted mesh slab is transformed into world length. The additive
+PBRMaterial.opticalDepth field preserves parsed extinction information while
+legacy attenuation-only materials remain supported. CPU regressions cover
+parsed limits, binary32 shader evaluation, uniform upload and fallback. The
+28-pixel GPU proof retains all twenty original cases and adds eight cases
+recovering transmittance after binary32/binary64 intermediate underflow, on
+both backends. No core, stage or rendering-backend implementation changes.
+Native thickness maps, boundary tracing, the hooked route's per-unit range
+and complete reference-image losses remain separate. Research and reproduction:
+[native-volume-range.md](../native-volume-range.md).
+
 ## Draco float range review (section 5 evidence, 2026-11-10)
 
 The optional exporter Rust/Wasm transform builder rejects nonrepresentable float32 range/inverse/reconstruction-step values before exposing output. A dedicated Wasm status becomes the coded unsupported diagnostic with bits-0/rescale guidance. The tiny and overflow range regressions run at sequential and topology-selected speeds; bits 0 retains exact floats through both decoders. Existing portable-transform, topology, memory and repeated-lifetime checks remain. No GPU math or core/stage entry changes. Sources, cause and limits are in [draco-float-ranges.md](../draco-float-ranges.md).
