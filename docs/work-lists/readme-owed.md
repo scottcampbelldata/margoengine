@@ -770,3 +770,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 217 job 4): document generated cutscene/nested-editor alias.
 
 - @margoengine/voxel-edit and margoengine (batch 241 job 2): document /select NDC conversion, cell-centre boundary rules, lasso parity, select-through/visibleOnly, model placement, normalized RGBA similarity, sparse indexes and budgets; README examples deferred.
+
+- @margoengine/text (batch 248 job 5): replace old CFF2/variation/shaping exclusion; document variations, axes, withVariations, shapedRuns em normalization/UTF-16 clusters/line order, FontLike providers, parser limits and dependency-free frozen oracle tests. No README examples written in build phase.

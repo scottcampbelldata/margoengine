@@ -332,3 +332,7 @@ Batch 205 surface fixtures: unchanged Maya NURBS planes and sphere from Samuli R
 
 
 Batch 238 standard-data derivatives: packages/splats/test/fixtures/raccoon-{0,1,2}.ksplat and ksplat-{0,1,2}-oracle.json are generated data-only derivatives of the existing Niantic MIT raccoon excerpt. Source, black-box converter version/arguments, sizes and SHA-256 hashes are recorded in packages/splats/test/fixtures/NOTICE.md. No implementation files or dependencies from that converter are included.
+
+## Batch 248 text extrusion fixtures
+Adobe Source Sans 3 variable Upright fonts, release 3.052R, Copyright 2010-2022 Adobe (Reserved Font Name Source), SIL Open Font License 1.1. Unmodified standard font/test assets, not package runtime code. Sources: https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/VF/SourceSans3VF-Upright.ttf and https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/VF/SourceSans3VF-Upright.otf . Full licence: packages/text/tests/fixtures/fonts/OFL.txt; hashes in variable-reference.json and NOTICE.md.
+Amiri Regular, Copyright 2010-2022 The Amiri Project Authors, SIL Open Font License 1.1. Unmodified standard Arabic font/test asset. Source: https://raw.githubusercontent.com/google/fonts/39d11bc313031c9f68e21a297ce5e4a15cc5365e/ofl/amiri/Amiri-Regular.ttf . Full licence: packages/text/tests/fixtures/fonts/Amiri-OFL.txt. No font-library source or rival engine files were imported. Frozen reference JSON is original data computed through public oracle APIs, not copied implementation files.

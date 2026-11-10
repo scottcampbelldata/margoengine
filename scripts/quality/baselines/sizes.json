@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13583404,
+  "total": 13587586,
   "history": [
     {
       "date": "2026-10-24",
@@ -7050,6 +7050,12 @@
       "commit": "87e4a7ec4",
       "reason": "batch241-selection-new-optional-entry-projection-shapes-visibility-and-colour",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "ea70841f4",
+      "reason": "Batch 248 job 5: text/extrude grows from 10834 to 14894 B gzip for CFF2 FD selection and blend, fvar/avar/HVAR/gvar and positioned shaping runs. The optional ceiling rises from 11160 to 15342 B. Keeping one parser avoids duplicated sfnt state or an asynchronous bridge; core plus stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8002,7 +8008,7 @@
     "@margoengine/text": 17109,
     "@margoengine/text/animate": 11783,
     "@margoengine/text/curve": 10802,
-    "@margoengine/text/extrude": 11160,
+    "@margoengine/text/extrude": 15342,
     "@margoengine/text/fit": 10636,
     "@margoengine/text/msdf": 4494,
     "@margoengine/text/rich": 11403,

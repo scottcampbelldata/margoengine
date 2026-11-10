@@ -1,3 +1,6 @@
+import { FontItemStore, FontVariations, type FontVariationOptions, type FontVariationAxis } from './font-variation.js';
+export type { FontVariationOptions, FontVariationAxis } from './font-variation.js';
+import { BinaryReader, fontError, FONT_HELP } from './font-reader.js';
 // Clean-room OpenType font outline parser, polygon triangulation with holes, and 3D text extrusion.
 // Specifications & Papers:
 // - ISO/IEC 14496-22 (OpenType specification) / Microsoft OpenType specification (sfnt, head, maxp, hhea, hmtx, cmap, loca, glyf)
@@ -43,10 +46,38 @@ export interface FontLike {
   glyphIndex(char: string): number;
   glyphAdvance(glyphIndex: number): number;
   getGlyphContours(glyphIndex: number, curveSegments?: number): Array<Array<[number, number] | number[]>>;
+  /** Optional shaping provider; called once per block when shapedRuns is not supplied. Output values use em units. */
+  shape?(text: string): readonly ShapedTextRun[];
+  /** Optional variable-instance provider for a custom font. */
+  withVariations?(variations: Readonly<Record<string, number>>): FontLike;
+}
+
+/** A positioned shaping result, in em units, in the shaper's visual glyph order. */
+export interface ShapedExtrusionGlyph {
+  /** Font glyph ID after substitution. */
+  glyphIndex: number;
+  /** Horizontal advance, including positioning adjustments. */
+  xAdvance: number;
+  /** Vertical advance. Default 0. */
+  yAdvance?: number;
+  /** Horizontal origin adjustment. Default 0. */
+  xOffset?: number;
+  /** Vertical origin adjustment. Default 0. */
+  yOffset?: number;
+  /** Optional UTF-16 source cluster offset; letter spacing is added only between different clusters. */
+  cluster?: number;
+}
+
+/** One shaping run belonging to a logical line. Multiple runs on a line concatenate in supplied order. */
+export interface ShapedTextRun {
+  /** Glyph IDs, advances and offsets after substitution, kerning and mark placement. */
+  glyphs: readonly ShapedExtrusionGlyph[];
+  /** Zero-based line. Default 0. */
+  line?: number;
 }
 
 /** Options for text extrusion. Only glyph coordinates and spacing are scaled by `size`; bevels and depth use world units. */
-export interface ExtrudeTextOptions {
+export interface ExtrudeTextOptions extends FontVariationOptions {
   /** Font binary buffer (TTF/OTF), parsed FontOutlines, or custom FontLike instance. */
   font: FontOutlines | FontLike | ArrayBuffer | ArrayBufferView;
   /** Font size in world units. Default 1. */
@@ -73,16 +104,14 @@ export interface ExtrudeTextOptions {
   lineHeight?: number;
   /** Text alignment across lines ('left', 'center', 'right'). Default 'left'. */
   align?: 'left' | 'center' | 'right';
+  /** Pre-shaped runs from any shaping engine. IDs refer to this font instance; coordinates are em units. Default font.shape(), then Unicode cmap fallback. */
+  shapedRuns?: readonly ShapedTextRun[];
 }
 
 // ---------------------------------------------------------------------------
 // Binary Stream Reader
 // ---------------------------------------------------------------------------
 
-const FONT_HELP = 'https://margoengine.com/docs/text';
-function fontError(detail: string): never {
-  throw new MargoError('failed', `OpenType font ${detail}; provide valid supported font bytes. Help: ${FONT_HELP}`);
-}
 function subdivision(name: string, value: number, min: number, max = 256): number {
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new MargoError(
@@ -91,78 +120,6 @@ function subdivision(name: string, value: number, min: number, max = 256): numbe
     );
   }
   return value;
-}
-class BinaryReader {
-  readonly view: DataView;
-  readonly bytes: Uint8Array;
-  pos = 0;
-  constructor(buffer: ArrayBuffer | ArrayBufferView) {
-    this.bytes = ArrayBuffer.isView(buffer)
-      ? new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-      : new Uint8Array(buffer);
-    this.view = new DataView(this.bytes.buffer, this.bytes.byteOffset, this.bytes.byteLength);
-  }
-  get length(): number {
-    return this.bytes.length;
-  }
-  check(pos: number, length: number): void {
-    if (
-      !Number.isSafeInteger(pos) ||
-      !Number.isSafeInteger(length) ||
-      pos < 0 ||
-      length < 0 ||
-      pos > this.length - length
-    ) {
-      fontError('offset or length exceeds its containing table, glyph or program');
-    }
-  }
-  slice(pos: number, length: number): BinaryReader {
-    this.check(pos, length);
-    return new BinaryReader(this.bytes.subarray(pos, pos + length));
-  }
-  seek(pos: number): void {
-    this.check(pos, 0);
-    this.pos = pos;
-  }
-  skip(bytes: number): void {
-    this.check(this.pos, bytes);
-    this.pos += bytes;
-  }
-  u8(): number {
-    this.check(this.pos, 1);
-    return this.view.getUint8(this.pos++);
-  }
-  i8(): number {
-    this.check(this.pos, 1);
-    return this.view.getInt8(this.pos++);
-  }
-  u16(): number {
-    this.check(this.pos, 2);
-    const v = this.view.getUint16(this.pos);
-    this.pos += 2;
-    return v;
-  }
-  i16(): number {
-    this.check(this.pos, 2);
-    const v = this.view.getInt16(this.pos);
-    this.pos += 2;
-    return v;
-  }
-  u32(): number {
-    this.check(this.pos, 4);
-    const v = this.view.getUint32(this.pos);
-    this.pos += 4;
-    return v;
-  }
-  i32(): number {
-    this.check(this.pos, 4);
-    const v = this.view.getInt32(this.pos);
-    this.pos += 4;
-    return v;
-  }
-  tag(): string {
-    return String.fromCharCode(this.u8(), this.u8(), this.u8(), this.u8());
-  }
 }
 type OutlinePoint = { x: number; y: number; onCurve: boolean };
 
@@ -285,8 +242,14 @@ export class FontOutlines {
   private readonly cffCharset?: number[];
   private readonly cffMatrix: number[] = [0.001, 0, 0, 0.001, 0, 0];
   private readonly reader: BinaryReader;
+  private readonly variationState: FontVariations;
+  private readonly variedAdvance = new Map<number, number>();
+  private cff2 = false;
+  private cffStore?: FontItemStore;
+  private cffFontDicts: Array<{subrs: Uint8Array[]; vsindex: number; matrix: number[]}> = [];
+  private cffSelect: number[] = [];
 
-  constructor(buffer: ArrayBuffer | ArrayBufferView) {
+  constructor(buffer: ArrayBuffer | ArrayBufferView, options: FontVariationOptions = {}) {
     this.reader = new BinaryReader(buffer);
     const root = this.reader;
     if (root.length < 12) fontError('Font file buffer is too small');
@@ -331,6 +294,7 @@ export class FontOutlines {
       this.hmtxAdvance.push(advance);
       this.hmtxLsb.push(hmtx.i16());
     }
+    this.variationState = new FontVariations(tables, this.numGlyphs, options.variations);
     this.cmap = new Map();
     this.parseCmap(table('cmap'));
     if (tables.has('glyf')) {
@@ -345,6 +309,11 @@ export class FontOutlines {
         this.locaOffsets.push(offset);
         prev = offset;
       }
+    } else if (tables.has('CFF2')) {
+      const parsed = this.parseCFF2(table('CFF2'));
+      this.cffCharStrings = parsed.charStrings;
+      this.cffGlobalSubrs = parsed.globalSubrs;
+      this.cffMatrix = parsed.matrix;
     } else if (tables.has('CFF ')) {
       const parsed = this.parseCFF(table('CFF '));
       this.cffCharStrings = parsed.charStrings;
@@ -424,6 +393,71 @@ export class FontOutlines {
       }
     }
   }
+  private parseCFF2(r: BinaryReader) {
+    this.cff2 = true;
+    if (r.u8() !== 2 || r.u8() !== 0) fontError('CFF2 version is unsupported');
+    const header = r.u8(), topLength = r.u16();
+    if (header < 5) fontError('CFF2 header is invalid');
+    const top = this.parseCFFDict(r.slice(header, topLength).bytes, true);
+    r.seek(header + topLength);
+    const globalSubrs = this.readCFFIndex(r, true);
+    const offset = (dict: Map<number, number | number[]>, op: number): number => {
+      const v = dict.get(op);
+      if (!Number.isInteger(v) || (v as number) < 0) fontError(`CFF2 offset ${op} is invalid`);
+      return v as number;
+    };
+    const store = top.get(24);
+    if (store !== undefined) {
+      r.seek(offset(top, 24));
+      const length = r.u16();
+      this.cffStore = new FontItemStore(r.slice(r.pos, length), this.variationState.coordinates);
+    }
+    r.seek(offset(top, 17));
+    const charStrings = this.readCFFIndex(r, true);
+    if (charStrings.length !== this.numGlyphs) fontError('CFF2 CharStrings count differs from maxp');
+    const matrix = (top.get(0x0c07) ?? [0.001, 0, 0, 0.001, 0, 0]) as number[];
+    if (!Array.isArray(matrix) || matrix.length !== 6 || !matrix.every(Number.isFinite)) fontError('CFF2 FontMatrix is invalid');
+    r.seek(offset(top, 0x0c24));
+    const dicts = this.readCFFIndex(r, true);
+    if (!dicts.length) fontError('CFF2 FontDICT INDEX is empty');
+    this.cffFontDicts = dicts.map(bytes => {
+      const dict = this.parseCFFDict(bytes, true), priv = dict.get(18);
+      let subrs: Uint8Array[] = [], vsindex = 0;
+      if (priv !== undefined) {
+        if (!Array.isArray(priv) || priv.length !== 2) fontError('CFF2 PrivateDICT range is invalid');
+        const [length, start] = priv, p = this.parseCFFDict(r.slice(start, length).bytes, true);
+        vsindex = Number(p.get(22) ?? 0);
+        if (p.has(19)) { r.seek(start + offset(p, 19)); subrs = this.readCFFIndex(r, true); }
+      }
+      let combined = matrix;
+      const local = dict.get(0x0c07);
+      if (local !== undefined) {
+        if (!Array.isArray(local) || local.length !== 6 || !local.every(Number.isFinite)) fontError('CFF2 FontDICT matrix is invalid');
+        const [a,b,c,d,x,y]=matrix,[e,f,g,h,u,v]=local;
+        combined=[a*e+c*f,b*e+d*f,a*g+c*h,b*g+d*h,a*u+c*v+x,b*u+d*v+y];
+      }
+      return {subrs,vsindex,matrix:combined};
+    });
+    this.cffSelect = new Array(this.numGlyphs).fill(0);
+    if (top.has(0x0c25)) {
+      r.seek(offset(top, 0x0c25));
+      const format=r.u8();
+      if(format===0) for(let i=0;i<this.numGlyphs;i++)this.cffSelect[i]=r.u8();
+      else if(format===3||format===4) {
+        const wide=format===4, n=wide?r.u32():r.u16();
+        const ranges=Array.from({length:n},()=>({first:wide?r.u32():r.u16(),fd:wide?r.u16():r.u8()}));
+        const sentinel=wide?r.u32():r.u16();
+        if(!n||ranges[0].first!==0||sentinel!==this.numGlyphs)fontError('CFF2 FDSelect range is invalid');
+        for(let i=0;i<n;i++) {
+          const end=i+1<n?ranges[i+1].first:sentinel;
+          if(end<=ranges[i].first||end>this.numGlyphs)fontError('CFF2 FDSelect ranges are not ordered');
+          this.cffSelect.fill(ranges[i].fd,ranges[i].first,end);
+        }
+      } else fontError('CFF2 FDSelect format is unsupported');
+    } else if(dicts.length!==1) fontError('CFF2 multiple FontDICTs require FDSelect');
+    if(this.cffSelect.some(i=>i>=dicts.length))fontError('CFF2 FDSelect references a missing FontDICT');
+    return {charStrings,globalSubrs,matrix};
+  }
   private parseCFF(r: BinaryReader) {
     if (r.u8() !== 1) fontError('CFF version is unsupported');
     r.u8();
@@ -490,8 +524,9 @@ export class FontOutlines {
     }
     return { charStrings, globalSubrs, localSubrs, charset, matrix };
   }
-  private readCFFIndex(r: BinaryReader): Uint8Array[] {
-    const count = r.u16();
+  private readCFFIndex(r: BinaryReader, cff2 = false): Uint8Array[] {
+    const count = cff2 ? r.u32() : r.u16();
+    if (count > 65536) fontError('CFF INDEX count exceeds 65536');
     if (!count) return [];
     const size = r.u8();
     if (size < 1 || size > 4) fontError('CFF INDEX offSize is invalid');
@@ -508,13 +543,20 @@ export class FontOutlines {
     r.seek(start + offsets[count] - 1);
     return items;
   }
-  private parseCFFDict(bytes: Uint8Array): Map<number, number | number[]> {
+  private parseCFFDict(bytes: Uint8Array, cff2 = false): Map<number, number | number[]> {
     const r = new BinaryReader(bytes),
       dict = new Map<number, number | number[]>(),
       stack: number[] = [];
     while (r.pos < r.length) {
       const b = r.u8();
-      if (b <= 21) {
+      if (cff2 && b === 23) {
+        const n = stack.pop()!;
+        const weights = this.cffStore?.weights(Number(dict.get(22) ?? 0)) ?? fontError('CFF2 DICT blend has no variation store');
+        const start = stack.length - n * (weights.length + 1);
+        if (!Number.isInteger(n) || n < 1 || start < 0) fontError('CFF2 DICT blend operand count is invalid');
+        for (let i = 0; i < n; i++) for (let j = 0; j < weights.length; j++) stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
+        stack.length = start + n;
+      } else if (b <= (cff2 ? 25 : 21)) {
         const op = b === 12 ? 0x0c00 + r.u8() : b;
         dict.set(op, stack.length === 1 ? stack[0] : [...stack]);
         stack.length = 0;
@@ -541,12 +583,20 @@ export class FontOutlines {
         if (!Number.isFinite(v)) fontError('CFF DICT real is invalid');
         stack.push(v);
       } else fontError('CFF DICT number is invalid');
-      if (stack.length > 48) fontError('CFF DICT operand stack exceeds 48');
+      if (stack.length > (cff2 ? 513 : 48)) fontError('CFF DICT operand stack exceeds its format limit');
     }
     if (stack.length) fontError('CFF DICT has trailing operands');
     return dict;
   }
 
+  /** Number of glyph IDs in the font. */
+  get glyphCount(): number { return this.numGlyphs; }
+  /** Supported variation axes in user units. */
+  get variationAxes(): readonly FontVariationAxis[] { return this.variationState.axes; }
+  /** Create an independent immutable instance at axis values; omitted values use the font defaults. */
+  withVariations(variations: Readonly<Record<string, number>>): FontOutlines {
+    return new FontOutlines(this.reader.bytes, { variations });
+  }
   /** Resolves Unicode code point or 1-character string to a glyph index. */
   glyphIndex(charOrCode: string | number): number {
     const cp = typeof charOrCode === 'string' ? (charOrCode.codePointAt(0) ?? 0) : charOrCode;
@@ -556,7 +606,12 @@ export class FontOutlines {
   /** Returns advance width for glyph index, normalized to 1 em. */
   glyphAdvance(glyphIndex: number): number {
     const raw = this.hmtxAdvance[glyphIndex] ?? this.unitsPerEm;
-    return raw / this.unitsPerEm;
+    let delta = this.variationState.advance(glyphIndex);
+    if (delta === undefined && this.variationState.hasGlyphVariations && this.locaOffsets) {
+      if (!this.variedAdvance.has(glyphIndex)) this.readTrueTypeGlyph(glyphIndex, [], {points:0,components:0});
+      delta = this.variedAdvance.get(glyphIndex) ?? 0;
+    }
+    return (raw + (delta ?? 0)) / this.unitsPerEm;
   }
 
   /** Extracts 2D contours for a glyph index, normalized to em coordinates (including negative bearings). */
@@ -567,7 +622,7 @@ export class FontOutlines {
       return this.getTrueTypeContours(glyphIndex, curveSegments);
     }
     if (this.cffCharStrings) {
-      const [a, b, c, d, tx, ty] = this.cffMatrix;
+      const [a, b, c, d, tx, ty] = this.cff2 ? this.cffFontDicts[this.cffSelect[glyphIndex]].matrix : this.cffMatrix;
       const contours = this.getCFFContours(glyphIndex, curveSegments);
       if (contours.reduce((n, loop) => n + loop.length, 0) > 16384) fontError('flattened glyph exceeds 16384 vertices');
       return contours.map((loop) => loop.map(([x, y]): Point2D => [a * x + c * y + tx, b * x + d * y + ty]));
@@ -597,7 +652,11 @@ export class FontOutlines {
     if (ancestors.includes(glyph) || ancestors.length >= 32) fontError('composite cycle or depth exceeds 32');
     const start = this.locaOffsets![glyph],
       end = this.locaOffsets![glyph + 1];
-    if (start === end) return [];
+    if (start === end) {
+      const [dx] = this.variationState.deltas(glyph, [], []);
+      this.variedAdvance.set(glyph, dx[1] - dx[0]);
+      return [];
+    }
     const r = this.reader.slice(this.glyfOffset! + start, end - start);
     const count = r.i16();
     r.skip(8);
@@ -634,6 +693,9 @@ export class FontOutlines {
         }
         coords.push(values);
       }
+      const [dx,dy] = this.variationState.deltas(glyph, coords[0].map((x,i)=>[x,coords[1][i]]), ends);
+      this.variedAdvance.set(glyph, dx[n+1]-dx[n]);
+      for (let i=0;i<n;i++) { coords[0][i]+=dx[i]; coords[1][i]+=dy[i]; }
       let index = 0;
       return ends.map((endpoint) => {
         const loop: OutlinePoint[] = [];
@@ -647,7 +709,19 @@ export class FontOutlines {
     if (count !== -1) fontError('glyf contour count is invalid');
     const contours: OutlinePoint[][] = [],
       parentPoints: OutlinePoint[] = [];
-    let flags = 0;
+    const componentReader = r.slice(r.pos, r.length-r.pos), componentPoints: number[][] = [];
+    let componentFlags = 0;
+    do {
+      componentFlags=componentReader.u16();componentReader.u16();
+      const words=!!(componentFlags&1),xy=!!(componentFlags&2);
+      const value=()=>words?(xy?componentReader.i16():componentReader.u16()):(xy?componentReader.i8():componentReader.u8());
+      const x=value(),y=value();componentPoints.push(xy?[x,y]:[0,0]);
+      componentReader.skip(componentFlags&8?2:componentFlags&64?4:componentFlags&128?8:0);
+      if(componentPoints.length>4096)fontError('composite component budget exceeds 4096');
+    } while(componentFlags&32);
+    const [componentX,componentY]=this.variationState.deltas(glyph,componentPoints,[],true);
+    this.variedAdvance.set(glyph,componentX[componentPoints.length+1]-componentX[componentPoints.length]);
+    let flags = 0, componentIndex = 0;
     do {
       if (++work.components > 4096) fontError('composite component budget exceeds 4096');
       flags = r.u16();
@@ -700,6 +774,7 @@ export class FontOutlines {
         tx = parent.x - point.x;
         ty = parent.y - point.y;
       }
+      tx += componentX[componentIndex]; ty += componentY[componentIndex++];
       for (const loop of loops) {
         for (const point of loop) {
           point.x += tx;
@@ -761,12 +836,13 @@ export class FontOutlines {
     let loop: Point2D[] = [],
       x = 0,
       y = 0,
-      widthSeen = false,
+      widthSeen = this.cff2,
       stems = 0,
       ended = false,
       operations = 0,
       seed = 1,
-      outputPoints = 0;
+      outputPoints = 0,
+      vsindex = this.cff2 ? this.cffFontDicts[this.cffSelect[glyphIndex]].vsindex : 0;
     const finish = () => {
       if (loop.length >= 3) contours.push(loop);
       loop = [];
@@ -818,12 +894,21 @@ export class FontOutlines {
         else if (b >= 247 && b <= 250) stack.push((b - 247) * 256 + r.u8() + 108);
         else if (b >= 251 && b <= 254) stack.push(-(b - 251) * 256 - r.u8() - 108);
         else if (b === 255) stack.push(r.i32() / 65536);
-        else if (b === 10 || b === 29) {
-          const subrs = (b === 10 ? this.cffLocalSubrs : this.cffGlobalSubrs) ?? [];
+        else if (this.cff2 && b === 15) {
+          need(1); vsindex=pop(); this.cffStore?.weights(vsindex);
+        } else if (this.cff2 && b === 16) {
+          const n=pop(),weights=this.cffStore?.weights(vsindex)??fontError('CFF2 blend has no variation store');
+          const start=stack.length-n*(weights.length+1);
+          if(!Number.isInteger(n)||n<1||start<0)fontError('CFF2 blend operand count is invalid');
+          for(let i=0;i<n;i++)for(let j=0;j<weights.length;j++)stack[start+i]+=weights[j]*stack[start+n+i*weights.length+j];
+          stack.length=start+n;
+        } else if (b === 10 || b === 29) {
+          const subrs = (b === 10 ? (this.cff2 ? this.cffFontDicts[this.cffSelect[glyphIndex]].subrs : this.cffLocalSubrs) : this.cffGlobalSubrs) ?? [];
           const index = pop() + (subrs.length < 1240 ? 107 : subrs.length < 33900 ? 1131 : 32768);
           if (!Number.isInteger(index) || !subrs[index]) fontError('Type 2 subroutine index is invalid');
           execute(subrs[index], depth + 1);
         } else if (b === 11) {
+          if (this.cff2) fontError('CFF2 return operator is reserved');
           if (!depth) fontError('Type 2 return outside a subroutine');
           return;
         } else if (b === 1 || b === 3 || b === 18 || b === 23 || b === 19 || b === 20) {
@@ -845,6 +930,7 @@ export class FontOutlines {
           line(b === 4 ? 0 : stack[0], b === 22 ? 0 : stack[count - 1]);
           stack.length = 0;
         } else if (b === 14) {
+          if (this.cff2) fontError('CFF2 endchar operator is reserved');
           width(stack.length >= 4 ? 4 : 0);
           if (stack.length === 4) {
             if (component || loop.length || contours.length)
@@ -865,6 +951,7 @@ export class FontOutlines {
           ended = true;
         } else if (b === 12) {
           const op = r.u8();
+          if (this.cff2 && op < 34) fontError('CFF2 escaped arithmetic operator is reserved');
           if (op >= 34 && op <= 37 && !loop.length) fontError('Type 2 flex requires moveto');
           if (op === 34) {
             need(7);
@@ -1009,10 +1096,11 @@ export class FontOutlines {
             }
           } else fontError(`Type 2 operator ${b} is unsupported`);
         }
-        if (stack.length > 48 || stack.some((v) => !Number.isFinite(v)) || !Number.isFinite(x) || !Number.isFinite(y))
+        if (stack.length > (this.cff2 ? 513 : 48) || stack.some((v) => !Number.isFinite(v)) || !Number.isFinite(x) || !Number.isFinite(y))
           fontError('Type 2 operand stack is invalid or exceeds 48');
       }
-      if (!ended) fontError(depth ? 'Type 2 subroutine is missing return' : 'Type 2 charstring is missing endchar');
+      if (this.cff2) { if (!depth) { if(stack.length)fontError('CFF2 charstring has trailing operands'); finish(); ended=true; } }
+      else if (!ended) fontError(depth ? 'Type 2 subroutine is missing return' : 'Type 2 charstring is missing endchar');
     };
     execute(charString, 0);
     return contours;
@@ -1518,13 +1606,13 @@ function extrudeShapeGeometry(
 // ---------------------------------------------------------------------------
 
 /** Parses font binary data into a reusable FontOutlines object. */
-export function parseFontOutlines(fontData: ArrayBuffer | ArrayBufferView): FontOutlines {
+export function parseFontOutlines(fontData: ArrayBuffer | ArrayBufferView, options: FontVariationOptions = {}): FontOutlines {
   if (!fontData || (!(fontData instanceof ArrayBuffer) && !ArrayBuffer.isView(fontData))) {
     throw new TypeError(
       'parseFontOutlines requires an ArrayBuffer or TypedArray view of font bytes; pass a valid buffer',
     );
   }
-  return new FontOutlines(fontData);
+  return new FontOutlines(fontData, options);
 }
 
 /**
@@ -1536,10 +1624,14 @@ export function extrudeText(text: string, options: ExtrudeTextOptions): Extruded
     throw new TypeError('extrudeText requires a font; pass {font: parseFontOutlines(bytes)} or font bytes');
   }
 
-  const font: FontLike =
+  let font: FontLike =
     options.font instanceof FontOutlines || typeof (options.font as any).getGlyphContours === 'function'
       ? (options.font as FontLike)
       : parseFontOutlines(options.font as ArrayBuffer | ArrayBufferView);
+  if (options.variations) {
+    if (!font.withVariations) fontError('custom font has no withVariations provider');
+    font = font.withVariations(options.variations);
+  }
   const size = options.size ?? 1;
   if (typeof size !== 'number' || size <= 0 || !Number.isFinite(size)) {
     throw new RangeError(`extrudeText size must be a positive finite number; got ${size}`);
@@ -1568,18 +1660,40 @@ export function extrudeText(text: string, options: ExtrudeTextOptions): Extruded
   }
 
   const lines = text.split('\n');
-  const lineMetrics: { glyphs: { char: string; index: number; advance: number }[]; width: number }[] = [];
+  type Positioned = { index: number; advance: number; yAdvance: number; xOffset: number; yOffset: number; cluster?: number };
+  const lineMetrics: { glyphs: Positioned[]; width: number }[] = [];
+  const shaped = options.shapedRuns ?? font.shape?.(text);
+  if (shaped !== undefined) {
+    for (let i=0;i<lines.length;i++) lineMetrics.push({glyphs:[],width:0});
+    for (const run of shaped) {
+      const line = run.line ?? 0;
+      if (!Number.isInteger(line) || line < 0 || line >= lines.length) fontError('shaping run line is outside the text');
+      for (const g of run.glyphs) {
+        const values=[g.xAdvance,g.yAdvance??0,g.xOffset??0,g.yOffset??0];
+        if (!Number.isInteger(g.glyphIndex) || g.glyphIndex < 0 || (font instanceof FontOutlines && g.glyphIndex >= font.glyphCount) || !values.every(Number.isFinite) ||
+          (g.cluster !== undefined && (!Number.isInteger(g.cluster) || g.cluster < 0 || g.cluster > text.length)))
+          fontError('shaping run glyph ID, cluster or position is invalid');
+        lineMetrics[line].glyphs.push({index:g.glyphIndex,advance:g.xAdvance*size,yAdvance:(g.yAdvance??0)*size,
+          xOffset:(g.xOffset??0)*size,yOffset:(g.yOffset??0)*size,cluster:g.cluster});
+      }
+    }
+    for (const line of lineMetrics) for (let i=0;i<line.glyphs.length;i++) {
+      const g=line.glyphs[i],next=line.glyphs[i+1];
+      if (next && (g.cluster===undefined || g.cluster!==next.cluster)) g.advance += letterSpacing*size;
+      line.width += g.advance;
+    }
+  }
 
-  for (const line of lines) {
-    const glyphs: { char: string; index: number; advance: number }[] = [];
+  if (shaped === undefined) for (const line of lines) {
+    const glyphs: Positioned[] = [];
     let lineWidth = 0;
     for (const char of line) {
       const index = font.glyphIndex(char);
       const advance = font.glyphAdvance(index) * size;
-      glyphs.push({ char, index, advance });
+      glyphs.push({ index, advance: advance + letterSpacing*size, yAdvance:0, xOffset:0, yOffset:0 });
       lineWidth += advance + letterSpacing * size;
     }
-    if (glyphs.length > 0) lineWidth -= letterSpacing * size;
+    if (glyphs.length > 0) { lineWidth -= letterSpacing * size; glyphs[glyphs.length-1].advance -= letterSpacing*size; }
     lineMetrics.push({ glyphs, width: lineWidth });
   }
 
@@ -1609,12 +1723,13 @@ export function extrudeText(text: string, options: ExtrudeTextOptions): Extruded
     if (align === 'center') cursorX = (maxLineWidth - width) * 0.5;
     else if (align === 'right') cursorX = maxLineWidth - width;
 
-    for (const { index, advance } of glyphs) {
+    let advanceY = 0;
+    for (const { index, advance, yAdvance, xOffset, yOffset } of glyphs) {
       const contours = font.getGlyphContours(index, curveSegments);
       if (contours.length > 0) {
         // Scale and translate glyph contours to world space
         const worldLoops: Point2D[][] = contours.map((loop) =>
-          loop.map((p) => [cursorX + p[0] * size, cursorY + p[1] * size]),
+          loop.map((p) => [cursorX + xOffset + p[0] * size, cursorY + advanceY + yOffset + p[1] * size]),
         );
 
         const shapes = classifyLoops(worldLoops);
@@ -1635,7 +1750,8 @@ export function extrudeText(text: string, options: ExtrudeTextOptions): Extruded
           );
         }
       }
-      cursorX += advance + letterSpacing * size;
+      cursorX += advance;
+      advanceY += yAdvance;
     }
     cursorY -= lineSpacing;
   }

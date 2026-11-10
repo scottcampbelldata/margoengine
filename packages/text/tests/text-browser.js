@@ -473,6 +473,20 @@ window.runTextTests = async () => {
   label.visible = true;
   report.checks.push('Extruded 3D text generates valid 3D geometry rendered by core WebGPU pipeline');
 
+  label.visible = false;
+  const shapedFixture = (await (await fetch('/tests/fixtures/fonts/shaping-reference.json')).json()).cases[0];
+  const variableBytes = await (await fetch('/tests/fixtures/fonts/SourceSans3VF-Upright.otf')).arrayBuffer();
+  const shapedGeometry = extrudeText(shapedFixture.text, { font: variableBytes, variations: shapedFixture.variations,
+    shapedRuns: shapedFixture.shapedRuns, size: 1.6, depth: 0.25 });
+  const shapedMesh = engine.createMesh().setGeometry(new Geometry(shapedGeometry.positions, shapedGeometry.normals, shapedGeometry.indices))
+    .setMaterial(new PbrMaterial({color:'#ff8800',roughness:0.4}));
+  shapedMesh.setPosition([-3,-0.6,0]);
+  image = await frame();
+  assert(ink(image, ([r,g,b])=>r>180&&g>80&&b<50).count>100, 'Variable CFF2 shaped extrusion must draw real glyph pixels');
+  shapedMesh.dispose();
+  label.visible = true;
+  report.checks.push('Shaped variable CFF2 extrusion renders a real OFL font with substituted glyph IDs and positioning');
+
   // 4. Billboard text faces the camera after orbiting; world-oriented text turns edge-on.
   label.set({ text: 'Hello', fontSize: 1.2, anchorX: 'left', anchorY: 'middle' });
   const frontal = ink(await frame());

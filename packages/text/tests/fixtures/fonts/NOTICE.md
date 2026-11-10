@@ -26,3 +26,8 @@ Pinned unchanged font bytes:
 
 - `SourceSans3-Regular.ttf`: 431,196 bytes, SHA-256 `4644c81b86ec9caaa76b634889968ed3c4f4f52f054855933acc7c2b21e53b0f`.
 - `SourceSans3-Regular.otf`: 334,924 bytes, SHA-256 `08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6`.
+
+## Variable and shaped-extrusion fixtures (batch 248)
+Unmodified Source Sans 3 VF Upright, Adobe release 3.052R, same copyright and OFL licence above. TTF and CFF2 OTF source URLs: https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/VF/SourceSans3VF-Upright.ttf and https://raw.githubusercontent.com/adobe-fonts/source-sans/3.052R/VF/SourceSans3VF-Upright.otf . SHA-256: TTF 1147db9a3f0edd4956068de77930148acce2742dd76d57f7239b2b1c687ac63f; OTF 3d0dfd6a3a644ab3d462a737923ffac41fb0ae007ce9ba83c24e6bfa76aa56c7.
+Amiri Regular: Copyright 2010-2022 The Amiri Project Authors, SIL OFL 1.1 (Amiri-OFL.txt). Source pinned to Google Fonts commit 39d11bc313031c9f68e21a297ce5e4a15cc5365e: https://raw.githubusercontent.com/google/fonts/39d11bc313031c9f68e21a297ce5e4a15cc5365e/ofl/amiri/Amiri-Regular.ttf . SHA-256 ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7.
+variable-reference.json and shaping-reference.json are Margo-generated independent public-API oracle outputs. Regeneration scripts are in the parent tests directory. FontTools 4.68 and uharfbuzz are oracle tools only, installed in an ignored local environment; no library source was read/copied or shipped. Fonts are standard test data under the documented asset exception, excluded from npm package files.

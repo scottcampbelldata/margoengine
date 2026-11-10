@@ -1,0 +1,147 @@
+{
+  "method": "HarfBuzz public hb_shape through uharfbuzz; FontTools public glyph drawing at 12 Bezier samples",
+  "cases": [
+    {
+      "font": "SourceSans3VF-Upright.otf",
+      "sha256": "3d0dfd6a3a644ab3d462a737923ffac41fb0ae007ce9ba83c24e6bfa76aa56c7",
+      "text": "office AV",
+      "variations": {
+        "wght": 650
+      },
+      "shapedRuns": [
+        {
+          "glyphs": [
+            {
+              "glyphIndex": 42,
+              "cluster": 0,
+              "xAdvance": 0.548,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 687,
+              "cluster": 1,
+              "xAdvance": 0.637,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 36,
+              "cluster": 3,
+              "xAdvance": 0.269,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 30,
+              "cluster": 4,
+              "xAdvance": 0.439,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 32,
+              "cluster": 5,
+              "xAdvance": 0.512,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 1,
+              "cluster": 6,
+              "xAdvance": 0.2,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 2,
+              "cluster": 7,
+              "xAdvance": 0.548,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 23,
+              "cluster": 8,
+              "xAdvance": 0.546,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            }
+          ]
+        }
+      ],
+      "bounds": [
+        0.03833639748912519,
+        -0.012000000000000113,
+        3.7044700848251235,
+        0.7155668436679989
+      ]
+    },
+    {
+      "font": "Amiri-Regular.ttf",
+      "sha256": "ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7",
+      "text": "سلامّ",
+      "variations": {},
+      "shapedRuns": [
+        {
+          "glyphs": [
+            {
+              "glyphIndex": 97,
+              "cluster": 3,
+              "xAdvance": 0.0,
+              "yAdvance": 0.0,
+              "xOffset": -0.013,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 85,
+              "cluster": 3,
+              "xAdvance": 0.452,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 3080,
+              "cluster": 2,
+              "xAdvance": 0.446,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 3075,
+              "cluster": 1,
+              "xAdvance": 0.245,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            },
+            {
+              "glyphIndex": 1919,
+              "cluster": 0,
+              "xAdvance": 0.568,
+              "yAdvance": 0.0,
+              "xOffset": 0.0,
+              "yOffset": 0.0
+            }
+          ]
+        }
+      ],
+      "bounds": [
+        0.06391666666666668,
+        -0.516,
+        1.6483611111111112,
+        1.0041597222222223
+      ]
+    }
+  ]
+}
