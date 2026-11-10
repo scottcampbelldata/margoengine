@@ -157,16 +157,24 @@ abstract class StepTrack<T extends DiscreteValue> {
     this.keyTimes = times;
     return this;
   }
-  /** Scale time; negative factors reverse both time and values. Zero is invalid. */
+  /**
+   * Scale time; a negative factor mirrors the track so it plays the original backwards. Zero is invalid. Under
+   * hold-last sampling the value held over (t[i], t[i+1]] moves to the key at -t[i+1], so values shift by one key:
+   * the original last value, held there for an instant only, is not kept.
+   */
   scale(factor: number): this {
     finite(factor, 'scale');
     if (!factor) throw invalid('Discrete scale must be nonzero; use action timeScale to pause');
-    const times = Float64Array.from(this.keyTimes, (t) => t * factor);
+    const times = Float64Array.from(this.keyTimes, (t) => t * factor + 0); // + 0 turns -0 into 0
     if (factor < 0) times.reverse();
     if (!ordered(times))
       throw invalid('Discrete scale loses time ordering; use a finite factor that preserves distinct keys');
     this.keyTimes = times;
-    if (factor < 0) this.keyValues = Object.freeze([...this.keyValues].reverse());
+    if (factor < 0) {
+      const v = this.keyValues,
+        n = v.length;
+      this.keyValues = Object.freeze(v.map((_, j) => v[j < n - 1 ? n - 2 - j : 0]));
+    }
     return this;
   }
   /** Clip to inclusive bounds, inserting held boundary samples so no categorical state is lost. */

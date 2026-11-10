@@ -61,7 +61,8 @@ test('editing preserves holds, endpoints, duration and strict order', () => {
   assert.deepEqual(track.values, ['a', 'b', 'b']);
   track.scale(-2).shift(5);
   assert.deepEqual([...track.times], [0, 1, 4]);
-  assert.deepEqual(track.values, ['b', 'b', 'a']);
+  // b held on [2, 2.5] and a on [0.5, 2) mirror to b on [0, 1) and a on [1, 4].
+  assert.deepEqual(track.values, ['b', 'a', 'a']);
   assert.equal(track.validate(), true);
   const before = track.toJSON();
   assert.throws(() => track.scale(0), { code: 'arguments' });
@@ -234,4 +235,16 @@ test('discrete model-root disposal never restores a property on a destroyed Mesh
   model.dispose();
   assert.doesNotThrow(() => action.stop());
   assert.doesNotThrow(() => mixer.dispose());
+});
+
+test('a negative scale samples the original backwards over every held interval', () => {
+  const original = new StringKeyframeTrack('s', [0, 1, 2], ['a', 'b', 'c']);
+  const mirrored = new StringKeyframeTrack('s', [0, 1, 2], ['a', 'b', 'c']).scale(-1);
+  assert.deepEqual([...mirrored.times], [-2, -1, 0]);
+  for (const t of [-1.75, -1.5, -1.25, -0.75, -0.5, -0.25, 0, 0.5]) assert.equal(mirrored.sample(t), original.sample(-t), `${t}`);
+  const flags = new BooleanKeyframeTrack('v', [0, 2, 3], [false, true, false]).scale(-2);
+  assert.deepEqual([...flags.times], [-6, -4, 0]);
+  assert.equal(flags.sample(-5), true);
+  assert.equal(flags.sample(-1), false);
+  assert.equal(flags.sample(1), false);
 });

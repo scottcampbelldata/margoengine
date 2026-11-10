@@ -115,6 +115,27 @@ test('warp uses signed absolute rates, zero duration, halt and global pause', ()
   close(action.getEffectiveWeight(), 0);
 });
 
+test('effective weight and rate follow assignments before the next update, so halt warps from the set rate', () => {
+  const root = skeleton(),
+    mixer = new AnimationMixer(root),
+    a = mixer.clipAction(clip('a', [0, 0, 0], [10, 0, 0], 10));
+  a.timeScale = 2;
+  a.weight = 0.5;
+  a.play();
+  assert.equal(a.getEffectiveTimeScale(), 2);
+  assert.equal(a.getEffectiveWeight(), 0.5);
+  a.halt(1);
+  assert.equal(a.getEffectiveTimeScale(), 2);
+  mixer.update(0.5);
+  close(a.getEffectiveTimeScale(), 1);
+  close(a.time, 0.5);
+  a.fadeOut(1);
+  assert.equal(a.getEffectiveWeight(), 0.5);
+  mixer.update(0.5);
+  close(a.getEffectiveWeight(), 0.25);
+  a.enabled = false;
+  assert.equal(a.getEffectiveWeight(), 0);
+});
 test('warped crossfade matches cycle rates for different durations', () => {
   const mixer = new AnimationMixer(skeleton());
   const a = mixer.clipAction(clip('short', [0, 0, 0], [1, 0, 0], 1)).play(),

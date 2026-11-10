@@ -102,8 +102,6 @@ export class AnimationAction {
   private fade?: Envelope;
   private speed?: Envelope;
   private start?: number;
-  private effectiveWeight = 1;
-  private effectiveSpeed = 1;
   /** @internal Actions are cached by AnimationMixer.clipAction. */
   constructor(
     private readonly mixer: AnimationMixer,
@@ -171,24 +169,31 @@ export class AnimationAction {
   }
   /** Current weight including enabled and fading. */
   getEffectiveWeight(): number {
-    return this.enabled ? this.effectiveWeight : 0;
+    return this.enabled ? this.weight * this.fadeFactor() : 0;
   }
   /** Current rate including pause and warping. */
   getEffectiveTimeScale(): number {
-    return this.paused ? 0 : this.effectiveSpeed;
+    return this.paused ? 0 : this.rate();
+  }
+  // Both read the public weight/timeScale and the envelopes at the mixer's time, so assignments show at once.
+  private fadeFactor(): number {
+    const e = this.fade;
+    return e ? (e.duration ? factor(e, this.mixer.time) : e.to) : 1;
+  }
+  private rate(): number {
+    const e = this.speed;
+    return e ? (e.duration ? factor(e, this.mixer.time) : e.to) : this.timeScale;
   }
   /** Set contribution and cancel fading. */
   setEffectiveWeight(weight: number): this {
     this.weight = finite(weight, 'weight', 0);
     this.fade = undefined;
-    this.effectiveWeight = this.enabled ? weight : 0;
     return this;
   }
   /** Set rate and cancel warping. Negative rates run backwards. */
   setEffectiveTimeScale(scale: number): this {
     this.timeScale = finite(scale, 'timeScale');
     this.speed = undefined;
-    this.effectiveSpeed = this.paused ? 0 : scale;
     return this;
   }
   /** Set a positive wall-time duration for one traversal. */
@@ -229,7 +234,6 @@ export class AnimationAction {
   /** Cancel the scheduled fade, retaining base weight. */
   stopFading(): this {
     this.fade = undefined;
-    this.effectiveWeight = this.enabled ? this.weight : 0;
     return this;
   }
   /** Schedule absolute signed rates over mixer seconds. */
@@ -278,27 +282,24 @@ export class AnimationAction {
       delta = Math.min(delta, this.mixer.time - this.start);
       this.start = undefined;
     }
-    let rate = this.timeScale;
+    const rate = this.rate();
     if (this.speed) {
       const e = this.speed;
-      rate = e.duration ? factor(e, this.mixer.time) : e.to;
       if (this.mixer.time >= e.start + e.duration) {
         this.timeScale = rate;
         this.speed = undefined;
         if (rate === 0) this.paused = true;
       }
     }
-    this.effectiveSpeed = this.paused ? 0 : rate;
-    let fade = 1;
+    const fade = this.fadeFactor();
     if (this.fade) {
       const e = this.fade;
-      fade = e.duration ? factor(e, this.mixer.time) : e.to;
       if (this.mixer.time >= e.start + e.duration) {
         this.fade = undefined;
         if (e.to === 0) this.enabled = false;
       }
     }
-    this.effectiveWeight = this.enabled ? this.weight * fade : 0;
+    let weight = this.enabled ? this.weight * fade : 0;
     const duration = this.clip.duration;
     let sample = this.time;
     if (!this.paused && delta * rate !== 0) {
@@ -322,8 +323,7 @@ export class AnimationAction {
       sample = this.time;
     }
     if (this.loop === LoopPingPong && this.loops % 2) sample = duration - sample;
-    if (!this.enabled) this.effectiveWeight = 0;
-    const weight = this.effectiveWeight;
+    if (!this.enabled) weight = 0;
     if (weight > 0)
       for (const channel of this.channels)
         this.mixer.accumulate(channel.binding, channel.sample(sample), weight, this.blendMode);
