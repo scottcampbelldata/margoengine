@@ -2653,3 +2653,13 @@ from scripts/measure-size.js and gzipSync, with bare imports external.
 
 Batch 252 job 5: after building, run node --test --test-timeout=120000 packages/navmesh/test/obstacles.test.js. The independent reference classifies all 64x64 cell centers using circle/inverse-rotation equations and builds ordinary box masks; encoded tile polygons must match exactly without tolerances.
 Batch 253 XR binding correctness: build packages/input then node --test --test-timeout=30000 packages/input/test/xr.test.js. Structural session/frame fixtures inject source changes, select/squeeze taps, controller samples and joint poses, then replay the resulting ordinary Input recording without XR. Physical headset acceptance remains a hardware follow-up.
+
+
+## Batch 262 viewport gizmo
+
+Run npm run test --workspace @margoengine/inspector. After building, run node
+scripts/gpu-lock.mjs run --owner=inspector-gizmo --max=2 --wait-max=60 -- node
+packages/inspector/test/gizmo-browser.mjs as one command; repeat with --compat
+appended. All three modes use real pointer drags, rendered colour checks and
+exact local pose comparisons after undo/redo. Package test:browser:gizmo and
+test:browser:gizmo:compat expose both routes to check:gpu-packages.

@@ -49,6 +49,10 @@
     "./tweak": {
       "types": "./dist/tweak.d.ts",
       "import": "./dist/tweak.js"
+    },
+    "./gizmo": {
+      "types": "./dist/gizmo.d.ts",
+      "import": "./dist/gizmo.js"
     }
   },
   "files": [
@@ -62,7 +66,8 @@
   "dependencies": {
     "@margoengine/lines": "^1.0.0",
     "@margoengine/math": "^1.0.0",
-    "@margoengine/stats": "^1.0.0"
+    "@margoengine/stats": "^1.0.0",
+    "@margoengine/controls": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
@@ -72,6 +77,8 @@
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
     "test:browser": "node test/parity-browser.mjs",
-    "test:browser:compat": "node test/parity-browser.mjs --compat"
+    "test:browser:compat": "node test/parity-browser.mjs --compat",
+    "test:browser:gizmo": "node test/gizmo-browser.mjs",
+    "test:browser:gizmo:compat": "node test/gizmo-browser.mjs --compat"
   }
 }

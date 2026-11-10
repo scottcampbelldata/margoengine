@@ -3841,3 +3841,15 @@ Batch 252 job 5 measured entry sizes: @margoengine/navmesh/obstacles: 1558 B gzi
 @margoengine/input/xr: 1675 B gzip (previously absent), ceiling 1931 B. Cohesive lifecycle retained; no separate fragment entry. Core and stage unchanged.
 
 Batch 253 XR input: optional input/xr supplies XRBindings, typed XRBinding descriptors and structural native session/frame/source types. map or binding converts descriptors to standard control bindings, usable by Input, VectorInput, interactions and recording/replay. Button value/pressed/touched, arbitrary axes, native select and squeeze (xr-grip), grip pose components and tracked flag, plus hand pinch are supported. Hand/source filters select the nth matching current session source (default 0); id defaults xr. Pinch begins at 0.02 m and releases above 0.03 m; both are configurable. Missing devices and poses read zero. Pose channels use reference-space metres/quaternion components before normal Input scalar clamping; choose a scale for large coordinates. Call update(frame, space) before input.update. Recorded channels need no XR during replay. For persistent descriptor configurations, keep the descriptor map and regenerate its control bindings in the same order. Hardware feel and browser permission availability have not been tested on a physical headset in this lane.
+
+
+## Batch 262: selection gizmo
+
+inspector/gizmo is 1,887 B min+gzip, bare imports external, previously absent;
+its 2,143 B ceiling includes standard headroom. It explicitly imports the existing
+controls/transform entry (11,877 B), an intentional optional dependency. The
+inspector root changes from 9,071 to 9,073 B for correct owner-scene disposal,
+within its existing ceiling. Core plus stage remains 23,950 B. Gizmo limits are
+those of controls/transform (including parent shear handling); the bridge adds no
+new transform math. One drag is one undo command. Disposed entities are not
+resurrected by transform history and recycled slots are never targeted.

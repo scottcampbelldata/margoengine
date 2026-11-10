@@ -5510,3 +5510,12 @@ a forced --compat run of the same WebGPU path through WebGL2 compatibility. The 
 is discoverable as inspector/test:browser for check:gpu-packages. CPU tests
 exercise gesture boundaries, shared undo, enum identity and abort/disposal. No
 core, stage, GPU mathematics or rendering pass is added.
+
+## Section 5 evidence: inspector gizmo ownership and arbitration
+
+The selection bridge uses existing controls rendering, including its WebGL2
+compatibility path; it adds no GPU math or core API. Real pointer tests prove
+rendered handles, selection retention, camera suspension and whole-drag undo.
+The owner-scene regression now prevents inspector cleanup from removing a
+same-named plugin in the default scene. Every gizmo plugin is attached in the
+inspector's scene and is removed on abort, engine disposal or inspector removal.

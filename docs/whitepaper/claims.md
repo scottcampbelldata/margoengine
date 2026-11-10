@@ -3141,3 +3141,15 @@ No speed result is claimed.
 
 The optional obstacle entry supports the web tile-cache row's upright cylinders and Y-rotated boxes alongside existing axis boxes. packages/navmesh/test/obstacles.test.js compares every tile mesh byte-for-byte against independent brute cell-center masks for cylinders and box headings 0, +/-pi/2, pi, 0.37 and -2.1. It checks open footprint AABB corners, moving between shape kinds, removal, ordinary-box interoperability, vertical exclusion, untouched tiles, subcell empty masks, atomic invalid replacements and disposal. The near-quarter-turn test fails with inverse-coefficient division and passes with monotone integer searches. No speed claim is made.
 Batch 253 XR actions claim: source-local buttons, axes, select, squeeze/grip, grip pose and hysteretic hand pinch feed ordinary action bindings and tick replay. Source loss, session end, missing pose and disposal clear published controls. Proof: packages/input/test/xr.test.js; design and public rival comparison: docs/clean-room.md Batch 253 job 2. No physical-headset or rendering claim.
+
+
+## Batch 262: viewport selection gizmo
+
+inspector/gizmo reuses controls/transform for move, rotate and scale in world or
+local space, with snaps and focus-scoped shortcuts. It follows inspector selection
+and shares its history, records one command per drag, cancels without an edit,
+and restores the camera's prior enabled state. Capture-phase handle presses do
+not become inspector canvas picks. Browser proof drags actual handles, checks
+rendered axis pixels and exact transform undo/redo on native WebGPU, WebGL2
+preview and forced WebGL2 compatibility. CPU regressions cover cancellation,
+recycled slots, abort, toolbar and owner-scene disposal. No speed claim is made.

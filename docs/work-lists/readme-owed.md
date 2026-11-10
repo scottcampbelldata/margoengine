@@ -101,3 +101,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated netcode/migrate alias | batch-256 job 4 |
 | @margoengine/input | xr: descriptors/map/binding, attach/update order, source filters, select/grip/poses, pinch distances, recording and lifecycle | batch-253 job 2 |
 | margoengine | Generated input/xr alias | batch-253 job 2 |
+| @margoengine/inspector | Selection gizmos, camera arbitration, toolbar and whole-drag undo. | Batch 262 job 2 |
+| margoengine | Optional inspector/gizmo import. | Batch 262 job 2 |

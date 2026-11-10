@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>Inspector selection gizmo</title>
+<canvas width="600" height="400" style="width:600px;height:400px"></canvas>
+<script type="module">
+import {Engine,box} from '@margoengine/core';
+import {engineRuntime,meshRuntime} from '@margoengine/core/extension';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+import {Inspector} from '@margoengine/inspector';
+import {InspectorGizmo} from '@margoengine/inspector/gizmo';
+window.setup=async(backend)=>{
+  window.engine?.dispose();
+  const old=document.querySelector('canvas'), canvas=old.cloneNode(); old.replaceWith(canvas);
+  const engine=window.engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:{position:[0,4,8],target:[0,0,0]}});
+  const mesh=window.mesh=engine.createMesh().setGeometry(box());
+  const inspector=window.inspector=Inspector.attach(engine), camera=window.camera={enabled:true};
+  const gizmo=window.gizmo=InspectorGizmo.attach(engine,inspector,{cameraControls:camera});
+  inspector.select(mesh); gizmo.sync(); engine.start();
+  window.pose=()=>{const runtime=engineRuntime(engine), id=meshRuntime(mesh).id; return ['x','y','z','qx','qy','qz','qw','sx','sy','sz'].map(k=>runtime.store.transforms[k][id]);};
+  window.points=(mode)=>{
+    gizmo.controls.setMode(mode); engine.render(); const frame=gizmo.controls.frame(),o=frame.origin,r=frame.size,m=engine.camera.matrix;
+    const project=(p)=>{const q=[...p,1],v=[0,1,2,3].map(row=>q.reduce((sum,c,col)=>sum+c*m[col*4+row],0));return [(v[0]/v[3]+1)*300,(1-v[1]/v[3])*200];};
+    for(let step=0;step<36;step++) {
+      const a=step/36*Math.PI*2, from=mode==='rotate'?[o[0]+r*Math.cos(a),o[1],o[2]+r*Math.sin(a)]:[o[0]+r*(0.5+step/72),o[1],o[2]],
+        to=mode==='rotate'?[o[0]+r*Math.cos(a+0.5),o[1],o[2]+r*Math.sin(a+0.5)]:[from[0]+r*0.4,from[1],from[2]], start=project(from);
+      if(gizmo.controls.pick(...start)===(mode==='rotate'?'Y':'X')) return {start,end:project(to)};
+    }
+    throw Error('No visible handle for '+mode);
+  };
+  window.redPixels=async()=>{
+    engine.render(); const bitmap=await createImageBitmap(canvas), copy=new OffscreenCanvas(bitmap.width,bitmap.height),g=copy.getContext('2d');g.drawImage(bitmap,0,0);bitmap.close();
+    const pixels=g.getImageData(0,0,copy.width,copy.height).data;let red=0;
+    for(let i=0;i<pixels.length;i+=4)if(pixels[i]>120&&pixels[i]>pixels[i+1]*1.4&&pixels[i+1]<140)red++;
+    return red;
+  };
+  return engine.backend;
+};
+</script>

@@ -1414,6 +1414,10 @@
       "types": "./dist/inspector/tweak.d.ts",
       "import": "./dist/inspector/tweak.js"
     },
+    "./inspector/gizmo": {
+      "types": "./dist/inspector/gizmo.d.ts",
+      "import": "./dist/inspector/gizmo.js"
+    },
     "./kinematics-constraints": {
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"

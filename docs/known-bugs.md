@@ -4152,3 +4152,15 @@ Resolved on main by 2c1b94730: the GPU queue now observes owner exit before repl
 Outside batch 262: run scripts/gpu-package-tests.mjs in two different worktrees; both request owner check:gpu-packages, and ownerLane maps both to check, so sameLane serializes unrelated lanes. Use a distinct lane owner when running these tests directly; the runner owner needs a tooling fix.
 
 Outside batch 262: node packages/cutscene/tests/vfx-browser.mjs --compat reproduces on clean origin/main 5d6e5facd without any inspector changes: frame 40 sought particle hash 397093820 vs played 3932506386, live 110 and picture 396217175 match. The compatibility VFX reset/replay or readback cause remains unproven. Log: test-results/batch262-resume-baseline-gate-0.log. Dependent GPU coverage belongs to scheduled CI and does not gate inspector landing.
+
+
+### Fixed in batch 262: inspector disposal in another scene
+
+Repro: keep an inspector in the default scene, attach another using other.use,
+then dispose the latter outside a render. The old engine.removePlugin(name)
+removed the default inspector and left the other scene's entry registered.
+Inspector.dispose now uses sceneOf(this). The multi-scene regression in
+packages/inspector/test/gizmo.test.js fails without it and proves both the owner
+cleanup and the default inspector's survival.
+
+Outside batch 262: tests/api-conventions.test.js:72 falsely rejects controls.globe.api.md GlobeControls. Its classes map reads exported declarations only, but GlobeControls inherits static attach from the unexported Controls declaration retained in that report. Repro: node --test tests/api-conventions.test.js. The runtime class has the inherited factory; the report scanner must include local bases while checking exported classes.

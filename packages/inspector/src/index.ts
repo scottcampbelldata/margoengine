@@ -904,7 +904,7 @@ export class Inspector implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     clearInterval(this.timer);
     this.stopPicking?.();

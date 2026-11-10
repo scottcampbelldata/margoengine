@@ -2590,6 +2590,33 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 256 migration: `@margoengine/netcode/migrate` exports HostMigration and its
+typed options/state. Give each peer the same schema, initial state, frame and
+host (default lowest id), and reliable full-mesh Connection links. It owns and
+closes these links, forwards other message kinds to earlier handlers, and uses
+wire prefix 112 for migration. Up to 64 peers; checkpoint default 1 MiB, maximum
+16 MiB. Initial frame defaults to 0, operation/recovery/wait timeout to 10 seconds.
+Frames, sequences and authority epochs are unsigned 32-bit; create a new session
+before overflow. `confirm(state, frame, { signal })` serially prepares and commits
+on every connected peer and resolves only after all stored acknowledgements.
+`confirmed` is a detached locally committed copy; await confirm before treating
+it as globally confirmed. Exactly two committed checkpoints are retained.
+Host disconnect selects the lowest surviving id, restores the newest common
+checkpoint and completes a survivor acknowledgement barrier before isHost becomes
+true. `handoff(target, { signal })` moves authority without leaving. Only isHost
+may simulate/publish authority work; use waitForHost to resume after migration.
+Abort/timeout of a publishing operation retires that session and closes its links
+rather than reusing an uncertain checkpoint. Cancelling waitForHost only cancels
+that wait. Trusted peers and a connected surviving full mesh are required; arbitrary
+network partitions, malicious voters, durable restart and adding peers to a live
+session require external membership/fencing or a fresh session. No consensus or
+partition-safety claim is made. The public role-switch behavior of Photon Realtime
+is covered, with explicit checkpoint replication/restoration supplied here.
+New migration entry gzip is 8,351 B (previously absent), ceiling 8,607 B. Complete
+checkpoint validation, two-phase replication, handoff and recovery remain in one
+optional entry. Splitting them would expose protocol internals and duplicate
+session lifecycle wiring. Core and stage remain 23,950 B combined gzip.
+
 Batch 256 Rust generation: `@margoengine/netcode/generate-rust` exports
 generateRust(schema.json or compiledSchema, { source? }). Output is standalone
 Rust 2021 requiring Rust 1.82 or newer, with no crate dependencies. Each schema
@@ -6397,9 +6424,37 @@ beyond #rrggbb is not part of this binding contract. Application writes need
 refresh(); arbitrary action buttons need a supplied inverse to be undoable.
 An input gesture commits on change/blur or panel.undo(), and Escape cancels it.
 
+
+Batch 252 job 5: @margoengine/navmesh/obstacles exports ObstacleNavMesh, a TiledNavMesh subclass with addCylinderObstacle(baseCenter,radius,height), addBoxObstacle(center,halfExtents,yRadians=0), and add/move/removeObstacle shape overloads. Cylinder dimensions and box half extents must be finite and positive; rotations are right-handed about +Y. Shapes use the same voxel-center inclusion, vertical climb allowance, radius erosion, deferred tile update queue and world lattice as ordinary boxes. New shape handles are negative numbers; axis-box ids retain their existing meaning, and move retains the supplied handle. Empty subcell masks remain movable/removable. Shapes are limited to 1,000,000 candidate rows and safe finite lattice coordinates. Baked tiled geometry retains the carved cell runs through the existing codec; grouped shape handles belong to the live optional subclass and are not serialized as analytic shape objects. Footprints are rasterized at the chosen cs, as the reference tile-cache behavior is voxel based.
+
+Batch 252 job 5 measured entry sizes: @margoengine/navmesh/obstacles: 1558 B gzip (ceiling 0 -> 1814 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+@margoengine/input/xr: 1675 B gzip (previously absent), ceiling 1931 B. Cohesive lifecycle retained; no separate fragment entry. Core and stage unchanged.
+
+Batch 253 XR input: optional input/xr supplies XRBindings, typed XRBinding descriptors and structural native session/frame/source types. map or binding converts descriptors to standard control bindings, usable by Input, VectorInput, interactions and recording/replay. Button value/pressed/touched, arbitrary axes, native select and squeeze (xr-grip), grip pose components and tracked flag, plus hand pinch are supported. Hand/source filters select the nth matching current session source (default 0); id defaults xr. Pinch begins at 0.02 m and releases above 0.03 m; both are configurable. Missing devices and poses read zero. Pose channels use reference-space metres/quaternion components before normal Input scalar clamping; choose a scale for large coordinates. Call update(frame, space) before input.update. Recorded channels need no XR during replay. For persistent descriptor configurations, keep the descriptor map and regenerate its control bindings in the same order. Hardware feel and browser permission availability have not been tested on a physical headset in this lane.
+
+
+## Batch 262: selection gizmo
+
+inspector/gizmo is 1,887 B min+gzip, bare imports external, previously absent;
+its 2,143 B ceiling includes standard headroom. It explicitly imports the existing
+controls/transform entry (11,877 B), an intentional optional dependency. The
+inspector root changes from 9,071 to 9,073 B for correct owner-scene disposal,
+within its existing ceiling. Core plus stage remains 23,950 B. Gizmo limits are
+those of controls/transform (including parent shear handling); the bridge adds no
+new transform math. One drag is one undo command. Disposed entities are not
+resurrected by transform history and recycled slots are never targeted.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Fixed: batch 256 synchronous host recovery deadline
+
+A synchronous Connection could complete recovery from inside status broadcast,
+then the returning outer frame armed a deadline that closed the healthy session.
+Initialize the timer before notifying peers and stop recovery work once authority
+is ready. The synchronous-transport case in packages/netcode/tests/migrate.test.js
+fails before the change and stays ready past the deadline afterward.
 
 ### Batch 258 text fields
 
@@ -10545,6 +10600,18 @@ Resolved on main by 2c1b94730: the GPU queue now observes owner exit before repl
 Outside batch 262: run scripts/gpu-package-tests.mjs in two different worktrees; both request owner check:gpu-packages, and ownerLane maps both to check, so sameLane serializes unrelated lanes. Use a distinct lane owner when running these tests directly; the runner owner needs a tooling fix.
 
 Outside batch 262: node packages/cutscene/tests/vfx-browser.mjs --compat reproduces on clean origin/main 5d6e5facd without any inspector changes: frame 40 sought particle hash 397093820 vs played 3932506386, live 110 and picture 396217175 match. The compatibility VFX reset/replay or readback cause remains unproven. Log: test-results/batch262-resume-baseline-gate-0.log. Dependent GPU coverage belongs to scheduled CI and does not gate inspector landing.
+
+
+### Fixed in batch 262: inspector disposal in another scene
+
+Repro: keep an inspector in the default scene, attach another using other.use,
+then dispose the latter outside a render. The old engine.removePlugin(name)
+removed the default inspector and left the other scene's entry registered.
+Inspector.dispose now uses sceneOf(this). The multi-scene regression in
+packages/inspector/test/gizmo.test.js fails without it and proves both the owner
+cleanup and the default inspector's survival.
+
+Outside batch 262: tests/api-conventions.test.js:72 falsely rejects controls.globe.api.md GlobeControls. Its classes map reads exported declarations only, but GlobeControls inherits static attach from the unexported Controls declaration retained in that report. Repro: node --test tests/api-conventions.test.js. The runtime class has the inherited factory; the report scanner must include local bases while checking exported classes.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

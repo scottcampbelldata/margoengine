@@ -5644,3 +5644,29 @@ Combined design: the optional ObstacleNavMesh subclass maps each shape onto exac
 ## Batch 253 job 2: XR action bindings (2026-11-10)
 Compared W3C Immersive Web Working Group, WebXR Device API (2026), https://www.w3.org/TR/webxr/ (source identity and select/squeeze lifecycle); Manish Goregaokar (editor), WebXR Hand Input Module Level 1 (2024), https://www.w3.org/TR/webxr-hand-input-1/ (named joint positions in reference-space metres); Alexander Schaefer, Gerd Reis and Didier Stricker, Comparing Controller With the Hand Gestures Pinch and Grab for Picking Up and Placing Virtual Objects (2022), https://arxiv.org/abs/2202.10964 (thumb/index distance and instability around one threshold); and Babylon's public XrInputSource and XrControllerComponents behaviour descriptions, https://doc.babylonjs.com/lite/typedoc/interfaces/XrInputSource/ and https://doc.babylonjs.com/lite/typedoc/interfaces/XrControllerComponents (source-local gamepads, grip tracking, select/squeeze). Combined: source-local typed button/axis/select/grip/pinch descriptors, optional grip pose channels, two-threshold spatial hysteresis without adding temporal latency, and normal Input control bindings for recording. No rival or companion source code used.
 XRBindings.map accepts mixed native/XR descriptors; binding converts one descriptor for vector axes too. attach publishes into ordinary Input controls. update runs before Input.update, with a frame/reference space only for poses and pinch. Source removal/session end and tracking loss clear state; complete select/squeeze taps survive between ticks. CPU fixtures exercise the complete action/replay contract, including handedness, source index, button touch/press/value, analog axes, pose tracking, pinch hysteresis, contexts and disposal. No renderer or GPU compute code; no public demo assets introduced. Physical headset/controller validation is still owed, not claimed by synthetic tests.
+
+
+## Batch 262 job 2: selection gizmo and scene ownership
+
+Ken Shoemake, *ARCBALL: A user interface for specifying three-dimensional
+orientation using a mouse* (1992), https://graphicsinterface.org/proceedings/gi1992/gi1992-18/,
+informs direct viewport manipulation and visible drag feedback. The new entry
+reuses Margo's existing controls math and graphics; it adds selection, capture-phase
+input arbitration and whole-drag command undo, combining Shoemake's interaction
+model with Yang (1992) and Berlage (1994), cited in job 1.
+PlayCanvas authors, *Toolbar* (living manual, consulted 2026-11-10),
+https://developer.playcanvas.com/user-manual/editor/interface/toolbar/, specifies
+translate/rotate/scale, world/local, snaps and undo/redo. These row behaviours
+are exposed through the existing TransformControls options and the new toolbar.
+No rival code or companion implementation was read. The browser fixture uses
+Margo's own procedural box, not an imported demo asset.
+
+The multi-scene regression exposed Inspector.dispose removing a name in the
+active/default scene rather than its owning scene. David G. Clarke, John M.
+Potter and James Noble, *Ownership Types for Flexible Alias Protection* (1998),
+https://cs.ioc.ee/ewscs/2010/mycroft/clarke-etal-oopsla98.pdf, distinguishes
+explicit object ownership from unrestricted aliases. Combined with Margo's own
+sceneOf contract, cleanup now resolves the owner by plugin identity before
+removing its name. No ownership type system is claimed or implemented. The
+regression keeps a default inspector alive while disposing another scene's
+inspector and both gizmo plugins.
