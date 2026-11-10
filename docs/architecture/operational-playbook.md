@@ -2227,6 +2227,8 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+Batch 238 job 4 adds two optional modifier compute passes around splat projection. Pre-pass writes canonical-space position/opacity before sorting; post-pass edits evaluated SH/fog colour before relighting. CPU canonical snapshots guarantee non-accumulation and restoration. Both-backend GPU evidence covers degree-4 analytic colour, extended opacity, seek identity, disable/setRest/restoration callbacks, ownership and pixel-exact restoration of the existing real capture. No covariance deformation, learned field or timing claim. Core/stage stay unchanged.
+
 Batch 206 PreviewSurface: independent alpha sampling and numeric primvar storage use existing PBR material shading hooks and later-UV input. Indexed/topology and geometry-budget regressions run on CPU; native/compatibility direct-worker GPU tests exercise upload, interpolation and disposal. uploadImage now declares the WebGPU external-copy destination usages, tested in its owning gltf-pro package. No core/stage feature.
 
 

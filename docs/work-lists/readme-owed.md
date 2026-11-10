@@ -761,3 +761,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/kinematics-constraints (batch 214 job 1): document /chain, CCD/FABRIK settings, failure ownership, query protocol, static-only guarantee and createLimbAvoidance.
 - @margoengine/animator (batch 214 job 1): document FullBodyLimb.avoidance, clear result and atomic whole-body rollback.
 - margoengine (batch 214 job 1): document kinematics-constraints/chain alias.
+
+- @margoengine/splats and margoengine (batch 238 job 4): document /modify async create/attach, position/opacity/color WGSL bodies, helper declarations, 64 live floats, seek/clock defaults, canonical setRest, abort, single ownership, SH/fog/relighting order and restore/disposal semantics; examples remain owed.

@@ -3518,6 +3518,10 @@
       "types": "./dist/splats/lod-sog.d.ts",
       "import": "./dist/splats/lod-sog.js"
     },
+    "./splats/modify": {
+      "types": "./dist/splats/modify.d.ts",
+      "import": "./dist/splats/modify.js"
+    },
     "./splines": {
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"

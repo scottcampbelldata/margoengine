@@ -4685,3 +4685,7 @@ Build-phase follow-up (batch 212 analyser): queue a meter report, call reset(), 
 Chain avoidance has no known defect from its correctness cases; bounded search and static-only limitations are documented in limits.md.
 
 Batch 214 unrelated GPU planner repro: node scripts/gpu-package-tests.mjs --no-build --select=animator/test:gpu rejects cameras/test/panorama-browser.mjs and weather/tests/parity-browser.mjs because neither has a registered package test script. Changed-package GPU leaves run directly under the lock instead; owners must register these scripts.
+
+Batch 238 job 4: no open modifier defect found by independent SH/position/opacity probes, repeated seek, lifecycle and real-image restoration checks. Source centre/opacity changes require explicit setRest, as documented; RGB, SH and covariance remain live inputs.
+
+Batch 238 finish-phase validation gap: a streamed manifest with top-level model "2dgs" and chunk metadata omitting model is treated as ordinary 3D. Repro: add model:"2dgs" only to a valid lod-meta.json and open it. Cause: the adapter currently validates the per-chunk SOG model, but ignores the manifest model; propagate/reject that unsupported model before loading images. This does not add 2D Gaussian rendering to the requested 3D reader.

@@ -78,6 +78,10 @@
     "./lod-sog": {
       "types": "./dist/lod-sog.d.ts",
       "import": "./dist/lod-sog.js"
+    },
+    "./modify": {
+      "types": "./dist/modify.d.ts",
+      "import": "./dist/modify.js"
     }
   },
   "files": [

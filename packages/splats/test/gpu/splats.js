@@ -20,6 +20,8 @@ import { loadProgressiveSplats } from '../../dist/progressive.js';
 import { parseKsplat, encodePly } from '../../dist/formats.js';
 import { loadStreamedSog } from '../../dist/lod-sog.js';
 import { encodeSog } from '../../dist/data.js';
+import { SplatModifier } from '../../dist/modify.js';
+import { engineRuntime } from '../../../core/dist/extension.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
@@ -367,6 +369,111 @@ window.check.sogV3 = async () => {
   const values = [...new Float32Array(staging.getMappedRange())];
   staging.destroy();
   return values;
+};
+window.check.modify = async (real = false) => {
+  engine?.dispose();
+  canvas?.remove();
+  globalThis.margoLow = 1;
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:256px;height:256px';
+  const data = real
+    ? await loadCapture()
+    : {
+        positions: new Float32Array([-0.6, 0, 0, -0.2, 0, 0, 0.2, 0, 0, 0.6, 0, 0]),
+        covariances: Float32Array.from({ length: 24 }, (_, i) => ([0, 3, 5].includes(i % 6) ? 0.02 : 0)),
+        colors: Float32Array.from({ length: 16 }, (_, i) => [0.2, 0.3, 0.4, i === 7 ? 1.5 : 0.8][i % 4]),
+        sphericalHarmonics: new Float32Array(4 * 75),
+      };
+  if (!real)
+    for (let i = 0; i < 4; i++) {
+      for (let c = 0; c < 3; c++) data.sphericalHarmonics[i * 75 + c] = (data.colors[i * 4 + c] - 0.5) / 0.2820947918;
+      data.sphericalHarmonics[i * 75 + 60] = 0.05;
+    }
+  let camera = { position: [0, 0, 3], target: [0, 0, 0], near: 0.05, far: 100 };
+  if (real) {
+    const n = data.positions.length / 3,
+      sum = [0, 0, 0];
+    for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) sum[a] += data.positions[i * 3 + a];
+    const at = sum.map((v) => v / n);
+    camera = { position: [at[0] - 2.5, at[1], at[2]], target: at, near: 0.05, far: 100 };
+  }
+  engine = await Engine.create(canvas, { backend: 'webgpu', preserveDrawingBuffer: true, camera });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  const cloud = Splats.attach(engine, data);
+  await waitForPipelines(draw);
+  const before = canvas.toDataURL('image/png'),
+    modifier = await SplatModifier.attach(engine, cloud, {
+      position: 'return position+vec3f(u.parameters[0].x*sin(time),0,u.parameters[0].y);',
+      opacity: 'return select(opacity,0.0,index==1u && time<1.0);',
+      color: 'return mix(color,vec3f(0,1,0),u.parameters[0].z);',
+      parameters: [0.4, 0.1, 0.5],
+    });
+  modifier.playing = false;
+  modifier.time = 0.4;
+  const read = async () => {
+    await draw();
+    const n = cloud.count,
+      staging = engine.gpu.createBuffer({ size: n * 32, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+      e = engine.gpu.createCommandEncoder();
+    e.copyBufferToBuffer(cloud.gpuState.positions, 0, staging, 0, n * 16);
+    e.copyBufferToBuffer(cloud.gpuState.colors, 0, staging, n * 16, n * 16);
+    engine.gpu.queue.submit([e.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const result = [...new Float32Array(staging.getMappedRange())];
+    staging.destroy();
+    return result;
+  };
+  await waitForPipelines(draw);
+  if (real) {
+    const modified = canvas.toDataURL('image/png');
+    modifier.dispose();
+    await waitForPipelines(draw);
+    return { before, modified, after: canvas.toDataURL('image/png') };
+  }
+  const first = await read(),
+    repeat = await read();
+  const sourceRead = await cloud.read();
+  modifier.time = 2;
+  const revealed = await read();
+  modifier.enabled = false;
+  const disabled = await read();
+  const next = { ...data, positions: data.positions.map((v, i) => (i % 3 === 0 ? v + 0.2 : v)) };
+  modifier.setRest(next);
+  modifier.enabled = true;
+  const rebound = await read();
+  modifier.onDeviceRestored(engineRuntime(engine));
+  const restored = await read();
+  let duplicate;
+  try {
+    await SplatModifier.attach(engine, cloud);
+  } catch (error) {
+    duplicate = error.code;
+  }
+  const afterDuplicate = await read();
+  modifier.playing = true;
+  modifier.speed = 2;
+  const initialTime = modifier.time;
+  await read();
+  const elapsed = modifier.time - initialTime;
+  modifier.playing = false;
+  modifier.dispose();
+  const disposed = await read();
+  modifier.dispose();
+  return {
+    sourceAlpha: sourceRead.colors[7],
+    sourceSHMatches: sourceRead.sphericalHarmonics.every((v, i) => v === data.sphericalHarmonics[i]),
+    first,
+    repeat,
+    revealed,
+    disabled,
+    rebound,
+    restored,
+    afterDuplicate,
+    duplicate,
+    disposed,
+    elapsed,
+    parameters: [...modifier.parameters.slice(0, 3)],
+  };
 };
 window.check.set = async (o) => {
   engine?.dispose();

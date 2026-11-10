@@ -3392,3 +3392,6 @@ After build:packages, run node --test --test-timeout=30000 packages/react/tests/
 
 ### Batch 214 chain correctness
 After build:packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/chain.test.js tests/modern-animator-fbik.test.js. Both CCD and FABRIK must find clear length-preserving N-link poses; independent per-link volume readings verify acceptance. The full-body tests place an obstacle at a solved elbow, solve again and check both links, then reject a late limb and compare all joints with the original frame. Existing GPU scripts for the changed animator and kinematics-constraints packages run under the shared GPU lock.
+
+### Batch 238 modifiers
+Build packages, then node --test --test-timeout=120000 packages/splats/test/modify.test.js. Shared GPU gate: node scripts/gpu-lock.mjs run --owner=codex-batch238 --gpu=splats --max=2 --wait-max=60 -- node packages/splats/test/gpu/check.mjs, normally and with --compat. The full suite includes modify-check.mjs and the earlier streamed-SOG checks. A focused diagnostic can run modify-check.mjs with the same shared lock. CPU tests for dependents run only after api:update, which can rebuild dependent dist trees; overlapping them produces transient missing chunks rather than a source defect. No benchmarks or paired timings.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13539725,
+  "total": 13560505,
   "history": [
     {
       "date": "2026-10-24",
@@ -7032,6 +7032,12 @@
       "commit": "a1d27197e",
       "reason": "Batch 214 job 1: chain is a new optional 1904 B entry. Full-body IK grows 5434 to 5728 B for an optional avoidance hook and atomic whole-body rollback. Splitting the commit logic would lose atomicity. Core plus stage stays 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-238-job4",
+      "reason": "Batch238 job4: optional WGSL per-splat modifiers keep canonical geometry, lifecycle, parameters and both effect passes together; splitting adds ownership and initialization complexity. Measured 0 to 20174 B gzip, ceiling 20780 B; core plus stage 24209 B unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8307,6 +8313,7 @@
     "margoengine/web": 577,
     "@margoengine/react/test": 6200,
     "@margoengine/react/offscreen": 1423,
-    "@margoengine/kinematics-constraints/chain": 2160
+    "@margoengine/kinematics-constraints/chain": 2160,
+    "@margoengine/splats/modify": 20780
   }
 }
