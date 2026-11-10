@@ -102,3 +102,21 @@ test('export bounds match the importer and shared region definitions are not tre
   const states = Object.fromEntries(Array.from({ length: 10001 }, (_v, i) => [`s${i}`, {}]));
   assert.throws(() => exportSCXML({ version: 1, initial: 's0', states }), /10,000/);
 });
+
+// Batch 132 audit: SCXML (W3C 2015, 3.13) exits and re-enters the source of a self or ancestor target and of an
+// external transition to a descendant; Margo keeps every state still on the path. Such files used to load silently.
+test('transitions SCXML would exit and re-enter by are refused, and Margo exports mark them so they round-trip', () => {
+  const tree = edge => xml(`<state id="p" initial="a"><state id="a">${edge}</state><state id="b"/></state>`);
+  assert.throws(() => parse(tree('<transition event="e" target="a"/>')), /itself or its ancestor/);
+  assert.throws(() => parse(tree('<transition event="e" target="p" type="internal"/>')), /itself or its ancestor/);
+  assert.throws(() => parse(xml('<state id="p" initial="a"><transition event="e" target="b"/><state id="a"/><state id="b"/></state>')), /add type="internal"/);
+  const inner = parse(xml('<state id="p" initial="a"><transition event="e" target="b" type="internal"/><state id="a"/><state id="b"/></state>'));
+  assert.deepEqual(plain(inner.transitions), [{ from: 'p', to: 'b', event: 'e' }]);
+  const native = { version: 1, initial: 'p', states: { p: { initial: 'a' }, a: { parent: 'p' } },
+    transitions: [{ from: 'a', to: 'a', event: 'again' }, { from: 'a', to: 'p', event: 'up' }] };
+  const text = exportSCXML(native);
+  assert.equal(text.match(/m:stay="true"/g).length, 2);
+  assert.deepEqual(plain(parse(text).transitions), native.transitions);
+  assert.throws(() => exportSCXML(native, { extensions: false }), /stay requires namespaced extensions/);
+  assert.throws(() => parse(text.replace('type="internal"', 'type="external"')), /native stay marks only/);
+});

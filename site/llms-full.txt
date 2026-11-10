@@ -6630,6 +6630,8 @@ Batch 250 job 1: fsm/events 0 to 2362 B min+gzip, ceiling 2618 B. Optional runti
 Optional fsm/final adds FinalMachine with final:true leaves, done.state.parent and always:true transitions. Final leaves have no children, regions or outgoing transitions. A top-level final stops events and clock advancement; goto explicitly restarts. Eventless steps run before queued completions and between delays. Limits: 10,000 eventless/internal steps per stabilization and 100,000 timed firings per update produce coded state errors; break cycles or use shorter deltas. Internal NUL-prefixed event names are reserved. Completion events retain the causing payload. Existing ParallelRegions remain ordinary region machines; FinalMachine completion is local to its hierarchy.
 
 Batch 250 job 2: fsm/final 0 to 2825 B min+gzip, ceiling 3081 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+Batch 132 audit (lane H, 2026-11-10): fsm/scxml 7750 B ceiling to 7761 B min+gzip, ceiling now 8017 B (quality sizes baseline). The 11 B refuse SCXML transitions whose exit and re-entry Margo cannot keep (self, ancestor and external-to-descendant targets) and mark Margo's own self and ancestor transitions `m:stay`. A split would put a ten-line check in a second file every import loads anyway.
 ### Tile styling (batch 239 job 1)
 
 `@margoengine/tiles/style` supplies `TilesStyle`: property expressions drive sRGB RGBA, show and pixel point size, with ordered conditions, defines and metadata expressions. The language supports scalar/vector math, comparisons, short circuiting, ternaries, arrays, property paths, interpolation, CSS colours and regular expressions. Expressions are limited to 65,536 characters, 4,096 tokens and 128 parser nesting levels. Wrong output types fail with a coded state error. No arbitrary host methods or JavaScript execution are allowed.
@@ -21511,12 +21513,10 @@ console.log(machine.state); // 'recover'
 - A delay that ends inside a long `delta` splits it, so the machine does not depend on the frame rate: `update(0.6)` ends where 36 updates of 1/60 do, and the next state's delay counts from the moment the last one ended. Update hooks get the pieces of `delta`, which add up to the whole.
 - A guard that declines is asked again on every update until it passes, or the machine leaves `from`.
 - Inner states go first when delays end together.
-- A delayed transition that leaves its `from` active, such as one from a parent to its child, waits again from that moment. So `{from: 'patrol', to: 'look', after: 5}` runs every five seconds while inside `patrol`.
+- A delayed transition that leaves its `from` active, such as one from a parent to its child, waits again from that moment. So `{from: 'patrol', to: 'look', after: 5}` runs every five seconds while inside `patrol`. Only that transition's wait starts again: the other delays of `patrol` keep counting from entry (before the batch 132 audit, 2026-11-10, a re-armed delay restarted them all, so a longer one never came).
 - `machine.clock` is the machine's running time and `machine.entered` holds when each active state began.
 
 ## Parallel regions (`margoengine/fsm/parallel`)
-
-Run independent states at once, such as what a character's legs do and what its weapon does. Each region is an ordinary machine with one active state of its own; they share a context and hear the same events. Two machines side by side would do until a guard in one reads the other, or a hook in one tells the other: `ParallelRegions` settles those.
 
 [README continues: https://margoengine.com/llms/packages/fsm.md]
 

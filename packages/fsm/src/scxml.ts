@@ -33,7 +33,7 @@ function attributes(element: XMLElement, allowed: string[], extra: string[] = []
   for (const attr of Array.from(element.attributes)) {
     if (attr.namespaceURI === XMLNS) continue;
     if (attr.namespaceURI === EXT && extra.includes(attr.localName)) {
-      if (['wrapper', 'regionHistory'].includes(attr.localName) && !['true', 'false'].includes(attr.value)) fail('invalid native boolean');
+      if (['wrapper', 'regionHistory', 'stay'].includes(attr.localName) && !['true', 'false'].includes(attr.value)) fail('invalid native boolean');
       if (attr.localName === 'transitions' && attr.value !== 'empty') fail('invalid native transitions marker');
       continue;
     }
@@ -85,7 +85,7 @@ export function importSCXML(text: string, options: SCXMLImportOptions = {}): Mac
     const local = new Map<string, string>();
     const aliases = new Map<string, string>();
     const elements: [XMLElement, string, StateDocument][] = [];
-    const pending: { transition: TransitionDocument; order: number }[] = [];
+    const pending: { transition: TransitionDocument; order: number; internal: boolean; stay: boolean }[] = [];
     const register = (element: XMLElement, parent?: string) => {
       const name = nameOf(element), id = element.getAttribute('id') ?? fail('state id is required');
       if (Object.hasOwn(states, name)) fail(`duplicate state name ${name}`);
@@ -176,7 +176,7 @@ export function importSCXML(text: string, options: SCXMLImportOptions = {}): Mac
             state[hook] = binding(script.textContent ?? '');
           } else fail('executable content is not a named hook');
         } else if (standard(child, 'transition')) {
-          attributes(child, ['target', 'event', 'cond', 'type'], ['after', 'duration', 'guard', 'order']);
+          attributes(child, ['target', 'event', 'cond', 'type'], ['after', 'duration', 'guard', 'order', 'stay']);
           if (children(child).length) fail('transition executable content');
           if (child.hasAttribute('type') && !['internal', 'external'].includes(child.getAttribute('type')!)) fail('invalid transition type');
           const edge: TransitionDocument = { from: name, to: target(child.getAttribute('target') ?? '') };
@@ -188,7 +188,7 @@ export function importSCXML(text: string, options: SCXMLImportOptions = {}): Mac
           const duration = extension(child, 'duration'); if (duration !== null) edge.duration = Number(duration);
           const order = extension(child, 'order');
           if (order !== null && (!/^\d+$/.test(order) || !Number.isSafeInteger(Number(order)))) fail('invalid transition order');
-          pending.push({ transition: edge, order: order === null ? pending.length : Number(order) });
+          pending.push({ transition: edge, order: order === null ? pending.length : Number(order), internal: child.getAttribute('type') === 'internal', stay: extension(child, 'stay') === 'true' });
         } else fail(`element ${child.localName} is outside the document subset`);
       }
     }
@@ -197,6 +197,16 @@ export function importSCXML(text: string, options: SCXMLImportOptions = {}): Mac
     const start = includeContainer ? nameOf(container) : initial(container, true);
     if (!start) fail('machine has no initial state');
     const region: RegionDocument = { states, initial: start };
+    // Margo never leaves a state that stays on the path, as SCXML's internal type does. SCXML exits and re-enters the
+    // source of a self or ancestor target, and of any external one (the default) to a descendant: refuse what would
+    // run other hooks than the file means. Margo's own export marks a self or ancestor target with m:stay.
+    const lineage = (name: string) => { const path: string[] = []; for (let at: string | undefined = name; at !== undefined; at = states[at].parent) path.push(at); return path; };
+    for (const { transition: { from, to }, internal, stay } of pending) {
+      if (stay && !(internal && (from === to || lineage(from).includes(to)))) fail('native stay marks only an internal transition to the source or its ancestor');
+      if (stay) continue;
+      if (from === to || lineage(from).includes(to)) fail(`transition from ${from} to itself or its ancestor ${to} would exit and re-enter ${to} in SCXML; target a child state, or use a native machine document`);
+      if (!internal && lineage(to).includes(from)) fail(`external transition from ${from} to its descendant ${to} would exit and re-enter ${from}; add type="internal"`);
+    }
     if (pending.length || extension(container, 'transitions') === 'empty') region.transitions = pending.sort((a, b) => a.order - b.order).map(p => p.transition);
     return region;
   }
@@ -233,6 +243,7 @@ export function exportSCXML(document: MachineDocument, options: SCXMLExportOptio
     let id: string; do { id = `margo${serial++}`; } while (used.has(id)); used.add(id); return id;
   };
   const a = (name: string, value: string | number) => ` ${name}="${escapeXML(String(value))}"`;
+  const lineageOf = (region: RegionDocument, name: string) => { const path: string[] = []; for (let at: string | undefined = name; at !== undefined; at = region.states[at].parent) path.push(at); return path; };
   const native = (name: string, value: string | number) => { if (!ext) fail(`${name} requires namespaced extensions; enable extensions`); return a(`m:${name}`, value); };
   function regionXML(region: RegionDocument, tag: string, attrs: string, depth: number): string {
     if (depth > 128) fail('overly nested document');
@@ -265,6 +276,7 @@ export function exportSCXML(document: MachineDocument, options: SCXMLExportOptio
         if (t.duration !== undefined) out += native('duration', t.duration);
         if (t.guard !== undefined) out += SYMBOL.test(t.guard) ? a('cond', `${t.guard}()`) : native('guard', t.guard);
         if (ext) out += a('m:order', i);
+        if (t.from === t.to || lineageOf(region, t.from).includes(t.to)) out += native('stay', 'true');
         out += '/>';
       }
       for (const child of childNames) out += write(child, level + 1);

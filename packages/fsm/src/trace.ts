@@ -27,6 +27,11 @@ export interface MachineSnapshot {
   clock: number;
   /** When each active state was entered, as name and clock pairs. */
   entered: [string, number][];
+  /**
+   * Delayed transitions that started waiting again while their `from` stayed active, as index in `transitions` and
+   * clock pairs. Optional: a snapshot without it restores with none.
+   */
+  waits?: [number, number][];
   /** What states remember, as name and child pairs. */
   memory: [string, string][];
   /** The regions held by states, as state name and snapshot pairs. */
@@ -80,6 +85,7 @@ export function snapshotMachine<C>(machine: StateMachine<C>): MachineSnapshot {
     duration: machine.duration,
     clock: machine.clock,
     entered: [...machine.entered],
+    waits: [...machine.waits],
     memory: [...machine.memory],
     regions: held(machine).map(([name, regions]) => {
       if (regions.busy) throw new MargoError('state', 'Snapshot during a delivery; take it after the hook returns');
@@ -115,6 +121,10 @@ function check<C>(machine: StateMachine<C>, value: MachineSnapshot, where: strin
   if (value.entered.length !== path.length) fail('entered must hold exactly the active states');
   for (const [name, at] of value.entered)
     if (!path.includes(name) || !time(at) || at > value.clock) fail(`bad entry for ${name}`);
+  if (value.waits !== undefined && !Array.isArray(value.waits)) fail('waits is a list');
+  for (const [index, at] of value.waits ?? [])
+    if (machine.transitions[index]?.after === undefined || !time(at) || at > value.clock)
+      fail(`bad wait for transition ${index}`);
   for (const [name, child] of value.memory)
     if (!known(machine, name) || !known(machine, child) || !pathOf(machine, child).includes(name) || name === child)
       fail(`${name} cannot remember ${child}`);
@@ -140,6 +150,8 @@ function write<C>(machine: StateMachine<C>, value: MachineSnapshot): void {
   machine.clock = value.clock;
   machine.entered.clear();
   for (const [name, at] of value.entered) machine.entered.set(name, at);
+  machine.waits.clear();
+  for (const [index, at] of value.waits ?? []) machine.waits.set(index, at);
   machine.memory.clear();
   for (const [name, child] of value.memory) machine.memory.set(name, child);
   held(machine).forEach(([, regions], index) => {

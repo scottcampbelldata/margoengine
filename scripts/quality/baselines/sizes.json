@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14734271,
+  "total": 14734538,
   "history": [
     {
       "date": "2026-10-24",
@@ -8219,6 +8219,12 @@
       "commit": "48a19ee1d",
       "reason": "lane I: webgl2-compat re-attach + animation upload cache mark (batch 132 Mac compat fixes)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "d3cdb99ca",
+      "reason": "batch 132 fsm audit (lane H): fsm/scxml 7750 to 7761 B gzip for refusing SCXML transitions whose exit and entry Margo cannot keep, and the m:stay round-trip mark",
+      "grew": 1
     }
   ],
   "items": {
@@ -8588,7 +8594,7 @@
     "@margoengine/fsm/inspect": 2798,
     "@margoengine/fsm/invoke": 3865,
     "@margoengine/fsm/parallel": 2607,
-    "@margoengine/fsm/scxml": 7750,
+    "@margoengine/fsm/scxml": 8017,
     "@margoengine/fsm/trace": 1863,
     "@margoengine/game": 996,
     "@margoengine/geometry": 24691,

@@ -74,7 +74,7 @@ console.log(machine.state); // 'recover'
 - A delay that ends inside a long `delta` splits it, so the machine does not depend on the frame rate: `update(0.6)` ends where 36 updates of 1/60 do, and the next state's delay counts from the moment the last one ended. Update hooks get the pieces of `delta`, which add up to the whole.
 - A guard that declines is asked again on every update until it passes, or the machine leaves `from`.
 - Inner states go first when delays end together.
-- A delayed transition that leaves its `from` active, such as one from a parent to its child, waits again from that moment. So `{from: 'patrol', to: 'look', after: 5}` runs every five seconds while inside `patrol`.
+- A delayed transition that leaves its `from` active, such as one from a parent to its child, waits again from that moment. So `{from: 'patrol', to: 'look', after: 5}` runs every five seconds while inside `patrol`. Only that transition's wait starts again: the other delays of `patrol` keep counting from entry (before the batch 132 audit, 2026-11-10, a re-armed delay restarted them all, so a longer one never came).
 - `machine.clock` is the machine's running time and `machine.entered` holds when each active state began.
 
 ## Parallel regions (`margoengine/fsm/parallel`)
@@ -192,11 +192,13 @@ console.log(exportSCXML(document, {extensions: false}).startsWith('<?xml')); // 
 
 - `importSCXML(text)` throws a `TypeError` naming the problem for malformed XML, a DTD or entity declaration, processing instructions, script code that is not a single name call, unknown elements or attributes, or input over 1 MiB, 10,000 elements or 128 levels deep.
 - `exportSCXML(document, {extensions})` writes the document back. With the default `extensions: true`, fields SCXML cannot hold (`after`, `duration`, `update`, region history, names that are not XML ids) keep their values in the `urn:margoengine:fsm:1` namespace; with `extensions: false` such a document is refused instead of losing them.
+- Margo never leaves a state that stays on the path between source and target, which is SCXML's `type="internal"`. SCXML itself (W3C 2015, section 3.13 and `getTransitionDomain` in Appendix D) exits and re-enters the source of a transition to itself or to an ancestor, and the source of an external transition (the default type) to a descendant. Since the batch 132 audit (2026-11-10) `importSCXML` refuses those three cases with a `TypeError` rather than running other hooks than the file means: write `type="internal"` for a descendant target. `exportSCXML` marks Margo's own self and ancestor transitions `m:stay="true"`, so they come back, and refuses them with `extensions: false`. A standard SCXML tool ignores the mark and exits and re-enters there.
+- Accepted difference: an SCXML event descriptor `a` also matches the event `a.b` (section 3.12.1). Margo matches the whole event name, so `send('a.b')` does not take a transition on `a`.
 - The old `parser` option is ignored and deprecated.
 
 ## Snapshots and trace (`margoengine/fsm/trace`)
 
-`snapshotMachine` gives where a machine is now as plain data: the state, cross-fade, every delay's progress, what states remember and all parallel regions. Put it in a save file or send it over the network, and `restoreMachine` puts a machine with the same definition back there. The machine then goes on exactly as the first would have, so rollback netcode can go back and replay.
+`snapshotMachine` gives where a machine is now as plain data: the state, cross-fade, every delay's progress (`waits` holds the delays that started waiting again; a snapshot without it restores with none), what states remember and all parallel regions. Put it in a save file or send it over the network, and `restoreMachine` puts a machine with the same definition back there. The machine then goes on exactly as the first would have, so rollback netcode can go back and replay.
 
 ```ts
 import {StateMachine} from 'margoengine/fsm';

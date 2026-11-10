@@ -228,3 +228,48 @@ test('regions run their own delays, and a hook of one raising during an update w
   regions.update(1.5);
   assert.equal(regions.active.fuse, 'lit');
 });
+
+// Batch 132 audit: re-arming one delay used to restart every delay of the same state, so the 2.5 s one never came.
+const rearmStates = { S: { initial: 'a' }, a: { parent: 'S' }, T: {} };
+const rearmTransitions = () => [
+  { from: 'S', to: 'a', after: 1 },
+  { from: 'S', to: 'T', after: 2.5 },
+];
+test('a delay that re-arms leaves the other delays of its state counting from entry', () => {
+  const machine = new StateMachine(rearmStates, 'S', {}, rearmTransitions());
+  for (let i = 0; i < 24; i++) machine.update(0.1);
+  assert.equal(machine.state, 'a');
+  machine.update(0.1);
+  assert.equal(machine.state, 'T');
+  const once = new StateMachine(rearmStates, 'S', {}, rearmTransitions());
+  once.update(4);
+  assert.equal(once.state, 'T');
+  assert.ok(Math.abs(once.elapsed - 1.5) < 1e-9);
+});
+test('a final machine re-arms one delay without restarting the others', async () => {
+  const { FinalMachine } = await import('../dist/final.js');
+  const machine = new FinalMachine(rearmStates, 'S', {}, rearmTransitions());
+  machine.update(2.4);
+  assert.equal(machine.state, 'a');
+  machine.update(0.2);
+  assert.equal(machine.state, 'T');
+});
+test('a snapshot keeps a re-armed wait, so a restored machine fires when the original does', async () => {
+  const { snapshotMachine, restoreMachine } = await import('../dist/trace.js');
+  const machine = new StateMachine(rearmStates, 'S', {}, rearmTransitions());
+  machine.update(1.5);
+  const saved = JSON.parse(JSON.stringify(snapshotMachine(machine)));
+  assert.deepEqual(saved.waits, [[0, 1]]);
+  const copy = new StateMachine(rearmStates, 'S', {}, rearmTransitions());
+  restoreMachine(copy, saved);
+  copy.update(0.4);
+  machine.update(0.4);
+  assert.equal(copy.clock, machine.clock);
+  const before = copy.waits.get(0);
+  copy.update(0.2);
+  assert.equal(copy.waits.get(0), 2);
+  assert.equal(before, 1);
+  copy.update(0.5);
+  assert.equal(copy.state, 'T');
+  assert.throws(() => restoreMachine(copy, { ...saved, waits: [[1, 9]] }), /bad wait for transition 1/);
+});

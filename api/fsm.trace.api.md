@@ -11,6 +11,7 @@ export interface MachineSnapshot {
     duration: number;
     clock: number;
     entered: [string, number][];
+    waits?: [number, number][];
     memory: [string, string][];
     regions: [string, RegionsSnapshot][];
 }
@@ -100,6 +101,7 @@ class StateMachine<C> {
     elapsed: number;
     clock: number;
     readonly entered: Map<string, number>;
+    readonly waits: Map<number, number>;
     readonly memory: Map<string, string>;
     duration: number;
     changing: boolean;
@@ -111,6 +113,7 @@ class StateMachine<C> {
     send(event: string): boolean;
     goto(next: string, duration?: number): void;
     update(delta: number): void;
+    protected waitStart(index: number): number | undefined;
 }
 
 interface Transition<C = unknown> {

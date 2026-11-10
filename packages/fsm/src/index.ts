@@ -60,6 +60,11 @@ export class StateMachine<C> {
   clock = 0;
   /** Value of `clock` when each active state was entered, by state name, for delayed transitions. */
   readonly entered = new Map<string, number>();
+  /**
+   * When a delayed transition that left its `from` active started waiting again, by its index in `transitions`. Its
+   * wait counts from this or from entering `from`, whichever is later, so re-arming one leaves the others alone.
+   */
+  readonly waits = new Map<number, number>();
   /** What each state with `history` remembers, by state name. Delete a key, or clear it, to forget. */
   readonly memory = new Map<string, string>();
   /** Length of the running cross-fade in seconds. */
@@ -69,7 +74,7 @@ export class StateMachine<C> {
   /** Called on every state change, before any hook, with the transition that caused it, or null for `goto`. */
   listener: ((from: string, to: string, transition: Transition<C> | null) => void) | null = null;
   private readonly paths = new Map<string, readonly string[]>();
-  private readonly timed: readonly Transition<C>[];
+  private readonly timed: readonly number[];
   /**
    * Build the machine and enter `initial` (and its ancestors).
    * @throws TypeError for an unknown parent, a hierarchy cycle, an unknown initial state, a state's `initial` that is
@@ -112,7 +117,7 @@ export class StateMachine<C> {
         throw new TypeError(
           'Invalid transition; give from and to as existing state names, and either event or an after above 0',
         );
-    this.timed = transitions.filter((transition) => transition.after !== undefined);
+    this.timed = transitions.flatMap((transition, index) => (transition.after === undefined ? [] : [index]));
     this.state = initial;
     this.state = this.resolve(initial);
     for (const name of this.paths.get(this.state)!) {
@@ -251,37 +256,47 @@ export class StateMachine<C> {
   // The next time a delay ends on the active path. One already over, held by its guard, does not stop the clock.
   private nextDue(): number {
     let due = Infinity;
-    for (const transition of this.timed) {
-      const entered = this.entered.get(transition.from);
-      if (entered === undefined) continue;
-      const end = entered + transition.after!;
+    for (const index of this.timed) {
+      const start = this.waitStart(index);
+      if (start === undefined) continue;
+      const end = start + this.transitions[index].after!;
       if (end > this.clock && end < due) due = end;
     }
     return due;
   }
   // Takes every delayed transition that is due, innermost first. Each waits again if its state stays active, so one
-  // from a parent to its own child fires once per wait. Returns the count so far.
+  // from a parent to its own child fires once per wait; only that transition's wait restarts. Returns the count so far.
   private fire(count: number): number {
     if (!this.timed.length) return count;
     for (;;) {
-      const transition = this.dueTransition();
-      if (!transition) return count;
+      const index = this.dueTransition();
+      if (index < 0) return count;
       if (++count > MAX_FIRED)
         throw new MargoError('state', 'Delayed transitions fire without end; use longer delays or a shorter delta');
+      const transition = this.transitions[index];
       this.change(transition.to, transition.duration ?? 0, transition);
-      if (this.entered.has(transition.from)) this.entered.set(transition.from, this.clock);
+      if (this.entered.has(transition.from)) this.waits.set(index, this.clock);
     }
   }
-  private dueTransition(): Transition<C> | null {
+  /** When the wait of the delayed transition at `index` began, or undefined while its `from` is not active. */
+  protected waitStart(index: number): number | undefined {
+    const entered = this.entered.get(this.transitions[index].from);
+    if (entered === undefined) return undefined;
+    const rearmed = this.waits.get(index);
+    return rearmed !== undefined && rearmed > entered ? rearmed : entered;
+  }
+  private dueTransition(): number {
     const path = this.paths.get(this.state)!;
     for (let i = path.length - 1; i >= 0; i--)
-      for (const transition of this.timed)
+      for (const index of this.timed) {
+        const transition = this.transitions[index];
         if (
           transition.from === path[i] &&
-          this.clock >= this.entered.get(path[i])! + transition.after! &&
+          this.clock >= this.waitStart(index)! + transition.after! &&
           (!transition.guard || transition.guard(this.context))
         )
-          return transition;
-    return null;
+          return index;
+      }
+    return -1;
   }
 }

@@ -2895,6 +2895,7 @@ Written clean room from the published work below. No source of a statechart libr
 | Delayed transitions (`after`) | Harel 1987, as above, for timeouts on a state; SCXML section 6.2 for delay and Appendix D for the end of a step. Splitting a step at the moment a delay ends is the event-scheduling of discrete event simulation, as in any textbook on it; asking a guard again each update is our own |
 | Machines as data (`fsm/document`) | The JSON format is our own, in the shape of `@margoengine/animator/graph`. Functions by name in place of code follows SCXML's split of a chart from its data model, in spirit only: the format shares nothing with SCXML |
 | Snapshots and trace (`fsm/trace`) | The configuration of a statechart, with its history values, as all a machine needs to go on: Harel 1987 and SCXML Appendix D. The snapshot format, restoring with no hooks and the rolling record are our own |
+| Transition domain on SCXML import and export (`fsm/scxml`), batch 132 audit 2026-11-10 | SCXML (W3C 2015, as above), section 3.13 and `getTransitionDomain` / `findLCCA` in Appendix D, re-read in full for this check: only an internal transition from a compound source to descendants keeps the source; self and ancestor targets exit and re-enter. Margo always keeps states still on the path, so the importer refuses the cases that differ and the exporter marks Margo's own with `m:stay`. Event descriptor prefix matching (3.12.1) is not followed: Margo matches whole names |
 
 ## Save and load: `@margoengine/save`
 

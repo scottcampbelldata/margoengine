@@ -87,10 +87,10 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
       for (const name of this.activePath().reverse()) {
         for (let i = 0; i < this.definition.length; i++) {
           const t = this.definition[i];
-          if (t.from !== name || t.after === undefined || this.clock < this.entered.get(name)! + t.after) continue;
+          if (t.from !== name || t.after === undefined || this.clock < this.waitStart(i)! + t.after) continue;
           if (this.microstep(`${INTERNAL}${i}`, undefined)) {
             if (++fired > 100000) throw new MargoError('state', 'Too many delayed transitions; use longer delays or a shorter delta');
-            if (this.entered.has(name)) this.entered.set(name, this.clock);
+            if (this.entered.has(name)) this.waits.set(i, this.clock);
             this.stabilize(undefined);
             this.onStable();
             taken = true;
@@ -103,10 +103,10 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
       if (taken) continue;
       if (left === 0) break;
       let step = left;
-      for (const t of this.definition) {
-        const entered = this.entered.get(t.from);
-        if (entered === undefined || t.after === undefined) continue;
-        const distance = entered + t.after - this.clock;
+      for (let i = 0; i < this.definition.length; i++) {
+        const t = this.definition[i], start = this.waitStart(i);
+        if (start === undefined || t.after === undefined) continue;
+        const distance = start + t.after - this.clock;
         if (distance > 0) step = Math.min(step, distance);
       }
       super.update(step);
