@@ -3896,3 +3896,6 @@ Optional fx implements all requested modulation/colour classes plus auto-pan and
 ### Batch 218 job 3: user GLSL transition functions
 
 GLSL ES 1.00 transition(vec2) functions can be translated to WGSL and used through the frozen or live custom pipeline, including supplied additional uniforms. Evidence: original glsl-fixtures.js semantic cases, glsl.test.js typed-WGSL validation and failure/cancellation checks, and glsl-browser.js native GLSL versus translated WGSL gradient comparisons. This does not claim bit-identical arbitrary float arithmetic or shader execution sandboxing.
+
+### Batch 244 job 3: CRT composite-video look
+CRT now covers the requested NTSC-style color bleed and chromatic offset row. The RGB split can move all three channels independently in two dimensions, as in the public PixiJS filter API, with an additional symmetric red/blue control. `crt.test.js` proves live uniform packing, range checks, grayscale/constant invariance, pre-clamp luma preservation, fractional offsets and premultiplied alpha. Seven new GPU readbacks cover full/partial bleed, integer/fractional/independent offsets, tube effects and live canvas changes on native WebGPU and full WebGL2. Existing all-off rational nearest tests stay exact. No RF-standard compliance or perceptual/timing superiority is claimed.

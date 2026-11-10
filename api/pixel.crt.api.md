@@ -12,6 +12,11 @@ export class CRT extends ScreenPass {
     mask: number;
     glow: number;
     brightness: number;
+    colorBleed: number;
+    chromaticOffset: ChromaticOffset;
+    redOffset: ChromaticOffset;
+    greenOffset: ChromaticOffset;
+    blueOffset: ChromaticOffset;
     constructor(options: CRTOptions);
     static attach(instance: EngineKernel, options: CRTOptions): CRT;
     protected fill(values: ArrayBuffer, rect: readonly number[]): void;
@@ -23,7 +28,14 @@ export interface CRTOptions extends ScreenPassOptions {
     mask?: number;
     glow?: number;
     brightness?: number;
+    colorBleed?: number;
+    chromaticOffset?: ChromaticOffset;
+    redOffset?: ChromaticOffset;
+    greenOffset?: ChromaticOffset;
+    blueOffset?: ChromaticOffset;
 }
+
+export type ChromaticOffset = number | readonly [number, number];
 
 export type PixelFit = 'contain' | 'stretch';
 

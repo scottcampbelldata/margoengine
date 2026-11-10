@@ -3350,3 +3350,5 @@ Build packages; node --test --test-timeout=120000 packages/mixer/tests/*.test.js
 ### Batch 218 job 3
 
 Use the transitions CPU and locked GPU commands recorded above. glsl-browser.js runs 23 original fixtures over three progress values on 16 by 16 gradients: 17664 pixel comparisons per backend against a separate native GLSL compiler. The same fixtures also compile and render via both frozen and live factory APIs. No downloaded shader library is part of this test or package.
+
+Batch 244 composite look: build packages and run `node --test --test-timeout=60000 packages/pixel/tests/crt.test.js`; then `node scripts/gpu-lock.mjs run --owner=pixel-crt --max=2 --wait-max=60 -- node packages/pixel/tests/crt-check.mjs` and the same with `--compat`. All 23 cases compare readback to the float64 tube oracle plus an independently inverted SMPTE matrix and normalized chroma kernels in crt-signal-reference.js. The original 7x5 colored diagnostic includes a half-alpha sample; default/all-off exact-boundary sweeps remain enabled.

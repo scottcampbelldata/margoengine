@@ -714,3 +714,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/transitions (batch 218 job 3): document /glsl, translation/frozen/live factories, GLSL ES 1.00 signature, uniform defaults/shapes, UV convention, parser limits, diagnostics, cancellation and trusted shader execution; examples deferred.
 - margoengine (batch 218 job 3): document transitions/glsl forwarding entry; examples deferred.
+
+- @margoengine/pixel (batch 244 job 3): document CRT colorBleed, chromaticOffset and independent red/green/blue offsets, scalar/tuple source-pixel units and signs, fractional sampling, alpha/gamut behavior, defaults and stylized baseband limits; README examples deferred.

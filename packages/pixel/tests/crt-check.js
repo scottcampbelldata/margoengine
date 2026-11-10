@@ -6,6 +6,7 @@ import { engineRuntime } from '/packages/core/dist/extension.js';
 import { CRT } from '/packages/pixel/dist/crt.js';
 import { PixelScale } from '/packages/pixel/dist/scale.js';
 import { screenRegressions } from './screen-regressions.js';
+import { crtSignal } from './crt-signal-reference.js';
 
 const SW = 7,
   SH = 5,
@@ -70,6 +71,7 @@ const fit = (vw, vh) => {
 };
 const LOOK = { curvature: 0.08, scanlines: 0.5, mask: 0.2, glow: 0.25, brightness: 1.2 };
 const reference = (vw, vh, look, under = [0, 0, 0, 0]) => {
+  const composite = crtSignal(texel,look);
   const { curvature, scanlines, mask, glow, brightness } = { ...LOOK, ...look },
     [rx, ry, rw, rh] = fit(vw, vh),
     out = new Float64Array(vw * vh * 4),
@@ -97,7 +99,7 @@ const reference = (vw, vh, look, under = [0, 0, 0, 0]) => {
             beam = 1 - scanlines * (1 - Math.sin(Math.PI * f) ** 2),
             grille = [1 - mask, 1 - mask, 1 - mask];
           grille[ox % 3] = 1;
-          const e = texel(ix, iy),
+          const e = composite(ix, iy),
             blur = [0, 0, 0, 0];
           for (let dy = -1; dy <= 1; dy++)
             for (let dx = -1; dx <= 1; dx++) {
@@ -117,7 +119,9 @@ const reference = (vw, vh, look, under = [0, 0, 0, 0]) => {
         (y * vw + x) * 4,
       );
     }
-  return { out, skip, exact: curvature === 0 && scanlines === 0 && mask === 0 && glow === 0 && brightness === 1 };
+  const signalOn = ['colorBleed','chromaticOffset','redOffset','greenOffset','blueOffset'].some(key=>
+    typeof look[key]==='number'?look[key]!==0:look[key]?.some(v=>v!==0));
+  return { out, skip, exact: !signalOn && curvature === 0 && scanlines === 0 && mask === 0 && glow === 0 && brightness === 1 };
 };
 const compare = (actual, { out, skip, exact }) => {
   let wrong = 0,
@@ -158,6 +162,13 @@ window.check = {
     await into('strong look', 41, 30, { curvature: 0.5, scanlines: 1, mask: 1, glow: 1, brightness: 4 });
     // With every effect off the CRT is plain nearest sampling of the flat picture.
     await into('all off', 23, 17, { curvature: 0, scanlines: 0, mask: 0, glow: 0, brightness: 1 });
+    const plain={curvature:0,scanlines:0,mask:0,glow:0,brightness:1};
+    await into('NTSC bleed',23,17,{...plain,colorBleed:1});
+    await into('NTSC partial bleed',31,24,{...plain,colorBleed:0.35});
+    await into('RGB horizontal offset',23,17,{...plain,chromaticOffset:1});
+    await into('RGB fractional offset',23,17,{...plain,chromaticOffset:[0.5,-0.25]});
+    await into('independent RGB channels',23,17,{...plain,redOffset:[-1,0],greenOffset:[0,1],blueOffset:[1,-1]});
+    await into('composite with tube effects',41,30,{colorBleed:0.8,chromaticOffset:0.5});
     out.checks['all-off rational nearest sweep'] = await nearestSweep();
 
     // Settings read each frame, and the canvas: the picture over the background, letterboxed in the middle.
@@ -175,6 +186,10 @@ window.check = {
         await readCanvas(),
         reference(40, 30, { scanlines: 0.9, curvature: 0.2 }, bg),
       );
+      pass.colorBleed=0.75;pass.chromaticOffset=[-0.5,0.25];pass.greenOffset=[0,0.5];
+      canvas.width=40;instance.render({delta:1/60});
+      out.checks['canvas composite live'] = compare(await readCanvas(),reference(40,30,
+        {scanlines:0.9,curvature:0.2,colorBleed:0.75,chromaticOffset:[-0.5,0.25],greenOffset:[0,0.5]},bg));
       pass.glow = 2;
       try {
         instance.render({ delta: 1 / 60 });

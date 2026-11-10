@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13462928,
+  "total": 13463887,
   "history": [
     {
       "date": "2026-10-24",
@@ -6954,6 +6954,12 @@
       "commit": "538708aa5",
       "reason": "Batch 218 GLSL importer new entry 0 to 15718 B gzip. Keep clean-room parser preprocessing typed lowering diagnostics and validated factories together instead of splitting compiler phases. Core plus stage remains 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "fbffe7fd8",
+      "reason": "batch-244-crt-2816-to-3775B-gzip-for-NTSC-chroma-and-independent-RGB-offsets-keep-one-pass-and-restore-lifetime-core-stage-unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -7578,7 +7584,7 @@
     "@margoengine/physics2d": 8390,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
-    "@margoengine/pixel/crt": 3072,
+    "@margoengine/pixel/crt": 4031,
     "@margoengine/pixel/follow": 3861,
     "@margoengine/pixel/palette": 5201,
     "@margoengine/pixel/render3d": 3866,

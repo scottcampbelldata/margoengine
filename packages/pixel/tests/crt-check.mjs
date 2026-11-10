@@ -22,7 +22,7 @@ try {
   await writeFile('test-results/pixel-crt-browser.json', JSON.stringify({ hardware, result }, null, 1));
   const failed = Object.entries(result.checks).filter(([, check]) => check.wrong !== 0);
   assert.deepEqual(failed, [], 'every pixel matches the CPU reference');
-  assert.equal(Object.keys(result.checks).length, 16);
+  assert.equal(Object.keys(result.checks).length, 23);
   assert.equal(result.checks['all off'].skipped, 0, 'all-off includes exact source boundaries');
   assert.equal(result.checks['all-off rational nearest sweep'].tested, 154);
   for (const [name, check] of Object.entries(result.checks))
