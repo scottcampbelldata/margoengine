@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export class GLTFWeather implements EnginePlugin {
     readonly options: GLTFWeatherOptions;
@@ -23,6 +23,7 @@ export class GLTFWeather implements EnginePlugin {
 }
 
 export interface GLTFWeatherOptions {
+    cover?: Pick<PrecipitationCover, 'shader' | 'bindings'>;
     puddles?: PuddleOptions;
     snow?: SnowOptions;
 }
@@ -32,6 +33,41 @@ export interface WeatherGLTFModel {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+interface PrecipitationCapture extends EnginePlugin {
+    readonly options: {
+        readonly weather: {
+            readonly occlusion?: PrecipitationMap;
+        };
+    };
+    readonly coverTexture?: GPUTexture;
+}
+
+class PrecipitationCover implements EnginePlugin {
+    readonly capture: PrecipitationCapture;
+    readonly name = "weather-cover";
+    readonly bias: number;
+    constructor(capture: PrecipitationCapture, options?: PrecipitationCoverOptions);
+    static attach(engine: EngineKernel, capture: PrecipitationCapture, options?: PrecipitationCoverOptions): PrecipitationCover;
+    get texture(): GPUTexture | undefined;
+    setup(engine: Engine): void;
+    onPreUpdate(delta: number): void;
+    registerPasses(graph: FrameGraph): void;
+    shader(source: string, group: number): string;
+    bindings(): GPUBindGroupEntry[];
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+interface PrecipitationCoverOptions {
+    bias?: number;
+}
+
+interface PrecipitationMap {
+    readonly buffer?: GPUBuffer;
+    readonly view?: GPUTextureView;
+}
 
 interface PuddleOptions {
     weather?: PuddleSource;

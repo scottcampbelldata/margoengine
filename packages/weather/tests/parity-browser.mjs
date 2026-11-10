@@ -17,4 +17,9 @@ try {
     assert.equal(result.repeat,0);assert.equal(result.disabled,0);
     for(const key of ['wet','moved','streaks','seeded'])assert.ok(result[key]>100,`${key}: ${result[key]}`);
   }
+  if(name==='cover'){
+    assert.deepEqual(result.exposed,[0,1,1,1,0,0,0]);
+    assert.ok(result.protectedPixels>1000);assert.equal(result.protectedChanged,0);
+    assert.ok(result.exposedChanged>1000);assert.ok(result.rain>20);assert.ok(result.wet>1000);
+  }
 } finally {await browser.close();}

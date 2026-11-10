@@ -1134,6 +1134,10 @@
       "types": "./dist/environment/prefiltered.d.ts",
       "import": "./dist/environment/prefiltered.js"
     },
+    "./environment/reflector-pbr": {
+      "types": "./dist/environment/reflector-pbr.d.ts",
+      "import": "./dist/environment/reflector-pbr.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"
@@ -4749,6 +4753,10 @@
     "./weather/lens": {
       "types": "./dist/weather/lens.d.ts",
       "import": "./dist/weather/lens.js"
+    },
+    "./weather/cover": {
+      "types": "./dist/weather/cover.d.ts",
+      "import": "./dist/weather/cover.js"
     },
     "./webgl2-compat": {
       "types": "./dist/webgl2-compat.d.ts",

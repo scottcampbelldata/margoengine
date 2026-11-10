@@ -66,6 +66,10 @@
     "./lens": {
       "types": "./dist/lens.d.ts",
       "import": "./dist/lens.js"
+    },
+    "./cover": {
+      "types": "./dist/cover.d.ts",
+      "import": "./dist/cover.js"
     }
   },
   "files": [
@@ -88,6 +92,6 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs",
     "prepack": "npm run build",
-    "test:browser:parity": "cd ../.. && node packages/weather/tests/parity-browser.mjs gltf && node packages/weather/tests/parity-browser.mjs lens"
+    "test:browser:parity": "cd ../.. && node packages/weather/tests/parity-browser.mjs gltf && node packages/weather/tests/parity-browser.mjs gltf --compat && node packages/weather/tests/parity-browser.mjs cover && node packages/weather/tests/parity-browser.mjs cover --compat && node packages/weather/tests/parity-browser.mjs lens && node packages/weather/tests/parity-browser.mjs lens --compat"
   }
 }

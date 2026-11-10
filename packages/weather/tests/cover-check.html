@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Imported weather correctness</title></head><body><canvas style="width:256px;height:192px"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/model-entry.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {GLTFWeather} from '/packages/weather/dist/gltf.js';
+import {PrecipitationCover} from '/packages/weather/dist/cover.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+import {WeatherFX} from '/packages/sky/dist/weather-fx.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,6,8],target:[0,0,0]}});
+engine.stop();const errors=[];engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+// A clean-room glTF fixture: broad green floor and red wall share the imported PBR path.
+const pos=new Float32Array([-6,0,-6,6,0,-6,6,0,6,-6,0,6,-3,0,-3,3,0,-3,3,5,-3,-3,5,-3]);
+const normals=new Float32Array([0,1,0,0,1,0,0,1,0,0,1,0,0,0,1,0,0,1,0,0,1,0,0,1]);
+const ix=new Uint16Array([0,2,1,0,3,2,4,5,6,4,6,7]);
+const buffer=new Uint8Array(pos.byteLength+normals.byteLength+ix.byteLength);buffer.set(new Uint8Array(pos.buffer));buffer.set(new Uint8Array(normals.buffer),pos.byteLength);buffer.set(new Uint8Array(ix.buffer),pos.byteLength+normals.byteLength);
+const doc={asset:{version:'2.0'},buffers:[{byteLength:buffer.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:pos.byteLength},{buffer:0,byteOffset:pos.byteLength,byteLength:normals.byteLength},{buffer:0,byteOffset:pos.byteLength+normals.byteLength,byteLength:ix.byteLength}],accessors:[{bufferView:0,componentType:5126,count:8,type:'VEC3',min:[-6,0,-6],max:[6,5,6]},{bufferView:1,componentType:5126,count:8,type:'VEC3'},{bufferView:2,componentType:5123,count:6,type:'SCALAR'},{bufferView:2,byteOffset:12,componentType:5123,count:6,type:'SCALAR'}],materials:[{pbrMetallicRoughness:{baseColorFactor:[0.05,0.6,0.05,1],metallicFactor:0,roughnessFactor:0.9}},{pbrMetallicRoughness:{baseColorFactor:[0.6,0.05,0.05,1],metallicFactor:0,roughnessFactor:0.9}}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0},{attributes:{POSITION:0,NORMAL:1},indices:3,material:1}]}],nodes:[{mesh:0}],scenes:[{nodes:[0]}],scene:0};
+const model=parseGLTF(engine,doc,[buffer]);
+const d=engine.gpu;
+const makeModule=d.createShaderModule.bind(d);d.createShaderModule=options=>{if(options.code.includes('let weatherWater='))window.weatherShader=options.code;return makeModule(options);};
+async function shot(){engine.render({delta:0});await d.queue.onSubmittedWorkDone();const texture=post.sceneTexture;
+const code='@group(0) @binding(0) var t:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> o:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) i:vec3u){let s=textureDimensions(t);if(any(i.xy>=s)){return;}o[i.y*s.x+i.x]=textureLoad(t,vec2i(i.xy),0);}';
+const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code}),entryPoint:'main'}}),size=texture.width*texture.height*16;
+const out=d.createBuffer({size,usage:128|4}),st=d.createBuffer({size,usage:8|1});const e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:out}}]}));pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();e.copyBufferToBuffer(out,0,st,0,size);d.queue.submit([e.finish()]);await st.mapAsync(1);const a=new Float32Array(st.getMappedRange()).slice();st.unmap();out.destroy();st.destroy();return a;}
+const difference=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>1e-4)n++;return n;};
+
+// The cover map is a square of side 2*radius centred on the camera (0,6,8). Radius 14 spans z -6.1 to 21.9, so the
+// whole roof footprint and every sheltered floor pixel in view lie inside it; outside the map surfaces count as exposed.
+const rain=Weather.attach(engine,{particles:3000,intensity:0,fadeSeconds:0,radius:14,height:12});
+// Capture-only roof triangles are independent of the view, like offscreen shelters.
+const roofV=d.createBuffer({size:72,usage:32|8});d.queue.writeBuffer(roofV,0,new Float32Array([-6,3,-6,0,3,-6,0,3,6,-6,3,-6,0,3,6,-6,3,6]));
+const roofI=d.createBuffer({size:28,usage:16|8});d.queue.writeBuffer(roofI,0,new Uint32Array([0,1,2,3,4,5]));
+const roof={shadowPrimitives:[{node:{matrix:new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])},vertex:roofV,index:roofI,count:6,stride:12}]};
+// WeatherFX's supported core stride is 24 bytes; normals are interleaved even in a depth-only source.
+const roofPacked=d.createBuffer({size:144,usage:32|8});d.queue.writeBuffer(roofPacked,0,new Float32Array([-6.5,3,-6.5,0,1,0,0,3,-6.5,0,1,0,0,3,6.5,0,1,0,-6.5,3,-6.5,0,1,0,0,3,6.5,0,1,0,-6.5,3,6.5,0,1,0]));roof.shadowPrimitives[0].vertex=roofPacked;roof.shadowPrimitives[0].stride=24;
+// The roof overhangs the floor by 0.5 m like eaves: with multisampling a floor edge pixel is shaded at its centre,
+// up to a pixel outside the floor, and that point must still lie under the roof to count as sheltered.
+// A small out-of-view canopy, x 8 to 10 and z 8 to 10, has its x=8 edge 0.016 m short of a texel centre (texel
+// 0.21875 m from x=-14): the probe at x=8.05 lies under it in a texel the canopy does not reach.
+const canopy=d.createBuffer({size:144,usage:32|8});d.queue.writeBuffer(canopy,0,new Float32Array([8,3,8,0,1,0,10,3,8,0,1,0,10,3,10,0,1,0,8,3,8,0,1,0,10,3,10,0,1,0,8,3,10,0,1,0]));
+roof.shadowPrimitives.push({...roof.shadowPrimitives[0],vertex:canopy});
+const fx=new WeatherFX({weather:rain,occluders:[roof],resolution:128,splashes:0,lensDrops:0});
+const cover=PrecipitationCover.attach(engine,fx);
+let coverInfo=null;const patch=cover.shader.bind(cover);cover.shader=(source,group)=>{const out=patch(source,group);if(group===2)coverInfo={changed:out!==source,water:out.includes('weather_cover_water(i.position,'),snow:out.includes('weather_cover_snow(i.position,'),bindings:cover.bindings().length};return out;};
+engine.createMesh().setGeometry(box(12,0.1,4)).setPosition([0,0.1,4]).setMaterial(new PbrMaterial({color:'#209020',roughness:0.9}));
+const wet=GLTFWeather.attach(engine,{cover,puddles:{wetness:0},snow:{cover:0,depth:0}});wet.add(model);
+import {Puddles} from '/packages/weather/dist/puddles.js';import {Snow} from '/packages/weather/dist/snow.js';
+const coreWet=Puddles.attach(engine,{wetness:0});const coreSnow=Snow.attach(engine,{cover:0,depth:0});
+async function exposure(){
+ const src='fn weather_snow_at(xz:vec2f,ny:f32,c:f32)->f32{return c;} @group(0) @binding(0) var<storage,read_write> result:array<f32>; @compute @workgroup_size(1) fn main(){let positions=array<vec3f,7>(vec3f(-3,0,0),vec3f(3,0,0),vec3f(-3,4,0),vec3f(30,0,0),vec3f(-5.5,0,-5.5),vec3f(-1,0,-2.5),vec3f(8.05,0,9));for(var k=0u;k<7u;k++){let i=positions[k];result[k]=select(0.0,1.0,weather_exposed(i));}} // weather_snow_at(i.position.xz,';
+ const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code:cover.shader(src,0)}),entryPoint:'main'}});
+ const out=d.createBuffer({size:28,usage:128|4}),st=d.createBuffer({size:28,usage:8|1}),e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:out}},...cover.bindings()]}));pass.dispatchWorkgroups(1);pass.end();e.copyBufferToBuffer(out,0,st,0,28);d.queue.submit([e.finish()]);await st.mapAsync(1);const a=[...new Float32Array(st.getMappedRange())];st.unmap();st.destroy();out.destroy();return a;
+}
+window.run=async()=>{
+ d.pushErrorScope('validation');const dry=await shot(),exposed=await exposure();
+ wet.options.puddles.wetness=1;coreWet.options.wetness=1;const damp=await shot();
+ wet.options.snow.cover=1;coreSnow.options.cover=1;const snow=await shot();
+ let protectedPixels=0,protectedChanged=0,exposedChanged=0;
+ const W=post.sceneTexture.width,H=post.sceneTexture.height;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(dry[i+1]>3*dry[i]&&dry[i+1]>3*dry[i+2]){
+  if(x<W*0.4){protectedPixels++;if(Math.abs(snow[i]-dry[i])+Math.abs(snow[i+1]-dry[i+1])+Math.abs(snow[i+2]-dry[i+2])>1e-4)protectedChanged++;}
+  if(x>W*0.6&&Math.abs(snow[i]-dry[i])+Math.abs(snow[i+1]-dry[i+1])+Math.abs(snow[i+2]-dry[i+2])>1e-4)exposedChanged++;
+ }}
+ wet.options.snow.cover=0;wet.options.puddles.wetness=0;coreSnow.options.cover=0;coreWet.options.wetness=0;
+ rain.options.intensity=1;const sheltered=await shot();fx.options.occluders=[];const open=await shot();
+ const samples=[];for(const x of [-3,3])for(const z of [-4,0,4]){const m=engine.camera.matrix,v=[x,0.15,z,1],q=[0,1,2,3].map(r=>m[r]*v[0]+m[r+4]*v[1]+m[r+8]*v[2]+m[r+12]);const sx=Math.floor((q[0]/q[3]+1)/2*W),sy=Math.floor((1-q[1]/q[3])/2*H),k=(sy*W+sx)*4;samples.push({x,z,sx,sy,dry:[...dry.slice(k,k+3)],snow:[...snow.slice(k,k+3)],wet:[...damp.slice(k,k+3)]});} const result={samples,exposed,protectedPixels,protectedChanged,exposedChanged,wet:difference(dry,damp),rain:difference(sheltered,open),validation:(await d.popErrorScope())?.message??null,errors};
+ console.assert(protectedPixels>1000&&protectedChanged===0&&exposedChanged>1000,'sheltered surfaces');
+ return {...result,coverInfo};
+};window.ready=true;
+
+</script></body></html>

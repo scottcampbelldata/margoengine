@@ -5,6 +5,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { Puddles, puddleWGSL, type PuddleOptions } from './puddles.js';
 import { Snow, snowWGSL, type SnowOptions } from './snow.js';
 import { noiseWGSL } from './scene-patch.js';
+import type { PrecipitationCover } from './cover.js';
 
 /** Imported model accepting gltf-pro's composable lighting/shading effects. */
 export interface WeatherGLTFModel {
@@ -13,6 +14,8 @@ export interface WeatherGLTFModel {
 
 /** Wet ground and snow settings; both default to their core-mesh entry's defaults. */
 export interface GLTFWeatherOptions {
+  /** Optional shared precipitation cover. Default none. */
+  cover?: Pick<PrecipitationCover, 'shader' | 'bindings'>;
   /** Wetness, standing water and rain rings. Default {}. */
   puddles?: PuddleOptions;
   /** Slope-dependent snow, grain and depth. Default {}. */
@@ -108,17 +111,18 @@ export class GLTFWeather implements EnginePlugin {
     // The world-space lift runs after skinning/morphing and before camera projection.
     code = code.replace('o.clip=f.camera*p; o.position=p.xyz;',
       'var weatherPosition=p;weatherPosition.y+=weather_snow_depth(p.xz,normalize((f.normalMatrix*vec4f(i.normal.xyz,0)).xyz).y,weatherSnow);o.clip=f.camera*weatherPosition;o.position=weatherPosition.xyz;');
-    return `${source.includes('fn weather_noise(') ? '' : noiseWGSL}
+    const weatherShader = `${source.includes('fn weather_noise(') ? '' : noiseWGSL}
       ${puddleWGSL.slice(noiseWGSL.length)}${snowWGSL.slice(noiseWGSL.length)}
       struct WeatherGLTFUniform { puddles:WeatherPuddles, snow:WeatherSnow }
       @group(${group}) @binding(160) var<uniform> weatherGLTF:WeatherGLTFUniform;
       ${code.replaceAll('weatherPuddles', 'weatherGLTF.puddles').replaceAll('weatherSnow', 'weatherGLTF.snow')}`;
+    return this.options.cover?.shader(weatherShader, group) ?? weatherShader;
   }
 
   /** Current uniform resource for gltf-pro's group 2. */
   bindings(): GPUBindGroupEntry[] {
     this.alive();
-    return this.uniform ? [{ binding: 160, resource: { buffer: this.uniform } }] : [];
+    return this.uniform ? [{ binding: 160, resource: { buffer: this.uniform } }, ...(this.options.cover?.bindings() ?? [])] : [];
   }
 
   onDeviceRestored(engine: Engine): void {

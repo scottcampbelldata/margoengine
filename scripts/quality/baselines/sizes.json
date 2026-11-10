@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14114843,
+  "total": 14116638,
   "history": [
     {
       "date": "2026-10-24",
@@ -7447,6 +7447,12 @@
       "commit": "batch-188",
       "reason": "New optional environment/reflector-pbr: 0 to 3340 B gzip; shared capture hooks preserve Fresnel and world-depth blur without duplicating the reflector.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "76db3f779",
+      "reason": "batch236: optional weather/cover top-down shelter map for core and gltf-pro surfaces; no root changes",
+      "grew": 1
     }
   ],
   "items": {
@@ -8623,6 +8629,7 @@
     "@margoengine/water/ripples": 3940,
     "@margoengine/weather": 5230,
     "@margoengine/weather/audio": 1908,
+    "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 1714,
     "@margoengine/weather/gltf": 5203,
