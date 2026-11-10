@@ -66,6 +66,13 @@ export interface InputFeed {
 /** Plain, JSON-safe snapshot of every action's bindings, as written by {@link Input.exportBindings}. */
 export type BindingMap = Record<string, Binding[]>;
 
+// Pointer Events 3, 4.1.1.3: the `buttons` bit of each `button` index (left 1, middle 4, right 2, back 8, forward 16).
+const BUTTON_BITS = [1, 4, 2, 8, 16];
+function fromButtons(buttons: number): number {
+  let held = 0;
+  for (let i = 0; i < BUTTON_BITS.length; i++) if (buttons & BUTTON_BITS[i]) held |= 1 << i;
+  return held;
+}
 const BINDING_TYPES = ['key', 'mouse', 'pointer', 'gamepad-axis', 'gamepad-button', 'touch', 'control'];
 function validateBinding(binding: Binding): void {
   if (!binding || typeof binding !== 'object')
@@ -176,20 +183,14 @@ export class Input {
         }
       });
       this.listen(target, 'keyup', (event) => this.keys.delete((event as KeyboardEvent).code));
-      this.listen(target, 'pointerdown', (event) => {
-        if ((event as PointerEvent).pointerType !== 'touch') {
-          this.buttons |= 1 << (event as PointerEvent).button;
-          this.tappedButtons |= 1 << (event as PointerEvent).button;
-        }
-      });
-      this.listen(target, 'pointerup', (event) => {
-        if ((event as PointerEvent).pointerType !== 'touch') this.buttons &= ~(1 << (event as PointerEvent).button);
-      });
+      this.listen(target, 'pointerdown', (event) => this.pointerButtons(event as PointerEvent));
+      this.listen(target, 'pointerup', (event) => this.pointerButtons(event as PointerEvent));
       this.listen(target, 'pointermove', (event) => {
         const e = event as PointerEvent;
         if (e.pointerType !== 'touch') {
           this.motion.x += e.movementX || 0;
           this.motion.y += e.movementY || 0;
+          this.pointerButtons(e);
         }
       });
       this.listen(target, 'wheel', (event) => {
@@ -201,6 +202,21 @@ export class Input {
       this.dispose();
       throw error;
     }
+  }
+  /**
+   * Pointer Events 3, 4.1.1.1: a button pressed or released while another is held fires no pointerdown or pointerup,
+   * only a pointermove whose `button` names the changed button. `buttons` holds them all, so read it on every event.
+   */
+  private pointerButtons(e: PointerEvent): void {
+    if (e.pointerType === 'touch') return;
+    const bit = e.button >= 0 ? 1 << e.button : 0,
+      known = typeof e.buttons === 'number';
+    let held = known ? fromButtons(e.buttons) : this.buttons;
+    if (e.type === 'pointerdown') held |= bit;
+    else if (e.type === 'pointerup') held &= ~bit;
+    else if (!bit || !known) return;
+    this.tappedButtons |= held & ~this.buttons;
+    this.buttons = held;
   }
   private listen(target: EventTarget, type: string, listener: EventListener): void {
     target.addEventListener(type, listener);
@@ -537,7 +553,9 @@ export class Input {
   }
   /**
    * Wait for the next key, mouse button or gamepad button press and resolve with it as a {@link Binding}, for a
-   * "press a key to rebind" prompt. Modifiers held with a key become `modifiers`. Escape cancels.
+   * "press a key to rebind" prompt. Modifiers held with a key become `modifiers`; a modifier alone is taken when it is
+   * released with no other key. A gamepad button already held at the call counts once released and pressed again.
+   * Escape cancels.
    * @throws DOMException `AbortError` when `signal` aborts or the user presses Escape.
    * @throws MargoError `'disposed'` after {@link Input.dispose}.
    */
@@ -547,23 +565,34 @@ export class Input {
       let timer = 0;
       const done = (finish: () => void) => {
         this.target.removeEventListener('keydown', onKey);
+        this.target.removeEventListener('keyup', onKeyUp);
         this.target.removeEventListener('pointerdown', onPointer);
         signal?.removeEventListener('abort', abort);
         if (timer) cancelAnimationFrame(timer);
         finish();
       };
       const abort = () => done(() => reject(signal?.reason ?? new DOMException('Aborted', 'AbortError')));
-      const onKey = (event: Event) => {
-        const e = event as KeyboardEvent;
-        if (e.code === 'Escape') return done(() => reject(new DOMException('Cancelled', 'AbortError')));
+      // A modifier pressed alone may begin a chord (Ctrl, then S), so it is taken only when released with nothing else.
+      let lone = '';
+      const take = (e: KeyboardEvent) => {
         const flags: Record<Modifier, boolean> = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
         const modifiers = (Object.keys(flags) as Modifier[]).filter(
           (m) => flags[m] && !MODIFIER_CODES[m].includes(e.code),
         );
-        e.preventDefault?.();
         done(() =>
           resolve(modifiers.length ? { type: 'key', code: e.code, modifiers } : { type: 'key', code: e.code }),
         );
+      };
+      const onKey = (event: Event) => {
+        const e = event as KeyboardEvent;
+        if (e.code === 'Escape') return done(() => reject(new DOMException('Cancelled', 'AbortError')));
+        e.preventDefault?.();
+        if (e.repeat) return;
+        if (Object.values(MODIFIER_CODES).some((codes) => codes.includes(e.code))) lone = e.code;
+        else take(e);
+      };
+      const onKeyUp = (event: Event) => {
+        if ((event as KeyboardEvent).code === lone) take(event as KeyboardEvent);
       };
       const onPointer = (event: Event) => {
         const e = event as PointerEvent;
@@ -573,12 +602,20 @@ export class Input {
       if (signal?.aborted) return abort();
       signal?.addEventListener('abort', abort);
       this.target.addEventListener('keydown', onKey);
+      this.target.addEventListener('keyup', onKeyUp);
       this.target.addEventListener('pointerdown', onPointer);
+      // A button already held when capture starts (the one that opened the prompt) counts only after it is released.
+      const held = new Set<string>();
+      for (const pad of this.gamepads())
+        pad?.buttons.forEach((button, index) => button.pressed && held.add(`${pad.index}:${index}`));
       const poll = () => {
-        const pad = this.gamepads().find((g) => g?.buttons.some((b) => b.pressed));
-        if (pad) {
-          const index = pad.buttons.findIndex((b) => b.pressed);
-          return done(() => resolve({ type: 'gamepad-button', index, gamepad: pad.index }));
+        for (const pad of this.gamepads()) {
+          if (!pad) continue;
+          for (let index = 0; index < pad.buttons.length; index++) {
+            const id = `${pad.index}:${index}`;
+            if (!pad.buttons[index].pressed) held.delete(id);
+            else if (!held.has(id)) return done(() => resolve({ type: 'gamepad-button', index, gamepad: pad.index }));
+          }
         }
         timer = requestAnimationFrame(poll);
       };

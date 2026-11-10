@@ -54,8 +54,19 @@ function anglesFromTilt(tiltX: number, tiltY: number): [altitude: number, azimut
   return [Math.atan2(1, length), azimuth < 0 ? azimuth + TURN : azimuth];
 }
 
-/** Tilt from altitude and azimuth, the same conversion the other way. */
+/**
+ * Tilt from altitude and azimuth, the same conversion the other way. A pen lying flat (altitude 0) takes the
+ * specification's exact quadrant values: 90 degrees toward each axis the azimuth leans to, 0 on the other axis when
+ * the azimuth is exactly on one axis (cos(pi / 2) is not exactly 0 in floating point).
+ */
 function tiltFromAngles(altitude: number, azimuth: number): [tiltX: number, tiltY: number] {
+  if (altitude === 0) {
+    const a = azimuth >= TURN ? azimuth - TURN : azimuth,
+      down = (3 * Math.PI) / 2,
+      x = a === HALF_PI || a === down ? 0 : a < HALF_PI || a > down ? 90 : -90,
+      y = a === 0 || a === Math.PI ? 0 : a < Math.PI ? 90 : -90;
+    return [x, y];
+  }
   const reach = 1 / Math.tan(altitude);
   return [Math.atan(Math.cos(azimuth) * reach) / RAD, Math.atan(Math.sin(azimuth) * reach) / RAD];
 }

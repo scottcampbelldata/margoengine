@@ -5524,3 +5524,39 @@ that shows only between exactly coplanar faces; on the M6 4x MSAA edge pixels al
 probe above, and scatter's entry), so overlapping instance edges can change between identical frames. `lod-check.mjs`
 has no frame-repeat assertion. The fix is scatter's and MeshletMesh's: flag, prefix count, compact in instance order.
 
+
+## Batch 132 audit: input (fixed and open)
+
+Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on the code before the fix):
+- Chorded mouse buttons. `Input` set and cleared button bits only on `pointerdown` and `pointerup` (index.ts:179-187
+  before the fix), but Pointer Events 3, 4.1.1.1 fires neither for a button pressed or released while another is held,
+  only a `pointermove` whose `button` names it. Holding left and pressing right never pressed a `{type: 'mouse', button: 2}`
+  action; releasing left while right was held left the left action down until a later `pointerup`. Every pointer event
+  now reads the `buttons` bitmask (4.1.1.3 bit order: left 1, right 2, middle 4).
+- `Gestures`: a two-finger pinch or spread ended with the last finger's lift read as a single pointer, so a quick spread
+  emitted a `swipe` (100 px in 100 ms from the second finger's start) and a still two-finger touch emitted a `tap`. A
+  sequence that ever had two pointers now ends with neither.
+- `captureBinding` resolved on the first keydown, so pressing Ctrl to enter Ctrl+S captured `ControlLeft` and a chord
+  could never be captured; a lone modifier now resolves on its release with no other key. It also resolved with a
+  gamepad button already held when it was called (the A press that opened the rebind prompt); it now waits for a new press.
+- `Pen` tilt from `altitudeAngle` 0: `1 / tan(0)` is Infinity and `cos(pi / 2)` is 6e-17, so azimuth pi/2 gave tiltX 90
+  instead of the specification's 0 (Pointer Events 3, 4.1.5, `spherical2tilt`); a flat pen on an axis now takes the
+  specification's values.
+
+- `Gyro` read `rotationRate.alpha` as the rate about the device z axis, `beta` about x and `gamma` about y (the
+  Euler-angle meaning of `deviceorientation`). Device Orientation (W3C CRD 2026-10-26) 6.3.2 defines the `alpha`,
+  `beta` and `gamma` getters of `rotationRate` as the rates about x, y and z. So `{alpha: 90}` (tipping the top back)
+  rolled the aim instead of pitching it, and a turn about the screen's up axis (`beta`) pitched it. motion.ts now reads
+  x, y and z from alpha, beta and gamma; the old motion tests fed the old meaning and now encode the specification.
+  Caveat: the same specification's informative vehicle example gives a turn about y as `gamma`; the normative getter
+  steps were followed. Not yet checked on a real phone.
+
+Open (not fixed in the audit):
+- On the M6, `packages/input/test/input-browser.mjs` fails before its pixel steps: Chromium rejects `requestPointerLock`
+  with `WrongDocumentError` under the test harness (same as the finish-later "132 | worker" row; a probe page that was
+  focused, visible and top level got the same). Native pointer lock is unverified on this Mac.
+- `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
+  so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
+- `Pen` tilt to angles at |tilt| = 90 with the other tilt nonzero returns the azimuth of the leaning side (tiltX -90,
+  tiltY 30 gives pi), where the specification's informative `tilt2spherical` returns 0 ("not enough information"); the
+  code inverts `spherical2tilt` instead, a deliberate difference.

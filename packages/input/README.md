@@ -36,7 +36,8 @@ input.resetBindings();
 
 - `modifiers` (`'shift' | 'ctrl' | 'alt' | 'meta'`) on a `key` binding makes a chord: the key counts only while every modifier is held.
 - `contexts` (option) group actions; an action owned by contexts reads 0 unless one is enabled. Unlisted actions are always active.
-- `captureBinding` resolves with the next key (with held modifiers), mouse button or gamepad button; Escape or the signal rejects with `AbortError`.
+- `captureBinding` resolves with the next key (with held modifiers), mouse button or gamepad button; Escape or the signal rejects with `AbortError`. A modifier pressed alone waits: Ctrl then S gives Ctrl+S, and Shift pressed and released alone gives Shift. A gamepad button already held when the prompt opens counts only after it is released and pressed again.
+- Mouse buttons follow Pointer Events chords: a second button pressed or released during a drag counts, though the browser sends it as a `pointermove`.
 
 ## Tap, hold, slow tap and double press
 

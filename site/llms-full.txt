@@ -9357,6 +9357,12 @@ AVIF review M2 (2026-11-10): chroma position 1 uses horizontal co-siting and ver
 
 ## Batch 137 encoder limits
 
+The default KTX2 encoder requires WebAssembly SIMD. A runtime without SIMD rejects
+with MargoError `unsupported` and a help link; there is no automatic scalar fallback.
+CSP compilation refusals use `failed` with the required permission and CSP help link.
+Failed loads are cleared, so each later encode call may make one fresh load attempt;
+successful modules remain cached. See [loader recovery](exporter-basis-loading.md).
+
 The clean-room ETC1S/UASTC encoder replaces the bundled prebuilt encoder, with the
 same public settings and a single lazy SIMD Wasm module. ETC1S uses shared endpoint
 and selector codebooks; all nineteen UASTC modes participate at level 2 and above.
@@ -14947,6 +14953,43 @@ that shows only between exactly coplanar faces; on the M6 4x MSAA edge pixels al
 probe above, and scatter's entry), so overlapping instance edges can change between identical frames. `lod-check.mjs`
 has no frame-repeat assertion. The fix is scatter's and MeshletMesh's: flag, prefix count, compact in instance order.
 
+
+## Batch 132 audit: input (fixed and open)
+
+Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on the code before the fix):
+- Chorded mouse buttons. `Input` set and cleared button bits only on `pointerdown` and `pointerup` (index.ts:179-187
+  before the fix), but Pointer Events 3, 4.1.1.1 fires neither for a button pressed or released while another is held,
+  only a `pointermove` whose `button` names it. Holding left and pressing right never pressed a `{type: 'mouse', button: 2}`
+  action; releasing left while right was held left the left action down until a later `pointerup`. Every pointer event
+  now reads the `buttons` bitmask (4.1.1.3 bit order: left 1, right 2, middle 4).
+- `Gestures`: a two-finger pinch or spread ended with the last finger's lift read as a single pointer, so a quick spread
+  emitted a `swipe` (100 px in 100 ms from the second finger's start) and a still two-finger touch emitted a `tap`. A
+  sequence that ever had two pointers now ends with neither.
+- `captureBinding` resolved on the first keydown, so pressing Ctrl to enter Ctrl+S captured `ControlLeft` and a chord
+  could never be captured; a lone modifier now resolves on its release with no other key. It also resolved with a
+  gamepad button already held when it was called (the A press that opened the rebind prompt); it now waits for a new press.
+- `Pen` tilt from `altitudeAngle` 0: `1 / tan(0)` is Infinity and `cos(pi / 2)` is 6e-17, so azimuth pi/2 gave tiltX 90
+  instead of the specification's 0 (Pointer Events 3, 4.1.5, `spherical2tilt`); a flat pen on an axis now takes the
+  specification's values.
+
+- `Gyro` read `rotationRate.alpha` as the rate about the device z axis, `beta` about x and `gamma` about y (the
+  Euler-angle meaning of `deviceorientation`). Device Orientation (W3C CRD 2026-10-26) 6.3.2 defines the `alpha`,
+  `beta` and `gamma` getters of `rotationRate` as the rates about x, y and z. So `{alpha: 90}` (tipping the top back)
+  rolled the aim instead of pitching it, and a turn about the screen's up axis (`beta`) pitched it. motion.ts now reads
+  x, y and z from alpha, beta and gamma; the old motion tests fed the old meaning and now encode the specification.
+  Caveat: the same specification's informative vehicle example gives a turn about y as `gamma`; the normative getter
+  steps were followed. Not yet checked on a real phone.
+
+Open (not fixed in the audit):
+- On the M6, `packages/input/test/input-browser.mjs` fails before its pixel steps: Chromium rejects `requestPointerLock`
+  with `WrongDocumentError` under the test harness (same as the finish-later "132 | worker" row; a probe page that was
+  focused, visible and top level got the same). Native pointer lock is unverified on this Mac.
+- `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
+  so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
+- `Pen` tilt to angles at |tilt| = 90 with the other tilt nonzero returns the azimuth of the leaning side (tiltX -90,
+  tiltY 30 gives pi), where the specification's informative `tilt2spherical` returns 0 ("not enough information"); the
+  code inverts `spherical2tilt` instead, a deliberate difference.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -18524,67 +18567,78 @@ with the terrain.
 Import `margoengine/voxel` from the `margoengine` package, or `@margoengine/voxel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Voxel worlds for block-building games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
-light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;
-meshing, rendering, light, queries, streaming and `.vox` files follow as subpath entries (plan: [DESIGN.md](DESIGN.md)).
+light byte per cell, and a chunked world with dirty tracking and change events.
+Meshing, rendering, light, queries, streaming and `.vox` files are optional subpath entries
+(design: [DESIGN.md](DESIGN.md)).
+
+## Custom blocks, placed objects and wind
+
+These are independent optional entries. `/models` defines a union of 1..64 boxes
+inside [0,1]^3, with strictly positive extent, and precomputes 24 right-handed cube
+orientations. `modelState(id,orientation)` defaults to identity 0; orientation is
+0..23. Each box has six UV rectangles and texture layers in +x,-x,+y,-y,+z,-z order.
+UV defaults are [0,0,1,1] and layers default to the block's textures; flipped UVs are
+allowed. Exact box-union query/collision and covered-face lighting metadata follow
+the orientation. These are cell-local boxes, not arbitrary triangle collision.
+
+`VoxelModelRenderer.create(engine,world,options,signal)` lazily loads the optional
+materials renderer. Install the matching `@margoengine/materials` peer from the
+private build when using model drawing. Call update after lighting, before rendering.
+It streams changed chunks without consuming the main renderer's light-dirty queue.
+The default material uses block colour/PBR factors; a per-type/texture override is
+caller-owned. Disposal removes model meshes/subscriptions, preserving caller textures
+and materials. Cancellation retains its exact reason.
+
+`/objects` places a core mesh or glTF `{root,meshes}` graph around each cell centre.
+`objectState(id,turns)` rotates 0..3 positive Y quarter turns, default 0. Definitions
+snapshot transforms and share Geometry/material identity. A source can be moved,
+hidden or disposed after definition; keep borrowed geometry/material resources alive
+until placements are removed. Default solid:false and opacity:0 are storage/light
+properties, not a generated triangle collider. Object geometry can extend beyond a
+cell/chunk and uses core's existing per-mesh culling/instancing. `update()` reconciles
+streamed chunks; unchanged cells keep handles. `at(x,y,z)` returns current core handles,
+root first, or empty before update/unloaded. Disposal removes placements/subscriptions,
+not source resources.
 
 ```ts
-import { BlockTypes, VoxelWorld, VoxelChunk, blockState, blockId, blockData } from 'margoengine/voxel';
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
+import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
+import { VoxelLighting } from '@margoengine/voxel/light';
+import { defineBlockModel, modelState, VoxelModelRenderer } from '@margoengine/voxel/models';
+import { VoxelObjects, objectState } from '@margoengine/voxel/objects';
+import { defineWindBlock, VoxelWind } from '@margoengine/voxel/wind';
 
-const blocks = new BlockTypes(); // id 0 is 'air'
-const stone = blocks.define('stone');
-const grass = blocks.define('grass', { textures: [2, 2, 0, 1, 2, 2] }); // +x, -x, +y (top), -y, +z, -z layers
-const glass = blocks.define('glass', { layer: 'translucent' });
-const torch = blocks.define('torch', { shape: 'cross', layer: 'cutout', solid: false, light: 14 });
-
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const blocks = new BlockTypes();
 const world = new VoxelWorld({ blocks });
-world.setBlock(0, 64, 0, grass); // adds the chunk if it is not loaded
-world.setBlocks([1, 64, 0, stone, 2, 64, 0, glass]); // flat [x, y, z, state, ...]
-world.getBlock(0, 64, 0); // grass; unloaded cells read as air (0)
-
-const off = world.onChange((x, y, z, state, previous) => {}); // once per changed cell
-for (const key of world.dirty) {
-  // 'cx,cy,cz' chunks to remesh: edits, border edits (neighbours too), added and removed chunks
-  world.dirty.delete(key);
-}
-
-const door = blockState(blocks.define('door'), 3); // id in the low 16 bits, data (e.g. facing) in the high 16
-blockId(door);
-blockData(door); // 3
-
-// Chunks are plain storage. In a worker: fill one and post it packed.
-const chunk = new VoxelChunk(stone); // uniform: stored as its palette alone
-chunk.set(5, 31, 5, torch);
-const packed = chunk.pack(); // {palette, bits, words, light}: typed arrays that own their buffers
-postMessage(packed, { transfer: [packed.palette.buffer, packed.words.buffer] }); // add light.buffer when light is a Uint8Array
-// On the main thread:
-const worker = new Worker(new URL('./chunks.js', import.meta.url), { type: 'module' });
-worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data));
+const panel = defineBlockModel(blocks, 'panel', { color: '#dd714b', boxes: [
+  { min: [0,0,0.4], max: [1,1,0.6] },
+] });
+const grass = defineWindBlock(blocks, 'grass', { shape: 'cross', layer: 'cutout', solid: false });
+const textures = new BlockTextures({ images: [
+  { width: 1, height: 1, data: new Uint8Array([90,180,70,255]) },
+] });
+const lighting = VoxelLighting.attach(world);
+const renderer = VoxelRenderer.attach(engine, { world, textures, workers: 1 });
+const wind = new VoxelWind(renderer, { direction: [1,0], time: 0 });
+const models = await VoxelModelRenderer.create(engine, world);
+const objects = VoxelObjects.attach(engine, world);
+const geometry = box(0.5,0.5,0.5);
+const source = engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({ color: '#49a6cf' }));
+const item = objects.define('item', source);
+source.dispose();
+world.setBlock(0,0,0, modelState(panel,4));
+world.setBlock(1,0,0, objectState(item,1));
+world.setBlock(2,0,0, grass);
+const off = engine.onFrame(() => { lighting.update(); models.update(); objects.update(); });
+wind.time = undefined; // Return to the renderer clock after deterministic setup.
+engine.start();
+window.addEventListener('pagehide', () => {
+  off(); wind.dispose(); objects.dispose(); models.dispose(); renderer.dispose();
+  lighting.dispose(); textures.dispose(); engine.dispose();
+}, { once: true });
 ```
-
-- **Chunks.** Cell `x | z << 5 | y << 10` holds an index into a palette of distinct block states, 0, 1, 2, 4, 8 or 16
-  bits wide (an index never straddles a 32-bit word). Palette entries are reference counted: the width grows as
-  states appear and narrows again (with hysteresis) as they disappear; one state left makes the chunk uniform.
-  `chunk.fill(state)` makes it uniform at once. Light is `sky << 4 | block` per cell (`getLight`, `setLight`), one
-  byte for the whole chunk until a cell differs.
-- **World.** Cells are 32-bit integer x and z and 16-bit y (`minY`/`maxY` narrow it; heightmaps are int16). Chunk
-  coordinates are cell >> 5. `addChunk` and `removeChunk` mark the chunk and its 26 loaded neighbours dirty; a dirty
-  key with no chunk was removed. `heightmap(cx, cz)` is the column's 32 x 32 Int16Array that `./light` fills. Edit
-  loaded chunks through the world (`chunk.set` on a loaded chunk bypasses dirty tracking and events).
-- **Block types.** Options: `textures`, `layer` (`'opaque'`, `'cutout'`, `'translucent'`, `'invisible'`), `shape`
-  (`'cube'`, `'cross'`, `'liquid'`, `'slab'`, `'stair'`), `solid`, `liquid`, `light` and `opacity` (0-15), `color`,
-  `roughness`, `metalness`, `emissive`, `animation: {frames, fps}`, `maps: {normal, roughness, emissive}` (texture
-  layers), `transmission` and `scatter`. `blocks.table` is the resolved list, plain data for workers.
-  Ids follow definition order, so define types in the same order wherever saved states are read back.
-- **Slabs and stairs.** Half-block shapes whose orientation is in the block state's data: `slabState(id, top)` (the
-  lower half, or the upper half when `top`), `doubleSlabState(id)` (both halves: one block of the slab's material,
-  shaped and lit like a cube) and `stairState(id, facing, upsideDown, corner?)` (a lower slab plus the upper quarter on
-  its back side, `facing` `'+x'`, `'-x'`, `'+z'` or `'-z'` naming that side; upside down puts the slab on top).
-  `connectStairs(world, x, y, z)` turns the stairs in that cell and beside it into the corners their neighbours call
-  for: outer when a stair's back meets the side of another stair of the same half (toward that stair's back), inner
-  when its front does; a `corner` given to `stairState` (`'straight'`, `'inner+z'`, `'outer-x'`, ...) is kept.
-  `waterlogState(state)` waterlogs a slab or stair: the liquid its type names (`waterlog`, a defined liquid's id or
-  name) fills the rest of the cell, meshed, lit and swum in like that liquid, while the block keeps colliding.
-  `shapeOctants(type, state)` gives the half cells a state fill
 
 [README continues: https://margoengine.com/llms/packages/voxel.md]
 
@@ -20073,7 +20127,8 @@ input.resetBindings();
 
 - `modifiers` (`'shift' | 'ctrl' | 'alt' | 'meta'`) on a `key` binding makes a chord: the key counts only while every modifier is held.
 - `contexts` (option) group actions; an action owned by contexts reads 0 unless one is enabled. Unlisted actions are always active.
-- `captureBinding` resolves with the next key (with held modifiers), mouse button or gamepad button; Escape or the signal rejects with `AbortError`.
+- `captureBinding` resolves with the next key (with held modifiers), mouse button or gamepad button; Escape or the signal rejects with `AbortError`. A modifier pressed alone waits: Ctrl then S gives Ctrl+S, and Shift pressed and released alone gives Shift. A gamepad button already held when the prompt opens counts only after it is released and pressed again.
+- Mouse buttons follow Pointer Events chords: a second button pressed or released during a drag counts, though the browser sends it as a `pointermove`.
 
 ## Tap, hold, slow tap and double press
 
@@ -20113,8 +20168,6 @@ tick();
 - `binding` (default: the whole action): an index into `input.actions[action]`, so a rule can read one device; after a rebind it reads what is bound there.
 - `threshold` (default 0.5): magnitude that counts as pressed, for triggers and sticks. The press ends at three quarters of it, so noise at the press point cannot flicker.
 - Option `now` (default `performance.now`): the clock in milliseconds.
-
-`state(rule)` gives `started`, `performed` and `canceled` (each true for one update), `active`, `progress` and `duration`. `reset()` drops every press in progress. Rules do not wait for each other, so one press can start a tap and a hold and each ends by its own rule. To tell a single press from a double, act on the double press's `canceled`, which comes `gap` after a lone press. Time is read once per update, so a rule is as exact as your tick. `input.bindingValue(action, index)` reads one binding yourself.
 
 [README continues: https://margoengine.com/llms/packages/input.md]
 

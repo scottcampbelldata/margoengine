@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14663658,
+  "total": 14664397,
   "history": [
     {
       "date": "2026-10-24",
@@ -8063,6 +8063,12 @@
       "commit": "89e3eb37d",
       "reason": "batch 132 shader audit",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "c7455bcfd",
+      "reason": "batch 132 input audit",
+      "grew": 2
     }
   ],
   "items": {
@@ -8496,14 +8502,14 @@
     "@margoengine/html/inline": 2744,
     "@margoengine/html/texture": 4779,
     "@margoengine/html/texture-gl": 6494,
-    "@margoengine/input": 5414,
+    "@margoengine/input": 5722,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
     "@margoengine/input/layout": 1954,
     "@margoengine/input/lock": 1616,
     "@margoengine/input/motion": 1806,
     "@margoengine/input/pen": 1561,
-    "@margoengine/input/players": 5248,
+    "@margoengine/input/players": 5679,
     "@margoengine/input/replay": 1713,
     "@margoengine/input/vector": 4551,
     "@margoengine/input/xr": 1931,

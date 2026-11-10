@@ -60,6 +60,8 @@ export class Gestures {
   private readonly o: Required<GestureOptions>;
   private lastTap: { x: number; y: number; time: number } | null = null;
   private moved = false;
+  /** More than one pointer took part since the first went down: the last lift ends a pinch, not a tap or swipe. */
+  private multi = false;
   private disposed = false;
   constructor(
     readonly element: EventTarget,
@@ -104,8 +106,9 @@ export class Gestures {
   private down(e: PointerEvent): void {
     if (e.pointerType === 'mouse') return;
     const t = this.o.now();
-    if (this.pointers.size === 0) this.moved = false;
+    if (this.pointers.size === 0) this.moved = this.multi = false;
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, startTime: t });
+    if (this.pointers.size > 1) this.multi = true;
   }
   private move(e: PointerEvent): void {
     const p = this.pointers.get(e.pointerId);
@@ -135,7 +138,7 @@ export class Gestures {
     if (!p) return;
     const single = this.pointers.size === 1;
     this.pointers.delete(e.pointerId);
-    if (!single) return;
+    if (!single || this.multi) return;
     const now = this.o.now(),
       dt = Math.max(1, now - p.startTime),
       dx = e.clientX - p.startX,

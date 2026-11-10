@@ -1,4 +1,4 @@
-﻿import { MargoError } from '@margoengine/math/errors';
+import { MargoError } from '@margoengine/math/errors';
 import type { Binding } from './index.js';
 import type { ControlHost } from './motion.js';
 
@@ -38,7 +38,11 @@ export interface XRBindingSource {
   /** Default 1, applied by the ordinary Input binding. */
   scale?: number;
 }
-/** XR-specific descriptors, converted by XRBindings.binding or map to standard replayable control bindings. */
+/**
+ * XR-specific descriptors, converted by XRBindings.binding or map to standard replayable control bindings.
+ * An action sums and clamps to [-1, 1], so an `xr-grip-pose` position beyond 1 m reads 1 there; read metres with
+ * `input.bindingValue(action, index)`, which is not clamped.
+ */
 export type XRBinding = XRBindingSource &
   (
     | { type: 'xr-button'; index: number; value?: 'value' | 'pressed' | 'touched' }

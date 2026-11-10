@@ -10,8 +10,10 @@ function rig(options = {}) {
   let time = 1000,
     angle = options.angle ?? 0;
   const gyro = new Gyro({ target, now: () => time, screenAngle: () => angle, deadzone: 0, ...options });
-  const motion = (alpha, beta, gamma) =>
-    target.dispatchEvent(Object.assign(new Event('devicemotion'), { rotationRate: { alpha, beta, gamma } }));
+  // Arguments are the rates about the device's z, x and y axes; rotationRate carries x, y and z as alpha, beta and
+  // gamma (Device Orientation 6.3.2).
+  const motion = (z, x, y) =>
+    target.dispatchEvent(Object.assign(new Event('devicemotion'), { rotationRate: { alpha: x, beta: y, gamma: z } }));
   const orient = (beta, gamma) =>
     target.dispatchEvent(Object.assign(new Event('deviceorientation'), { beta, gamma, alpha: 123 }));
   // One sensor event every 10 ms at a constant rate.

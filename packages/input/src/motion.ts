@@ -201,14 +201,16 @@ export class Gyro {
       angle = this.screenAngle() * RAD,
       sin = Math.sin(angle),
       cos = Math.cos(angle),
-      alpha = raw.alpha - this.bias.alpha,
-      beta = raw.beta - this.bias.beta,
-      gamma = raw.gamma - this.bias.gamma;
-    // Device axes: x to the right of the natural screen, y up it, z out of it; beta turns about x, gamma about y and
-    // alpha about z, right handed. The screen's right is cos x - sin y and its up is sin x + cos y.
-    this.pending.yaw -= this.gated(sin * beta + cos * gamma) * step * RAD;
-    this.pending.pitch += this.gated(cos * beta - sin * gamma) * step * RAD;
-    this.pending.roll -= this.gated(alpha) * step * RAD;
+      // Device Orientation (W3C CRD 2026-10-26) 6.3.2: rotationRate alpha, beta and gamma are the rates about the
+      // device's x, y and z axes, unlike the Euler angles of deviceorientation (alpha about z, beta x, gamma y).
+      rx = raw.alpha - this.bias.alpha,
+      ry = raw.beta - this.bias.beta,
+      rz = raw.gamma - this.bias.gamma;
+    // Device axes: x to the right of the natural screen, y up it, z out of it, right handed. The screen's right is
+    // cos x - sin y and its up is sin x + cos y.
+    this.pending.yaw -= this.gated(sin * rx + cos * ry) * step * RAD;
+    this.pending.pitch += this.gated(cos * rx - sin * ry) * step * RAD;
+    this.pending.roll -= this.gated(rz) * step * RAD;
   };
   private readonly onOrientation = (event: Event): void => {
     const { beta, gamma } = event as DeviceOrientationEvent;
