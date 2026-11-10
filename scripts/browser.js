@@ -10,7 +10,7 @@ import { settleWgslReports, watchWgsl, wgslGuard } from './support/wgsl-guard.js
 import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { compatRun, compatShim } from './support/compat-shim.js';
-import { closeAll } from './support/shutdown.mjs';
+import { closeAll, traceShutdown } from './support/shutdown.mjs';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -606,7 +606,9 @@ export async function openBrowser({
         // Bounded: a report that never arrives fails the close naming its module, after the browser and server close.
         let unsettled;
         try {
-          await settleWgslReports(page);
+          await traceShutdown('WGSL compile reports', async () => {
+            await settleWgslReports(page);
+          });
         } catch (error) {
           unsettled = error;
         }

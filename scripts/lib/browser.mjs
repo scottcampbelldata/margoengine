@@ -1,6 +1,6 @@
 import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
-import { closeAll, endTree, waitSignaled, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
+import { closeAll, endTree, waitSignaled, traceShutdown, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
 
 const ownedBrowserServers = new WeakMap();
 const ownedProcessCloses = new WeakMap();
@@ -273,7 +273,7 @@ export function withBoundedClose(
     browser[SHUTDOWN_STEPS] = pending;
     const step = async (name, run) => {
       pending.add(name);
-      try { return await run(); } finally { pending.delete(name); }
+      try { return await traceShutdown(name, run); } finally { pending.delete(name); }
     };
     return closeAll({
       budgetMs,
@@ -405,6 +405,19 @@ export async function launchBrowser({
       if (typeof launchers.chromium.launchServer === 'function') {
         const server = await launchers.chromium.launchServer({...settings, host: '127.0.0.1'});
         const child = server.process?.();
+        if (child && process.env.MARGO_TRACE_SHUTDOWN === '1') {
+          const record = (event) => console.error(`[chromium] ${JSON.stringify({
+            at: new Date().toISOString(), pid: child.pid, event,
+            exitCode: child.exitCode, signalCode: child.signalCode,
+            pipes: child.stdio?.map(pipe => pipe && ({
+              destroyed: pipe.destroyed, closed: pipe.closed, readable: pipe.readable, writable: pipe.writable,
+            })),
+          })}`);
+          child.once('exit', () => record('exit'));
+          child.once('close', () => record('close'));
+          child.stdio?.forEach((pipe, i) => pipe?.once('close', () => record(`pipe ${i} close`)));
+          record('launch');
+        }
         if (child && child.exitCode === null && child.signalCode === null)
           ownedProcessCloses.set(server, new Promise((resolve) => child.once('close', resolve)));
         let browser;

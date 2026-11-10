@@ -11,6 +11,24 @@ export const SHUTDOWN_BUDGET_MS = 30_000;
 /** Pending nested teardown steps, shared by a resource and wrappers that own its shutdown. */
 export const SHUTDOWN_STEPS = Symbol('shutdown steps');
 
+/** Opt-in phase timestamps for teardown diagnosis; errors still propagate to the owning close. */
+export function traceShutdown(name, run, report = process.env.MARGO_TRACE_SHUTDOWN === '1' ? console.error : null) {
+  if (!report) return run();
+  const begun = Date.now();
+  const emit = (outcome) => report?.(`[shutdown] ${JSON.stringify({ at: new Date().toISOString(), pid: process.pid, name, outcome, elapsedMs: Date.now() - begun })}`);
+  emit('start');
+  return (async () => {
+    try {
+      const result = await run();
+      emit('done');
+      return result;
+    } catch (error) {
+      emit(`error: ${String(error?.message ?? error)}`);
+      throw error;
+    }
+  })();
+}
+
 /** An `http.Server`, a Vite dev or preview server (its `httpServer`), or anything with `close()`. */
 function httpServerOf(server) {
   return typeof server?.closeAllConnections === 'function' ? server : server?.httpServer;
@@ -229,7 +247,7 @@ export async function closeAll({ context, browser, servers = [], children = [], 
   const step = async (name, run) => {
     open.add(name);
     try {
-      await run();
+      await traceShutdown(name, run);
     } catch (error) {
       failures.push(error);
     }

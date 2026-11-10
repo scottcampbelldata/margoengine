@@ -6,7 +6,35 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer, request } from 'node:http';
-import { closeAll, waitSignaled } from '../scripts/support/shutdown.mjs';
+import { closeAll, traceShutdown, waitSignaled } from '../scripts/support/shutdown.mjs';
+
+test('shutdown tracing distinguishes concurrent waits and preserves their values and errors', async () => {
+  const entries = [];
+  const report = (line) => entries.push(JSON.parse(line.slice('[shutdown] '.length)));
+  const pending = Promise.withResolvers();
+  const closing = traceShutdown('client close', () => pending.promise, report);
+  const failure = new Error('server refused kill');
+  await assert.rejects(traceShutdown('server kill', () => { throw failure; }, report), error => error === failure);
+  assert.deepEqual(entries.map(({ name, outcome }) => [name, outcome]), [
+    ['client close', 'start'], ['server kill', 'start'], ['server kill', 'error: server refused kill'],
+  ]);
+  pending.resolve(42);
+  assert.equal(await closing, 42);
+  assert.equal(entries.at(-1).name, 'client close');
+  assert.equal(entries.at(-1).outcome, 'done');
+  for (const entry of entries) {
+    assert.equal(entry.pid, process.pid);
+    assert.ok(Number.isFinite(Date.parse(entry.at)));
+    assert.ok(entry.elapsedMs >= 0);
+  }
+});
+
+test('disabled shutdown tracing returns the original wait without changing its scheduling', () => {
+  const wait = Promise.resolve(42);
+  assert.equal(traceShutdown('disabled', () => wait, null), wait);
+  const failure = new Error('synchronous failure');
+  assert.throws(() => traceShutdown('disabled', () => { throw failure; }, null), error => error === failure);
+});
 
 // A server that answers with headers and never ends the body (an event stream, an HMR socket): a non-idle connection.
 async function streamingServer() {

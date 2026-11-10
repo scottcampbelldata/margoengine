@@ -6925,12 +6925,32 @@ and executable skip/return patterns; `tests/python-venv.test.js` checks missing 
 flags unset. [The inventory](work-lists/missing-test-items.md) separates batch 160, held physics and
 remaining unverified real-file variants. Their proof gaps are not claimed fixed by the gate.
 
-### Fixed by lane-M 2026-11-09: exporter capture browser shutdown exceeded its deadline
+### Earlier repair, recurrence still open: browser shutdown exceeded its deadline
 
 - **Repro:** after a package build, run `node scripts/gpu-lock.mjs run --owner=codex-missing -- node packages/exporters/tests/capture-browser.mjs` with a process-tree limit. The required-input audit's 19-suite GPU run observed this at base `c1646e3ec` plus test-only edits, RTX A6000, Edge 157.0.4341.42.
 - **Observed:** all capture/render/GIF/JPEG/WebM assertions printed success, then `closeAll` threw `SHUTDOWN_TIMEOUT`, still open: browser, at its unchanged 30,000 ms deadline. The suite failed in 36 s; the other 18 selected suites, including real Jupyter notebooks, passed.
 - **Cause narrowed, not isolated:** shutdown awaits the wrapped browser close before closing the server. The owned Chromium wrapper waits for both `server.kill()` and the connected client's ordinary `close()` through `Promise.allSettled`; at least one browser teardown wait did not settle before the deadline. The failing run did not instrument the two promises independently, so it does not identify which one or establish a load-only explanation.
 - **Resolution:** lane-M fixed the owning Chromium shutdown path in `cff40d127`. Once a GPU slot became available, this lane reran capture successfully, including teardown (4 seconds); no browser/shutdown source changed here. Scott assigned this GPU teardown hang to batch 160 in lane-M (2026-11-09). This lane does not work on it or count the suite as passing. No retry, budget increase or assertion change was made. Logs remain in the lane's ignored `test-results/missing-items/gpu-packages.log`; the active [work list](work-lists/missing-test-items.md) records the owner.
+
+The teardown hunt at main `55e916e4a` adds opt-in `MARGO_TRACE_SHUTDOWN=1`
+timestamps for each server kill, client close, WGSL report wait, README page
+close, process exit and individual pipe close. The original batch 160 log
+`test-results/batch-160/gate18-readmes.log` did not isolate the inner wait.
+The batch 171 log `test-results/sciviz-fixes/derive-integrated-root.log` in
+lane-X isolates process/stdio close after native termination, but cannot explain
+why the latched event did not arrive. A passing control does not close this bug.
+Reproduce with the environment flag and one shared GPU slot, for example
+`node scripts/gpu-lock.mjs run --owner=teardown-hunt --max=1 --wait-max=60 -- node packages/sciviz/tests/sciviz-browser.mjs`.
+The single README control, all 25 sciviz README examples and the native and
+compatibility 30-check sciviz cases passed with every traced wait settled.
+In the final rebuilt native control beside verify, all pipes closed at
+00:46:27.784Z; browser exit arrived at 00:46:36.509Z. Process/stdio close
+settled after 7,974 ms and total browser cleanup after 9,691 ms, within its
+unchanged budget. This separates pending process exit from pending pipe closes;
+it does not establish why the older run exceeded the deadline.
+No root-cause fix or changed cleanup semantics is claimed. The 30,000 ms budget
+and all existing regressions remain intact; capture the missing event and native
+process/pipe state at the next recurrence before changing resource ownership.
 
 ### Fixed 2026-11-08: text extrusion API report
 

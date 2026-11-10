@@ -29,7 +29,7 @@ import { acquire } from './gpu-lock.mjs';
 import { reportSpeedPhase } from './support/speed-phase.mjs';
 import { chromiumLaunchOptions, launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
-import { closeAll, endTree } from './support/shutdown.mjs';
+import { closeAll, endTree, traceShutdown } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
 import { headlessReference } from './support/headless-readme.mjs';
 import { readmeFixture, readmeNodeEnv, serveSample } from './support/readme-assets.mjs';
@@ -510,7 +510,7 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
       result = fail(String(error.message).split('\n')[0].slice(0, 300));
     } finally {
       phase = 'closing page';
-      await page?.close();
+      await traceShutdown(`README page close (${example.id})`, () => page?.close());
     }
     return result;
   })();

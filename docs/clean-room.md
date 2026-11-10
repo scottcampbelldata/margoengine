@@ -4787,3 +4787,37 @@ existing explicit override in seven canonical drivers and executes those setup
 calls in a regression. No shader, pixel tolerance, scene or runtime changes.
 No companion code, other engine source or foreign repository files were read
 or used. No timing measurement or driver-cause inference is made.
+
+## Chromium teardown hunt diagnostics (2026-11-09)
+
+Research compared process separation, cancellation and the documented lifecycle
+of native processes and client connections before adding phase instrumentation.
+No foreign implementation or companion source was opened or copied.
+
+- Charles Reis, Alexander Moshchuk and Nasko Oskov, *Site Isolation: Process
+  Separation for Web Sites within the Browser* (2019), abstract and introduction:
+  https://charlesreis.com/research/publications/sec19-reis.pdf . Browser and
+  renderer processes are distinct resources; this does not explain a stuck close.
+- Galen C. Hunt and James R. Larus, *Singularity: Rethinking the Software Stack*
+  (2007), abstract search review only:
+  https://www.microsoft.com/en-us/research/publication/singularity-rethinking-the-software-stack/ .
+  Compared process isolation with communication-channel lifetime; no algorithm used.
+- Utsav Sethi, Haochen Pan, Shan Lu, Madanlal Musuvathi and Suman Nath,
+  *Cancellation in Systems: An Empirical Study of Task Cancellation Patterns and
+  Failures* (OSDI 2022), conference abstract search review only (full paper and
+  conference page returned HTTP 403):
+  https://www.usenix.org/conference/osdi22/presentation/sethi . Cancellation
+  completion needs evidence; no claim of full-paper review or causal attribution.
+- Node.js contributors, *Child process*, Node 26 API documentation (2026),
+  close/exit and stdio sections: https://nodejs.org/api/child_process.html .
+  Trace exit and pipe close separately because process exit alone is insufficient.
+- Microsoft, *TerminateProcess function* (2026 documentation accessed), remarks:
+  https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess .
+  Native termination is asynchronous and pending I/O must complete or cancel.
+- Microsoft Playwright contributors, *BrowserServer* and *Browser* (2026 API
+  documentation accessed): https://playwright.dev/docs/api/class-browserserver
+  and https://playwright.dev/docs/api/class-browser . Trace the owner's kill and
+  connected client's close independently rather than inferring one from the other.
+
+Only diagnostic observation is added. Passing controls do not prove that any
+historical shutdown hang has been repaired; the known-bug entry remains open.

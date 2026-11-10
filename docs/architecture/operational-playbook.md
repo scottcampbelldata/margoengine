@@ -5246,3 +5246,18 @@ returns a failing status for every retained RSS loss without taking another
 sample. Both paths have before/after regressions. Dedicated dist readers
 must start after verify finishes its build; the repaired own driver enforces
 that barrier after transient gltf-pro/README import failures.
+
+### Section 5 evidence: Chromium teardown phase tracing, recurrence open
+
+`MARGO_TRACE_SHUTDOWN=1` logs separate start/completion/error timestamps for
+native termination, process/stdio close, Playwright server kill and client close,
+WGSL report settlement, README page closes and server closes. Owned Chromium
+also logs launch, exit and each pipe's close with current process/stream state.
+Tracing is disabled by default and does not replace or shorten any wait.
+The single README, 25-example sciviz README run and native/compatibility 30-check
+sciviz cases passed on the hunt branch. These controls do not establish the
+cause of the historical process/stdio close recurrence. Keep that defect open;
+the trace value/error and scheduling tests validate diagnostics only.
+The final rebuilt control under concurrent verify load recorded closed pipes
+before the browser's delayed exit; process/stdio close took 7,974 ms and complete
+cleanup 9,691 ms. These are diagnostic phase observations, not benchmark results.
