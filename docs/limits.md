@@ -3428,3 +3428,16 @@ respect navigation limits, and reject unreachable framing. The optional entry
 is 13,676 B gzip (new entry, previously 0 B); the full four-control bundle avoids
 separate duplicated transition implementations. Core/stage source is unchanged,
 measuring 23,950 B in the current local build; no root budget is raised.
+
+### Batch 197 globe controls
+
+Optional `@margoengine/controls/globe` adds axis-aligned ellipsoid grabbing,
+cursor zoom and hit-centred tilt, including FloatingOrigin rebases. WGS84
+defaults are metres with a Y polar axis; custom three-axis radii and centre work.
+Minimum/maximum altitude are radial, not terrain/geodetic clearance. Perspective
+only; no terrain picking, mesh collision or inertia; a sky drag keeps the last
+surface hit. Constraints can override exact anchoring. Near/far adapt by default
+to 1% of altitude and twice the horizon distance plus altitude; disable
+`clipPlanes` to own them. Core/stage unchanged at 23,950 B gzip.
+
+Entry measurement: controls/globe 0 to 3646 B min+gzip; ceiling 3902 B.

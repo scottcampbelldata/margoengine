@@ -5034,3 +5034,14 @@ one near the final sample; the regression samples 30 and 60 fps through opposite
 views. Input clears existing inertia through protected package hooks and cancels
 before applying a new gesture. Synthetic boxes and sphere samples are correctness
 fixtures, not downloaded demo assets. No new public asset demo or speed claim.
+
+## Batch 197 job 2: globe navigation
+
+Sources compared before implementing the relevant design, accessed 2026-11-10:
+- Ken Shoemake, *ARCBALL: A User Interface for Specifying Three-Dimensional Orientation Using a Mouse* (1992), Graphics Interface, https://graphicsinterface.org/proceedings/gi1992/gi1992-18/ . Surface-based orientation and continuous pointer manipulation inform the normal-to-normal camera transport. No companion implementation was read.
+- Yalong Yang, Bernhard Jenny, Tim Dwyer, Kim Marriott, Haohui Chen and Maxime Cordeil, *Maps and Globes in Virtual Reality* (2018), Computer Graphics Forum, https://doi.org/10.1111/cgf.13431 and author abstract https://arxiv.org/abs/1908.02088 . Compared geographic-centre adjustment and the external globe presentation; use one exterior coordinate frame at all scales. No VR efficacy claim is made for these mouse/touch controls.
+- Karl Bladin, Emil Axelsson, Erik Broberg, Carter Emmart, Patric Ljung, Alexander Bock and Anders Ynnerman, *Globe Browsing: Contextualized Spatio-Temporal Planetary Surface Visualization* (2018), TVCG, https://doi.org/10.1109/TVCG.2017.2743958 . Compared the published abstract's whole-planet/local-detail framing. Margo's existing FloatingOrigin supplies local rendering precision, separately from the navigation math.
+- National Geospatial-Intelligence Agency, *World Geodetic System 1984* (current specification), https://earth-info.nga.mil/index.php?action=wgs84&dir=wgs84 . Reference radii derive from its defining a and inverse flattening, with Y as the default polar axis. These public-domain factual parameters are the real data in the README example; no third-party file is copied.
+- CesiumGS, *ScreenSpaceCameraController API reference* (accessed 2026-11-10), https://cesium.com/learn/cesiumjs/ref-doc/ScreenSpaceCameraController.html . Public descriptions of globe rotation, hit-based tilt, zoom, altitude limits and input toggles are the row's web-library reference. Source links were not opened.
+
+Combined clean-room design: scale a camera ray by the reference radii, solve its quadratic with the cancellation-resistant root pair, transport geodetic normals by Rodrigues rotation and translate the hit exactly onto the anchor. Zoom is a similarity about the picked point. Tilt rotates the full camera frame about the hit with a local-horizon limit; radial altitude clamps and altitude-dependent clip planes cover orbit/street scales. Floating-origin rebases translate a live grab and recompute the local reference centre. This is not a terrain collision system or a reproduction of a rival controller.

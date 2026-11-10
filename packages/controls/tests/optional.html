@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Optional controls correctness</title><link rel="icon" href="data:,">
+<script type="module">
+const entry = new URLSearchParams(location.search).get('entry');
+if (!/^[a-z-]+$/.test(entry ?? '')) throw new Error('Invalid controls entry');
+const module = await import(`./${entry}-browser.js`);
+window.runOptionalCheck = module.check;
+</script></html>

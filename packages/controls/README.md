@@ -643,3 +643,56 @@ preserves any replacement with the same name and plugins in other scenes.
 The ordinary attach/dispose example above uses the same lifecycle. The
 scene-owner suite covers all nine camera control classes and both gizmo wrappers,
 including initialization failures and scene/engine disposal.
+
+## Globe navigation: `@margoengine/controls/globe`
+
+`GlobeControls` grabs an ellipsoid with the left mouse button or one finger, zooms
+toward its hit under the wheel or pinch, and tilts about a surface hit with the
+right/middle button, modified left button or two fingers. The same continuous
+coordinates work from orbit down to the street. The outward ellipsoid normal
+transports the camera frame between grabbed points; it preserves the grabbed
+pixel without assuming the ellipsoid is a sphere.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {GlobeControls} from 'margoengine/controls/globe';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 8_000_000, 22_000_000], target: [0, 0, 0], near: 100_000, far: 100_000_000},
+});
+const origin = FloatingOrigin.attach(engine);
+const globe = new GlobeControls(engine, undefined, {origin});
+// Add your georeferenced scene in the same frame; the default ellipsoid is Y-polar WGS84 in metres.
+console.log(globe.altitude, globe.pick(0, 0)); // pick returns a local world point, or null on sky
+engine.start();
+```
+
+The real reference data are NGA WGS84's equatorial radius 6,378,137 m and inverse
+flattening 298.257223563 (US government factual geodetic parameters, public
+domain; [NGA WGS84](https://earth-info.nga.mil/index.php?action=wgs84&dir=wgs84)).
+`radii` defaults to `[6378137, 6356752.314245, 6378137]`; pass Z-polar radii
+`[6378137, 6378137, 6356752.314245]` for an unrotated ECEF scene. `centre` is
+`[0,0,0]`, global with `origin`, otherwise local. The floating origin shifts an
+active grab too, and its subscription is removed on disposal.
+
+Options: `minAltitude` (1 world unit), `maxAltitude` (Infinity), `maxTilt`
+(89 degrees in radians), `clipPlanes` (true: near = 1% of radial altitude; far
+reaches twice the reference horizon distance plus altitude), and `origin` (none).
+Altitude is **radial height**, not geodetic height or terrain clearance.
+Properties `enablePan`, `enableZoom`, `enableTilt` default true; `zoomSpeed` is
+1 (500 wheel pixels doubles distance); `rotateSpeed` is PI radians per viewport
+height. Without `clipPlanes`, the app owns valid near/far settings.
+
+`pick(x,y)`, `grab(previousHit,x,y)`, `zoomAt(x,y,wheelPixels)` and
+`tilt(hit,yaw,pitch)` accept CSS pixels and radians. Hits are in the current local
+frame. `normal(hit)` returns its geodetic unit normal. Constructor values are
+copied; invalid coordinates/limits throw. Events are `start`, `change`, `end`.
+Like other controls, a bare camera and element can be passed instead of an
+engine; `update()` reports whether a programmatic or input operation moved it.
+
+Limits: perspective camera, axis-aligned reference ellipsoid, no terrain/mesh
+collision, no inertia; dragging a point onto sky leaves it at the last valid
+surface hit. Altitude/tilt constraints take precedence over pixel anchoring.
+Use one camera controller at a time. GPU tests use synthetic geometry as
+correctness fixtures, not as an asset demonstration.

@@ -4049,3 +4049,7 @@ Tests reject a target path through a minimum-radius shell and invalid replacemen
 requests without disturbing a running move. Existing controls remain covered by
 all 324 unit cases. Custom perspective projections and dynamically moving fit
 bounds are explicit API limits, documented in the controls README.
+
+### Batch 197 globe navigation
+
+No open defect from the globe suite. Radial altitude, perspective/reference-ellipsoid navigation and sky-drag behavior are explicit limits in the controls README.

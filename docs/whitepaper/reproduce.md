@@ -2453,3 +2453,12 @@ times WebGPU/WebGL2, fitted foreground pixels, completion and wheel cancellation
 and no GPU errors. These are generated correctness fixtures, not asset demos.
 Run `npm run check:readme-run -- --packages=controls` for the copy-paste sample.
 The build phase adds no benchmark or timing assertion.
+
+### Batch 197 globe controls
+
+Build controls, run `node --test --test-timeout=30000 packages/controls/tests/globe.test.js`,
+then `node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js globe`.
+The browser script checks both real backends and writes
+`packages/controls/test-results/globe-browser.json`. Run the controls README
+examples through `npm run check:readme-run -- --packages=controls`. No speed
+measurement, benchmark or exclusive GPU lease is required.

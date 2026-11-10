@@ -5401,3 +5401,12 @@ milliseconds, disconnects and moves on, waiting for the proof of teardown only u
 `test-results/browser-host-survivors.log`. Evidence: the 40-cycle loop under load in
 docs/known-bugs.md, `tests/browser-host.test.js`, `tests/browser-teardown.test.js`.
 Missing: a run on the laptop and the Mac mini, and the cause of the kernel's delay.
+
+#### Batch 197 globe control evidence
+
+Reference ellipsoid rays, geodetic-normal transport, local-horizon tilt and radial
+altitude clipping live in the optional controls/globe entry. CPU fixtures cover
+WGS84 and triaxial radii and a live floating-origin rebase. The optional-controls
+browser gate checks anchor projection, actual foreground rendering and zero
+validation errors on WebGPU and WebGL2. It does not establish terrain collision
+or full rival navigation parity beyond the batch row. No core/stage code changes.

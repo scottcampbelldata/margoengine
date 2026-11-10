@@ -3681,6 +3681,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./controls/globe": {
+      "types": "./dist/controls/globe.d.ts",
+      "import": "./dist/controls/globe.js"
     }
   },
   "dependencies": {

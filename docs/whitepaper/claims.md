@@ -2879,3 +2879,15 @@ The browser suite renders all eight control/backend combinations and cancels eac
 by wheel input. This matches the four requested camera-controls operations; it
 is not a claim of the rival's full unrelated API or timing equivalence. No speed
 result is claimed. Research and exact limits are in clean-room.md and limits.md.
+
+### Batch 197: globe controls
+
+The optional controls/globe entry preserves a grabbed ellipsoid point's CSS pixel
+through unconstrained grab and zoom, transports its camera frame by geodetic
+normals, tilts about that hit above its horizon, and clamps radial altitude.
+`packages/controls/tests/globe.test.js` covers spheres, triaxial ellipsoids, WGS84,
+nonzero centres, orbit-to-street zoom and an active FloatingOrigin rebase.
+The browser check renders the moved globe on both WebGPU and WebGL2 and checks
+the projected anchor as well as actual foreground pixels and validation errors.
+Reference behavior is the public Cesium controller description; this claim is
+limited to this batch row, not all Cesium navigation, terrain or scene modes.

@@ -29,7 +29,8 @@
     "test:browser": "npm run build && node scripts/test-browser.js",
     "size": "npm run build && node scripts/size.js",
     "prepack": "npm run build",
-    "test:browser:walk": "npm run build && node scripts/test-walk-browser.js"
+    "test:browser:walk": "npm run build && node scripts/test-walk-browser.js",
+    "test:browser:globe": "npm run build && node scripts/test-optional-browser.js globe"
   },
   "sideEffects": false,
   "exports": {
@@ -76,6 +77,10 @@
     "./walk": {
       "types": "./dist/walk.d.ts",
       "import": "./dist/walk.js"
+    },
+    "./globe": {
+      "types": "./dist/globe.d.ts",
+      "import": "./dist/globe.js"
     }
   },
   "files": [
