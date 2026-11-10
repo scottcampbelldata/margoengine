@@ -3870,6 +3870,10 @@
       "types": "./dist/worker/rpc.d.ts",
       "import": "./dist/worker/rpc.js"
     },
+    "./worker/auto": {
+      "types": "./dist/worker/auto.d.ts",
+      "import": "./dist/worker/auto.js"
+    },
     "./xr": {
       "types": "./dist/xr.d.ts",
       "import": "./dist/xr.js"

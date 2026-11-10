@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12389612,
+  "total": 12395840,
   "history": [
     {
       "date": "2026-10-24",
@@ -5646,6 +5646,12 @@
       "commit": "8b5e85718",
       "reason": "batch267-new-optional-live-entries",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e0621c44c",
+      "reason": "Batch 257 worker optional entries: measured gzip {\"@margoengine/worker/auto\":3345,\"@margoengine/worker dist/workers/scene.js\":2371}; previous ceilings {\"@margoengine/worker/auto\":0,\"@margoengine/worker dist/workers/scene.js\":0}. New orchestration, cancellation and lifecycle behavior remains optional. Splitting would complicate ownership and duplicate the protocol. Core/stage source unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -6626,6 +6632,8 @@
     "@margoengine/wfc/sockets": 932,
     "@margoengine/wfc/worker": 1587,
     "@margoengine/worker": 2128,
+    "@margoengine/worker dist/workers/scene.js": 2627,
+    "@margoengine/worker/auto": 3601,
     "@margoengine/worker/canvas": 1597,
     "@margoengine/worker/rpc": 2408,
     "@margoengine/xr": 8967,

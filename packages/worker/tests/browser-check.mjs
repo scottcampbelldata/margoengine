@@ -30,6 +30,30 @@ try {
   assert.equal(result.supported, true);
   result.rpc = await page.evaluate(() => window.check.rpc());
   assert.deepEqual(result.rpc, { sums: [42, 3], detached: true, result: 42 });
+  result.auto = [];
+  for (const backend of ['webgpu', 'webgl2']) {
+    for (const mode of ['worker', 'page', 'fallback']) {
+      const state = await page.evaluate(([mode, backend]) => window.check.autoStart(mode, backend), [mode, backend]);
+      assert.equal(state.mode, mode === 'worker' ? 'worker' : 'page');
+      assert.equal(state.original, true);
+      assert.equal(state.detached, mode === 'worker');
+      if (mode === 'fallback') assert.equal(state.reason, 'unsupported');
+      const screenshot = (await page.locator('#auto').screenshot()).toString('base64');
+      const pixel = await page.evaluate(async (base64) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${base64}`;
+        await image.decode();
+        const ctx = new OffscreenCanvas(128, 128).getContext('2d');
+        ctx.drawImage(image, 0, 0);
+        return [...ctx.getImageData(64, 64, 1, 1).data];
+      }, screenshot);
+      assert.ok(pixel[0] > 60 && pixel[0] > pixel[2] * 2, `shared ${backend} scene shows its red box on ${mode}`);
+      const closed = await page.evaluate(() => window.check.autoClose());
+      assert.equal(closed.disposed, true);
+      if (mode !== 'worker') assert.equal(closed.aborted, true);
+      result.auto.push({ backend, ...state, pixel, closed });
+    }
+  }
 
   const ratio = await page.evaluate(() => devicePixelRatio);
   result.first = await until((s) => s.frames > 3, 'three frames');

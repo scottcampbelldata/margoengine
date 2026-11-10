@@ -43,6 +43,10 @@
     "./rpc": {
       "types": "./dist/rpc.d.ts",
       "import": "./dist/rpc.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "import": "./dist/auto.js"
     }
   },
   "files": [

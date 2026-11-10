@@ -1,6 +1,7 @@
 // The page of browser-check.mjs: a real Worker draws on a real transferred canvas; browser-check-worker.js is its other end.
 import { transferCanvas, workerCanvasSupported } from '/packages/worker/dist/index.js';
 import { RpcPool } from '/packages/worker/dist/rpc.js';
+import { runScene } from '/packages/worker/dist/auto.js';
 
 const asked = new Map();
 let next = 0;
@@ -34,8 +35,39 @@ const open = (backend, element) => {
 };
 
 const gpu = await open('webgpu', document.getElementById('gpu'));
+let auto;
 
 window.check = {
+  async autoStart(mode, backend) {
+    const canvas = document.createElement('canvas');
+    canvas.id = 'auto';
+    canvas.width = canvas.height = 128;
+    canvas.style.width = canvas.style.height = '128px';
+    document.body.prepend(canvas);
+    const buffer = new Uint8Array([42]).buffer;
+    auto = await runScene(canvas, new URL('./auto-render-scene.js', import.meta.url), {
+      mode: mode === 'fallback' ? 'auto' : mode,
+      backend,
+      data: { backend, buffer },
+      transfer: [buffer],
+      ...(mode === 'fallback'
+        ? { worker: () => new Worker(new URL('./auto-unavailable-worker.js', import.meta.url), { type: 'module' }) }
+        : {}),
+    });
+    return {
+      mode: auto.mode,
+      original: auto.canvas === canvas,
+      detached: buffer.byteLength === 0,
+      reason: auto.fallbackReason?.code,
+    };
+  },
+  async autoClose() {
+    await auto.dispose();
+    await auto.dispose();
+    const aborted = auto.canvas.dataset.sceneAborted === 'true';
+    auto.canvas.remove();
+    return { disposed: auto.disposed, aborted };
+  },
   async rpc() {
     const pool = new RpcPool(() => new Worker('/packages/worker/tests/rpc-worker.js', { type: 'module' }), { size: 2 });
     try {
