@@ -728,3 +728,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/text (batch 248 job 4): document /curve CurvedText, signed radius, subdivisions, unwrapped caret coordinates, PathText frames/offset/closure, update and lifecycle.
 - margoengine (batch 248 job 4): document text/curve forwarding.
+- @margoengine/mixer (batch 212 dynamics): document gate hysteresis/hold/floor, expanderCurve/range, LR4 phase compensation, per-band settings, envelope direction, createBusDynamics ownership and peak safety.
+
+- margoengine (batch 212 dynamics): document generated mixer/dynamics alias.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13503226,
+  "total": 13506338,
   "history": [
     {
       "date": "2026-10-24",
@@ -6984,6 +6984,12 @@
       "commit": "918d94cfa",
       "reason": "Batch 248 job 4: optional text/curve adds cylinder subdivision and path frames. Text root reuses existing spare uniforms, one block draw retained; no core/stage change. Measurements recorded in docs/limits.md; separate rendering would duplicate the text renderer.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch212-dynamics",
+      "reason": "Optional dynamics; @margoengine/mixer/dynamics: ceiling 0 to 3112, measured 2856. Keep one shared routing lifetime and K-weighting design rather than duplicate state. Core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8250,6 +8256,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/cameras/stereo": 3400,
-    "@margoengine/text/curve": 10802
+    "@margoengine/text/curve": 10802,
+    "@margoengine/mixer/dynamics": 3112
   }
 }

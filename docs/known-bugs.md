@@ -4664,3 +4664,4 @@ Batch 238 dependent gate finding: npm test --workspace @margoengine/sciviz runs 
 No known open correctness defect in the completed output modes. StereoRig's initial constructor geometry now matches StereoOutput settings before the first render; stereo.test.js retains the regression. The automatic resize resolution follow-up is recorded privately for finishing polish.
 
 Batch 248 job 4: cylindrical and path text built; numeric and pixel checks cover the new paths.
+Batch 212 extended dynamics: no open defect found by curve, envelope, linked-channel and compensated-crossover tests.

@@ -3363,3 +3363,5 @@ Build packages; node --test --test-timeout=120000 packages/splats/test/lod-sog.t
 Build packages, run node --test packages/cameras/test/*.test.js, then under a shared GPU lock run node packages/cameras/test/stereo-browser.mjs and the same command with --compat. stereo-check.html is the analytic fixture. It checks all four layouts against separately rendered eye images at constant-colour interior pixels, including a CPU Dubois reference, both swaps, row/column phase, one plugin update, resize and device restoration.
 
 Batch 248 job 4: `node --test --test-timeout=120000 packages/text/tests/curve.test.js`; run the text browser suite under the shared GPU lock on native and --compat. It compares flat and cylindrical pixel fields and checks a sinusoidal baseline with analytic tangent/normal frames. No elapsed-time assertion.
+## Batch 212 job 4: extended dynamics
+Build packages, run node --test --test-timeout=120000 packages/mixer/tests/dynamics.test.js; the normal changed-package/dependent CPU test scope also runs it. Use the existing shared GPU-locked mixer browser runner for both backends; its extended-dynamics check renders all three factories.

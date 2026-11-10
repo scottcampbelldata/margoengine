@@ -62,6 +62,10 @@
     "./fx": {
       "types": "./dist/fx.d.ts",
       "import": "./dist/fx.js"
+    },
+    "./dynamics": {
+      "types": "./dist/dynamics.d.ts",
+      "import": "./dist/dynamics.js"
     }
   },
   "files": [

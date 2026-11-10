@@ -3912,3 +3912,5 @@ Claim: cameras/stereo provides the four requested non-XR output layouts with par
 
 ### Batch 248 job 4: cylindrical and path text
 The optional curve entry covers Troika's documented signed cylinder radius plus horizontal glyph detail, and adds arc-length path frames with start offsets. Numeric proof lives in packages/text/tests/curve.test.js; the existing text browser suite verifies actual bent pixels in one draw and separately verifies path glyph draws on both backends. Path frames provide glyph alignment, while the cylinder deforms subdivided glyph geometry. This does not claim SVG parsing or arbitrary-path glyph warping.
+## Batch 212 job 4: exact extended dynamics
+Gate/expander curves, hold and one-pole envelopes run on sample time with linked channels; three independent compressor bands use phase-compensated LR4 crossovers. Proof: dynamics.test.js compares static levels, gate sample boundaries, independent filter-bank convolution and frequency-domain unity magnitude. browser.js renders gate, expansion and flat multiband output on both backends. No phase transparency, true-peak, speed or perceptual claim.

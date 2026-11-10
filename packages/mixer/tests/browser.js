@@ -19,6 +19,7 @@ import { measureLoudness, normalizeLoudness } from '@margoengine/mixer/loudness'
 import { createBusStereo } from '@margoengine/mixer/stereo';
 import { createBusAnalyser } from '@margoengine/mixer/analyser';
 import { createFX, createBusFX } from '@margoengine/mixer/fx';
+import { createBusDynamics, createMultibandCompressor } from '@margoengine/mixer/dynamics';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -426,6 +427,24 @@ export async function runChecks() {
     const data=sine(1000,.1,.2);play(context,data).connect(shaper.input);shaper.output.connect(context.destination);
     const out = await context.startRendering();
     out.getChannelData(0).forEach((v,i)=>near(v,data[i],1e-7,'authored identity curve'));
+  });
+  await check('exact gate expansion and phase-aligned multiband worklets render on both backends', async () => {
+    for (const spec of [{type:'gate',threshold:-20,attack:0,release:0,hold:0},
+      {type:'expander',threshold:-20,knee:0,ratio:2,attack:0,release:0}]) {
+      const context = new OfflineAudioContext(2,4800,rate);
+      using mixer = new Mixer(context);
+      using stage = await createBusDynamics(mixer.master,spec);
+      const data=constant(.1,.01);data.fill(.2,2400);play(context,data).connect(mixer.master.input);
+      const out=await context.startRendering();
+      near(out.getChannelData(0)[1000],spec.type==='gate'?0:.001,1e-8,`${spec.type} below threshold`);
+      near(out.getChannelData(0)[3000],.2,1e-7,`${spec.type} above threshold`);
+      assert(out.getChannelData(0).every((v,i)=>v===out.getChannelData(1)[i]),'linked stereo dynamics');
+    }
+    const context = new OfflineAudioContext(2,4800,rate);
+    using multiband = await createMultibandCompressor(context,{low:{ratio:1},mid:{ratio:1},high:{ratio:1}});
+    play(context,sine(1000,.1,.2)).connect(multiband.input);multiband.output.connect(context.destination);
+    const out=await context.startRendering();
+    near(measure(out.getChannelData(0),2400,4800).rms,.2/Math.sqrt(2),1e-6,'phase-aligned crossover magnitude');
   });
   device?.destroy();
   return { checks, backend };

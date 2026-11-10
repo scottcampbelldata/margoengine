@@ -2306,6 +2306,10 @@
       "types": "./dist/mixer/fx.d.ts",
       "import": "./dist/mixer/fx.js"
     },
+    "./mixer/dynamics": {
+      "types": "./dist/mixer/dynamics.d.ts",
+      "import": "./dist/mixer/dynamics.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"
