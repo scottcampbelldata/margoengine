@@ -275,17 +275,28 @@ test('texture binding limit: over the device limit, the draw throws naming the m
   fixture.doc.meshes[0].primitives[0].attributes.TEXCOORD_0 = fixture.doc.accessors.length;
   fixture.doc.accessors.push({ bufferView: uvView, componentType: 5126, count: 3, type: 'VEC2' });
   fixture.doc.textures = [{ source: 0 }];
-  fixture.doc.materials = [{ extensions: {
-    KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatTexture: map, clearcoatRoughnessTexture: map, clearcoatNormalTexture: map },
-    KHR_materials_transmission: { transmissionTexture: map },
-    KHR_materials_sheen: { sheenColorTexture: map, sheenRoughnessTexture: map },
-    KHR_materials_specular: { specularTexture: map, specularColorTexture: map },
-  } }];
+  fixture.doc.materials = [
+    {
+      extensions: {
+        KHR_materials_clearcoat: {
+          clearcoatFactor: 1,
+          clearcoatTexture: map,
+          clearcoatRoughnessTexture: map,
+          clearcoatNormalTexture: map,
+        },
+        KHR_materials_transmission: { transmissionTexture: map },
+        KHR_materials_sheen: { sheenColorTexture: map, sheenRoughnessTexture: map },
+        KHR_materials_specular: { specularTexture: map, specularColorTexture: map },
+      },
+    },
+  ];
   fixture.doc.extensionsUsed = ['KHR_materials_clearcoat'];
   delete fixture.doc.skins;
   delete fixture.doc.animations;
   delete fixture.doc.nodes[0].skin;
-  const model = parseGLTF(engine, fixture.doc, fixture.buffers, [{ width: 1, height: 1 }], { materials: extendedMaterials });
+  const model = parseGLTF(engine, fixture.doc, fixture.buffers, [{ width: 1, height: 1 }], {
+    materials: extendedMaterials,
+  });
   store.tick(false);
   const shadows = new Shadows({ resolution: 64 }),
     clustered = new Clustered({ grid: [4, 3, 2] });
@@ -305,6 +316,17 @@ test('texture binding limit: over the device limit, the draw throws naming the m
   shadows.add(model);
   clustered.add(model);
   ibl.applyTo(model);
+  // Packing frees four material units. Fill them with four probe declarations so the
+  // original strict boundaries (15 over 14, then 17 over 16) remain unchanged.
+  model.addLighting({
+    shader: (source) =>
+      Array.from({ length: 4 }, (_, i) => `@group(2) @binding(${80 + i}) var budgetProbe${i}:texture_2d<f32>;`).join(
+        '\n',
+      ) +
+      '\n' +
+      source,
+    bindings: () => [],
+  });
   const draw = () =>
     gpu.record(() => {
       view.begin(0);
@@ -314,10 +336,10 @@ test('texture binding limit: over the device limit, the draw throws naming the m
   assert.throws(draw, {
     name: 'RangeError',
     message:
-      'gltf-pro: physical material + shadows + clustered + environment:lighting needs 15 sampled textures per shader stage; this device allows 14',
+      'gltf-pro: physical material + shadows + clustered + environment:lighting + shader patch needs 15 sampled textures per shader stage; this device allows 14',
   });
   delete gpu.device.limits.maxSampledTexturesPerShaderStage; // WebGPU's default, 16
-  // Physical 13 + shadows 1 + IBL 1 (the BRDF LUT is a buffer); LocalShadows would add the 16th.
+  // Packed material 9 + budget probes 4 + shadows 1 + IBL 1 (the BRDF LUT is a buffer); LocalShadows would add the 16th.
   const code = draw().find((e) => e[0] === 'module')[2].code;
   assert.equal(code.match(/var\s*\w+\s*:\s*texture_/g).length, 15);
   model.addLighting({
@@ -327,7 +349,7 @@ test('texture binding limit: over the device limit, the draw throws naming the m
   });
   assert.throws(draw, {
     message:
-      'gltf-pro: physical material + shadows + clustered + environment:lighting + shader patch needs 17 sampled textures per shader stage; this device allows 16',
+      'gltf-pro: physical material + shadows + clustered + environment:lighting + shader patch + shader patch needs 17 sampled textures per shader stage; this device allows 16',
   });
   model.dispose();
   shadows.dispose();

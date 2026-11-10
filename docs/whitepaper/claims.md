@@ -4127,3 +4127,6 @@ quality/events provides finite motion throttling and Infinity suppression matchi
 
 ### Batch 201 job 2: DDS glTF images
 The optional DDS entry implements MSFT_texture_dds source substitution and preserves authored mip chains. It delegates container parsing to decoders/dds, selects formats per device, and keeps HDR/signed BC fallback values through decodeBCFloat. CPU tests: packages/gltf-pro/tests/dds.test.js and packages/decoders/tests/bc-float.test.js. GPU native/fallback oracle: packages/gltf-pro/scripts/test-dds-browser.mjs on both backends. This is format/loading correctness evidence, with no speed claim. See clean-room.md for primary sources and limits.md for device constraints.
+
+### Assigned batch-273 material sampler repair
+High-resource gltf-pro permutations preserve all existing material slots while using nine material texture declarations instead of thirteen. This leaves room for compatibility storage textures and depth sampling aliases. Proof: unchanged scripts/gltf-pro-materials-gpu-check.js assertions on both backends, the stricter binding regressions in materials-ext.test.js, and the 360-case test-base-textures-browser.mjs continuous-sampler oracle. RGBA32F packing preserves linear source texels, at an explicit memory/upload cost (limits.md). No speed claim or raised hardware limit.

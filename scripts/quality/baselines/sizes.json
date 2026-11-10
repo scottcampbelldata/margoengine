@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14047836,
+  "total": 14062689,
   "history": [
     {
       "date": "2026-10-24",
@@ -7424,6 +7424,12 @@
       "commit": "af8577615",
       "reason": "Batch 201 DDS source substitution, retained mips and native or HDR/signed-preserving fallback; decoders adds decodeBCFloat. No optional quality loss or artificial splits; core and stage unchanged. Before/after in docs/limits.md.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "0979b055c",
+      "reason": "Assigned batch-273 gltf-pro sampler repair: full base-map mip copies and independent continuous sampling in float array layers preserve every existing material binding, leaving actual compatibility units for storage and shadows. Dependent blender pbr-ext inherits the shader. No split or feature omission for optional bytes. Core and stage unchanged. Before/after in docs/limits.md.",
+      "grew": 5
     }
   ],
   "items": {
@@ -7525,7 +7531,7 @@
     "@margoengine/blender/meshopt": 8560,
     "@margoengine/blender/nodes": 10406,
     "@margoengine/blender/objects": 5201,
-    "@margoengine/blender/pbr-ext": 12556,
+    "@margoengine/blender/pbr-ext": 13441,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/alpha-triangles": 1381,
@@ -7753,7 +7759,7 @@
     "@margoengine/exporters/usdz-anim": 20969,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 22144,
-    "@margoengine/fbx dist/workers/fbx.js": 109054,
+    "@margoengine/fbx dist/workers/fbx.js": 118642,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
     "@margoengine/fbx/export": 8525,
@@ -7799,18 +7805,18 @@
     "@margoengine/gltf-pro dist/workers/progressive.js": 16170,
     "@margoengine/gltf-pro/asset": 5754,
     "@margoengine/gltf-pro/coordinates": 755,
-    "@margoengine/gltf-pro/extended": 8224,
+    "@margoengine/gltf-pro/extended": 9011,
     "@margoengine/gltf-pro/instancing": 3350,
     "@margoengine/gltf-pro/interactivity": 16807,
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/material-draw": 683,
     "@margoengine/gltf-pro/metadata": 2432,
-    "@margoengine/gltf-pro/model": 57606,
+    "@margoengine/gltf-pro/model": 60429,
     "@margoengine/gltf-pro/physics": 8977,
     "@margoengine/gltf-pro/prepare": 31610,
     "@margoengine/gltf-pro/progressive": 87387,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/spec-gloss": 9712,
+    "@margoengine/gltf-pro/spec-gloss": 10482,
     "@margoengine/gltf-pro/splats": 2100,
     "@margoengine/gltf-pro/worker": 78950,
     "@margoengine/gltf/auto": 14750,

@@ -33,7 +33,8 @@
     "test:gpu:viewer": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node scripts/stage-viewer-gpu-check.js --compat",
     "test:gpu:native-volume": "cd ../.. && node packages/gltf-pro/scripts/test-native-volume.mjs && node packages/gltf-pro/scripts/test-native-volume.mjs --compat",
     "test:gpu:spec-gloss": "cd ../.. && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs --compat",
-    "test:gpu:dds": "cd ../.. && node packages/gltf-pro/scripts/test-dds-browser.mjs && node packages/gltf-pro/scripts/test-dds-browser.mjs --compat"
+    "test:gpu:dds": "cd ../.. && node packages/gltf-pro/scripts/test-dds-browser.mjs && node packages/gltf-pro/scripts/test-dds-browser.mjs --compat",
+    "test:gpu:base-textures": "cd ../.. && node packages/gltf-pro/scripts/test-base-textures-browser.mjs && node packages/gltf-pro/scripts/test-base-textures-browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {

@@ -3580,3 +3580,6 @@ Build packages, run node --test --test-timeout=120000 packages/quality/test/even
 
 ### Batch 201 job 2
 After build:packages, run `node --test --test-timeout=120000 packages/gltf-pro/tests/dds.test.js packages/decoders/tests/bc-float.test.js`. Under the shared GPU lock run `node packages/gltf-pro/scripts/test-dds-browser.mjs`, then the same script with `--compat`. The fixture compares native and forced software BC paths and records maximum channel error in test-results/batch201-dds[-compat].json; it also asserts a visible red mip-chain material and no GPU validation errors.
+
+### Assigned batch-273 sampler overflow
+Build packages, then run gltf-pro CPU tests. Under the shared GPU lock run `node scripts/gltf-pro-materials-gpu-check.js` and again with `--compat`; all composed and transmissive permutations must still report null pipeline errors. Run `node packages/gltf-pro/scripts/test-base-textures-browser.mjs` and again with `--compat` for 360 continuous-filter reference cases per backend; test-results/batch201-base-textures[-compat].json records analytic and native filtering errors separately. No original pipeline assertion is relaxed.

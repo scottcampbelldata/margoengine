@@ -80,6 +80,10 @@ class StreamedImage implements GLTFStreamedImage {
     }
     return view;
   }
+  viewSize(): { width: number; height: number; levels: number } | undefined {
+    const texture = this.stream?.texture;
+    return texture ? { width: texture.width, height: texture.height, levels: texture.mipLevelCount } : undefined;
+  }
   /** Takes on a newly opened stream and tells the models. */
   use(stream: StreamedKTX2): void {
     this.stream = stream;
@@ -213,7 +217,9 @@ export class GLTFTextureStream implements GLTFTextureOpener {
           image = source === undefined ? undefined : model['images'][source];
         if (!(image instanceof StreamedImage)) return [];
         const { texCoord, transform } = textureCoordinates(map!),
-          repeat = transform ? Math.min(Math.hypot(transform[0], transform[4]), Math.hypot(transform[1], transform[5])) : 1;
+          repeat = transform
+            ? Math.min(Math.hypot(transform[0], transform[4]), Math.hypot(transform[1], transform[5]))
+            : 1;
         return [{ image, set: texCoord, repeat: repeat || 1 }];
       });
       // A material with no maps yet is the bare stand-in of a load in progress.
@@ -260,8 +266,7 @@ export class GLTFTextureStream implements GLTFTextureOpener {
     for (const image of this.images) image.drop();
     this.streamer.dispose();
     this.start();
-    for (const image of this.images)
-      this.begin(image).catch((error) => (this.options.onError ?? console.error)(error));
+    for (const image of this.images) this.begin(image).catch((error) => (this.options.onError ?? console.error)(error));
   }
   /** Stops loading and frees every texture; disposing the model does this. */
   dispose(): void {

@@ -1,3 +1,4 @@
+import { packBaseTextures, type BaseTextureSource, type PackedBaseTextures } from './base-textures.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import { markedClipDistances } from '../../shared/section.js';
 import { currentMaterialDraw, runMaterialDraw, inheritMaterialDraw } from './material-draw-state.js';
@@ -241,6 +242,14 @@ const planOf = (m: PBRMaterial, x: GLTFExtendedMaterials): ExtendedPlan => {
   if (plan?.from !== m.extended) plans.set(m, (plan = { ...x.plan(m.maps, m.extended!), from: m.extended! }));
   return plan!;
 };
+const needsPackedBase = (m: PBRMaterial, hooks: GLTFExtendedMaterials | undefined, source: PBRPrimitive['extension']) =>
+  !!(
+    !m.shading?.replacesTextures &&
+    !source?.replacesPhysical &&
+    (m.extended
+      ? hooks && planOf(m, hooks).packedBase
+      : m.physical && !m.shading && !source && m.maps.length > 5 && m.maps.slice(5, 13).filter(Boolean).length >= 6)
+  );
 // Map slot i of resource material m gets its own texture and sampler: base slots always; extension slots of extended
 // materials only when bound, once per shared glTF texture.
 const ownSlot = (m: PBRMaterial, i: number, x?: GLTFExtendedMaterials) => {
@@ -1181,6 +1190,8 @@ interface DrawResource {
   sectionBuffer?: GPUBuffer;
   views: GPUTextureView[];
   samplers: GPUSampler[];
+  packedBase?: PackedBaseTextures;
+  baseSources?: BaseTextureSource[];
   replacesTextures?: boolean;
   extension?: MaterialExtensionResource;
   coordinates?: CoordinateExtension;
@@ -1473,11 +1484,17 @@ function textureGroup(
   m: PBRMaterial,
   hooks: GLTFExtendedMaterials | undefined,
 ): GPUBindGroup {
-  return pipelineGroup(
-    device,
-    pipeline,
-    1,
-    r.views.flatMap((view, i) => {
+  const packed = needsPackedBase(m, hooks, r.primitive.extension ?? m.extension);
+  if (packed && !r.packedBase) r.packedBase = packBaseTextures(device, r.baseSources!);
+  return pipelineGroup(device, pipeline, 1, [
+    ...(packed
+      ? [
+          { binding: 0, resource: r.packedBase!.view },
+          { binding: 1, resource: { buffer: r.packedBase!.params } },
+        ]
+      : []),
+    ...r.views.flatMap((view, i) => {
+      if (i < 5 && packed) return [];
       // Keep fallback views available for a hook added later, but bind only authored native physical maps.
       if (i >= 5 && m.physical && !m.maps[i] && !m.shading && !(r.primitive.extension ?? m.extension)) return [];
       const binding = i < 5 || !m.extended ? i * 2 : 10 + planOf(m, hooks!).slots[i] * 2;
@@ -1488,7 +1505,7 @@ function textureGroup(
           ]
         : [];
     }),
-  );
+  ]);
 }
 interface DrawScratch {
   context?: Context;
@@ -2610,7 +2627,8 @@ export class PBRModel implements EnginePlugin {
     for (const r of this.resources)
       if (r.batch) {
         for (const b of [r.vertex, r.index]) this.dropBuffer(r.device, b);
-        for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume]) retire(r.device, b);
+        for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume, r.packedBase])
+          retire(r.device, b);
       }
     this.resources = this.resources.filter((r) => !r.batch);
     for (const r of this.resources) r.mergedInto = undefined;
@@ -2773,6 +2791,9 @@ export class PBRModel implements EnginePlugin {
   }
   // The material's uniform buffer (880 bytes, 1232 for extended materials), textures and samplers; again after a variant switch.
   private bindMaterial(r: DrawResource, device: GPUDevice, mipSampler: GPUSampler): void {
+    retire(device, r.packedBase);
+    r.packedBase = undefined;
+    const baseSources: BaseTextureSource[] = [];
     const m = r.primitive.material,
       floats =
         !(r.primitive.extension ?? m.extension)?.replacesPhysical && (m.extendedFrame || m.physical || m.ext?.[0])
@@ -2888,6 +2909,20 @@ export class PBRModel implements EnginePlugin {
       if (!view) textureViews.set(texture!, (view = texture!.createView()));
       r.views.push(view);
       const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler');
+      if (i < 5) {
+        const resident = live ? streamed?.viewSize?.() : undefined;
+        baseSources.push({
+          view,
+          width: resident?.width ?? size[0],
+          height: resident?.height ?? size[1],
+          levels:
+            resident?.levels ??
+            texture?.mipLevelCount ??
+            compressed?.mipmaps.length ??
+            Math.floor(Math.log2(Math.max(...size))) + 1,
+          sampler: s,
+        });
+      }
       const wrap = (v: unknown) => {
         if (v === undefined || v === 10497) return 'repeat';
         if (v === 33071) return 'clamp-to-edge';
@@ -2914,6 +2949,10 @@ export class PBRModel implements EnginePlugin {
       if (!sampler) samplers.set(samplerKey, (sampler = device.createSampler(state)));
       r.samplers.push(sampler);
     }
+    r.baseSources = baseSources;
+    const hooks = this.asset.hooks.materials || undefined;
+    if (needsPackedBase(m, hooks, r.primitive.extension ?? m.extension))
+      r.packedBase = packBaseTextures(device, baseSources);
   }
   registerPasses(graph: FrameGraph): void {
     let models = modelGraphs.get(graph);
@@ -5287,7 +5326,8 @@ export class PBRModel implements EnginePlugin {
             if (state.instances.buffer) buffers.set(state.instances.buffer, r.device);
           }
       r.rowStates = undefined;
-      for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume]) if (b) buffers.set(b, r.device);
+      for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume, r.packedBase])
+        if (b) buffers.set(b, r.device);
       for (const b of [r.vertex, r.index, r.uvs]) if (b) counted.set(b, r.device);
     }
     for (const [b, owner] of buffers) cleanup.run(() => retire(owner, b));

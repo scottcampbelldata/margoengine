@@ -44,6 +44,8 @@ export interface GLTFStreamedImage {
   readonly users: Set<{ rebindStreamed(image: GLTFStreamedImage): void }>;
   /** The current view on `device` in the colour space a map slot reads, or undefined while no texture lives there. */
   view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+  /** Actual resident view size, when a stream rebases level zero while keeping its authored width/height. */
+  viewSize?(): { width: number; height: number; levels: number } | undefined;
   close(): void;
 }
 /**

@@ -18,6 +18,7 @@ export function specGlossToMetalRough(diffuse?: readonly number[], specular?: re
 // Not exported from this entry, but used by the exports above:
 
 interface ExtendedPlan {
+    readonly packedBase?: boolean;
     readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;

@@ -1578,6 +1578,10 @@
       "types": "./dist/gltf-pro/spec-gloss.d.ts",
       "import": "./dist/gltf-pro/spec-gloss.js"
     },
+    "./gltf-pro/dds": {
+      "types": "./dist/gltf-pro/dds.d.ts",
+      "import": "./dist/gltf-pro/dds.js"
+    },
     "./headless": {
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"
@@ -4897,10 +4901,6 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
-    },
-    "./gltf-pro/dds": {
-      "types": "./dist/gltf-pro/dds.d.ts",
-      "import": "./dist/gltf-pro/dds.js"
     }
   },
   "dependencies": {

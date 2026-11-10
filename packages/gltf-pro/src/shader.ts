@@ -1,3 +1,4 @@
+import { packBaseShader } from './base-textures-shader.js';
 import { iridescenceWgsl } from '../../shared/iridescence.js';
 export { iridescenceWgsl } from '../../shared/iridescence.js';
 import { margoError } from '../../shared/errors.js';
@@ -399,7 +400,7 @@ function patch(source: string, edits: [string | RegExp, string][]): string {
 }
 let physical: string | undefined;
 /** Variant for KHR_materials_clearcoat, transmission, ior, volume, sheen and specular, built on first use (so it tree-shakes). Only materials using them compile it; other materials keep extendedPBRShader and its ten group-1 bindings. */
-export const physicalShader = (): string =>
+const rawPhysicalShader = (): string =>
   (physical ??= patch(
     extendedPBRShader,
     physicalEdits(
@@ -412,13 +413,16 @@ export const physicalShader = (): string =>
         .join('\n'),
     ),
   ));
+let packedPhysical: string | undefined;
+/** Stable unmodified physical source contract for material and node-shader consumers. */
+export const physicalShader = (): string => rawPhysicalShader();
 const sparsePhysical = new Map<number, string>();
 /** Native glTF physical maps: absent extension slots have their exact one-texel fallback value without a sampler. */
 export function sparsePhysicalShader(maps: readonly unknown[]): string {
   const mask = physicalMaps.reduce((bits, _, i) => bits | (maps[i + 5] ? 1 << i : 0), 0);
   let code = sparsePhysical.get(mask);
   if (code !== undefined) return code;
-  code = physicalShader();
+  code = rawPhysicalShader();
   for (let i = 0; i < physicalMaps.length; i++) {
     if (mask & (1 << i)) continue;
     const name = physicalMaps[i];
@@ -427,6 +431,7 @@ export function sparsePhysicalShader(maps: readonly unknown[]): string {
       .replace(`@group(1) @binding(${11 + i * 2}) var ${name}Sampler:sampler;`, '')
       .replaceAll(sample(name), name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)');
   }
+  if (maps.slice(5, 13).filter(Boolean).length >= 6) code = packBaseShader(code);
   sparsePhysical.set(mask, code);
   return code;
 }
@@ -493,13 +498,20 @@ fn margoVolumeTint(i:Out,s:Surface,m:mat3x3f)->vec3f {
   if (code.includes('o.mirror=margoS;')) {
     const fields = /struct Out \{([^}]+)\}/.exec(out)![1];
     let location = 0;
-    while ([location, location + 1, location + 2].some(slot => fields.includes(`@location(${slot})`))) location++;
+    while ([location, location + 1, location + 2].some((slot) => fields.includes(`@location(${slot})`))) location++;
     out = out
-      .replace(/(struct Out \{[^}]*?)\n\}/,
-        `$1, @location(${location}) @interpolate(flat) volume0:vec3f, @location(${location + 1}) @interpolate(flat) volume1:vec3f, @location(${location + 2}) @interpolate(flat) volume2:vec3f\n}`)
-      .replace('o.mirror=margoS;', 'o.mirror=margoS; o.volume0=margoI[0].xyz; o.volume1=margoI[1].xyz; o.volume2=margoI[2].xyz;')
-      .replace('margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz))',
-        'margoVolumeTint(i,s,mat3x3f(i.volume0,i.volume1,i.volume2))');
+      .replace(
+        /(struct Out \{[^}]*?)\n\}/,
+        `$1, @location(${location}) @interpolate(flat) volume0:vec3f, @location(${location + 1}) @interpolate(flat) volume1:vec3f, @location(${location + 2}) @interpolate(flat) volume2:vec3f\n}`,
+      )
+      .replace(
+        'o.mirror=margoS;',
+        'o.mirror=margoS; o.volume0=margoI[0].xyz; o.volume1=margoI[1].xyz; o.volume2=margoI[2].xyz;',
+      )
+      .replace(
+        'margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz))',
+        'margoVolumeTint(i,s,mat3x3f(i.volume0,i.volume1,i.volume2))',
+      );
   }
   return out;
 }
@@ -510,7 +522,7 @@ fn margoVolumeTint(i:Out,s:Surface,m:mat3x3f)->vec3f {
  * shader's own direct and hemisphere terms do; before, an IBL lit clear glass as an opaque white diffuser. The
  * `margoTint` entry is the draw that multiplies the background by the transmission tint.
  */
-export function transmissiveShader(code: string = physicalShader()): string {
+export function transmissiveShader(code: string = (packedPhysical ??= packBaseShader(physicalShader()))): string {
   let out = transmissive.get(code);
   if (out !== undefined) return out;
   out =
@@ -591,7 +603,7 @@ let factors: string | undefined;
 /** physicalShader with extension maps replaced by their neutral values: factors only, extendedPBRShader's five group-1 textures.
  * Drawn for physical materials whose `maps` hold only the five core slots (`@margoengine/materials`). */
 export const factorPhysicalShader = (): string =>
-  (factors ??= physicalShader()
+  (factors ??= rawPhysicalShader()
     .replace(/@group\(1\) @binding\((\d+)\) var \w+:[^;]+;\n?/g, (line, binding) => (+binding < 10 ? line : ''))
     .replace(/textureSample\((\w+)Map,\1Sampler,uv\(i,\d+\)\)/g, (_, name) =>
       name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)',
@@ -646,6 +658,8 @@ export function transmissionPBR(code: string, declarations: string): string {
  * -1 for the slot's default value. Base slots 0-4 always keep their own bindings 0-9 (text patches use them).
  */
 export interface ExtendedPlan {
+  /** Packed base layers reserve compatibility units for storage and shadow sampling. */
+  readonly packedBase?: boolean;
   /** Optional spec/gloss conversion, implemented only by the spec-gloss entry. Defaults to false. */
   readonly specularGlossiness?: boolean;
   readonly slots: readonly number[];
@@ -674,7 +688,7 @@ export function extendedPlan(
       if (textures.length === extendedTextureLimit) return -1;
       return textures.push(map.index) - 1;
     });
-  return { slots, ...features };
+  return { slots, ...features, packedBase: textures.length >= 6 };
 }
 // KHR_materials_anisotropy: the texture's direction (default +X) rotated by anisotropyRotation in tangent space, as a
 // world tangent orthogonal to the shading normal, and the strength; plus the bent normal its notes suggest for IBL.
@@ -694,7 +708,10 @@ fn margoBent(s:Surface,v:vec3f)->vec3f {
  * Sources: anisotropic D and V: KHR_materials_anisotropy "Implementation" (Burley 2012; Heitz 2014); isotropic
  * separable Smith V: glTF 2.0 Appendix B.
  */
-export const directWgsl = (anisotropic: boolean, scatter = false): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
+export const directWgsl = (
+  anisotropic: boolean,
+  scatter = false,
+): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let f0=mix(s.f0,s.base.rgb,s.metal); let schlick=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);
   let fr=mix(schlick,s.ir.rgb,s.ir.w); let kd=mix(vec3f(1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh))),vec3f(1-max(s.ir.r,max(s.ir.g,s.ir.b))),s.ir.w); let a=s.roughness*s.roughness;
@@ -774,7 +791,14 @@ const extended = new Map<string, string>();
  * length, thickness). Hook points and text-patch anchors are those of `physicalShader`.
  */
 export function extendedShader(plan: ExtendedPlan): string {
-  const key = plan.slots.join() + +plan.iridescence + +plan.anisotropy + +plan.diffuseTransmission + +!!plan.bump + +!!plan.scatter;
+  const key =
+    plan.slots.join() +
+    +plan.iridescence +
+    +plan.anisotropy +
+    +plan.diffuseTransmission +
+    +!!plan.bump +
+    +!!plan.scatter +
+    +!!plan.packedBase;
   let out = extended.get(key);
   if (out !== undefined) return out;
   const names = [...physicalMaps, ...extendedMaps],
@@ -833,6 +857,7 @@ ${plan.scatter ? scatterEdit(sampleOf) : ''}  if(margoFaceTest&&!facing&&f.setti
         : 'margoDielectricFresnel(s.f0,s.sw,nv)'
     };}` +
     tintEntry;
+  if (plan.packedBase) out = packBaseShader(out);
   if (extended.size >= 64) extended.clear();
   extended.set(key, out);
   return out;

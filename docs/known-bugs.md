@@ -3779,14 +3779,15 @@ The owning FFT entry now reports the actual GPU height, lengths and evaluated
 time. The strict unit regression failed before the correction; both GPU
 backends also check nonexact decimal metadata. The new attachment error now
 links to the existing state help entry; its regression rejects the broken link.
-Batch 273 full materials follow-up: unchanged gltf-pro-materials-gpu-check.js
-still fails the composed worst-case and transmissive pipelines at the actual
-16 fragment texture-unit cap, with no shader-module, GPU or page errors.
-The translator already shares nondynamic storage buffers per bind group, but
-that representation still consumes extra samplers beyond the 16 sampled
-textures. No sampler-count reduction, effect omission or raised limit is a
-repair. Cross-group storage packing or another representation remains open.
-Receipt: test-results/batch-273-materials-sampler-repro.log (10.0 s).
+Batch 273 full materials follow-up: resolved by the batch-201 owning gltf-pro repair.
+The composed worst-case and transmissive pipelines previously spent all 16 fragment
+units on material/effect sampled textures, leaving no units for compatibility storage
+and depth load/comparison aliases. High-resource native glTF physical/extended
+permutations now pack five base maps into RGBA32F layers, retaining source texels,
+logical dimensions, mip chains and independent sampler/UV state. The unchanged
+materials GPU check passes on both backends; 360-case continuous sampler oracles
+and all-map/lifecycle CPU regressions cover the representation. Custom hook resource
+contracts remain separate. Allocation and native interpolation differences are in limits.md.
 
 Batch 273 LOD imposter isolation: a diagnostic preserving the full picking grid
 advances through successive rows after readiness. The original report's timeout
@@ -4843,4 +4844,4 @@ Batch 186 gate finding: gpu-package-tests.mjs --select=clustered/test:gpu fails 
 
 quality/events (batch 195 job 3): no open defect found in motion policy, queued-input coalescing, asynchronous pick serialization, rejection or cancellation tests. Explicit notification of programmatic movement and no stationary-pointer polling are documented contracts in limits.md.
 
-Batch 201 job 2: DDS source loading, retained mip uploads and signed/HDR fallback are built. No new DDS defect identified. The separately assigned batch-273 composed compatibility sampler overflow remains the next owning fix and is not waived.
+Batch 201 job 2: DDS source loading, retained mip uploads and signed/HDR fallback are built. No new DDS defect identified. The separately assigned batch-273 composed compatibility sampler overflow is repaired in the same lane, with its strict assertions unchanged.

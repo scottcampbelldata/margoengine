@@ -961,3 +961,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/gltf-pro (batch 201 job 2): document automatic MSFT_texture_dds loading, ddsTextures/decodeDDSImage, mip retention, native and HDR/signed fallback, and 2D/float32 feature limits.
 - @margoengine/decoders (batch 201 job 2): document decodeBCFloat and its signed/HDR-preserving RGBA output alongside decodeBC.
+
+- @margoengine/gltf-pro (assigned batch-273 overflow): explain packed base-map arrays for full physical/large extended permutations, independent filters and mips, float storage cost and stream viewSize metadata.
+
+- @margoengine/vfx (batch 201 landing blocker): manifest duplicate-script repair only; retained the complete existing GPU command, no README example change owed.
+
+- margoengine (batch 201): expose DDS/audio aliases in the eventual loader coverage; regenerated existing main prefiltered/halftone aliases, no README examples edited.

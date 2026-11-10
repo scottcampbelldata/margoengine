@@ -16,6 +16,7 @@ export function decodeDDSImage(data: Uint8Array, options?: {
 // Not exported from this entry, but used by the exports above:
 
 interface ExtendedPlan {
+    readonly packedBase?: boolean;
     readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;
@@ -388,6 +389,11 @@ interface GLTFStreamedImage {
         rebindStreamed(image: GLTFStreamedImage): void;
     }>;
     view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+    viewSize?(): {
+        width: number;
+        height: number;
+        levels: number;
+    } | undefined;
     close(): void;
 }
 

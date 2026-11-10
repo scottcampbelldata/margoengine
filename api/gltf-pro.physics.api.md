@@ -71,6 +71,19 @@ class Arena {
     free(slot: UniformSlot): void;
 }
 
+interface BaseTextureSource {
+    view: GPUTextureView;
+    width: number;
+    height: number;
+    levels: number;
+    sampler: {
+        magFilter?: number;
+        minFilter?: number;
+        wrapS?: number;
+        wrapT?: number;
+    };
+}
+
 type BatchGroups = Map<GPURenderPipeline, Map<GPUBufferBinding, Map<GPUBufferBinding, GPUBindGroup>>>;
 
 class BatchInstances {
@@ -230,6 +243,8 @@ interface DrawResource {
     sectionBuffer?: GPUBuffer;
     views: GPUTextureView[];
     samplers: GPUSampler[];
+    packedBase?: PackedBaseTextures;
+    baseSources?: BaseTextureSource[];
     replacesTextures?: boolean;
     extension?: MaterialExtensionResource;
     coordinates?: CoordinateExtension;
@@ -281,6 +296,7 @@ interface Drive {
 }
 
 interface ExtendedPlan {
+    readonly packedBase?: boolean;
     readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;
@@ -722,6 +738,11 @@ interface GLTFStreamedImage {
         rebindStreamed(image: GLTFStreamedImage): void;
     }>;
     view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+    viewSize?(): {
+        width: number;
+        height: number;
+        levels: number;
+    } | undefined;
     close(): void;
 }
 
@@ -1157,6 +1178,13 @@ interface PBRTransparency {
     readonly depthWrite?: boolean;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+}
+
+interface PackedBaseTextures {
+    texture: GPUTexture;
+    view: GPUTextureView;
+    params: GPUBuffer;
+    destroy(): void;
 }
 
 interface PassBindings {

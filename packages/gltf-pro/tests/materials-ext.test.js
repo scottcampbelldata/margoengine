@@ -45,6 +45,67 @@ const features = { iridescence: true, anisotropy: true, diffuseTransmission: tru
 // A recorded writeBuffer's hex bytes as floats (copied: Buffer.from may hand out a slice of a shared pool).
 const floatsOf = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer);
 
+test('all physical map bindings survive base-layer packing and model cleanup', async () => {
+  const map = (index) => ({ index });
+  const { gpu, engine, model, view } = await scene(
+    [
+      {
+        pbrMetallicRoughness: { baseColorTexture: map(0), metallicRoughnessTexture: map(1) },
+        normalTexture: map(2),
+        occlusionTexture: map(3),
+        emissiveTexture: map(4),
+        extensions: {
+          KHR_materials_clearcoat: {
+            clearcoatFactor: 1,
+            clearcoatTexture: map(5),
+            clearcoatRoughnessTexture: map(6),
+            clearcoatNormalTexture: map(7),
+          },
+          KHR_materials_transmission: { transmissionFactor: 0.5, transmissionTexture: map(8) },
+          KHR_materials_sheen: { sheenColorTexture: map(9), sheenRoughnessTexture: map(10) },
+          KHR_materials_specular: { specularTexture: map(11), specularColorTexture: map(12) },
+        },
+      },
+    ],
+    {
+      doc: {
+        textures: Array.from({ length: 13 }, (_, source) => ({ source })),
+        images: Array.from({ length: 13 }, () => ({})),
+      },
+      images: Array.from({ length: 13 }, () => ({ width: 1, height: 1, close() {} })),
+    },
+  );
+  try {
+    const r = model['resources'][0];
+    assert.equal(r.packedBase.texture.format, 'rgba32float');
+    assert.equal(r.packedBase.texture.depthOrArrayLayers, 5);
+    assert.equal(r.packedBase.params.size, 160);
+    const log = gpu.record(() => {
+      view.begin(0);
+      model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+    });
+    const group = log.find((e) => e[0] === 'group' && e[2].entries.some((entry) => entry.binding === 25));
+    assert.deepEqual(
+      group[2].entries.map((e) => e.binding),
+      [0, 1, ...Array.from({ length: 16 }, (_, i) => i + 10)],
+    );
+    assert.equal(r.views.length, 13, 'original views remain available to shadow and custom-hook consumers');
+    let released = 0;
+    for (const resource of [r.packedBase.texture, r.packedBase.params]) {
+      const original = resource.destroy;
+      resource.destroy = () => {
+        released++;
+        original.call(resource);
+      };
+    }
+    model.dispose();
+    assert.equal(released, 2, 'cleanup retires the exact packed array and parameter buffer');
+  } finally {
+    model.dispose();
+    engine.dispose();
+  }
+});
+
 async function scene(materials, extra = {}) {
   const gpu = mockGPU(),
     store = await TransformStore.create(64),
@@ -213,7 +274,10 @@ test('binding plan: shared glTF textures bind once, at most 8 extension textures
   );
   assert.equal(extendedTextureLimit, 8);
   const code = extendedShader(distinct);
-  assert.equal(textures(code), 5 + 8);
+  assert.equal(textures(code), 1 + 8);
+  assert.equal(distinct.packedBase, true);
+  for (let slot = 0; slot < 5; slot++) assert.match(code, new RegExp('margoBaseSample\\(' + slot + ','));
+  for (let binding = 0; binding < 8; binding++) assert.ok(code.includes('var margoMap' + binding + ':texture_2d<f32>'));
   assert.match(
     code,
     /s\.ir=vec4f\(margoIridescence\([^;]*vec4f\(1\)\.g\),f\.iri\.y\),f\.iri\.x\*vec4f\(1\)\.r\)/,
@@ -227,7 +291,7 @@ test('binding plan: shared glTF textures bind once, at most 8 extension textures
   assert.equal(extendedShader(distinct), code, 'cached per plan');
 });
 
-test('extended shaders: hook points once, only used features compiled, worst case 16 sampled textures with shadows, IBL and LocalShadows', async () => {
+test('extended shaders: hook points once, only used features compiled, worst case 12 sampled textures reserves units for compatibility storage and shadow aliases', async () => {
   const points = [
     'direct+ambient(s)',
     'var color=',
@@ -282,11 +346,11 @@ test('extended shaders: hook points once, only used features compiled, worst cas
     ),
   );
   const lit = [shadows.pbr(2), clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, worst);
-  assert.equal(textures(lit), 16, 'worst case: 13 material + shadow cascades + IBL cube + local shadow atlas');
+  assert.equal(textures(lit), 12, 'worst case: 9 material + shadow cascades + IBL cube + local shadow atlas');
   assert.equal(
     textures([shadows.pbr(2), clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, physicalShader())),
     16,
-    'the physical variant is at the same ceiling',
+    'the raw physical source contract retains its original separate bindings',
   );
   // Layered hooks: the ambient hook becomes margoAmbientTerm, local lights margoLocal0 on the transmitted-out surface.
   assert.match(lit, /fn margoAmbientTerm\(i:Out,s:Surface,v:vec3f\)->vec3f \{return iblShade\(/);
@@ -385,7 +449,13 @@ test('EXT_materials_bump: the height map takes slot 18, its factor and space the
     },
   );
   const m = model.primitives[0].material;
-  assert.deepEqual(m.extended, { iridescence: false, anisotropy: false, diffuseTransmission: false, bump: true, scatter: false });
+  assert.deepEqual(m.extended, {
+    iridescence: false,
+    anisotropy: false,
+    diffuseTransmission: false,
+    bump: true,
+    scatter: false,
+  });
   assert.equal(m.maps[18].index, 0);
   const log = gpu.record(() => {
     view.begin(0);
@@ -402,7 +472,10 @@ test('EXT_materials_bump: the height map takes slot 18, its factor and space the
   model.dispose();
   engine.dispose();
   assert.equal(extendedShader(extendedPlan([], { ...features, bump: false })).includes('margoBumpGradient'), false);
-  assert.notEqual(extendedShader(extendedPlan([], { ...features, bump: true, scatter: false })), extendedShader(extendedPlan([], features)));
+  assert.notEqual(
+    extendedShader(extendedPlan([], { ...features, bump: true, scatter: false })),
+    extendedShader(extendedPlan([], features)),
+  );
 });
 
 test('EXT_materials_bump: no texture or a zero factor is no bump, a bad height space or factor is refused', () => {
@@ -507,8 +580,10 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   let log = draw();
   const pipelines = log.filter((e) => e[0] === 'renderPipeline'),
     passes = log.filter((e) => e[0].startsWith('pass.')).map((e) => (e[0] === 'pass.setPipeline' ? e[1] : e[0]));
-  assert.equal(log.find((e) => e[0] === 'module')[2].code,
-    viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(model.primitives[0].material.maps)))));
+  assert.equal(
+    log.find((e) => e[0] === 'module')[2].code,
+    viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(model.primitives[0].material.maps)))),
+  );
   assert.deepEqual(
     pipelines.map((e) => [e[2].fragment.entryPoint, e[2].fragment.targets[0].blend.color]),
     [
@@ -523,7 +598,12 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   const write = log.find((e) => e[0] === 'writeBuffer'),
     values = new Float32Array(write[2] / 4 + floatsOf(write[3]).length);
   values.set(floatsOf(write[3]), write[2] / 4);
-  near([values[98], values[99], values[102]], [1, 1, 1], 1e-6, 'tint lanes: volume attenuation alone, the rest comes from the surface');
+  near(
+    [values[98], values[99], values[102]],
+    [1, 1, 1],
+    1e-6,
+    'tint lanes: volume attenuation alone, the rest comes from the surface',
+  );
   ibl.applyTo(model);
   log = draw();
   const code = log.find((e) => e[0] === 'module')[2].code;
@@ -575,7 +655,13 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   const frame = model['resources'].find((r) => r.primitive === p).uniform.contents;
   assert.deepEqual(Array.from(frame.slice(76, 80)), [1, 0, 0, 1], 'primitive 0 draws red');
   model.selectVariant(1);
-  assert.deepEqual(p.material.extended, { iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false });
+  assert.deepEqual(p.material.extended, {
+    iridescence: true,
+    anisotropy: false,
+    diffuseTransmission: false,
+    bump: false,
+    scatter: false,
+  });
   const log = draw();
   assert.equal(
     model['resources'].find((r) => r.primitive === p).uniform.binding.size,
@@ -590,7 +676,10 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   assert.equal(log.filter((e) => e[0] === 'pass.drawIndexed').length, 3);
   model.selectVariant();
   assert.equal(model.selectedVariant, undefined);
-  assert.ok([model.root, ...model.nodes].every((mesh) => model.ownedMeshes.includes(mesh)), 'ownedMeshes has what the model made');
+  assert.ok(
+    [model.root, ...model.nodes].every((mesh) => model.ownedMeshes.includes(mesh)),
+    'ownedMeshes has what the model made',
+  );
   assert.equal(p.material, own);
   assert.equal(model.primitives[1].material, model.primitives[1].material, 'unmapped primitives keep theirs');
   assert.throws(() => model.selectVariant('Blue'), {
@@ -618,14 +707,26 @@ test('Khronos samples: extended materials and variants parse as their files decl
       [...lampExtended].sort(),
       [
         JSON.stringify([null, false]),
-        JSON.stringify([{ iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false }, false]),
-        JSON.stringify([{ iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false }, true]),
+        JSON.stringify([
+          { iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false },
+          false,
+        ]),
+        JSON.stringify([
+          { iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false },
+          true,
+        ]),
       ],
       'plain, iridescent, and iridescent transmissive glass',
     );
     const barn = await load(await headless(), 'AnisotropyBarnLamp/AnisotropyBarnLamp.glb'),
       metal = barn.primitives.find((p) => p.material.name === 'Lamp Metal').material;
-    assert.deepEqual(metal.extended, { iridescence: false, anisotropy: true, diffuseTransmission: false, bump: false, scatter: false });
+    assert.deepEqual(metal.extended, {
+      iridescence: false,
+      anisotropy: true,
+      diffuseTransmission: false,
+      bump: false,
+      scatter: false,
+    });
     assert.deepEqual(
       extendedPlan(metal.maps, metal.extended).slots.slice(5),
       [-1, -1, 0, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1],

@@ -4,6 +4,7 @@
 
 ```ts
 export interface ExtendedPlan {
+    readonly packedBase?: boolean;
     readonly specularGlossiness?: boolean;
     readonly slots: readonly number[];
     readonly iridescence: boolean;
