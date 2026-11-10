@@ -162,6 +162,10 @@
     "./xml": {
       "types": "./dist/xml.d.ts",
       "import": "./dist/xml.js"
+    },
+    "./vtk-legacy": {
+      "types": "./dist/vtk-legacy.d.ts",
+      "import": "./dist/vtk-legacy.js"
     }
   },
   "files": [

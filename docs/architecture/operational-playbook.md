@@ -5969,3 +5969,5 @@ Batch 219 job 1, section 5 evidence: optional geometry/nurbs-edit runs entirely 
 
 
 Batch 224 repair evidence: independent edge closure, signed volume, UV/source correspondence and downstream boolean checks cover soup normalization, parity orientation, disconnected fan splitting and cavity nesting. Existing strict polygon validation runs on owned compacted output. Nonfinite unused input positions are removed before the strict hole filler, rather than bypassing validation. Browser presentation covers native and compatibility devices; no GPU math or renderer code changed.
+### 5. Legacy VTK topology and surfaces (batch 202)
+The optional legacy reader shares package-local numeric and surface building modules with the previous root and XML readers. CPU evidence compares structured grid and outer-face topology and source-cell mapping exactly; the loader GPU fixture checks the resulting surface still renders on each backend. This factors existing math without changing its formulas. Legacy integer precision loss now rejects with a tested coded error.

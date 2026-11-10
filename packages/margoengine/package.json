@@ -4189,6 +4189,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./loaders/vtk-legacy": {
+      "types": "./dist/loaders/vtk-legacy.d.ts",
+      "import": "./dist/loaders/vtk-legacy.js"
     }
   },
   "dependencies": {

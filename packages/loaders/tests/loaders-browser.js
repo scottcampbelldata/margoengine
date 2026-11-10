@@ -4,6 +4,7 @@ import { createMeshes, load, parse3MF, LoaderError } from '@margoengine/loaders'
 import { parseLottie } from '@margoengine/loaders/lottie';
 import { parsePLY } from '@margoengine/loaders/ply';
 import { parseOFF } from '@margoengine/loaders/off';
+import { parseVTKLegacy } from '@margoengine/loaders/vtk-legacy';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -48,6 +49,17 @@ window.runLoaderTests = async () => {
     scene.dispose();
   }
   checks.push('PLY and OFF face color groups create and render engine meshes');
+  const vtk = parseVTKLegacy(
+    new TextEncoder().encode(
+      '# vtk DataFile Version 3.0\nlegacy cells\nASCII\nDATASET POLYDATA\nPOINTS 3 float\n0 0 0 1 0 0 0 1 0\nVERTICES 1 2\n1 2\nLINES 1 3\n2 0 1\nPOLYGONS 1 4\n3 0 1 2\nCELL_DATA 3\nSCALARS pressure double\nLOOKUP_TABLE default\n10 20 30\n',
+    ),
+  );
+  assert(vtk.vertices[0] === 2 && vtk.lines.length === 2 && vtk.triangleCells[0] === 2, 'VTK source cells survive');
+  assert(vtk.cellData.pressure.values[2] === 30, 'VTK cell data addresses the rendered surface');
+  const vtkScene = createMeshes(engine, vtk);
+  engine.render();
+  vtkScene.dispose();
+  checks.push('Legacy VTK vertex/line topology and cell data survive surface rendering');
   const result = await load('/tests/fixtures/face_colors.3mf', parse3MF, { maxBytes: 1 << 20 });
   assert(result.groups.length === 5, `expected 5 color groups, got ${result.groups.length}`);
   checks.push('load() + parse3MF in the browser (DecompressionStream deflate-raw)');

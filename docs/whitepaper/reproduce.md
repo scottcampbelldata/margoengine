@@ -3039,3 +3039,5 @@ Batch 219 job 1: after building packages, run `node --test --test-timeout=120000
 
 ### Batch 224 mesh repair
 Run npm run build:packages, then node --test --test-timeout=120000 packages/mesh-edit/tests/repair.test.js. The nine fixtures cover dirty soups through exact boolean consumption, hole defaults/limits, invalid/duplicate/non-manifold pieces, disconnected vertex fans, cavity nesting, non-chaining welds, concave polygons and nonorientable strips. The package browser runner and its --compat variant draw a repaired cube after one missing face and one winding reversal. Synthetic correctness fixtures introduce no asset licence or demo claim.
+### Batch 202 legacy VTK
+Run the built loaders' `vtk-legacy.test.js`, existing `vtk-xml*.test.js` and loader suite with Node's test timeout. `test-browser.js` also verifies mixed legacy cells and their cell data before rendering the extracted surface with createMeshes, on WebGPU and `--compat`. No external rival implementation is imported.

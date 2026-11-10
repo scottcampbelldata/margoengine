@@ -403,3 +403,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/mesh-edit: document repairMesh soup input, exact/distance welding, reported removals, winding/fan policy, hole limits, cavity orientation, corner UV reset, provenance, readyForBoolean meaning and cancellation (batch 224 job 3).
 - margoengine: document mesh-edit/repair alias in the README phase (batch 224 job 3).
+- @margoengine/loaders (batch 202 job 2): document /vtk-legacy, all five datasets, preserved topology, line/vertex/triangle source cells, point/cell/global data, bounds and outer/all surface policy; examples deferred.
+- margoengine (batch 202 job 2): document loaders/vtk-legacy and the regenerated selection/hit-details alias for the already-landed picking entry.
