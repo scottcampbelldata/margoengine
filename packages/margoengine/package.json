@@ -2434,6 +2434,10 @@
       "types": "./dist/procedural/caves.d.ts",
       "import": "./dist/procedural/caves.js"
     },
+    "./procedural/tree-mesh": {
+      "types": "./dist/procedural/tree-mesh.d.ts",
+      "import": "./dist/procedural/tree-mesh.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"

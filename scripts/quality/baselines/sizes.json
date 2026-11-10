@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12594487,
+  "total": 12599163,
   "history": [
     {
       "date": "2026-10-24",
@@ -6214,6 +6214,12 @@
       "commit": "batch-220-job-2",
       "reason": "New optional math/curve entry: 0 to 2403 B gzip, four interpolation modes, editable curves, channel sets and reusable packed results. A split would duplicate validation and key semantics.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-230",
+      "reason": "New optional procedural/tree-mesh entry: 0 to 4420 B gzip for full skeleton meshing and parameter controls; no core or stage change",
+      "grew": 1
     }
   ],
   "items": {
@@ -7334,6 +7340,7 @@
     "margoengine/game": 996,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/math/curve": 2659
+    "@margoengine/math/curve": 2659,
+    "@margoengine/procedural/tree-mesh": 4676
   }
 }
