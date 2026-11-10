@@ -4,6 +4,8 @@ import { chartDataAdapters } from './chart-data.js';
 import { figureAtCanvas, registerFigureCleanup } from './publication-labels.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { multiplyMatrices, projectPoint } from '@margoengine/math/mat4';
+import type { Engine } from '@margoengine/core/extension';
+import { reducedMotionFigures } from './motion-state.js';
 
 /** A native or application-defined row, in data units. */
 export interface AccessibleDatum {
@@ -706,29 +708,45 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
   const reduced = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
   const contrast =
     typeof matchMedia === 'function' ? matchMedia('(prefers-contrast: more), (forced-colors: active)') : undefined;
+  const engine = figure.engine as unknown as Engine;
+  const suspended = () => false;
+  let motionApplied = false, originalPace: Engine['pace'];
+  const restoreMotion = () => {
+    if (!motionApplied) return;
+    reducedMotionFigures.delete(figure);
+    if (engine.pace === suspended) engine.pace = originalPace;
+    motionApplied = false;
+  };
   const motion = () => {
-    if (options.reducedMotion ?? reduced?.matches) {
-      figure.pause();
-      figure.engine.stop();
-      root.dataset.reducedMotion = 'true';
-    } else root.dataset.reducedMotion = 'false';
+    const active = options.reducedMotion ?? reduced?.matches ?? false;
+    if (active && !motionApplied) {
+      originalPace = engine.pace;
+      engine.pace = suspended;
+      reducedMotionFigures.add(figure);
+      motionApplied = true;
+    } else if (!active) restoreMotion();
+    root.dataset.reducedMotion = String(active);
   };
   motion();
   if (reduced) on(reduced, 'change', motion as EventListener);
-  const originalTheme = { ...figure.theme };
+  let originalTheme = { ...figure.theme };
   let contrastApplied = false;
+  const applyTheme = (theme: Theme) => {
+    void figure.setTheme(theme).then(
+      () => {
+        if (!disposed) figure.render();
+      },
+      (e) => {
+        if (!disposed) live.textContent = `Theme update failed: ${String(e)}`;
+      },
+    );
+  };
   const useContrast = () => {
     const active = options.highContrast ?? contrast?.matches ?? false;
+    if (active && !contrastApplied) originalTheme = { ...figure.theme };
     if (active || contrastApplied) {
       contrastApplied = active;
-      void figure.setTheme(active ? HIGH_CONTRAST_THEME : originalTheme).then(
-        () => {
-          if (!disposed) figure.render();
-        },
-        (e) => {
-          if (!disposed) live.textContent = `Theme update failed: ${String(e)}`;
-        },
-      );
+      applyTheme(active ? HIGH_CONTRAST_THEME : originalTheme);
     }
   };
   useContrast();
@@ -737,6 +755,11 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
   function dispose(reason: unknown = new DOMException('Figure data view disposed', 'AbortError')) {
     if (disposed) return;
     disposed = true;
+    restoreMotion();
+    if (contrastApplied) {
+      contrastApplied = false;
+      applyTheme(originalTheme);
+    }
     views.delete(figure);
     controller.abort(reason);
     audio?.abort(controller.signal.reason);

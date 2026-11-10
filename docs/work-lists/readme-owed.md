@@ -1,5 +1,7 @@
 # README work owed
 
+- @margoengine/sciviz (review M3): document reversible contrast and reduced-motion suspension, retained playback cancellation, and preservation of stopped engines.
+
 - @margoengine/sciviz (review M1): document automatic GPU picking synchronization of in-place position and rectangle edits.
 
 - @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase.

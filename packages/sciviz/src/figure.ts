@@ -22,6 +22,7 @@ import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } 
 import { packColour, RectsLayer } from './rects.js';
 import { formatValue } from './ticks.js';
 import { Timeline, type TimelineFrame, type PlayOptions, type TimelineOptions } from './timeline.js';
+import { timelineFigures } from './motion-state.js';
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
@@ -1786,6 +1787,7 @@ export class Figure extends EventTarget {
       options,
     );
     this.#timeline = timeline;
+    timelineFigures.set(timeline, this);
     timeline.seek(0).catch(reportError);
     return timeline;
   }

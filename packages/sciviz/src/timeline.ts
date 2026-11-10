@@ -4,6 +4,7 @@
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { Theme } from './axes.js';
 import { formatValue } from './ticks.js';
+import { reducedMotionFigures, timelineFigures } from './motion-state.js';
 
 /** Shows one frame: update your layers for frame `index` at `time`. May return a promise; playback waits for it. */
 export type TimelineFrame = (index: number, time: number) => void | Promise<void>;
@@ -185,6 +186,11 @@ export class Timeline extends EventTarget {
           await this.#queue;
           if (stopped) return;
           next = this.#index < 0 || this.#index >= last ? 0 : this.#index + 1;
+        }
+        const owner = timelineFigures.get(this);
+        if (owner && reducedMotionFigures.has(owner)) {
+          timer = setTimeout(step, 1000 / fps);
+          return;
         }
         const started = performance.now();
         try {

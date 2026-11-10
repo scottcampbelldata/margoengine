@@ -130,6 +130,87 @@ function domFixture() {
     },
   };
 }
+
+test('disposing accessibility restores the original theme and frame pacing', async () => {
+  const f = domFixture();
+  try {
+    const theme = { ...f.fig.theme };
+    const pace = () => true;
+    f.engine.pace = pace;
+    const a = attachAccessibility(f.fig, { highContrast: true, reducedMotion: true });
+    await a.ready;
+    assert.deepEqual(f.fig.theme, HIGH_CONTRAST_THEME);
+    a.dispose();
+    await f.fig.ready();
+    assert.deepEqual(f.fig.theme, theme);
+    assert.equal(f.engine.pace, pace);
+    assert.notEqual(f.engine.stopped, true);
+  } finally { f.restore(); }
+});
+
+test('OS preferences restore theme and motion without restarting a stopped engine', async (t) => {
+  const f = domFixture();
+  const queries = [];
+  const savedMedia = globalThis.matchMedia;
+  t.after(() => {
+    if (savedMedia === undefined) delete globalThis.matchMedia;
+    else globalThis.matchMedia = savedMedia;
+  });
+  globalThis.matchMedia = (query) => {
+    const media = new EventTarget();
+    media.matches = false;
+    media.media = query;
+    queries.push(media);
+    return media;
+  };
+  try {
+    f.engine.stop();
+    const theme = { ...f.fig.theme };
+    const a = attachAccessibility(f.fig);
+    await a.ready;
+    for (const q of queries) { q.matches = true; q.dispatchEvent(new Event('change')); }
+    await f.fig.ready();
+    assert.deepEqual(f.fig.theme, HIGH_CONTRAST_THEME);
+    for (const q of queries) { q.matches = false; q.dispatchEvent(new Event('change')); }
+    await f.fig.ready();
+    assert.deepEqual(f.fig.theme, theme);
+    assert.equal(f.engine.pace, undefined);
+    assert.equal(f.engine.stopped, true);
+    a.dispose();
+  } finally { f.restore(); }
+});
+
+test('reduced motion suspends timeline frames while preserving playback and cancellation', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const savedReport = globalThis.reportError;
+  globalThis.reportError = (e) => { throw e; };
+  t.after(() => {
+    if (savedReport === undefined) delete globalThis.reportError;
+    else globalThis.reportError = savedReport;
+  });
+  const f = domFixture();
+  try {
+    let frames = 0;
+    const timeline = f.fig.timeline([0, 1, 2], () => { frames++; }, { controls: false });
+    await timeline.seek(0);
+    const before = frames;
+    const abort = new AbortController();
+    const playback = f.fig.play({ loop: true, fps: 10, signal: abort.signal });
+    const a = attachAccessibility(f.fig, { reducedMotion: true });
+    await a.ready;
+    t.mock.timers.tick(100);
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.equal(frames, before);
+    assert.equal(timeline.playing, true);
+    a.dispose();
+    t.mock.timers.tick(100);
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.ok(frames > before);
+    const reason = new Error('stop restored playback');
+    abort.abort(reason);
+    await assert.rejects(playback, (e) => e === reason);
+  } finally { f.restore(); }
+});
 test('keyboard movement, full table paging, live descriptions, weak discovery and figure-owned cleanup', async () => {
   const f = domFixture();
   try {
@@ -143,7 +224,7 @@ test('keyboard movement, full table paging, live descriptions, weak discovery an
     });
     await a.refresh();
     assert.equal(figureForCanvas(f.canvas), f.fig);
-    assert.ok(f.engine.stopped);
+    assert.equal(f.engine.pace(0), false);
     assert.match(a.element.textContent, /5 series records/);
     assert.match(a.element.textContent, /Trend rising/);
     const key = (k) =>
