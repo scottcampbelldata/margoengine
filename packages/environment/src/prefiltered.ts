@@ -68,9 +68,15 @@ const bytes = (data: ArrayBuffer | ArrayBufferView) =>
   data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
 const view = (data: Uint8Array) => new DataView(data.buffer, data.byteOffset, data.byteLength);
 
-function validate(data: PrefilteredIBL): void {
+function validate(data: PrefilteredIBL): number {
   if (!power(data.size) || !power(data.specularSize) || data.specularSize > data.size)
     throw new RangeError('Invalid baked cube edge; use powers of two up to 16384 with specularSize <= size');
+  if (!(data.brdf instanceof Uint32Array) || !lutEdge(Math.sqrt(data.brdf.length))) fail();
+  // Six RGBA16F faces, including every source mip: 48 * (4 * size^2 - 1) / 3 bytes.
+  // KTX2 counts the length word and padding in its u32 kvdByteLength, not only the payload.
+  const payloadLength = 240 + data.brdf.byteLength + 16 * (4 * data.size ** 2 - 1);
+  if (4 + align(key.length + payloadLength) > 0xffffffff)
+    throw new RangeError('KTX2 metadata exceeds the 32-bit byte length limit; use a smaller source cube');
   for (const [edge, mips, full] of [
     [data.size, data.cube, true],
     [data.specularSize, data.specular, false],
@@ -79,10 +85,10 @@ function validate(data: PrefilteredIBL): void {
     for (let m = 0; m < mips.length; m++)
       if (!(mips[m] instanceof Uint16Array) || mips[m].length !== (edge >> m) ** 2 * 24) fail();
   }
-  if (!(data.brdf instanceof Uint32Array) || !lutEdge(Math.sqrt(data.brdf.length))) fail();
   for (const sh of [data.radiance, data.irradiance])
     if (!(sh instanceof Float32Array) || sh.length !== 27 || !sh.every(Number.isFinite)) fail();
   if (!Number.isFinite(data.rotation) || !Number.isFinite(data.intensity) || data.intensity < 0) fail();
+  return payloadLength;
 }
 
 // Khronos basic DFD: RGBSDA, BT.709 primaries, linear transfer, one 8-byte texel, four signed float samples.
@@ -107,11 +113,10 @@ function dfd(): Uint8Array {
 
 /** Encode a baked environment as uncompressed, linear RGBA16F KTX2. Every saved GPU bit is retained. */
 export function encodePrefilteredIBL(data: PrefilteredIBL): Uint8Array {
-  validate(data);
+  const payloadLength = validate(data);
   const count = data.specular.length,
     dfdOffset = 80 + 24 * count,
     kvOffset = dfdOffset + 92;
-  const payloadLength = 24 + 216 + data.brdf.byteLength + data.cube.reduce((sum, mip) => sum + mip.byteLength, 0);
   const kvLength = 4 + align(key.length + payloadLength);
   let end = align(kvOffset + kvLength, 8);
   const offsets = new Array<number>(count);

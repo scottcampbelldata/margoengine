@@ -18,6 +18,27 @@ const make = () => ({
   intensity: 2,
 });
 
+test('KTX2 metadata overflow is rejected from dimensions before reading or allocating cube mips', () => {
+  const mipAccess = new Error('mip data must not be read for an unrepresentable KTX2');
+  for (const size of [8192, 16384, 4096]) {
+    const data = {
+      ...make(),
+      size,
+      specularSize: 1,
+      brdf: new Uint32Array(1),
+      get cube() {
+        throw mipAccess;
+      },
+    };
+    if (size === 4096) assert.throws(() => encodePrefilteredIBL(data), (error) => error === mipAccess);
+    else
+      assert.throws(() => encodePrefilteredIBL(data), {
+        name: 'RangeError',
+        message: /KTX2 metadata exceeds the 32-bit byte length limit/,
+      });
+  }
+});
+
 test('KTX2 baked IBL preserves every source/specular mip, LUT, SH and metadata bit', () => {
   const data = make(),
     encoded = encodePrefilteredIBL(data),

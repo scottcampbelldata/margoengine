@@ -8611,3 +8611,7 @@ Build annotation repair sources: Vite Team, Features and Static Asset Handling (
 ### Review 5 biased implicit sampling (2026-11-10)
 
 Compared WGSL textureSampleBias (Baker, Derin and Neto, W3C, 2026), GLSL ES 3.00 section 8.8 (Simpson and Kessenich, Khronos, 2016), and WebGPU sampler precision (Ninomiya, Jones and Blandy, W3C, 2026). Full titles, links, rationale and reproducible evidence: [review5-compat-bias.md](review5-compat-bias.md). Clean-room implementation; no companion or other repository code read.
+
+### Prefiltered IBL metadata capacity (2026-11-10)
+
+Compared Mark Callow (editor), Khronos Group, *KTX File Format Specification*, version 2.0.4 (2025), sections 3.9.4 and 3.11, https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html, with Ecma International TC39, *ECMAScript Language Specification* (2026), DataView.prototype.setUint32 and ToUint32, https://tc39.es/ecma262/multipage/structured-data.html#sec-dataview.prototype.setuint32. KTX requires a u32 total including length words and padding; ECMAScript writing does not reject an overflowing value. The checked dimension sum combines those requirements before allocating the encoded file. The six-face RGBA16F full mip chain has 16 * (4 * edge^2 - 1) bytes. No external implementation or companion source was read or copied.

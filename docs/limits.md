@@ -6593,3 +6593,7 @@ The eleven optional product-viewer packages, including PostStack, compose with R
 Biased and unbiased implicit texture requests retain hardware filtering and footprint selection. Shader mip interpolation covers explicit levels and gradients only. Exact native bits are proven for the committed 20-probe bias fixture on RTX A6000, ANGLE D3D11 and Vulkan; no universal GPU filtering claim. See [methods and reproduction](review5-compat-bias.md).
 
 Notebook/share backend ownership (review5, 2026-11-10): the isolated sciviz entries use the installed backend in auto mode and require prepareBackend for explicit WebGL2. The forwarding margoengine and viz entries have the same contract; Python and offline bundled runtimes retain their existing lazy setup. See docs/guides/sciviz-notebooks.md.
+
+### Prefiltered IBL metadata capacity (2026-11-10)
+
+The optional environment/prefiltered encoder refuses KTX2 key/value data above 4,294,967,295 bytes with RangeError before reading cube mips or allocating output. The total includes the metadata length word, key, payload and padding. A complete 8192-edge source cube needs at least 4,294,967,548 metadata bytes, even with a 1x1 BRDF LUT; 8192 and 16384 source edges cannot be saved in this lossless embedded-source format. Source edges through 4096 remain representable with every supported LUT edge (1..4096); this is a format capacity statement, not a promise of available memory or device support. Specular level byte offsets remain u64.
