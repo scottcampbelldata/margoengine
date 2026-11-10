@@ -19,7 +19,7 @@ export interface ProjectionOptions {
   /** Eye-space clip distances, may be negative. Default: camera.far deep, centred on the target. */
   near?: number;
   far?: number;
-  /** Screen up for exactly vertical views; needs a horizontal component. Default [0,0,-1]: north up looking down. */
+  /** Screen up when the view is parallel to camera world up; must not be parallel to that view. Default [0,0,-1]. */
   up?: Vec3;
   /** Render only a sub-rectangle of a larger frustum; see `ViewOffset`. Default: none, the whole frustum. */
   viewOffset?: ViewOffset;
@@ -351,10 +351,15 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       x = p[0] - t[0],
       y = p[1] - t[1],
       z = p[2] - t[2];
-    if (Math.hypot(x, z) > VERTICAL * Math.hypot(x, y, z)) return this.worldUp;
+    const w = this.worldUp,
+      side = (u: readonly number[]) => Math.hypot(u[1] * z - u[2] * y, u[2] * x - u[0] * z, u[0] * y - u[1] * x),
+      threshold = VERTICAL * Math.hypot(x, y, z);
+    if (!w.every(Number.isFinite) || !(Math.hypot(...w) > 0))
+      throw new RangeError('Invalid world up; set camera.up to a finite nonzero direction');
+    if (side(w) > threshold * Math.hypot(...w)) return w;
     const u = this.up;
-    if (!(Math.hypot(u[0], u[2]) > 0) || !Number.isFinite(u[1]))
-      throw new RangeError('Invalid vertical up; set up to a finite vector that is not parallel to the Y axis');
+    if (!u.every(Number.isFinite) || !(side(u) > threshold * Math.hypot(...u)))
+      throw new RangeError('Invalid vertical up; set up to a finite vector that is not parallel to the view axis');
     return u;
   }
   private vfov(camera: Camera, aspect: number): number {

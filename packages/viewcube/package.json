@@ -29,6 +29,10 @@
     "./axes": {
       "types": "./dist/axes.d.ts",
       "import": "./dist/axes.js"
+    },
+    "./up": {
+      "types": "./dist/up.d.ts",
+      "import": "./dist/up.js"
     }
   },
   "files": [

@@ -126,6 +126,12 @@ try {
   await page.mouse.click(ballX.x, ballX.y);
   near((await page.evaluate(() => window.check.settle())).direction, [1, 0, 0], 'X ball click', 1e-6);
   console.log('ok axis triad');
+  await page.evaluate(() => window.check.upCube());
+  near((await page.evaluate(() => window.check.settle())).up, [0, 0, 1], 'Z-up front screen up');
+  near((await click('0,1,1')).direction, [0, -s2, s2], 'Z-up front-top edge');
+  near((await click('0,1,0')).direction, [0, 0, 1], 'Z-up top face', 1e-5);
+  near((await page.evaluate(() => window.check.settle())).up, [0, 1, 0], 'Z-up pole screen up');
+  console.log('ok Z-up CSS hit testing and rendered pole');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
 } finally {

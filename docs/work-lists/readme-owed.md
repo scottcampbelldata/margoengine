@@ -781,3 +781,9 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - `margoengine` (batch 213 job 5): document the generated rigging/pose-tracking alias in README phase.
 - @margoengine/water and margoengine (batch 235 job 1): cover /ripples attachment, drops, swept boat/character wakes, camera following, query/capture composition, defaults, limits, cancellation and disposal; examples deferred.
 - @margoengine/lod (batch 222 job 3): document static/animated imposter LODFade, native/full compatibility, reverse/null/interrupted transitions, sequence ownership and target-only shadows/masks; examples deferred.
+
+
+
+- @margoengine/viewcube (batch 198 job 1): document /up UpViewCube, up/front defaults, widget tuple directions, world home poses, frame conversion, pole and control conventions.
+- margoengine (batch 198 job 1): document viewcube/up forwarding.
+- @margoengine/cameras (batch 198 job 1): document that pole detection follows camera world up and that projection.up must be nonparallel to the view axis.

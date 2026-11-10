@@ -195,6 +195,14 @@ let count = 0;
  * `@margoengine/controls` OrbitControls (they read the camera each frame), and toggles a `@margoengine/cameras` projection.
  */
 export class ViewCube {
+  /** Converts a world direction to the widget frame. Optional entries may supply a different frame. */
+  protected local(direction: readonly number[]): readonly number[] {
+    return direction;
+  }
+  /** Converts a widget direction to world space. Inverse of {@link local}. */
+  protected world(direction: readonly number[]): readonly number[] {
+    return direction;
+  }
   /** The widget root; style or move it as you like. */
   readonly element: HTMLDivElement;
   readonly camera: Camera;
@@ -449,7 +457,7 @@ export class ViewCube {
   home(duration = this.duration): void {
     const h = this.homeView;
     if (!h) return this.view('iso', duration);
-    const d = h.position.map((x, i) => x - h.target[i]);
+    const d = this.local(h.position.map((x, i) => x - h.target[i]));
     this.orbit(...angles(d), duration, h.target, Math.hypot(...d));
   }
   /**
@@ -523,12 +531,12 @@ export class ViewCube {
     if (this.toggle && this.toggle.getAttribute('aria-pressed') !== String(this.projection!.mode === 'orthographic'))
       this.showProjection();
     const c = this.camera,
-      z = c.position.map((x, i) => x - c.target[i]),
+      z = this.local(c.position.map((x, i) => x - c.target[i])),
       l = Math.hypot(...z);
     if (!l) return;
     // Core's view rotation: right = up x back, then up' = back x right (camera.up is +Y unless an app changed it).
     const [zx, zy, zz] = z.map((x) => x / l),
-      u = c.up ?? [0, 1, 0],
+      u = this.local(c.up ?? [0, 1, 0]),
       r = [u[1] * zz - u[2] * zy, u[2] * zx - u[0] * zz, u[0] * zy - u[1] * zx],
       s = Math.hypot(...r);
     const [xx, xy, xz] = s ? r.map((x) => x / s) : [1, 0, 0],
@@ -548,7 +556,7 @@ export class ViewCube {
     const c = this.camera;
     if (this.upSet && c.up === this.upSet) {
       const [theta, phi] = this.current(),
-        d = c.position.map((x, i) => x - c.target[i]);
+        d = this.local(c.position.map((x, i) => x - c.target[i]));
       c.up = this.upPrev!;
       if (!d[0] && !d[2]) this.place(theta, phi ? Math.PI - 1e-6 : 1e-6, Math.hypot(...d));
     }
@@ -570,13 +578,14 @@ export class ViewCube {
   private place(theta: number, phi: number, r: number): V3 {
     const p = this.camera.target,
       pole = phi < POLE ? 1 : phi > Math.PI - POLE ? -1 : 0;
-    return (this.camera.position = pole
-      ? [p[0], p[1] + pole * r, p[2]]
+    const d = this.world(pole
+      ? [0, pole * r, 0]
       : [
-          p[0] + r * Math.sin(phi) * Math.sin(theta),
-          p[1] + r * Math.cos(phi),
-          p[2] + r * Math.sin(phi) * Math.cos(theta),
+          r * Math.sin(phi) * Math.sin(theta),
+          r * Math.cos(phi),
+          r * Math.sin(phi) * Math.cos(theta),
         ]);
+    return (this.camera.position = d.map((x, i) => p[i] + x) as V3);
   }
   /**
    * Core rejects an up parallel to the view. On an exactly vertical view the cube sets camera.up to the screen up the
@@ -587,22 +596,24 @@ export class ViewCube {
    */
   private pole(theta?: number): void {
     const c = this.camera,
-      d = c.position.map((x, i) => x - c.target[i]);
+      direction = c.position.map((x, i) => x - c.target[i]),
+      d = this.local(direction);
     if (this.upSet && c.up !== this.upSet) {
       this.upSet = undefined;
       this.twist = 0;
     }
-    const app = this.upSet ? this.upPrev! : c.up;
-    let n: readonly number[] = app;
+    const app = this.upSet ? this.upPrev! : c.up,
+      up = this.local(app);
+    let n: readonly number[] = up;
     if (!d[0] && !d[2] && d[1]) {
       if (theta === undefined) return;
       const k = Math.sign(d[1]);
-      if (this.upSet || !Math.hypot(app[0], app[2])) {
+      if (this.upSet || !Math.hypot(up[0], up[2])) {
         n = [-k * Math.sin(theta), 0, -k * Math.cos(theta)];
         this.az = theta;
-      } else this.az = Math.atan2(-k * app[0], -k * app[2]);
+      } else this.az = Math.atan2(-k * up[0], -k * up[2]);
     }
-    if (n === app && !this.twist) {
+    if (n === up && !this.twist) {
       if (this.upSet) {
         c.up = app;
         this.upSet = undefined;
@@ -613,13 +624,13 @@ export class ViewCube {
       this.upPrev = c.up;
       c.up = this.upSet = [0, 0, 0];
     }
-    rotate(this.upSet, n, d, -this.twist);
+    rotate(this.upSet, this.world(n), direction, -this.twist);
   }
   /** Azimuth and polar angle of the camera; on the pole the azimuth of the up the cube set, else of camera.up (the screen up). */
   private current(): [number, number] {
     const c = this.camera,
-      d = c.position.map((x, i) => x - c.target[i]),
-      u = c.up,
+      d = this.local(c.position.map((x, i) => x - c.target[i])),
+      u = this.local(c.up),
       a = angles(d);
     if (!d[0] && !d[2] && d[1])
       if (this.upSet && u === this.upSet) a[0] = this.az;
@@ -671,7 +682,7 @@ export class ViewCube {
     if (target.dataset.view) {
       const d = target.dataset.view.split(',').map(Number) as V3,
         c = this.camera,
-        o = c.position.map((x, i) => x - c.target[i]);
+        o = this.local(c.position.map((x, i) => x - c.target[i]));
       // flip: already looking from d (and not mid-animation) turns to -d.
       const same =
         this.flip &&

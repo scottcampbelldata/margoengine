@@ -31,6 +31,8 @@ type View = Face | 'iso' | readonly [number, number, number];
 
 class ViewCube {
     readonly engine: EngineKernel;
+    protected local(direction: readonly number[]): readonly number[];
+    protected world(direction: readonly number[]): readonly number[];
     readonly element: HTMLDivElement;
     readonly camera: Camera;
     duration: number;

@@ -5,16 +5,19 @@ import {CameraProjection} from '/packages/cameras/dist/index.js';
 import {OrbitControls} from '/packages/controls/dist/index.js';
 import {ViewCube} from '/packages/viewcube/dist/index.js';
 import {AxisTriad} from '/packages/viewcube/dist/axes.js';
+import {UpViewCube} from '/packages/viewcube/dist/up.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,10],target:[0,0,0],near:0.1,far:100}}),errors=[];
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 // Red at +X, blue at -Z, green at the origin: top view puts red right of centre and blue above it.
 for(const [color,position] of [['#ff0000',[2,0,0]],['#0000ff',[0,0,-2]],['#00ff00',[0,0,0]]])engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(position);
 const projection=new CameraProjection({mode:'perspective'});engine.use(projection);
-const orbit=new OrbitControls(engine),cube=new ViewCube(engine,{projection,duration:0.25,home:true,roll:true});
+const orbit=new OrbitControls(engine);
+let cube=new ViewCube(engine,{projection,duration:0.25,home:true,roll:true});
 const triad=new AxisTriad(engine,{corner:'bottom-left',duration:0.25});
 engine.start();
 const direction=()=>{const c=engine.camera,d=c.position.map((v,i)=>v-c.target[i]),l=Math.hypot(...d);return d.map(v=>v/l);};
 window.check={
+  upCube(){cube.dispose();triad.dispose();orbit.dispose();engine.camera.position=[0,-10,0];engine.camera.target=[0,0,0];cube=new UpViewCube(engine,{projection,duration:0.25,home:true,roll:true});cube.view('front',0);engine.render();},
   /** Centre of the visible cell for a view, and what the browser hit-tests there. */
   cell(view){
     for(const e of cube.element.querySelectorAll(`[data-view="${view}"]`)){const r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;if(r.width>4&&document.elementFromPoint(x,y)===e)return {x,y};}
