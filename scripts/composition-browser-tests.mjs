@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { pairCoverage } from './support/composition-contracts.mjs';
+import { compatArgs, groupRows, runScene } from './support/composition-run.mjs';
 import { exitOnHelp } from './support/help.mjs';
 
 exitOnHelp(
@@ -21,18 +22,37 @@ const release = await acquire({ owner: 'composition-browser', waitMax: 1 });
 const results = [];
 let browser;
 try {
-  for (const compat of [false, true]) {
-    browser = await openBrowser({ startPath: `/tests/composition/${rows[0].id}.html`, port: 'free', compat });
+  // The compatibility pass opens one browser per ANGLE backend its rows need (support/composition-run.mjs).
+  const passes = [
+    { compat: false, args: [], rows },
+    ...groupRows(rows, (row) => compatArgs(row.members)).map((group) => ({ compat: true, ...group })),
+  ];
+  for (const { compat, args, rows: passRows } of passes) {
+    browser = await openBrowser({
+      startPath: `/tests/composition/${passRows[0].id}.html`,
+      port: 'free',
+      compat,
+      ...(args.length ? { args } : {}),
+    });
     const pageErrors = [];
     browser.page.on('pageerror', (error) => pageErrors.push(error.message));
-    for (const row of rows) {
+    for (const row of passRows) {
       await browser.page.goto(new URL(`/tests/composition/${row.id}.html`, browser.page.url()).href);
       await browser.page.waitForFunction(() => !!window.composition, null, { timeout: 60_000 });
       for (const samples of [1, 4]) {
-        const result = await browser.page.evaluate((samples) => window.composition.run(samples), samples);
+        const page = browser.page;
+        const result = await runScene(() => page.evaluate((samples) => window.composition.run(samples), samples), {
+          label: `${row.id} ${compat ? 'webgl2-compat' : 'webgpu'}${args.length ? ` (${args.join(' ')})` : ''} ${samples}x ${row.members.join('+')}`,
+          probe: () =>
+            page.evaluate(() => JSON.stringify(globalThis.__margoPipelines ?? null)).then((p) => `pipelines ${p}`),
+        });
         assert.deepEqual(result.errors, [], `${row.id} ${row.members.join('+')}`);
         assert.deepEqual(pageErrors, [], `${row.id}: browser error`);
-        results.push({ backend: compat ? 'webgl2-compat' : 'webgpu', ...result });
+        results.push({
+          backend: compat ? 'webgl2-compat' : 'webgpu',
+          ...(args.length ? { browserArgs: args } : {}),
+          ...result,
+        });
         console.log(
           `PASS ${row.id} ${compat ? 'webgl2-compat' : 'webgpu'} ${samples}x ${row.members.join('+') || '(baseline)'}`,
         );

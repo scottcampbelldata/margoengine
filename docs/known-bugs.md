@@ -1774,6 +1774,17 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   staged path loop. Actual GPU output parity and disposal-during-compilation regressions remain required.
 - **Meanwhile:** a page on this route gets the raster view. WebGPU is the route on such a machine where the browser has
   it, and ANGLE Vulkan works.
+- **C2 composition (2026-11-10):** integration row c2-003 (post/FXAA, toon, transitions, scenery/Moon and
+  voxel-pathtracer) never returned on the WebGL2 layer at 1x, and the GPU lease reclaimed the run after 195.7 s idle.
+  Bisected on an RTX A6000 under ANGLE Direct3D 11: voxel-pathtracer alone stalls at `await tracer.ready`, while the
+  other four together pass. Two programs never report `COMPLETION_STATUS_KHR` (45 s, context not lost): the `trace`
+  render pipeline (GLSL vertex 366 and fragment 134,717 bytes; ANGLE HLSL fragment 220,071 bytes, SHA-256 prefix
+  cc09ce32cd70a8b8) and the compute `preview` stand-in (GLSL vertex 70,244 bytes; HLSL 117,960 bytes, 7ca27c68a5387fb6),
+  read back with `WEBGL_debug_shaders`. The same page under `--use-angle=vulkan` on the same GPU passes with the
+  expected probes, so the cause is the native compile above, not an interaction between members. The C2 runner now runs
+  rows with this member on ANGLE Vulkan on Windows, as the tracer's own compatibility checks do, and bounds each scene
+  with `ERR_COMPOSITION_STALL` (docs/integration-composition.md). C2 coverage of the tracer on ANGLE Direct3D 11 stays
+  open with this entry.
 
 ### Three routes still break WebGPU compatibility-level rules
 

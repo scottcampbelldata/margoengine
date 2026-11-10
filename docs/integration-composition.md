@@ -15,7 +15,16 @@ unimplemented target rows are not represented as GPU passes.
 Generated `.html` and `.ts` files live in `tests/composition/`. Regenerate with
 `node scripts/generate-composition.mjs`; the CPU test fails on stale output.
 `npm run test:composition:browser` holds one shared GPU slot and runs one browser
-per backend, with every row at 1x and 4x MSAA. Use `-- --packages=taa,dof` to select
+per backend, with every row at 1x and 4x MSAA. On Windows, compatibility rows that
+hold a member listed in `COMPAT_VULKAN_MEMBERS` (`scripts/support/composition-run.mjs`)
+run in a second compatibility browser on ANGLE Vulkan, as that member's own
+compatibility checks do; the other rows keep ANGLE's default Direct3D 11 backend.
+The one member listed is voxel-pathtracer, whose `trace` program never finishes
+compiling on Direct3D 11 (docs/known-bugs.md, "The path tracer never compiles on
+ANGLE Direct3D 11"). Each scene run has a 150 s limit, under the GPU lease's 3 minute
+idle window: a scene that does not return fails with `ERR_COMPOSITION_STALL`
+naming the row, backend, sample count and the page's pending pipelines, instead of
+holding the slot until the lease reclaims the whole run. Use `-- --packages=taa,dof` to select
 rows containing those packages. `check:gpu-packages` registers it as a ROOT suite;
 affected-GPU footprints include every generated page and the packages it imports.
 
