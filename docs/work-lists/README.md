@@ -6,6 +6,7 @@ Scott is running more than one Claude account at once. The remaining work is spl
 - `list-2.md` and `list-2-prompts.md`: the second account.
 - `list-3.md` and `list-3-prompts.md`: the third account.
 - `list-4.md` and `list-4-prompts.md`: the Mac, after lists 2 and 3 (2026-11-10).
+- `list-5.md` and `list-5-prompts.md`: the Beelink, after list 3 (2026-11-10): AMD GPU bug hunt and packages work together, part 1.
 - `machines.md`: which machine runs which list, and what is different on each.
 
 ## Starting an account
