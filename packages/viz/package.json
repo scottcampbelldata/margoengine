@@ -1735,6 +1735,10 @@
       "types": "./dist/sciviz/temporal.d.ts",
       "import": "./dist/sciviz/temporal.js"
     },
+    "./sciviz/density": {
+      "types": "./dist/sciviz/density.d.ts",
+      "import": "./dist/sciviz/density.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

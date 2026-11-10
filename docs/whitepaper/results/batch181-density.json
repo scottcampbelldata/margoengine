@@ -1,0 +1,243 @@
+{
+  "date": "2026-11-10",
+  "kind": "correctness and pixel comparison only; no timings",
+  "baseCommit": "93b4ce4e5",
+  "entryGzip": 4815,
+  "coreStageGzip": 24209,
+  "visibilityRegression": {
+    "failsBeforeFix": true,
+    "passesAfterFix": true,
+    "cases": [
+      "hidden cloud replaced before preparation",
+      "hidden cloud replaced after preparation"
+    ]
+  },
+  "density": [
+    {
+      "fallback": false,
+      "exactMaximum": 100000,
+      "votes": 100000,
+      "pixels": 3840,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "demo": {
+        "stars": 1000000,
+        "taxi": 1024,
+        "exact": 1024,
+        "sum": 15868.432289659977
+      }
+    },
+    {
+      "fallback": true,
+      "exactMaximum": 100000,
+      "votes": 100000,
+      "pixels": 3840,
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "demo": {
+        "stars": 1000000,
+        "taxi": 1024,
+        "exact": 1024,
+        "sum": 15868.432289659977
+      }
+    }
+  ],
+  "scale": [
+    {
+      "fallback": false,
+      "results": [
+        {
+          "name": "2MASS",
+          "points": 20000000,
+          "votes": 20000000,
+          "sourceBytes": 240000000,
+          "chunks": 20,
+          "maxCount": 16600,
+          "computeRoutes": null
+        },
+        {
+          "name": "NYC TLC",
+          "points": 10000000,
+          "votes": 10000000,
+          "sourceBytes": 120000000,
+          "chunks": 10,
+          "maxCount": 908205,
+          "computeRoutes": null
+        },
+        {
+          "name": "coincident",
+          "points": 16777217,
+          "votes": 16777217
+        }
+      ],
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      }
+    },
+    {
+      "fallback": true,
+      "results": [
+        {
+          "name": "2MASS",
+          "points": 20000000,
+          "votes": 20000000,
+          "sourceBytes": 240000000,
+          "chunks": 20,
+          "maxCount": 16600,
+          "computeRoutes": {
+            "fragment": 0,
+            "scatter": 2,
+            "cpu": 21
+          }
+        },
+        {
+          "name": "NYC TLC",
+          "points": 10000000,
+          "votes": 10000000,
+          "sourceBytes": 120000000,
+          "chunks": 10,
+          "maxCount": 908205,
+          "computeRoutes": {
+            "fragment": 0,
+            "scatter": 2,
+            "cpu": 12
+          }
+        },
+        {
+          "name": "coincident",
+          "points": 16777217,
+          "votes": 16777217
+        }
+      ],
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      }
+    }
+  ],
+  "rivals": {
+    "date": "2026-11-10",
+    "kind": "pixel-only, no timing",
+    "versions": {
+      "regl-scatterplot": "1.16.0",
+      "@deck.gl/core": "9.4.1",
+      "@deck.gl/layers": "9.4.1"
+    },
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "results": [
+      {
+        "rival": "regl-scatterplot",
+        "points": 20000000,
+        "width": 256,
+        "height": 256,
+        "opacity": 0.08,
+        "projection": "same float32 normalized XY; y up; orthographic full window",
+        "pointPolicy": "one-pixel squares, alpha blending enabled, no performance mode",
+        "margoVotes": 20000000,
+        "meanAbsRed": 0.1480712890625,
+        "maxRed": 246,
+        "shareAbove2": 0.002227783203125,
+        "rivalInk": 41427,
+        "margoInk": 41420,
+        "actualCompositedInk": 41420,
+        "margoAnalyticMeanAbsRed": 0
+      },
+      {
+        "rival": "deck.gl",
+        "points": 10000000,
+        "width": 256,
+        "height": 256,
+        "opacity": 0.08,
+        "projection": "same float32 normalized XY; y up; orthographic full window",
+        "pointPolicy": "one-pixel circles, no antialiasing; alpha quantized to u8",
+        "margoVotes": 10000000,
+        "meanAbsRed": 0.0787353515625,
+        "maxRed": 255,
+        "shareAbove2": 0.0017242431640625,
+        "rivalInk": 95,
+        "margoInk": 113,
+        "actualCompositedInk": 113,
+        "margoAnalyticMeanAbsRed": 0
+      }
+    ]
+  },
+  "workingTree": true
+}

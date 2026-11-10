@@ -1309,3 +1309,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz: /temporal source contract, streaming reductions and missingness, interpolation, physical probe charts, numbered/.series readers and time units; NOAA daily and ERA5 six-hour demo.
 - margoengine: generated /sciviz/temporal alias and optional source/probe/chart workflow.
 - @margoengine/viz: generated /sciviz/temporal alias and optional temporal analysis workflow.
+
+- @margoengine/sciviz: cover optional /density all-point integer count opacity, Gaussian bandwidth and clipping, direct arrays/scatter replacement, readback, restore and exact table aggregation; use the attributed 2MASS/TLC demo. Batch 181 job 4, examples remain deferred during build phase.
+- margoengine: document the generated sciviz/density alias and its optional loading behaviour after the build phase (batch 181 job 4).
+- @margoengine/viz: document the generated sciviz/density alias after the build phase (batch 181 job 4).

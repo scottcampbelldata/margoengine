@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Every source counts | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css">
+<style>.views{display:grid;grid-template-columns:1fr 1fr;gap:20px}.views canvas{width:100%;height:400px}label{margin-right:20px}output{display:block;margin:12px 0}@media(max-width:700px){.views{grid-template-columns:1fr}}</style></head>
+<body><header><h1>Every source counts.</h1><p>Pixel counts preserve the full scatter. Gaussian density reveals the shape of crowded regions. Drag to pan; scroll to zoom.</p></header>
+<p><label>View <select id="mode"><option value="count">Pixel counts</option><option value="kernel" selected>Gaussian density</option></select></label>
+<label>Bandwidth <input id="bandwidth" type="range" min="0.5" max="12" step="0.5" value="3"> <span id="sigma">3 pixels</span></label></p>
+<div class="views"><section><h2>2MASS sources</h2><canvas id="stars" aria-label="2MASS right ascension and declination density"></canvas><output id="star-count"></output></section>
+<section><h2>New York taxi pick-ups</h2><canvas id="taxi" aria-label="NYC TLC longitude and latitude density"></canvas><output id="taxi-count"></output></section></div>
+<p id="status" role="status" data-webgpu-status>Loading attributed data...</p>
+<footer>2MASS via NASA/IPAC IRSA, public domain. Taxi rows: NYC TLC 2015 yellow trips, first 1,024 geographically valid pick-ups in source order, subject to <a href="https://data.cityofnewyork.us/stories/s/Terms-of-Use/k9k7-3cje">NYC Open Data terms</a>. Each original observation contributes one vote; no sampling or artificial extra observations. Display smoothing leaves the exact table statistics unchanged. <a href="?backend=webgl2">Use WebGL2 compatibility</a>.</footer>
+<script type="module">import('./sciviz-density.ts').catch(error=>{document.querySelector('#status').textContent=error.message;console.error(error);});</script>
+</body></html>

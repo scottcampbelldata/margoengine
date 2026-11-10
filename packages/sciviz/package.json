@@ -307,6 +307,10 @@
     "./temporal": {
       "types": "./dist/temporal.d.ts",
       "import": "./dist/temporal.js"
+    },
+    "./density": {
+      "types": "./dist/density.d.ts",
+      "import": "./dist/density.js"
     }
   },
   "files": [
@@ -378,6 +382,8 @@
     "test:browser:a11y": "node scripts/browser-root.mjs tests/a11y-browser.mjs",
     "audit:a11y": "node scripts/audit-accessibility.mjs",
     "test:browser:progressive": "node scripts/browser-root.mjs tests/progressive-browser.mjs",
-    "test:browser:temporal": "node scripts/browser-root.mjs tests/temporal-browser.mjs"
+    "test:browser:temporal": "node scripts/browser-root.mjs tests/temporal-browser.mjs",
+    "test:browser:density": "node scripts/browser-root.mjs tests/density-browser.mjs",
+    "test:browser:density-scale": "node scripts/browser-root.mjs tests/density-scale-browser.mjs"
   }
 }

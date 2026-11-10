@@ -442,3 +442,5 @@ Batch 174 job 1: shared selection mask uploads have deterministic one-write evid
 
 
 - Batch 181 job 5, sciviz/progressive: quiet-machine frame-budget response and motion/rest frame-time distributions on bricked EMDB and batch 173 cinematic EMDB/TCIA, both backends. Retain original quality at rest and record target pixels/integration work alongside timing. Deferred during build; no speed claim.
+
+- Batch 181 job 4: quiet-machine same-data/same-256x256-pixels scatter density comparisons against regl-scatterplot 20M 2MASS and deck.gl 10M NYC TLC. Preserve every source point, camera, opacity, losses and image differences. Measure upload/first-frame, unchanged-view and camera-change latency/memory, record CPU load and full environment, and include native/compatibility routes (compatibility atomic count currently uses CPU tier). Correctness includes exact 20M/10M integer histograms and 16,777,217 coincident votes on both backends; no timing or exclusive run during build phase.

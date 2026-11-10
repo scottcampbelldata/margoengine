@@ -1,7 +1,6 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15339221,
   "history": [
     {
       "date": "2026-10-24",
@@ -7921,6 +7920,12 @@
       "commit": "97ecaf26f",
       "reason": "Batch 180 job 5 optional temporal entry: 0 to 3901 B gzip, ceiling 4157 B, for streaming statistics, interpolation, probe charts, file series and units; cohesive optional API avoids extra loader coordination. Core plus stage unchanged at 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch181-density",
+      "reason": "New optional sciviz/density: absent before (0 B), 4815 B gzip after, ceiling 5071 B. Exact u32 raster accumulation, separable Gaussian, bounded readback and source replacement. Core + stage remains 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9347,6 +9352,8 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
-  }
+    "margoengine/web": 577,
+    "@margoengine/sciviz/density": 5071
+  },
+  "total": 15344292
 }
