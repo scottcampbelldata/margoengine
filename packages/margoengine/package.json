@@ -594,6 +594,10 @@
       "types": "./dist/clustered/budget.d.ts",
       "import": "./dist/clustered/budget.js"
     },
+    "./clustered/shapes": {
+      "types": "./dist/clustered/shapes.d.ts",
+      "import": "./dist/clustered/shapes.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"

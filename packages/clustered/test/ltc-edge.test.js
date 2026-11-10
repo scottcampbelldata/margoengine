@@ -4,9 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { edge, formFactor } from './ltc-reference.js';
+import { AreaLights } from '../dist/area.js';
 
 const vectors = JSON.parse(readFileSync(new URL('./fixtures/ltc-edge.json', import.meta.url), 'utf8'));
-const source = readFileSync(new URL('../src/area.ts', import.meta.url), 'utf8');
+// The area lights' WGSL as the shader receives it (the polygon helpers live in src/ltc-wgsl.ts, shared with shapes).
+const source = new AreaLights({ lights: { setLights() {} } }).declarations(0);
 
 // The WGSL areaEdge step by step, every operation rounded to float32 (atan2 taken as correctly rounded).
 const f = Math.fround;

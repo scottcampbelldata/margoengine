@@ -574,3 +574,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/labels (batch 261 job 3): document ClusterLabels radius components, minCount, camera/logical zoom, bubble styling and member handles, nested layouts and disposal.
 - margoengine (batch 261 job 3): document labels/cluster alias.
+
+| @margoengine/clustered | shapes: ShapeLights (sphere, disc, tube), setLights validation, MAX_SHAPE_LIGHTS, radianceFromPower and shapeLightArea, Clustered.shapes hook, no shadows | batch-52 job 3 |

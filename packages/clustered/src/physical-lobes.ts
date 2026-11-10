@@ -21,18 +21,21 @@ fn clusterLobes(v:vec3f,l:vec3f)->vec3f {
   return (1-s.cc*fc)*s.sh.rgb*margoSheenBRDF(s.sh.w,nl,nv,clamp(dot(s.n,h),0.0,1.0))*nl+s.cc*fc*ggx(s.cn,v,l,s.cr);
 }
 `;
-/** The coat under area lights: the Linearly Transformed Cosines of the coat's normal and roughness, F0 0.04, no diffuse. */
-const areaCoat = `if(s.cc>0.0){clusterLobeLight+=s.cc*clusterAreaLighting(i.position,s.cn,v,clamp(dot(s.cn,v),0.0001,1.0),vec3f(0),s.cr,0.0,vec3f(0.04),1.0);}`;
+/** The coat under area and shaped lights: the Linearly Transformed Cosines of the coat's normal and roughness, F0 0.04, no diffuse. */
+const coat = (fn: string) =>
+  `if(s.cc>0.0){clusterLobeLight+=s.cc*${fn}(i.position,s.cn,v,clamp(dot(s.cn,v),0.0001,1.0),vec3f(0),s.cr,0.0,vec3f(0.04),1.0);}`;
 /**
  * Set as `Clustered.lobes`: `lights.lobes = physicalLobes`. Physical shaders then light clearcoat, sheen, anisotropy and
- * the thin film with every point, spot and extra directional light, and clearcoat with every area light. Shaders without
+ * the thin film with every point, spot and extra directional light, and clearcoat with every area and shaped light. Shaders without
  * those lobes keep their text. Costs one more GGX and sheen term per light on physical materials only.
  */
 export const physicalLobes: ClusteredLobes = {
   finish(code) {
     if (!code.includes('fn layers(')) return code;
     const direct = code.includes('fn margoDirect(') ? 'margoDirect(clusterSurface,v,l)' : clusterBrdf + '*nl',
-      area = code.includes('fn clusterAreaLighting(') ? areaCoat : '';
+      area =
+        (code.includes('fn clusterAreaLighting(') ? coat('clusterAreaLighting') : '') +
+        (code.includes('fn clusterShapeLighting(') ? coat('clusterShapeLighting') : '');
     return (
       declarations +
       code

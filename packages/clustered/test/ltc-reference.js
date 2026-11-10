@@ -46,7 +46,7 @@ const cell = (x, y, k) => {
   return [half(table[at]), half(table[at + 1])];
 };
 /** Bilinear LUT lookup at table coordinates st, pair k (0: matrix x y, 1: matrix z w, 2: magnitude, Fresnel). */
-function lookup(st, k) {
+export function lookup(st, k) {
   const i = [Math.floor(st[0]), Math.floor(st[1])],
     j = [Math.min(i[0] + 1, ltcSize - 1), Math.min(i[1] + 1, ltcSize - 1)],
     f = [st[0] - i[0], st[1] - i[1]];
@@ -60,7 +60,7 @@ function lookup(st, k) {
 
 const unitOrZero = (p) => scale(p, 1 / Math.sqrt(Math.max(dot(p, p), 1e-20)));
 // Quad seen through the 3x3 transform `m` (a function), clipped to z >= 0, closed along the horizon.
-function integral(m, corners) {
+export function integral(m, corners) {
   const p = corners.map(m);
   let leave = [0, 0, 0],
     enter = [0, 0, 0],

@@ -31,7 +31,8 @@
     "test:gpu:falloff": "cd ../.. && node scripts/clustered-falloff-gpu-check.js",
     "test:gpu:shadow": "cd ../.. && node scripts/clustered-shadow-gpu-check.js",
     "test:gpu:light-render": "cd ../.. && node scripts/light-render-gpu-check.js",
-    "test:gpu:orthographic": "cd ../.. && node scripts/orthographic-gpu-check.js"
+    "test:gpu:orthographic": "cd ../.. && node scripts/orthographic-gpu-check.js",
+    "test:gpu:shapes": "cd ../.. && node scripts/shape-lights-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {
@@ -74,6 +75,10 @@
     "./budget": {
       "types": "./dist/budget.d.ts",
       "import": "./dist/budget.js"
+    },
+    "./shapes": {
+      "types": "./dist/shapes.d.ts",
+      "import": "./dist/shapes.js"
     }
   },
   "files": [

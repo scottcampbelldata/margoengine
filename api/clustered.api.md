@@ -35,6 +35,8 @@ export class Clustered implements EnginePlugin {
     set ies(hook: ClusteredLightTerm | undefined);
     get projector(): ClusteredLightTerm | undefined;
     set projector(hook: ClusteredLightTerm | undefined);
+    get shapes(): ClusteredShapes | undefined;
+    set shapes(hook: ClusteredShapes | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
@@ -112,6 +114,9 @@ export interface ClusteredSamplingHooks {
         declarations(group: number): string;
         readonly term: string;
     }[];
+    shapes?: {
+        declarations(group: number): string;
+    };
 }
 
 export interface ClusteredShadow {
@@ -119,6 +124,11 @@ export interface ClusteredShadow {
     bindings(): GPUBindGroupEntry[];
     readonly directionalShadow?: string;
     readonly areaShadow?: string;
+}
+
+export interface ClusteredShapes {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
 }
 
 export interface DirectionalShadowLight {
@@ -205,5 +215,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     readonly areaShadow?: string;
 }, area?: {
     declarations(group: number, shadow?: string): string;
-}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms }?: ClusteredSamplingHooks): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes }?: ClusteredSamplingHooks): string;
 ```

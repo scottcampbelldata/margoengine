@@ -183,6 +183,14 @@ local.add(table);
 - Off is exact: while no directional or area light casts, the shaders, bindings, buffers and uploads are byte for byte
   what they were before these shadows existed (unit-tested by hash; images and probe radiance compared on a real GPU).
 
+## Sphere, disc and tube lights
+
+`ShapeLights` from `@margoengine/clustered/shapes` adds bulbs (`shape: 'sphere'`), round fixtures (`'disc'`, lit on the
+side its `direction` faces, or `twoSided`) and fluorescent tubes (`'tube'`, a capsule from `start` to `end`) to a
+`Clustered` light loop, up to 64 at once. Highlights take the light's shape and the light falls off with its size, shaded
+with the same Linearly Transformed Cosines as the rectangle lights. `intensity` is the surface radiance;
+`radianceFromPower(light, lumens)` converts a total power. Shaped lights do not cast shadows yet (docs/limits.md).
+
 ## IES profiles
 
 `@margoengine/clustered/ies` reads IES LM-63 photometric files (the 1986 to 2019 revisions, type B and C photometry) and

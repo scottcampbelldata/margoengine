@@ -6,6 +6,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import type { Clustered, ClusteredArea } from './index.js';
 import { ltcSize, ltcTable } from './ltc.js';
+import { ltcPolygonWgsl } from './ltc-wgsl.js';
 import { areaShadowSettings, MAX_AREA_SHADOWS, type AreaShadowLight } from './light-shadow-math.js';
 import { rectFrame } from '../../shared/rect-frame.js';
 export { MAX_AREA_SHADOWS } from './light-shadow-math.js';
@@ -33,39 +34,7 @@ const sampling = (group: number, shadow?: string) => /* wgsl */ `
 struct AreaLight {center:vec4f,right:vec4f,up:vec4f,color:vec4f}
 struct AreaLightData {count:vec4u,lights:array<AreaLight,${MAX_AREA_LIGHTS}>,lut:array<u32>}
 @group(${group}) @binding(17) var<storage,read> areaLights:AreaLightData;
-fn areaLutCell(x:u32,y:u32,k:u32)->vec2f {return unpack2x16float(areaLights.lut[(y*${ltcSize}u+x)*3u+k]);}
-fn areaLut(st:vec2f,k:u32)->vec2f {let i=vec2u(st);let j=min(i+1u,vec2u(${ltcSize - 1}u));let f=st-vec2f(i);
-  return mix(mix(areaLutCell(i.x,i.y,k),areaLutCell(j.x,i.y,k),f.x),mix(areaLutCell(i.x,j.y,k),areaLutCell(j.x,j.y,k),f.x),f.y);}
-fn areaUnit(p:vec3f)->vec3f {return p*inverseSqrt(max(dot(p,p),1e-20));}
-// One edge's share of the polygon's vector form factor (Lambert's formula, as Heitz et al. 2016 integrate it), z
-// component: (a x b).z / |a x b| * angle(a, b) / (2 pi). The angle is atan2(|a x b|, a.b), which is well conditioned
-// everywhere (acos loses digits near a.b = 1, asin near -1), and (a x b).z / |a x b| is a direction cosine in [-1, 1],
-// so no factor grows without bound as the edge closes up (angle -> 0) or opens to pi. Both pieces are invariant to
-// the scale of the cross product, so it is divided by its largest component first (no float32 underflow in |a x b|^2
-// for nearly parallel edges). Rounding adds a few ulp to atan2's own error. A zero cross product (parallel or zero
-// vectors, as the unclipped horizon chord) returns 0.
-fn areaEdge(a:vec3f,b:vec3f)->f32 {let n=cross(a,b);let top=max(max(abs(n.x),abs(n.y)),abs(n.z));if(top<=0.0){return 0.0;}
-  let k=n/top;let s=length(k);return k.z/s*atan2(top*s,dot(a,b))*0.15915494;}
-// One edge clipped to z>=0; records where the quad leaves and re-enters the upper hemisphere.
-fn areaClip(s0:vec3f,e0:vec3f,leave:ptr<function,vec3f>,enter:ptr<function,vec3f>)->f32 {
-  if(s0.z<0&&e0.z<0){return 0.0;}var s=s0;var e=e0;
-  if(s0.z<0){s=mix(s0,e0,s0.z/(s0.z-e0.z));*enter=s;}else if(e0.z<0){e=mix(s0,e0,s0.z/(s0.z-e0.z));*leave=e;}
-  return areaEdge(areaUnit(s),areaUnit(e));
-}
-// Cosine-weighted integral (form factor) of the quad seen through m, clipped to z>=0: its edges plus the horizon chord
-// (zero when nothing was clipped: both points stay at the origin). Unrolled: no dynamically indexed private array.
-// The two early returns are the clipped sum's own result when no edge crosses z=0: same operations in the same order,
-// each corner made unit once where the edges would do it twice. On p-rect-area they cut the main pass by a fifth.
-fn areaIntegral(m:mat3x3f,a:vec3f,b:vec3f,c:vec3f,d:vec3f)->f32 {
-  let p0=m*a;let p1=m*b;let p2=m*c;let p3=m*d;
-  if(min(min(p0.z,p1.z),min(p2.z,p3.z))>=0.0){let u0=areaUnit(p0);let u1=areaUnit(p1);let u2=areaUnit(p2);let u3=areaUnit(p3);
-    return areaEdge(u0,u1)+areaEdge(u1,u2)+areaEdge(u2,u3)+areaEdge(u3,u0);}
-  if(max(max(p0.z,p1.z),max(p2.z,p3.z))<0.0){return 0.0;}
-  var leave=vec3f(0);var enter=vec3f(0);
-  let sum=areaClip(p0,p1,&leave,&enter)+areaClip(p1,p2,&leave,&enter)+areaClip(p2,p3,&leave,&enter)+areaClip(p3,p0,&leave,&enter);
-  return sum+areaEdge(areaUnit(leave),areaUnit(enter));
-}
-fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughness:f32,metal:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
+${ltcPolygonWgsl('area')}fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughness:f32,metal:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
   let st=vec2f(clamp(roughness,0.045,1.0),sqrt(1-nv))*${ltcSize - 1}.0;let t1=vec4f(areaLut(st,0u),areaLut(st,1u));let t2=areaLut(st,2u);
   var t=v-n*dot(n,v);if(dot(t,t)<1e-8){t=cross(n,select(vec3f(1,0,0),vec3f(0,0,1),abs(n.x)>0.5));}
   let x=normalize(t);let local=transpose(mat3x3f(x,cross(n,x),n));

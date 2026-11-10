@@ -52,7 +52,7 @@ const directionalLoop = (shadow: string) => /* wgsl */ `
     let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
     result+=${clusterBrdf}*nl*light.color.rgb${shadow};
   }`;
-/** Light-loop hooks beyond shadows and area lights: `Clustered.directional`, `Clustered.ies` and `Clustered.projector`. */
+/** Light-loop hooks beyond shadows and area lights: `Clustered.directional`, `Clustered.ies`, `Clustered.projector` and `Clustered.shapes`. */
 export interface ClusteredSamplingHooks {
   /** WGSL defining `clusterDirectional` (`count:vec4u`, `lights` of `toLight:vec4f`, `color:vec4f`), lit in the light loop. */
   directional?: { declarations(group: number): string };
@@ -61,6 +61,8 @@ export interface ClusteredSamplingHooks {
    * loop's `index` (the light's position in the `setLights` list), `light`, `l` (unit, to the light) and `position`.
    */
   terms?: readonly { declarations(group: number): string; readonly term: string }[];
+  /** WGSL defining `clusterShapeLighting` (sphere, disc and tube lights), added to the result like the area lights. */
+  shapes?: { declarations(group: number): string };
 }
 // BRDF: GGX D and separable Smith-GGX G (Walter et al. 2007 eq. 33-34), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
 // (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
@@ -85,7 +87,7 @@ export function clusteredSampling(
   integratedShadows = false,
   decay = false,
   receive = false,
-  { directional, terms = [] }: ClusteredSamplingHooks = {},
+  { directional, terms = [], shapes }: ClusteredSamplingHooks = {},
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
@@ -99,6 +101,7 @@ export function clusteredSampling(
     (area ? (areaShadow ? area.declarations(group, term(areaShadow)) : area.declarations(group)) : '') +
     (directional ? directional.declarations(group) : '') +
     terms.map((t) => t.declarations(group)).join('') +
+    (shapes ? shapes.declarations(group) : '') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
@@ -115,7 +118,7 @@ ${/* @__PURE__ */ clusterCell('position')}
     ${decay ? decayTerms : legacyTerms}
     result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
   }${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
-  return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90))' : 'result'}*clusterFrame.intensity.x;
+  return ${area || shapes ? `(result${area ? '+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${shapes ? '+clusterShapeLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''})` : 'result'}*clusterFrame.intensity.x;
 }`;
   return shadows ? localShadowSampling(group) + code : code;
 }
