@@ -277,9 +277,15 @@ export class AudioListener implements EnginePlugin {
       listener = context.listener,
       immediate = !this.written;
     this.written = true;
-    const [px, py, pz] = this.position,
-      [fx, fy, fz] = this.forward,
-      [ux, uy, uz] = this.up;
+    const px = this.position[0],
+      py = this.position[1],
+      pz = this.position[2],
+      fx = this.forward[0],
+      fy = this.forward[1],
+      fz = this.forward[2],
+      ux = this.up[0],
+      uy = this.up[1],
+      uz = this.up[2];
     if (listener.positionX) {
       smoothParam(listener.positionX, px, context, this.smoothing, immediate);
       smoothParam(listener.positionY, py, context, this.smoothing, immediate);

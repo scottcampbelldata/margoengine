@@ -1,5 +1,9 @@
 # Claims and evidence
 
+- Batch 170 audio: stored pose-vector iterator starts fall from 154,500 to zero in the three-mode replay, preserving
+  all 931,662 recorded automation events and raw values. This is semantic work evidence, not heap, PCM or timing
+  evidence. [Scope and reproduction](batch-170-audio.md).
+
 - Batch 170 controls: 10,000 idle screen-basis builds and 200 carried-list replacements become zero with matching
   raw replay bytes. Both work-count tests fail on the parent. This is scoped deterministic work evidence, not
   a measured speedup or a rival win. [Methods and reproduction](batch-170-controls.md).

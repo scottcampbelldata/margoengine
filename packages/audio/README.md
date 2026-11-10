@@ -1,5 +1,24 @@
 # @margoengine/audio
 
+Pose writes read the three stored vector components directly. They preserve the existing parameter scheduling,
+smoothing and clock-read order. This removes vector-iterator work; it does not establish a measured speedup.
+For a self-contained offline example with no audio device or user gesture:
+
+```ts
+import {AudioListener, PositionalAudio} from '@margoengine/audio';
+
+const context = new OfflineAudioContext(2, 4800, 48000);
+const listener = new AudioListener({context, autoResume: false, smoothing: 0});
+const sound = new PositionalAudio(listener);
+const oscillator = context.createOscillator();
+sound.setNodeSource(oscillator);
+sound.setPosition(1, 0, -2).setDirection([0, 0, 1]);
+oscillator.start();
+const rendered = await context.startRendering();
+console.assert(rendered.length === 4800 && rendered.numberOfChannels === 2);
+listener.dispose();
+```
+
 Import `margoengine/audio` from the `margoengine` package, or `@margoengine/audio` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Web Audio listener, global and positional sounds, encoded-file loading and a frequency analyser for Margo Engine.

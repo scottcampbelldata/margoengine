@@ -847,8 +847,12 @@ export class PositionalAudio extends Audio {
       immediate = !this.written,
       smoothing = this.listener.smoothing;
     this.written = true;
-    const [px, py, pz] = this.worldPosition,
-      [dx, dy, dz] = this.worldDirection;
+    const px = this.worldPosition[0],
+      py = this.worldPosition[1],
+      pz = this.worldPosition[2],
+      dx = this.worldDirection[0],
+      dy = this.worldDirection[1],
+      dz = this.worldDirection[2];
     if (panner.positionX) {
       smoothParam(panner.positionX, px, context, smoothing, immediate);
       smoothParam(panner.positionY, py, context, smoothing, immediate);

@@ -1,5 +1,12 @@
 # Performance history: losses, causes and fixes
 
+## Batch 170 audio: fixed pose-vector reads (2026-11-10)
+
+Fixed-vector destructuring in listener/panner writes started 154,500 iterators in the three-mode replay. Indexed
+reads start zero with all 931,662 automation events and raw values unchanged, including advancing clock reads.
+Fix commit subject: `perf(audio): read pose vectors without iterators`. Timing pending the quiet rerun; the historical
+slower result remains. [Research, scope, hash and reproduction](batch-170-audio.md).
+
 ## Batch 170 controls: consumed motion and carried lists (2026-11-10)
 
 `p-arcball` rebuilt its screen basis on the explicit update after immediate pointer input; `p-drag-controls`

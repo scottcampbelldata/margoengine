@@ -1,5 +1,8 @@
 # Reproducing Margo's numbers
 
+- Batch 170 audio: after building, `node --test --test-timeout=120000 packages/audio/tests/workcount.test.js` checks
+  iterator starts and exact parent automation/value bytes. [Research, fixture scope and quiet-rerun command](batch-170-audio.md).
+
 - Batch 170 controls: [commands, parent byte hash and work-count scope](batch-170-controls.md). Correctness uses
   `node --test --test-timeout=120000 packages/controls/tests/workcount.test.js` after building packages. Timing
   pending the quiet rerun; no new speed ratio is claimed.

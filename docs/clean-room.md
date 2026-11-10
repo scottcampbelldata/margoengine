@@ -1,5 +1,11 @@
 # Clean room
 
+### Batch 170 audio work counts (2026-11-10)
+
+Compared Adenot and Choi's W3C *Web Audio API 1.1* (2026 draft), TC39's *ECMAScript Language Specification*
+(living draft) and Smus's *Web Audio API* (2013). Fixed stored-vector reads retain audio clock and automation order.
+[Full titles, authors, dates, links and tests](whitepaper/batch-170-audio.md). No external implementation was read.
+
 ### Batch 170 controls work counts (2026-11-10)
 
 Compared Shoemake's *ARCBALL* (1992) with Lauke and Flack's W3C *Pointer Events Level 4* (2026 draft), retaining
