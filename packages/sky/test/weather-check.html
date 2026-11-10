@@ -3,8 +3,10 @@
 // Renders a scene with and without Weather and reads the HDR scene back: rain and snow must change pixels, a
 // lightning flash must add light, and the frame must return to the dry one once weather is off or the flash is over.
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
-import {Weather} from '/packages/sky/dist/weather.js';
+import {Weather} from '/packages/sky/dist/compat-clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,4,14],target:[0,3,-30],near:0.1,far:800}}),device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
@@ -23,7 +25,7 @@ async function read(texture){
 async function shot(delta=1/60){engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
 const sum=a=>{let s=0;for(let i=0;i<a.length;i+=4)s+=a[i]+a[i+1]+a[i+2];return s;};
 const changed=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4)n++;return n;};
-window.check={
+window.check={samples:sceneSamples,
  async run(){
   const out={};device.pushErrorScope('validation');
   const clear=await shot();

@@ -6,6 +6,19 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 const checks = {
+  async weather(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.validation, null);
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.rainChanged > 200, `rain changed ${r.rainChanged} of ${r.pixels} pixels`);
+    assert.ok(r.snowChanged > 200, `snow changed ${r.snowChanged} of ${r.pixels} pixels`);
+    assert.equal(r.afterNone, 0, 'precipitation none draws nothing');
+    assert.equal(r.dry, 0, 'intensity 0 draws nothing');
+    assert.ok(r.flashGain > 0, `the flash lit the frame: ${JSON.stringify(r)}`);
+    assert.equal(r.afterFlash, 0, 'the frame returns to dry after the flash');
+    console.log(`ok weather ${samples}x: rain ${r.rainChanged}, snow ${r.snowChanged}, lightning and dry reset`);
+    return r;
+  },
   async volumetric(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     assert.equal(r.error, null);

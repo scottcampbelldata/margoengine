@@ -4090,3 +4090,7 @@ Batch 270 job 5: vfx/json provides versioned authoring save/load with typed asse
 
 ## Batch 272: textured idle product stills
 The optional staging/pathtrace-materials entry connects existing mesh-pbr transport to the idle still lifecycle, including interpolated normals, base colour/normal/roughness maps, alpha cutouts and loaded glTF conversion. Proof: packages/staging/test/pathtrace-materials.test.js and pathtrace-materials-browser.mjs, independent texture/factor image equivalences and licensed textured FlightHelmet disposal/restoration on both backends. Scope: docs/staging-parity.md. No timing or full-renderer-parity claim.
+
+
+## Batch 189: full-layer cloud and weather support
+The optional @margoengine/sky/compat-clouds entry runs the existing volumetric cloud, precipitation and weather-effects implementations on native WebGPU or the full WebGL2 compatibility layer. It does not add another renderer or modify core/stage. Proof: packages/sky/test/compat-clouds.test.js checks shared class identities and encoded work; the existing browser pages import the new entry, and features-check.mjs validates cloud traversal/depth, precipitation, lightning and covered weather effects at both sample counts. The comparison is backend support for the batch-189 row; no complete rival-package equivalence, pixel identity between different GPUs, physical reference accuracy or speed advantage is claimed.

@@ -6,7 +6,7 @@ import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {sceneSamples} from '/packages/core/dist/quality.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {Sky} from '/packages/sky/dist/index.js';
-import {Weather} from '/packages/sky/dist/weather.js';
+import {Weather} from '/packages/sky/dist/compat-clouds.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.5,0],target:[0,1.5,-10],near:0.1,far:2000}}),device=engine.gpu,errors=[];

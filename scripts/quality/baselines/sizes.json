@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13925050,
+  "total": 13940643,
   "history": [
     {
       "date": "2026-10-24",
@@ -7352,6 +7352,12 @@
       "commit": "64b7ad4d7",
       "reason": "Batch272-new-textured-still-entry-1560B-reuses-existing-PBR-transport",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-189",
+      "reason": "New sky/compat-clouds aggregate: 0 to 15138 B gzip, ceiling 15593 B; shares the complete cloud, precipitation and weather-effects implementations with no renderer fork. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8236,6 +8242,7 @@
     "@margoengine/sky/bruneton": 3258,
     "@margoengine/sky/cloud-shadows": 3448,
     "@margoengine/sky/clouds": 2338,
+    "@margoengine/sky/compat-clouds": 15593,
     "@margoengine/sky/fog": 2295,
     "@margoengine/sky/hillaire": 11147,
     "@margoengine/sky/lighting": 4064,

@@ -2734,6 +2734,10 @@
       "types": "./dist/post/mask.d.ts",
       "import": "./dist/post/mask.js"
     },
+    "./post/pixelate": {
+      "types": "./dist/post/pixelate.d.ts",
+      "import": "./dist/post/pixelate.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
@@ -3557,6 +3561,10 @@
     "./sky/planet": {
       "types": "./dist/sky/planet.d.ts",
       "import": "./dist/sky/planet.js"
+    },
+    "./sky/compat-clouds": {
+      "types": "./dist/sky/compat-clouds.d.ts",
+      "import": "./dist/sky/compat-clouds.js"
     },
     "./splats": {
       "types": "./dist/splats.d.ts",

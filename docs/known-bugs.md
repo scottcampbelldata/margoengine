@@ -4803,3 +4803,9 @@ Repro: install compatShim in packages/taa/test/upscale-browser.mjs and run the u
 Batch 270 job 5: no new open defects identified in preset save/load; typed precision, signed zero, missing resources, pollution keys, exact simulation replay and pixel equality have regression coverage.
 
 - Batch 272 unrelated gate finding: gpu-package-tests plan fails before staging selection when packages/water/package.json test:gpu places npm run build after initial GPU steps; move that build to the script start in the owning lane. Repro: node scripts/gpu-package-tests.mjs --no-build --select=staging/test:gpu. Staging gates are run directly instead.
+
+
+### Batch 189: cloud/weather fallback support
+No new rendering defect found in the full compatibility route. Earlier unsupported wording described the small preview; the new optional entry and native/compatibility browser coverage make the full-layer contract explicit. Existing cloud/weather approximation limits remain in limits.md.
+
+Batch 189 landing repairs an incoming generated-export omission: post/pixelate existed in its owner package but margoengine lacked the facade and subpath export. Regenerated them with scripts/umbrella.mjs. The existing tests/umbrella.test.js fails on the missing alias before this correction.

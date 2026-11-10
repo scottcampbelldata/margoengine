@@ -102,6 +102,10 @@
     "./planet": {
       "types": "./dist/planet.d.ts",
       "import": "./dist/planet.js"
+    },
+    "./compat-clouds": {
+      "types": "./dist/compat-clouds.d.ts",
+      "import": "./dist/compat-clouds.js"
     }
   },
   "files": [

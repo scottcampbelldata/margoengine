@@ -917,3 +917,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/staging (batch 272 job 1): document pathtrace-materials TexturedStill, glTF snapshots, maps/cutouts, idle lifecycle, captures, compatibility and static-scene limits; examples deferred.
 - margoengine (batch 272 job 1): document generated staging/pathtrace-materials alias; examples deferred.
+
+
+- @margoengine/sky (batch 189): document /compat-clouds shared plugin/type exports, explicit full-layer installation before Engine.create, native/compat behaviour, preview refusal, unchanged defaults and ownership; README examples deferred.
+- margoengine (batch 189): document generated sky/compat-clouds alias and the incoming post/pixelate alias; README examples deferred.
