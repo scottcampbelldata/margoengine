@@ -4,7 +4,7 @@
 
 ```ts
 import { Camera, EngineKernel, Mesh, RenderView, Scene } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface SpatialContact extends PickHit {
     position: readonly [number, number, number];
@@ -28,6 +28,21 @@ export interface SpatialPickingOptions {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+interface DrawOptions {
+    surface?: PickSurface;
+    format: GPUTextureFormat;
+    depthFormat: GPUTextureFormat;
+    sampleCount?: number;
+    filter?: (node: Mesh, primitive: PickingPrimitive, source: PickingSource, index: number) => boolean;
+    id?: (node: Mesh, source: PickingSource, index: number) => number;
+    mask?: (node: Mesh) => boolean;
+    depthCompare?: GPUCompareFunction;
+}
 
 interface ModelLike {
   readonly root: Mesh;
@@ -66,6 +81,23 @@ interface PickHit {
     splat?: number;
 }
 
+interface PickProxy {
+  readonly anchor: Mesh;
+  readonly sphere: ArrayLike<number>;
+  readonly model?: object | null;
+}
+
+interface PickScene {
+    device: GPUDevice;
+    live: Engine['meshes'];
+    meshes: Map<number, Mesh>;
+    models: ModelLike[];
+    starts: number[];
+    total: number;
+    list: readonly PickProxy[];
+    capacity: number;
+}
+
 interface PickSurface {
     readonly targets: GPUColorTargetState[];
     readonly views: GPUTextureView[];
@@ -75,6 +107,19 @@ interface PickSurface {
     copy(encoder: GPUCommandEncoder, buffer: GPUBuffer, offset: number, origin: number[], size: number[]): void;
     decode(hit: PickHit, data: Uint32Array, offset: number, x: number, y: number, matrix: Float32Array, eye: readonly number[], origin: number[]): void;
     dispose(): void;
+}
+
+interface PickTile {
+    at: number;
+    cx: number;
+    cy: number;
+    width: number;
+    height: number;
+    candidates: Map<Mesh, PickingSource[]> | undefined;
+    instances: number[][];
+    matrix?: Float32Array;
+    eye?: readonly number[];
+    origin?: number[];
 }
 
 type PickView = RenderView & {
@@ -87,6 +132,8 @@ class Picking implements EnginePlugin {
     };
     readonly name = "picking";
     protected surface?: PickSurface;
+    protected instanceHits: number[][];
+    protected readonly primitives: PickingPrimitives;
     constructor(options?: {
         capture?: boolean;
     });
@@ -101,6 +148,16 @@ class Picking implements EnginePlugin {
     onPick(x: number, y: number, view?: PickView): Promise<Mesh | null>;
     pick(x: number, y: number, view?: RenderView): Promise<PickHit | null>;
     pickMany(points: readonly (readonly [number, number])[], view?: RenderView): Promise<(PickHit | null)[]>;
+    protected get queryEngine(): Engine;
+    protected queryContext(x: number, y: number, view: RenderView | undefined, run: (view: PickView) => Promise<void>): Promise<void>;
+    protected scene(): PickScene;
+    protected decode(scene: PickScene, data: Uint32Array, tile: PickTile, view: PickView | undefined): PickHit | null;
+    protected renderMicro(encoder: GPUCommandEncoder, x: number, y: number, list: readonly PickProxy[], rect: readonly number[], view?: PickView, target?: {
+        width: number;
+        height: number;
+        color: GPUTextureView;
+        depth: GPUTextureView;
+    }): Map<Mesh, PickingSource[]> | undefined;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -153,6 +210,22 @@ interface PickingPrimitive {
     clip?: GPUBufferBinding;
     doubleSided?: boolean;
     side?: 'front' | 'back' | 'double';
+}
+
+class PickingPrimitives {
+    get hasSources(): boolean;
+    discover(meshes: Iterable<MeshHandle>): void;
+    add(source: PickingSource): () => void;
+    setup(engine: Engine): void;
+    prepare(c: {
+        backend: 'webgpu';
+        device: GPUDevice;
+        encoder: GPUCommandEncoder;
+    }): void;
+    contains(source: PickingSource, node: Mesh): boolean;
+    draw(c: Context, matrix: Float32Array, options: DrawOptions): Map<Mesh, PickingSource[]>;
+    release(): void;
+    dispose(): void;
 }
 
 interface PickingSource {

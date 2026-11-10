@@ -46,6 +46,8 @@ type PickView = RenderView & { pixels: true };
 /** True when `rect` is absent or covers the whole target. */
 const covers = (rect: readonly number[] | undefined, c: Context) =>
   !rect || (rect[0] === 0 && rect[1] === 0 && rect[2] === c.width && rect[3] === c.height);
+const contextQuery = Symbol('selection query');
+type QueryView = PickView & { [contextQuery]?: (view: PickView) => Promise<void> };
 const attachedPickers = new WeakMap<Engine, Picking>();
 type Snapshot = { geometry: Geometry | null; values: Float32Array; visible: number };
 const microShader =
@@ -266,7 +268,7 @@ export class Picking implements EnginePlugin {
   private sphere?: ModelPrimitiveLike;
   private readonly proxyMatrix = new Float32Array(16);
   private readonly instanceWorld = new Float32Array(16);
-  private instanceHits: number[][] = [];
+  protected instanceHits: number[][] = [];
   private ids?: GPUTexture;
   private idsView?: GPUTextureView;
   private micro?: GPUTexture;
@@ -286,7 +288,7 @@ export class Picking implements EnginePlugin {
   private captured = false;
   private original?: Context['draw'];
   private context?: Context;
-  private readonly primitives = new PickingPrimitives();
+  protected readonly primitives = new PickingPrimitives();
   /** Registered overlays by ID slot; a removed one leaves its slot empty. */
   private readonly overlays: (PickingOverlay | undefined)[] = [];
   /** `capture:false` skips the per-frame ID target and snapshot; every pick then uses the culled 3x3 pass. */
@@ -491,6 +493,8 @@ export class Picking implements EnginePlugin {
   }
   /** `engine.pick` hook: the core mesh, or the glTF node of a gltf-pro model, at a canvas CSS pixel, in `view` when given. */
   async onPick(x: number, y: number, view?: PickView): Promise<Mesh | null> {
+    const query = (view as QueryView | undefined)?.[contextQuery];
+    if (query) { await query(view!); return null; }
     const { batch } = this;
     if (batch) {
       this.batch = undefined;
@@ -548,6 +552,14 @@ export class Picking implements EnginePlugin {
     if (!view) for (const i of batch.outside) out[i] = await this.pick(points[i][0], points[i][1]);
     return out;
   }
+  /** Runtime for optional query entries; validates the picker lifetime before access. */
+  protected get queryEngine(): Engine { this.ready(); return this.engine!; }
+  /** Run an optional readback inside the engine's serialized, refreshed scene/view pick context. */
+  protected async queryContext(x: number, y: number, view: RenderView | undefined, run: (view: PickView) => Promise<void>): Promise<void> {
+    this.ready();
+    const request = { ...view, camera: view?.camera ?? this.engine!.camera, viewport: view?.viewport ?? (view?.pixels ? [0, 0, this.engine!.canvas.width, this.engine!.canvas.height] : [0, 0, 1, 1]), [contextQuery]: run } as QueryView;
+    await this.engine!.pick(x, y, request);
+  }
   /** Throws unless a pick can run now. */
   private ready(): void {
     if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to pick.');
@@ -555,7 +567,7 @@ export class Picking implements EnginePlugin {
       throw new MargoError('state', 'Picking is not attached; call Picking.attach(engine) before picking.');
   }
   /** The scene one pick or batch reads, taken before its first await. */
-  private scene(): PickScene {
+  protected scene(): PickScene {
     const e = this.engine!,
       // The picked scene's live meshes (engine.pick enters that scene until this first await) and a snapshot.
       live = e.meshes,
@@ -620,7 +632,7 @@ export class Picking implements EnginePlugin {
     return { at: offset / 4, cx: px - x0, cy: py - y0, width, height, candidates, instances: this.instanceHits, ...(this.surface ? { matrix: this.frame.slice(0, 16), eye: [...camera.position], origin } : {}) };
   }
   /** The hit of one mapped tile: the center's ID, else the nearest neighbor's, resolved and checked against the scene. */
-  private decode(scene: PickScene, data: Uint32Array, tile: PickTile, view: PickView | undefined): PickHit | null {
+  protected decode(scene: PickScene, data: Uint32Array, tile: PickTile, view: PickView | undefined): PickHit | null {
     const e = this.engine!,
       { device, live, meshes, models, starts, total, list, capacity } = scene,
       { at, cx, cy, width, height, candidates } = tile;
@@ -779,25 +791,28 @@ export class Picking implements EnginePlugin {
       read.destroy();
     }
   }
-  private renderMicro(
+  protected renderMicro(
     encoder: GPUCommandEncoder,
     x: number,
     y: number,
     list: readonly PickProxy[],
     rect: readonly number[],
     view?: PickView,
+    target?: { width: number; height: number; color: GPUTextureView; depth: GPUTextureView },
   ): Map<Mesh, PickingSource[]> | undefined {
     const e = this.engine!,
       device = this.device!,
       camera = view?.camera ?? e.camera,
+      targetWidth = target?.width ?? 3,
+      targetHeight = target?.height ?? 3,
       scope = { view },
       shown = (mesh: Mesh) => !hidden(e, mesh.id) && inView(scope, mesh),
       matrix = camera.matrix.slice(),
       nx = (2 * (x - rect[0] + 0.5)) / rect[2] - 1,
       ny = 1 - (2 * (y - rect[1] + 0.5)) / rect[3];
     for (let c = 0; c < 4; c++) {
-      matrix[c * 4] = ((matrix[c * 4] - nx * matrix[c * 4 + 3]) * rect[2]) / 3;
-      matrix[c * 4 + 1] = ((matrix[c * 4 + 1] - ny * matrix[c * 4 + 3]) * rect[3]) / 3;
+      matrix[c * 4] = ((matrix[c * 4] - nx * matrix[c * 4 + 3]) * rect[2]) / targetWidth;
+      matrix[c * 4 + 1] = ((matrix[c * 4 + 1] - ny * matrix[c * 4 + 3]) * rect[3]) / targetHeight;
     }
     this.frame.set(matrix);
     this.frame.set(camera.position, 16);
@@ -814,8 +829,8 @@ export class Picking implements EnginePlugin {
       width: e.canvas.width,
       height: e.canvas.height,
       delta: 0,
-      color: this.micro!.createView(),
-      depth: this.depth!.createView(),
+      color: target?.color ?? this.micro!.createView(),
+      depth: target?.depth ?? this.depth!.createView(),
       format: 'r32uint',
       shader: microShader,
       bindings: [],

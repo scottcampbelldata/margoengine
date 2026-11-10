@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12814589,
+  "total": 12830308,
   "history": [
     {
       "date": "2026-10-24",
@@ -6364,6 +6364,12 @@
       "commit": "batch-202",
       "reason": "Optional loader entries loaders:vtk-legacy, selection:hit-details preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-199-job-3",
+      "reason": "Optional selection/area absent -> 15287 B gzip, ceiling 15719 B. It retains the shared picker and current-pose replay instead of a duplicate ID renderer. Root 21308 -> 21464 B and hit-details 15002 -> 15152 B remain within their ceilings. Core + stage unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7529,6 +7535,7 @@
     "@margoengine/mesh-edit/repair": 9920,
     "@margoengine/loaders/vtk-legacy": 6592,
     "margoengine/loaders/vtk-legacy": 321,
-    "margoengine/selection/hit-details": 324
+    "margoengine/selection/hit-details": 324,
+    "@margoengine/selection/area": 15719
   }
 }

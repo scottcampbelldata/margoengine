@@ -405,3 +405,4 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine: document mesh-edit/repair alias in the README phase (batch 224 job 3).
 - @margoengine/loaders (batch 202 job 2): document /vtk-legacy, all five datasets, preserved topology, line/vertex/triangle source cells, point/cell/global data, bounds and outer/all surface policy; examples deferred.
 - margoengine (batch 202 job 2): document loaders/vtk-legacy and the regenerated selection/hit-details alias for the already-landed picking entry.
+- @margoengine/selection: document area AreaPicking, rect/polygon CSS pixel-centre rules, even-odd lassos, view/scissor/layers, identity/order, source/overlay limits, pixel/memory budget, cancellation and shared pick queue (batch 199 job 3).

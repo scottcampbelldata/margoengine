@@ -1,0 +1,43 @@
+﻿import assert from 'node:assert/strict';
+import {fileURLToPath} from 'node:url';
+import {openBrowser} from '../../../scripts/browser.js';
+process.chdir(fileURLToPath(new URL('../../../',import.meta.url)));
+const browser=await openBrowser({port:'free'}),{page}=browser,errors=[];
+page.setDefaultTimeout(120000);
+page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+try{
+ await page.waitForFunction(()=>window.modern);
+ const report=await page.evaluate(async()=>{
+  const {Engine,box}=await import('/packages/core/dist/extension.js');
+  const {loadGLTF}=await import('/packages/gltf-pro/dist/index.js');
+  const {CameraProjection}=await import('/packages/cameras/dist/index.js');
+  const {AreaPicking}=await import('/packages/selection/dist/area.js');
+  const assert=(ok,message)=>{if(!ok)throw new Error(message)};
+  const canvas=document.createElement('canvas');canvas.style.cssText='width:128px;height:128px';document.body.prepend(canvas);
+  const e=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,5],target:[0,0,0]}});
+  const gpuErrors=[];e.gpu.addEventListener('uncapturederror',ev=>gpuErrors.push(ev.error.message));
+  CameraProjection.attach(e,{mode:'orthographic',height:4});
+  const picker=AreaPicking.attach(e),back=e.createMesh().setGeometry(box()).setScale([1.6,1.6,1]).setPosition([0,0,-1]);
+  const front=e.createMesh().setGeometry(box()).setScale([2,2,1]);
+  const side=await loadGLTF(e,'/packages/exporters/tests/fixtures/Box.glb');side.root.setScale([0.5,0.5,0.5]).setPosition([1.5,0,0]);
+  const all=await picker.rect({x:0,y:0,width:128,height:128});
+  assert(all.some(h=>h.mesh===front)&&all.some(h=>h.model===side)&&!all.some(h=>h.mesh===back),'visible-only marquee');
+  assert((await picker.rect({x:96,y:64,width:1,height:1})).length===0,'area must not borrow a neighboring ID');
+  assert((await picker.rect({x:0,y:0,width:31,height:128})).length===0,'bounds must not count as pixels');
+  const lasso=await picker.polygon([[0,0],[128,0],[0,128]]);
+  assert(lasso.length===1&&lasso[0].mesh===front,'lasso must filter each ID pixel');
+  const pixelView=await picker.rect({x:0,y:0,width:128,height:128},{camera:e.camera,pixels:true});assert(pixelView.length===all.length,'pixel view without a rectangle must cover the canvas');
+  const reverse=await picker.rect({x:128,y:128,width:-128,height:-128});assert(reverse.length===all.length,'negative rectangle dimensions');
+  const before=e.gpu.queue.submit,buffer=e.gpu.createBuffer;let submissions=0,maps=0;
+  e.gpu.queue.submit=function(...args){submissions++;return before.apply(this,args)};
+  e.gpu.createBuffer=function(desc){const b=buffer.call(this,desc);if(desc.usage&GPUBufferUsage.MAP_READ){const map=b.mapAsync;b.mapAsync=function(...args){maps++;return map.apply(this,args)}}return b};
+  await picker.rect({x:0,y:0,width:128,height:128});
+  e.gpu.queue.submit=before;e.gpu.createBuffer=buffer;
+  assert(submissions===1&&maps===1,'area must use one scene submission and one map');
+  const concurrent=await Promise.all([picker.rect({x:0,y:0,width:31,height:128}),picker.polygon([[0,0],[128,0],[0,128]]),picker.pick(64,64)]);
+  assert(concurrent[0].length===0&&concurrent[1].length===1&&concurrent[2].mesh===front,'queued queries must retain their own operation');
+  const controller=new AbortController();controller.abort();let aborted=false;try{await picker.rect({x:0,y:0,width:1,height:1},undefined,controller.signal)}catch(ex){aborted=ex.name==='AbortError'}assert(aborted,'abort');
+  const small=new AreaPicking({maxPixels:1});picker.dispose();e.use(small);let budget=false;try{await small.rect({x:0,y:0,width:128,height:128})}catch(ex){budget=ex instanceof RangeError}assert(budget,'allocation budget');small.dispose();side.dispose();e.dispose();
+  assert(gpuErrors.length===0,gpuErrors.join('\n'));return {visible:all.length,lasso:lasso.length,submissions,maps};
+ });assert.deepEqual(errors,[]);console.log('area pixels',report);
+}finally{await browser.close()}

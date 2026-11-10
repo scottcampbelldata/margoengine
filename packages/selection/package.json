@@ -37,6 +37,10 @@
     "./xray": {
       "types": "./dist/xray.d.ts",
       "import": "./dist/xray.js"
+    },
+    "./area": {
+      "types": "./dist/area.d.ts",
+      "import": "./dist/area.js"
     }
   },
   "files": [
@@ -59,7 +63,8 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "node test/picking.browser.mjs && node test/pick-many.browser.mjs && node test/models.browser.mjs && node test/xray.browser.mjs && node test/hit-details.browser.mjs",
     "prepack": "npm run build",
-    "test:browser:xray-pulse": "node test/pulse.browser.mjs"
+    "test:browser:xray-pulse": "node test/pulse.browser.mjs",
+    "test:browser:area": "node test/area.browser.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {
