@@ -128,6 +128,34 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   tan^2 theta = alpha^2 xi / (1 - xi) (Walter et al. 2007). Worst cell now 4.9e-4, within one f16 step, on WebGPU and
   WebGL2 compat. Regression: `packages/environment/tests/environment-browser.js` section 4c.
 
+### The weather lens long-time parity bound is below the shader's own f32 rounding (list 5 R6 row 24, 2026-11-10, open)
+
+- **What:** `packages/weather` `test:browser:parity` lens case (`tests/parity-browser.mjs`, `tests/lens-check.html`)
+  on the Beelink (Radeon 680M, Chrome on D3D12): `longTime` worst 1.374e-4 over 2,400 cases, over its bound 1e-4.
+  The `math` case passes (7.6e-5). Repeats exactly on every run.
+- **Repro:** a CPU model of `lens_field` that rounds every WGSL operation once to f32, with the inputs
+  `lensSettings` packs, against `lensField` in f64 on the same 2,400 cases: worst 1.364e-4, at case 1441
+  (time 123456.75, x 1.1293, y 0.9679, the mask: 0.37333 in f64, 0.37347 in f32). The bound is 1e-4.
+- **Cause:** the test, not the GPU. The field divides cell-local positions (about 1.7, f32 step 1.2e-7) by the drop
+  radius (down to 0.01375) and passes them through smoothsteps with slopes up to about 17, so a correctly rounded f32
+  evaluation of the shipped shader already misses the f64 field by 1.36e-4. A GPU that fuses or reorders operations
+  can land under 1e-4 (the workstation does); one that rounds each operation as written cannot. The long-time packing
+  the case guards (c9b0a86ba) works: the raw time * speed product it replaced is off by far more.
+- **Open:** needs Scott's ruling. The bound is not loosened here. Options: an f32 reference (the model above) with a
+  bound from WGSL's accuracy rules, or a bound derived from the f32 analysis.
+
+### Radeon 680M machine: the instanced frame allocates 4,048 B, over its 292 B floor (list 5 R6 row 15, 2026-11-10, open, core)
+
+- **What:** `npm run test:frame-alloc:browser` on the Beelink: `instanced` (10,000 moving instanced boxes) median
+  4,048 B a frame in three runs (floor 292 B, set on the RTX A6000 machine); the other four scenes pass.
+- **Repro:** `node scripts/frame-alloc-browser.mjs --scenes=instanced,basic --profile --no-check`: 3,750 B a frame in
+  core's `uploadRows` (`packages/core/src/renderer.ts`), the walk over the batch's dirty-row words. 10,000 rows are
+  313 words, and 313 x 12 B (one V8 heap number) is 3,756 B: every word, all bits set (4294967295, outside V8's small
+  integer range), is boxed once a frame, as it is when the function runs below V8's optimizing tier.
+- **Cause:** not proven past the profile. The reading is that `uploadRows` does not reach (or falls out of) the tier
+  that keeps a uint32 unboxed on this machine. Core is frozen for this lane: needs Scott (a core change, for example
+  reading the word as a signed 32-bit value, which the floor check would then confirm).
+
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 
 - **What:** on the WebGL2 layer, which runs no level or cluster kernel and culls no loaded model, `MeshletMesh`

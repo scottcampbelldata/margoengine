@@ -9765,6 +9765,91 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   decision 2026-11-09), with a control that drops one box from the culled engine alone and must show. `meshlets-check`
   compares A and B without MSAA instead. On the WebGL2 layer the resolved frames are compared as before.
 
+### Radeon 680M: a colour attachment's export narrows the shader output to binary16 by truncation (list 5 R6 row 25, 2026-11-10, worked around in webgl2-compat)
+
+- **What:** `packages/webgl2-compat` `test:gpu:preview-contract` (`test/package-tiers-browser.mjs`) on the Beelink
+  (Radeon 680M, driver 32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): the procedural texture baker (bricks,
+  16 x 16) stored red 133 at texel (3, 0) on the WebGL2 layer where native WebGPU stores 134; the other 15 texels of
+  the row matched.
+- **Repro:** a CPU model of the bake in f32 (the bricks shader, op by op): texel 3 is 133.5204 / 255. Rounded straight
+  from f32, as a WebGPU storage texture store does, that is 134, and the model gives native's whole row. Truncated to
+  binary16 first (11 significant bits: 0.523609 becomes 0.5234375, 133.477 / 255) and then rounded, it is 133, and
+  that model gives the layer's whole row. `compute-browser.mjs` case `fragmentUnormRound` stores (k + 0.52) / 255 and
+  three other near-half values into an rgba8unorm storage texture: before the fix the layer stored k on many texels
+  (the first at texel 8, blue 8.505 / 255) where native WebGPU stores k + 1.
+- **Cause:** below Margo. The layer runs a compute store into rgba8unorm as a draw into a colour attachment, and the
+  680M's driver exports the fragment output to an 8-bit target as binary16, truncating, before the UNORM conversion
+  (the same truncation as R6 row 7's half targets). The conversion rounding of a colour write is implementation
+  chosen, so this is allowed; NVIDIA exports f32 and matches.
+- **Workaround (`packages/webgl2-compat/src/compute/glsl.ts`):** the fragment and scatter tiers round a float texel to
+  the 255 steps in the shader before an 8-bit UNORM target stores it, as the CPU tier's quantize already did. A value
+  on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores k.
+  `fragmentUnormRound` and `scatterUnormRound` pass, and so does the baker comparison.
+
+### Fixed 2026-11-10: weather machine stopped its schedule on a refused call and dropped time after 256 steps
+
+- **What:** `WeatherMachine.transitionTo` and `set` (`packages/weather/src/machine.ts`) cleared a running schedule or
+  random walk before checking the target, seconds and ease, so a refused call still stopped it. `update` processed at
+  most 256 blends and holds per 5 s piece and silently dropped the rest of the time: 300 steps of 1 ms in one
+  `update(5)` arrived short. Found in Scott's native Rust engine, which ported this machine.
+- **Fix:** both check first, then stop and start; a piece runs every blend and hold that ends inside it, and throws
+  only if zero-length steps make no progress past a bound set by the schedule length. Regression:
+  `packages/weather/tests/weather.test.js` (both tests fail on the old machine).
+
+### Fixed 2026-11-10: a MASK texel with alpha equal to alphaCutoff was cut where vertex alpha was 1
+
+- **What:** glTF 2.0 keeps a MASK texel whose alpha is greater than or equal to `alphaCutoff`. With base colour alpha
+  0.5, cutoff 0.5 and COLOR_0 alpha 1 (or no COLOR_0, which packs 1), the gltf-pro colour pass cut 40,257 of 77,822
+  pixels of a tilted grid and the pick pass lost 8 of 64 points (RTX A6000, WebGPU). Cause: the stage output alpha
+  of 1 reaches the fragment through perspective-correct interpolation as 0.99999994 in some pixels; the
+  `vertexAlpha: false` caster path wrote `o.alpha=1.0` and kept the same fault. Found in Scott's native Rust engine.
+- **Fix:** the stage hands on 1 - alpha and the fragment reads 1 minus that, so a constant alpha of 1 arrives as an
+  exactly interpolated 0 (gltf-pro `exactAlphaShader` on MASK pipelines; `solidVertexDepth` in `packages/shared/caster.js`
+  for shadows, selection, clustered, staging and taa). gltf-pro casters and pick primitives whose vertex alpha is all 1
+  take the `vertexAlpha: false` path. Regression: `packages/gltf-pro/scripts/test-mask-alpha-browser.mjs`
+  (`npm run test:gpu:mask-alpha`, WebGPU and WebGL2 compat), `packages/gltf-pro/tests/vertex-inputs.test.js`,
+  `packages/shadows/test/cutout-casters.test.js`. The directional shadow map lost nothing before the fix on this GPU
+  (orthographic, no perspective division); it is checked anyway.
+
+### Fixed 2026-11-10: GGX importance samples collapsed onto the normal at low roughness
+
+- **What:** `importanceGGX` (`packages/environment/src/shader-common.ts`, used by the prefilter, the BRDF LUT and
+  sampled probe bakes) took sinTheta as sqrt(1 - cosTheta^2). In f32, below alpha^2 = 2^-24 (roughness under about
+  0.0156) cosTheta rounds to 1 and every sample lands on the normal; just above it the subtraction cancels. The
+  default 128 x 128 LUT was 0.00117 off an f64 integration of the same samples at its smoothest grazing cell (0, 0),
+  2.4 f16 steps. Found in Scott's native Rust engine, which ported this code.
+- **Fix:** cosTheta = sqrt((1 - xi) / d) and sinTheta = alpha sqrt(xi / d) with d = (1 - xi) + alpha^2 xi, from
+  tan^2 theta = alpha^2 xi / (1 - xi) (Walter et al. 2007). Worst cell now 4.9e-4, within one f16 step, on WebGPU and
+  WebGL2 compat. Regression: `packages/environment/tests/environment-browser.js` section 4c.
+
+### The weather lens long-time parity bound is below the shader's own f32 rounding (list 5 R6 row 24, 2026-11-10, open)
+
+- **What:** `packages/weather` `test:browser:parity` lens case (`tests/parity-browser.mjs`, `tests/lens-check.html`)
+  on the Beelink (Radeon 680M, Chrome on D3D12): `longTime` worst 1.374e-4 over 2,400 cases, over its bound 1e-4.
+  The `math` case passes (7.6e-5). Repeats exactly on every run.
+- **Repro:** a CPU model of `lens_field` that rounds every WGSL operation once to f32, with the inputs
+  `lensSettings` packs, against `lensField` in f64 on the same 2,400 cases: worst 1.364e-4, at case 1441
+  (time 123456.75, x 1.1293, y 0.9679, the mask: 0.37333 in f64, 0.37347 in f32). The bound is 1e-4.
+- **Cause:** the test, not the GPU. The field divides cell-local positions (about 1.7, f32 step 1.2e-7) by the drop
+  radius (down to 0.01375) and passes them through smoothsteps with slopes up to about 17, so a correctly rounded f32
+  evaluation of the shipped shader already misses the f64 field by 1.36e-4. A GPU that fuses or reorders operations
+  can land under 1e-4 (the workstation does); one that rounds each operation as written cannot. The long-time packing
+  the case guards (c9b0a86ba) works: the raw time * speed product it replaced is off by far more.
+- **Open:** needs Scott's ruling. The bound is not loosened here. Options: an f32 reference (the model above) with a
+  bound from WGSL's accuracy rules, or a bound derived from the f32 analysis.
+
+### Radeon 680M machine: the instanced frame allocates 4,048 B, over its 292 B floor (list 5 R6 row 15, 2026-11-10, open, core)
+
+- **What:** `npm run test:frame-alloc:browser` on the Beelink: `instanced` (10,000 moving instanced boxes) median
+  4,048 B a frame in three runs (floor 292 B, set on the RTX A6000 machine); the other four scenes pass.
+- **Repro:** `node scripts/frame-alloc-browser.mjs --scenes=instanced,basic --profile --no-check`: 3,750 B a frame in
+  core's `uploadRows` (`packages/core/src/renderer.ts`), the walk over the batch's dirty-row words. 10,000 rows are
+  313 words, and 313 x 12 B (one V8 heap number) is 3,756 B: every word, all bits set (4294967295, outside V8's small
+  integer range), is boxed once a frame, as it is when the function runs below V8's optimizing tier.
+- **Cause:** not proven past the profile. The reading is that `uploadRows` does not reach (or falls out of) the tier
+  that keeps a uint32 unboxed on this machine. Core is frozen for this lane: needs Scott (a core change, for example
+  reading the word as a signed 32-bit value, which the floor check would then confirm).
+
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 
 - **What:** on the WebGL2 layer, which runs no level or cluster kernel and culls no loaded model, `MeshletMesh`
@@ -9829,6 +9914,56 @@ crop/flip path, with explicit handling of the source's alpha representation.
 Standards compared: WHATWG HTML canvas and ImageBitmap (2026), Khronos WebGL
 1.0 section 5.14.8 (2026), W3C WebGPU sections 3.11/19.2 (2026), and W3C
 WebCodecs section 9.4 (2026); sources in clean-room.md.
+
+### Fixed 2026-11-10: batch 132 sciviz audit, seven colour, isosurface and reader defects
+
+- `diverging` compared Lab hues without wrapping, so endpoints 43 degrees apart across +-180 degrees went through
+  white; hues now compare and blend the short way round.
+- Isosurface normals at the grid's faces used an unscaled one-sided difference (up to 11 degrees off on a planar
+  field), in both the CPU Wasm kernel and the WGSL; one-sided differences are now scaled like central ones.
+- An HDF5 enumeration took byte order and sign from its member count; they now come from its base type.
+- FITS rejected HISTORY and COMMENT cards with '=' in column 9 and complex values, and read a blank value as 0; a zero-
+  width binary table row count looped to out-of-memory. Commentary is skipped, complex values keep their text, a blank
+  value reads as absent and the row count is bounded by maxBytes.
+- Xdmf polyhedron face counts and CoRectMesh Dimensions, and EnSight uniform blocks, looped or allocated without bound;
+  they are now checked against the data left and maxBytes before any allocation.
+- Regression: packages/sciviz/tests/audit-132.test.js (every case fails on the old code).
+
+### Open from the batch 132 sciviz audit (2026-11-10): GPU volume defects
+
+Found by reading the shaders against Max 1995 and the package's own docs; each needs a GPU check on both backends,
+so they wait for the fix phase. Line numbers are at the audit commit.
+
+- **Absorption follows the box shape.** `src/volume.ts` (step setup and opacity correction) and `src/multivolume.ts`
+  measure the step in unit-box coordinates against 1 / max(dims), so a ray along a short axis absorbs as if it crossed
+  the longest one. Repro: dims [64, 64, 8], constant field, alpha 0.1: a ray along z gives about 1 - 0.9^64 instead of
+  1 - 0.9^7. `volume-quality-shader.ts` already uses physical length.
+- **Voxel centres are offset by half a voxel.** `volume.ts` and `multivolume.ts` sample at texture coordinate p while the
+  docs say bounds are voxel centres; the coordinate should be (p (n - 1) + 0.5) / n, as the quality shader does.
+  Multivolume channels of different resolutions are offset from each other. bricks.ts and cinematic-shader.ts share it.
+- **Lighting view direction uses the normal matrix.** `volume.ts` maps the box-space ray direction by the inverse
+  transpose instead of the model matrix; with non-cubic bounds the normal flip and specular are wrong.
+- **`density` means two things.** `volume.ts` and `multivolume.ts` scale opacity (min(alpha density, 0.999)) on one
+  path and extinction (1 - (1 - alpha)^density) on the other, so the quality wrapper changes the picture.
+- **The quality wrapper fails with a colorScale map.** `volume-quality.ts` binds the transfer texture as filterable
+  float but a colorScale map makes it rgba32float, so bind-group creation fails; the shader also reads row 0.5 of a
+  4-row table.
+- **Jittered preintegration spans the wrong length.** `volume-quality-shader.ts` takes front at t + ds jitter and back
+  at t + ds but applies opacity for the full ds; back should be front + ds.
+- **Preintegration uses the transfer function's range, not the layer's.** `transfer.ts` builds the table over
+  tf.state.range while the shader normalises by the layer range; `bindTransfer` uses layer.range.
+- **Multivolume culls back faces and ignores scene depth.** `multivolume.ts` always uses cullMode 'back' (nothing draws
+  with the camera inside the box) and never clips rays against opaque geometry, unlike `volume.ts`.
+- **Cyclic tables are read half an entry off.** `colormaps.ts` places entries at k / 256 and `color-lookup.ts` reads
+  t 255, so the GPU shows sample(t 255 / 256).
+
+### Open from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
+
+- **Dense attributes are not read.** `src/hdf5.ts` reads attribute messages (type 12) only; an object with more than 8
+  attributes stores them in a fractal heap (attribute info message, type 21) and `attributes()` returns none or some.
+  Repro needs a file written with h5py and 9 or more attributes on one object; no fixture has one yet.
+- **The implicit chunk index walks every chunk.** `src/hdf5.ts` loops over all chunks of a dataset with an implicit
+  index whatever the selection, with no abort check, so a large shape with chunk size 1 takes very long.
 
 ### Fixed 2026-11-10: blender parseMargoPBR leaked decoded images when the physical shader failed to load
 
@@ -15690,6 +15825,59 @@ showed the path from the registry's WeakCells through `gl` to the disposed engin
 `WeakRef` to the device and an id into a per-device `WeakMap` of shared textures. Regression:
 packages/webgl2-compat/test/bind-group-release.test.js (fails with the old held value), and vfx-check under compat.
 
+### Fixed: ANGLE D3D11 on an AMD driver hung the GPU under the old flipped-blit present (2026-11-10, Beelink)
+
+Repro (Radeon 680M, Windows 11, AMD driver 32.0.21030.2001, Edge 157.0.4341.42): `node
+packages/materials/test/features-browser.mjs` failed its compat half 2 of 2 on 48ca54edd, at a different step each run
+("eye angle 0.6: 0,256", "white highlight at NaN", "hair shows: 0,0,0"): every pixel of the frame read 0, alpha too.
+Cause, from the browser's GPU log (edge://gpu after the run): `Renderer11::testDeviceLost: The D3D11 device was removed,
+HRESULT: 0x887A0006` (DXGI_ERROR_DEVICE_HUNG), then `The GPU process crashed! Exit code:
+RESULT_CODE_GPU_EXIT_ON_CONTEXT_LOST`. The scene's context was lost and its frames stayed empty; after the third GPU
+process restart the browser blocked WebGL for the page (`getContext('webgl2')` null: "WebGPU adapter unavailable").
+No Windows TDR event was logged; native WebGPU (Dawn D3D12) never hung. Measured with loops of 30 fresh devices, each a
+256x128 PBR sphere (65k triangles): hangs in 12 of 13 runs with the old present (a y-flipped `blitFramebuffer` and a
+colour-masked clear, both ANGLE D3D11 shader paths) while frames reached the page through `transferToImageBitmap` and
+the layer polled fence syncs. Removing any one ingredient stopped it: a 2D `drawImage` present 0 in 90 devices,
+`fenceSync` returning null 0 in 60, a 32x16 sphere 0 in 30, an unlit sphere 0 in 72; `gl.finish()` before each
+transfer, never calling `loseContext` or no `keepFrame` copy did not. A plain WebGL2 page with the same mesh, MSAA
+resolve, flip blit, fences and transfers did not hang in 240 contexts, so the trigger inside ANGLE or the driver is
+not isolated. Valid WebGL calls must not hang the device: below Margo. Not caused by the 2026-11-10 compat commits
+first suspected (compat source at 42d6e24ae^ hung the same). 450015cb1 ("present the canvas with a texel-fetch draw,
+not a flipped blit", for the NVIDIA uniform-block bug above) removes the old present, and with it the hang: 0 in 60
+devices, and the features test passes 2 of 2 on 000a11e1d. Regression: packages/webgl2-compat/test/device-churn-browser.mjs
+(in test:gpu; 30 fresh devices must each show their frame) fails at device 1 with compat source at 450015cb1^ on the
+Beelink and passes on main. Diagnostics kept outside the repository in lane M1's `.lane/diag` (raw-launch.mjs, wrap.js
+GL wrappers, feat.html, min.html).
+
+### Accepted: AMD D3D11 compressed mip blend makes implicitFootprint differ from native (2026-11-10, Beelink)
+
+Repro (Radeon 680M, Windows 11, AMD driver 32.0.21030.2001): `node packages/webgl2-compat/test/features-browser.mjs`
+on main 50b7ceddc stopped at `implicitFootprint: compat differs from native`, `.linear/implicit/false[0..7]: native
+1051063284, compat 1048608897`. Decoded: native 0x3ea5f3f4 = 0.32413 = level 2 (64/255) plus 25/256 of level 1, so
+LOD 487/256 (1.90234); compat 0x3e808081 = 64/255, level 2 alone. Every one of the 20 linear-mip rows fits that one
+LOD on both sides (bias -1.25, 0.375 and 1.25 give LOD fractions 0.652, 0.277, 0.152; native blends by the fraction,
+compat by 0.6875, 0.21875, 0.0625); nearest-mip rows and the near-integer map are bit-identical. Cause, below Margo:
+the layer emits a plain GLSL `texture()` for these footprints and the AMD driver under ANGLE D3D11 blends two mip
+levels with weight clamp((frac - 0.1) / 0.8, 0, 1) on a 1/64 grid. Raw WebGL2 without the layer
+("ANGLE (AMD Radeon(TM) Graphics 0x1681 Direct3D11)") at LOD fractions 0, .0625, .125, .1875, .25, .3125, .375, .5,
+.625, .75, .875, .9375 between a white and a black level returns 1, 1, .96875, .89063, .8125, .73438, .65625, .5,
+.34375, .1875, .03125, 0, through `textureLod` and through `texture()` with a bias alike; native WebGPU (Dawn D3D12)
+on the same GPU in the same page returns 1 - frac exactly, and so does ANGLE Vulkan. The LOD itself is the same.
+Spec: WebGPU 7.1.1 (GPUSamplerDescriptor), "The precise filtering behavior is implementation-dependent."; OpenGL ES
+3.0 section 3.8.10.4 gives tau = [1 - frac(lambda)] tau1 + frac(lambda) tau2 for LINEAR_MIPMAP_LINEAR, which the
+D3D11 driver does not follow. Exact layer-equals-native bits for hardware-blended footprints is therefore not a spec
+requirement; it held on NVIDIA, Intel and ANGLE Vulkan only because their blends are linear.
+Scott ruled 2026-11-10: a spec-scoped test. test/blend-check.mjs classifies the backend with a raw WebGL2 probe
+(textureLod at every LOD k/256). Linear-blend backends keep the exact bit equality unchanged. On a compressed-blend
+backend the linear-mip rows of implicitFootprint and the footprint rows of mipFiltering must pick native's LOD
+(nearest-mip sweeps of 512 biases i/256 - 1, compared bit for bit) and each blended texel must equal, bit for bit,
+native's own textureSampleLevel and raw WebGL2 textureLod at one shared LOD k/256; every other row stays exact. A
+self-test scales the layer's footprint coordinates by 1.01 (LOD 3.7/256 high, inside the clamp, so the blend alone
+cannot see it) and must fail through the sweeps. bias-browser.mjs (test:gpu:bias) uses the same scheme: D3D11
+compressed, Vulkan linear and exact. Regression: blend-check.test.js (classification and the comparison on synthetic
+probes); on the Beelink features-browser.mjs passes with the self-test failing as required. No system or driver
+setting was changed (the AMD "Texture Filtering Quality" setting may control the compression; not tried).
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -17683,7 +17871,7 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 - `transitionTo(target, {seconds = 30, ease = 'smoothstep'})` blends to a preset or a partial state. Starting another one mid-blend continues from the current weather, so nothing jumps. `set(target)` jumps.
 - `schedule([{to, seconds, hold}], {loop})` runs steps in order. `randomWalk(from, {chain, hold, blend, seed})` wanders by a weighted chain (`TEMPERATE` by default; a made-up mild climate), the same way for the same seed.
 - `on(listener)` gets `start` and `arrive` events once each per transition. A listener that changes the weather throws `MargoError` `'state'`.
-- `update(delta)` moves everything; a long delta (a hidden tab) is applied in pieces of at most 5 s so the ground and the schedule behave as if time had passed normally. `state` is a fresh copy each read.
+- `update(delta)` moves everything; a long delta (a hidden tab) is applied in pieces of at most 5 s so the ground and the schedule behave as if time had passed normally. Every blend and hold that ends inside a piece is processed, however many there are, so no time is lost. A call refused for a bad target, seconds or ease (`transitionTo`, `set`) throws before it stops a running schedule or walk. `state` is a fresh copy each read.
 - `wetness` rises under rain and hail (about 20 s) and dries (about 90 s); `snowCover` builds under snow (about 2 minutes) and melts (about 5 minutes). The time constants match the sky's own `Weather`.
 - `using` and `dispose()` end it; use afterwards throws `MargoError` `'disposed'`.
 
@@ -17692,10 +17880,6 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 `machine.wind` is a `WindField`, kept in step with the state; make your own with `new WindField({speed, direction, gust, turbulence, gustPeriod, scale, seed})`. `sample(x, y, z, t)` returns a velocity: the mean wind scaled by a gust factor (between `1 - gust` and `1 + gust`), a direction that wobbles up to `0.5 * gust` radians, and turbulence that differs from place to place and blows downwind with the mean. It is a pure function of its arguments, so the same call gives the same vector, and its length never exceeds `speed * (1 + gust + turbulence)`. Use it for rain slant, sway of trees and cloth, or a sound's wind layer.
 
 ## Wet and snowy surfaces
-
-`wetRoughness`, `wetColor`, `snowWeight` and `surfaceResponse` give a surface's roughness and colour from the ground state: wet is darker (up to 25 percent) and shinier (down to 35 percent of the dry roughness), and snow whitens up-facing surfaces first and steeper ones as the cover grows. `applyWetness(material, dryRoughness, wetness)` sets `material.roughness`. For a shader, paste `surfaceWGSL` ahead of it and call `weather_surface(roughness, color, normalY, wetness, snowCover)`; the real-GPU test checks that WGSL against the JavaScript.
-
-## Puddles and wet ground
 
 [README continues: https://margoengine.com/llms/packages/weather.md]
 

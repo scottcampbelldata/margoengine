@@ -4934,3 +4934,23 @@ GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
   failures still open (WebKit VP8 colour, Chromium pointer lock under the harness, sky's 2 px on ANGLE Metal, the
   `implicitFootprint` oblique-gradient case, ANGLE's dropped draw after a texture upload, which is worked around in
   `60552800e` but not reported upstream) are in [known-bugs.md](../known-bugs.md).
+
+## List 5 on the Beelink: batch R6, AMD GPU bug hunt (2026-11-10)
+
+Run on the Beelink (AMD Radeon 680M, RDNA 2 iGPU, driver 32.0.21030.2001, Windows 11; Chromium with WebGPU on Dawn
+D3D12 and the WebGL2 layer on ANGLE D3D11), the project's only AMD GPU. Every package's GPU and browser tests ran on
+both backends, one GPU slot, the mini-pc heat profile; the failed suites ran again on current main after the fixes.
+Every row, with what came out, the cause and its state, is in [amd-gpu-hunt.md](../work-lists/amd-gpu-hunt.md).
+
+- **Fixed in the owning package, each with a regression test:** animator and four other packages' browser checks
+  served the wrong folder (`195e51396`); biomes erosion's consumer page (`bd3147a9f`); creative's half-float mip
+  average (`30abe249a`); headless MP4 range (`a182a4000`); culling readbacks and MSAA comparisons (`08728ca78`);
+  the GPU runner refusing every plan over an unlisted sky probe (`95fb4ca7e`); compat compute stores into 8-bit UNORM
+  textures, which the 680M's colour export truncated through binary16 (`391011efa`); river inflow footprints that a
+  GPU division moved by a cell (`17eebeb5c`).
+- **Below Margo, in known-bugs.md:** the 4x resolve's rounding (row 8), the `screen` blend unit (row 14), the
+  transitions texel-edge oracle (row 21), the binary16 colour export (row 25).
+- **Open, for Scott or a dedicated hunt:** the weather lens long-time bound is below the shader's own f32 rounding
+  (row 24, known-bugs); the instanced frame's allocation in core's `uploadRows` (row 15, core); compat-only rows 26,
+  28 and 29; rows 16 to 18 belong to the dev PC's commits of the same day.
+- **Machine:** ffmpeg n9.0 installed for the headless check, from the build linked by ffmpeg.org, sha256 checked.
