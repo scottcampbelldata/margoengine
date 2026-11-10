@@ -1414,6 +1414,10 @@
       "types": "./dist/input/layout.d.ts",
       "import": "./dist/input/layout.js"
     },
+    "./input/haptics": {
+      "types": "./dist/input/haptics.d.ts",
+      "import": "./dist/input/haptics.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

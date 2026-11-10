@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12410493,
+  "total": 12411694,
   "history": [
     {
       "date": "2026-10-24",
@@ -5681,6 +5681,12 @@
       "commit": "batch-264",
       "reason": "@margoengine/stats/geometry: optional Stats parity entry, 1568 B gzip; separate from root and core/stage.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-253",
+      "reason": "New optional @margoengine/input/haptics: absent to 945 B gzip, ceiling 1201 B. Cohesive device/action lifecycle stays together; splitting would add coordination without saving consumer bytes. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6764,6 +6770,7 @@
     "@margoengine/sprites/pick": 2189,
     "@margoengine/html/blend": 3303,
     "@margoengine/inspector/textures": 4964,
-    "@margoengine/stats/geometry": 1824
+    "@margoengine/stats/geometry": 1824,
+    "@margoengine/input/haptics": 1201
   }
 }

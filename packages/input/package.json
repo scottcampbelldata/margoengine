@@ -61,6 +61,10 @@
     "./layout": {
       "types": "./dist/layout.d.ts",
       "import": "./dist/layout.js"
+    },
+    "./haptics": {
+      "types": "./dist/haptics.d.ts",
+      "import": "./dist/haptics.js"
     }
   },
   "files": [
