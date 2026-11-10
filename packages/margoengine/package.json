@@ -1402,6 +1402,10 @@
       "types": "./dist/lightmap/refracted.d.ts",
       "import": "./dist/lightmap/refracted.js"
     },
+    "./lightmap/mesh": {
+      "types": "./dist/lightmap/mesh.d.ts",
+      "import": "./dist/lightmap/mesh.js"
+    },
     "./lines": {
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"

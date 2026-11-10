@@ -1,5 +1,5 @@
 // The plain entry must not carry the optional passes: area lights, bounces and glass (./global) or caustics
-// (./refracted). Checked on the built files: the code each entry loads, following its relative imports.
+// (./refracted), and the triangle-mesh baker (./mesh) carries none of them nor the quad atlas packer. Checked on the built files: the code each entry loads, following its relative imports.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -16,8 +16,11 @@ async function loaded(file, seen = new Set()) {
 test('each entry loads only its own passes', async () => {
   const plain = await loaded('index.js'),
     global = await loaded('global.js'),
-    refracted = await loaded('refracted.js');
-  for (const name of ['bakeGlobalLightmap', 'bakeRefractedLightmap', 'glass']) assert.ok(!plain.includes(name), name);
+    refracted = await loaded('refracted.js'),
+    mesh = await loaded('mesh.js');
+  for (const name of ['bakeGlobalLightmap', 'bakeRefractedLightmap', 'bakeMeshLightmap', 'glass'])
+    assert.ok(!plain.includes(name), name);
+  assert.ok(mesh.includes('bakeMeshLightmap') && !mesh.includes('bakeGlobalLightmap') && !mesh.includes('packAtlas'));
   assert.ok(global.includes('bakeGlobalLightmap') && !global.includes('bakeRefractedLightmap'));
   assert.ok(refracted.includes('bakeRefractedLightmap') && !refracted.includes('bakeGlobalLightmap'));
 });

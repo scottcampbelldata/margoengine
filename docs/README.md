@@ -87,7 +87,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/environment`](../packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](../packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](../packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](../packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
+| [`@margoengine/lightmap`](../packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](../packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/weather`](../packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](../packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |

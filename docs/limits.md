@@ -3283,3 +3283,11 @@ control but has no ETC extension, so0/993 uploaded. Prior Vulkan loading
 failure remains unresolved. Remaining formats/public integration/prebuilt
 removal and speed-phase timing debt remain open.
 [Full receipt](whitepaper/results/batch-134-allocation-checkpoint.json).
+
+## Triangle-mesh lightmaps (batch 54)
+
+`bakeMeshLightmap` (`@margoengine/lightmap/mesh`) bakes on the CPU, one mesh per call, at most 2,048 x 2,048 texels,
+4,194,304 covered texels and 67,108,864 rays. Light is direct (with shadows) and AO; bounces, area and emissive lights
+are in `./global` for quads only. Overlapping UV charts are counted (`overlaps`), not separated: the later triangle's
+light is kept where both centres fall. Dilation averages neighbours across a gutter narrower than twice `dilate`, so
+two charts closer than that blend in the gutter (never inside a chart). Overlaps under 1e-3 texels count as touching.

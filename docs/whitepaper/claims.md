@@ -2773,3 +2773,10 @@ control but has no ETC extension, so0/993 uploaded. Prior Vulkan loading
 failure remains unresolved. Remaining formats/public integration/prebuilt
 removal and speed-phase timing debt remain open.
 [Full receipt](results/batch-134-allocation-checkpoint.json).
+
+## Batch 54 lightmap (Mac)
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| `@margoengine/lightmap/mesh` bakes any triangle mesh at its own UV1 | `packages/lightmap/tests/mesh.test.js`: two triangles match the quad baker texel for texel within one RGB8 step; a 12-triangle cube matches Lambert irradiance on all 1,176 chart texels within 1e-5 | CPU, direct light and AO; hand-made test meshes, no real glTF file baked yet |
+| Conservative coverage reaches every texel a triangle touches | same test file: a sliver covering no texel centre still bakes its row | overlaps under 1e-3 texels count as touching |

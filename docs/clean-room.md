@@ -1501,6 +1501,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | L4 | bounce gather by cosine-weighted hemisphere rays | lightmap/src/global.ts | Malley's method, PBRT 4e sec. A.5 |
 | L5 | caustic photons: point power 4pi I, area power pi L A, Snell refraction, Fresnel split | lightmap/src/refracted.ts | photometry; PBRT 4e sec. 9.3 (cited line 3) |
 | L6 | sRGB encode, defaults (texelsPerUnit 1, aoDistance 4), normal 0.5-bias encode, ray bias 1e-3 | lightmap/src/bake.ts | IEC 61966-2-1 |
+| L7 | overestimated conservative rasterization in UV space: edge functions shifted by the cell's worst-case semidiagonal, 0.5 (abs(ex) + abs(ey)), inside the triangle's bounds; border texels sample the nearest triangle point; 8-neighbour mean dilation | lightmap/src/mesh.ts | Pineda 1988 (edge functions); Hasselgren, Akenine-Moller, Ohlsson, "Conservative Rasterization", GPU Gems 2 ch. 42, 2005 (read in full, figures and equation images missing); nearest-point border sampling and dilation Margo-own. Pineda's paper itself was not read this batch |
 
 The batch 168 irradiance measurement drives Cycles inside Blender 5.3.0 Beta as a black box (`C:\blender\blender.exe`,
 `MARGO_BLENDER` overrides the path). The bake is the diffuse direct and indirect passes with the surface color left

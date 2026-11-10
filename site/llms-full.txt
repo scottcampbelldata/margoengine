@@ -350,7 +350,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/environment`](packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
+| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/weather`](packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
@@ -5873,6 +5873,14 @@ control but has no ETC extension, so0/993 uploaded. Prior Vulkan loading
 failure remains unresolved. Remaining formats/public integration/prebuilt
 removal and speed-phase timing debt remain open.
 [Full receipt](whitepaper/results/batch-134-allocation-checkpoint.json).
+
+## Triangle-mesh lightmaps (batch 54)
+
+`bakeMeshLightmap` (`@margoengine/lightmap/mesh`) bakes on the CPU, one mesh per call, at most 2,048 x 2,048 texels,
+4,194,304 covered texels and 67,108,864 rays. Light is direct (with shadows) and AO; bounces, area and emissive lights
+are in `./global` for quads only. Overlapping UV charts are counted (`overlaps`), not separated: the later triangle's
+light is kept where both centres fall. Dilation averages neighbours across a gutter narrower than twice `dilate`, so
+two charts closer than that blend in the gutter (never inside a chart). Overlaps under 1e-3 texels count as touching.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -11546,25 +11554,35 @@ atlas.textures.lightmap; // RGBA8, irradiance / atlas.lightmapScale
   Inputs are copied before the first await; `signal` and `onProgress` run every 256 texels.
 - **Quads only.** `bakeLightmap` accepts quads and nothing else: `positions` is a `Float32Array` of 12 floats per quad,
   each a parallelogram with its corners counterclockwise (anything else throws a `RangeError` naming the fix), and the
-  atlas UVs are its own, one chart per quad. It does not read triangles, n-gons or a mesh's existing UVs, including the
-  lightmap UVs `@margoengine/mesh-edit/modeling`'s `meshLightmapUVs` makes; those are ready for a future general-mesh
-  baker but cannot be baked here today.
+  atlas UVs are its own, one chart per quad. Triangle meshes with their own lightmap UVs bake through
+  `@margoengine/lightmap/mesh` below.
 - **Asset record.** `lightingAsset(lightmap, terms)` returns a small record (scales, size, radiometry, baked terms) to
   store next to the textures, for example in glTF extras.
 
-## More light: `@margoengine/lightmap/global`
+## Any triangle mesh: `@margoengine/lightmap/mesh`
 
-`bakeGlobalLightmap(quads, options)` takes every `bakeLightmap` option and adds:
+`bakeMeshLightmap(mesh, options)` bakes a triangle mesh at its own second UV set (`uv1`, glTF `TEXCOORD_1`), such as
+the lightmap UVs of a glTF file or of `@margoengine/mesh-edit/modeling`'s `meshLightmapUVs`.
 
-- `areaLights`: rectangle lights, the same `RectAreaLight` objects as `@margoengine/clustered/area`, with
-  `areaSamples` shadow rays per texel.
-- `emissiveLights`: emissive quads light the others; with a `surface` callback, each emitting texel is its own light.
-- `bounces` (0 to 2) and `bounceRays`: diffuse indirect light, as per-quad averages (coarse radiosity).
-- `transmission`: quads with albedo alpha below 1 cast no shadows.
-- `glassVolumes`: closed convex volumes made of bake quads cast coloured shadows (Fresnel at each boundary, Beer
-  absorption inside). Light goes straight through: no refraction or caustics.
+```ts
+import { bakeMeshLightmap } from 'margoengine/lightmap/mesh';
 
-## Caustics: `@margoengine/lightmap/refracted`
+// A 4 x 4 floor as two triangles, its lightmap UVs covering the whole map.
+const baked = await bakeMeshLightmap(
+  {
+    positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+    uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  },
+  {
+    width: 64, // height defaults to width
+    lights: [{ type: 'point', position: [2, 2, -2], intensity: 8 }],
+    occluders: [{ positions: new Float32Array([1, 1, -1, 3, 1, -1, 2, 1, -3]) }], // casts shadows, not baked
+  },
+);
+baked.lightmap; // RGBA8, light / baked.lightmapScale; alpha 0 where no chart reaches
+baked.irradiance; // Float32 RGB per texel, HDR
+```
 
 [README continues: https://margoengine.com/llms/packages/lightmap.md]
 

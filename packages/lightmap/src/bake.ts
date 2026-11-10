@@ -5,7 +5,10 @@ import { MeshBVH } from '@margoengine/bvh/tree';
 import { packAtlas } from '@margoengine/materials/atlas';
 import type { MutableVec3 } from '@margoengine/math';
 import { cross, dot, length, normalize } from '@margoengine/math/vec3';
+import { checkpoint, inRange } from './checks.js';
 import type { Lightmap, LightmapChart, LightmapOptions, LightmapQuads, LightmapSurface } from './index.js';
+
+export { checkpoint, inRange } from './checks.js';
 
 interface Settings {
   physical: boolean;
@@ -85,20 +88,6 @@ type Extension = (input: BakeInput) => Plan;
 const byte = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255);
 // sRGB encoding per IEC 61966-2-1.
 const srgbByte = (v: number) => byte(v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
-
-/** Yields to the event loop, then throws if `signal` aborted. */
-export async function checkpoint(signal?: AbortSignal): Promise<void> {
-  signal?.throwIfAborted();
-  await new Promise<void>((resolve) => setTimeout(resolve, 0));
-  signal?.throwIfAborted();
-}
-
-/** Throws a RangeError naming `name` unless `value` is a number (an integer by default) from `min` to `max`. */
-export function inRange(value: number, min: number, max: number, name: string, integer = true): number {
-  if (!Number.isFinite(value) || value < min || value > max || (integer && !Number.isSafeInteger(value)))
-    throw new RangeError(`${name} must be ${integer ? 'an integer' : 'a number'} from ${min} to ${max}`);
-  return value;
-}
 
 /** The unit vector of `a`; throws when it is zero or not finite. */
 export function unit(a: ArrayLike<number>, subject: string): MutableVec3 {

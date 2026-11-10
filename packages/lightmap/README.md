@@ -43,11 +43,49 @@ atlas.textures.lightmap; // RGBA8, irradiance / atlas.lightmapScale
   Inputs are copied before the first await; `signal` and `onProgress` run every 256 texels.
 - **Quads only.** `bakeLightmap` accepts quads and nothing else: `positions` is a `Float32Array` of 12 floats per quad,
   each a parallelogram with its corners counterclockwise (anything else throws a `RangeError` naming the fix), and the
-  atlas UVs are its own, one chart per quad. It does not read triangles, n-gons or a mesh's existing UVs, including the
-  lightmap UVs `@margoengine/mesh-edit/modeling`'s `meshLightmapUVs` makes; those are ready for a future general-mesh
-  baker but cannot be baked here today.
+  atlas UVs are its own, one chart per quad. Triangle meshes with their own lightmap UVs bake through
+  `@margoengine/lightmap/mesh` below.
 - **Asset record.** `lightingAsset(lightmap, terms)` returns a small record (scales, size, radiometry, baked terms) to
   store next to the textures, for example in glTF extras.
+
+## Any triangle mesh: `@margoengine/lightmap/mesh`
+
+`bakeMeshLightmap(mesh, options)` bakes a triangle mesh at its own second UV set (`uv1`, glTF `TEXCOORD_1`), such as
+the lightmap UVs of a glTF file or of `@margoengine/mesh-edit/modeling`'s `meshLightmapUVs`.
+
+```ts
+import { bakeMeshLightmap } from 'margoengine/lightmap/mesh';
+
+// A 4 x 4 floor as two triangles, its lightmap UVs covering the whole map.
+const baked = await bakeMeshLightmap(
+  {
+    positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+    uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  },
+  {
+    width: 64, // height defaults to width
+    lights: [{ type: 'point', position: [2, 2, -2], intensity: 8 }],
+    occluders: [{ positions: new Float32Array([1, 1, -1, 3, 1, -1, 2, 1, -3]) }], // casts shadows, not baked
+  },
+);
+baked.lightmap; // RGBA8, light / baked.lightmapScale; alpha 0 where no chart reaches
+baked.irradiance; // Float32 RGB per texel, HDR
+```
+
+- **Coverage.** Each triangle is rasterized in texel space conservatively: every texel whose cell it overlaps by more
+  than 1e-3 texels (Hasselgren, Akenine-Moller and Ohlsson 2005). A texel whose centre is inside samples that surface
+  point; a border texel samples the triangle's point nearest its centre, the nearest triangle winning, so chart
+  edges are lit to their outer texels and thin slivers still get texels. `triangle` names each texel's source.
+- **Lighting.** The same lights, shadows, AO and `radiometry` as `bakeLightmap`, traced through `@margoengine/bvh`
+  against the mesh and `occluders`. Normals are interpolated from `normals` when given, else each triangle's own.
+  Point and spot shadows skip the receiving triangle; other rays start `bias` (default 0.001) off the surface.
+- **Dilation.** `dilate` passes (default 2) give each empty texel next to a chart the mean of its filled neighbours,
+  so bilinear filtering at chart borders reads light, not black. Leave at least that many texels between charts.
+- **Checks.** UVs must be 0 to 1; `overlaps` counts texels inside two triangles (overlapping charts) and `degenerate`
+  the triangles with no UV area (they still cast shadows). Size (`width`, `height` up to 2,048), texels, rays and
+  bytes are checked before tracing; inputs are copied before the first await; `signal` and `onProgress` run every
+  256 texels.
 
 ## More light: `@margoengine/lightmap/global`
 

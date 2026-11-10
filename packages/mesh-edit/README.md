@@ -539,9 +539,8 @@ console.log(unwrapped.charts.length, unwrapped.seams.length, lightmap.texelsPerU
 - Pins are checked against each other by their face outlines (overlap throws, touching is reported), but the packed
   charts keep `padding` from a pinned chart's whole box.
 - One texel density for every unpinned and single-pin chart; there is no per-chart weighting.
-- `meshLightmapUVs` takes no pins. Its UV set is ready for a general-mesh baker, but `@margoengine/lightmap` does not
-  read it today: `bakeLightmap` bakes quads only (12 floats per quad in `positions`, each quad a parallelogram) and
-  makes its own UVs, one chart per quad. Triangles, n-gons and these charts are not baked yet.
+- `meshLightmapUVs` takes no pins. Bake its UV set with `bakeMeshLightmap` from `@margoengine/lightmap/mesh`: fan-split
+  each face into triangles and pass `uv[f][c]` per corner as the mesh's `uv1`.
 
 ## Import to editable meshes and flat-tile merging
 
