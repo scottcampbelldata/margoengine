@@ -4298,6 +4298,10 @@
       "types": "./dist/viewcube/fit.d.ts",
       "import": "./dist/viewcube/fit.js"
     },
+    "./viewcube/compass": {
+      "types": "./dist/viewcube/compass.d.ts",
+      "import": "./dist/viewcube/compass.js"
+    },
     "./voxel": {
       "types": "./dist/voxel.d.ts",
       "import": "./dist/voxel.js"

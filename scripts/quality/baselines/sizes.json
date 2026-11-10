@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13844722,
+  "total": 13852638,
   "history": [
     {
       "date": "2026-10-24",
@@ -7268,6 +7268,12 @@
       "commit": "0298bf691",
       "reason": "Batch 269 adds native playback lifecycle, readiness, cancellation and policy fallback in one optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-198-job3",
+      "reason": "New optional viewcube/compass: 0 to 7660 B gzip, ceiling 7916. DOM compass, turntable input and accessible menu share one lifecycle; splitting would complicate ownership. Root and core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8586,6 +8592,7 @@
     "@margoengine/voxel-net/server-runtimes": 20060,
     "@margoengine/creative/grass-terrain": 1907,
     "margoengine/creative/grass-terrain": 325,
-    "@margoengine/video/playback": 1725
+    "@margoengine/video/playback": 1725,
+    "@margoengine/viewcube/compass": 7916
   }
 }

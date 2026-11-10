@@ -37,6 +37,10 @@
     "./fit": {
       "types": "./dist/fit.d.ts",
       "import": "./dist/fit.js"
+    },
+    "./compass": {
+      "types": "./dist/compass.d.ts",
+      "import": "./dist/compass.js"
     }
   },
   "files": [

@@ -880,3 +880,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/creative and margoengine (batch 271 job 3): document /grass-terrain async factory, scatter peer, segmented default blade, height/density and world colour rasters, seed/LOD/wind defaults, sphere interaction/recovery, abort and restoration; examples deferred.
 - @margoengine/video (batch 269 job 4): document /playback prepareVideo, muted inline/autoplay defaults, native poster, ready vs started, owned/custom fallback, play gesture, timeout, errors, abort and source/stream ownership; examples deferred.
 - margoengine (batch 269 job 4): document video/playback alias; examples deferred.
+
+
+- @margoengine/viewcube (batch 198 job 3): document /compass ViewCompass attachment, north/radian defaults, cardinal clicks/drag, keyboard menu actions, fit callback and adapter fallback, visibility/themes, reserved margins, cleanup and pole limitation.
+- margoengine (batch 198 job 3): document viewcube/compass forwarding.
