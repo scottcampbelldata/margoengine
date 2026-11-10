@@ -3,6 +3,7 @@
 <title>Compatibility device tiers</title>
 <script type="module">
 import { createTieredGPU } from '/packages/webgl2-compat/dist/tiers.js';
+import { maskTier } from './support/mask-tier.js';
 
 const U = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
 const allocations = [];
@@ -11,12 +12,7 @@ const FULL = '@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) 
 function makeContext(tier, attributes) {
   const gl = new OffscreenCanvas(4, 4).getContext('webgl2', attributes);
   if (!gl) throw new Error('WebGL2 required for tier checks');
-  const get = gl.getExtension.bind(gl);
-  gl.getExtension = name => {
-    if (tier !== 'full' && name === 'EXT_color_buffer_float') return null;
-    if (tier === 'ldr' && name === 'EXT_color_buffer_half_float') return null;
-    return get(name);
-  };
+  maskTier(gl, tier);
   for (const [name, index] of [['texStorage2D', 2], ['texStorage3D', 2], ['renderbufferStorageMultisample', 2]]) {
     const original = gl[name].bind(gl);
     gl[name] = (...args) => { allocations.push({ tier, name, internal: args[index] }); return original(...args); };

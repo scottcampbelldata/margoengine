@@ -864,6 +864,14 @@ window.check = {
     }
   },
   names: () => Object.keys(cases),
+  async runCompat(name) {
+    if (!compat) {
+      const adapter = await createCompatGPU().requestAdapter();
+      const extra = adapter.features.has('texture-compression-bc') ? ['texture-compression-bc'] : [];
+      compat = await adapter.requestDevice({ requiredFeatures: ['depth32float-stencil8', ...extra] });
+    }
+    return run(compat, name);
+  },
   async run(name) {
     if (!native) {
       // The BC formats where both adapters have them (the layer: s3tc, its sRGB twin, RGTC and BPTC).

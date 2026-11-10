@@ -48,11 +48,7 @@ a particular browser selected that adapter.
   `C:\Program Files\Google\Chrome\Application\chrome.exe`.
 - Edge 157.0.4341.42 exists at
   `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`.
-- Desktop Firefox is absent from the standard Program Files locations,
-  StartMenuInternet registry entries and PATH. Playwright's patched Firefox
-  157.0 exists at
-  `\AppData\Local\ms-playwright\firefox-1555\firefox\firefox.exe`.
-  This corrects the previous handoff's claim that no Firefox binary was present.
+- Shipped Firefox159.0.1 is now runnable through WebDriver BiDi. Its executable is supplied only by environment variable; no installed path is committed. The older patched-browser loader refusal remains historical evidence below.
 - Playwright Chromium 1248/headless-shell 1248 are installed, supplemental only.
   No Playwright WebKit directory, `adb` or `safaridriver` was found locally.
   No connected physical Android or Apple device/farm access has been established.
@@ -73,7 +69,7 @@ Windows viewport/UA emulation cannot certify iOS, iPadOS or Android GPU drivers;
 Playwright WebKit cannot certify Safari.
 
 The coordinator should request the real Mac, iPhone, iPad and both Android GPU
-families above, plus a working stable Firefox setup or access to one.
+families above, with the Firefox scoped row now measured below.
 Physical lower-tier hardware and the integrated AMD browser rows are still
 unmeasured. Chrome and Edge availability is not a completed matrix row.
 
@@ -113,5 +109,11 @@ requires resource ID 1 for a private assembly DLL. Thus the installed browser's
 manifest packaging explains this loader refusal and Playwright's generic spawn
 UNKNOWN, before renderer/GPU startup. The [resource documentation](https://learn.microsoft.com/en-us/windows/win32/sbscs/using-side-by-side-assemblies-as-a-resource)
 distinguishes IDs 1 and 2. No installation, binary, registry or setting was changed;
-no Firefox pixel pass is claimed. Evidence with hashes, resource IDs, manifest
+that historical diagnostic claimed no Firefox pixel pass. Evidence with hashes, resource IDs, manifest
 text and event: docs/whitepaper/results/batch-273-firefox-diagnosis.json.
+
+## Shipped Firefox row, completed under rule22
+
+Shipped Firefox159.0.1 now passes full/forced16F/forcedLDR device numeric checks, the scoped10-scene lower-tier package grid and destroy-after-submit checks. Its default native WebGPU adapter is null. All46 feature/ordinary-compute/strict-CSP cases execute on Firefox compatibility against native Chromium references with unchanged tolerances. The final corpus draws733 render pipelines, dispatches477 compute pipelines and rejects one intended invalid10-storage-binding pipeline on an8-binding device. Initial eleven-driver failures are retained, not relabeled: seven drivers require unavailable native Firefox WebGPU; the original corpus reached an extra transport bound before the repaired final replay passed.
+
+Receipt: docs/whitepaper/results/batch-273-firefox-matrix.json. This closes the requested scoped Firefox work under rule22, with native adapter availability and full-package/physical-device certification remaining in finish-later.md. The overall physical browser/device matrix remains open. No local binary path, patched-browser substitution or forced-tier-as-hardware claim.

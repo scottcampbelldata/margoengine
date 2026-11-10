@@ -4298,3 +4298,16 @@ Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio a
 - Fixed while recording the VRM asset: appended WebXR generic-hand provenance is now part of the notices generator asset table, preserving the original licence and hashes. The existing supply-chain consistency test covers both records.
 
 - Existing VRM scene ownership: without an Animator, `addVRM` in packages/rigging/src/vrm.ts registers/removes its plugin through the engine active scene rather than the model scene; reproduce loading into an inactive secondary scene. Waits for the fix phase.
+
+### Batch 273 Firefox scope and concurrent landing blockers
+Shipped Firefox159.0.1 now launches through the package-owned BiDi transport and
+passes the scoped46 numeric cases,733 render pipelines and477 legal compute
+pipelines plus the required negative pipeline rejection. The old patched-browser
+side-by-side loader diagnosis above is historical, not a refusal by this shipped
+browser. Its default native WebGPU requestAdapter is null, so native-baseline
+canonical driver refusals remain visible in the receipt. Full-package and
+physical-device certification remains open; see work-lists/batch-273-browser-matrix.md.
+The latest main's committed merge markers in the umbrella manifest and size
+baseline blocked this job's package build. Both additions and history records
+are retained, budgets unchanged, and tests/integration-json.test.js parses all
+workspace manifests and quality baselines and checks their totals.

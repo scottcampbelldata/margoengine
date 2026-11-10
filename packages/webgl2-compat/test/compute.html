@@ -425,6 +425,10 @@ async function runCase(device, name) {
 let native, compat;
 window.check = {
   names: () => Object.keys(cases),
+  async runCompat(name) {
+    compat ??= await (await createCompatGPU().requestAdapter()).requestDevice();
+    return runCase(compat, name);
+  },
   async run(name) {
     native ??= await (await navigator.gpu.requestAdapter()).requestDevice();
     compat ??= await (await createCompatGPU().requestAdapter()).requestDevice();

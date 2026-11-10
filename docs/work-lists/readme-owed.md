@@ -250,3 +250,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/ecs (batch 249 job 3): ReactiveQuery cache, rows, subscribe/flush boundaries, initial replay, disposal, and World.destroying teardown semantics.
 - margoengine (batch 249 job 3): generated ecs/reactive alias.
+
+| @margoengine/webgl2-compat | Shipped Firefox BiDi matrix, environment-only executable, cross-browser oracle scope and native-adapter refusals. | Batch273 job2 |
+| margoengine | Retained XR AR extras alias after concurrent manifest integration. | Batch273 landing blocker |

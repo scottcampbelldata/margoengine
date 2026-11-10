@@ -57,10 +57,15 @@ try {
     .map(([tier, n]) => `  ${n} x ${tier}`)
     .join('\n');
   console.log(
-    `WGSL corpus compute: ${computes.length} recorded compute pipelines dispatched on WebGL2 (${outOfScope} of the voxel path tracer, checked on their own, not dispatched):\n${tiers}`,
+    `WGSL corpus compute: ${computes.length - compute.validatedInvalid} recorded compute pipelines dispatched on WebGL2, ${compute.validatedInvalid} invalid pipelines correctly rejected (${outOfScope} of the voxel path tracer, checked on their own, not dispatched):\n${tiers}`,
   );
   if (compute.failures.length) console.log(`FAILURES ${compute.failures.length}:\n${compute.failures.join('\n')}`);
   assert.deepEqual(compute.failures, []);
+  assert.equal(
+    Object.values(compute.tiers).reduce((a, b) => a + b, 0) + compute.validatedInvalid,
+    computes.length,
+    'every recorded compute pipeline must dispatch or prove its required validation rejection',
+  );
   // Nothing is refused: the light probes' bake kernels, which sample a cube map on the CPU tier, were the last.
   assert.deepEqual(
     Object.keys(compute.tiers).filter((tier) => tier.startsWith('refused')),

@@ -116,11 +116,23 @@ window.drawAll = async (records, sources) => {
 // Every recorded compute pipeline (milestone M5): planned, translated for its tier and dispatched once (one
 // workgroup) with stand-in resources, so each fragment or scatter program meets ANGLE's draw-time compile and each
 // CPU kernel runs. Returns the count per tier and the failures.
+// A valid WGSL module can be an intentionally invalid pipeline: the readback
+// validation fixture records one with more storage bindings than the device
+// permits. Test that rejection explicitly instead of dispatching an invalid handle.
+function computeValidationResult(layouts, limits, error) {
+  const storage = layouts.flatMap(layout => layout.entries).filter(e => (e.visibility & 4) && e.buffer && e.buffer.type !== 'uniform').length;
+  const invalid = storage > limits.maxStorageBuffersPerShaderStage;
+  if (!invalid) return { invalid, problem: error?.message ?? null };
+  const expected = new RegExp(`\\b${storage} bindings exceed maxStorageBuffersPerShaderStage\\b`);
+  const correct = error?.name === 'GPUValidationError' && expected.test(error.message);
+  return { invalid, problem: correct ? null : `expected validation rejection for ${storage} storage bindings, got ${error?.message ?? 'no error'}` };
+}
 window.dispatchAll = async (records, sources) => {
   const gpu = createCompatGPU();
   const failures = [],
     tiers = {};
   let device, modules;
+  let validatedInvalid = 0;
   const fresh = async () => {
     device?.destroy();
     device = await (await gpu.requestAdapter()).requestDevice();
@@ -139,9 +151,21 @@ window.dispatchAll = async (records, sources) => {
         layout: 'auto',
         compute: { module: module(rec.compute.module), entryPoint: rec.compute.entryPoint, constants: rec.compute.constants },
       });
+      const layouts = Array.from({length: device.limits.maxBindGroups}, (_, g) => pipeline.getBindGroupLayout(g));
+      const construction = computeValidationResult(layouts, device.limits, await device.popErrorScope());
+      if (construction.problem) {
+        failures.push(`${rec.id}: ${construction.problem}`);
+        await fresh();
+        continue;
+      }
+      if (construction.invalid) {
+        validatedInvalid++;
+        continue;
+      }
+      device.pushErrorScope('validation');
       const groups = [];
       for (let g = 0; g < 4; g++) {
-        const layout = pipeline.getBindGroupLayout(g);
+        const layout = layouts[g];
         if (!layout.entries.length) continue;
         const entries = layout.entries.map((e) => {
           if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: (e.buffer.type === 'uniform' ? 64 : 128) | 8 }) } };
@@ -185,7 +209,7 @@ window.dispatchAll = async (records, sources) => {
     }
   }
   device.destroy();
-  return { tiers, failures };
+  return { tiers, failures, validatedInvalid };
 };
 window.ready = true;
 </script>
