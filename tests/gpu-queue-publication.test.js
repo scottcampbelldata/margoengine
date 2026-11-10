@@ -8,6 +8,80 @@ import test from 'node:test';
 import { createGpuQueue } from '../scripts/gpu-queue.mjs';
 import { windowsCommandLine } from '../scripts/gpu-lock.mjs';
 
+for (const state of ['passed', 'failed', 'running']) {
+  test(`an owner exiting after the observer's status read retains ${state} evidence`, {
+    timeout: 5000,
+  }, async (t) => {
+    const folder = fs.mkdtempSync(resolve('test-results/gpu-queue-observe-exit-'));
+    const lock = join(folder, 'gpu.lock');
+    const ticket = '001794250000000-123-observe';
+    const pid = 2147483647;
+    const record = { ticket, state: 'running', pid, options: {}, log: join(folder, 'command.log') };
+    fs.mkdirSync(`${lock}-jobs`);
+    const base = join(`${lock}-jobs`, `${ticket}.json`);
+    fs.writeFileSync(base, JSON.stringify(record));
+    fs.writeFileSync(record.log, 'failure evidence\n');
+    let probes = 0,
+      drains = 0,
+      output = '';
+    const exitCode = process.exitCode;
+    t.mock.method(process, 'kill', (owner, signal) => {
+      assert.equal(owner, pid);
+      assert.equal(signal, 0);
+      probes++;
+      // The owner publishes its last immutable revision and exits after the read,
+      // before the observer probes it. No time-based scheduling is needed.
+      if (state !== 'running')
+        fs.writeFileSync(
+          `${base.slice(0, -5)}.00000001.json`,
+          JSON.stringify({
+            ...record,
+            state,
+            revision: 1,
+            finishedAt: 42,
+            result: { ok: state === 'passed' },
+          }),
+        );
+      throw Object.assign(new Error('owner exited'), { code: 'ESRCH' });
+    });
+    t.mock.method(process.stdout, 'write', (bytes) => {
+      output += String(bytes);
+      return true;
+    });
+    t.mock.method(console, 'log', (line) => {
+      output += `${line}\n`;
+    });
+    try {
+      const queue = createGpuQueue({
+        lockDir: lock,
+        settleOwner: async (pids, bound, since) => {
+          assert.deepEqual(pids, [pid]);
+          assert.equal(bound, 30_000);
+          assert.equal(since, 42);
+          drains++;
+          return [];
+        },
+      });
+      if (state === 'running') {
+        await assert.rejects(queue.queueCli('wait', [ticket]), /ERR_GPU_QUEUE_OWNER_GONE/);
+        assert.equal(output, '');
+        assert.equal(drains, 0);
+      } else {
+        await queue.queueCli('wait', [ticket]);
+        assert.match(output, /failure evidence/);
+        assert.ok(output.includes(`"state":"${state}"`), output);
+        assert.equal(process.exitCode, state === 'passed' ? 0 : 1);
+        assert.equal(drains, 1, 'the terminal record still drains its owner');
+      }
+      assert.equal(probes, 1, 'one liveness observation, no retries');
+    } finally {
+      process.exitCode = exitCode;
+      t.mock.restoreAll();
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  });
+}
+
 test('waiting for a terminal ticket drains its detached owner before returning completion', {
   timeout: 5000,
 }, async () => {

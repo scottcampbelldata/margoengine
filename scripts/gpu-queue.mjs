@@ -182,8 +182,19 @@ export function createGpuQueue({
   async function waitForTicket(ticket, minutes) {
     const initial = read(ticket);
     const bound = positive(minutes, (initial.options.waitMax ?? 60) + (initial.options.max ?? 20) + 1, 'wait-max');
+    let record = initial;
     for (const deadline = Date.now() + bound * MIN; ; ) {
-      const record = read(ticket);
+      let live = true;
+      if (record.pid && record.state !== 'passed' && record.state !== 'failed') {
+        try {
+          process.kill(record.pid, 0);
+        } catch (error) {
+          if (error.code !== 'EPERM') live = false;
+        }
+      }
+      // Observe owner exit before reading its final publication. A status read
+      // before the probe can still say running after the owner has finished.
+      record = read(ticket);
       if (record.state === 'passed' || record.state === 'failed') {
         // Terminal status is written just before owner exit. Windows keeps its cwd open
         // until process handles close; a completed gate must be safe to clean up.
@@ -201,16 +212,8 @@ export function createGpuQueue({
         throw new Error(
           `ERR_GPU_QUEUE_WAIT_TIMEOUT: ${ticket} is ${record.state}; its place is retained, run wait ${ticket} again`,
         );
-      if (record.pid) {
-        let live = true;
-        try {
-          process.kill(record.pid, 0);
-        } catch (error) {
-          if (error.code !== 'EPERM') live = false;
-        }
-        if (!live)
-          throw new Error(`ERR_GPU_QUEUE_OWNER_GONE: detached owner ${record.pid} exited before completing ${ticket}`);
-      }
+      if (!live)
+        throw new Error(`ERR_GPU_QUEUE_OWNER_GONE: detached owner ${record.pid} exited before completing ${ticket}`);
       await pause(100);
     }
   }

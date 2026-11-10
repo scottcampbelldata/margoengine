@@ -579,6 +579,22 @@ again. A default observer bound covers the command's admission wait plus hold
 limit and one minute of shutdown allowance. The command itself retains its
 independent hard limit and process-tree termination.
 
+Section 5 evidence, queue observer exit ordering (2026-11-10): `wait` samples
+owner liveness before reading the current immutable status revision. A running
+snapshot taken before an owner publishes completion and exits cannot establish
+`ERR_GPU_QUEUE_OWNER_GONE`. The ordered observation retains terminal command
+output and exit status, still drains the owner, and still rejects an owner that
+exits without publishing completion. `tests/gpu-queue-publication.test.js`
+forces all three outcomes without sleeps or retries; its passed and failed
+cases fail on the former reader. These CPU tests are included in verify and
+therefore check:merge. The existing detached-failure test now includes stderr
+in its output assertion diagnostic. The lane-S failure retained 17 command-log
+bytes but did not retain wait stderr, so its exact exception is unavailable;
+the deterministic regression proves the stale-status defect on current main.
+Standalone current-main runs passed both normally and with verify's recorder.
+No lock policy, deadline, assertion tolerance or engine package changes.
+See [the research comparison](../clean-room.md#gpu-queue-observer-exit-ordering-2026-11-10).
+
 Detached owner stdout and stderr persist in `<command log>.owner.log`, separately
 from the command log. An owner exiting before admission reports
 `ERR_GPU_QUEUE_OWNER_EXIT`, its exit/signal, log path and original stderr; only an

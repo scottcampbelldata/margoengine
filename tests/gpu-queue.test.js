@@ -169,7 +169,7 @@ test('a detached command failure is retained for wait and never reported as a pa
     const { ticket } = JSON.parse(queued.stdout);
     const completed = run(['wait', ticket]);
     assert.equal(completed.status, 1, completed.stderr);
-    assert.match(completed.stdout, /failure evidence/);
+    assert.match(completed.stdout, /failure evidence/, completed.stderr);
     const record = readGpuQueueRecord(join(`${env.MARGO_GPU_LOCK}-jobs`, `${ticket}.json`));
     assert.equal(record.state, 'failed');
     assert.equal(record.result.ok, false);

@@ -4852,3 +4852,40 @@ packages/splats/test/fixtures/NOTICE.md. This is binding fidelity evidence, not 
 Camera ownership also follows the documented native attach/dispose contract in packages/cameras/README.md: the
 orthographic projection is attached to the actual default camera, preserving its dynamic up and fixedOrthographic
 getters and same-frame projection reads. A copied callback or a frame-lagged proxy does not preserve that contract.
+
+## GPU queue observer exit ordering (2026-11-10)
+
+Research before repair compared these primary sources, without reading any
+foreign implementation or companion repository:
+
+- Leslie Lamport, *Time, Clocks and the Ordering of Events in a Distributed
+  System* (1978), author's publication discussion:
+  https://www.microsoft.com/en-us/research/publication/time-clocks-ordering-events-distributed-system/ .
+  Observation order matters: terminal publication precedes owner exit; an
+  earlier status snapshot need not include that publication.
+- Leslie Lamport, *On Concurrent Reading and Writing* (1977), author's
+  publication discussion:
+  https://www.microsoft.com/en-us/research/publication/concurrent-reading-writing/ .
+  Compared safe publication with overlapping reads. Immutable files already
+  prevent replacement conflicts, but cannot make separate observations atomic.
+- Maurice P. Herlihy and Jeannette M. Wing, *Linearizability: A Correctness
+  Condition for Concurrent Objects* (1990), abstract and introduction:
+  https://www.cs.columbia.edu/~wing/publications/HerlihyWing90.pdf .
+  Motivates testing legal interleavings and checking observable results, rather
+  than relying on repeated runs to expose one scheduling outcome.
+- Node.js contributors, *Process*, process.kill documentation (2026):
+  https://nodejs.org/api/process.html#processkillpid-signal . A zero signal
+  probes existence and throws when the PID is absent; it carries no ticket state.
+- Microsoft, *Process.GetProcessById*, API documentation (2026 accessed):
+  https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.getprocessbyid .
+  Compared native lookup failure and the existing handle-drain path; the latter
+  remains required even after a terminal ticket is observed.
+
+Combined inference: probe liveness first, then read the authoritative revision
+before classifying a vanished owner. This uses the existing one probe and one
+status read per iteration, without retrying either. Terminal results retain
+the common handle-drain path. Deterministic tests publish a final revision at
+the liveness boundary for passed and failed jobs, and leave another owner
+genuinely incomplete. The two terminal tests fail before and pass after the
+repair; the incomplete owner continues to fail. The historical lane-S assertion
+did not preserve its wait stderr, so the exact historical exception is not known.
