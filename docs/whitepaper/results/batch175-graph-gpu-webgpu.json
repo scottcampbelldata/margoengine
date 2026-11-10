@@ -1,0 +1,172 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "compat": false,
+  "originalWorks": 80,
+  "originalEdges": 109,
+  "checks": [
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 2,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 2,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 2,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 2,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 3,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    },
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 3,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 3,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 3,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    }
+  ],
+  "treeRelativeError": 0.0019204423056442133,
+  "scale": [
+    {
+      "model": "fruchterman-reingold",
+      "nodes": 1000000,
+      "edges": 1362500,
+      "copiesOfOpenAlexSubgraph": 12500,
+      "originalWorks": 80,
+      "changed": 1000000,
+      "maxMove": 100.00004995473344,
+      "checksum": 278275.3451566212,
+      "work": {
+        "iterations": 1,
+        "dispatches": 225,
+        "sortComparisons": 220200960,
+        "adjacencyEntries": 2725000,
+        "bufferBytes": 158452640
+      },
+      "diagnostics": {
+        "speed": 0.5,
+        "swinging": 778799349760,
+        "traction": 389399674880,
+        "interactions": 206803792,
+        "totalMass": 1000000
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "nodes": 1000000,
+      "edges": 1362500,
+      "copiesOfOpenAlexSubgraph": 12500,
+      "originalWorks": 80,
+      "changed": 1000000,
+      "maxMove": 10.000022135371058,
+      "checksum": 298359.98249453306,
+      "work": {
+        "iterations": 1,
+        "dispatches": 225,
+        "sortComparisons": 220200960,
+        "adjacencyEntries": 2725000,
+        "bufferBytes": 158452640
+      },
+      "diagnostics": {
+        "speed": 0.5,
+        "swinging": 232168849408,
+        "traction": 116084424704,
+        "interactions": 212753312,
+        "totalMass": 3725000
+      }
+    }
+  ]
+}

@@ -3859,3 +3859,8 @@ and forced WebGL2 sequentially, using 1,574 shared float-reference checks each a
 a WGSL compilation guard. The analytical sine-valued fixtures are original test
 data, not a third-party model or demo. Error formulas and all defaults are in
 docs/compute-quant.md; no timing benchmark is part of this check.
+
+
+## Batch 175 job 5: GPU graph layout
+
+Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/graph-gpu.test.js. Then run node scripts/gpu-lock.mjs run --owner=graph-gpu-proof --wait-max=60 --max=8 -- node packages/sciviz/tests/graph-gpu-browser.mjs. The browser suite covers native WebGPU and WebGL2 compatibility, exact CPU oracles and tree error, OpenAlex drawing, labels, cancellation and bundling. Native WebGPU also lays out and draws a million physical nodes in each force model, using repeated copies of the pinned original citation topology. Results are test-results/batch175-graph-gpu-{webgpu,webgl2}.json. --small omits only the standalone scale proof while retaining correctness cases on both backends. No benchmark or timing assertion runs. Open examples/sciviz-graph-gpu.html through the repository development server for the CC0 citation demo.

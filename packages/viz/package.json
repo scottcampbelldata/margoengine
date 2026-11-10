@@ -1747,6 +1747,10 @@
       "types": "./dist/sciviz/notebook.d.ts",
       "import": "./dist/sciviz/notebook.js"
     },
+    "./sciviz/graph-gpu": {
+      "types": "./dist/sciviz/graph-gpu.d.ts",
+      "import": "./dist/sciviz/graph-gpu.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -4489,3 +4489,10 @@ docs/compute-quant.md. This is correctness evidence only, not a latency, univers
 accuracy or integer-only epilogue claim. Research is recorded in docs/clean-room.md.
 
 Sciviz review M1 (2026-11-10): pick-live-browser.mjs fails before the repair and passes after it on both GPU backends for cloud.updatePositions after a prior pick and render. Current and stale locations are checked. CPU snapshots and content comparison ensure freshness without CPU projection; see docs/sciviz-pick-gpu.md for the memory and work cost.
+
+
+## Batch 175 job 5: graph GPU correctness and scale
+
+@margoengine/sciviz/graph-gpu evaluates FR and ForceAtlas2 in compute shaders and draws directly from layout buffers. Both native WebGPU and WebGL2 compatibility are checked against the independent CPU references, including 2D/3D, weights, isolates, loops, duplicate edges, fixed nodes, LinLog, degree masses, strong gravity and overlap prevention. Native/compat GPU route counters are retained when available. FDEB has a separate CPU cycle oracle and endpoint/contraction tests. Label boxes are disjoint and drawing tests distinguish styled and bundled pixels. Evidence: packages/sciviz/tests/graph-gpu.test.js and graph-gpu-browser.mjs. The existing sciviz/graph CPU FR implementation is retained unchanged.
+
+Million-node correctness evidence, including a repeated OpenAlex topology, is retained in results/batch175-graph-gpu-webgpu.json; compatibility correctness is in results/batch175-graph-gpu-webgl2.json. No interactive-rate, convergence-time or relative-speed claim is made during the deferred speed phase.

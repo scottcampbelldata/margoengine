@@ -6327,3 +6327,18 @@ The new optional /quant entry measures 3,927 B minified gzip (previously absent,
 storage and validation in one optional module; splitting would add loading and
 API complexity without reducing core/stage. The core + stage root remains
 24,209 B gzip in this build, below its unchanged 25,000 B ceiling.
+
+
+## GPU graph layout (batch 175 job 5)
+
+Optional @margoengine/sciviz/graph-gpu has device-resident 2D/3D FR and ForceAtlas2, a sorted Morton grid tree, styled screen-space edges/arrows, GPU FDEB and collision-avoiding labels. CPU all-pairs references remain available. There is no root/core/stage import.
+
+Graph counts are 1..16,777,216 nodes, subject to per-device buffer/binding limits; indices are exact u32. Grid side is a power of two, 2..512 in 2D or 2..64 in 3D. Defaults are 128 and 16. theta defaults to 0.7; 0 gives all pairs. Tree bounds use actual points even outside the Morton partition box. Sorting takes log2(padded N)*(log2(padded N)+1)/2 device passes; every node is represented, with no sampling. Concentrated/coincident leaves can require quadratic pair work. Force storage and accumulation are float32, not bit-identical to binary64 CPU results. Zero-length pairs receive a seeded index direction.
+
+FDEB defaults to six cycles, 50 initial iterations, 0.1 step/stiffness and 0.6 compatibility; 1..9 cycles, at most 10,000 initial iterations. It is deliberately opt-in: compatible pairs are evaluated without truncation, O(E squared * subdivision points * iterations), and buffers must fit device limits. Rebundle after moving nodes; bundled endpoints are a snapshot. Arrows follow each edge's own direction. Self loops do not pull on their node; degenerate projected edge segments are not drawn.
+
+Label candidates are explicit node/text records, default maximum 200 visible. Only candidate positions are gathered/read back by refreshLabels(); frame hooks reproject that snapshot for camera changes. Call refreshLabels after layout changes. Labels avoid each other and viewport boundaries; obscured labels can be suppressed. Device loss hides a GPU-owned layer; recreate layout/bundles/layer on the replacement device, as with other caller-owned GPU arrays. Dispose drawing layers before their caller-owned layout and bundles.
+
+The million-node proof records all output positions, moved-node count, capped movement, persistent buffer bytes, dispatches, compare-exchanges and many-body interaction count. These are logical allocations/work, not physical VRAM, heap totals, FPS or wall-clock measurements. Million-node topology repeats the original OpenAlex citation subgraph; it does not claim a million unique works. Runtime speed comparisons await the speed phase.
+
+The new graph-gpu entry measures 13717 B gzip (before 0 B), ceiling 14129 B. Core + stage remains 24,209 B. Full layout, bundling and drawing share one optional lifecycle; a split would add resource coordination solely to save optional bytes.

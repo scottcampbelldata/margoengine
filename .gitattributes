@@ -97,3 +97,5 @@ packages/sciviz/tests/fixtures/sgp4-vallado.json text eol=lf
 
 # Native AMR headers and hash-pinned numerical samples retain exact bytes.
 packages/sciviz/tests/fixtures/amr/** -text
+
+packages/sciviz/tests/fixtures/graph-gpu/*.json text eol=lf

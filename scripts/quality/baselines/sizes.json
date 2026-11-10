@@ -7943,6 +7943,12 @@
       "commit": "97ecaf26f",
       "reason": "Batch 274 job 6 adds optional signed int8 inference: entry absent (0 B) to 3927 B gzip, 4183 B ceiling; packed CPU/WebGPU matmul and grouped Conv2d share validation and exact int32 MACs. Splitting this small optional entry would add API and loading complexity without reducing core or stage.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-175-j5",
+      "reason": "New optional sciviz/graph-gpu: 0 to 13717 B gzip, ceiling 14129 B. FR/FA2 spatial layout, direct styled drawing, FDEB and label collision avoidance stay in one optional entry. Splitting would fragment shared layout/draw/bundle lifetimes without reducing core or stage, unchanged at 24209 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9373,7 +9379,8 @@
     "@margoengine/sciviz/density": 5071,
     "@margoengine/compute/onnx": 10444,
     "@margoengine/sciviz/notebook": 2095,
-    "@margoengine/compute/quant": 4183
+    "@margoengine/compute/quant": 4183,
+    "@margoengine/sciviz/graph-gpu": 14129
   },
-  "total": 15361014
+  "total": 15375143
 }

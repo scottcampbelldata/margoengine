@@ -5034,3 +5034,5 @@ Batch 181 job 4 fixed before landing: density scatter replacement must retain th
 Batch 274 job 6: no open correctness defect found in signed int8 matmul/Conv2d.
 Conservative accumulator limits and f32 rescale error bounds are documented in
 docs/compute-quant.md; independent float-reference cases cover CPU and both GPU backends.
+
+Batch 175 job 5: no open defect found in the built graph-gpu paths. The straight-edge zero-subdivision u32 underflow is fixed in the owning optional shader and covered by the invisible-first-edge GPU regression; figure dimensionality, both force references, bundling boundaries, labels and device routes are checked. Float32 precision, concentrated-leaf costs, FDEB quadratic pair work and explicit label snapshot refresh remain documented limits.

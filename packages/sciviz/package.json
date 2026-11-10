@@ -315,6 +315,10 @@
     "./notebook": {
       "types": "./dist/notebook.d.ts",
       "import": "./dist/notebook.js"
+    },
+    "./graph-gpu": {
+      "types": "./dist/graph-gpu.d.ts",
+      "import": "./dist/graph-gpu.js"
     }
   },
   "files": [
@@ -389,6 +393,7 @@
     "test:browser:temporal": "node scripts/browser-root.mjs tests/temporal-browser.mjs",
     "test:browser:density": "node scripts/browser-root.mjs tests/density-browser.mjs",
     "test:browser:density-scale": "node scripts/browser-root.mjs tests/density-scale-browser.mjs",
-    "test:browser:notebook": "node scripts/browser-root.mjs tests/notebook-browser.mjs"
+    "test:browser:notebook": "node scripts/browser-root.mjs tests/notebook-browser.mjs",
+    "test:browser:graph-gpu": "node scripts/browser-root.mjs tests/graph-gpu-browser.mjs"
   }
 }

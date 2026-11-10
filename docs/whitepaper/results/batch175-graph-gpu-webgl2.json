@@ -1,0 +1,128 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "margo-webgl2",
+      "architecture": "webgl2",
+      "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true,
+    "compat": true
+  },
+  "compat": true,
+  "originalWorks": 80,
+  "originalEdges": 109,
+  "checks": [
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 2,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 2,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 2,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 2,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 2960
+      }
+    },
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 3,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    },
+    {
+      "model": "fruchterman-reingold",
+      "dimensions": 3,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 3,
+      "variant": false,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    },
+    {
+      "model": "forceatlas2",
+      "dimensions": 3,
+      "variant": true,
+      "work": {
+        "iterations": 5,
+        "dispatches": 75,
+        "sortComparisons": 240,
+        "adjacencyEntries": 10,
+        "bufferBytes": 8336
+      }
+    }
+  ],
+  "treeRelativeError": 0.0019205937836643413,
+  "routes": {
+    "fragment": 0,
+    "scatter": 748,
+    "cpu": 0
+  }
+}

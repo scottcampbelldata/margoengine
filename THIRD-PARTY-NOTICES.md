@@ -446,3 +446,7 @@ Batch 180 temporal standard data assets: examples/assets/sciviz/temporal/wind-00
 # ONNX Model Zoo MNIST-12 standard test assets
 
 `packages/compute/tests/fixtures/onnx/mnist-12.onnx`, `input_0.pb` and `output_0.pb` are standard model/test data, permitted by the repository's standard-assets exception. Source: ONNX Model Zoo contributors (mengniwang95, airMeng, ftian1 and hshen14), https://github.com/onnx/models/tree/main/validated/vision/classification/mnist , the `mnist-12.tar.gz` download. The model's source page explicitly identifies its license as MIT. Only binary model and reference input/output data are used; no implementation, training or conversion code is copied or adapted. The model was trained on the MNIST handwritten-digit dataset. No model accuracy or training-result claim is made by Margo.
+
+## OpenAlex GPU graph demonstration data
+
+packages/sciviz/tests/fixtures/graph-gpu/openalex.json contains 80 original work metadata and citation records from the OpenAlex API, retrieved 2026-11-10. OpenAlex data is CC0-1.0: https://help.openalex.org/api/ and https://creativecommons.org/publicdomain/zero/1.0/. The exact query, retrieval timestamp and SHA-256 are in source.json. Titles are metadata, not publication text; no external software source was read or copied.

@@ -9198,6 +9198,10 @@
       "./progressive": {
         "raw": 13541,
         "gzip": 4746
+      },
+      "./graph-gpu": {
+        "raw": 39713,
+        "gzip": 13717
       }
     },
     "@margoengine/selection": {

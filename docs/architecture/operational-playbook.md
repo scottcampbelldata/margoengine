@@ -5758,6 +5758,10 @@ CPU evidence: rigging.test.js, including skin conversion regressions. GPU eviden
 rigging-check.mjs plus the existing skeletal-check.mjs, on both backends.
 
 
+### Batch 175 job 5: GPU graphs
+
+The optional graph-gpu entry owns sorted Morton spatial trees, FR/FA2 compute passes, on-device swinging/traction reductions, direct-buffer node/edge draws and GPU force-directed edge bundling. Core and stage are untouched. Graph GPU tests compare both backends with exact CPU equations, track compatibility CPU/GPU routing, check nonuniform-tree error, styled pixels and collision-free labels. The native million-node proof counts every output and records deterministic work and persistent buffers; runtime speed remains unmeasured during build. External GPU state hides after device loss and must be recreated. See docs/limits.md and the batch175 graph GPU result records.
+
 ## Batch 252 navmesh worker evidence (section 5 supplement)
 
 The optional navmesh/wasm entry loads one feature-local Rust SIMD raster asset and an owned CPU worker. Exact output evidence is in packages/navmesh/test/wasm.test.js and the crate's tests: byte-identical ordinary/tiled polygon files, equal reference clipping counts, cancellation/error/timeout teardown and source/artifact hash enforcement. The SIMD work proof keeps coverage, triangle order, span merging, classification and polygonization unchanged. Native rasterization uses fixed stack clip buffers, not allocations per cell. Evidence still owed: quiet-machine end-to-end speed measurements and browser/CSP hosting matrix. No core/stage or GPU backend change.

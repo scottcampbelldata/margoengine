@@ -1331,3 +1331,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/compute (batch 274 job 6): document /quant upload, per-channel affine int8 parameters, broadcast matmul, grouped Conv2d, packed lifetime, bias units, cancellation and float-reference error bounds.
 - @margoengine/sciviz: document mode 101 row padding and truncated padded payload rejection (review H1).
+
+
+- @margoengine/sciviz (batch 175 job 5): graph-gpu layout/reference settings, direct device drawing, widths/colours/arrows, FDEB lifecycle, candidate label refresh, OpenAlex demo and cancellation/device-loss behaviour.
+- margoengine (batch 175 job 5): generated sciviz/graph-gpu optional alias.
+- @margoengine/viz (batch 175 job 5): generated sciviz/graph-gpu optional alias.

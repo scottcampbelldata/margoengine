@@ -1,0 +1,9 @@
+{
+  "source": "https://api.openalex.org/works?search=graph%20drawing&per-page=80&select=id,display_name,referenced_works,publication_year",
+  "retrieved": "2026-11-10T12:00:49.661Z",
+  "license": "CC0-1.0",
+  "licenseURL": "https://help.openalex.org/api/",
+  "sha256": "90bb89ff2ad62bd097ab44567a2cd322d94793fedc4b0c0e567dd150452c2d9d",
+  "records": 80,
+  "description": "Original OpenAlex work IDs, titles, publication years and outgoing citation links. Referenced IDs are retained as nodes even when their metadata is outside the query."
+}
