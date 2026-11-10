@@ -69,6 +69,10 @@
     "./stars": {
       "types": "./dist/stars.d.ts",
       "import": "./dist/stars.js"
+    },
+    "./planet-atmosphere": {
+      "types": "./dist/planet-atmosphere.d.ts",
+      "import": "./dist/planet-atmosphere.js"
     }
   },
   "files": [
@@ -77,10 +81,14 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/post": "^1.0.0"
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/sky": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/post": {
+      "optional": true
+    },
+    "@margoengine/sky": {
       "optional": true
     }
   },

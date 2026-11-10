@@ -32,6 +32,7 @@ await build({
     rollupOptions: {
       external: [
         '@margoengine/post/stack',
+        '@margoengine/sky/planet',
         '@margoengine/core',
         '@margoengine/core/extension',
         '@margoengine/vfx/base',

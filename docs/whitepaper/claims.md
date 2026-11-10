@@ -4020,3 +4020,6 @@ Claim: shader/compute-volume writes and loads 3D voxels and array layers using a
 Batch 270 job 2: vfx/over-life covers the requested spin, speed, growth and velocity-limit curves; proof is over-life.test.js and parity.mjs --over-life on WebGPU and WebGL2. Spin uses an analytic piecewise-linear integral, growth reaches simulation and culling, and speed can cross zero and recover. This is a behavioural claim, with no speed claim.
 
 - Batch 193 job 1: optional HueGrade provides global and circular selective hue rotation while retaining Grade controls. Evidence: packages/tonemap/tests/hue.test.js and hue-browser.mjs (native WebGPU and full WebGL2 compatibility); no speed or exact rival-pixel claim. Sources and method: docs/clean-room.md, Batch 193 job 1.
+
+### Batch 271 job 2: optional orbital atmosphere
+OrbitAtmosphere in creative/planet-atmosphere reuses sky's Hillaire transport for a spherical planet observed from space, arbitrary world centre/radius, physical terminator/limb and a uniform albedo ground. Native and compatibility pixel checks prove solar response, vacuum/disable and exact replacement-device reconstruction. This is not a speed claim or a claim that creative/planet's textured shader has acquired aerial transport.

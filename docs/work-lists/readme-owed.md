@@ -838,3 +838,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/tonemap: document optional HueGrade, degree units, circular hueHue points, live Grade controls and display-linear/HDR limits (batch 193 job 1).
 - margoengine: expose tonemap/hue in the optional entry index (batch 193 job 1).
+
+- @margoengine/creative and margoengine (batch 271 job 2): document /planet-atmosphere OrbitAtmosphere defaults, world/km conversion, sky peer, physical background vs textured Planet surface, depth, restoration, observer/medium limits and both GPU backends; examples deferred.

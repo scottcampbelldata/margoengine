@@ -6387,3 +6387,7 @@ The shader/compute-volume optional entry owns 3D and 2D-array allocation, views,
 
 ### 5. Lifetime dynamics evidence (batch 270 job 2)
 VFX over-life uses storage binding 26 and uniform binding 27; the original 64-byte particle record remains unchanged. The current size/velocity and accumulated spin are written into that record so billboard, mesh, ribbon, event and culling consumers agree. GPU readback checks growth, zero-speed recovery, trapezoidal spin integration, limit projection, exact reset replay and local-frame rotation on both backends. CPU tests validate limits and packed curves. No core/stage change or speed claim.
+
+
+### 5. Batch 271 orbit transport evidence
+Creative /planet-atmosphere uses sky/planet's shared physical transport and converts arbitrary world centre/radius into planet kilometres. A fullscreen ray at reversed clear depth renders ground plus atmospheric shell; ordinary geometry retains depth ownership. `packages/creative/scripts/test-orbit-atmosphere.js` reads back pixels directly on native WebGPU and --compat: solar direction changes the terminator, vacuum is black, disabled output is clear, and replacement-device output equals the retained frame. CPU tests check physical-table dispatch reuse and terminal teardown. The feature does not claim textured-Planet aerial transport, clouds, speed or untested hardware.

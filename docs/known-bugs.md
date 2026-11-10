@@ -4754,3 +4754,8 @@ Batch 270 job 2: no new open defects identified in lifetime dynamics; exact rese
 - Batch 193 job 1: no open defect found in HueGrade; its display-linear domain, 64-point cap and HSV luminance difference are documented limits.
 
 - Batch 193 gate finding: the GPU package runner cannot select tonemap because packages/water/package.json has an npm build in the middle of test:gpu. Repro: node scripts/gpu-package-tests.mjs --no-build --only=tonemap. Tonemap scripts run directly under the shared lock; water script correction belongs to its lane.
+
+### Batch 271 job 1 retained off main
+Depth/MSAA/mip target implementation is retained on batch-271-targets, 4fa1903b7. Native WebGPU passed 164 subresources. Its compatibility 5x5x5 3D target stays red when a green fullscreen triangle is drawn with an attached 2D depth texture, even with mip generation and the second pass removed; cube and array targets pass. The failure is isolated to the 3D/depth draw path, with no WebGPU-shaped validation error; lower-level cause remains unisolated after the lane round cap. Repro: `node packages/creative/scripts/test-targets-depth.js --compat` on that branch under a shared GPU lock. No incomplete target code is on main.
+
+Batch 271 supplemental check: `scripts/modern-grass-tests.js --compat` reaches the 4x meadow fixture but `meadowAudit.frames > 5` times out at 30000 ms in the device-loss wait wrapper (line 491); native meadow passes. The new orbit renderer's own native/compat pixel, vacuum and replacement-device checks pass. The existing compatibility meadow's render/readiness interaction remains unisolated; no test or timeout was changed.

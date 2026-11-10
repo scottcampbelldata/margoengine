@@ -790,6 +790,10 @@
       "types": "./dist/creative/stars.d.ts",
       "import": "./dist/creative/stars.js"
     },
+    "./creative/planet-atmosphere": {
+      "types": "./dist/creative/planet-atmosphere.d.ts",
+      "import": "./dist/creative/planet-atmosphere.js"
+    },
     "./culling": {
       "types": "./dist/culling.d.ts",
       "import": "./dist/culling.js"

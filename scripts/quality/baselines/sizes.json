@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13733849,
+  "total": 13737555,
   "history": [
     {
       "date": "2026-10-24",
@@ -7191,6 +7191,12 @@
       "commit": "911de66c4",
       "reason": "Batch 193 adds optional HueGrade: absent to 2165 B min+gzip, retaining wheels and curves plus circular selective hue control, with no core or stage growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-271",
+      "reason": "New optional orbital atmosphere entry: 0 to 3121 B gzip plus a generated alias. Reuses sky transport; a second implementation would duplicate physical tables and validation.",
+      "grew": 2
     }
   ],
   "items": {
@@ -8491,6 +8497,8 @@
     "@margoengine/shader/compute-volume": 4961,
     "@margoengine/voxel-net/webrtc": 7194,
     "@margoengine/vfx/over-life": 1831,
-    "@margoengine/tonemap/hue": 2421
+    "@margoengine/tonemap/hue": 2421,
+    "@margoengine/creative/planet-atmosphere": 3377,
+    "margoengine/creative/planet-atmosphere": 329
   }
 }
