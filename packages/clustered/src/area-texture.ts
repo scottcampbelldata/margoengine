@@ -13,7 +13,13 @@
 // foot of the perpendicular when it does not). The footprint of a clamped cosine on a plane at distance h is
 // E(x) proportional to h^2 / (h^2 + x^2)^2, which falls to half at x = h sqrt(sqrt(2) - 1) = 0.6436 h; the level chain is
 // read at the level whose texel spans that footprint's diameter over the transformed rectangle's side (the square root
-// of its area). Far lights and rough lobes thus read the mean colour, near and sharp ones the texel. The derivation is
+// of its area), clipped to the rectangle: the lobe sees only the part of its footprint that lies on the light, so the
+// footprint box (centred on the lookup point, the footprint's diameter wide) is cut to the image and read at its centre,
+// at the level whose texel spans the cut box. The rectangle is read as 2 x 2 cells this way, each weighted by its share of
+// the lobe's integral (its vector form factor along the normal), so a receiver beside a light narrower than the lobe's
+// footprint still sees the near half's colour more than the far half's; a single lookup read the whole image's mean
+// there (R5: the split-image GPU check, 0 of 340 floor samples on the right side). Far lights and rough
+// lobes thus read the mean colour of what they see, near and sharp ones the texel. The derivation is
 // Margo's own from the LTC paper's integral and the cosine footprint; the LTC paper's textured-light section could not
 // be read for this job (docs/clean-room.md, docs/work-lists/finish-later.md).
 import type { EngineKernel } from '@margoengine/core';
@@ -118,23 +124,37 @@ fn areaTextureBilinear(image:vec4u,level:u32,uv:vec2f)->vec3f {let l=areaTexture
 // component is AreaLights' areaEdge), scaled like areaEdge against float32 underflow.
 fn areaTextureEdge(a:vec3f,b:vec3f)->vec3f {let n=cross(a,b);let top=max(max(abs(n.x),abs(n.y)),abs(n.z));if(top<=0.0){return vec3f(0);}
   let k=n/top;let s=length(k);return k/s*atan2(top*s,dot(a,b))*0.15915494;}
+// One cell of the image (uv box o + [0, e]) on the rectangle c +- r +- u under the lobe m: its colour filtered over the
+// part of the lobe's footprint on the cell, in xyz, and its share of the lobe's integral (the vector form factor's
+// component along the normal), in w.
+fn areaTextureCell(image:vec4u,top:f32,m:mat3x3f,c:vec3f,r:vec3f,u:vec3f,side:f32,o:vec2f,e:vec2f)->vec4f {
+  let C=m*c;let R=m*r;let U=m*u;let N=cross(R,U);let nn=dot(N,N);
+  if(nn<=1e-30){return vec4f(areaTextureBilinear(image,u32(top),vec2f(0.5)),0.0);}
+  let p0=areaUnit(C-R-U);let p1=areaUnit(C-R+U);let p2=areaUnit(C+R+U);let p3=areaUnit(C+R-U);
+  let f=(areaTextureEdge(p0,p1)+areaTextureEdge(p1,p2)+areaTextureEdge(p2,p3)+areaTextureEdge(p3,p0))*side;
+  let h=dot(C,N);let fd=dot(f,N);var q=N*(h/nn);if(fd*h>0.0){q=f*(h/fd);}
+  let rel=q-C;let at=clamp(vec2f(dot(cross(rel,U),N)/nn*0.5+0.5,0.5-dot(cross(R,rel),N)/nn*0.5),vec2f(0),vec2f(1));
+  let nl=sqrt(nn);let s=${FOOTPRINT.toFixed(7)}*abs(h)/nl/(2.0*sqrt(nl));
+  let lo=max(at-s,vec2f(0));let hi=min(at+s,vec2f(1));let span=(hi-lo)*e*vec2f(image.yz);
+  let lod=clamp(log2(max(max(span.x,span.y),1.0)),0.0,top);let uv=o+(lo+hi)*0.5*e;
+  let k=u32(floor(lod));var a=areaTextureBilinear(image,k,uv);
+  if(k<image.w-1u){a=mix(a,areaTextureBilinear(image,k+1u,uv),lod-f32(k));}
+  return vec4f(a,abs(fd)/nl);
+}
 // The image of area light j filtered over what the lobe m sees of the rectangle c +- r +- u (receiver to centre, half
-// extents); side -1 for the back of a two-sided light. 1 for a light without an image.
+// extents); side -1 for the back of a two-sided light. 1 for a light without an image. The rectangle is read as 2 x 2
+// cells, each weighted by its share of the lobe's integral, so a receiver whose lobe is wider than the light still sees
+// the near side's colour more than the far side's.
 fn clusterAreaTexture(j:u32,m:mat3x3f,c:vec3f,r:vec3f,u:vec3f,side:f32)->vec3f {
   if(j>=areaTextureData.header.x){return vec3f(1);}let id=areaTextureData.words[j];if(id==0u){return vec3f(1);}
   let image=areaTextureData.images[id-1u];let top=f32(image.w-1u);
-  let C=m*c;let R=m*r;let U=m*u;let N=cross(R,U);let nn=dot(N,N);
-  var uv=vec2f(0.5);var lod=top;
-  if(nn>1e-30){
-    let p0=areaUnit(C-R-U);let p1=areaUnit(C-R+U);let p2=areaUnit(C+R+U);let p3=areaUnit(C+R-U);
-    let f=(areaTextureEdge(p0,p1)+areaTextureEdge(p1,p2)+areaTextureEdge(p2,p3)+areaTextureEdge(p3,p0))*side;
-    let h=dot(C,N);let fd=dot(f,N);var q=N*(h/nn);if(fd*h>0.0){q=f*(h/fd);}
-    let rel=q-C;uv=clamp(vec2f(dot(cross(rel,U),N)/nn*0.5+0.5,0.5-dot(cross(R,rel),N)/nn*0.5),vec2f(0),vec2f(1));
-    let nl=sqrt(nn);let span=${(2 * FOOTPRINT).toFixed(7)}*abs(h)/nl/(2.0*sqrt(nl))*f32(max(image.y,image.z));
-    lod=clamp(log2(max(span,1.0)),0.0,top);
+  var sum=vec4f(0);
+  for(var i=0u;i<4u;i++){
+    let g=vec2f(f32(i&1u),f32(i>>1u));let a=g-0.5;
+    let cell=areaTextureCell(image,top,m,c+r*a.x-u*a.y,r*0.5,u*0.5,side,g*0.5,vec2f(0.5));sum+=vec4f(cell.xyz*cell.w,cell.w);
   }
-  let k=u32(floor(lod));let a=areaTextureBilinear(image,k,uv);if(k>=image.w-1u){return a;}
-  return mix(a,areaTextureBilinear(image,k+1u,uv),lod-f32(k));
+  if(sum.w<=0.0){return areaTextureBilinear(image,u32(top),vec2f(0.5));}
+  return sum.xyz/sum.w;
 }
 `;
 /**

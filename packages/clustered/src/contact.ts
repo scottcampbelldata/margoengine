@@ -5,7 +5,11 @@
 // The lit pass cannot read the depth it is writing, so the march reads the previous frame's depth, copied after the frame
 // into a storage buffer with that frame's camera (a physical material with shadows, IBL and LocalShadows already binds
 // all 16 sampled textures a shader stage may have; docs/shader-contracts.md). A caster that moved this frame is
-// marched where it was one frame ago.
+// marched where it was one frame ago. A depth sample is read back at its texel's centre, and one within `bias` plus one
+// texel's width of the lit point's tangent plane (or below it) is taken as the receiver's own surface, not an occluder:
+// the depth is known only to a texel (nearest texel, and a multisampled depth holds sample 0, off the pixel centre), and
+// from a 45-degree view one texel spans more depth than the start offset, so the top of a pebble shadowed itself.
+
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
@@ -32,7 +36,11 @@ export interface ContactLightOptions {
   strength?: number;
   /** March steps per ray, 1 to 64. Default 12. */
   steps?: number;
-  /** Start offset along the surface normal, world units, 0 or more, against self-shadowing. Default 0.01. */
+  /**
+   * Start offset along the surface normal, world units, 0 or more, against self-shadowing; a depth sample no further than
+   * this plus one depth texel's width above the lit point's tangent plane never shadows it (that is the receiver's own
+   * surface, to the depth's resolution). Default 0.01.
+   */
   bias?: number;
 }
 
@@ -53,7 +61,7 @@ fn clusterContact(index:u32,light:ClusterLight,l:vec3f,position:vec3f,n:vec3f,pi
   let strength=clusterContactData.strength[index];if(strength<=0.0){return 1.0;}
   let reach=min(march.x,distance(light.positionRange.xyz,position));let stride=reach/march.z;
   let shift=fract(52.9829189*fract(dot(pixel,vec2f(0.06711056,0.00583715))));
-  let start=position+n/max(length(n),0.000001)*march.w;
+  let unit=n/max(length(n),0.000001);let start=position+unit*march.w;
   for(var i=0.0;i<march.z;i+=1.0){
     let q=start+l*stride*(i+shift);let clip=clusterContactData.view*vec4f(q,1);
     if(clip.w<=0.0){break;}
@@ -62,8 +70,10 @@ fn clusterContact(index:u32,light:ClusterLight,l:vec3f,position:vec3f,n:vec3f,pi
     let texel=min(vec2u(uv*size.xy),vec2u(size.xy)-1u);
     let found=clusterContactData.depth[texel.y*u32(size.x)+texel.x];
     if(found>ndc.z){
-      let back=clusterContactData.inverse*vec4f(ndc.xy,found,1);
-      if(distance(back.xyz/back.w,q)<march.y){return 1.0-strength;}
+      let uvc=(vec2f(texel)+0.5)/size.xy;let centre=vec2f(uvc.x*2.0-1.0,1.0-uvc.y*2.0);
+      let back=clusterContactData.inverse*vec4f(centre,found,1);let side=clusterContactData.inverse*vec4f(centre.x+2.0/size.x,centre.y,found,1);
+      let hit=back.xyz/back.w;let texelSize=distance(side.xyz/side.w,hit);
+      if(distance(hit,q)<march.y&&dot(hit-position,unit)>march.w+texelSize){return 1.0-strength;}
     }
   }
   return 1.0;

@@ -2,16 +2,20 @@
 // node scripts/gpu-lock.mjs run --owner=clustered-shadow -- node scripts/clustered-shadow-gpu-check.js [--baseline]
 // --baseline records the shadow-off scenes (images, lit shader text, probe radiance) with the build in dist; a later run
 // requires them to be identical. That proof is for a change, against the build from before it, so with no baseline on disk
-// the run says so and goes on. It always checks the shadowed scenes against analytic occlusion.
+// the run says so and goes on. It always checks the shadowed scenes against analytic occlusion. Each backend keeps its own
+// baseline (baseline.json on WebGPU, baseline-compat.json on the WebGL2 layer): the two rasterize and round differently,
+// so a WebGPU record compared with a --compat run failed every shadow-off scene by a few hundred bytes.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
 import { acquire } from './gpu-lock.mjs';
+import { compatRun } from './support/compat-shim.js';
 
 const folder = 'test-results/clustered-shadow',
   baseline = process.argv.includes('--baseline'),
+  recordFile = `${folder}/baseline${compatRun() ? '-compat' : ''}.json`,
   release = await acquire({ owner: 'clustered-shadow-gpu-check' });
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 let browser;
@@ -65,12 +69,12 @@ try {
     };
   }
   if (baseline) {
-    await writeFile(`${folder}/baseline.json`, JSON.stringify(record, null, 2) + '\n');
-    console.log(JSON.stringify({ baseline: `${folder}/baseline.json`, scenes: Object.keys(record) }, null, 2));
+    await writeFile(recordFile, JSON.stringify(record, null, 2) + '\n');
+    console.log(JSON.stringify({ baseline: recordFile, scenes: Object.keys(record) }, null, 2));
   } else {
-    const saved = await readFile(`${folder}/baseline.json`, 'utf8').catch(() => null),
+    const saved = await readFile(recordFile, 'utf8').catch(() => null),
       before = saved ? JSON.parse(saved) : {};
-    if (!saved) console.log(`No ${folder}/baseline.json: the shadow-off scenes were not compared with an earlier build.`);
+    if (!saved) console.log(`No ${recordFile}: the shadow-off scenes were not compared with an earlier build.`);
     for (const [label, now] of saved ? Object.entries(record) : []) {
       const old = before[label];
       check(`${label}: lit shader text unchanged with the new shadows off`, now.shader === old.shader, {

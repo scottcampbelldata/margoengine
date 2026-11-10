@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14657448,
+  "total": 14657835,
   "history": [
     {
       "date": "2026-10-24",
@@ -8021,6 +8021,12 @@
       "commit": "c562eaf7c",
       "reason": "batch 132 cache audit: strict RFC 9110 HTTP-date parser and If-Range check in every cache entry (correctness, about 300-500 B gzip each)",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b586dfe60",
+      "reason": "R5 clustered: textured area cells, contact self-shadow",
+      "grew": 1
     }
   ],
   "items": {
@@ -8168,7 +8174,7 @@
     "@margoengine/clustered": 14904,
     "@margoengine/clustered/area": 11229,
     "@margoengine/clustered/area-shapes": 13202,
-    "@margoengine/clustered/area-texture": 3962,
+    "@margoengine/clustered/area-texture": 4349,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6158,
     "@margoengine/clustered/cube-projector": 4716,

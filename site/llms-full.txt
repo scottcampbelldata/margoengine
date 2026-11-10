@@ -9368,6 +9368,9 @@ The game test page composes 13 optional packages on native WebGPU and full WebGL
 ### TAA reset phase (2026-11-10)
 TAA reset restarts its eight Halton samples and discards history for the named view or every view. Motion frame identity remains monotonic until device recreation. This proves identical initial sample projections after reset and restoration, not identical shader arithmetic across backends. See [reset evidence](taa-reset.md).
 
+## J6 scientific dashboard integration
+The eight optional packages in [the scientific dashboard](integration-sciviz.md) share a canvas on native WebGPU and WebGL2 compatibility, with exact restored probes, an exact compute reduction and zero tracked allocations/scene ownership after disposal. Inputs are three authored XYZ points and a static canvas VideoFrame. Compute contexts are recreated explicitly on the replacement device; no transparent array-restoration, codec, speed or all-options claim is made.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

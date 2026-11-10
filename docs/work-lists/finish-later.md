@@ -73,14 +73,11 @@ Scott (2026-11-10): build to about 95%, push and move on. Each job lists here, o
 | 52.7 | @margoengine/clustered | layers: layer area lights and directional lights (only point and spot lights carry masks today) |
 | 52.7 | @margoengine/clustered | layers: per-mesh masks for core meshes (they are fixed to layer 0; needs a core per-mesh slot, outside this package) |
 | 52.7 | @margoengine/clustered | layers: masks for local shadow casters (a light's shadow map still sees every caster) and a per-instance mask without a shader per receiver |
-| 52.5 | @margoengine/clustered | area-texture: scripts/clustered-light-images-gpu-check.js "split image" fails on the Mac (0 red, 0 green, 340 wrong): the level rule's footprint for the 16 x 8 image under the 2 x 1 light at 1.5 m is about 22 texels, past the 16-texel image, so the floor reads the 1 x 1 mean (uniform yellow, test-results/clustered-light-images-area-split.png). Either the Lambert lobe's level is too coarse or the scene needs a nearer light or a larger image; the script also lacked `await` on decodePNG, fixed in 52.7, so it never ran past the first frame before |
 | 63.2 | @margoengine/biomes | view flow: lines past the 16th get no inflow; merge tributaries or let water/rivers take more sources |
 | 63.2 | @margoengine/biomes | view flow: discharge is one number per view; derive it per line from the hydrology's accumulation |
 | 53.1 | clustered | `ContactLights` marches the canvas's first view's depth only: other views and render targets reuse it (needs a depth copy per view id) |
 | 53.1 | clustered | Contact march timing on a real scene (many lights per cluster x steps) not measured; no half-resolution depth option |
 | 53.1 | clustered | A moving caster's contact trails it by one frame (previous-frame depth); no motion-vector reprojection |
-| 53.1 | clustered | GPU check (scripts/clustered-shadow-gpu-check.js) fails 'contact: points on the light side, beside, far away and on top keep it exactly' on Metal: the point on the pebble's top gets factor 0 (ratios [1,1,1,0]); likely self-shadowing where one depth texel's step at the 45-degree view exceeds the 0.01 normal bias; needs a slope-scaled or texel-footprint bias |
-| 53.1 | clustered | GPU check's shadow-off baseline (test-results/clustered-shadow/baseline.json, local) predates main's LTC and textured-light shader changes; regenerate it with --baseline on main before comparing |
 | 53.2 | clustered | Culling tests every light per cluster: no coarse pre-cull (per-tile or BVH) for tens of thousands of lights; not timed at those counts |
 | 53.2 | clustered | Area lights are not clustered: a range or per-cluster list for many area lights; only the first 64 may cast shadows |
 | 53.2 | clustered | IES, projector and contact per-light settings stop at index 1,024 |
