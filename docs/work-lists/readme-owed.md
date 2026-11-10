@@ -846,3 +846,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/decoders: document /zstd decompressZstd and /lz4 decodeLZ4/decodeLZ4Block, byte-buffer stream input, limits, cancellation, checksums and external dictionaries.
 - margoengine: document generated decoders/zstd and decoders/lz4 optional facades.
+
+
+
+- @margoengine/viewcube (batch 198 job 2): document /fit FitViewCube, live world AABBs, padding/aspect defaults, transition envelopes, ortho zoom, Home and projection semantics, clipping and manual drag behavior.
+- margoengine (batch 198 job 2): document viewcube/fit forwarding.

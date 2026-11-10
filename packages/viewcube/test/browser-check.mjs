@@ -132,6 +132,15 @@ try {
   near((await click('0,1,0')).direction, [0, 0, 1], 'Z-up top face', 1e-5);
   near((await page.evaluate(() => window.check.settle())).up, [0, 1, 0], 'Z-up pole screen up');
   console.log('ok Z-up CSS hit testing and rendered pole');
+  await page.evaluate(() => window.check.fitCube());
+  await click('0,1,1');
+  assert.equal(await page.evaluate(() => window.check.framed()), true, 'perspective bounds fit');
+  const fitToggle = await page.evaluate(() => window.check.toggle());
+  await page.mouse.click(fitToggle.x, fitToggle.y);
+  await page.evaluate(() => window.check.settle());
+  await click('0,1,0');
+  assert.equal(await page.evaluate(() => window.check.framed()), true, 'orthographic bounds fit');
+  console.log('ok bounds fit on view change in both projections');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
 } finally {

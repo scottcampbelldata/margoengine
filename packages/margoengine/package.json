@@ -4262,6 +4262,10 @@
       "types": "./dist/viewcube/up.d.ts",
       "import": "./dist/viewcube/up.js"
     },
+    "./viewcube/fit": {
+      "types": "./dist/viewcube/fit.d.ts",
+      "import": "./dist/viewcube/fit.js"
+    },
     "./voxel": {
       "types": "./dist/voxel.d.ts",
       "import": "./dist/voxel.js"

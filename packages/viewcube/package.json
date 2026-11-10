@@ -33,6 +33,10 @@
     "./up": {
       "types": "./dist/up.d.ts",
       "import": "./dist/up.js"
+    },
+    "./fit": {
+      "types": "./dist/fit.d.ts",
+      "import": "./dist/fit.js"
     }
   },
   "files": [

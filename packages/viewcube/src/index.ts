@@ -638,7 +638,7 @@ export class ViewCube {
     return a;
   }
   /** Animates the azimuth and polar angle around the target; home also moves the target to `to` and the distance to `radius`. */
-  private orbit(
+  protected orbit(
     theta: number,
     phi: number,
     duration: number,

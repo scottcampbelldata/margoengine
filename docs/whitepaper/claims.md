@@ -4030,3 +4030,6 @@ The optional video/demux entry indexes AVC fragments and VP8/VP9/AV1 WebM and sh
 
 ## Batch 203 standalone stream codecs
 Optional decoders/zstd and decoders/lz4 provide rendering-independent decompression in Node and workers. streams.test.js compares every output byte against 48 native LZ4 encodings of CC0 Avocado data across block sizes, linkage, compression levels and content-size modes, plus raw/dictionary/legacy inputs and native Node Zstandard streams. Tests enforce checksums, bounds, concatenation and cancellation. Limits and memory behavior are recorded in limits.md. This is format coverage evidence, not an incremental-I/O or speed claim.
+
+## Batch 198 job 2: view change fitting
+FitViewCube frames supplied world bounds during orientation transitions in perspective and orthographic projections. The CPU proof projects every corner at every frame across portrait/wide aspects, translated targets, exact poles, custom up, fixed and asymmetric orthographic frusta, Home/roll/keyboard and live bounds. The owning browser suite verifies real edge/face clicks and projection toggles remain framed on WebGPU and WebGL2. Scope is the documented automatic fit behavior; enclosing-sphere looseness is recorded in limits.md. No speed claim.

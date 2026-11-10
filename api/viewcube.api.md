@@ -48,6 +48,7 @@ export class ViewCube {
     sync(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    protected orbit(theta: number, phi: number, duration: number, to?: readonly number[], radius?: number, twist?: number): void;
 }
 
 export interface ViewCubeOptions {

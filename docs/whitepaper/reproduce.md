@@ -3480,3 +3480,6 @@ Fetch required CC0 flower MP4 and WebM with `node scripts/reference-rendering/fe
 
 ## Batch 203 standalone compression
 After npm run build:packages run node --test --test-timeout=120000 packages/decoders/tests/streams.test.js packages/decoders/tests/zstd-destination.test.js. The checked-in LZ4 manifest and NOTICE record the native producer and CC0 source; tests reconstruct expected data from Avocado.bin. No native codec is needed to run them. Zstandard references use Node zlib. Existing decoder GPU tests continue to cover decoded texture upload on both backends.
+
+## Batch 198 job 2: bounds fitting
+After building packages, run node --test packages/viewcube/test/*.test.js. fit.test.js independently projects AABB corners through Camera.matrix throughout transitions. Run packages/viewcube/test/browser-check.mjs and the same with --compat, each under the shared GPU lock with owner codex-batch198, --max=3 and --wait-max=60. The added fixture switches to a FitViewCube, clicks an edge, toggles projection and clicks Top; both resulting rendered camera matrices must contain all bounds corners. No external data or benchmark.
