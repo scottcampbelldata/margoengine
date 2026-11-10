@@ -5718,3 +5718,20 @@ Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md
 and a standalone pass over all 1,312 entry `.d.ts` files found every source file. Cause not found yet: a
 `getSourceFile` that resolves to a non-remote node under load in `typescript/unstable/async`. Repro attempt: run
 `npm run hygiene` while `npm test` runs in several packages.
+
+- **Fixed (2026-11-10, Mac lane E): wrong-scene dispose in creative, labels, points, tiles, lod, materials, rigging, usdz,
+  gltf-pro, mcp and scatter.** `engine.removePlugin(name)` acts on the active scene, so disposing a plugin attached to
+  another scene removed the active scene's same-name plugin and left the disposed one registered and running. Each
+  site now removes through `engine.sceneOf(plugin)` (one `fix(<pkg>): dispose removes the plugin from its own scene`
+  commit per package, each with a regression that fails on the old code). Left as is on purpose: react's and ui's
+  React effects (attach and detach both run in a React commit, where the default scene is active; react's plugins stay
+  in the default scene, and adaptive-resolution uses `engine.scene` both ways), controls' `cadControls` (replaces the
+  active scene's stage controls on purpose), environment's `EnvironmentLighting.load` rollback (same synchronous call
+  as the attach), and the already scene-scoped sites in animation, audio, inspector, save, shader, xr and the other
+  gltf-pro and materials files. Open, outside the lanes that may edit them: `packages/physics/src/physics.ts:1209`,
+  `packages/physics/src/next/physics.ts:896` and `packages/physics2d/src/physics.ts:630` check `hasPlugin` and remove
+  by name in the active scene (same bug); `packages/ragdoll/src/ragdoll.ts:1211` compares against the active scene, so
+  a ragdoll in another scene is never removed; sciviz (dev PC) `axes.ts:290`, `media-tiles.ts:282` and
+  `pointcloud.ts:374` have the same pattern. Also open: tiles' points plugin and usdz `curves()` attached after an
+  import's await used to land in the default scene; tiles now attaches its points plugin to the renderer's scene,
+  usdz is in finish-later.md.
