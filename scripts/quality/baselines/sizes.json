@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14731482,
+  "total": 14731904,
   "history": [
     {
       "date": "2026-10-24",
@@ -8201,6 +8201,12 @@
       "commit": "71beba857",
       "reason": "batch 162 work counts: worldSphere locals (+2 B bvh/alpha)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "0447b769b",
+      "reason": "rigging/vrm: lookAt range maps checked against the VRMC_vrm schema and missing fields defaulted one by one (batch 132 audit fix)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9009,7 +9015,7 @@
     "@margoengine/rigging/springs": 5069,
     "@margoengine/rigging/transfer": 3680,
     "@margoengine/rigging/voxel-weights": 5534,
-    "@margoengine/rigging/vrm": 10739,
+    "@margoengine/rigging/vrm": 11161,
     "@margoengine/rigging/vrm-constraints": 3254,
     "@margoengine/rigging/vrm0": 6744,
     "@margoengine/rigging/vrma": 6295,

@@ -338,6 +338,20 @@ export function checkVRM(avatar: VRMAvatar, doc: VRMDocument): string[] {
   }
   if (avatar.lookAt && avatar.lookAt.type !== 'bone' && avatar.lookAt.type !== 'expression')
     issues.push(`lookAt.type ${String(avatar.lookAt.type)} must be bone or expression`);
+  if (avatar.lookAt) {
+    const offset = avatar.lookAt.offsetFromHeadBone;
+    if (offset !== undefined && !(Array.isArray(offset) && offset.length === 3 && offset.every(Number.isFinite)))
+      issues.push('lookAt.offsetFromHeadBone must be three finite numbers');
+    for (const side of ['HorizontalInner', 'HorizontalOuter', 'VerticalDown', 'VerticalUp'] as const) {
+      const map = avatar.lookAt[`rangeMap${side}`] as Partial<VRMRangeMap> | undefined;
+      if (map === undefined) continue;
+      if (map === null || typeof map !== 'object') issues.push(`lookAt.rangeMap${side} must be an object`);
+      else if (map.inputMaxValue !== undefined && !(map.inputMaxValue >= 0 && map.inputMaxValue <= 180))
+        issues.push(`lookAt.rangeMap${side}.inputMaxValue must be from 0 to 180 degrees`);
+      else if (map.outputScale !== undefined && !Number.isFinite(map.outputScale))
+        issues.push(`lookAt.rangeMap${side}.outputScale must be a finite number`);
+    }
+  }
   for (const annotation of avatar.firstPerson?.meshAnnotations ?? [])
     if (!known(annotation.node)) issues.push(`firstPerson names node ${annotation.node}, which does not exist`);
   const spring = avatar.springBone;
@@ -605,7 +619,8 @@ const DEFAULT_RANGE: VRMRangeMap = { inputMaxValue: 90, outputScale: 1 };
 
 /** A gaze angle through a range map, as a magnitude. An input range of 0 gives all or nothing. */
 function ranged(value: number, map: VRMRangeMap | undefined): number {
-  const { inputMaxValue, outputScale } = map ?? DEFAULT_RANGE,
+  // The schema requires neither field, so each missing one takes its default on its own.
+  const { inputMaxValue = DEFAULT_RANGE.inputMaxValue, outputScale = DEFAULT_RANGE.outputScale } = map ?? DEFAULT_RANGE,
     size = Math.abs(value);
   if (!(inputMaxValue > 0)) return size > 0 ? outputScale : 0;
   return (Math.min(size, inputMaxValue) / inputMaxValue) * outputScale;

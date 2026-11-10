@@ -155,6 +155,12 @@ test('what breaks the specification is named and refused', () => {
   );
   assert.match(issues((a) => (a.humanoid.humanBones.tail = { node: 1 })), /not a humanoid bone/);
   assert.match(issues((a) => (a.lookAt = { type: 'eyes' })), /lookAt.type/);
+  // Batch 132: range maps and the offset are checked against the lookAt schema.
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', rangeMapVerticalUp: { inputMaxValue: 200, outputScale: 10 } })), /rangeMapVerticalUp.inputMaxValue/);
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', rangeMapHorizontalInner: { inputMaxValue: -1 } })), /rangeMapHorizontalInner.inputMaxValue/);
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', rangeMapHorizontalOuter: { outputScale: 'ten' } })), /outputScale/);
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', offsetFromHeadBone: [0, 0.06] })), /offsetFromHeadBone/);
+  assert.equal(issues((a) => (a.lookAt = { type: 'bone', rangeMapVerticalUp: { inputMaxValue: 90 } })), '');
   assert.match(
     issues((a) => (a.expressions = { custom: { happy: {} } })),
     /preset's name/,
@@ -297,6 +303,11 @@ test('gaze: yaw and pitch in LookAt space, through the range maps', () => {
   assert.equal(vrmLookWeights({ rangeMapHorizontalOuter: map(0, 0.7) }, { yaw: 5, pitch: 0 }).lookLeft, 0.7);
   assert.equal(vrmLookWeights({ rangeMapHorizontalOuter: map(0, 0.7) }, { yaw: 0, pitch: 0 }).lookLeft, 0);
   assert.equal(vrmLookWeights({}, { yaw: 45, pitch: 0 }).lookLeft, 0.5);
+  // Batch 132: the schema requires neither range field; a missing one takes its default alone, never NaN.
+  assert.equal(vrmLookWeights({ rangeMapHorizontalOuter: { outputScale: 0.8 } }, { yaw: 45, pitch: 0 }).lookLeft, 0.4);
+  assert.equal(vrmLookWeights({ rangeMapVerticalDown: { inputMaxValue: 30 } }, { yaw: 0, pitch: 15 }).lookDown, 0.5);
+  const partial = vrmEyeAngles({ type: 'bone', rangeMapHorizontalOuter: {} }, { yaw: 45, pitch: 0 });
+  assert.ok(Number.isFinite(partial.left.yaw) && close(partial.left.yaw, 0.5));
 });
 
 test('every real spring chain runs: no bad number, lengths hold, the pose returns', () => {
