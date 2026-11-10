@@ -260,3 +260,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/ui | forms entry: Select, RadioGroup, Tabs content ownership, Checkbox, ColorPicker, normalized channels, mirror/input attachment and disposal. | batch-258 job 3 |
 | margoengine | ui/forms alias and accessible form setup. | batch-258 job 3 |
+| @margoengine/inspector | gl: GLInspector attach/setDebug/capture, native preview backend, state restoration, timing limits and cancellation | batch-263 job 2 |
+| margoengine | Generated inspector/gl alias | batch-263 job 2 |

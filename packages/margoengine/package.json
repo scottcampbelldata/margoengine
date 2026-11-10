@@ -1486,6 +1486,10 @@
       "types": "./dist/inspector/textures.d.ts",
       "import": "./dist/inspector/textures.js"
     },
+    "./inspector/gl": {
+      "types": "./dist/inspector/gl.d.ts",
+      "import": "./dist/inspector/gl.js"
+    },
     "./kinematics-constraints": {
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"

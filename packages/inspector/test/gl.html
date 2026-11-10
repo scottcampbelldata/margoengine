@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>WebGL2 inspector overlays</title>
+<canvas width="600" height="400" style="width:600px;height:400px"></canvas><main></main>
+<script type="module">
+import {Engine,Geometry} from '@margoengine/core';
+import {webglRenderer,glRenderer} from '@margoengine/webgl2-compat/preview';
+import {GLTFAsset} from '@margoengine/gltf-pro/model';
+import {GLInspector} from '@margoengine/inspector/gl';
+window.setup=async()=>{
+  const engine=window.engine=await Engine.create(document.querySelector('canvas'),{backend:'webgl2',fallback:webglRenderer,camera:{position:[3,2,5],target:[0,0,0]}});
+  const bytes=await(await fetch('/examples/assets/khronos/BoxVertexColors/BoxVertexColors.glb')).arrayBuffer(), view=new DataView(bytes), jsonLength=view.getUint32(12,true),
+    doc=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,20,jsonLength))), binary=new Uint8Array(bytes,28+jsonLength), asset=new GLTFAsset(doc,[],binary), p=doc.meshes[0].primitives[0];
+  window.mesh=engine.createMesh().setGeometry(new Geometry(asset.accessor(p.attributes.POSITION,'VEC3'),asset.accessor(p.attributes.NORMAL,'VEC3'),asset.accessor(p.indices,'SCALAR')));
+  const panel=window.panel=GLInspector.attach(engine,{parent:document.querySelector('main')});
+  window.pixel=()=>{engine.render();const gl=glRenderer(engine.canvas).gl,data=new Uint8Array(engine.canvas.width*engine.canvas.height*4);gl.readPixels(0,0,engine.canvas.width,engine.canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,data);return Array.from(data);};
+  engine.render();return engine.backend;
+};
+</script>

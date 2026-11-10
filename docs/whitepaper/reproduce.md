@@ -2848,3 +2848,4 @@ Build packages, then node --test --test-timeout=60000 packages/wfc/test/overlapp
 
 ### Batch 258 forms correctness
 After build:packages, run node --test --test-timeout=120000 packages/ui/tests/forms.test.js packages/ui/tests/mirror.test.js. Under a shared GPU slot run node packages/ui/tests/forms-browser.mjs, then the same command with --compat. The driver uses actual canvas pointer and keyboard actions, shared gamepad commands, native hex input and exact ARIA state checks after mirror reconciliation. No timing assertion or benchmark is included.
+- Batch 263 WebGL2 inspector: build packages, run `node --test --test-timeout=30000 packages/inspector/test/gl.test.js`; under the shared GPU lock run `node packages/inspector/test/gl-browser.mjs` and the same command with `--compat`. The fixture uses CC0 BoxVertexColors geometry and checks all overlays, returned draw/shader state, pass costs and pixel restoration.

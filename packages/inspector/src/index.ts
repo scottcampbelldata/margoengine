@@ -12,7 +12,7 @@ import {
 import { Lines, Line, BoxHelper, VertexNormalsHelper, LightsHelper } from '@margoengine/lines';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { margoError } from '../../shared/errors.js';
-import { meshTriangles } from '../../shared/mesh-source.js';
+import { meshData, wireframe } from './debug-geometry.js';
 import { inView } from '../../shared/view-rect.js';
 import { EditHistory } from './history.js';
 import { editorDeleted } from './edit-state.js';
@@ -52,73 +52,6 @@ interface DebugLines {
   normals?: Line;
   bounds?: Line;
 }
-const wirePositions = new WeakMap<object, Float32Array>();
-interface MeshData {
-  identity: object;
-  pbr: boolean;
-  parts: { vertices: Float32Array; indices: Uint32Array; stride: number }[];
-  radius: number;
-}
-const debugData = new WeakMap<object, MeshData>();
-
-function meshData(mesh: Mesh) {
-  const triangles = meshTriangles(mesh);
-  if (!triangles) return null;
-  const identity = triangles.kind === 'core' ? triangles.geometry : triangles.source;
-  let data = debugData.get(identity);
-  if (!data) {
-    if (triangles.kind === 'core')
-      data = {
-        identity,
-        pbr: false,
-        parts: [{ vertices: triangles.geometry.vertices, indices: triangles.geometry.indices, stride: 6 }],
-        radius: triangles.geometry.bounds[3],
-      };
-    else {
-      const b = triangles.source.bounds;
-      data = {
-        identity,
-        pbr: true,
-        parts: triangles.source.primitives.map((p) => ({ vertices: p.vertices, indices: p.indices, stride: 20 })),
-        radius: Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2,
-      };
-    }
-    debugData.set(identity, data);
-  }
-  return data;
-}
-
-function wireframe(mesh: Mesh): Line {
-  const source = meshData(mesh)!;
-  let positions = wirePositions.get(source.identity);
-  if (!positions) {
-    const data: number[] = [];
-    for (const { indices, vertices, stride } of source.parts) {
-      const count = vertices.length / stride,
-        seen = new Set<number>();
-      for (let i = 0; i < indices.length; i += 3)
-        for (let edge = 0; edge < 3; edge++) {
-          const a = indices[i + edge],
-            b = indices[i + ((edge + 1) % 3)],
-            key = Math.min(a, b) * count + Math.max(a, b);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          data.push(
-            vertices[a * stride],
-            vertices[a * stride + 1],
-            vertices[a * stride + 2],
-            vertices[b * stride],
-            vertices[b * stride + 1],
-            vertices[b * stride + 2],
-          );
-        }
-    }
-    positions = new Float32Array(data);
-    wirePositions.set(source.identity, positions);
-  }
-  return new Line({ mesh, positions, mode: 'segments', color: '#72e8cc', onTop: true, cap: 'butt', join: 'miter' });
-}
-
 const css = `
 :host{position:fixed;right:12px;top:12px;width:280px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);z-index:10001;display:block;color:#202226;font:12px/1.4 system-ui;letter-spacing:0}
 @media(max-width:560px){:host{top:150px;max-height:calc(100dvh - 162px)}section{max-height:calc(100dvh - 162px)!important}}
