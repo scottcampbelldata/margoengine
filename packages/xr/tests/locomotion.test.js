@@ -74,3 +74,7 @@ test('zero movement speeds keep the comfort view open',()=>{
 test('session end removes hooks before a new reference-space origin can be used',()=>{
  const f=fixture();try{f.player.teleport([5,2,6]);f.host.session.dispatchEvent(new Event('end'));assert.equal(f.frameListeners.size,0);assert.equal(f.eyeListeners.size,0);assert.throws(()=>f.player.teleport([0,0,0]),/disposed/);}finally{f.dispose();}
 });
+test('a zero-length frame keeps the comfort vignette while the stick is held, even with fade 0',()=>{
+ const f=fixture({fade:0});try{f.step();assert.equal(f.player.comfort,1);f.state.delta=0;f.step();assert.equal(f.player.comfort,1);
+ f.state.delta=NaN;f.step();assert.equal(f.player.comfort,1);assert.equal(f.offsets.length,1);}finally{f.dispose();}
+});

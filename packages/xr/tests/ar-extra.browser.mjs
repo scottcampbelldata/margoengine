@@ -25,7 +25,8 @@ function documentFor(moved){let s=fixture;
  const overlay=DOMOverlay.attach(xr,overlayRoot),event=new Event('beforexrselect',{cancelable:true});overlayRoot.dispatchEvent(event);if(!event.defaultPrevented)throw new Error('DOM overlay did not stop world select');
  const images=ImageTracking.attach(xr);if((await images.trackability())[0]!=='trackable')throw new Error('image trackability');
  const meshes=await MeshDetection.create(xr,{show:{engine,material:new PbrMaterial({color:'#ee6633'})}});`);
- s=replace(s,'const pixels =',`await xr.device.queue.onSubmittedWorkDone();if(meshes.meshes.size!==1||images.images.size!==1)throw new Error('missing AR observations');
+ s=replace(s,'const pixels =',`{const attached=session.frames;while(session.frames<attached+3)await new Promise(r=>setTimeout(r,5));}// The observers attach after the fixture's own three-frame wait has often passed: give them three frames of their own.
+ await xr.device.queue.onSubmittedWorkDone();if(meshes.meshes.size!==1||images.images.size!==1)throw new Error('missing AR observations');
  const pixels =`);
  s=replace(s,'await xr.end();','meshes.dispose();images.dispose();overlay.dispose();persistent.dispose();bitmap.close();overlayRoot.remove(); await xr.end();');return s;}
 const browser=await openBrowser({startPath:'/tests/modern-extension.html',port:'free',compat:false}),origin=new URL(browser.page.url()).origin,results=new Map();

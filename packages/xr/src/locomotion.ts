@@ -96,6 +96,9 @@ export class SmoothLocomotion {
   private update(state: XRFrameState): void {
     if (state.frame.session !== this.session || this.xr.session !== this.session) return;
     const dt = Math.max(0,Math.min(Number.isFinite(state.delta) ? state.delta : 0,0.1));
+    // A frame of no length (two frames inside the browser's clock step, or a non-finite delta) moves nothing and must
+    // not count as a still stick: with fade 0 it switched the vignette off for that frame while the stick was held.
+    if (dt === 0) return;
     const viewer=state.viewer;
     let motion=0;
     if(this.enabled && viewer && dt > 0) {
