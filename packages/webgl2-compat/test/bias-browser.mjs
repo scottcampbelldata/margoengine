@@ -1,5 +1,7 @@
 // Native WebGPU is unavailable beside ANGLE Vulkan in some Windows Chromium builds.
-// Keep the native oracle on the same adapter in its own browser, then compare raw f32 bits on both ANGLE backends.
+// Keep the native oracle on the same adapter in its own browser, then compare raw f32 bits on each of the platform's
+// real ANGLE backends. Forcing a backend the platform does not have (d3d11 on macOS) makes Chromium fall back to
+// SwiftShader, which openBrowser refuses, so each platform names its own (lane L, 2026-11-10).
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -18,12 +20,26 @@ try {
 } finally {
   await native.close();
 }
-for (const backend of ['d3d11', 'vulkan']) {
+export const ANGLE_BACKENDS = {
+  win32: [
+    ['d3d11', /Direct3D11/],
+    ['vulkan', /Vulkan/],
+  ],
+  darwin: [['metal', /Metal/]],
+  linux: [
+    ['vulkan', /Vulkan/],
+    ['gl', /OpenGL/],
+  ],
+};
+const backends = ANGLE_BACKENDS[process.platform];
+if (!backends)
+  throw new Error(`No ANGLE backends listed for ${process.platform}; add its real backends to ANGLE_BACKENDS`);
+for (const [backend, renderer] of backends) {
   const context = await openBrowser({ startPath: path, port: 'free', compat: false, args: [`--use-angle=${backend}`] });
   const errors = [];
   context.page.on('pageerror', (error) => errors.push(error.message));
   try {
-    assert.match(context.hardware.webglRenderer, backend === 'd3d11' ? /Direct3D11/ : /Vulkan/);
+    assert.match(context.hardware.webglRenderer, renderer);
     await context.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
     const result = await context.page.evaluate(() => window.check.runCompat('implicitFootprint'));
     assert.equal(result.thrown, null);

@@ -2048,7 +2048,14 @@ export class StageEmitter {
           parameterExtra = ', float l';
           localExtra = ', l';
         }
-        if (name === 'textureSampleGrad') {
+        if (name === 'textureSampleGrad' && implicitGradients(rest[1], rest[i], rest[i + 1])) {
+          // textureSampleGrad(c, dpdx(c), dpdy(c)) is the implicit footprint by definition, so sample with
+          // implicit derivatives. GLSL textureGrad(c, dFdx(c), dFdy(c)) is not the same on every driver: Apple's
+          // Metal compiler folds Dawn's gradient2d(dfdx(c), dfdy(c)) into the implicit footprint, but not the
+          // y-flipped derivatives ANGLE Metal emits, so the layer chose a different mip (LOD 1.77 against the
+          // native 1.86 on the M6, bias-browser.mjs, 2026-11-10).
+          i += 2;
+        } else if (name === 'textureSampleGrad') {
           fn = 'textureGrad';
           const dx = v(rest[i++]),
             dy = v(rest[i++]);
@@ -2074,9 +2081,7 @@ export class StageEmitter {
           const coordType = arrayed ? 'vec3' : `vec${n}`;
           const sample = (level: string) =>
             offset ? `textureLodOffset(t, p, ${level}, ${offset})` : `textureLod(t, p, ${level})`;
-          const hardware = offset
-            ? `${fn}Offset(t, p${localExtra}, ${offset})`
-            : `${fn}(t, p${localExtra})`;
+          const hardware = offset ? `${fn}Offset(t, p${localExtra}, ${offset})` : `${fn}(t, p${localExtra})`;
           // Pass already-emitted argument values once. Re-emitting IR can consume a discard hoist twice;
           // expanding coordinates in derivatives duplicates effects. The helper also stays inside lazy operands.
           const blend = this.generated(
@@ -2344,4 +2349,54 @@ export class StageEmitter {
     }
     throw unsupported(`@builtin(${name}) as an input`);
   }
+}
+
+/** Expressions that evaluate to the same value twice in one invocation: no calls, assignments or pointer reads. */
+function sameExpression(a: IRExpr, b: IRExpr): boolean {
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'literal':
+      return JSON.stringify(a.value) === JSON.stringify(b.value) && JSON.stringify(a.type) === JSON.stringify(b.type);
+    case 'name':
+      return a.decl === (b as typeof a).decl && (a.decl.kind === 'let' || a.decl.kind === 'param');
+    case 'construct': {
+      const other = b as typeof a;
+      return (
+        JSON.stringify(a.type) === JSON.stringify(b.type) &&
+        a.args.length === other.args.length &&
+        a.args.every((arg, n) => sameExpression(arg, other.args[n]))
+      );
+    }
+    case 'member':
+      return a.index === (b as typeof a).index && sameExpression(a.object, (b as typeof a).object);
+    case 'swizzle':
+      return (
+        a.components.join() === (b as typeof a).components.join() && sameExpression(a.object, (b as typeof a).object)
+      );
+    case 'unary':
+      return a.op === (b as typeof a).op && sameExpression(a.operand, (b as typeof a).operand);
+    case 'binary':
+      return (
+        a.op === (b as typeof a).op &&
+        sameExpression(a.left, (b as typeof a).left) &&
+        sameExpression(a.right, (b as typeof a).right)
+      );
+    case 'convert':
+      return JSON.stringify(a.type) === JSON.stringify(b.type) && sameExpression(a.arg, (b as typeof a).arg);
+    default:
+      return false;
+  }
+}
+
+/** `dx` and `dy` are dpdx(coordinate) and dpdy(coordinate) (any coarse or fine form) of the sampled coordinate. */
+function implicitGradients(coordinate: IRExpr | undefined, dx: IRExpr | undefined, dy: IRExpr | undefined): boolean {
+  if (!coordinate || dx?.kind !== 'builtin' || dy?.kind !== 'builtin') return false;
+  return (
+    /^dpdx(Coarse|Fine)?$/.test(dx.name) &&
+    /^dpdy(Coarse|Fine)?$/.test(dy.name) &&
+    dx.args.length === 1 &&
+    dy.args.length === 1 &&
+    sameExpression(coordinate, dx.args[0]) &&
+    sameExpression(coordinate, dy.args[0])
+  );
 }

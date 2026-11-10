@@ -49,6 +49,42 @@ for (const [dimension, coords, offset] of [
       assert.doesNotMatch(f.source, /log2\(|textureLod\(/);
     });
 
+for (const [dimension, coords, offset] of [
+  ['2d', 'uv', 'vec2i(1,-1)'],
+  ['2d_array', 'uv, 1', 'vec2i(1,-1)'],
+])
+  for (const [dx, dy] of [
+    ['dpdx', 'dpdy'],
+    ['dpdxFine', 'dpdyCoarse'],
+  ])
+    for (const shifted of [false, true])
+      test(`textureSampleGrad ${dimension} with ${dx}/${dy} of its own coordinate offset=${shifted} samples implicitly`, () => {
+        // Regression (M6 Mac mini, 2026-11-10): ANGLE Metal's textureGrad(c, dFdx(c), dFdy(c)) chose LOD 1.77 where
+        // native Metal's textureSampleGrad(c, dpdx(c), dpdy(c)) equals textureSample (LOD 1.86); bias-browser.mjs.
+        const source = `${V}\n@group(0) @binding(0) var t:texture_${dimension}<f32>; @group(0) @binding(1) var s:sampler;
+    @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {let uv=vec2f(0.173,0.124)*p.x+vec2f(-0.063,0.186)*p.y;
+      return textureSampleGrad(t,s,${coords},${dx}(uv),${dy}(uv)${shifted ? `,${offset}` : ''});}`;
+        const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment.source;
+        assert.match(f, shifted ? /textureOffset\(/ : /texture\(/);
+        assert.doesNotMatch(f, /textureGrad|dFdx|dFdy/);
+      });
+
+test('textureSampleGrad keeps explicit gradients that are not the derivatives of its own coordinate', () => {
+  for (const [grad, why] of [
+    ['vec2f(0.173,0.124),vec2f(-0.063,0.186)', 'constant gradients'],
+    ['dpdx(uv),dpdy(uv*2.0)', 'derivatives of another expression'],
+    ['dpdy(uv),dpdx(uv)', 'swapped derivatives'],
+    ['dpdx(w),dpdy(w)', 'a var read twice'],
+    ['dpdx(uv)*2.0,dpdy(uv)', 'scaled derivatives'],
+  ]) {
+    const source = `${V}\n@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+    @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {let uv=p.xy*0.123;var w=uv;
+      return textureSampleGrad(t,s,${grad.startsWith('dpdx(w)') ? 'w' : 'uv'},${grad});}`;
+    const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment.source;
+    assert.match(f, /textureGrad\(/, why);
+  }
+});
+
 test('isotropic sampling carries the live sampler mip state and blends integer-level samples', () => {
   const source = `${V}\n@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
     @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(t,s,p.xy,2.125);}`;

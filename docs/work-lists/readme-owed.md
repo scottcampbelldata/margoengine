@@ -1559,3 +1559,4 @@ in the post README during the README phase (2026-11-10); all 28 runtime examples
 - @margoengine/procedural batch 169 job 7: DONE; Noise section documents the pruned exact Worley search with a runnable example, checked by check:readme-run.
 - @margoengine/environment batch 164 fog: standalone Tonemap/VolumetricFog example completed and runtime checked during the README phase. Other environment debt remains.
 - @margoengine/fsm batch 132 audit (lane H): README prose on per-transition delay re-arm, SCXML transition refusals and `m:stay`; no new example.
+- @margoengine/webgl2-compat (lane L, 2026-11-10): textureSampleGrad with dpdx/dpdy of its own coordinate now samples implicitly (matches native Metal); note it in the WGSL support section. No new example.

@@ -6788,3 +6788,29 @@ https://www.w3.org/TR/pointerlock-2/). Any other refusal, on any platform, still
 prove: that Chromium on macOS acquires a native lock for Margo's elements. That needs a run with the console unlocked
 and the browser in front (finish-later "132 | worker"); the Windows dev PC runs the native path. Regression for the
 classifier: `tests/pointer-lock-harness.test.js`.
+
+## webgl2-compat footprint check per platform, and explicit gradients on ANGLE Metal (lane L, 2026-11-10)
+
+`packages/webgl2-compat/test/bias-browser.mjs` compares the layer's raw f32 sample bits with native WebGPU on each
+ANGLE backend. It forced `d3d11` and `vulkan`, which macOS does not have, so Chromium fell back to SwiftShader and
+the harness refused the run. It now takes the platform's real backends: Windows `d3d11` and `vulkan`, macOS `metal`,
+Linux `vulkan` and `gl` (the Linux rows have not been run yet; finish-later).
+
+The first Metal run found a real difference, fixed in the same commit. `textureSampleGrad(t, s, uv, dpdx(uv),
+dpdy(uv))` on the oblique map read 0.4205882 (LOD about 1.77) through the layer and 0.3563725 (LOD about 1.86)
+natively, on the M6 Mac mini (Apple M-series GPU, Chromium 156.0.8078.4). A probe of the same texture showed why:
+natively, gradients written as `dpdx(uv), dpdy(uv)` give exactly the implicit `textureSample` value, but the same
+gradients passed as constants give 0.4205882, so the native result is the implicit footprint, not the generic
+explicit-gradient path. ANGLE Metal's GLSL `textureGrad(c, dFdx(c), dFdy(c))` takes the generic path (0.4205882
+for both forms). The layer now emits implicit sampling for `textureSampleGrad` whose gradients are `dpdx`/`dpdy` (any
+coarse or fine form) of the very coordinate it samples, which is the implicit footprint by definition (WGSL,
+https://www.w3.org/TR/WGSL/#texturesamplegrad and #texturesample). Any other explicit gradients still use
+`textureGrad`; on Metal they matched native in the probe (constant gradients, axis-aligned and diagonal gradients:
+identical bits). Regressions: `packages/webgl2-compat/test/glsl.test.js` (emission, and the cases that must keep
+`textureGrad`) and `bias-browser.mjs` on the Mac (1280 f32 words identical to native after the fix, 128 words differed
+before).
+
+Accepted difference seen in the same probe and not part of this check: `textureSampleLevel` at a fractional LOD
+(1.7679) reads 0.4264706 natively and 0.4248279 through the layer, because the layer blends levels with the exact
+float fraction while the Metal sampler snaps it to 8 bits. That is the layer's documented exact-mip design
+(`emit.ts`, `exactMip`).

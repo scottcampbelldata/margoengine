@@ -5870,3 +5870,14 @@ changed. Repro: `MARGO_GPU_SLOTS=2 node packages/webgl2-compat/test/features-bro
 ## Batch 132 audit: mcp (fixed)
 
 - Fixed: `createMcpServer` (packages/mcp/src/server.ts) handled `resources/read` without refusing a request id that was already running. A reused id replaced the running `tools/call`'s cancellation controller and deleted it when the read finished, so a later `notifications/cancelled` for that call did nothing and the tool ran on. `resources/read` now refuses an active id (as `tools/call` already did) and removes only its own controller. Regression: "a resources/read reusing an active tool id is refused and leaves the tool cancellable" in packages/mcp/tests/server.test.js.
+
+## webgl2-compat explicit gradients on ANGLE Metal (lane L, 2026-11-10, fixed)
+
+Fixed: on the M6 Mac mini, `textureSampleGrad(t, s, uv, dpdx(uv), dpdy(uv))` through the WebGL2 layer chose a
+different mip (0.4205882 against native 0.3563725 on the bias-browser oblique map), because ANGLE Metal's GLSL
+`textureGrad` takes the generic explicit-gradient path while native Metal returns the implicit footprint for those
+gradients. Repro before the fix: `node packages/webgl2-compat/test/bias-browser.mjs` on a Mac (128 of 1280 words
+differ, keys `linear/oblique-grad/false` and `/true`). Fix: `packages/webgl2-compat/src/glsl/emit.ts` samples
+implicitly when the gradients are the coordinate's own derivatives. Regression: `packages/webgl2-compat/test/glsl.test.js`.
+Details and numbers: docs/limits.md "webgl2-compat footprint check per platform".
+
