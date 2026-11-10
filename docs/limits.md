@@ -3291,3 +3291,29 @@ removal and speed-phase timing debt remain open.
 are in `./global` for quads only. Overlapping UV charts are counted (`overlaps`), not separated: the later triangle's
 light is kept where both centres fall. Dilation averages neighbours across a gutter narrower than twice `dilate`, so
 two charts closer than that blend in the gutter (never inside a chart). Overlaps under 1e-3 texels count as touching.
+
+### Batch 133 resource and historical acceptance inventory
+
+Fresh-process collection completed all 3,881 inputs for each opaque build.
+Full: 3,881 accepted and exact; glTF: 1,003 accepted and exact. Per-file peak
+RSS parity fails on 116 full and 113 glTF inputs; these are open losses. There
+are no linear-memory losses: corpus peaks are native 18,874,368 B and old
+20,185,088 B. Smaller linear memory does not establish RSS parity. Every
+per-file RSS observation, public copy/allocation count and startup record is
+retained in [the resource inventory](whitepaper/results/batch-133-resources-inventory.json).
+
+Each fresh child compiles and instantiates one Wasm module. Native loads
+122,685 Wasm bytes; full loads 285,747 Wasm plus 58,763 wrapper bytes; glTF
+loads 192,420 Wasm bytes plus its recorded wrapper. These are work counts,
+not startup or cold-decode timing proof. No timing campaign ran.
+
+The scalar inventory adds 8,580 exact generic cases across all seven point
+versions and six mesh versions, all five semantics, types 1..11, normalized
+and raw descriptors, and widths 1/2/3/4/7/16. A separate 550-case wide inventory
+is accepted by the full oracle: 440 expose usable widths 17/31/64/127, while
+110 width-255 descriptors expose a negative component count in its binding.
+Native rejects all 550 at its descriptor's 16-component ceiling. Twelve
+complete historical predictor-3 streams with intact position/float canaries
+are accepted in versions 1.0/1.1/1.2; native rejects method 3. These are
+concrete gaps, not skips or unavailable-feature conclusions. Historical KD
+and the remaining prediction/transform/quantization cross product remain open.

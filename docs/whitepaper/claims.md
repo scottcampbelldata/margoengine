@@ -2780,3 +2780,9 @@ removal and speed-phase timing debt remain open.
 | --- | --- | --- |
 | `@margoengine/lightmap/mesh` bakes any triangle mesh at its own UV1 | `packages/lightmap/tests/mesh.test.js`: two triangles match the quad baker texel for texel within one RGB8 step; a 12-triangle cube matches Lambert irradiance on all 1,176 chart texels within 1e-5 | CPU, direct light and AO; hand-made test meshes, no real glTF file baked yet |
 | Conservative coverage reaches every texel a triangle touches | same test file: a sliver covering no texel centre still bakes its row | overlaps under 1e-3 texels count as touching |
+
+Batch133 resource/inventory observations: full 3,881 and glTF 1,003 accepted
+geometry fingerprints remain exact. Strict per-file RSS fails116/113; no
+memory-parity or replacement claim follows. Generic scalar inventory8,580
+is exact;440 usable wide cases and12 historical predictor3 cases expose
+native gaps. [Complete per-file evidence](results/batch-133-resources-inventory.json).

@@ -5208,3 +5208,16 @@ control but has no ETC extension, so0/993 uploaded. Prior Vulkan loading
 failure remains unresolved. Remaining formats/public integration/prebuilt
 removal and speed-phase timing debt remain open.
 [Full receipt](../whitepaper/results/batch-134-allocation-checkpoint.json).
+
+Batch133 resource evidence separates lifetime process peak RSS, linear-memory
+capacity and public work counts. The child harness uses an explicit frozen
+Wasm so builds cannot remove its input; draco-resource-harness.test.js proves
+working-directory/dist isolation in verify. RSS116/113 losses and historical
+width/predictor gaps remain open in the resource inventory; this gate work
+adds no core/stage or default decoder change.
+
+Resource acceptance also rejects a changed opaque variant on resume and
+returns a failing status for every retained RSS loss without taking another
+sample. Both paths have before/after regressions. Dedicated dist readers
+must start after verify finishes its build; the repaired own driver enforces
+that barrier after transient gltf-pro/README import failures.

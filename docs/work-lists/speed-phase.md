@@ -374,3 +374,8 @@ Real timestamps, tier storage/next-load selection and wrapper cleanup remain
 live correctness. No speed run occurred during this continuation.
 
 - Deferred core one-pass item: lane-K measurement d1c55001c and docs a5877f3f1 remain on the branch in margoengine-lane-K; A6000 gain beyond spread, AMD within spread; core change waits for the speed phase and Scott's OK.
+
+Batch133 still owes whole-corpus per-file cold/warm decode minima, compile/
+instantiate/startup timings and resolution of every retained warm loss against
+the prebuilt. Non-timed RSS and cold work counts do not substitute for those
+targets. Both default prebuilts and removal job5 wait for passing speed phase.

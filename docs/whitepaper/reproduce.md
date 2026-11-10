@@ -2333,3 +2333,24 @@ render control is useful hardware-selection evidence and is not ETC proof.
 The GPU leaf uses one shared slot, --wait-max=60, a bounded command maximum;
 never wrap preparation, build, CPU tests or waits in that lock.
 Timing, cold/warm/startup and paired A/B debt stay in the deferred speed phase.
+
+Batch133 non-timed resources: freeze packages/decoders/dist/draco-native.wasm
+under your own test-results folder and set MARGO_DRACO_ORACLE_ROOT to the
+verified opaque copies outside the repository. Run node
+scripts/acceptance/draco-resources.mjs draco-full <paired-inputs.json>
+<own-output-prefix> <frozen.wasm>, then draco with a different prefix. The
+maintainer corpus manifest is `<maintainer-cache>/batch-133/paired-inputs.json`; source
+identities/licences are in results/batch-133-corpus-manifest.json. Each child
+has a30-second hard deadline; wrap the whole command in a40-minute process-tree
+deadline. --resume validates manifest/artifact identity and retained rows.
+No timing metric, GC, minima or repeat-to-pass is performed. The final record
+retains every RSS row and hashes the original raw campaign/harness.
+Generate the historical generic inputs with node
+scripts/acceptance/draco-generic-inputs.mjs <own-output.json>; --wide generates
+the550 wide controls. Complete predictor3 repro streams are embedded in
+results/batch-133-resources-inventory.json. Re-run the regression with node
+--test --test-timeout=60000 tests/draco-resource-harness.test.js.
+
+The resource command returns nonzero when RSS or linear-memory parity fails.
+A completed --resume checkpoint rechecks that result without new samples.
+Run dedicated package/README readers only after verify completes its build.

@@ -4713,3 +4713,52 @@ exposed implementation references/snippets; no such page or companion code
 was opened or used. The block-layout formula was already present in Margo's
 own checked KTX parser and was revalidated against KTX2.0.4, not inferred from
 an implementation search result.
+
+### Batch 133 resources and E22 historical inventory
+
+Sources compared: Node.js contributors, *Process* (2026),
+[resourceUsage and memoryUsage](https://nodejs.org/api/process.html#processresourceusage);
+WebAssembly Community Group, *Understanding the JS API* (2026),
+[loading, compilation, instantiation and memory](https://webassembly.org/getting-started/js-api/);
+and Frank Galligan / Google, *Draco Bitstream Specification* (2017),
+[scalar and decoder tables](https://google.github.io/draco/spec/). The named
+sections were read; the Draco specification was previously read in full.
+RSS is lifetime process high water (Node maxRSS KiB times 1024), distinct
+from linear-memory capacity. Counts observe public API calls/copies and
+loaded bytes, without clocks or claims about hidden allocator work.
+
+E22: the specification-derived generic emitter establishes 8,580 exact
+full-oracle cases, including signed/unsigned 64-bit raw attributes. The first
+comparison adapter lacked 64-bit getters and reported 1,560 harness failures;
+adding those getters resolves every case without a decoder change. They do
+not prove extreme 64-bit public conversion rounding. Wide probes establish
+440 usable accepted streams outside native's 16-component cap. A first wide
+observer crashed allocating a negative exposed count; the corrected observer
+records all 110 negative width-255 binding results explicitly. None is called
+a usable extracted-output proof. All 550 native rejections stay recorded.
+
+Historical UV3: changing the predictor byte in current-layout UV streams
+rejects all 64 and proves no historical rule. A separate 320-case framing
+search over valid historical one-triangle topology, i32/f32 positions, flag
+encodings/counts and flag/wrap order finds 12 complete accepted cases: versions
+1.0/1.1/1.2, u32 count 1/3, binary flags then wrap bounds. Both position and
+float canaries remain intact. Their full ordered UV output and complete
+input bytes are retained, but reconstruction is not inferred or implemented.
+No foreign implementation/wrapper text, companion code, disassembly or
+remembered internals supplied any observation.
+
+The resource experiment's first 578 full pairs preceded an own rebuild that
+removed dist mid-pair. Frozen, hash-verified Wasm repairs that setup cause;
+no completed pair was repeated to get a better RSS. The failing pair's old
+side had not been recorded and was repeated after repair. The original
+failure stays retained. A permanent cwd/dist isolation regression fails
+when restored to the old relative load and passes with explicit frozen input.
+[All observations and limitations](whitepaper/results/batch-133-resources-inventory.json).
+
+Research hygiene note for this continuation: the first broad specification
+search returned unsolicited implementation excerpts in its result list. Those
+implementation links were not opened and no excerpt supplied any implemented
+rule. Subsequent retrieval used primary standards and papers. No Rust decoder
+math changed in this continuation; metadata conversion was established by
+the complete discovery/held opaque experiments recorded above. Historical
+reconstruction gaps remain unimplemented.

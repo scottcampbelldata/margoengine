@@ -3959,3 +3959,26 @@ made textured pixels brighter than the equivalent constant material. The
 existing shared unitLight writer repairs the owning package. The real draw
 writer regression fails before and passes after; GPU comparison assertions
 and tolerances remain unchanged.
+
+### Open: batch 133 resource and historical target failures
+
+Fresh-process strict RSS losses: 116/3,881 full and 113/1,003 accepted glTF
+inputs. Largest observed excesses: full input83a312e3fe... +5,017,600 B; glTF
+inputa22e31f28c... +5,660,672 B. Exact hashes, old/new peaks, copy counts and
+manifest identities are in [the complete record](whitepaper/results/batch-133-resources-inventory.json).
+Linear-memory peaks pass; physical-page, JIT and live-allocation contributions
+to the RSS excess are not yet isolated. This remains an unaccepted target
+requiring a root allocation diagnosis, not a busy-machine timing waiver.
+
+Native descriptor components are capped at16 despite accepted generic widths
+17/31/64/127 (440 usable crafted cases); descriptor/transform/predictor scratch
+arrays assume16. Expand the owning decoder consistently, with regressions
+for every affected path; removing only the descriptor check would permit
+array slicing traps. The record contains a full width17 i8 repro and frozen
+old output. Another110 width255 streams decode in the old full build but its
+public binding exposes count-1; these are recorded separately.
+
+Historical predictor3 is absent from integer.rs's supported-method set. The
+record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
+UV bytes and intact canaries; native returns code5. The old-format reconstruction
+rule remains to be established by further crafted public-API observations.
