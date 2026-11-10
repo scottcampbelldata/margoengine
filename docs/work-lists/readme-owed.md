@@ -1293,3 +1293,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/viz (batch 174 job 6): document the generated sciviz/views domain-profile alias.
 
 - create-margo: document web/game/viz/react-kit standalone template installs and prefix changes, keep the one-line create command, and refresh all template README examples in the README phase.
+- @margoengine/sciviz (batch 179 job 2): document /share compressed links and limits, pinned data, runtime bundler and standalone export, exact-origin iframe commands/events, lifecycle/cancellation and camera/time deep links.
+- margoengine (batch 179 job 2): document generated sciviz/share alias.
+- @margoengine/viz: document generated sciviz/share forwarding entry after build phase.

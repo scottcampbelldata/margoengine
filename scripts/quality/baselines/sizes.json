@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15318110,
+  "total": 15323399,
   "history": [
     {
       "date": "2026-10-24",
@@ -7897,6 +7897,12 @@
       "date": "2026-11-10",
       "commit": "batch-174-job6",
       "reason": "New optional sciviz/views: absent to 4786 B gzip, ceiling 5042 B. Echo-free linked cameras/data ranges, owned grid creation, per-cell pipelines and isotropic physical volume quad views share lifecycle and coordinate handling; splitting duplicates those contracts. Root 60851 B, core and stage untouched. No timing claim."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "e68bbe3ce",
+      "reason": "Batch 179 share: new optional entry 0 to 5033 B gzip, ceiling 5289 B for complete compressed links, inline HTML and iframe control. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9319,6 +9325,7 @@
     "margoengine/viz": 800,
     "margoengine/web": 577,
     "@margoengine/sciviz/aggregate": 29019,
-    "@margoengine/sciviz/views": 5042
+    "@margoengine/sciviz/views": 5042,
+    "@margoengine/sciviz/share": 5289
   }
 }

@@ -892,6 +892,8 @@ export function recordedFigure(canvas: HTMLCanvasElement): Figure | undefined;
 
 export function recordedResources(figure: Figure): ReadonlyMap<object, string>;
 
+export function recordedTimeline(figure: Figure): ReturnType<BaseFigure['timeline']> | undefined;
+
 export function saveFigure(figure: Figure, options?: FigureSaveOptions): Promise<FigureSpec>;
 
 export function specHash(bytes: Uint8Array): Promise<string>;

@@ -47,5 +47,6 @@ export const packageVersions: Readonly<Record<string, string>> = {
   "@margoengine/voxel-pathtracer": "1.0.0",
   "@margoengine/save": "1.0.0",
   "@margoengine/shader": "1.0.0",
-  "@margoengine/exporters": "1.0.0"
+  "@margoengine/exporters": "1.0.0",
+  "@margoengine/webgl2-compat": "1.0.0"
 };

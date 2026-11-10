@@ -1719,6 +1719,10 @@
       "types": "./dist/sciviz/views.d.ts",
       "import": "./dist/sciviz/views.js"
     },
+    "./sciviz/share": {
+      "types": "./dist/sciviz/share.d.ts",
+      "import": "./dist/sciviz/share.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

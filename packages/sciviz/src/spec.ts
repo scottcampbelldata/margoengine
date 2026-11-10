@@ -133,6 +133,10 @@ export function recordedFigure(canvas: HTMLCanvasElement): Figure | undefined {
 export function recordedResources(figure: Figure): ReadonlyMap<object, string> {
   return new Map(records.get(figure)?.refs);
 }
+/** The recorded figure's active timeline, if one has been created or restored. */
+export function recordedTimeline(figure: Figure): ReturnType<BaseFigure['timeline']> | undefined {
+  return records.get(figure)?.timeline?.object;
+}
 const methods = [
   'scatter',
   'line',
