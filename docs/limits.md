@@ -4209,6 +4209,12 @@ Batch 220 job 1: import Matrix4, Vector3, Quaternion, Ray, Plane, Box3 and Color
 Batch 220 job 1 size: math/compat 0 to 9929 B min+gzip, ceiling 10227 B. The entry includes seven interoperable opt-in classes and avoids weakening the original Vector3 1600 B test; splitting would require multiple porting imports. Original math root and seven per-type measurements are unchanged. Core + stage remains 24209 B, below 25000 B.
 # Batch 204 optional exporter optimization
 
+Optional exporters `/splats`: 2,800 B gzip, ceiling 3,056 B, with a lazily loaded
+splats data-codec peer. GLB retains degree 0..3 SH in linear Rec.709; raw .splat
+uses 32-byte records and its standard color/rotation byte quantization with no
+SH. Input limit 3,000,000 Gaussians; default maxBytes 4,294,967,295, checked for
+both formats. Core and stage unchanged. [Full contract](exporter-splats.md).
+
 Optional `/materials`: `exportMaterialGLB` adds glTF-shaped KHR material payloads
 and per-primitive named variants to data scenes. New entry 17,967 B minified gzip,
 ceiling 18,507 B. The writer finalization hook changes the exporters root from

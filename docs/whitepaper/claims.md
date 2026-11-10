@@ -3346,6 +3346,11 @@ The optional forms entry provides Select, Tabs, RadioGroup, Checkbox and ColorPi
 - Batch 220 job 1: math/compat supplies all 17 requested porting methods on seven familiar classes, with original per-type bundles unchanged. Proof: packages/math/test/methods.test.js and existing math.test.js small-import assertions. Six Euler orders, native/separate camera round trips on both depth conventions, ray/segment constraints, closed triangle/plane contacts, degenerate inputs and explicit color spaces are covered. This is mathematical correctness evidence, not a timing claim.
 # Batch 204 optional optimization
 
+Exporters `/splats` writes ratified KHR Gaussian splat GLBs and raw .splat files
+from SplatData. Full SH, covariance, linear color and opacity round-trip through
+the independent gltf-pro reader; the existing raw codec is reused. Real-capture
+evidence and precision boundaries: [splat record](../exporter-splats.md).
+
 The optional exporters `/materials` entry writes data-scene KHR material payloads,
 texture maps and primitive-local variants, including shared default meshes with
 different alternatives and alternate-only image resources. Regression and

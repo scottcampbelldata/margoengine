@@ -208,6 +208,10 @@
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"
+    },
+    "./splats": {
+      "types": "./dist/splats.d.ts",
+      "import": "./dist/splats.js"
     }
   },
   "files": [
@@ -217,13 +221,17 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/splats": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf-pro": {
       "optional": true
     },
     "@margoengine/decoders": {
+      "optional": true
+    },
+    "@margoengine/splats": {
       "optional": true
     }
   },

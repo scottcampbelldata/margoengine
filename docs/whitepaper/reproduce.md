@@ -2860,6 +2860,10 @@ After build:packages, run node --test --test-timeout=120000 packages/ui/tests/fo
 Batch 220 job 1: build packages, then node --test --test-timeout=120000 packages/math/test/*.test.js. methods.test.js imports math/compat and checks analytic independent results; math.test.js retains unchanged small-import assertions. CPU-only mathematics; this package defines no GPU test. Sources and API contract comparison are in docs/clean-room.md.
 # Batch 204 exporter optimization
 
+Gaussian export: run `node --test --test-timeout=90000 packages/exporters/tests/splats-entry.test.js`
+after building. It reads the licensed existing raccoon fixture and exercises
+both formats, every SH degree, covariance reconstruction, metadata and limits.
+
 Material extension evidence: after building, run
 `node --test --test-timeout=90000 packages/exporters/tests/materials-entry.test.js`.
 It reads the existing Khronos BoxTextured fixture and validates the written GLBs.

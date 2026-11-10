@@ -268,6 +268,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 220 job 1): document generated math/compat alias.
 # Batch 204 exporters
 
+- `@margoengine/exporters/splats`: document GLB ellipse-kernel/linear SH retention, optional splats peer, .splat quantization, cancellation and output limits.
+
 - `@margoengine/exporters/optimize-extra`: document independent resample, prune and static sibling instancing passes, defaults, conservative extension retention and abort handling.
 
 
