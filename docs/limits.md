@@ -6738,4 +6738,5 @@ The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md
 | inspector `GLInspector` | Preview route | None: route added (3 backend tests) | `packages/inspector/test/gl-browser.mjs` (preview overlay pixels), `test/gl.test.js` |
 | labels `GPULabelLayer` | Preview route | None: route added (1 backend test) | `packages/labels/tests/gpu-browser.js` (pixels on WebGPU, preview and compat) |
 | ui `GlWorldPanels` | Preview route | None: route added (2 backend tests) | `packages/ui/tests/world-gl-browser.js` (preview and WebGPU pixels), `tests/world-gl.test.js` |
+| stats `GeometryStats`, `GLStats`, `StatsPanels` | Preview route | None: routes added (1, 2, 1 backend tests); new preview regression | `packages/stats/test/preview.test.js`, `packages/stats/test/gl.test.js` |
 

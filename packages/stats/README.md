@@ -406,3 +406,7 @@ console.log(panels.toJSON());
 panels.dispose(); // Borrowed stats remains attached.
 stats.dispose(); engine.dispose(); canvas.remove();
 ```
+
+## Preview tier contract
+
+`GeometryStats`, `GLStats` and `StatsPanels` are reviewed preview routes in `scripts/check-preview-contract.mjs` (2026-11-10; 1, 2 and 1 `backend` tests). On the small WebGL2 preview `GeometryStats` counts WebGL2 draws, `GLStats` times named passes with WebGL2 timer queries, and `StatsPanels` uses `GLStats` for its GPU graph and pass list. Evidence: `test/preview.test.js` (new: a preview engine, one WebGL2 draw counted as 2 triangles and the `main` pass timed into the panel) and `test/gl.test.js`. No behaviour changed; the missing rows kept `npm run verify` red.
