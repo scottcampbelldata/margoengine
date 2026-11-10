@@ -4889,3 +4889,32 @@ the liveness boundary for passed and failed jobs, and leave another owner
 genuinely incomplete. The two terminal tests fail before and pass after the
 repair; the incomplete owner continues to fail. The historical lane-S assertion
 did not preserve its wait stderr, so the exact historical exception is not known.
+
+### Batch 268 XR selection pointers
+
+Compared Doug A. Bowman and Larry F. Hodges, *An Evaluation of Techniques for
+Grabbing and Manipulating Remote Objects in Immersive Virtual Environments*
+(1997), https://www.cs.princeton.edu/courses/archive/spr01/cs598b/papers/bowman97.pdf
+and the authors' description https://people.cs.vt.edu/~bowman/grab.html; Ivan
+Poupyrev, Mark Billinghurst, Suzanne Weghorst and Tadao Ichikawa, *The Go-Go
+Interaction Technique: Non-linear Mapping for Direct Manipulation in VR* (1996),
+https://citeseerx.ist.psu.edu/document?doi=8d4337cfac5dfadd3adc6926f9efa2fbfb326c77&repid=rep1&type=pdf;
+W3C Immersive Web Working Group, editors Brandon Jones, Manish Goregaokar and Rik
+Cabanier, *WebXR Device API* (2026), https://www.w3.org/TR/webxr/; and W3C Pointer
+Events Working Group, editors Patrick H. Lauke and Robert Flack, *Pointer Events
+Level 4* (2026 draft), https://www.w3.org/TR/pointerevents/.
+
+Research distinguishes selecting a distant object by ray from direct contact
+and subsequent manipulation. Our inference combines GPU ray selection with
+world-triangle sphere proximity, rather than approximating a mesh by its box.
+WebXR supplies -Z ray/grip spaces and native select/squeeze transitions. The
+Pointer Events state model supplies stable identity, hover, press/release,
+capture and cancellation. Mode priority follows the published Meta XR Input
+Overview (2026), https://developers.meta.com/vr/documentation/iwsdk/concepts/xr-input/:
+touch, then grab, then ray. Compared the public pmndrs interaction descriptions
+https://pmndrs.github.io/xr/docs/tutorials/interactions for the requested web
+library behavior: mesh handlers, multiple input modes and capture. No rival
+implementation or companion code was read or copied. This implements the batch
+row, not the separate object-manipulation techniques or a physical device proof.
+The real GPU fixture loads Khronos Box (Cesium, CC BY 4.0), already noticed in
+packages/exporters/tests/fixtures/NOTICE.md and THIRD-PARTY-NOTICES.md.

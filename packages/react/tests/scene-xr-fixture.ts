@@ -100,6 +100,9 @@ export function simulatedXR(errors: string[]) {
     }
   }
   class Binding implements XRBinding {
+    // This stand-in supplies projection images on either real device implementation.
+    // The dedicated compat XR suite separately tests the native XRWebGLLayer bridge.
+    static readonly webgl = !!(globalThis as { __margoCompat?: boolean }).__margoCompat;
     constructor(_session: XRNativeSession, gpu: GPUDevice) {
       device = gpu;
       device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));

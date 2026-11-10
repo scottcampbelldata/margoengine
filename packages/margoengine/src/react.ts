@@ -23,3 +23,4 @@ export * from '@margoengine/react/selection';
 export * from '@margoengine/react/splats';
 export * from '@margoengine/react/viewcube';
 export * from '@margoengine/react/cameras';
+export * from '@margoengine/react/xr-pointer';

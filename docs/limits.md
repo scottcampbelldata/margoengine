@@ -3358,3 +3358,22 @@ Before 0 means a new entry. The parent Line/Grid entry was rebundled from its Ty
 its previous recorded ceiling was 999 B. Its new line binding adds an independent native object and lifecycle owner.
 Each optional binding has a lazy import and resource cleanup, with its own entry budget.
 removing functionality. Core + stage stays 23,950 B gzip, below 25,000 B; no core/stage source changed.
+
+### Batch 268 XR pointers
+
+Optional entries xr/pointer, selection/spatial and react/xr-pointer add world-ray,
+grip-sphere and fingertip-sphere mesh events without core/stage changes. Rays
+use the selection GPU picker; proximity tests current world triangles, including
+nonuniform transforms and model instances/deformation. Sphere queries rebuild
+world BVHs, test both sides and ignore texture alpha; a sphere in an empty mesh
+interior has no surface contact. Ray PickHit does not include a world position.
+Proximity requires the optional bvh peer, loaded lazily. Pointer defaults and
+lifetimes are in the package READMEs. Physical Quest/Android runs are still
+unavailable, and no simulated session is counted as device evidence.
+
+New optional-entry gzip sizes (bare package imports external), before 0 bytes:
+xr/pointer 2,419 B, selection/spatial 2,057 B, react/xr-pointer 1,260 B.
+The initial ceilings are respectively 2,675 B, 2,313 B and 1,516 B including the
+normal 256 B headroom. These bytes buy the event state machine, exact proximity
+and React parent routing; further splitting would fragment one public feature.
+The combined core + stage stays 23,950 B, below 25,000 B.

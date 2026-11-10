@@ -220,3 +220,67 @@ enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand
 ## Preview tier refusal
 
 `XR.create` and `XR.attach` reject the small WebGL2 preview with linked `MargoError` code `unsupported`, so an awaited call inside `autoEngine` setup can trigger `loadCompat`. After installing the full layer, WebXR also needs its `/xr` route and browser session support as documented above. An already attached or disposed engine remains a state error.
+
+## Mesh pointer events
+
+`XRPointerEvents` from `@margoengine/xr/pointer` sends `pointerover`, `pointerout`,
+`pointermove`, `pointerdown`, `pointerup`, `pointercancel` and `click` to selection
+hits on any supported mesh or glTF primitive. `SpatialPicking` from
+`@margoengine/selection/spatial` supplies GPU ray picking and exact triangle
+proximity. A source has one stable pointer id. Touch wins over grab, then ray;
+`types` can change that order or disable modes. Capture keeps the selected target
+through a miss. Session end, source removal, tracking loss and disposal cancel a
+press. Pending picks retain pose snapshots and press/release ordering; moves
+coalesce. Native select/squeeze events support sources without gamepads.
+
+Copy `packages/exporters/tests/fixtures/Box.glb` to your app's
+`public/xr-pointer-box.glb` before running this example. The README gate serves
+that exact licensed fixture at the same URL.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import { Picking } from '@margoengine/selection';
+import { SpatialPicking } from '@margoengine/selection/spatial';
+import { XR } from '@margoengine/xr';
+import { XRPointerEvents } from '@margoengine/xr/pointer';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 4] } });
+await loadGLTF(engine, '/xr-pointer-box.glb');
+const picking = Picking.attach(engine);
+const spatial = new SpatialPicking(engine, picking);
+const xr = await XR.create(engine);
+const pointers = XRPointerEvents.attach(xr, spatial, {
+  onEvent(event) { if (event.type === 'click') console.log(event.target, event.pointerType); },
+  onError: engine.onError,
+});
+const enter = document.createElement('button'); enter.textContent = 'Enter VR'; document.body.append(enter);
+enter.onclick = () => void xr.requestSession('immersive-vr', { optionalFeatures: ['hand-tracking'] }).catch(engine.onError);
+engine.start();
+// On teardown: pointers.dispose(); spatial.dispose(); picking.dispose(); xr.dispose(); engine.dispose();
+```
+
+The sample model is Cesium's Khronos Box, CC BY 4.0; see
+[its fixture notice](../exporters/tests/fixtures/NOTICE.md). Serve this repository
+or copy that standard asset to your application's public folder.
+
+Distances are metres: `touchRadius` defaults to 0.01 in addition to the reported
+fingertip radius, `grabRadius` to 0.08, `near` to 0.0001 and `far` to 1000. Pinch
+uses a 0.025 metre thumb/index-tip threshold. Controller trigger selects; squeeze
+grabs. Touch presses on surface contact and releases/clicks on leaving it. A
+held pointer keeps its mode through release. `signal` aborts the attachment;
+`dispose()` and `Symbol.dispose` detach it. `onError` is required. `onEvent` may
+call `stopPropagation` and `setPointerCapture(target?)`, `releasePointerCapture`
+or `hasPointerCapture`; the optional target lets a parent capture a child hit.
+A custom picker can implement the exported `XRPointerPicker` interface.
+
+React apps mount `XRPointerEvents` from `@margoengine/react/xr-pointer` inside
+`Canvas` and `XR`; existing mesh handlers receive the events with the source and
+selection hit at `event.xr`. See that package's example. These deterministic and
+browser checks do not replace the still-missing physical device runs.
+
+`npm run test:gpu:pointers --workspace @margoengine/xr` is registered in the GPU
+package plan and check:merge, with a 3 minute hard limit. Pass `-- --compat` for
+the WebGL2 implementation. The dedicated compatibility XR bridge suite remains
+packages/webgl2-compat/test/xr-browser.mjs.

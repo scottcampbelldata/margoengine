@@ -1018,3 +1018,52 @@ Splat clouds sort independently, and the native LOD limit is eight children. The
 
 
 Optional binding entry gzip sizes (bare peers external): lines 1,502 B, points 1,204 B, lod 2,764 B, selection 1,156 B, splats 1,858 B, viewcube 1,032 B, cameras 1,821 B. Native peers load separately. Line and Points follow the enclosing Mesh unless an explicit matrix (or Line mesh) is supplied; SplatData uses world-space positions.
+
+## XR mesh pointer events
+
+Mount `XRPointerEvents` from `@margoengine/react/xr-pointer` inside `Canvas` and
+`XR` to send XR ray/grab/touch events to the same Mesh handlers as desktop input.
+It accepts a caller-owned `XRPointerPicker`, such as `SpatialPicking`, plus the
+pointer options documented by `@margoengine/xr/pointer`. It bubbles click,
+over/out, move and down/up through mesh parents, deduplicates model-root
+handlers, respects `stopPropagation`, and lets a parent capture the pointer.
+The event's `xr` field holds its input source, stable id, pointer type and hit;
+XR has no canvas pixel coordinates, so the DOM coordinate fields are zero.
+
+Copy `packages/exporters/tests/fixtures/Box.glb` to your app's
+`public/xr-pointer-box.glb` before running this example. The README gate serves
+that exact licensed fixture at the same URL.
+
+```tsx
+import { Suspense, useEffect, useState } from 'react';
+import { Canvas, useEngine } from '@margoengine/react';
+import { XR } from '@margoengine/react/xr';
+import { Gltf } from '@margoengine/react/gltf-pro';
+import { XRPointerEvents } from '@margoengine/react/xr-pointer';
+import { Picking } from '@margoengine/selection';
+import { SpatialPicking } from '@margoengine/selection/spatial';
+
+function Pointers() {
+  const engine = useEngine();
+  const [picker, setPicker] = useState<SpatialPicking | null>(null);
+  useEffect(() => {
+    const existing = Picking.forEngine(engine);
+    const picking = existing ?? Picking.attach(engine);
+    const spatial = new SpatialPicking(engine, picking);
+    setPicker(spatial);
+    return () => { spatial.dispose(); if (!existing) picking.dispose(); };
+  }, [engine]);
+  return picker ? <XRPointerEvents picker={picker} /> : null;
+}
+export function PointerScene() {
+  return <Canvas><XR><Pointers /><Suspense fallback={null}><Gltf src="/xr-pointer-box.glb" onClick={event => console.log(event.mesh)} /></Suspense></XR></Canvas>;
+}
+```
+
+This is the event binding; enter the session with `useXR().enter()` from a user
+gesture as in the XR example. A Canvas with an existing Picking plugin should
+pass a SpatialPicking around that picker instead of attaching a second one.
+Unmount detaches the XR helper; picker ownership remains with the caller.
+
+The example uses Cesium's Khronos Box (CC BY 4.0), as recorded in the
+[exporter fixture notice](../exporters/tests/fixtures/NOTICE.md).

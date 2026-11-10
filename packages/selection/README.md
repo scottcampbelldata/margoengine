@@ -189,3 +189,53 @@ Real WebGPU checks: npm run test:browser --workspace @margoengine/selection
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 `Selection` outlines already refused the preview; `Picking` can use the real `/pick` route when `webglPicking()` is attached first.
+
+## World pointers and proximity
+
+`SpatialPicking` from `@margoengine/selection/spatial` reuses a caller-owned
+`Picking` for arbitrary world rays without moving the desktop camera. Each
+asynchronous query owns its camera. `sphere` finds the nearest actual triangle
+surface in world metres, including nonuniform scale, glTF instances and the
+current GPU-deformed pose. It loads the optional `@margoengine/bvh` peer lazily
+on the first sphere query; ordinary rays do not load it.
+
+Copy `packages/exporters/tests/fixtures/Box.glb` to your app's
+`public/xr-pointer-box.glb` before running this example. The README gate serves
+that exact licensed fixture at the same URL.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import { Picking } from '@margoengine/selection';
+import { SpatialPicking } from '@margoengine/selection/spatial';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 4] } });
+await loadGLTF(engine, '/xr-pointer-box.glb');
+const picking = Picking.attach(engine);
+const spatial = new SpatialPicking(engine, picking);
+console.log(await spatial.ray([0, 0, 4], [0, 0, -1]));
+console.log(await spatial.sphere([0, 0, 0.6], 0.11));
+spatial.dispose(); picking.dispose(); engine.dispose();
+```
+
+The model is Cesium's Khronos Box (CC BY 4.0), recorded in
+[the fixture notice](../exporters/tests/fixtures/NOTICE.md). Serve this clone or
+copy the asset to your application. Constructor options: `scene` defaults to
+`engine.scene`, `layers` to every render layer. Ray range defaults to 0.0001 to
+1000 metres. `ray(origin, direction, near?, far?, signal?)` and
+`sphere(center, radius, signal?)` accept AbortSignal. Both follow visibility and
+scene/layer membership. Rays preserve the GPU picker's cutouts and sidedness;
+sphere contacts test geometric surfaces on both sides, without texture alpha.
+A sphere wholly inside a closed mesh does not touch its surface. Contacts retain
+mesh, model, primitive, instance, world position, distance and face identity;
+ray hits retain the existing `PickHit` fields and do not invent a world position.
+Proximity constructs world-space BVHs per query for current geometry; large
+continuous proximity workloads should budget that work explicitly.
+The helper owns no meshes or GPU picker; disposal terminates only the helper.
+
+`SpatialPicking.attach(engine, picking, options?)` is the equivalent factory.
+For secondary-scene rays, register a Picking in that scene with
+`scene.use(new Picking())` and pass it to the helper with `{ scene }`. A picker
+registered in a different scene rejects rays with code `attached` before any
+GPU read. Proximity does not require a registered GPU picker.

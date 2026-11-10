@@ -5949,6 +5949,25 @@ its previous recorded ceiling was 999 B. Its new line binding adds an independen
 Each optional binding has a lazy import and resource cleanup, with its own entry budget.
 removing functionality. Core + stage stays 23,950 B gzip, below 25,000 B; no core/stage source changed.
 
+### Batch 268 XR pointers
+
+Optional entries xr/pointer, selection/spatial and react/xr-pointer add world-ray,
+grip-sphere and fingertip-sphere mesh events without core/stage changes. Rays
+use the selection GPU picker; proximity tests current world triangles, including
+nonuniform transforms and model instances/deformation. Sphere queries rebuild
+world BVHs, test both sides and ignore texture alpha; a sphere in an empty mesh
+interior has no surface contact. Ray PickHit does not include a world position.
+Proximity requires the optional bvh peer, loaded lazily. Pointer defaults and
+lifetimes are in the package READMEs. Physical Quest/Android runs are still
+unavailable, and no simulated session is counted as device evidence.
+
+New optional-entry gzip sizes (bare package imports external), before 0 bytes:
+xr/pointer 2,419 B, selection/spatial 2,057 B, react/xr-pointer 1,260 B.
+The initial ceilings are respectively 2,675 B, 2,313 B and 1,516 B including the
+normal 256 B headroom. These bytes buy the event state machine, exact proximity
+and React parent routing; further splitting would fragment one public feature.
+The combined core + stage stays 23,950 B, below 25,000 B.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -7278,6 +7297,9 @@ does not own. Each entry says exactly what is needed to close it.
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
 
 ### WebXR: no run on a real headset or AR phone
+
+Batch 268 job 1 remains blocked: no Quest/Android device or ADB connection is
+available in this lane; the new pointer GPU checks are desktop evidence only.
 
 - **What:** nothing in `@margoengine/xr` has run on a real device: sessions, stereo drawing, inputs, hit testing, or the
   WebGL2 layer's route. `npm run check:xr-runs` lists the four routes, each NOT RUN.
@@ -9974,6 +9996,21 @@ checks same-frame dolly, vertical views, fixedOrthographic, nested defaults and 
 Instances, texture hooks, frame priorities and adaptive performance remain separate batch jobs.
 
 Open outside job 1: render Grid inside Scene name="hud" and draw only that scene with RenderView; the grid is missing there because packages/react/src/lines.tsx Grid attaches with engine.use instead of the enclosing world.use. Recorded under lane-efficiency rule 6; the new Line binding uses its owning Scene.
+
+### XR manager secondary-scene disposal
+
+Register XR on a secondary scene, then dispose outside dispatch: XR.dispose
+checks/removes the active scene by name (packages/xr/src/index.ts), leaving its
+secondary registration behind or removing a same-name default plugin. This
+pre-existing owner repair is outside batch 268 pointer scope and remains open.
+
+### README browser shutdown observation
+
+The batch 268 README gate reached a new example's HTTP 404, then stopOwned in
+scripts/lib/browser.mjs threw SHUTDOWN_TIMEOUT for Chromium PID 93904 after its
+termination request. The PID was absent on inspection after the run. The browser
+helper's Windows child-exit observation needs a focused reproducer; no timeout
+was raised and no shutdown failure was accepted as a passing gate.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

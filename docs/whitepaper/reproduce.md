@@ -2391,3 +2391,20 @@ and npm run modern:test:react. For actual rendering, run node scripts/gpu-lock.m
 Reports and paired PNGs are written to test-results/react-bindings*.json and test-results/react-binding-*.png.
 The source page is packages/react/tests/bindings-browser.html. Real-capture licence/source is in
 packages/splats/test/fixtures/NOTICE.md. Run npm run check:readme-run -- --packages=react for all copy-paste examples.
+
+### Batch 268 XR pointer checks
+
+Build with npm run build:packages. Run the XR, selection and React package tests.
+Run node scripts/gpu-lock.mjs run --owner=codex-batch268 --wait-max=60 --max=3 --
+node packages/xr/tests/pointer.browser.mjs, then the same command with --compat
+at the end. Each run emits test-results/batch268-pointer-<mode>.json. The browser
+fixture loads Cesium's Khronos Box (CC BY 4.0) from the already-noticed exporter
+fixture folder. It tests the real selection readback, not a simulated picker.
+Run npm run check:readme-run -- --packages=xr,selection,react for runtime examples.
+
+XR stereo compat validation uses packages/webgl2-compat/test/xr-browser.mjs,
+which installs the real compatibility XR route and compares both eyes with
+native output. scripts/modern-xr-tests.js is the native XRGPUBinding fixture;
+forcing that fixture through compat without installXR correctly refuses setup.
+React's scene-browser suite is run normally and with --compat; its fixture now
+prepares the corresponding binding before its XR-only modes.

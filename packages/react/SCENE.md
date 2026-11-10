@@ -9,6 +9,7 @@ Canvas on the server creates no GPU, physics world, pointer lock or XR session. 
 | Entry | Components and hooks | Install |
 | --- | --- | --- |
 | `@margoengine/react` | `Canvas`, `Stage`, `Mesh`/`Group`, `BoxGeometry`, `PbrMaterial`, `GeometryResource`, `Sun`, `Center`, `Scene`, `RenderView`, `useFrame`, `useMargo`, `useEngine`, `useCamera`, `useLoader`, `useProgress` | nothing more (core, the stage, math, cache and selection come with it) |
+| `@margoengine/react/xr-pointer` | `XRPointerEvents`, `XRMeshPointerEvent` | `@margoengine/xr`, selection picker supplied by the caller |
 | `@margoengine/react/controls` | `OrbitControls`, `MapControls`, `CadControls`, `ArcballControls`, `PointerLock`, `TransformControls` | `@margoengine/controls` |
 | `@margoengine/react/gltf-pro` | `Gltf` (`Model`), `Gltf.preload` | `@margoengine/gltf-pro` |
 | `@margoengine/react/fbx` | `Fbx`, `Fbx.preload` | `@margoengine/fbx`, `@margoengine/gltf-pro` |

@@ -28,7 +28,8 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js xr",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:pointers": "cd ../.. && node packages/xr/tests/pointer.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -55,6 +56,10 @@
     "./interaction": {
       "types": "./dist/interaction.d.ts",
       "import": "./dist/interaction.js"
+    },
+    "./pointer": {
+      "types": "./dist/pointer.d.ts",
+      "import": "./dist/pointer.js"
     }
   },
   "files": [
@@ -62,9 +67,20 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/selection": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/selection": {
+      "optional": true
+    }
+  },
+  "margo": {
+    "gpuTestTimeoutMinutes": {
+      "test:gpu:pointers": 3
+    }
   }
 }

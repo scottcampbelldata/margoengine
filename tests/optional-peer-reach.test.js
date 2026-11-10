@@ -73,6 +73,7 @@ test('the stage root reaches no optional package', () => {
 
 // Each React subpath is named after the optional package it needs; these are the others it may reach.
 const REACT_EXTRA = {
+  './xr-pointer': ['@margoengine/xr'],
   './devtools': ['@margoengine/inspector', '@margoengine/stats'],
   './fbx': ['@margoengine/gltf-pro'],
   './geometry': ['@margoengine/gltf'],

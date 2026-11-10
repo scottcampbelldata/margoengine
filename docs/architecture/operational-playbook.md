@@ -5285,3 +5285,21 @@ change or new GPU maths. The binding gate compares paired native/React pixels on
 checks LOD selection, outline pixels, viewcube navigation and lifetime cleanup on WebGPU and the compatibility device.
 StrictMode unit coverage checks per-Scene plugin ownership and nested camera restoration. Independent rival pixel
 comparisons are not supplied; the public behavioural contract comparison is recorded in clean-room.md.
+
+### Section 5 evidence addition: batch 268 XR pointers
+
+World rays use the existing GPU selection route with a camera owned by each
+query. Proximity transforms triangles to world space before nearest-contact
+queries, preserving distances under nonuniform scaling and instancing; deformed
+models supply explicit GPU geometry snapshots. No core, stage or shader math
+changes. Unit cases exercise delayed reads, short native presses, capture,
+tracking loss, input removal, session end, abort and React parent bubbling. The
+new real GPU leaf runs on WebGPU and WebGL2 compat and uses a licensed standard
+model. Physical Quest and Android evidence remains missing (docs/xr-device-runs).
+
+The React browser fixture now installs the compat XR binding before ordinary
+XR preparation and labels its simulated projection-image binding for the active
+device. Its existing stereo/callback/teardown assertions stay intact on both
+backends. The dedicated webgl2-compat/test/xr-browser.mjs separately checks
+installXR's actual XRWebGLLayer bridge against native images. The native-only
+modern-xr fixture deliberately cannot stand in for that compat bridge.

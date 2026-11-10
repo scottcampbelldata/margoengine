@@ -2820,3 +2820,15 @@ limits and the stable-camera identity difference are explicit in the React READM
 Measured optional entry gzip bytes: lines 1502, points 1204, lod 2764, selection 1156, splats 1858, viewcube 1032, cameras 1821. Core + stage: 23,950 B. These are bundle byte counts, not speed measurements.
 
 Recorded proof: [batch-265-bindings.json](results/batch-265-bindings.json). Both backends match native line, point, parented line/point, splat and orthographic-camera pixels exactly. The distant LOD contributes 256 green pixels; the outline contributes 1,272 green pixels. The native projection stays on the actual leased camera, preserving same-frame controls and metadata.
+
+### Batch 268 XR mesh pointer behavior
+
+The optional XR pointer entry combines selection GPU rays and exact geometric
+sphere contacts for grab/touch. It preserves ordered press/release transitions,
+input identity, capture, tracking/session cancellation and mesh-parent React
+bubbling. Proof: packages/xr/tests/pointer.test.js,
+packages/selection/test/spatial.test.js, packages/react/tests/xr-pointer.test.js
+and packages/xr/tests/pointer.browser.mjs on native WebGPU and WebGL2 compat.
+This is deterministic interface and real desktop GPU evidence, not a Quest or
+phone run. Proximity is geometric (not texture alpha), and per-query world BVH
+construction carries no timing or scaling claim.

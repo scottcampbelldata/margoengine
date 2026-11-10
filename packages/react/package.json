@@ -189,6 +189,11 @@
       "types": "./dist/cameras.d.ts",
       "react-server": "./dist/rsc/cameras.js",
       "import": "./dist/cameras.js"
+    },
+    "./xr-pointer": {
+      "types": "./dist/xr-pointer.d.ts",
+      "react-server": "./dist/rsc/xr-pointer.js",
+      "import": "./dist/xr-pointer.js"
     }
   },
   "files": [

@@ -2362,6 +2362,10 @@
       "types": "./dist/react/cameras.d.ts",
       "import": "./dist/react/cameras.js"
     },
+    "./react/xr-pointer": {
+      "types": "./dist/react/xr-pointer.d.ts",
+      "import": "./dist/react/xr-pointer.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"
@@ -2577,6 +2581,10 @@
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
+    },
+    "./selection/spatial": {
+      "types": "./dist/selection/spatial.d.ts",
+      "import": "./dist/selection/spatial.js"
     },
     "./shader": {
       "types": "./dist/shader.d.ts",
@@ -3649,6 +3657,10 @@
     "./xr/interaction": {
       "types": "./dist/xr/interaction.d.ts",
       "import": "./dist/xr/interaction.js"
+    },
+    "./xr/pointer": {
+      "types": "./dist/xr/pointer.d.ts",
+      "import": "./dist/xr/pointer.js"
     },
     "./game": {
       "types": "./dist/game.d.ts",

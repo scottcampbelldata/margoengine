@@ -204,7 +204,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/labels API](https://margoengine.com/llms/api/labels.md): 3 entry points
 - [@margoengine/html API](https://margoengine.com/llms/api/html.md): 2 entry points
 - [@margoengine/video API](https://margoengine.com/llms/api/video.md): 6 entry points
-- [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 6 entry points
+- [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 7 entry points
 - [@margoengine/headless API](https://margoengine.com/llms/api/headless.md): 6 entry points
 - [@margoengine/staging API](https://margoengine.com/llms/api/staging.md): 4 entry points
 - [@margoengine/post API](https://margoengine.com/llms/api/post.md): 25 entry points
@@ -239,7 +239,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/input API](https://margoengine.com/llms/api/input.md): 6 entry points
 - [@margoengine/ui API](https://margoengine.com/llms/api/ui.md): 4 entry points
 - [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 2 entry points
-- [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 1 entry point
+- [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 2 entry points
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 7 entry points
 - [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 6 entry points
 - [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 3 entry points
@@ -260,7 +260,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 13 entry points
 - [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 14 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 5 entry points
-- [@margoengine/react API](https://margoengine.com/llms/api/react.md): 31 entry points
+- [@margoengine/react API](https://margoengine.com/llms/api/react.md): 32 entry points
 
 ## Optional
 

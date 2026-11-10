@@ -23,6 +23,7 @@ export function readmeNodeFetch(request = globalThis.fetch, root = externalAsset
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
+  '/xr-pointer-box.glb': 'packages/exporters/tests/fixtures/Box.glb',
   '/mesh.drc': decoder + 'readme/avocado.drc',
   '/meshopt.bin': decoder + 'readme/cube-positions.bin',
   '/capture.splat': 'packages/splats/test/fixtures/raccoon-v2.splat',

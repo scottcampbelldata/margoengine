@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12011333,
+  "total": 12017837,
   "history": [
     {
       "date": "2026-10-24",
@@ -5282,6 +5282,12 @@
       "commit": "batch-265",
       "reason": "Batch 265 native React package bindings: six new optional entries and Line alongside Grid, with independent lazy peers and lifecycle ownership. Exact entry bytes recorded in docs/limits.md; core and stage unchanged.",
       "grew": 7
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-268-pointer",
+      "reason": "New optional XR pointer, spatial selection and React bridge entries; per-entry measured bytes recorded in docs/limits.md. Lazy proximity BVH avoids importing it for ray-only clients.",
+      "grew": 3
     }
   ],
   "items": {
@@ -6276,6 +6282,9 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/xr/pointer": 2675,
+    "@margoengine/selection/spatial": 2313,
+    "@margoengine/react/xr-pointer": 1516
   }
 }

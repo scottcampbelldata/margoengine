@@ -493,6 +493,11 @@ async function mount(next: Mode) {
   xrReady = false;
   xrError = undefined;
   controllerFrames = 0;
+  // Native preparation on the forced WebGL2 route needs that route's actual binding.
+  if (mode === 'xr' && (globalThis as { __margoCompat?: boolean }).__margoCompat) {
+    const { installXR } = await import('@margoengine/webgl2-compat/xr');
+    installXR();
+  }
   if (mode === 'xr-simulated') xrFixture = simulatedXR(gpuErrors);
   root = createRoot(app);
   root.render(<Scene />);

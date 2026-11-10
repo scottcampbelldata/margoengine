@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./spatial": {
+      "types": "./dist/spatial.d.ts",
+      "import": "./dist/spatial.js"
     }
   },
   "files": [
@@ -36,7 +40,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
@@ -46,5 +51,10 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "node test/picking.browser.mjs && node test/pick-many.browser.mjs && node test/models.browser.mjs && node test/xray.browser.mjs",
     "prepack": "npm run build"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/bvh": {
+      "optional": true
+    }
   }
 }

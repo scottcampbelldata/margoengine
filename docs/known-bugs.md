@@ -1326,6 +1326,9 @@ does not own. Each entry says exactly what is needed to close it.
 
 ### WebXR: no run on a real headset or AR phone
 
+Batch 268 job 1 remains blocked: no Quest/Android device or ADB connection is
+available in this lane; the new pointer GPU checks are desktop evidence only.
+
 - **What:** nothing in `@margoengine/xr` has run on a real device: sessions, stereo drawing, inputs, hit testing, or the
   WebGL2 layer's route. `npm run check:xr-runs` lists the four routes, each NOT RUN.
 - **Verified:** real WebGPU with a stand-in session (`npm run modern:test:xr:browser`), mocks in
@@ -4021,3 +4024,19 @@ checks same-frame dolly, vertical views, fixedOrthographic, nested defaults and 
 Instances, texture hooks, frame priorities and adaptive performance remain separate batch jobs.
 
 Open outside job 1: render Grid inside Scene name="hud" and draw only that scene with RenderView; the grid is missing there because packages/react/src/lines.tsx Grid attaches with engine.use instead of the enclosing world.use. Recorded under lane-efficiency rule 6; the new Line binding uses its owning Scene.
+
+### XR manager secondary-scene disposal
+
+Register XR on a secondary scene, then dispose outside dispatch: XR.dispose
+checks/removes the active scene by name (packages/xr/src/index.ts), leaving its
+secondary registration behind or removing a same-name default plugin. This
+pre-existing owner repair is outside batch 268 pointer scope and remains open.
+
+### README browser shutdown observation
+
+The batch 268 README gate reached a new example's HTTP 404, then stopOwned in
+scripts/lib/browser.mjs threw SHUTDOWN_TIMEOUT for Chromium PID 93904 after its
+termination request. The PID was absent on inspection after the run. The browser
+helper's Windows child-exit observation needs a focused reproducer; no timeout
+was raised and no shutdown failure was accepted as a passing gate.
+

@@ -889,6 +889,8 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
       'TransformControls',
       'Voxels',
       'XR',
+      'XRPointerEvents',
+      'dispatchXRPointer',
       'boxGeometry',
       'clearLoader',
       'extend',
