@@ -2590,6 +2590,27 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 256 presence: `@margoengine/netcode/presence` exposes RoomPresence,
+PresenceStore, MemoryPresence, StorePresence, openSqlitePresence and RoomNode.
+Run each node's `run({ signal })` promise and handle its rejection; `close()` or
+`await using` withdraws it after in-flight heartbeat/service tasks have stopped.
+Lease defaults to 10 seconds, heartbeat to 1 second (strictly shorter than lease),
+IPC timeout to 5 seconds and poll interval to 20 ms. List snapshots are eventually
+consistent; `sync()` refreshes them immediately. Remote reserve always executes
+on the room owner and returns its endpoint and one-time join credential. Failed
+or uncertain RPCs are never replayed. A cancellation after the owner claims a
+request may leave its reserved seat until normal reservation expiry. Private
+and full rooms remain routable by id but are hidden from public list results.
+The shared-store adapter requires atomic take and expiry-aware reads. The supplied
+SQLite WAL adapter uses Node's lazy built-in sqlite module and a local file shared
+by processes on one host; network filesystems and multi-host SQLite are unsupported.
+Implement the public store/presence contract for a network database. The control
+plane is trusted server code; applications authenticate matchmaking endpoints.
+Presence entry gzip is 6,219 B (new entry, previously absent), ceiling 6,475 B.
+The optional entry retains the complete shared-store adapter and native SQLite
+path; splitting would add another public adapter entry without reducing room
+control-plane work. Core and stage stay unchanged at 23,950 B combined gzip.
+
 Batch 256 lobby: `@margoengine/netcode/lobby` provides `LobbyRoom` and `RoomLobby`.
 List results contain room id/name, detached scalar metadata, connected clients,
 reserved/reconnecting seats and capacity. Name and metadata filters are exact;
@@ -6154,6 +6175,69 @@ entry). UI root remains 31,885 B gzip and core + stage remains 23,950 B,
 below 25,000 B. The bytes keep native editing, selection and its mirror in one
 entry; splitting would require additional coordination without reducing the
 work a text-field consumer needs.
+### FSM live inspection (batch 250 job 4)
+Optional fsm/inspect provides a DOM hierarchy overlay with active ancestors, expandable outgoing edges, per-region paths, remembered history and the latest 32 trace entries by default. Capacity is 1 to 10,000. The Inspector structural element interface avoids loading its renderer dependencies; an explicit parent embeds the view, otherwise it overlays the bottom left. Live frames compare public trace fields and configuration, never serialize payloads. Existing traces remain caller-owned. Disposal removes frame callbacks and only the trace owned by the view. Internal optional-runtime edges are labelled internal in the topology; trace records retain public completion/delay metadata. It is a viewer, with no graph editing or remote actor session.
+
+Batch 250 job 4: fsm/inspect 0 to 2542 B min+gzip, ceiling 2798 B. Optional runtime is not loaded by the FSM root or core/stage.
+
+### Save OPFS (batch 255 job 3)
+
+The optional save/opfs entry uses a private subdirectory, default margo-saves, and atomically replaces a file at FileSystemWritableFileStream.close. The API needs a secure origin and navigator.storage.getDirectory or an injected private directory; no fallback hides unsupported OPFS. Keys are well-formed nonempty Unicode, at most 175 UTF-8 bytes. Filenames encode keys so slashes cannot escape the namespace. Each value costs five framing bytes. Interrupted first writes leave empty placeholders hidden from reads/keys. Per-key operations serialize per adapter; separate adapters/tabs use the browser's last-close-wins behavior. This is single-key atomicity, not a transaction across keys or a claim of hardware power-loss durability. Abort is checked at filesystem boundaries before the irreversible close; cancellation during close cannot undo a committed write. Native permission, quota and locking failures propagate. README work is owed in docs/work-lists/readme-owed.md.
+
+Save/opfs entry: 1,507 B min+gzip (before: absent, 0 B), ceiling 1,763 B. Core plus stage stays 23,950 B. Measured with scripts/measure-size.js bundleBytes and measureCoreStage; optional adapter code does not enter either root.
+### Batch 197 orbit collision
+
+Optional controls/collide exports OrbitControls and MapControls. Defaults: explicit colliders [], clearance 0.01 world units, returnTime 0.2 seconds; colliders=null queries the scene. Both triangle sides block by default. Five rays sample the centre and four symmetric near-plane corners using the canvas aspect and camera roll, including orthographic projection. This is sampled visibility, not a swept camera volume: thin obstacles between samples and asymmetric frusta need application-specific collision queries. A blocker at the target leaves a 1e-6 nonzero arm. Collision may retract inside minDistance to protect visibility. Applications exclude their target object from colliders. Mutable query settings are restored even on errors. Disposed controls cease updates.
+
+Entry size: controls/collide 0 to 7085 B min+gzip, ceiling 7341 B. The optional entry imports the BVH peer for synchronous triangle queries; splitting would require async construction or a caller-owned query. Core/stage unchanged.
+
+
+Batch 252 job 2: `NavMeshQuery.route` / `partialRoute` return `{points, offMesh, partial, polygon}`; `path` returns their points. Partial endpoints minimize XZ distance among allowed polygons reachable from the start, with vertical distance breaking ties. Area costs steer the chosen corridor, not the endpoint metric. Directed off-mesh links participate. There is no allowed partial route from an off-mesh or forbidden start. A Crowd on this query surface uses these routes and exposes `agent.partial`. Its `arrived` state/event means the route endpoint was reached; inspect partial to distinguish the requested goal. Partial arrivals replan on a version change. Planning currently scans the reachable component and allocates its search buffers per call, bounded by the underlying mesh graph. Core/stage remain unchanged.
+
+Batch 252 job 2 measured entry sizes: @margoengine/navmesh/queries: 3115 B gzip (ceiling 1865 -> 3371 B); @margoengine/navmesh: 7506 B gzip (ceiling 7694 -> 7694 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
+Batch 252 job 2 entry delta: queries 1,609 -> 3,115 B gzip; navmesh root 7,464 -> 7,506 B. The optional route implementation accounts for the query growth; root adds only the partial route protocol and Crowd state, with no dependency on the optional implementation.
+
+
+
+## Batch 171 derived flow fields
+
+Optional @margoengine/sciviz/derive: absent -> 3993 B gzip, ceiling 4249 B (256 B headroom).
+Keep validation, second-order boundaries, six owned output arrays, float64 CPU reference and GPU Jacobi
+in one synchronous entry rather than split the mathematical contract. Root 50599, flow 8665, LIC 23461,
+tubes 2533, core+stage 23924 B unchanged. No core/stage or physics source changes; no speed claim.
+
+Cartesian regular grids only, x fastest, at most 1000000 points. Finite f32 velocities, NaN missing,
+finite normal signed f32 inverse spacing I; equal bounds on singleton axes, derivative zero.
+Conservative envelope D=8*max(maxAbsVelocity,2^-126)*maxAbsInverseSpacing <=1e18; rescale units
+outside that domain. Second-order central/one-sided stencils, first-order secant for two samples.
+Missing centres or required neighbours make all six point outputs NaN without bridging or downgrade.
+Q is rotation dominance even for nonzero divergence, not the general second invariant. Lambda-2 is the
+middle eigenvalue of S^2+Omega^2; a sign alone proves neither a material vortex nor a pressure minimum.
+
+CPU/GPU absolute comparison: e=2^-23,t=2^-126,I=maxAbsInverseSpacing,L=32eD+32t*max(1,I).
+Gradient <=L, divergence/curl <=4L, vorticity <=8L, Q <=256eD^2+128t,
+lambda2 <=1024eD^2+128t. These include float rounding, FTZ and checked Jacobi residual, not spatial
+truncation or measurement uncertainty. Sign within the bound is unresolved. GPU needs eight storage
+bindings and 36 bytes per point within a storage buffer limit; 84 bytes/point output+temporary storage,
+excluding readback/driver overhead. Recompute GPU sources and layers after device replacement.
+NOAA demo reuses original public-domain pinned bytes; a fixed planar approximation omits spherical
+metric terms, latitude-varying spacing, vertical measurements/derivatives and subdaily variation.
+
+Derived-grid null component/mask validation adds 27 B (3955 -> 3982), retaining linked diagnostics
+in the same optional entry; ceiling 4211 -> 4238 restores standard 256 B headroom. No API split.
+
+Primitive-type validation before float32 coercion adds 11 B (3982 -> 3993), ceiling 4238 -> 4249 B
+with 256 B headroom. Preserve linked diagnostics for untyped callers; splitting would separate the
+input contract from its owner. Scalar volume/iso consumers need all dimensions at least two and
+ascending bounds; reorder descending-axis point samples for those consumers, or use planar heatmaps.
+
+Batch 171 integrated checkpoint at source 461e82a93: derive stays 3993 B (ceiling 4249),
+root 50599, flow 8665, LIC 23461 and tubes 2533 B. Current main owns the core light-direction
+repair: core+stage is now 23950 B, below 25000; this entry changes neither core nor stage.
+The earlier 23924 B figures above describe their original feature checkpoints. Entry/network
+records both genuinely measured 461e82a93 with dirty=false. No record has been relabeled.
+Acceptance is blocked on shared Chromium process/stdio cleanup after 30 passing root rendering
+assertions, as recorded in known-bugs.md. No new native-WebGL2 volume claim or speed claim.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -10245,6 +10329,21 @@ Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails Rigged
 - **Cause:** not yet found; the file-level exit happens before the sixth test reports. Owner: scripts/gpu-lock.mjs and its tests. Waits for the fix phase (Scott 2026-11-09, build first).
 Batch 251 job 2: no open inspector defect found by the full-hierarchy, utility,
 text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
+
+### Batch 255 save capture blockers
+
+- Job 1 remains unbuilt: captureScene reduces every material to the core fields (packages/save/src/engine.ts material block). Repro: capture a textured/emissive optional material; it is not restored as that kind. A lossless implementation for every kind also needs shader-owned serialization: NodeMaterial discards its constructor node roots (packages/shader/src/material.ts constructor); surfaceGraph exists only for createGraphMaterial. This lane's save-only scope cannot add that owning-package API. No partial materials entry is shipped.
+- Job 2 remains unbuilt: captureScene omits light lists and model playback; exact weighted playback restoration also requires Animator's private fade pose/elapsed and layer/clock state (packages/animator/src/index.ts). Repro: capture during a layered crossfade and restore; the playing clips/time/weights cannot be recovered through the current public save API. That owning-package serialization is outside this lane's scope. No partial scene-state entry is shipped.
+
+### Fixed: derived-grid validation coerced nonnumeric primitives before its diagnostic
+
+Owner: sciviz/derive prepare. Math.fround performed ToNumber before the own primitive check;
+BigInt/Symbol inputs therefore threw a raw TypeError, while optional null components/masks
+reached a property access. Primitive and array checks now precede coercion/access, preserving
+the linked sciviz RangeError before any GPU allocation. derive.test.js checks both entry paths.
+The numerical/consumer limits are in limits.md and the sciviz README; no algorithm is weakened.
+
+Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

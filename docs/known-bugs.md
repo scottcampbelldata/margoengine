@@ -4091,3 +4091,13 @@ text-injection, frame, pause/resume and disposal DOM checks (inspect.test.js).
 
 - Job 1 remains unbuilt: captureScene reduces every material to the core fields (packages/save/src/engine.ts material block). Repro: capture a textured/emissive optional material; it is not restored as that kind. A lossless implementation for every kind also needs shader-owned serialization: NodeMaterial discards its constructor node roots (packages/shader/src/material.ts constructor); surfaceGraph exists only for createGraphMaterial. This lane's save-only scope cannot add that owning-package API. No partial materials entry is shipped.
 - Job 2 remains unbuilt: captureScene omits light lists and model playback; exact weighted playback restoration also requires Animator's private fade pose/elapsed and layer/clock state (packages/animator/src/index.ts). Repro: capture during a layered crossfade and restore; the playing clips/time/weights cannot be recovered through the current public save API. That owning-package serialization is outside this lane's scope. No partial scene-state entry is shipped.
+
+### Fixed: derived-grid validation coerced nonnumeric primitives before its diagnostic
+
+Owner: sciviz/derive prepare. Math.fround performed ToNumber before the own primitive check;
+BigInt/Symbol inputs therefore threw a raw TypeError, while optional null components/masks
+reached a property access. Primitive and array checks now precede coercion/access, preserving
+the linked sciviz RangeError before any GPU allocation. derive.test.js checks both entry paths.
+The numerical/consumer limits are in limits.md and the sciviz README; no algorithm is weakened.
+
+Batch 171 derived-field shutdown blocker was repaired on main by 919fdc09e; the original failure remains in its historical validation record.

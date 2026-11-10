@@ -87,6 +87,10 @@
     "./vtk": {
       "types": "./dist/vtk.d.ts",
       "import": "./dist/vtk.js"
+    },
+    "./derive": {
+      "types": "./dist/derive.d.ts",
+      "import": "./dist/derive.js"
     }
   },
   "files": [
@@ -114,7 +118,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs && node tests/restoration-browser.mjs && node tests/demos-browser.mjs && node tests/webgl2-browser.mjs && node tests/formats-browser.mjs && node tests/derive-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
     "build:flow": "node scripts/build-flow.mjs",

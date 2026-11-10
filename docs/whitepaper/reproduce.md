@@ -2547,3 +2547,20 @@ After build:packages, run node --test --test-timeout=30000 packages/controls/tes
 
 
 Batch 252 job 2: after building, run `node --test --test-timeout=120000 packages/navmesh/test/partial.test.js`. All fixtures are analytic CPU tests; Crowd walks through partial arrival and a subsequent surface revision.
+
+
+### Batch 171 derived flow
+
+Build sciviz; run node --test packages/sciviz/tests/derive.test.js. Its synthetic integer Jacobian
+fixture was generated locally with NumPy default_rng(171), integers(-8,9,(3,3)) and eigvalsh(sym(J^2)),
+24 matrices; no foreign source or data copied. CPU test stencils also have direct analytic oracles.
+For actual GPU dispatch/readback and volume/isosurface integration on BOTH backends, run through one
+shared slot: node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=3 -- node
+packages/sciviz/tests/derive-browser.mjs. Results: test-results/sciviz-fixes/derive-gpu.json.
+Run demos-browser.mjs --only=derive through the same shared lock for both NOAA layouts/backends,
+all diagnostic/day controls and PNG export. Original wind.json pins source URLs/hashes/licence;
+wind.bin hash is e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd.
+CPU/GPU bounds are absolute, scale-aware envelopes on a rounded input, not truncation-error estimates.
+No benchmarks or timing-only assertions; build phase remains in effect.
+
+Batch 171 derived-field source evidence: results/batch-171-derive-entries.json and results/batch-171-derive-network.json preserve the complete original 461e82a93 pair (both dirty=false), together with the retained source audit branch. Shared current benchmark records retain the other lanes' updates. This is historical byte/network evidence, not a new speed run.

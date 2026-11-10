@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>North Atlantic wind derivatives | Margo Engine</title><link rel="stylesheet" href="./sciviz-demo.css"></head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html">Moving wind</a><a href="./sciviz-lic.html">Wind texture</a><a href="./sciviz-tubes.html">Wind paths</a><a href="./sciviz-derive.html" aria-current="page">Wind derivatives</a></nav>
+  <header><h1>North Atlantic wind derivatives</h1><p>Gradient-based diagnostics of NOAA daily mean near-surface winds, January 1-8, 2024. Q measures rotation relative to strain; lambda-2 is the middle eigenvalue of the strain and rotation tensor squares. A local negative lambda-2 value is a diagnostic, not an observed vortex.</p></header>
+  <div class="controls">
+    <label>Day <select id="day"><option value="0">January 1</option><option value="1">January 2</option><option value="2">January 3</option><option value="3">January 4</option><option value="4">January 5</option><option value="5">January 6</option><option value="6">January 7</option><option value="7">January 8</option></select></label>
+    <label>Diagnostic <select id="field"><option value="q">Q rotation dominance</option><option value="lambda2">Lambda-2</option><option value="vorticity">Curl magnitude</option><option value="divergence">Divergence</option></select></label>
+    <button id="export" type="button">Save PNG</button>
+  </div>
+  <div class="view"><canvas id="viewport" aria-label="NOAA wind derivatives on the projected North Atlantic grid"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
+  <footer>NCEP-NCAR Reanalysis 1 from <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. US-government public domain. Native 2.5 degree samples, 100 W to 20 E, 20 N to 65 N, sigma 0.995. Raw east/north velocity in m/s is differentiated on a fixed Cartesian equirectangular grid centred at 42.5 N. This planar approximation omits spherical metric terms, latitude-dependent grid scale, vertical derivatives and subdaily variability. The singleton vertical axis assumes constant velocity with height; no vertical measurements are invented. Values and sign thresholds are not a full atmospheric vortex identification. Colour spans the displayed diagnostic's min/max each time; <a href="./assets/sciviz/README.md">sources, hashes and limits</a>.</footer>
+  <script type="module">import { needsWebGPU } from './needs-webgpu.js'; needsWebGPU('#viewport').then(ok => ok && import('./sciviz-derive.ts'));</script>
+</body></html>

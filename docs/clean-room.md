@@ -159,6 +159,91 @@ The test page uses the opening sentence from Lewis Carroll's *Alice's Adventures
 in Wonderland* (1865), public domain, <https://www.gutenberg.org/ebooks/11>.
 Other short strings are original test controls. No downloaded code or art.
 
+## Batch 171 job 4 derived-field numerical design
+
+Continued research after the initial audit (6616a9ce1, rebased from 3d3116d56).
+No existing velocity Jacobian, curl/Q/lambda-2 filter or symmetric eigensolver exists in sciviz.
+Reuse compute.kernel and its disposal, and the existing GpuArray volume/isosurface inputs.
+The CPU entry uses float64 arithmetic on a copied float32 snapshot. There is no measured Rust/Wasm
+work-count gain for this new CPU loop, so do not add a Wasm binary or claim a timing gain.
+
+Primary-source comparison, scoped mathematical readings, before implementation:
+
+- Jinhee Jeong and Fazle Hussain, *On the identification of a vortex*, 1995,
+  https://doi.org/10.1017/S0022112095000462, section 4 and equations 5-6.
+  Full paper obtained at https://electronicsandbooks.com/edt/manual/Magazine/J/Journal%20of%20Fluid%20Mechanics/1995%20Volume%20285/S0022112095000462.pdf .
+  Lambda-2 is the middle eigenvalue of symmetric S^2+Omega^2, not an eigenvalue of the velocity
+  gradient or its singular values. Its pressure interpretation assumes incompressibility and omits
+  unsteady strain/viscosity. A negative contour is a local indicator, not a proof of a material vortex.
+- J. C. R. Hunt, A. A. Wray and P. Moin, *Eddies, Streams, and Convergence Zones in Turbulent Flows*,
+  1988, https://ntrs.nasa.gov/api/citations/19890015184/downloads/19890015184.pdf,
+  introduction, section 2.1 and scanned page 196 visually read (equations 2.1a/b and 2.2).
+  Rotation must dominate strain; pure shear can have vorticity without a vortex core. Pressure was an
+  additional original condition, not computed here from velocity alone.
+- Pinaki Chakraborty, S. Balachandar and Ronald J. Adrian, *On the relationships between local vortex
+  identification schemes*, 2005, section 2.1.1-2.1.2, equations 2.1-2.3,
+  https://www.oist.jp/sites/default/files/img/pages/units/fm/chakraborty-pinaki-pubs/vortex_identification_jfm05.pdf .
+  Compared the general second invariant with rotation dominance: they differ by divergence^2/2 in
+  compressible flow. This API explicitly returns rotation dominance at all points, and does not claim
+  pressure minima or a compressible-flow vortex detector. Algebra gives S^2+Omega^2 = sym(J^2).
+- Bengt Fornberg, *Generation of Finite Difference Formulas on Arbitrarily Spaced Grids*, 1988,
+  https://www.colorado.edu/amath/sites/default/files/attached-files/mathcomp_88_fd_formulas.pdf,
+  scanned page 700, equations 3.1-3.4, visually read. Differentiate the local Lagrange polynomial:
+  centred (-1/2,0,1/2)/h and boundary (-3/2,2,-1/2)/h stencils. Rewrite boundary weights in terms of
+  differences from the endpoint to preserve constant offsets. Two samples give a first-order secant;
+  singleton axes give zero, explicitly extending a planar vector field constantly along that axis.
+- Joachim Kopp, *Efficient numerical diagonalization of hermitian 3x3 matrices*, 2008,
+  https://arxiv.org/pdf/physics/0610206, mathematical sections 2.1/2.3 and 3 reviewed.
+  Compared iterative orthogonal rotations with analytical cubic roots and their cancellation near
+  degeneracy. Choose largest-pivot Jacobi on a scaled real symmetric 3x3; no eigenvectors needed.
+  CPU uses a 1e-14 relative pivot cutoff; GPU 1e-7, bounded to 48 rotations with a checked 1e-6
+  residual. Neither Appendix B, companion implementations, nor any other repository source was read.
+
+Synthesis: regular Cartesian physical coordinates, signed inverse spacing rounded once to f32, row-major
+J_ij = du_i/dx_j, curl (J_zy-J_yz,J_xz-J_zx,J_yx-J_xy), divergence trace(J), and scaled tensor products.
+A centre or required stencil neighbour masked/missing makes all outputs NaN; no lower-order fallback
+across masks. All six GPU fields own separate contiguous arrays, allowing scalar volume/iso reuse without
+readback of values. Device replacement requires deriving again on the replacement compute context.
+Input copies and CPU work yield every 8192 points, exact-reason AbortSignal; GPU status read is cancellable.
+
+Numerical domain: at most 1000000 points, finite f32 velocities (NaN missing), finite normal f32 inverse
+spacing on active axes, and conservative stencil envelope D=8*max(maxAbsVelocity,2^-126)*maxAbsInverseSpacing <=1e18.
+This keeps stencil/norm/tensor intermediates within f32 range; rescale physical units outside that domain.
+With e=2^-23, t=2^-126, I=maxAbsInverseSpacing: gradient difference <= L=32eD+32t*max(1,I);
+divergence/curl <=4L, magnitude <=8L; Q <=256eD^2+128t, lambda2 <=1024eD^2+128t.
+Bounds include f32 rounding, flush-to-zero, tensor and residual errors (Weyl perturbation for symmetric
+matrices), not finite-difference truncation or uncertainty in measured velocities. They are absolute,
+scale-aware envelopes; values closer than the bound to zero cannot be classified reliably by sign.
+The factor 8 bounds endpoint stencil amplification; first-order output bounds include sums/norms.
+Tensor perturbations are bounded by products of those first-order errors, plus f32 arithmetic and
+Jacobi residual; the published factors conservatively dominate those terms. Tests must also use
+independent tighter analytic oracles so the conservative cross-device bound cannot hide wrong math.
+No benchmark, paired wall-clock run, speed assertion or performance claim.
+
+W3C GPU for the Web Working Group, *WebGPU Shading Language*, 2026-10-21,
+https://www.w3.org/TR/2026/CRD-WGSL-20261021/, floating-point evaluation/finite-math and bitcast
+sections consulted for masked output encoding. WGSL rejects NaN constant expressions and permits
+finite-math assumptions on floating operations. Therefore output storage uses u32 bit patterns over
+f32 GpuArray buffers: arithmetic results are bitcast to u32, missing values write 0x7fc00000 directly,
+without ever constructing or doing arithmetic on a shader NaN. The mask regression runs on both
+backends, including missing endpoint neighbours. No source from external shader libraries was read.
+
+
+Runtime-input review before the coercion repair compared Gavin Bierman, Martin Abadi and Mads
+Torgersen, *Understanding TypeScript*, 2014, abstract (https://research.google/pubs/understanding-typescript/),
+and Aseem Rastogi, Nikhil Swamy, Cedric Fournet, Gavin Bierman and Panagiotis Vekris, *Safe & Efficient
+Gradual Typing for TypeScript*, 2015, abstract
+(https://www.microsoft.com/en-us/research/publication/safe-efficient-gradual-typing-typescript/).
+Their static-versus-runtime distinction motivates checking untyped callers at this array boundary,
+without importing a compiler or attempting a general runtime type system. ECMA TC39, *ECMAScript
+Language Specification*, living draft consulted 2026-11-09, Math.fround/ToNumber,
+https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math.fround,
+confirms that rounding coerces its operand and can throw on BigInt/Symbol before an API's own guard.
+Validate the primitive type before rounding, retaining the existing linked diagnostic. Regression
+cases require RangeError plus the sciviz help link for BigInt/Symbol, null optional components/masks
+and the earlier malformed numeric inputs, on both CPU and GPU entry paths before allocation.
+
+
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
 The latest-main rebase preserves all concurrent work. Sciviz/geometry/compute/math/core source is identical
 to the accepted source; the affected 203 CPU checks, root GPU checks, 16 entry parity comparisons, four
@@ -5310,3 +5395,6 @@ Combined design: preserve the requested orbit, immediately constrain its arm by 
 Sources compared before implementation: Peter E. Hart, Nils J. Nilsson and Bertram Raphael, *A Formal Basis for the Heuristic Determination of Minimum Cost Paths* (1968), https://doi.org/10.1109/TSSC.1968.300136; Douglas Demyen and Michael Buro, *Efficient Triangulation-Based Pathfinding* (2006), https://cdn.aaai.org/AAAI/2006/AAAI06-148.pdf; Mikko Mononen and Recast Navigation contributors, *dtNavMeshQuery API reference* (2009-present), https://recastnav.com/classdtNavMeshQuery.html. Compared graph-cost search, portal funneling and incomplete/reachable route contracts. No rival or companion implementation read.
 
 Combined design: explore the directed, filtered reachable component, minimize point-to-polygon XZ distance (vertical distance breaks a tie), then use the existing cost-aware corridor search and funnel to that precise reachable point. Reachable goal polygons remain complete; disconnected, forbidden and outside goals return partial=true. Off-mesh links remain marked and directed. NavMeshQuery implements NavSurface so Crowd can use the optional planner without importing it in the root. Crowd preserves unsnapped goals via the optional partialRoute hook and exposes agent.partial; an arrived partial agent replans when the surface changes. Analytic synthetic fixtures only; no new asset demo or speed claim.
+
+
+Batch 171 job 4 context checkpoint: [receipt](whitepaper/results/batch-171-derive-validation.json). The shared browser process/stdio close failure is retained as a blocker, not attributed to numerical work or excused as machine load. Independent integrated derive and all 26 README examples pass; original failed root suite is not retried.

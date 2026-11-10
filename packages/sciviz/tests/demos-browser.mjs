@@ -128,7 +128,7 @@ async function run(compat) {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport);
-      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'lic', 'tubes', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
+      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'lic', 'tubes', 'derive', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
         if (only && !only.split(',').includes(name)) continue;
         const fixture = ['aeroflow', 'astrometrics', 'medical', 'showcase'].includes(name);
         const path = `${fixture ? '/packages/sciviz/tests/pages' : '/examples'}/sciviz-${name}.ts`;
@@ -374,6 +374,16 @@ async function run(compat) {
             pixels.every((n) => n > 20),
             `wind never displays an empty frame: ${JSON.stringify(pixels)}`,
           );
+          await download('export');
+        } else if (name === 'derive') {
+          const first = await structure(path);
+          await select('day', '7'); await settled(path);
+          assert.notEqual(await structure(path), first, 'real NOAA day changes derivatives');
+          for (const field of ['lambda2', 'vorticity', 'divergence', 'q']) {
+            await select('field', field); await settled(path); await structure(path);
+            assert.match(await page.locator('#status').textContent(), /10\^-/);
+          }
+          assert.equal(await page.evaluate(async path => (await import(path)).figure.layers.length, path), 1);
           await download('export');
         } else if (name === 'aeroflow') {
           await page.evaluate(monitor, path);

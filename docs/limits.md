@@ -3606,3 +3606,45 @@ Batch 252 job 2: `NavMeshQuery.route` / `partialRoute` return `{points, offMesh,
 
 Batch 252 job 2 measured entry sizes: @margoengine/navmesh/queries: 3115 B gzip (ceiling 1865 -> 3371 B); @margoengine/navmesh: 7506 B gzip (ceiling 7694 -> 7694 B). Optional bytes provide the requested navigation behavior without a package split. Core plus stage remains below 25,000 B.
 Batch 252 job 2 entry delta: queries 1,609 -> 3,115 B gzip; navmesh root 7,464 -> 7,506 B. The optional route implementation accounts for the query growth; root adds only the partial route protocol and Crowd state, with no dependency on the optional implementation.
+
+
+
+## Batch 171 derived flow fields
+
+Optional @margoengine/sciviz/derive: absent -> 3993 B gzip, ceiling 4249 B (256 B headroom).
+Keep validation, second-order boundaries, six owned output arrays, float64 CPU reference and GPU Jacobi
+in one synchronous entry rather than split the mathematical contract. Root 50599, flow 8665, LIC 23461,
+tubes 2533, core+stage 23924 B unchanged. No core/stage or physics source changes; no speed claim.
+
+Cartesian regular grids only, x fastest, at most 1000000 points. Finite f32 velocities, NaN missing,
+finite normal signed f32 inverse spacing I; equal bounds on singleton axes, derivative zero.
+Conservative envelope D=8*max(maxAbsVelocity,2^-126)*maxAbsInverseSpacing <=1e18; rescale units
+outside that domain. Second-order central/one-sided stencils, first-order secant for two samples.
+Missing centres or required neighbours make all six point outputs NaN without bridging or downgrade.
+Q is rotation dominance even for nonzero divergence, not the general second invariant. Lambda-2 is the
+middle eigenvalue of S^2+Omega^2; a sign alone proves neither a material vortex nor a pressure minimum.
+
+CPU/GPU absolute comparison: e=2^-23,t=2^-126,I=maxAbsInverseSpacing,L=32eD+32t*max(1,I).
+Gradient <=L, divergence/curl <=4L, vorticity <=8L, Q <=256eD^2+128t,
+lambda2 <=1024eD^2+128t. These include float rounding, FTZ and checked Jacobi residual, not spatial
+truncation or measurement uncertainty. Sign within the bound is unresolved. GPU needs eight storage
+bindings and 36 bytes per point within a storage buffer limit; 84 bytes/point output+temporary storage,
+excluding readback/driver overhead. Recompute GPU sources and layers after device replacement.
+NOAA demo reuses original public-domain pinned bytes; a fixed planar approximation omits spherical
+metric terms, latitude-varying spacing, vertical measurements/derivatives and subdaily variation.
+
+Derived-grid null component/mask validation adds 27 B (3955 -> 3982), retaining linked diagnostics
+in the same optional entry; ceiling 4211 -> 4238 restores standard 256 B headroom. No API split.
+
+Primitive-type validation before float32 coercion adds 11 B (3982 -> 3993), ceiling 4238 -> 4249 B
+with 256 B headroom. Preserve linked diagnostics for untyped callers; splitting would separate the
+input contract from its owner. Scalar volume/iso consumers need all dimensions at least two and
+ascending bounds; reorder descending-axis point samples for those consumers, or use planar heatmaps.
+
+Batch 171 integrated checkpoint at source 461e82a93: derive stays 3993 B (ceiling 4249),
+root 50599, flow 8665, LIC 23461 and tubes 2533 B. Current main owns the core light-direction
+repair: core+stage is now 23950 B, below 25000; this entry changes neither core nor stage.
+The earlier 23924 B figures above describe their original feature checkpoints. Entry/network
+records both genuinely measured 461e82a93 with dirty=false. No record has been relabeled.
+Acceptance is blocked on shared Chromium process/stdio cleanup after 30 passing root rendering
+assertions, as recorded in known-bugs.md. No new native-WebGL2 volume claim or speed claim.

@@ -10,4 +10,6 @@ export const scientificPages = [
   'sciviz-lic',
   'sciviz-tubes',
   'sciviz-formats',
+
+  'sciviz-derive',
 ];

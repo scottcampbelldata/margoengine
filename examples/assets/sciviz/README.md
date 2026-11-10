@@ -77,3 +77,13 @@ e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd. It traces the 
 projected daily mean; original interpolated speed sets colour and drawing width. The horizontal field has
 zero streamwise curl, so the real-data ribbons have no physical spin. Tube radii and ribbon widths are
 drawing aids, not observed flow diameters. No measured parcel, vertical motion or forecast claim.
+
+The official North Atlantic wind derivatives example (examples/sciviz-derive.html) reuses that same
+unchanged public-domain NOAA wind.bin, SHA-256
+e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd. It differentiates the raw
+east/north velocities on a fixed Cartesian equirectangular grid in metres (42.5 N centre), with no
+invented vertical data. This planar diagnostic omits spherical metric terms, latitude-dependent
+spacing, vertical derivatives and subdaily variability. Q uses rotation dominance even when the
+two-dimensional projected field has nonzero divergence; it is not the general second invariant.
+Lambda-2 is a local diagnostic, not a measured vortex or a pressure-minimum claim. Heatmap values
+are scaled only for the displayed units (10^-5 s^-1 or 10^-10 s^-2), with a fresh min/max colour range.

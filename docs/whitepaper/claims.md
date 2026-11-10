@@ -2998,3 +2998,17 @@ The optional controls/collide entry retracts orbit/map cameras before selected t
 ## Batch 252 job 2: partial paths and Crowd
 
 The optional queries surface returns the precise nearest reachable point and a partial flag for unreachable goals, and Crowd follows it with an inspectable partial flag. `packages/navmesh/test/partial.test.js` proves disconnected islands, forbidden areas, outside goals, geometry-based nearest selection, directed jump links, ordinary full routes, tiled rebuilds, arrival and reopening a route. Compared with the published Detour partial/corridor contract, the endpoint is selected from reachable polygon geometry rather than a polygon center. No optimal continuous weighted-path or speed claim is made.
+
+
+### Batch 171 derived-flow numerical contract
+
+The optional /derive entry computes J, divergence, curl/magnitude, rotation-dominance Q and the middle
+eigenvalue of S^2+Omega^2 on a Cartesian grid. CPU analytical stencils, solid rotation/shear, degenerate
+and rotated eigenvalues, scale/cancellation, masks and ownership are independently tested. A NumPy
+eigvalsh black-box oracle checks 24 own integer nonsymmetric Jacobians, without reading its source.
+Real GPU tests compare every value on both backends within the explicit absolute bounds in limits.md,
+including masks, FTZ and volume/isosurface integration. The NOAA example is a planar daily diagnostic;
+no measured atmospheric vortex, original-data error, material coherence, pressure or speed claim.
+Sources and synthesis: clean-room.md; reproduction: reproduce.md. Final acceptance is recorded separately.
+
+Batch 171 job 4 is an unlanded implementation checkpoint: [numerical GPU evidence](results/batch-171-derive-gpu.json) and [complete checkpoint receipt](results/batch-171-derive-validation.json). All integrated mathematical checks pass, but shared Chromium process/stdio teardown blocks acceptance. No full-green verify or completed-job claim.

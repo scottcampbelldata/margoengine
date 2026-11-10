@@ -1,0 +1,311 @@
+{
+  "status": "DONE",
+  "landed": true,
+  "sourceCommit": "461e82a93",
+  "sourceAuditRef": "sciviz-derive-source-461e82a93",
+  "feature": "CPU/GPU Cartesian gradient, divergence, curl, vorticity magnitude, Q rotation dominance and lambda2",
+  "methods": "Second-order interior/boundary stencils, secant two-point axes, constant singleton extension, scaled largest-pivot Jacobi; missing stencil outputs are NaN bits",
+  "fullVerify": {
+    "ok": false,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 553.8,
+    "repeated": false,
+    "failure": "api:check used stale rebuilt dependency reports; regenerated; interrupted chains completed directly"
+  },
+  "fullUnits": {
+    "ok": false,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 411.3,
+    "tests": 14164,
+    "pass": 14161,
+    "fail": 3,
+    "failedFiles": [
+      "tests/llms.test.js",
+      "tests/sizes-page.test.js",
+      "tests/umbrella.test.js"
+    ],
+    "closure": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 36.1,
+      "tests": 31,
+      "pass": 31,
+      "fail": 0
+    },
+    "allGreenRunClaimed": false
+  },
+  "packageCPU": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 18.8,
+    "tests": 201,
+    "pass": 201
+  },
+  "integratedCPU": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 11.1,
+    "tests": 226,
+    "pass": 226
+  },
+  "beforeRebaseGPU": [
+    {
+      "name": "root",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 68.2
+    },
+    {
+      "name": "bricks",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 17.6
+    },
+    {
+      "name": "entries",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 37.3
+    },
+    {
+      "name": "restoration",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 121.6
+    },
+    {
+      "name": "demos",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 293.3
+    },
+    {
+      "name": "webgl2",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 88.8
+    },
+    {
+      "name": "derive",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 72.6
+    },
+    {
+      "name": "readme",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 67.3
+    }
+  ],
+  "integratedGPUIndependent": [
+    {
+      "name": "derive",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 59.8
+    },
+    {
+      "name": "readme",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 74.3
+    }
+  ],
+  "numericalGPU": [
+    {
+      "compat": false,
+      "cases": 25,
+      "lit": 3508,
+      "triangles": 896
+    },
+    {
+      "compat": true,
+      "cases": 25,
+      "lit": 3508,
+      "triangles": 896
+    }
+  ],
+  "readme": {
+    "examples": 26,
+    "node": 4,
+    "browser": 22,
+    "failed": 0
+  },
+  "productionExamples": 10,
+  "size": {
+    "derive": {
+      "raw": 9899,
+      "gzip": 3993
+    },
+    "ceiling": 4249,
+    "coreStage": {
+      "raw": 59152,
+      "gzip": 23950,
+      "limit": 25000
+    },
+    "entryCommit": "461e82a93",
+    "networkCommit": "461e82a93",
+    "entryDirty": false,
+    "networkDirty": false
+  },
+  "quality": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 36
+  },
+  "api": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 132.7,
+    "entries": 902,
+    "exports": 8725
+  },
+  "lint": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 3
+  },
+  "hygiene": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 17.6
+  },
+  "blocker": {
+    "name": "root",
+    "ok": false,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 44.8,
+    "assertionsPassed": 30,
+    "code": "SHUTDOWN_TIMEOUT",
+    "budgetMs": 30000,
+    "phase": "Chromium process/stdio close (84700)",
+    "nativePIDAbsentAfterward": true,
+    "owner": "Shared browser launcher, assigned to batch 160",
+    "cause": "Latched ChildProcess close promise remained unresolved after native termination; exact pipe/event chain unproved",
+    "retried": false,
+    "budgetRaised": false,
+    "log": "test-results/sciviz-fixes/derive-integrated-root.log"
+  },
+  "sourceHashes": {
+    "packages/sciviz/src/derive.ts": "ae483903b6d5876b2bdab276a3f6bdbe0ce48edb51aab4c0066157b9e82202ea",
+    "packages/sciviz/src/derive-shader.ts": "cc686c274660b74129b67407fb06e92774ad40b9145b0a4b05bc980f40263b40"
+  },
+  "noCoreStageOrPhysicsChanges": true,
+  "noTimingOrSpeedClaim": true,
+  "next": "Job 4 complete. Historical failed verify and shutdown attempts are retained above; they were not repeated. Build job 6 atmosphere next.",
+  "finalCheckpointMetadata": {
+    "ok": true,
+    "timedOut": false,
+    "aborted": false,
+    "seconds": 37.2,
+    "tests": 31,
+    "pass": 31,
+    "fail": 0
+  },
+  "integrationBase": "4198a3e7e411f3013774a2ae5bbf512c3d22b1e5",
+  "fastGate": {
+    "policy": "No lane verify or README work; changed-package GPU only after main 896ebf844.",
+    "cpu": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 131.1
+    },
+    "tests": 245,
+    "pass": 245,
+    "gpu": [
+      {
+        "name": "root",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 8.8
+      },
+      {
+        "name": "root-compat",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 11.3
+      },
+      {
+        "name": "bricks",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 11.4
+      },
+      {
+        "name": "entries",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 19
+      },
+      {
+        "name": "restoration",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 12.1
+      },
+      {
+        "name": "demos",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 104.3
+      },
+      {
+        "name": "webgl2",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 4.5
+      },
+      {
+        "name": "derive",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 44
+      },
+      {
+        "name": "formats",
+        "ok": true,
+        "timedOut": false,
+        "aborted": false,
+        "seconds": 6.1
+      }
+    ],
+    "shutdown": "main 919fdc09e repairs the historical blocker; all affected GPU children settle normally."
+  },
+  "sourceArtifacts": {
+    "entries": "batch-171-derive-entries.json",
+    "network": "batch-171-derive-network.json",
+    "commit": "461e82a93",
+    "dirty": false,
+    "note": "The complete original pair is preserved together in this job. Shared latest-main benchmark records are left intact."
+  }
+}

@@ -2642,6 +2642,10 @@
       "types": "./dist/sciviz/vtk.d.ts",
       "import": "./dist/sciviz/vtk.js"
     },
+    "./sciviz/derive": {
+      "types": "./dist/sciviz/derive.d.ts",
+      "import": "./dist/sciviz/derive.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

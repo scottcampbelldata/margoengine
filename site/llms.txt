@@ -234,7 +234,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 5 entry points
 - [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 8 entry points
 - [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 7 entry points
-- [@margoengine/controls API](https://margoengine.com/llms/api/controls.md): 12 entry points
+- [@margoengine/controls API](https://margoengine.com/llms/api/controls.md): 13 entry points
 - [@margoengine/cameras API](https://margoengine.com/llms/api/cameras.md): 7 entry points
 - [@margoengine/input API](https://margoengine.com/llms/api/input.md): 6 entry points
 - [@margoengine/ui API](https://margoengine.com/llms/api/ui.md): 5 entry points
@@ -247,18 +247,18 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/ragdoll API](https://margoengine.com/llms/api/ragdoll.md): 6 entry points
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 11 entry points
 - [@margoengine/ecs API](https://margoengine.com/llms/api/ecs.md): 7 entry points
-- [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 7 entry points
+- [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 8 entry points
 - [@margoengine/behavior API](https://margoengine.com/llms/api/behavior.md): 11 entry points
-- [@margoengine/save API](https://margoengine.com/llms/api/save.md): 6 entry points
+- [@margoengine/save API](https://margoengine.com/llms/api/save.md): 7 entry points
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 4 entry points
-- [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 15 entry points
+- [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 16 entry points
 - [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 10 entry points
 - [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 12 entry points
 - [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 16 entry points
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 9 entry points
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 3 entry points
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 13 entry points
-- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 16 entry points
+- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 17 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 5 entry points
 - [@margoengine/react API](https://margoengine.com/llms/api/react.md): 33 entry points
 
@@ -274,7 +274,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Bending tangent of the supported four-box column](https://margoengine.com/llms/docs/architecture/physics2d-support-bending.md): The centered 1:1000 column has a negative bending direction under Margo's existing steady contact force law. The calculation includes the…
 - [Own 2D sustained support](https://margoengine.com/llms/docs/architecture/physics2d-support-proof.md): This note derives the correction to the contact support ceiling found on `47f81f909`. It concerns the owned Rust/Wasm kernel, not the…
 - [Benchmarking](https://margoengine.com/llms/docs/benchmarking.md): Margo has one benchmark tool: `npm run bench`. It measures bytes, startup, rendering, objects, kernel maths, glTF, loaders, assemblies…
-- [Clean room](https://margoengine.com/llms/docs/clean-room.md): Research compared before implementation: Cary G. Gray and David R. Cheriton, *Leases: An Efficient Fault-Tolerant Mechanism for…
+- [Clean room](https://margoengine.com/llms/docs/clean-room.md): Sources compared before implementation: Leslie Lamport, *Time, Clocks, and the Ordering of Events in a Distributed System* (1978)…
 - [Content Security Policy](https://margoengine.com/llms/docs/csp.md): Core and stage compile the Rust transform kernel, so every Margo engine page under a strict CSP needs `'wasm-unsafe-eval'`. For a…
 - [Demo cold-load measurements](https://margoengine.com/llms/docs/demo-loading.md): Scope: all seven pages shipped by `scripts/build-site.js`, including both robot entry points. The phased startup and 180 ms effect…
 - [Deploying a Margo app](https://margoengine.com/llms/docs/deploying.md): A Margo app is static files: HTML, JavaScript, CSS, a few `.wasm` files and your assets. Any static host works. Three things decide…

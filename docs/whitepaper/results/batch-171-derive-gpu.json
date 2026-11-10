@@ -1,0 +1,1005 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "summaries": [
+      {
+        "name": "rotation",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000274658203125,
+          "divergence": 0.0010986328125,
+          "curl": 0.0010986328125,
+          "vorticity": 0.002197265625,
+          "q": 0.158203125,
+          "lambda2": 0.6328125
+        }
+      },
+      {
+        "name": "shear",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.0003662109375,
+          "divergence": 0.00146484375,
+          "curl": 0.00146484375,
+          "vorticity": 0.0029296875,
+          "q": 0.28125,
+          "lambda2": 1.125
+        }
+      },
+      {
+        "name": "quadratic",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0.0000019073486328125,
+          "q": 0.0000019073486328125,
+          "lambda2": 0.00000762939453125
+        },
+        "bound": {
+          "gradient": 0.00067138671875,
+          "divergence": 0.002685546875,
+          "curl": 0.002685546875,
+          "vorticity": 0.00537109375,
+          "q": 0.9453125,
+          "lambda2": 3.78125
+        }
+      },
+      {
+        "name": "nonlinear",
+        "maxima": {
+          "gradient": 9.5367431640625e-7,
+          "divergence": 2.384185791015625e-7,
+          "curl": 9.403987633049837e-7,
+          "vorticity": 8.458780484943418e-7,
+          "q": 0.00002288818359375,
+          "lambda2": 0.00002288818359375
+        },
+        "bound": {
+          "gradient": 0.003124067047596976,
+          "divergence": 0.012496268190387905,
+          "curl": 0.012496268190387905,
+          "vorticity": 0.02499253638077581,
+          "q": 20.46777343162458,
+          "lambda2": 81.87109372649832
+        }
+      },
+      {
+        "name": "two samples",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 5.960464477539063e-8
+        },
+        "bound": {
+          "gradient": 0.000213623046875,
+          "divergence": 0.0008544921875,
+          "curl": 0.0008544921875,
+          "vorticity": 0.001708984375,
+          "q": 0.095703125,
+          "lambda2": 0.3828125
+        }
+      },
+      {
+        "name": "planar",
+        "maxima": {
+          "gradient": 5.960464477539063e-8,
+          "divergence": 0,
+          "curl": 1.1920928955078125e-7,
+          "vorticity": 1.1920928955078125e-7,
+          "q": 5.960464477539063e-8,
+          "lambda2": 5.960464477539063e-8
+        },
+        "bound": {
+          "gradient": 0.00018310546875,
+          "divergence": 0.000732421875,
+          "curl": 0.000732421875,
+          "vorticity": 0.00146484375,
+          "q": 0.0703125,
+          "lambda2": 0.28125
+        }
+      },
+      {
+        "name": "singleton",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 3.76158192263132e-37,
+          "divergence": 1.504632769052528e-36,
+          "curl": 1.504632769052528e-36,
+          "vorticity": 3.009265538105056e-36,
+          "q": 1.504632769052528e-36,
+          "lambda2": 1.504632769052528e-36
+        }
+      },
+      {
+        "name": "near-cancelling strain and rotation",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0.00048828125,
+          "curl": 0.001953125,
+          "vorticity": 0.001953125,
+          "q": 16.231550216674805,
+          "lambda2": 16.231550216674805
+        },
+        "bound": {
+          "gradient": 0.6103515625,
+          "divergence": 2.44140625,
+          "curl": 2.44140625,
+          "vorticity": 4.8828125,
+          "q": 781250,
+          "lambda2": 3125000
+        }
+      },
+      {
+        "name": "constant offset",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 305.1761474609375,
+          "divergence": 1220.70458984375,
+          "curl": 1220.70458984375,
+          "vorticity": 2441.4091796875,
+          "q": 195312968750.28125,
+          "lambda2": 781251875001.125
+        }
+      },
+      {
+        "name": "small scale",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 7.0000043097342615e-40,
+          "lambda2": 4.00000646641519e-40
+        },
+        "bound": {
+          "gradient": 1.8310546293928124e-24,
+          "divergence": 7.32421851757125e-24,
+          "curl": 7.32421851757125e-24,
+          "vorticity": 1.46484370351425e-23,
+          "q": 1.5046398003020818e-36,
+          "lambda2": 1.504660894050743e-36
+        }
+      },
+      {
+        "name": "subnormal high inverse spacing",
+        "maxima": {
+          "gradient": 0.009999945759773254,
+          "divergence": 0.009999945759773254,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0.0000499994566780515,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 37.61585389692118,
+          "divergence": 150.46341558768472,
+          "curl": 150.46341558768472,
+          "vorticity": 300.92683117536944,
+          "q": 0.002698802500897851,
+          "lambda2": 0.010795210003591404
+        }
+      },
+      {
+        "name": "subnormal",
+        "maxima": {
+          "gradient": 1.0000226360807625e-40,
+          "divergence": 1.401298464324817e-45,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 3.761585509955389e-37,
+          "divergence": 1.5046342039821555e-36,
+          "curl": 1.5046342039821555e-36,
+          "vorticity": 3.009268407964311e-36,
+          "q": 1.504632769052528e-36,
+          "lambda2": 1.504632769052528e-36
+        }
+      },
+      {
+        "name": "masked",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000091552734375,
+          "divergence": 0.0003662109375,
+          "curl": 0.0003662109375,
+          "vorticity": 0.000732421875,
+          "q": 0.017578125,
+          "lambda2": 0.0703125
+        }
+      },
+      {
+        "name": "eigen 1,1,1 scale 1e-12",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 9.155273400917333e-17,
+          "divergence": 3.662109360366933e-16,
+          "curl": 3.662109360366933e-16,
+          "vorticity": 7.324218720733866e-16,
+          "q": 1.757812486102719e-26,
+          "lambda2": 7.031249943959487e-26
+        }
+      },
+      {
+        "name": "eigen 1,1,1 scale 1",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000091552734375,
+          "divergence": 0.0003662109375,
+          "curl": 0.0003662109375,
+          "vorticity": 0.000732421875,
+          "q": 0.017578125,
+          "lambda2": 0.0703125
+        }
+      },
+      {
+        "name": "eigen 1,1,1 scale 1000000000000",
+        "maxima": {
+          "gradient": 65536,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 91552736,
+          "divergence": 366210944,
+          "curl": 366210944,
+          "vorticity": 732421888,
+          "q": 1.7578125624000006e+22,
+          "lambda2": 7.031250249600002e+22
+        }
+      },
+      {
+        "name": "eigen 1,1.0001,-3 scale 1e-12",
+        "maxima": {
+          "gradient": 1.0842021724855044e-19,
+          "divergence": 1.0842021724855044e-19,
+          "curl": 1.3552527156068805e-19,
+          "vorticity": 1.053658011379101e-19,
+          "q": 1.5777218104420236e-30,
+          "lambda2": 2.9582283945787943e-31
+        },
+        "bound": {
+          "gradient": 2.4075318044971465e-16,
+          "divergence": 9.630127217988586e-16,
+          "curl": 9.630127217988586e-16,
+          "vorticity": 1.9260254435977172e-15,
+          "q": 1.2155532114105798e-25,
+          "lambda2": 4.86221284559718e-25
+        }
+      },
+      {
+        "name": "eigen 1,1.0001,-3 scale 1",
+        "maxima": {
+          "gradient": 1.1920928955078125e-7,
+          "divergence": 5.960464477539063e-8,
+          "curl": 1.4901161193847656e-7,
+          "vorticity": 1.4795023162150756e-7,
+          "q": 9.5367431640625e-7,
+          "lambda2": 3.5762786865234375e-7
+        },
+        "bound": {
+          "gradient": 0.00024075317196547985,
+          "divergence": 0.0009630126878619194,
+          "curl": 0.0009630126878619194,
+          "vorticity": 0.0019260253757238388,
+          "q": 0.12155531257224084,
+          "lambda2": 0.48622125028896335
+        }
+      },
+      {
+        "name": "eigen 1,1.0001,-3 scale 1000000000000",
+        "maxima": {
+          "gradient": 131072,
+          "divergence": 65536,
+          "curl": 229376,
+          "vorticity": 123668.890625,
+          "q": 1729382256910270500,
+          "lambda2": 576460752303423500
+        },
+        "bound": {
+          "gradient": 240753168,
+          "divergence": 963012672,
+          "curl": 963012672,
+          "vorticity": 1926025344,
+          "q": 1.2155530856793107e+23,
+          "lambda2": 4.862212342717243e+23
+        }
+      },
+      {
+        "name": "eigen 0,0.0001,2 scale 1e-12",
+        "maxima": {
+          "gradient": 5.421010862427522e-20,
+          "divergence": 2.168404344971009e-19,
+          "curl": 8.131516293641283e-20,
+          "vorticity": 5.451102142148553e-20,
+          "q": 3.944304526105059e-31,
+          "lambda2": 1.7841522776907739e-31
+        },
+        "bound": {
+          "gradient": 1.3563537260894131e-16,
+          "divergence": 5.4254149043576525e-16,
+          "curl": 5.4254149043576525e-16,
+          "vorticity": 1.0850829808715305e-15,
+          "q": 3.8581209511459683e-26,
+          "lambda2": 1.5432483804132484e-25
+        }
+      },
+      {
+        "name": "eigen 0,0.0001,2 scale 1",
+        "maxima": {
+          "gradient": 5.960464477539063e-8,
+          "divergence": 2.384185791015625e-7,
+          "curl": 5.960464477539063e-8,
+          "vorticity": 5.392454482944231e-8,
+          "q": 5.960464477539062e-7,
+          "lambda2": 1.7842037447479697e-7
+        },
+        "bound": {
+          "gradient": 0.00013563537504523993,
+          "divergence": 0.0005425415001809597,
+          "curl": 0.0005425415001809597,
+          "vorticity": 0.0010850830003619194,
+          "q": 0.038581210895955564,
+          "lambda2": 0.15432484358382226
+        }
+      },
+      {
+        "name": "eigen 0,0.0001,2 scale 1000000000000",
+        "maxima": {
+          "gradient": 65536,
+          "divergence": 131072,
+          "curl": 90112,
+          "vorticity": 81096.65625,
+          "q": 432345564227567600,
+          "lambda2": 178411241742532600
+        },
+        "bound": {
+          "gradient": 135635376,
+          "divergence": 542541504,
+          "curl": 542541504,
+          "vorticity": 1085083008,
+          "q": 3.858121143911475e+22,
+          "lambda2": 1.54324845756459e+23
+        }
+      },
+      {
+        "name": "eigen -2,2,1 scale 1e-12",
+        "maxima": {
+          "gradient": 1.0842021724855044e-19,
+          "divergence": 1.0842021724855044e-19,
+          "curl": 1.6263032587282567e-19,
+          "vorticity": 1.0827177710268839e-19,
+          "q": 7.888609052210118e-31,
+          "lambda2": 7.888609052210118e-31
+        },
+        "bound": {
+          "gradient": 1.8310546801834666e-16,
+          "divergence": 7.324218720733866e-16,
+          "curl": 7.324218720733866e-16,
+          "vorticity": 1.4648437441467732e-15,
+          "q": 7.031249943959487e-26,
+          "lambda2": 2.8124999775386556e-25
+        }
+      },
+      {
+        "name": "eigen -2,2,1 scale 1",
+        "maxima": {
+          "gradient": 1.1920928955078125e-7,
+          "divergence": 1.1920928955078125e-7,
+          "curl": 2.1606683731079102e-7,
+          "vorticity": 1.2525981674116338e-7,
+          "q": 4.76837158203125e-7,
+          "lambda2": 7.152557373046875e-7
+        },
+        "bound": {
+          "gradient": 0.00018310546875,
+          "divergence": 0.000732421875,
+          "curl": 0.000732421875,
+          "vorticity": 0.00146484375,
+          "q": 0.0703125,
+          "lambda2": 0.28125
+        }
+      },
+      {
+        "name": "eigen -2,2,1 scale 1000000000000",
+        "maxima": {
+          "gradient": 131072,
+          "divergence": 65536,
+          "curl": 163840,
+          "vorticity": 143997.296875,
+          "q": 864691128455135200,
+          "lambda2": 864691128455135200
+        },
+        "bound": {
+          "gradient": 183105472,
+          "divergence": 732421888,
+          "curl": 732421888,
+          "vorticity": 1464843776,
+          "q": 7.031250249600002e+22,
+          "lambda2": 2.812500099840001e+23
+        }
+      }
+    ],
+    "lit": 3508,
+    "triangles": 896,
+    "device": 8
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "summaries": [
+      {
+        "name": "rotation",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000274658203125,
+          "divergence": 0.0010986328125,
+          "curl": 0.0010986328125,
+          "vorticity": 0.002197265625,
+          "q": 0.158203125,
+          "lambda2": 0.6328125
+        }
+      },
+      {
+        "name": "shear",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.0003662109375,
+          "divergence": 0.00146484375,
+          "curl": 0.00146484375,
+          "vorticity": 0.0029296875,
+          "q": 0.28125,
+          "lambda2": 1.125
+        }
+      },
+      {
+        "name": "quadratic",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0.0000019073486328125,
+          "q": 0.0000019073486328125,
+          "lambda2": 0.00000762939453125
+        },
+        "bound": {
+          "gradient": 0.00067138671875,
+          "divergence": 0.002685546875,
+          "curl": 0.002685546875,
+          "vorticity": 0.00537109375,
+          "q": 0.9453125,
+          "lambda2": 3.78125
+        }
+      },
+      {
+        "name": "nonlinear",
+        "maxima": {
+          "gradient": 9.5367431640625e-7,
+          "divergence": 2.384185791015625e-7,
+          "curl": 9.403987633049837e-7,
+          "vorticity": 8.458780484943418e-7,
+          "q": 0.00002288818359375,
+          "lambda2": 0.0000152587890625
+        },
+        "bound": {
+          "gradient": 0.003124067047596976,
+          "divergence": 0.012496268190387905,
+          "curl": 0.012496268190387905,
+          "vorticity": 0.02499253638077581,
+          "q": 20.46777343162458,
+          "lambda2": 81.87109372649832
+        }
+      },
+      {
+        "name": "two samples",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000213623046875,
+          "divergence": 0.0008544921875,
+          "curl": 0.0008544921875,
+          "vorticity": 0.001708984375,
+          "q": 0.095703125,
+          "lambda2": 0.3828125
+        }
+      },
+      {
+        "name": "planar",
+        "maxima": {
+          "gradient": 5.960464477539063e-8,
+          "divergence": 0,
+          "curl": 1.1920928955078125e-7,
+          "vorticity": 1.1920928955078125e-7,
+          "q": 5.960464477539063e-8,
+          "lambda2": 5.960464477539063e-8
+        },
+        "bound": {
+          "gradient": 0.00018310546875,
+          "divergence": 0.000732421875,
+          "curl": 0.000732421875,
+          "vorticity": 0.00146484375,
+          "q": 0.0703125,
+          "lambda2": 0.28125
+        }
+      },
+      {
+        "name": "singleton",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 3.76158192263132e-37,
+          "divergence": 1.504632769052528e-36,
+          "curl": 1.504632769052528e-36,
+          "vorticity": 3.009265538105056e-36,
+          "q": 1.504632769052528e-36,
+          "lambda2": 1.504632769052528e-36
+        }
+      },
+      {
+        "name": "near-cancelling strain and rotation",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0.00048828125,
+          "curl": 0.001953125,
+          "vorticity": 0.001953125,
+          "q": 16.231550216674805,
+          "lambda2": 16.231550216674805
+        },
+        "bound": {
+          "gradient": 0.6103515625,
+          "divergence": 2.44140625,
+          "curl": 2.44140625,
+          "vorticity": 4.8828125,
+          "q": 781250,
+          "lambda2": 3125000
+        }
+      },
+      {
+        "name": "constant offset",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 305.1761474609375,
+          "divergence": 1220.70458984375,
+          "curl": 1220.70458984375,
+          "vorticity": 2441.4091796875,
+          "q": 195312968750.28125,
+          "lambda2": 781251875001.125
+        }
+      },
+      {
+        "name": "small scale",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 7.0000043097342615e-40,
+          "lambda2": 4.00000646641519e-40
+        },
+        "bound": {
+          "gradient": 1.8310546293928124e-24,
+          "divergence": 7.32421851757125e-24,
+          "curl": 7.32421851757125e-24,
+          "vorticity": 1.46484370351425e-23,
+          "q": 1.5046398003020818e-36,
+          "lambda2": 1.504660894050743e-36
+        }
+      },
+      {
+        "name": "subnormal high inverse spacing",
+        "maxima": {
+          "gradient": 0.009999945759773254,
+          "divergence": 0.009999945759773254,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0.0000499994566780515,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 37.61585389692118,
+          "divergence": 150.46341558768472,
+          "curl": 150.46341558768472,
+          "vorticity": 300.92683117536944,
+          "q": 0.002698802500897851,
+          "lambda2": 0.010795210003591404
+        }
+      },
+      {
+        "name": "subnormal",
+        "maxima": {
+          "gradient": 1.0000226360807625e-40,
+          "divergence": 1.401298464324817e-45,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 3.761585509955389e-37,
+          "divergence": 1.5046342039821555e-36,
+          "curl": 1.5046342039821555e-36,
+          "vorticity": 3.009268407964311e-36,
+          "q": 1.504632769052528e-36,
+          "lambda2": 1.504632769052528e-36
+        }
+      },
+      {
+        "name": "masked",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000091552734375,
+          "divergence": 0.0003662109375,
+          "curl": 0.0003662109375,
+          "vorticity": 0.000732421875,
+          "q": 0.017578125,
+          "lambda2": 0.0703125
+        }
+      },
+      {
+        "name": "eigen 1,1,1 scale 1e-12",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 9.860761315262648e-32,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 9.155273400917333e-17,
+          "divergence": 3.662109360366933e-16,
+          "curl": 3.662109360366933e-16,
+          "vorticity": 7.324218720733866e-16,
+          "q": 1.757812486102719e-26,
+          "lambda2": 7.031249943959487e-26
+        }
+      },
+      {
+        "name": "eigen 1,1,1 scale 1",
+        "maxima": {
+          "gradient": 0,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 0,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 0.000091552734375,
+          "divergence": 0.0003662109375,
+          "curl": 0.0003662109375,
+          "vorticity": 0.000732421875,
+          "q": 0.017578125,
+          "lambda2": 0.0703125
+        }
+      },
+      {
+        "name": "eigen 1,1,1 scale 1000000000000",
+        "maxima": {
+          "gradient": 65536,
+          "divergence": 0,
+          "curl": 0,
+          "vorticity": 0,
+          "q": 144115188075855870,
+          "lambda2": 0
+        },
+        "bound": {
+          "gradient": 91552736,
+          "divergence": 366210944,
+          "curl": 366210944,
+          "vorticity": 732421888,
+          "q": 1.7578125624000006e+22,
+          "lambda2": 7.031250249600002e+22
+        }
+      },
+      {
+        "name": "eigen 1,1.0001,-3 scale 1e-12",
+        "maxima": {
+          "gradient": 1.0842021724855044e-19,
+          "divergence": 1.0842021724855044e-19,
+          "curl": 1.3552527156068805e-19,
+          "vorticity": 1.053658011379101e-19,
+          "q": 1.5777218104420236e-30,
+          "lambda2": 3.944304526105059e-31
+        },
+        "bound": {
+          "gradient": 2.4075318044971465e-16,
+          "divergence": 9.630127217988586e-16,
+          "curl": 9.630127217988586e-16,
+          "vorticity": 1.9260254435977172e-15,
+          "q": 1.2155532114105798e-25,
+          "lambda2": 4.86221284559718e-25
+        }
+      },
+      {
+        "name": "eigen 1,1.0001,-3 scale 1",
+        "maxima": {
+          "gradient": 1.1920928955078125e-7,
+          "divergence": 5.960464477539063e-8,
+          "curl": 1.4901161193847656e-7,
+          "vorticity": 1.4795023162150756e-7,
+          "q": 0.000001430511474609375,
+          "lambda2": 2.384185791015625e-7
+        },
+        "bound": {
+          "gradient": 0.00024075317196547985,
+          "divergence": 0.0009630126878619194,
+          "curl": 0.0009630126878619194,
+          "vorticity": 0.0019260253757238388,
+          "q": 0.12155531257224084,
+          "lambda2": 0.48622125028896335
+        }
+      },
+      {
+        "name": "eigen 1,1.0001,-3 scale 1000000000000",
+        "maxima": {
+          "gradient": 131072,
+          "divergence": 65536,
+          "curl": 229376,
+          "vorticity": 123668.890625,
+          "q": 1729382256910270500,
+          "lambda2": 432345564227567600
+        },
+        "bound": {
+          "gradient": 240753168,
+          "divergence": 963012672,
+          "curl": 963012672,
+          "vorticity": 1926025344,
+          "q": 1.2155530856793107e+23,
+          "lambda2": 4.862212342717243e+23
+        }
+      },
+      {
+        "name": "eigen 0,0.0001,2 scale 1e-12",
+        "maxima": {
+          "gradient": 5.421010862427522e-20,
+          "divergence": 2.168404344971009e-19,
+          "curl": 8.131516293641283e-20,
+          "vorticity": 5.451102142148553e-20,
+          "q": 3.944304526105059e-31,
+          "lambda2": 2.2547272341568677e-31
+        },
+        "bound": {
+          "gradient": 1.3563537260894131e-16,
+          "divergence": 5.4254149043576525e-16,
+          "curl": 5.4254149043576525e-16,
+          "vorticity": 1.0850829808715305e-15,
+          "q": 3.8581209511459683e-26,
+          "lambda2": 1.5432483804132484e-25
+        }
+      },
+      {
+        "name": "eigen 0,0.0001,2 scale 1",
+        "maxima": {
+          "gradient": 5.960464477539063e-8,
+          "divergence": 2.384185791015625e-7,
+          "curl": 5.960464477539063e-8,
+          "vorticity": 5.392454482944231e-8,
+          "q": 4.76837158203125e-7,
+          "lambda2": 2.0192494520898663e-7
+        },
+        "bound": {
+          "gradient": 0.00013563537504523993,
+          "divergence": 0.0005425415001809597,
+          "curl": 0.0005425415001809597,
+          "vorticity": 0.0010850830003619194,
+          "q": 0.038581210895955564,
+          "lambda2": 0.15432484358382226
+        }
+      },
+      {
+        "name": "eigen 0,0.0001,2 scale 1000000000000",
+        "maxima": {
+          "gradient": 65536,
+          "divergence": 131072,
+          "curl": 90112,
+          "vorticity": 81096.65625,
+          "q": 288230376151711740,
+          "lambda2": 225441702716899330
+        },
+        "bound": {
+          "gradient": 135635376,
+          "divergence": 542541504,
+          "curl": 542541504,
+          "vorticity": 1085083008,
+          "q": 3.858121143911475e+22,
+          "lambda2": 1.54324845756459e+23
+        }
+      },
+      {
+        "name": "eigen -2,2,1 scale 1e-12",
+        "maxima": {
+          "gradient": 1.0842021724855044e-19,
+          "divergence": 1.0842021724855044e-19,
+          "curl": 1.6263032587282567e-19,
+          "vorticity": 1.0827177710268839e-19,
+          "q": 7.888609052210118e-31,
+          "lambda2": 3.944304526105059e-31
+        },
+        "bound": {
+          "gradient": 1.8310546801834666e-16,
+          "divergence": 7.324218720733866e-16,
+          "curl": 7.324218720733866e-16,
+          "vorticity": 1.4648437441467732e-15,
+          "q": 7.031249943959487e-26,
+          "lambda2": 2.8124999775386556e-25
+        }
+      },
+      {
+        "name": "eigen -2,2,1 scale 1",
+        "maxima": {
+          "gradient": 1.1920928955078125e-7,
+          "divergence": 1.1920928955078125e-7,
+          "curl": 2.1606683731079102e-7,
+          "vorticity": 1.2525981674116338e-7,
+          "q": 4.76837158203125e-7,
+          "lambda2": 4.76837158203125e-7
+        },
+        "bound": {
+          "gradient": 0.00018310546875,
+          "divergence": 0.000732421875,
+          "curl": 0.000732421875,
+          "vorticity": 0.00146484375,
+          "q": 0.0703125,
+          "lambda2": 0.28125
+        }
+      },
+      {
+        "name": "eigen -2,2,1 scale 1000000000000",
+        "maxima": {
+          "gradient": 131072,
+          "divergence": 65536,
+          "curl": 163840,
+          "vorticity": 143997.296875,
+          "q": 864691128455135200,
+          "lambda2": 576460752303423500
+        },
+        "bound": {
+          "gradient": 183105472,
+          "divergence": 732421888,
+          "curl": 732421888,
+          "vorticity": 1464843776,
+          "q": 7.031250249600002e+22,
+          "lambda2": 2.812500099840001e+23
+        }
+      }
+    ],
+    "lit": 3508,
+    "triangles": 896,
+    "device": 8
+  }
+]

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12108134,
+  "total": 12112383,
   "history": [
     {
       "date": "2026-10-24",
@@ -5390,6 +5390,24 @@
       "commit": "batch-256",
       "reason": "New optional netcode/presence: 6219 B gzip; no previous entry, full feature kept in one import. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-171-derive",
+      "reason": "New optional derive entry 0 -> 3955 B gzip, ceiling 4211 B; keep six derived fields, boundary/mask validation, scaled Jacobi and CPU/GPU ownership together. Splitting complicates a single mathematical contract. Core+stage unchanged at 23924 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-171-derive-validation",
+      "reason": "Derived-grid null component/mask diagnostics: 3955 -> 3982 B gzip, ceiling 4211 -> 4238 B with standard 256 B headroom. Keep validation in its owning entry rather than split it. Core+stage unchanged at 23924 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "batch-171-derive-input-types",
+      "reason": "Check primitive types before fround coercion so BigInt/Symbol receive the linked owning diagnostic: 3982 -> 3993 B gzip, ceiling 4238 -> 4249 B with standard 256 B headroom. Keep validation with its API; core+stage unchanged at 23924 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -6410,6 +6428,7 @@
     "margoengine/web": 577,
     "@margoengine/controls/collide": 7341,
     "leak @margoengine/controls/collide -> @margoengine/bvh": 1,
-    "@margoengine/netcode/presence": 6475
+    "@margoengine/netcode/presence": 6475,
+    "@margoengine/sciviz/derive": 4249
   }
 }

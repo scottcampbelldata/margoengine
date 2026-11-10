@@ -1,0 +1,62 @@
+{
+  "commit": "461e82a93",
+  "dirty": false,
+  "browser": "msedge 157.0.4341.42 headless",
+  "adapter": "nvidia ampere",
+  "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
+  "files": [
+    {
+      "path": "index.html",
+      "role": "Page",
+      "encoding": "identity",
+      "transferred": 808,
+      "raw": 558,
+      "gzip": 370,
+      "brotli": 231
+    },
+    {
+      "path": "assets/index-spRahO2U.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 24365,
+      "raw": 58411,
+      "gzip": 23983,
+      "brotli": 21180
+    },
+    {
+      "path": "assets/geometry-DuxZuGD0.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 2631,
+      "raw": 4454,
+      "gzip": 2261,
+      "brotli": 2041
+    },
+    {
+      "path": "assets/dist-Cez3xx-L.js",
+      "role": "@margoengine/gltf (addGLTF)",
+      "encoding": "gzip",
+      "transferred": 7295,
+      "raw": 17999,
+      "gzip": 6923,
+      "brotli": 6213
+    },
+    {
+      "path": "model.glb",
+      "role": "Model",
+      "encoding": "identity",
+      "transferred": 1605,
+      "raw": 1332,
+      "gzip": 454,
+      "brotli": 359
+    }
+  ],
+  "total": {
+    "requests": 5,
+    "transferred": 36704,
+    "raw": 82754,
+    "gzip": 33991,
+    "brotli": 30024
+  },
+  "notFetched": []
+}

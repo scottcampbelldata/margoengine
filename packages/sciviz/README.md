@@ -85,6 +85,85 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
+
+## Derived flow fields (optional /derive)
+
+Import `@margoengine/sciviz/derive` (or `margoengine/sciviz/derive`) for the velocity gradient,
+divergence, curl, vorticity magnitude, Q rotation dominance and lambda-2 on a regular Cartesian grid.
+No import of this entry occurs through the root. CPU and GPU compute the same second-order stencils;
+GPU scalar arrays feed the existing volume and isosurface layers directly on the same device.
+[North Atlantic wind derivatives](../../examples/sciviz-derive.html) shows the hash-pinned NOAA daily
+winds with an explicit planar approximation, without inventing vertical measurements.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { deriveFlow, deriveFlowGPU } from '@margoengine/sciviz/derive';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+using fig = await Figure.create(canvas, { axes: false, controls: false });
+const dims = [9, 9, 9] as const;
+const u = new Float32Array(9 ** 3), v = new Float32Array(u.length);
+for (let z = 0; z < 9; z++) for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+  const a = (x - 4) / 4, b = (y - 4) / 4, amplitude = Math.exp(-2 * (a * a + b * b));
+  const i = (z * 9 + y) * 9 + x;
+  u[i] = -b * amplitude; v[i] = a * amplitude;
+}
+const grid = { dims, bounds: [-1, 1, -1, 1, -1, 1] as const, u, v };
+const signal = AbortSignal.timeout(30000);
+const cpu = await deriveFlow(grid, { signal }); // Owned f32 arrays, float64 arithmetic.
+const gpu = await fig.renderer.compute(); // Figure owns this context; do not dispose it yourself.
+using fields = await deriveFlowGPU(gpu, grid, { signal });
+fig.volume(fields.vorticity, { bounds: [...grid.bounds], range: [0, 2], opacity: [[0, 0], [1, 0.15]] });
+await fig.isosurface(fields.lambda2, -0.12, { bounds: [...grid.bounds], color: '#ffb640', signal });
+await fig.ready(); fig.engine.render();
+console.log(cpu.gradient.length, cpu.q.length); // 6561, 729.
+```
+
+Input: `{ dims:[nx,ny,nz], bounds:[x0,x1,y0,y1,z0,z1], u,v,w?,mask? }`, x fastest.
+Every dimension is at least one; descending bounds work. A singleton axis needs equal bounds and
+has derivative zero (constant extension). `w` defaults to zero; `mask` defaults to all valid, zero
+means missing, every other finite value valid. NaN in any velocity component also marks missing.
+Inputs are copied, rounded to float32 and never mutated; keep them stable until the call settles.
+Only option: `signal`, default absent, with exact-reason cancellation during copying/CPU work/readback.
+There are no fetches, callback APIs, device creation or retained resources on import.
+
+The gradient is nine row-major values per point, `J[3*i+j]=du_i/dx_j`. Curl is xyz per point,
+not angular velocity (which is half the curl). Divergence is trace(J), magnitude is the norm of curl.
+Let S=(J+J^T)/2 and Omega=(J-J^T)/2. `q` is (||Omega||_F^2-||S||_F^2)/2, including for
+nonzero divergence; the general second invariant differs by divergence^2/2. `lambda2` is the middle
+real eigenvalue of S^2+Omega^2, computed with scaled largest-pivot Jacobi rotations. A negative
+lambda-2 or positive Q is a local indicator under the incompressible model, without a pressure
+condition, global coherence, compressible-flow validity or a universal vortex threshold.
+
+Interior derivatives use (next-prev)/(2h). Endpoints use second-order one-sided stencils,
+2*(next-current)/h - (nextNext-current)/(2h), with reversed direction at the far end. A two-point
+axis uses its first-order secant. A missing centre or any required stencil neighbour makes all six
+outputs at that point NaN: no interpolation, bridging or lower-order fallback across missing samples.
+Units are velocity/distance for gradient/divergence/curl/magnitude and its square for Q/lambda-2.
+These are Cartesian derivatives; convert spherical or curvilinear fields before calling.
+
+CPU results are independent Float32Arrays with no disposal needed. GPU scalar shapes are [nz,ny,nx],
+gradient [...,3,3], curl [...,3]. Each is contiguous with offset zero. GPU results support `dispose()`
+and `using`; disposal is idempotent and does not dispose the caller context. Keep fields alive until
+consumers finish; remove GPU-sourced layers and derive them again after device replacement. CPU
+sources can also feed volume/isosurface with explicit dims/bounds. A nonconverged GPU solve rejects
+with coded `failed`, releasing all partial resources, rather than publishing incorrect eigenvalues.
+Volume/isosurface consumers require at least two samples per axis and ascending bounds. Reorder
+descending-axis scalar samples before drawing them in those consumers; planar results feed a heatmap.
+
+Float32 domain: at most 1000000 points, finite representable velocities (NaN missing), active inverse
+spacing finite normal f32, and D=8*max(maxAbsVelocity,2^-126)*maxAbsInverseSpacing <=1e18. Rescale units outside
+this conservative overflow envelope. Each call returns `floatBound`, an absolute CPU/GPU difference
+bound on the rounded snapshot: e=2^-23, t=2^-126, I=maxAbsInverseSpacing,
+L=32eD+32t*max(1,I); gradient <=L, divergence/curl <=4L, magnitude <=8L,
+Q <=256eD^2+128t and lambda-2 <=1024eD^2+128t. These include flush-to-zero and the checked Jacobi
+residual (GPU 1e-6 of scaled tensor max element; at most 48 rotations), not finite-difference
+truncation or measurement uncertainty. A sign within its absolute bound is unresolved. GPU needs
+eight storage bindings and 36 bytes per point within each buffer limit; total temporary plus output
+storage is 84 bytes/point, excluding readback/driver overhead. CPU work yields every 8192 points.
+Both native WebGPU and the WebGL2 compute route are supported; neither changes core/stage.
+
+
 ## Line integral convolution
 
 `@margoengine/sciviz/lic` creates a dense GPU LIC image from a regular 2D vector field or a planar slice

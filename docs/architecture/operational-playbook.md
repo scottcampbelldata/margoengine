@@ -2224,6 +2224,16 @@ the reference-selection class, with original GPU assertions retained; it does
 not prove the unresolved rendering, XR setup, limits, validation or wait cases.
 Dispersion failure 9 is parked with its full-grid state-dependence in known-bugs.
 
+Batch 171 job 4: /derive reuses compute.kernel and existing contiguous f32 scalar volume/isosurface
+inputs. Scaled Jacobi operates on sym(J^2)=S^2+Omega^2; CPU/GPU absolute bounds, masks, one-sided
+physical derivatives and FTZ limits are explicit in sciviz README/limits.md. Independent analytic and
+NumPy black-box eigenvalue oracles guard against agreement on incorrect math; real GPU readbacks
+cover both native WebGPU and the WebGL2 compute route. Synthetic vortex output feeds existing volume
+and isosurface consumers; real NOAA demo remains an honest planar approximation. GPU results require
+recomputation after device replacement. No core/stage/physics changes, no speed or native-WebGL2
+volume claim. Final gate counts/limitations belong to the job acceptance receipt.
+
+
 Batch 134's private ETC2/EAC draft has exact independent alpha and EAC
 parameter oracles, edge-padding and coded-error checks. EAC interval masks
 preserve error and header ties while reducing full palette constructions on
@@ -5457,3 +5467,10 @@ are unchanged. Analytical byte-layout tests plus 200 pinned NOAA samples cover s
 The formats-browser leaf exercises both backends and compares identical-source image hashes by renderer kind.
 HDF5, oriented-image resampling and general solver rendering remain outside the claim; see docs/limits.md.
 No GPU lock is taken for parsing/building or CPU tests. Runtime rendering uses the lane's single shared slot.
+
+Batch 171 integration evidence remains incomplete: all 30 root GPU assertions pass, but the shared
+Chromium launcher waits past its unchanged 30 s deadline for process/stdio close after native
+termination. PID 84700 was absent afterward; exact event/handle cause remains unproved. The owning
+shared-launcher repair belongs to batch 160, not sciviz. This is a failing hang and blocks landing
+job 4; metadata repairs and pre-rebase GPU acceptance do not supersede it. No failed check is
+weakened, retried unchanged, marked busy, or reported as a passing suite. See known-bugs.md.
