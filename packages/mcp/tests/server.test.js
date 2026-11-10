@@ -72,6 +72,38 @@ test('a duplicate active tool id rejects without replacing the original cancella
   }
 });
 
+test('a resources/read reusing an active tool id is refused and leaves the tool cancellable', {
+  timeout: 10000,
+}, async () => {
+  const calls = [];
+  const server = createMcpServer({
+    tools: [
+      {
+        ...slow,
+        run: (_args, { signal }) =>
+          new Promise((resolve) => {
+            calls.push(signal);
+            signal.addEventListener('abort', () => resolve({ content: [{ type: 'text', text: 'cancelled' }] }), {
+              once: true,
+            });
+          }),
+      },
+    ],
+    resources: { list: () => [], read: (uri) => [{ uri, mimeType: 'text/plain', text: 'x' }] },
+  });
+  const pending = [server.handle(request(7, 'tools/call', { name: 'slow' }))];
+  try {
+    const read = await server.handle(request(7, 'resources/read', { uri: 'margo://docs/limits' }));
+    assert.equal(read.error?.code, RPC.invalidRequest, 'a reused active id is refused');
+    await server.handle({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 7 } });
+    assert.equal(calls[0].aborted, true, 'the tool call keeps its cancellation');
+    assert.equal((await pending[0]).result.content[0].text, 'cancelled');
+  } finally {
+    server.dispose();
+    await Promise.allSettled(pending);
+  }
+});
+
 test('batch duplicate ids preserve cancellation and numeric/string ids remain distinct', {
   timeout: 10000,
 }, async () => {

@@ -5862,3 +5862,7 @@ changed. Repro: `MARGO_GPU_SLOTS=2 node packages/webgl2-compat/test/features-bro
 ## Batch 132 audit: mesh-edit (fixed)
 
 - Fixed: `simplifyMesh` (packages/mesh-edit/src/simplify.ts) documented `maxError` and `error` as squared distances, but its quadrics are weighted by face area (Garland and Heckbert), so the cost was area times squared distance (length to the fourth): scaling a model by 10 scaled `error` by 10,000, and a `maxError` picked as a squared distance stopped at a different point on every model scale. Each vertex now carries the face area summed into its quadric and the cost is divided by it (an area-weighted mean squared distance). Regression: "simplify error and maxError are squared distances: scaling the model by 4 scales them by 16" in packages/mesh-edit/tests/simplify.test.js.
+
+## Batch 132 audit: mcp (fixed)
+
+- Fixed: `createMcpServer` (packages/mcp/src/server.ts) handled `resources/read` without refusing a request id that was already running. A reused id replaced the running `tools/call`'s cancellation controller and deleted it when the read finished, so a later `notifications/cancelled` for that call did nothing and the tool ran on. `resources/read` now refuses an active id (as `tools/call` already did) and removes only its own controller. Regression: "a resources/read reusing an active tool id is refused and leaves the tool cancellable" in packages/mcp/tests/server.test.js.

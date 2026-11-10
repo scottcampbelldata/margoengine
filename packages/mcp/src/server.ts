@@ -290,6 +290,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       case 'resources/read': {
         if (!options.resources) return unknownMethod();
         if (typeof params.uri !== 'string' || !params.uri) return rpcError(id, RPC.invalidParams, 'uri must be a string');
+        if (running.has(id)) return rpcError(id, RPC.invalidRequest, 'Request id is already active in this session');
         const controller = new AbortController();
         const abort = () => controller.abort();
         lifetime.signal.addEventListener('abort', abort, { once: true });
@@ -299,7 +300,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           if (!contents) return rpcError(id, RPC.resourceNotFound, 'Resource not found', { uri: params.uri });
           return { jsonrpc: '2.0', id, result: { contents: contents as unknown as Json } };
         } finally {
-          running.delete(id);
+          if (running.get(id) === controller) running.delete(id);
           lifetime.signal.removeEventListener('abort', abort);
         }
       }
