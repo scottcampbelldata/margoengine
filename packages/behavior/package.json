@@ -63,6 +63,10 @@
     "./context": {
       "types": "./dist/context.d.ts",
       "import": "./dist/context.js"
+    },
+    "./subtrees": {
+      "types": "./dist/subtrees.d.ts",
+      "import": "./dist/subtrees.js"
     }
   },
   "files": [

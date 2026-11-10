@@ -2923,3 +2923,11 @@ canvas's context mode. Proof: packages/webgl2-compat/test/canvas-present.test.js
 fails on the parent, passes with the repair, and checks three presentations in
 each order. Canonical GPU results are recorded with the landing check logs.
 No physical headset or speed claim is made.
+## Behavior subtree references (batch 251 job 1)
+
+`@margoengine/behavior/subtrees` provides `subtree(name)`, `SubtreeRegistry`,
+`SubtreeTree`, `resolveTree` and its reference-aware `validateTree`. References
+expand once during construction. Each occurrence has independent node state;
+blackboard, seeded random stream and task cancellation retain standard tree
+semantics. Proof: packages/behavior/tests/subtrees.test.js compares inline and
+resolved traces and exercises nested/diamond reuse, missing names and cycles.

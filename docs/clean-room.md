@@ -5107,3 +5107,17 @@ Only a bitmap still backed by the device belongs in its context-loss retention
 set. Root simulated XR bindings identify the selected real device route; actual
 XRWebGLLayer bridging remains covered by the separate native/compat stereo test.
 No other engine source or companion implementation was read.
+## Batch 251 job 1: named behavior subtrees
+
+Research compared before implementation: Michele Colledanchise and Petter Ogren,
+*Behavior Trees in Robotics and AI: An Introduction* (2018), https://arxiv.org/abs/1709.00084
+(modular subtree composition); Robert Tarjan, *Depth-First Search and Linear Graph
+Algorithms* (1972), https://www.cs.cmu.edu/~cdm/resources/Tarjan1972-sccs.pdf
+(active-path cycle detection); Nik Korn, *Mistreevous*, public Branch and Global
+Subtrees documentation (accessed 2026-11-10), https://github.com/nikkorn/mistreevous#branch .
+Only public descriptions were read, no rival or companion source. The combination
+uses explicit caller-owned registries, bounded reference expansion and the existing
+runtime. Tests compare resolved and inline statuses/traces, nested/diamond reuse,
+per-occurrence task cancellation, missing names, cycles and expansion depth. This
+covers the documented reference/reuse row without introducing global state.
+No asset demo or timing claim is added; generated trees are correctness fixtures.

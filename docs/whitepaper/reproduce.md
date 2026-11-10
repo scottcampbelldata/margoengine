@@ -2487,3 +2487,6 @@ packages/webgl2-compat/test/canvas-present.test.js. Under a shared GPU lock run
 node scripts/modern-xr-tests.js, then the same command with --compat, and
 node packages/webgl2-compat/test/xr-browser.mjs. Keep every stereo, package pass,
 depth, AR alpha, controller and lifecycle assertion unchanged.
+Batch 251 subtrees: build behavior and run
+`node --test --test-timeout=120000 packages/behavior/tests/subtrees.test.js`.
+All fixtures are generated locally; no renderer, GPU, external assets or timings.

@@ -4055,3 +4055,6 @@ bounds are explicit API limits, documented in the controls README.
 ### Batch 197 globe navigation
 
 No open defect from the globe suite. Radial altitude, perspective/reference-ellipsoid navigation and sky-drag behavior are explicit limits in the controls README.
+
+Batch 251 job 1: no open defect found in reference expansion; missing registrations,
+cycles and bounded expansion reject during construction (subtrees.test.js).

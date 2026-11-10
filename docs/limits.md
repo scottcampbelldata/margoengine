@@ -3484,3 +3484,13 @@ to the ordinary offscreen-to-bitmap route. These are simulated XR sessions on
 real GPU devices, not physical headset results. Core/stage source is unchanged.
 Measured min+gzip: compatibility root 105,568 B, device 105,626 B, XR 105,420 B,
 tiers 105,323 B. Existing optional ceilings pass. Core plus stage is 23,950 B.
+## Behavior subtree references (batch 251)
+
+The optional `behavior/subtrees` entry measures 5,207 B min+gzip (previously absent),
+with the generated umbrella alias 64 B external. No existing size ceiling changes.
+Expansion is bounded by 256 levels and 100,000 visited reference/node occurrences.
+Registrations are explicit objects; only reachable registrations are validated.
+References expand before execution, with occurrence-specific state, paths and labels.
+The runtime document stores the expanded form; retain the original input to edit
+reference names. No automatic blackboard remapping or dynamic hot replacement.
+Core + stage remains 23,950 B gzip, below 25,000 B.
