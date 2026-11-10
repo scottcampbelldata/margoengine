@@ -1370,6 +1370,10 @@
       "types": "./dist/html/texture-gl.d.ts",
       "import": "./dist/html/texture-gl.js"
     },
+    "./html/blend": {
+      "types": "./dist/html/blend.d.ts",
+      "import": "./dist/html/blend.js"
+    },
     "./input": {
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"

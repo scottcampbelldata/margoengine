@@ -3225,3 +3225,5 @@ pivot, flips, signed scale, pages, opacity and masks. CPU proof: pick.test.js.
 Rendered proof: pick-check.mjs compares picked identity at all 1,024 pixel
 centres over four sorting/mask combinations on both GPU backends. Custom
 fragment effects are not executed on the CPU. No speed claim.
+### CSS3D per-pixel blending (batch 260 job 2)
+html/blend's HTMLBlend provides a live DOM panel behind a scene-depth-tested canvas aperture on WebGPU, full compatibility and alpha-enabled preview. packages/html/test/blend-browser.js proves zero RGBA on uncovered panel pixels, intact opaque foreground and off-panel scene pixels, moving/resizing/hidden/removed panels, live input and disposal. A rectangular mask matches the requested blending row; transparent CSS inside that rectangle reveals the page beneath it, rather than reconstructing scene content behind the panel. It does not claim DOM pointer occlusion by scene geometry.

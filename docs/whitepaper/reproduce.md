@@ -2725,3 +2725,5 @@ texture flips affect the proof. Three overlapping tinted sprites use rotated
 and reflected transforms, nonzero camera and zoom; every picked identity is
 compared with the actual canvas pixel, with and without y sorting and a circle
 mask. Unit tests cover fractional alpha and dimension-only box picking as well.
+### Batch 260 CSS3D blending
+The existing HTML browser commands above also run blendScenario on WebGPU and native preview, and on the full layer with --compat. Inspect report measurements.blend for zero-alpha apertures and opaque foreground/off-panel pixels. CPU tests include blend.test.js. Preview setup uses fallback: canvas => webglRenderer(canvas, {transparent: true}); an already opaque preview is refused with a coded error.

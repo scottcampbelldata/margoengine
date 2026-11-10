@@ -3983,3 +3983,5 @@ not grow. The redundant two-float position interpolator is removed.
 Current slice bundle after the shared mask repair is 8,614 B gzip (8,587 B at
 job 1 landing), within its unchanged 8,845 B ceiling. Caller-owned picking
 bytes must match the atlas currently uploaded to the renderer.
+### Batch 260 job 2: CSS3D depth blending
+New html/blend entry: 0 to 3,047 B min+gzip, ceiling 0 to 3,303 B. It deliberately keeps canvas ownership and both mask backends together; splitting would complicate consistent lifecycle. Rectangular, double-sided CSS3D panels use the existing default 0.01 world units/CSS pixel and default name html-blend; their uncovered pixels replace RGBA with zero and write scene depth. Native preview requires an alpha-enabled context at creation. Canvas pointer events are disabled while any blend owns it; bind scene controls to a shared parent. DOM input is live but not masked by foreground geometry. CSS transparency reveals the underlying page throughout the rectangular aperture. Apply colour/post effects before the mask if they would otherwise overwrite alpha. Core/stage are unchanged.

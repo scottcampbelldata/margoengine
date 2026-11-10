@@ -33,6 +33,10 @@
     "./texture-gl": {
       "types": "./dist/texture-gl.d.ts",
       "import": "./dist/texture-gl.js"
+    },
+    "./blend": {
+      "types": "./dist/blend.d.ts",
+      "import": "./dist/blend.js"
     }
   },
   "files": [

@@ -5582,3 +5582,5 @@ centred at (12,13.5) with radius 7.5. The old renderer dropped the rotated red
 sprite there in both draw orders; pick-check.mjs requires red and zero mismatches.
 SpriteLayer now tests builtin fragment position minus view origin. The origin
 reuses two uniform padding floats; no extra uniform bytes or position varying.
+### Section 5 evidence: batch 260 CSS3D apertures
+html/blend draws zero RGBA over a rectangular CSS3D panel only where its scene-depth test passes, on WebGPU/full WebGL2 compatibility and native alpha-enabled preview. It shares LabelRenderer's pose, inherited visibility and near-plane clipping; layout size is remeasured each frame. The DOM stays live beneath the canvas. Browser checks cover per-pixel foreground coverage, movement/resizing, removal, visibility, native input and canvas-style restoration. Unit tests verify depth writes, replacement blending, alpha-mode preservation, ownership and the opaque-preview diagnostic. No core or stage changes, timing claim or readback-based clipping.
