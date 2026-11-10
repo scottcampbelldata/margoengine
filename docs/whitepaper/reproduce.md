@@ -2766,3 +2766,5 @@ After build:packages run `node --test packages/xr/tests/ar-extra.test.js`, then 
 
 Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-query.test.js after building packages; original synthetic tuple/lifecycle fixtures.
 >>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
+
+Batch 225 job 1: npm run build --workspace @margoengine/splines, then node --test --test-timeout=120000 packages/splines/test/kinds.test.js. Mathematical references and combined design are in docs/clean-room.md. Pure CPU evaluation has no backend-specific GPU test.

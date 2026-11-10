@@ -187,3 +187,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/ecs (batch 249 job 2): RelationQuery exact/wildcard terms, source filters, returned target ids/rows, products and mutation semantics.
 - margoengine (batch 249 job 2): generated ecs/relation-query alias.
 >>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
+
+- @margoengine/splines (batch 225 kinds): centripetal/chordal Catmull-Rom, CubicSpline closed controls, global analytic derivatives, curvature/torsion singularities and repeated-knot conventions.
+
+- margoengine (batch 225 kinds): generated splines/kinds alias and refreshed existing audio/sprites, audio/voices and xr/hands aliases.

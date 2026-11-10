@@ -2,10 +2,14 @@
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
 <<<<<<< HEAD
+<<<<<<< HEAD
   "total": 12425529,
 =======
   "total": 12423519,
 >>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
+=======
+  "total": 12421181,
+>>>>>>> 1a05a6bfe (feat(splines): add nonuniform cubic kinds and analytic geometry)
   "history": [
     {
       "date": "2026-10-24",
@@ -5711,6 +5715,7 @@
     },
     {
       "date": "2026-11-10",
+<<<<<<< HEAD
       "commit": "4e3337946",
       "reason": "Batch 249 objects: new optional JS field storage entry, 0 -> 1324 B gzip; preserves typed numeric storage and reference lifecycle.",
       "grew": 1
@@ -5730,6 +5735,10 @@
       "commit": "25af5c823",
       "reason": "Batch 249 relation-query: new optional pair joins, 0 -> 1023 B gzip; return source/target rows with live membership checks.",
 >>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
+=======
+      "commit": "batch-225",
+      "reason": "New optional splines/kinds: absent -> 2802 B gzip; exact cubic geometry and tested public operations justify the optional bytes. Root, core and stage unchanged.",
+>>>>>>> 1a05a6bfe (feat(splines): add nonuniform cubic kinds and analytic geometry)
       "grew": 1
     }
   ],
@@ -6492,6 +6501,7 @@
     "@margoengine/splines/closest": 983,
     "@margoengine/splines/fit": 3250,
     "@margoengine/splines/frames": 2039,
+    "@margoengine/splines/kinds": 3058,
     "@margoengine/splines/knots": 3478,
     "@margoengine/splines/mesh": 3213,
     "@margoengine/sprites": 7660,

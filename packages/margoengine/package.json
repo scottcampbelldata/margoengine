@@ -3026,6 +3026,10 @@
       "types": "./dist/splines/fit.d.ts",
       "import": "./dist/splines/fit.js"
     },
+    "./splines/kinds": {
+      "types": "./dist/splines/kinds.d.ts",
+      "import": "./dist/splines/kinds.js"
+    },
     "./sprites": {
       "types": "./dist/sprites.d.ts",
       "import": "./dist/sprites.js"
@@ -3950,10 +3954,13 @@
       "types": "./dist/xr/hands.d.ts",
       "import": "./dist/xr/hands.js"
     },
+<<<<<<< HEAD
     "./xr/ar-extra": {
       "types": "./dist/xr/ar-extra.d.ts",
       "import": "./dist/xr/ar-extra.js"
     },
+=======
+>>>>>>> 1a05a6bfe (feat(splines): add nonuniform cubic kinds and analytic geometry)
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"

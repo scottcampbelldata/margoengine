@@ -45,6 +45,10 @@
     "./fit": {
       "types": "./dist/fit.d.ts",
       "import": "./dist/fit.js"
+    },
+    "./kinds": {
+      "types": "./dist/kinds.d.ts",
+      "import": "./dist/kinds.js"
     }
   },
   "files": [

@@ -3271,3 +3271,5 @@ The optional xr/ar-extra entry supports native DOM overlays, image/marker tracki
 
 Batch 249 job 2: ecs/relation-query matches exact and wildcard relationship pairs with component filters and exposes target entity ids and component rows. Proof: packages/ecs/test/relation-query.test.js; no performance claim.
 >>>>>>> 77128945e (feat(ecs): query exact and wildcard relation target rows)
+
+Batch 225 job 1: optional splines/kinds exactly implements centripetal/chordal/uniform Catmull-Rom geometry and analytic derivatives through third order, curvature and torsion for all existing spline kinds. Proof: packages/splines/test/kinds.test.js compares the independent published interpolation pyramid, known (t,t^2,t^3) derivatives, global scaling, repeated knots and periodic seams. No global intersection-free or speed claim.
