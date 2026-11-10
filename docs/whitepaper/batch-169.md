@@ -7,10 +7,45 @@ No wall-clock benchmarks or budget changes. Timing pending the quiet rerun.
 | 1 | ui | DONE in `perf(ui): memoize intrinsic layout per call` | 24 to 2 leaf measurements; identical layout bytes; five Yoga oracle fixtures |
 | 2 | text | DONE in `perf(text): reuse logical kerning and shaped prefix advances` | 1198 to 599 pair calls; 35 to 18 prefix calls; 35 byte-identical layouts; Canvas/Troika value oracle |
 | 3 | mesh-edit | DONE in `perf(mesh-edit): index subdivision edges numerically` | 1260 to 0 edge-ID parses; 482650 identical bytes; Blender 5.3 vertices match within Float32 |
-| 4 | splines | Pending | Curve values and work count |
+| 4 | splines | DONE in `perf(splines): rebuild intersection cubics once per curve` | 512 to 64 point evaluations; 1264 identical bytes; three.js Catmull-Rom values within 4.44e-16 |
 | 5 | terrain | Pending | Source-height and clipmap error |
 | 6 | wfc | Pending | Constraint satisfaction and work count |
 | 7 | procedural | Pending | Published noise values, Poisson spacing and work count |
+
+## Job 4: splines curve intersection
+
+Cause: `intersectSplines` rebuilt both segments' exact cubics inside the segment-pair loop.
+For non-Bezier kinds each rebuild samples four points with `at`, so two 8-segment curves
+ran 512 evaluations: 4 x (8 x 8) per side. The change builds each curve's segment cubics
+once per call and reuses the same arrays for every pair; nothing downstream mutates them.
+Subdivision, Newton polish, overlap tests, ordering and `maxWork` accounting are unchanged.
+No export, option, core/stage byte or optional import changes.
+
+`packages/splines/test/intersect-workcount.test.js` requires 64 `at` calls (parent 512)
+and hashes six curve pairs: Catmull-Rom, B-spline against Kochanek-Bartels, two closed
+curves, Bezier against Catmull-Rom, identical curves and Hermite against Catmull-Rom.
+All 26 points and 7 overlaps (parameters and positions as Float64) retain 1264 bytes,
+SHA-256 `769dc0b4158961ab3161e435586b94d1f5dee85cb8aa33fae79536390a6bff0b`, captured on
+the parent.
+
+Black-box value oracle: three.js 0.186.1 `CatmullRomCurve3` (type `catmullrom`, tension
+0.5), installed outside the repository, against Margo's uniform Catmull-Rom on the same
+points at 401 parameters each. Largest coordinate differences: open 9 points 2.50e-16,
+shifted 2.22e-16, closed 6 points 4.44e-16, at the floating-point rounding level. three.js
+has no curve-curve intersection, so the intersection work has no like-for-like rival row.
+
+Reproduce after `npm run build:packages`:
+`node --test packages/splines/test/intersect-workcount.test.js` and
+`node scripts/bp-169-splines-oracle.mjs --three=<absolute external three directory>`.
+No time is measured.
+
+Research: E. Catmull and R. Rom, *A Class of Local Interpolating Splines*, Computer Aided
+Geometric Design (Academic Press), 1974, https://doi.org/10.1016/B978-0-12-079050-0.50020-5;
+T. W. Sederberg and T. Nishita, *Curve intersection using Bezier clipping*, Computer-Aided
+Design 22(9), 1990, https://doi.org/10.1016/0010-4485(90)90039-F (subdivision by control
+hulls, which this solver uses with boxes); W. Wang et al., *Computation of Rotation
+Minimizing Frames*, ACM TOG 27(1), 2008, https://doi.org/10.1145/1330511.1330513 (frames
+unchanged here). No rival source was read.
 
 ## Job 3: mesh-edit subdivision edges
 

@@ -404,10 +404,13 @@ export function intersectSplines(first: Spline, second: Spline, options: SplineQ
     m = segmentCount(second);
   const result: SplineIntersections = { points: [], overlaps: [] };
   let work = 0;
+  // Each segment's exact cubic is reconstructed once, not once per segment pair.
+  const firsts = Array.from({ length: n }, (_, i) => controls(first, i)),
+    seconds = Array.from({ length: m }, (_, j) => controls(second, j));
   for (let i = 0; i < n; i++)
     for (let j = 0; j < m; j++) {
-      const a = controls(first, i),
-        b = controls(second, j);
+      const a = firsts[i],
+        b = seconds[j];
       const scale = Math.max(1, ...a.map(Math.abs), ...b.map(Math.abs)),
         roundoff = scale * Number.EPSILON * 16;
       const same = (reverse: boolean): boolean =>

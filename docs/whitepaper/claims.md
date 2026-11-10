@@ -4716,6 +4716,14 @@ At the unchanged p-extrude resolutions, lathe revolution and tube radial sin/cos
 
 The four changed p-primitives builders evaluate 654 sin/cos calls instead of 12,452, retaining all geometry output. Evidence, byte snapshots, limits, research and reproduction: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). This is not a runtime or rival speed claim; timing pending the quiet rerun.
 
+### Batch 169 splines intersection work (2026-11-10)
+
+`intersectSplines` evaluates each segment's four reconstruction points once per call: two
+8-segment curves need 64 `at` calls instead of 512, with identical results over six curve
+pairs. Margo's Catmull-Rom equals three.js 0.186.1 CatmullRomCurve3 within 4.44e-16.
+Regression: `packages/splines/test/intersect-workcount.test.js`;
+[sources](batch-169.md#job-4-splines-curve-intersection). No timing claim.
+
 ### Batch 169 mesh-edit subdivision work (2026-11-10)
 
 `subdivideMesh` parses no string edge IDs: three cube levels need 0 parses instead of

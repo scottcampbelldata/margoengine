@@ -93,6 +93,20 @@ const {spline, points, pieces, maxError} = fitSpline(gpsTrack, {tolerance: 0.5})
 
 Every input point ends up within `tolerance` of the returned cubic Bezier curve (`maxError` is the measured worst, at most `tolerance`). Pieces are cut at the worst point where one cubic misses; repeated points are dropped. The result is a `kind: 'bezier'` spline of `3 * pieces + 1` control points.
 
+## Bounds and intersections (`@margoengine/splines/query`)
+
+```ts
+import {Spline} from '@margoengine/splines';
+import {intersectSplines, splineBounds} from '@margoengine/splines/query';
+const road = new Spline([[0, 0, 0], [1, 0.3, 0], [2, -0.2, 0], [3, 0.1, 0]]);
+const rail = new Spline([[0, 0.2, 0], [1, -0.3, 0], [2, 0.3, 0], [3, -0.1, 0]]);
+const crossings = intersectSplines(road, rail);
+console.log(crossings.points.length, crossings.overlaps.length); // 3 0
+console.log(splineBounds(road).max[1] > 0.3); // true: the analytic peak lies between samples
+```
+
+`splineBounds` and `splineExtrema` solve each piece's derivative exactly. `intersectSplinePlane` and `intersectSplineRay` find roots per piece; `intersectSplines` subdivides piece pairs by their control boxes and polishes each hit with Newton steps. Identical or reversed pieces come back as `overlaps`, not as endless points. Each curve's pieces are rebuilt as exact cubics once per call (four `at` evaluations per piece for non-Bezier kinds), not once per pair. `maxWork` (default 200000) bounds the subdivision nodes.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/splines

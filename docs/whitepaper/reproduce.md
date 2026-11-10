@@ -3973,6 +3973,12 @@ This checks seven parent geometry stream digests and exact angular call counts.
 
 [Work-count methods](batch-162-workcounts.md) give the unchanged scenes, deterministic assertions, parent byte checks, trade-offs and sources. Build with npm run build:packages, then run node --test --test-timeout=120000 packages/geometry/tests/primitive-workcount.test.js for primitive columns. Timing pending the quiet rerun; do not enable the deferred speed suite for this evidence.
 
+### Batch 169 splines intersection work count
+
+After build:packages run `node --test packages/splines/test/intersect-workcount.test.js`
+and `node scripts/bp-169-splines-oracle.mjs --three=<absolute external three directory>`;
+see [batch-169.md](batch-169.md#job-4-splines-curve-intersection). Timing pending the quiet rerun.
+
 ### Batch 169 mesh-edit subdivision work count
 
 After build:packages run `node --test packages/mesh-edit/tests/subdivide-workcount.test.js`

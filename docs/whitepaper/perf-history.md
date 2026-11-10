@@ -3300,6 +3300,13 @@ No new speed verdict is claimed. [Scope, sources and commands](parity-preflight.
 
 `perf(geometry): reuse primitive angular columns` removes repeated trigonometric evaluations: 12,452 to 654 sin/cos calls for the sphere, capped cylinder, capsule and torus in one p-primitives iteration. Every geometry byte and group matches 13 parent snapshots. Per-call Float64 table trade-off and research: [work counts](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun; no benchmark run or speed ratio claimed.
 
+### Batch 169 job 4: splines curve intersection (2026-11-10)
+
+`perf(splines): rebuild intersection cubics once per curve` builds each curve's segment
+cubics once per `intersectSplines` call instead of once per segment pair: 512 to 64 point
+evaluations for two 8-segment curves, with 1264 identical result bytes over six pairs.
+[Methods](batch-169.md#job-4-splines-curve-intersection). Timing pending the quiet rerun.
+
 ### Batch 169 job 3: mesh-edit subdivision edges (2026-11-10)
 
 `perf(mesh-edit): index subdivision edges numerically` replaces string edge IDs inside

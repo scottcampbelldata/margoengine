@@ -197,6 +197,14 @@ edge differences. The independent trace confirms the weighted image loss, not an
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
 Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
 
+## Batch 169 splines: work counts, 2026-11-10
+
+| Work | Before | After | Output | Black-box oracle | Status |
+| --- | --- | --- | --- | --- | --- |
+| Two 8-segment Catmull-Rom curves intersected | 512 point evaluations | 64 | 6 curve pairs, 26 points and 7 overlaps, 1264 identical bytes | three.js 0.186.1 CatmullRomCurve3 values equal within 4.44e-16; it has no curve intersection | `perf(splines): rebuild intersection cubics once per curve`; timing pending the quiet rerun |
+
+Values and commands: [batch-169.md](batch-169.md#job-4-splines-curve-intersection).
+
 ## Batch 169 mesh-edit: work counts, 2026-11-10
 
 | Work | Before | After | Output | Black-box oracle | Status |
