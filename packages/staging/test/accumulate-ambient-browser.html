@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Multi-light sky shadows</title><canvas width="64" height="64"></canvas><script type="module">
+import {Engine,PbrMaterial,Geometry,box} from '/packages/core/dist/index.js';
+import {sphereGeometry} from '/packages/geometry/dist/primitives.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {AmbientShadows} from '/packages/staging/dist/accumulate-ambient.js';
+import {shadowHistory} from './shadow-history.js';
+window.run=async compat=>{
+ if(compat)await(await import('/packages/webgl2-compat/dist/index.js')).install({force:true});
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,5,4],target:[0,0,0]}});
+ const errors=[],watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));watch();
+ const data=sphereGeometry(.5,96,48);
+ const product=engine.createMesh().setGeometry(new Geometry(data.positions,data.normals,data.indices)).setMaterial(new PbrMaterial()).setPosition([0,.5,0]);
+ let effect=AmbientShadows.attach(engine,{ambient:1,lights:[],resolution:128,size:4,height:2,frames:1024,opacity:1});effect.add(product);
+ const frames=async n=>{for(let i=0;i<n;i++)engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();};
+ try{
+  await frames(1024);const sky=await shadowHistory(engine.gpu,effect);let mae=0,max=0,pixels=0;
+  for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+   const px=(x+.5)/128*4-2,pz=(y+.5)/128*4-2;
+   if(Math.hypot(px,pz)<=.5+4/128)continue;
+   const expected=.125/(.25+px*px+pz*pz)**1.5,
+    error=Math.abs(sky[y*128+x]/1024-expected);mae+=error;max=Math.max(max,error);pixels++;
+  }
+  mae/=pixels;await frames(1);const hold=await shadowHistory(engine.gpu,effect);
+  effect.dispose();product.setGeometry(box(1,.1,1)).setPosition([0,1,0]);
+  const lights=[{position:[-4,8,0],radius:0,intensity:1},{position:[4,8,0],radius:0,intensity:3}];
+  effect=AmbientShadows.attach(engine,{ambient:0,lights,resolution:32,size:6,height:2,frames:256,opacity:1});const remove=effect.add(product);
+  await frames(256);const mixed=await shadowHistory(engine.gpu,effect);
+  const columns=[0,0];for(let y=0;y<32;y++)for(let x=0;x<32;x++)columns[x<16?0:1]+=mixed[y*32+x];
+  const mixedBefore=mixed.slice();effect.options.ambient=.75;await frames(1);const reset=effect.samples===1;
+  effect.options.ambient=0;await frames(256);const repeated=await shadowHistory(engine.gpu,effect);
+  const old=engine.gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();await frames(256);
+  const restored=await shadowHistory(engine.gpu,effect);
+  remove();await frames(1);const empty=(await shadowHistory(engine.gpu,effect)).every(v=>v===0);
+  return {mae,max,pixels,skyHold:sky.every((v,i)=>v===hold[i]),columns,reset,repeat:mixedBefore.every((v,i)=>v===repeated[i]),restored:mixedBefore.every((v,i)=>v===restored[i]),empty,errors};
+ }finally{effect.dispose();effect.dispose();engine.dispose();}
+};window.ready=true;
+</script>

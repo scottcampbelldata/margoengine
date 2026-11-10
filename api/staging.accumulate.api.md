@@ -15,7 +15,7 @@ export interface AccumulatedShadowOptions extends ContactShadowOptions {
 }
 
 export class AccumulatedShadows extends ContactShadows {
-    readonly name = "accumulated-shadows";
+    readonly name: string;
     readonly options: AccumulatedShadowOptions;
     constructor(options?: AccumulatedShadowOptions);
     static attach(engine: EngineKernel, options?: AccumulatedShadowOptions): AccumulatedShadows;
@@ -30,6 +30,8 @@ export class AccumulatedShadows extends ContactShadows {
     protected changed(draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): boolean;
     protected projection(s: ReturnType<AccumulatedShadows['settings']>): Float32Array;
     protected update(c: Context, draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): GPUTextureView;
+    protected validateLighting(s: ReturnType<AccumulatedShadows['settings']>): void;
+    protected lightingKey(s: ReturnType<AccumulatedShadows['settings']>): string;
 }
 
 // Not exported from this entry, but used by the exports above:

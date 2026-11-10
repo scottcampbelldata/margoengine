@@ -51,7 +51,7 @@ const radicalInverse = (value: number): number => {
  * above the receiving plane. Equal visibility weights, not a full radiometric area-light solution.
  */
 export class AccumulatedShadows extends ContactShadows {
-  override readonly name = 'accumulated-shadows';
+  override readonly name: string = 'accumulated-shadows';
   declare readonly options: AccumulatedShadowOptions;
   private count = 0;
   private lightKey = '';
@@ -113,7 +113,7 @@ export class AccumulatedShadows extends ContactShadows {
   protected override changed(draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): boolean {
     this.validate();
     const changed = super.changed(draws, s);
-    const key = [...this.light(s), this.options.lightRadius ?? 2, this.options.frames ?? 64].join('|');
+    const key = this.lightingKey(s) + '|' + (this.options.frames ?? 64);
     if (changed || key !== this.lightKey) this.count = 0;
     this.lightKey = key;
     return changed;
@@ -164,15 +164,27 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   private validate(): void {
-    const s = this.settings(), o = this.options, light = this.light(s);
-    if (!Array.isArray(light) || light.length !== 3 || ![0,1,2].every(i => Number.isFinite(light[i]) && Math.abs(light[i]) <= 1e6) ||
-      !(Math.fround(s.normal.reduce((sum,v,i)=>sum+v*(light[i]-[s.x,s.ground,s.z][i]),0)) > Math.fround(s.height)) ||
-      !Number.isFinite(o.lightRadius ?? 2) || (o.lightRadius ?? 2) < 0 || (o.lightRadius ?? 2) > 1e6 ||
-      !Number.isInteger(o.frames ?? 64) || (o.frames ?? 64) < 1 || (o.frames ?? 64) > 1024 ||
+    const s = this.settings(), o = this.options;
+    this.validateLighting(s);
+    if (!Number.isInteger(o.frames ?? 64) || (o.frames ?? 64) < 1 || (o.frames ?? 64) > 1024 ||
       s.blur !== 0 || Boolean(o.static) ||
       ![s.x,s.ground,s.z,s.width,s.depth,s.height].every(v => Math.abs(v) <= 1e6) ||
       Math.min(s.width,s.depth,s.height) < 1e-6)
       throw rangeError('Invalid accumulated shadow options; use frames 1..1024, blur 0, static false, receiver sizes 1e-6..1e6 and a finite disk light above the caster height', 'arguments');
+  }
+
+  /** Validates the optional entry's light distribution before rendering or allocation. */
+  protected validateLighting(s: ReturnType<AccumulatedShadows['settings']>): void {
+    const light = this.light(s), radius = this.options.lightRadius ?? 2;
+    if (!Array.isArray(light) || light.length !== 3 || ![0,1,2].every(i => Number.isFinite(light[i]) && Math.abs(light[i]) <= 1e6) ||
+      !(Math.fround(s.normal.reduce((sum,v,i)=>sum+v*(light[i]-[s.x,s.ground,s.z][i]),0)) > Math.fround(s.height)) ||
+      !Number.isFinite(radius) || radius < 0 || radius > 1e6)
+      throw rangeError('Invalid accumulated shadow light; use a finite disk above the caster height and radius 0..1e6', 'arguments');
+  }
+
+  /** History identity of a light distribution; live edits restart the sum. */
+  protected lightingKey(s: ReturnType<AccumulatedShadows['settings']>): string {
+    return [...this.light(s), this.options.lightRadius ?? 2].join('|');
   }
 
   private light(s: ReturnType<AccumulatedShadows['settings']>): readonly number[] {

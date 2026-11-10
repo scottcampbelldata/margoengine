@@ -4865,6 +4865,10 @@
     "./xr/pointer": {
       "types": "./dist/xr/pointer.d.ts",
       "import": "./dist/xr/pointer.js"
+    },
+    "./staging/accumulate-ambient": {
+      "types": "./dist/staging/accumulate-ambient.d.ts",
+      "import": "./dist/staging/accumulate-ambient.js"
     }
   },
   "dependencies": {

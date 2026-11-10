@@ -85,7 +85,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3, `./kinds` 7, `./query` 11, `./offset` 5 | 31 |  | 1,630 |
 | @margoengine/sprites | `.` 17, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8, `./shader` 8, `./skeletal` 18, `./slice` 5, `./pick` 4, `./blend` 7, `./spine` 17 | 46 |  | 7,404 |
 | @margoengine/stage | `.` 24, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,974 |
-| @margoengine/staging | `.` 4, `./accumulate` 2, `./pathtrace` 2, `./ground` 3, `./pathtrace-materials` 3 | 23 |  | 8,520 |
+| @margoengine/staging | `.` 4, `./accumulate` 2, `./pathtrace` 2, `./ground` 3, `./pathtrace-materials` 3, `./accumulate-ambient` 3 | 34 |  | 8,520 |
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6, `./geometry` 3, `./gl` 4, `./panels` 4 | 22 |  | 4,861 |
 | @margoengine/taa | `.` 10, `./upscale` 2, `./sharpen` 2, `./upscale-velocity` 2 | 14 |  | 14,259 |
 | @margoengine/terrain | `.` 13, `./query` 6, `./layers-pbr` 4, `./stream` 4, `./sculpt` 7, `./holes` 2, `./rvt` 5, `./displace` 3, `./deform` 4, `./blend` 2, `./planet` 8, `./imagery` 12, `./overlays` 6 | 92 |  | 12,907 |

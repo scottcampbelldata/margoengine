@@ -41,6 +41,10 @@
     "./pathtrace-materials": {
       "types": "./dist/pathtrace-materials.d.ts",
       "import": "./dist/pathtrace-materials.js"
+    },
+    "./accumulate-ambient": {
+      "types": "./dist/accumulate-ambient.d.ts",
+      "import": "./dist/accumulate-ambient.js"
     }
   },
   "files": [
@@ -63,7 +67,8 @@
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/staging/test/browser-check.mjs --no-record && node packages/staging/test/ground-browser.mjs && node packages/staging/test/ground-browser.mjs --studio && node packages/staging/test/ground-browser.mjs --studio --compat && node packages/staging/test/accumulate-browser.mjs && node packages/staging/test/accumulate-browser.mjs --compat && node packages/staging/test/pathtrace-browser.mjs && node packages/staging/test/orientation-browser.mjs && node packages/staging/test/orientation-browser.mjs --compat && node packages/staging/test/floor-browser.mjs && node packages/staging/test/floor-browser.mjs --compat && node packages/staging/test/hdr-shadow-browser.mjs && node packages/staging/test/hdr-shadow-browser.mjs --compat",
-    "test:gpu:materials": "cd ../.. && node packages/staging/test/pathtrace-materials-browser.mjs"
+    "test:gpu:materials": "cd ../.. && node packages/staging/test/pathtrace-materials-browser.mjs",
+    "test:gpu:ambient": "cd ../.. && node packages/staging/test/accumulate-ambient-browser.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/voxel-pathtracer": {

@@ -937,3 +937,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - materials: document fur/FurMaterial/createFur controls and defaults, shared textures, explicit setTime, atomic setOptions, shell-root parenting, caster support, two-shell sampling and integration limits.
 - margoengine: document the generated materials/fur alias and post/mask mapping repair.
 - @margoengine/post: document Halftone and DotScreen, four shapes, degree angles, pixel origin, frequency, RGB/grayscale, scatter/blend/intensity and LDR ordering.
+
+- @margoengine/staging (batch 272 job 2): cover accumulate-ambient weighted disk lights, ambient sky share, normalized visibility, slab/footprint limits, live edits and convergence; examples deferred.
+- margoengine (batch 272 job 2): cover staging/accumulate-ambient and regenerated post/pixelate forwarding; examples deferred.

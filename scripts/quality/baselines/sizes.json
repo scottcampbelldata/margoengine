@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13958384,
+  "total": 13969107,
   "history": [
     {
       "date": "2026-10-24",
@@ -7382,6 +7382,12 @@
       "commit": "batch-191-job-4",
       "reason": "New optional post/halftone: 0 to 6300 B gzip. One renderer-independent pass owns RGB and monochrome screening, four contours and blend controls; splitting would duplicate shader and lifecycle logic. Core plus stage stays 24209 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "1ff43b9fd",
+      "reason": "Batch272-new-ambient-visibility-entry-10410B-ceiling10723B-existing-accumulate9767B-below9945B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8722,6 +8728,7 @@
     "@margoengine/environment/prefiltered": 3949,
     "@margoengine/materials/fur": 3400,
     "leak @margoengine/materials/fur -> @margoengine/gltf-pro/model": 1,
-    "@margoengine/post/halftone": 6556
+    "@margoengine/post/halftone": 6556,
+    "@margoengine/staging/accumulate-ambient": 10723
   }
 }
