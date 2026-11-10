@@ -2782,6 +2782,10 @@
       "types": "./dist/road/intersections.d.ts",
       "import": "./dist/road/intersections.js"
     },
+    "./road/lanes": {
+      "types": "./dist/road/lanes.d.ts",
+      "import": "./dist/road/lanes.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

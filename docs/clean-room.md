@@ -6612,3 +6612,5 @@ Combine GeoJSON's geometry model and source double coordinates with Shapefile pa
 Evidence: exact spec-derived binary fixtures, area/holes and feature mappings in `packages/loaders/tests/geo.test.js`, plus the complete 127-feature Natural Earth land fixture already held in `packages/procedural/test/fixtures/caves/ne_110m_land.geojson`. Natural Earth v5.1.2, Nathaniel Vaughn Kelso and Tom Patterson, public domain, source and hash are already recorded in THIRD-PARTY-NOTICES.md. No third-party implementation or new asset is added.
 
 Metadata-only face groups preserve the prior whole-mesh vertex-color average in createMeshes; the existing material test now also asserts all seven source flag groups and a single visual mesh.
+## Batch 233 job 2: spline lane markings
+Bishop moving-frame research, SVG distance-based dashes and ASAM lane-border coordinates are compared and cited with authors/year/links in [road-design.md](road-design.md). Analytic circle and straight-road tests are independent position/phase oracles; no rival source used.

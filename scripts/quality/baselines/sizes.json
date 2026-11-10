@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12951705,
+  "total": 12954284,
   "history": [
     {
       "date": "2026-10-24",
@@ -6445,6 +6445,12 @@
       "commit": "batch-202",
       "reason": "Optional loader entries loaders:geo, selection:area preserve source data and decoding without splitting shared readers or compromising fidelity; before and after sizes in docs/limits.md. Core/stage untouched.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "cc7fd3c6b",
+      "reason": "Batch 233 job 2: new optional road/lanes entry 0 to 2323 B gzip, standard ceiling 2579 B. Distance-based line and arrow construction shares frames and clipping; splitting duplicates road-coordinate ownership.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7631,6 +7637,7 @@
     "@margoengine/selection/highlight": 13475,
     "@margoengine/loaders/geo": 8502,
     "margoengine/loaders/geo": 314,
-    "margoengine/selection/area": 317
+    "margoengine/selection/area": 317,
+    "@margoengine/road/lanes": 2579
   }
 }

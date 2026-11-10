@@ -53,6 +53,10 @@
     "./intersections": {
       "types": "./dist/intersections.d.ts",
       "import": "./dist/intersections.js"
+    },
+    "./lanes": {
+      "types": "./dist/lanes.d.ts",
+      "import": "./dist/lanes.js"
     }
   },
   "files": [

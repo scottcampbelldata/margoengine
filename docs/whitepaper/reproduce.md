@@ -3096,3 +3096,5 @@ After building packages, run `node scripts/gpu-lock.mjs run --owner=selection-hi
 
 ### Batch 202 geospatial vectors
 Build loaders and run `node --test --test-timeout=120000 packages/loaders/tests/geo.test.js`. Natural Earth is the already-noticed public-domain fixture; spec-derived binary writers independently construct Shapefile, dBASE and MVT records. Shared-lock loader browser tests run native and --compat, including a polygon with a hole and its feature group. Source-double comparisons use result.positions; result.mesh is the existing float32 render contract.
+### Batch 233 job 2: lane paint
+After package build run node --test --test-timeout=120000 packages/road/test/lanes.test.js; rendering uses the shared-lock road browser command above. The lanes fixture checks curved paint pixels and exact reboot/disposal on both backends. No benchmark or timing assertion.

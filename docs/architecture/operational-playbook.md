@@ -6019,3 +6019,5 @@ Batch 199 job 4 adds an optional mask-only Selection consumer, two R16F separabl
 
 ### 5. Geospatial vector evidence (batch 202)
 Geo parsers preserve raw doubles and source features separately from float32 rendering. Planar fill delegates to @margoengine/geometry/triangulate, preserving holes and feature-to-triangle association; polygon outlines and explicit lines/points remain independently drawable. CPU tests check exact area, source cell/feature ownership and real geographic polygons; the browser case renders the resulting holed surface on WebGPU and WebGL2. No core, stage or backend math is added.
+### Section 5 evidence: batch 233 lane paint
+Optional lane meshes use arc-distance samples, horizontal tangent/lateral frames and final float32 face normals. No core/stage/GPU shader changes. Independent circle-radius, boundary, dash/phase and slope equations cover CPU geometry; the road browser gate renders actual curved line/arrow pixels on both backends, restores them exactly and disposes all paint meshes.

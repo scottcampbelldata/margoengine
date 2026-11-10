@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'intersections', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
+  for (const feature of ['junctions', 'intersections', 'lanes', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -109,6 +109,13 @@ try {
         const {intersections}=await import('/packages/road/dist/intersections.js');
         data=await intersections([{points:[[-10,0],[10,0]],width:4},{points:[[0,-10],[0,10]],width:4}],{elevation:(x,z)=>0.02*x+0.03*z});
         if(!(data.area>144 && data.curb.area>0 && data.sidewalk.area>0))throw new Error('Intersection design oracle');
+      } else if (feature === 'lanes') {
+        const {road}=await import('/packages/road/dist/index.js');
+        const {Spline}=await import('/packages/splines/dist/index.js');
+        const {lanes}=await import('/packages/road/dist/lanes.js');
+        const curve=new Spline([[0,0,-10],[2,0,0],[0,0,10]]);
+        data=road(curve,{crossSection:[[-4,0],[4,0]]});
+        data.paint=lanes(curve,{widths:[3,3],lines:[{width:0.35},{width:0.35,dash:[2,2]},{width:0.35}],arrows:[{lane:1,distance:curve.length/2,length:4,width:1.5}]});
       } else if (feature === 'markings') {
         const {road} = await import('/packages/road/dist/index.js');
         const {Spline} = await import('/packages/splines/dist/index.js');
@@ -167,6 +174,7 @@ try {
         .setMaterial(new PbrMaterial({ color: '#ff0000' }));
       const extraMeshes=[];
       if(feature==='intersections')for(const [part,color] of [[data.curb,'#0000ff'],[data.sidewalk,'#00ff00']])extraMeshes.push(engine.createMesh().setGeometry(part.geometry).setMaterial(new PbrMaterial({color})));
+      if(feature==='lanes')for(const part of data.paint)extraMeshes.push(engine.createMesh().setGeometry(part.geometry).setMaterial(new PbrMaterial({color:'#ffffff'})));
       let paint;
       if(feature === 'markings') {
         const {Tonemap}=await import('/packages/tonemap/dist/index.js');
@@ -214,7 +222,7 @@ try {
     const pixels = () => page.locator('canvas').screenshot().then(decodePNG);
     const first = await pixels();
     const rgb = (p, x, y) => Array.from(p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3));
-    for (const [x, y] of (feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
+    for (const [x, y] of (feature === 'lanes' ? [[64,24],[64,104]] : feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
       [64, 64],
       [24, 64],
       [104, 64],
@@ -228,6 +236,10 @@ try {
     if(feature==='intersections') {
       let green=0,blue=0;for(let i=0;i<first.data.length;i+=4){const [r,g,b]=first.data.subarray(i,i+3);if(g>r+30&&g>b+30)green++;if(b>r+30&&b>g+30)blue++;}
       assert.ok(green>200&&blue>10, `${mode}: separate sidewalk and curb pixels ${green}/${blue}`);
+    }
+    if(feature==='lanes') {
+      let white=0;for(let i=0;i<first.data.length;i+=4){const [r,g,b]=first.data.subarray(i,i+3);if(Math.min(r,g,b)>60&&Math.max(r,g,b)-Math.min(r,g,b)<5)white++;}
+      assert.ok(white>200,`${mode}: curved lane lines and arrows paint ${white} pixels`);
     }
     if(feature === 'markings') {
       let white=0;for(let y=50;y<78;y++)for(let x=67;x<78;x++){const p=rgb(first,x,y);if(Math.min(...p)>60 && Math.max(...p)-Math.min(...p)<5)white++;}
