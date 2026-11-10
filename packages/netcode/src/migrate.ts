@@ -344,6 +344,13 @@ export class HostMigration<State> {
       this.send(from, { ...packet, kind: TRANSFERRED });
       return;
     }
+    if (packet.kind === STATUS && this.hostId === undefined && packet.epoch > this.epochNumber) {
+      // A survivor that saw more departures during this recovery is already in a later round; join it, or the two
+      // peers drop each other's reports forever and the recovery barrier never completes.
+      this.future.set(from, packet);
+      this.beginRecovery(packet.epoch);
+      return;
+    }
     if (packet.epoch !== this.epochNumber) return;
     const pending = this.pending;
     if (

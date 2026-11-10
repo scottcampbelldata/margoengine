@@ -312,3 +312,40 @@ test('synchronous reliable transports cannot arm a recovery timer after migratio
   assert.equal(sessions[1].isHost, true);
   assert.equal(sessions[2].host, 2);
 });
+
+test('a survivor that missed the resume joins the later recovery epoch instead of timing out', async (t) => {
+  const {
+    sessions: [a, b, c, d],
+    links,
+    settle,
+    close,
+  } = mesh(4);
+  t.after(close);
+  const errors = [];
+  for (const session of [b, d]) session.options.onerror = (error) => errors.push(error);
+  const confirmed = a.confirm({ score: 5, label: 'safe' }, 5);
+  await settle();
+  await confirmed;
+  // Hold the elected peer's RESUME to d so that c leaves before d sees it.
+  const toD = links[1].get(4),
+    send = toD.send.bind(toD),
+    held = [];
+  toD.send = (data, delivery) => {
+    if (data[0] === 112 && data[1] === 6) held.push([data, delivery]);
+    else send(data, delivery);
+  };
+  a.close();
+  await settle();
+  assert.equal(held.length, 1);
+  assert.equal(c.isHost, false);
+  c.close();
+  await settle();
+  toD.send = send;
+  for (const [data, delivery] of held) send(data, delivery);
+  await settle();
+  assert.deepEqual(errors, []);
+  assert.equal(b.isHost, true);
+  assert.equal(d.host, 2);
+  assert.equal(d.epoch, b.epoch);
+  assert.deepEqual(d.confirmed, { frame: 5, state: { score: 5, label: 'safe' } });
+});
