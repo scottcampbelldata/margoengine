@@ -378,6 +378,10 @@
       "types": "./dist/blender/ktx2.d.ts",
       "import": "./dist/blender/ktx2.js"
     },
+    "./blender/objects": {
+      "types": "./dist/blender/objects.d.ts",
+      "import": "./dist/blender/objects.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

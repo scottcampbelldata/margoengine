@@ -69,7 +69,7 @@ def _ordered_bones(armature):
     return out
 
 
-def export_animated(context, objects, pack, convert, node_of, geometry):
+def export_animated(context, objects, pack, convert, node_of, geometry, object_animation=False):
     """Appends nodes for `objects` through `node_of` and returns (root node ids, document fields, data bytes)."""
     data = Data()
     skins, roots, owners = [], [], []
@@ -180,6 +180,10 @@ def export_animated(context, objects, pack, convert, node_of, geometry):
         if targets:
             node_of.meshes[mesh_index] = {"weights": [block.value for block in targets], "extras": {"targetNames": [block.name for block in targets]}}
             owners.append(("key", key, targets, node["id"]))
+    if object_animation:
+        from .objects import hierarchy
+        roots, object_owners = hierarchy(context, node_of)
+        owners += object_owners
     animations = _sample(context, owners, node_of, data)
     fields = {}
     if data.blob:
@@ -203,8 +207,10 @@ def _actions(owner):
     return actions
 
 
-def _assign(data, action, id_type):
+def _assign(data, action, id_type, slot=None):
     data.action = action
+    if action is not None and slot is not None and hasattr(data, "action_slot"):
+        data.action_slot = slot
     if action is not None and hasattr(data, "action_slot") and data.action_slot is None:
         slots = [slot for slot in action.slots if slot.target_id_type == id_type] or list(action.slots)
         if slots:
@@ -215,9 +221,17 @@ def _sample(context, owners, node_of, data):  # noqa: C901
     """One clip per action, sampled at every frame of its range with NLA off; restores the scene afterwards."""
     scene = context.scene
     fps = scene.render.fps / scene.render.fps_base
-    clips, uses = {}, {}
+    clips, uses, slots = {}, {}, {}
     for kind, owner, *_ in owners:
         uses[owner.as_pointer()] = _actions(owner)
+        ad = owner.animation_data
+        if ad:
+            if ad.action:
+                slots[(owner.as_pointer(), ad.action.as_pointer())] = getattr(ad, "action_slot", None)
+            for track in ad.nla_tracks:
+                for strip in track.strips:
+                    if strip.action:
+                        slots.setdefault((owner.as_pointer(), strip.action.as_pointer()), getattr(strip, "action_slot", None))
         for action in uses[owner.as_pointer()]:
             clips.setdefault(action.name_full, action)
     saved = []
@@ -225,12 +239,14 @@ def _sample(context, owners, node_of, data):  # noqa: C901
         if owner.animation_data:
             ad = owner.animation_data
             saved.append((ad, ad.action, getattr(ad, "action_slot", None), ad.use_nla))
-    frame = scene.frame_current
+    frame, subframe = scene.frame_current, scene.frame_subframe
     channels_of = ("location", "rotation_quaternion", "rotation_euler", "rotation_axis_angle", "scale")
     shown = []
     for kind, owner, *rest in owners:
         if kind == "armature":
             shown += [(pose, name, tuple(getattr(pose, name))) for pose in owner.pose.bones for name in channels_of]
+        elif kind == "object":
+            shown += [(owner, name, tuple(getattr(owner, name))) for name in channels_of]
         else:
             shown += [(block, "value", block.value) for block in rest[0]]
     animations = []
@@ -250,7 +266,7 @@ def _sample(context, owners, node_of, data):  # noqa: C901
                 ad.use_nla = False
                 _assign(ad, None, None)
                 if action in uses[owner.as_pointer()]:
-                    _assign(ad, action, "OBJECT" if kind == "armature" else "KEY")
+                    _assign(ad, action, "KEY" if kind == "key" else "OBJECT", slots.get((owner.as_pointer(), action.as_pointer())))
             # Every joint and every shape-key set gets a channel in every clip, so a clip is whole on its own: a
             # player that keeps the last clip's values on the nodes a new clip leaves alone still shows this pose.
             for kind, owner, *rest in owners:
@@ -268,6 +284,11 @@ def _sample(context, owners, node_of, data):  # noqa: C901
                             samples.setdefault((ids[bone.name], "translation"), []).append(t)
                             samples.setdefault((ids[bone.name], "rotation"), []).append(r)
                             samples.setdefault((ids[bone.name], "scale"), []).append(s)
+                    elif kind == "object":
+                        node, local = rest
+                        t, r, s = node_of.trs(owner, None, local(owner))
+                        for path, value in (("translation", t), ("rotation", r), ("scale", s)):
+                            samples.setdefault((node, path), []).append(value)
                     else:
                         targets, node = rest
                         samples.setdefault((node, "weights"), []).append([block.value for block in targets])
@@ -300,6 +321,6 @@ def _sample(context, owners, node_of, data):  # noqa: C901
             if slot is not None and hasattr(ad, "action_slot"):
                 ad.action_slot = slot
             ad.use_nla = nla
-        scene.frame_set(frame)
+        scene.frame_set(frame, subframe=subframe)
     return animations
 

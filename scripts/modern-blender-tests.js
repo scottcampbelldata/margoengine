@@ -337,6 +337,7 @@ assert.ok(
   "Blender viewer build failed",
 );
 const browser = await openBrowser({
+    port: 'free',
     startPath: "/tests/modern-extension.html",
   }),
   { page, hardware } = browser,
@@ -1126,7 +1127,7 @@ try {
     delete results[i].screenshot;
     results[i].colorfulPixels = colorful;
   }
-  await page.goto("http://127.0.0.1:5193/examples/blender-loader/index.html");
+  await page.goto(new URL('/examples/blender-loader/index.html', page.url()).href);
   await page.waitForFunction(
     () =>
       !document.querySelector("#file").disabled &&

@@ -17,7 +17,7 @@ class NeedsBake(ValueError):
     """A node graph the direct Principled subset cannot carry; baking turns it into images."""
 
 
-def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False):
+def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False):
     """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
     (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
     bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead.
@@ -373,21 +373,29 @@ def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=Fals
         """Appends one node per call: TRS from a converted matrix, asset ID and `margo:` properties."""
 
         def __init__(self):
-            self.nodes, self.meshes, self.convert = nodes, {}, convert
+            self.nodes, self.meshes, self.convert, self.objects = nodes, {}, convert, {}
 
-        def __call__(self, obj, bone, world, mesh=None, instance=""):
+        def trs(self, obj, bone, world):
             translation, rotation, scale = world.decompose()
             rebuilt = Matrix.LocRotScale(translation, rotation, scale)
             label = f"Bone '{bone.name}' of '{obj.name}'" if bone else f"Object '{obj.name}'"
             if any(abs(world[r][c] - rebuilt[r][c]) > 1e-4 * max(1, abs(world[r][c])) for r in range(4) for c in range(4)) or any(abs(v) < 1e-8 for v in scale):
                 raise ValueError(f"{label}: shear/singular transforms must be applied before export")
+            return list(translation), [rotation.x, rotation.y, rotation.z, rotation.w], list(scale)
+
+        def __call__(self, obj, bone, world, mesh=None, instance=""):
+            if object_animation and bone is None and not instance:
+                world = Matrix.Identity(4)  # The hierarchy pass validates local TRS; a valid world may have shear.
+            translation, rotation, scale = self.trs(obj, bone, world)
             identity = f"{obj.library.filepath if obj.library else ''}:{obj.name_full}:{instance}" + (f":{bone.name}" if bone else "")
             node = {"name": bone.name if bone else obj.name_full}
             if mesh is not None:
                 node["mesh"] = mesh
-            node.update({"translation": list(translation), "rotation": [rotation.x, rotation.y, rotation.z, rotation.w], "scale": list(scale), "extras": {"margo": {"id": str(uuid.uuid5(uuid.NAMESPACE_URL, identity)), "properties": {} if bone else properties(obj)}}})
+            node.update({"translation": translation, "rotation": rotation, "scale": scale, "extras": {"margo": {"id": str(uuid.uuid5(uuid.NAMESPACE_URL, identity)), "properties": {} if bone else properties(obj)}}})
             node["id"] = len(nodes)
             nodes.append(node)
+            if bone is None and not instance:
+                self.objects[obj.as_pointer()] = (obj, node)
             return node
 
     def properties(obj):
@@ -549,14 +557,14 @@ def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=Fals
                 world = convert(instance.matrix_world)
             node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "")
             node.update(added)
-    if (extra.curves or extra.points or extra.volumes) and moving:
+    if (extra.curves or extra.points or extra.volumes) and (moving or object_animation):
         raise ValueError("Curves, point clouds and volumes cannot be exported with skins, shape keys or actions yet; "
                          "export them from a scene without animation, or turn off Curves, Points and Volumes")
     roots = [node["id"] for node in nodes]
     fields, animation = {}, b""
-    if moving:
-        animated_roots, fields, animation = export_animated(context, moving, pack, convert, node_of, geometry)
-        roots += animated_roots
+    if moving or object_animation:
+        animated_roots, fields, animation = export_animated(context, moving, pack, convert, node_of, geometry, object_animation)
+        roots = animated_roots if object_animation else roots + animated_roots
     for node in nodes:
         del node["id"]
     shapes = {key: value for key, value in (("curves", extra.curves), ("pointClouds", extra.points), ("volumes", extra.volumes)) if value}

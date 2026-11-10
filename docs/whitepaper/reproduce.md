@@ -3045,3 +3045,8 @@ Run the built loaders' `vtk-legacy.test.js`, existing `vtk-xml*.test.js` and loa
 Build packages, then run `node scripts/gpu-lock.mjs run --owner=selection-area --wait-max=60 --max=2 -- node packages/selection/test/area.browser.mjs` and repeat with `--compat`. It requires two actually visible mesh IDs, one lasso ID, no fully occluded mesh, zero hits in an adjacent one-pixel marquee and one submission/map for the whole canvas. The real glTF is the existing attributed Khronos Box. CPU validation is packages/selection/test/area.test.js; package point/model GPU suites also run after changing the region rendering hook.
 ## Batch 210 job 2: playback
 Build packages, then run node --test --test-timeout=30000 packages/animation/tests/playback.test.js. Under the shared GPU lock run node packages/animation/tests/playback-browser.mjs, then repeat with --compat. The authored strip visits 0, 0.5, 1, 0.5, 0 and checks every deformed position component; the credited Fox is driven to exact forward and reverse endpoints. No timing assertions or README execution.
+
+
+
+## Batch 207 job 1
+Build packages, then node --test --test-timeout=120000 packages/blender/tests/objects.test.js. Regenerate the CC0 Blender oracle with C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_objects.py -- test-results/blender-objects. Run node scripts/gpu-lock.mjs run --owner=objects --max=2 --wait-max=60 -- node packages/blender/tests/objects-browser.mjs, then the same command with --compat on the browser script. Each browser run renders and compares actual Animation.seek/model node matrices, checks validation and disposal. No timing measurement.

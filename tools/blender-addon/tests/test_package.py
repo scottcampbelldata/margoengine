@@ -20,7 +20,7 @@ class PackageTests(unittest.TestCase):
             with ZipFile(destination) as archive:
                 prefix = packager.manifest["id"] + "/"
                 self.assertEqual(set(archive.namelist()), {prefix + name for name in (
-                    "blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "bake.py", "curves.py", "live.py", "writer.py", "LICENSE", "NOTICE")})
+                    "blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "objects.py", "bake.py", "curves.py", "live.py", "writer.py", "LICENSE", "NOTICE")})
                 # Every module the add-on imports ships (curves.py was once left out, so Blender failed to enable it).
                 modules = {path.name for path in root.glob("*.py")} - {"package_addon.py"}
                 self.assertLessEqual({prefix + name for name in modules}, set(archive.namelist()))

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12832382,
+  "total": 12837584,
   "history": [
     {
       "date": "2026-10-24",
@@ -6376,6 +6376,11 @@
       "commit": "batch210-playback",
       "reason": "New playback entry 0 -> 1817 B min+gzip, ceiling 2073 B. Directed clocks, exact endpoints and event/promise lifetime stay together; it intentionally reuses the existing Animation/model runtime to preserve base identity and deformation without duplication. Core/stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-207",
+      "reason": "New blender/objects entry: 0 to 4945 gzip bytes, ceiling 5201. Reuses the anim converter and existing PBR model dependency instead of duplicating animation/model ownership. Core plus stage unchanged at 24209 B."
     }
   ],
   "items": {
@@ -7544,6 +7549,8 @@
     "margoengine/selection/hit-details": 324,
     "@margoengine/selection/area": 15719,
     "@margoengine/animation/playback": 2073,
-    "leak @margoengine/animation/playback -> @margoengine/gltf-pro/model": 1
+    "leak @margoengine/animation/playback -> @margoengine/gltf-pro/model": 1,
+    "@margoengine/blender/objects": 5201,
+    "leak @margoengine/blender/objects -> @margoengine/gltf-pro/model": 1
   }
 }

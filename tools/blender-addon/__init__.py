@@ -42,10 +42,15 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         description="Export visible curves as splines, point clouds as points and volumes as OpenVDB grids; the file then needs @margoengine/blender/curves",
         default=False,
     )
+    object_animation: bpy.props.BoolProperty(
+        name="Object actions and hierarchy",
+        description="Keep parent links and sample object actions, including empty pivots and constrained transforms; load with the anim or objects entry",
+        default=False,
+    )
 
     def execute(self, context):
         try:
-            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves)
+            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation)
         except (ValueError, OSError, OverflowError, RuntimeError) as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}
