@@ -11,7 +11,15 @@ export { moveFocus } from './focus.js';
 export type { Direction } from './focus.js';
 export type { UiRendererOptions } from './renderer.js';
 export { DrawList } from './draw.js';
-export type { DrawCommand, RectCommand, TextCommand, ClipCommand, UnclipCommand, RectStyle } from './draw.js';
+export type {
+  DrawCommand,
+  ImageCommand,
+  RectCommand,
+  TextCommand,
+  ClipCommand,
+  UnclipCommand,
+  RectStyle,
+} from './draw.js';
 export { arrange, edges, translate, validateStyle } from './layout.js';
 export type { LayoutStyle, LayoutNode, Rect, Size, Edges, Align, Justify, Anchor } from './layout.js';
 export { Widget } from './widget.js';

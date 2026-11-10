@@ -3166,3 +3166,6 @@ The optional device-orientation entry converts standard device poses into a roll
 
 sciviz/atmosphere adds a date-driven solar globe using sky's existing Hillaire tables and transport, including an atmospheric limb, per-fragment aerial perspective and optional density shells. Geographic wind remains GPU-resident after a one-time physical-unit conversion; scalar meshes and physical-size point glyphs use the existing WGS84 projection at metre heights. The source/manifests and numerical/GPU tests are named in the operational playbook and reproduce.md. Existing entries have no static sky import. This claim includes the documented polar-stretch approximation and perspective/exterior camera domain, not exact ellipsoidal or spectral radiometry, meteorological altitude inference or a performance result.
 
+
+### UI image widget (batch 258 job 2)
+The optional ui/image entry draws pixel textures and atlas cells with contain/cover/fill, tint and fixed-corner nine-slice borders. Claim scope is the job row, not all sprite-animation or image-editing functionality. CPU geometry/gutter/copy regressions and image-browser.mjs support the claim; the browser driver checks actual pixels on WebGPU, complete compatibility and preview GL. It also requires zero uploads on an unchanged image-only second frame. No elapsed-speed number is claimed.

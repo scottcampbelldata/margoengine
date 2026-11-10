@@ -1,5 +1,5 @@
 import { type AtlasSlot, type GlyphAtlas, type GlyphBitmap, SDF_DEFAULTS, glyphAtlases } from '@margoengine/text';
-import type { DrawList, TextCommand } from './draw.js';
+import type { DrawList, TextCommand, ImageCommand } from './draw.js';
 import { uiShader } from './shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
@@ -155,8 +155,7 @@ export class UiPainter {
       const batch = this.batch;
       batch.build(list, this.sdfAtlas!, this.colorAtlas!);
       this.fresh = this.ensureBuffers(batch.rectCount, batch.glyphCount) || this.fresh;
-      if (batch.rectCount)
-        device.queue.writeBuffer(this.rectBuffer!, 0, batch.rects, 0, batch.rectCount * RECT_FLOATS);
+      if (batch.rectCount) device.queue.writeBuffer(this.rectBuffer!, 0, batch.rects, 0, batch.rectCount * RECT_FLOATS);
       if (batch.glyphCount)
         device.queue.writeBuffer(this.glyphBuffer!, 0, batch.glyphs, 0, batch.glyphCount * GLYPH_FLOATS);
       stats.uploads++;
@@ -185,7 +184,9 @@ export class UiPainter {
           { binding: 5, resource: { buffer: this.glyphBuffer! } },
         ],
       });
-      this.groupKey = key;
+      // Binding an unused atlas creates its placeholder view. Capture that
+      // generation too, so an unchanged image-only list stays uploaded.
+      this.groupKey = this.uploadedAtlas = this.atlasKey;
       this.fresh = false;
     }
     const { width, height, format } = target;
@@ -339,6 +340,11 @@ export class UiBatch {
           push(false, 1);
           break;
         }
+        case 'image': {
+          glyphCount = this.placeImage(command, glyphCount);
+          push(true, 1);
+          break;
+        }
         case 'text': {
           const before = glyphCount;
           glyphCount = this.placeText(command, glyphCount);
@@ -349,6 +355,33 @@ export class UiBatch {
     }
     this.rectCount = rectCount;
     this.glyphCount = glyphCount;
+  }
+
+  private placeImage(command: ImageCommand, at: number): number {
+    const slot = this.color!.place(command.bitmap),
+      size = this.color!.size,
+      source = command.source;
+    if ((at + 1) * GLYPH_FLOATS > this.glyphs.length) this.glyphs = grow(this.glyphs, (at + 1) * GLYPH_FLOATS);
+    const o = at * GLYPH_FLOATS;
+    this.glyphs.set(
+      [
+        command.x,
+        command.y,
+        command.x + command.width,
+        command.y + command.height,
+        (slot.x + source.x) / size,
+        (slot.y + source.y) / size,
+        (slot.x + source.x + source.width) / size,
+        (slot.y + source.y + source.height) / size,
+        ...command.color,
+        slot.page,
+        2,
+        0,
+        0,
+      ],
+      o,
+    );
+    return at + 1;
   }
 
   /** Place the glyphs of a text command into `this.glyphs` from index `at`; an outline is a layer drawn under the fill. */

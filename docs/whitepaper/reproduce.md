@@ -2676,3 +2676,6 @@ After build:packages, run node --test --test-timeout=30000 packages/controls/tes
 
 Build sky and sciviz, then run node --test --test-timeout=120000 packages/sciviz/tests/atmosphere.test.js packages/sky/test/planet.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=4 -- node packages/sciviz/tests/atmosphere-browser.mjs for both GPU backends. It uses the official sciviz-atmosphere NOAA demo and writes test-results/sciviz-atmosphere/gpu.json. Existing sciviz GPU suites check unchanged flat/Cartesian paths. No speed suite, full verify or README example command is part of the lane gate.
 
+
+### Batch 258 image correctness
+After build:packages, run node --test --test-timeout=120000 packages/ui/tests/image.test.js. Under one shared GPU slot run node packages/ui/tests/image-browser.mjs, then the same command with --compat. Each mode also runs the preview GL page. The tracked Poly Haven JPG and its CC0 provenance are in examples/assets/source/skinning_ik/textures/polyhaven and examples/assets/skinning-ik-LICENSE.md. The tests assert actual nine-slice/cell/fit pixels, photograph decoding, tint and unchanged uploads. No timing comparison is performed.

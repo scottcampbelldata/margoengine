@@ -1,0 +1,17 @@
+﻿<!doctype html><html lang="en"><meta charset="utf-8"><title>UI image correctness</title><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block;width:400px;height:240px}</style><canvas width="400" height="240"></canvas><script type="module">
+import {Engine} from '@margoengine/core';
+import {Ui,UiRenderer,Panel} from '@margoengine/ui';
+import {Image,ImageTexture} from '@margoengine/ui/image';
+import {webglRenderer} from '@margoengine/webgl2-compat/preview';
+const canvas=document.querySelector('canvas'),preview=new URLSearchParams(location.search).has('preview'),engine=await Engine.create(canvas,preview?{backend:'webgl2',fallback:webglRenderer}:{}),ui=new Ui({safeArea:[0,0,0,0],reducedMotion:true});engine.scene.background='#101010';
+const errors=[];engine.gpu?.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const bytes=new Uint8Array(9*9*4),colors=[[255,0,0,255],[0,0,0,255],[0,255,0,255],[0,0,0,255],[255,255,255,255],[0,0,0,255],[0,0,255,255],[0,0,0,255],[255,255,0,255]];
+for(let y=0;y<9;y++)for(let x=0;x<9;x++)bytes.set(colors[Math.floor(y/3)*3+Math.floor(x/3)],(y*9+x)*4);
+const texture=new ImageTexture(9,9,bytes),nine=new Image({texture,width:60,height:60,slice:3,borderScale:2,anchor:'top-left',margin:10}),cell=new Image({texture,source:{x:6,y:0,width:3,height:3},width:60,height:60,fit:'fill',anchor:'top-left',margin:[10,0,0,90]}),contain=new Image({texture:new ImageTexture(2,1,new Uint8Array([255,0,255,255,255,0,255,255])),width:60,height:60,anchor:'top-left',margin:[10,0,0,170]});
+ui.add(nine,cell,contain);const renderer=UiRenderer.attach(engine,ui,{input:false,mirror:false});await ui.ready;
+// CC0 Poly Haven real photograph, already an owned development asset.
+const realTexture=await ImageTexture.load('/examples/assets/source/skinning_ik/textures/polyhaven/wood_table_worn/wood_table_worn_diff_1k.jpg');
+const real=new Image({texture:realTexture,width:80,height:80,anchor:'top-left',margin:[100,0,0,10]});ui.add(real);
+async function frame(){engine.render(0);const bitmap=await createImageBitmap(canvas),copy=new OffscreenCanvas(bitmap.width,bitmap.height),g=copy.getContext('2d',{willReadFrequently:true});g.drawImage(bitmap,0,0);bitmap.close();const data=g.getImageData(0,0,copy.width,copy.height).data;return {at:(x,y)=>[...data.slice((y*copy.width+x)*4,(y*copy.width+x)*4+4)],stats:{...renderer.stats}};}
+window.imageTest={ImageTexture,frame,ui,nine,cell,contain,real,realTexture,errors,engine,renderer,close:()=>{engine.dispose();ui.dispose();}};
+</script></html>

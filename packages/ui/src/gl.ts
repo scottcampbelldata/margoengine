@@ -75,6 +75,11 @@ void main() {
   vec4 t = textureLod(colorAtlas, vec3(vUv, vInfo.x), 0.0);
   if (vInfo.y > 0.5) {
     if (frame.z > 0.5 && t.a > 0.0) t = vec4(toLinear(t.rgb / t.a) * t.a, t.a);
+    if (vInfo.y > 1.5) {
+      vec3 tint = frame.z > 0.5 ? toLinear(vTint.rgb) : vTint.rgb;
+      color = vec4(t.rgb * tint, t.a) * vTint.a;
+      return;
+    }
     color = t * vTint.a;
     return;
   }
@@ -121,7 +126,8 @@ class GlAtlas implements GlyphPages {
       );
     slot = packed;
     this.slots.set(glyph, slot);
-    if (slot.page >= this.layers) this.allocate(Math.min(this.packer.maxPages, Math.max(slot.page + 1, this.layers * 2)));
+    if (slot.page >= this.layers)
+      this.allocate(Math.min(this.packer.maxPages, Math.max(slot.page + 1, this.layers * 2)));
     else this.upload(glyph, slot);
     return slot;
   }
@@ -290,6 +296,8 @@ export class GlUiPainter {
     gl.enable(gl.SCISSOR_TEST);
     this.sdfAtlas.bind(0);
     this.colorAtlas.bind(1);
+    // Empty atlases allocate their placeholder on bind, after batch upload.
+    this.uploadedAtlas = key();
     let current: GlProgram | undefined;
     for (const run of batch.runs) {
       const p = run.glyphs ? this.glyph : this.rect,

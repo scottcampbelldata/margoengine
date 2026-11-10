@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12288701,
+  "total": 12291402,
   "history": [
     {
       "date": "2026-10-24",
@@ -5569,6 +5569,12 @@
       "commit": "batch-171-atmosphere",
       "grew": 3,
       "reason": "Atmosphere globe retains one physical sky owner and existing tile/mesh/GPU-flow owners. New sciviz/atmosphere 0 to 32092 B and sky/planet 0 to 4687 B; flow recorded ceiling 8854 to measured 9118 B for optional draw projection/transport. The atmosphere entry includes the exact existing colormaps and composed geometry/flow APIs; splitting would duplicate owners or make a usable globe require manual transport binding. Core/stage unchanged."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "5a32a0b2c",
+      "reason": "Optional ui/image: 0 to 2524 B gzip, ceiling 2700 B. UI root 31885 to 32080 B uses existing ordered colour quads instead of a separate pipeline. Core+stage remains 23950 B. Input and image widgets share UI text dependency.",
+      "grew": 2
     }
   ],
   "items": {
@@ -6622,6 +6628,8 @@
     "@margoengine/audio/pan": 933,
     "@margoengine/controls/device-orientation": 3770,
     "@margoengine/sciviz/atmosphere": 33055,
-    "@margoengine/sky/planet": 4943
+    "@margoengine/sky/planet": 4943,
+    "@margoengine/ui/image": 2700,
+    "leak @margoengine/ui/image -> @margoengine/text": 1
   }
 }

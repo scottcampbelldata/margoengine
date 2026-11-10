@@ -3881,3 +3881,11 @@ The official NOAA demo uses the hash-pinned public-domain wind.bin. Sigma 0.995 
 
 
 Job 6 entry bytes (min+gzip): sciviz/atmosphere absent to 32092 B (ceiling 33055); sky/planet absent to 4687 B (ceiling 4943); flow previously ceiling 8854, now measured 9118 B (ceiling 9392). The composed entry retains exact existing colormap data and single authoritative geometry/flow/sky implementations. A split would add manual binding and ownership complexity. Core/stage source is unchanged, 23950 B combined in this build, below 25000.
+
+## Batch 258 image scope
+
+ImageTexture copies straight-alpha RGBA8 sRGB pixels, decodes browser images with AbortSignal, and snapshots canvas/image/video sources. Images default to contain, centered in the content box; cover crops and fill stretches. Source is an integer pixel atlas cell. Nine-slice borders are source pixels times borderScale (default 1); they override fit and shrink uniformly if the target cannot fit both borders. Tint defaults to opaque white. No GPU objects are exposed or borrowed from core.
+
+Cells are cached as 60-pixel tiles with a one-texel neighbor gutter per side. Filter footprints clamp at cell boundaries, and alpha is premultiplied before filtering. UI's colour atlas controls total residency: default 512-square pages, 16 pages; increase colorAtlasSize/maxPages for more images. Its configured atlas limits still throw when exhausted. Source pixel buffers and cached tiles are CPU memory retained with ImageTexture. Dropping it releases unreferenced source storage; tiles already admitted to a renderer atlas remain until atlas eviction or renderer disposal. Edits use a new ImageTexture. Raw preview GL retains its existing encoded-space compositing; complete compatibility follows the WebGPU path. No speed claim or GPU render-target input is made.
+
+Batch 258 job 2 sizes: image 0 to 2524 B min+gzip, ceiling 2700 B; UI root 31885 to 32080 B. The small root addition preserves ordered mixed-image drawing using existing colour quads; a separate painter would require another pipeline and pass coordination. Core + stage stays 23950 B.

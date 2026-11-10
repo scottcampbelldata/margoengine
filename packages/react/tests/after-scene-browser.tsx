@@ -341,6 +341,7 @@ async function mount(next: Mode, src = assetSrc, defer = false) {
   root.render(<Scene />);
   if (defer) {
     await until(() => !!document.querySelector('[data-loading="skin"]'), 'Suspense fallback');
+    await until(() => assetRequests === 1 && !!releaseAsset, 'held asset request');
     await settle();
   } else {
     await until(ready, 'scene ready');

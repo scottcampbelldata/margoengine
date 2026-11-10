@@ -84,6 +84,11 @@ struct GlyphOut {
   if (g.info.y > 0.5) {
     // Colour glyph (emoji): premultiplied sRGB texels, no field.
     if (frame.linear > 0.5 && tint.a > 0.0) { tint = vec4f(toLinear(tint.rgb / tint.a) * tint.a, tint.a); }
+    if (g.info.y > 1.5) {
+      var color = g.color.rgb;
+      if (frame.linear > 0.5) { color = toLinear(color); }
+      return vec4f(tint.rgb * color, tint.a) * g.color.a;
+    }
     return tint * g.color.a;
   }
   // Signed distance in texels, positive outside; the outline grows it by info.z screen pixels.

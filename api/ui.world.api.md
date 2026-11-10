@@ -145,7 +145,7 @@ interface DialogOptions {
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
-type DrawCommand = RectCommand | TextCommand | ClipCommand | UnclipCommand;
+type DrawCommand = RectCommand | TextCommand | ClipCommand | UnclipCommand | ImageCommand;
 
 interface DrawContext {
     list: DrawList;
@@ -169,6 +169,22 @@ class DrawList {
 }
 
 type Edges = number | readonly [number, number] | readonly [number, number, number, number];
+
+interface ImageCommand {
+    type: 'image';
+    bitmap: import('@margoengine/text').GlyphBitmap;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    source: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    };
+    color: Rgba;
+}
 
 type InputSource = 'pointer' | 'touch' | 'keyboard' | 'gamepad';
 

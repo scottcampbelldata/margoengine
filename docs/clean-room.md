@@ -57,6 +57,22 @@ SQLite WAL is a same-host adapter; other shared stores implement PresenceStore
 or RoomPresence. No distributed-consensus or cross-host SQLite claim. No source
 or companion code read; no rival dependency, new asset demo or timing claim.
 
+## Batch 258 job 2: image widgets and atlas lifetime
+
+Dependent-gate fixture repair: React's official lazy reference (Meta contributors, accessed 2026, https://react.dev/reference/react/lazy) specifies Promise-backed code loading and Suspense fallback, not arrival of an asset fetch. Compare WHATWG's HTML Living Standard event-loop processing (2026, https://html.spec.whatwg.org/multipage/webappapis.html#event-loops). The after-scene fixture previously returned after fallback commit plus a task; the next lazy module had not always reached fetch, producing assetRequests 0 against the unchanged exact assertion of 1. It now uses its existing bounded readiness helper for the actual held request/release latch. No engine code, deadline or assertion changes. The retained GPU failure and succeeding fixture gate are the regression evidence.
+
+
+Research compared specifications, a texture-atlas paper and incremental rendering research:
+- Tab Atkins Jr., Elika J. Etemad and Lea Verou (editors), *CSS Images Module Level 3* (2023), https://www.w3.org/TR/css-images-3/ . Use its contain/cover/fill geometry, with centered placement and cropped source coordinates for cover.
+- NVIDIA, *Improve Batching Using Texture Atlases*, WP-01387-001-v01 (2004), https://download.nvidia.com/developer/NVTextureSuite/Atlas_Tools/Texture_Atlas_Whitepaper.pdf . Compare atlas packing and filtering hazards. Our original implementation splits cells into 60-pixel tiles with neighboring filter texels and clamps only at the cell boundary, keeping unrelated cells out of bilinear footprints.
+- Michael Woerister, Harald Steinlechner, Stefan Maierhofer and Robert F. Tobler, *Lazy Incremental Computation for Efficient Scene Graph Rendering* (HPG 2013 presentation), https://www.highperformancegraphics.org/wp-content/uploads/2013/Steinlechner-LazySG.pdf . Retain a separate rendering cache and synchronize its actual dependencies; no scene reordering is needed here.
+- GPU for the Web Working Group, *WebGPU* (2026), https://www.w3.org/TR/webgpu/ . Bind groups retain texture views. A lazily allocated placeholder changes our atlas generation during binding, so both WebGPU and preview GL cache keys now capture the generation after views exist. The image-only second-frame regression originally observed 1 upload instead of 0; the test retains its exact zero assertion.
+- PlayCanvas contributors, *9-slicing* (accessed 2026), https://developer.playcanvas.com/user-manual/2D/slicing/ . Documentation comparison only: fixed corners, stretchable edge strips and center. Our nine patches use independent source and target rectangles and shrink borders proportionately when a target cannot fit them.
+
+Combined original design: optional Image/ImageTexture owns decoding, atlas cells, fit, slicing and tint. A small image command in UI reuses the existing colour quad instances, preserving text/rectangle/image order and clipping on WebGPU, complete compatibility and preview GL. Straight input RGBA is copied and premultiplied once per cached tile before filtering. Source, border and tint inputs are copied; a CPU regression mutates caller arrays and returned copies. No rival or companion implementation source was read or copied. No elapsed-speed claim is made.
+
+The real photographic test uses Wood Table Worn by Dimitrios Savva, processing by Rico Cilliers, Poly Haven CC0-1.0, https://polyhaven.com/a/wood_table_worn . It reuses the tracked original JPG and provenance in examples/assets/skinning-ik-LICENSE.md and its texture manifest. Other colour patches are original deterministic test fixtures.
+
 ## Batch 256 job 1: room lobby and one-time seats
 
 Research compared before implementation: Cary G. Gray and David R. Cheriton,

@@ -8,6 +8,10 @@ Initialize the timer before notifying peers and stop recovery work once authorit
 is ready. The synchronous-transport case in packages/netcode/tests/migrate.test.js
 fails before the change and stays ready past the deadline afterward.
 
+### Batch 258 image checks
+
+Fixed within the image job: four-value slice arrays previously remained aliased after validation; defensive copies now cover construction, assignment and reads. Lazy creation of an unused SDF atlas placeholder changed generation after the upload key was captured, causing one redundant image-only second-frame upload. Both WebGPU and GL now retain the post-binding generation. image.test.js and image-browser.mjs preserve the regressions. No other UI defect is being repaired in this build job.
+
 ### Batch 258 text fields
 
 Tooling follow-up: running quality concurrently with React subpath CPU tests
@@ -4166,3 +4170,7 @@ cleanup and the default inspector's survival.
 Outside batch 262: tests/api-conventions.test.js:72 falsely rejects controls.globe.api.md GlobeControls. Its classes map reads exported declarations only, but GlobeControls inherits static attach from the unexported Controls declaration retained in that report. Repro: node --test tests/api-conventions.test.js. The runtime class has the inherited factory; the report scanner must include local bases while checking exported classes.
 
 Batch 171 job 6, small fix-phase follow-up under rule 22: clearing the optional demo UTC datetime input passes an invalid Date from its change handler to globe.setDate, which correctly rejects but leaves the event unhandled. Repro: clear Sun (UTC) in examples/sciviz-atmosphere.html. Cause: the demo does not validate the empty datetime value before calling the typed solar API. The default valid date, API input checks and complete globe feature pass.
+
+Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
+
+Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles remain resident until atlas eviction/renderer disposal. Repro: create, draw and remove a sequence of new ImageTexture objects; the colour atlas retains their tile slots. Cause: image tiles share the glyph atlas lifetime. These build-phase quality gaps are queued in private finish-later, with residency limits documented.

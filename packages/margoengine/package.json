@@ -3314,6 +3314,10 @@
       "types": "./dist/ui/markup.d.ts",
       "import": "./dist/ui/markup.js"
     },
+    "./ui/image": {
+      "types": "./dist/ui/image.d.ts",
+      "import": "./dist/ui/image.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

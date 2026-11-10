@@ -114,3 +114,10 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | @margoengine/sciviz | Document atmosphere globe creation, UTC solar time, metre heights, wind units, scalar/point/cloud layers, disposal and model limits. | Batch 171 job 6 |
 | @margoengine/sky | Document the planet entry frame, Hillaire transport bindings, physical limits and disposal. | Batch 171 job 6 |
 | margoengine | Document the sciviz/atmosphere and sky/planet aliases. | Batch 171 job 6 |
+
+
+
+| @margoengine/ui | ui/image: ImageTexture loading and snapshots, Image fit/source/slice/tint options, atlas residency and disposal by ownership. | batch-258 job 2 |
+| margoengine | ui/image umbrella alias and image widget setup. | batch-258 job 2 |
+
+| @margoengine/react | Review UI image usage from the React canvas during the README phase; no public React API change. | batch-258 job 2 |

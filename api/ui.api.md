@@ -91,7 +91,7 @@ export interface DialogOptions {
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
-export type DrawCommand = RectCommand | TextCommand | ClipCommand | UnclipCommand;
+export type DrawCommand = RectCommand | TextCommand | ClipCommand | UnclipCommand | ImageCommand;
 
 export interface DrawContext {
     list: DrawList;
@@ -123,6 +123,22 @@ export class HealthBar extends ProgressBar {
 export interface HealthBarOptions extends Omit<ProgressBarOptions, 'variant' | 'trail'> {
     value?: number;
     max?: number;
+}
+
+export interface ImageCommand {
+    type: 'image';
+    bitmap: import('@margoengine/text').GlyphBitmap;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    source: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    };
+    color: Rgba;
 }
 
 export type InputSource = 'pointer' | 'touch' | 'keyboard' | 'gamepad';

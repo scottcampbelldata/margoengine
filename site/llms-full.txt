@@ -6472,6 +6472,14 @@ The official NOAA demo uses the hash-pinned public-domain wind.bin. Sigma 0.995 
 
 Job 6 entry bytes (min+gzip): sciviz/atmosphere absent to 32092 B (ceiling 33055); sky/planet absent to 4687 B (ceiling 4943); flow previously ceiling 8854, now measured 9118 B (ceiling 9392). The composed entry retains exact existing colormap data and single authoritative geometry/flow/sky implementations. A split would add manual binding and ownership complexity. Core/stage source is unchanged, 23950 B combined in this build, below 25000.
 
+## Batch 258 image scope
+
+ImageTexture copies straight-alpha RGBA8 sRGB pixels, decodes browser images with AbortSignal, and snapshots canvas/image/video sources. Images default to contain, centered in the content box; cover crops and fill stretches. Source is an integer pixel atlas cell. Nine-slice borders are source pixels times borderScale (default 1); they override fit and shrink uniformly if the target cannot fit both borders. Tint defaults to opaque white. No GPU objects are exposed or borrowed from core.
+
+Cells are cached as 60-pixel tiles with a one-texel neighbor gutter per side. Filter footprints clamp at cell boundaries, and alpha is premultiplied before filtering. UI's colour atlas controls total residency: default 512-square pages, 16 pages; increase colorAtlasSize/maxPages for more images. Its configured atlas limits still throw when exhausted. Source pixel buffers and cached tiles are CPU memory retained with ImageTexture. Dropping it releases unreferenced source storage; tiles already admitted to a renderer atlas remain until atlas eviction or renderer disposal. Edits use a new ImageTexture. Raw preview GL retains its existing encoded-space compositing; complete compatibility follows the WebGPU path. No speed claim or GPU render-target input is made.
+
+Batch 258 job 2 sizes: image 0 to 2524 B min+gzip, ceiling 2700 B; UI root 31885 to 32080 B. The small root addition preserves ordered mixed-image drawing using existing colour quads; a separate painter would require another pipeline and pass coordination. Core + stage stays 23950 B.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6483,6 +6491,10 @@ then the returning outer frame armed a deadline that closed the healthy session.
 Initialize the timer before notifying peers and stop recovery work once authority
 is ready. The synchronous-transport case in packages/netcode/tests/migrate.test.js
 fails before the change and stays ready past the deadline afterward.
+
+### Batch 258 image checks
+
+Fixed within the image job: four-value slice arrays previously remained aliased after validation; defensive copies now cover construction, assignment and reads. Lazy creation of an unused SDF atlas placeholder changed generation after the upload key was captured, causing one redundant image-only second-frame upload. Both WebGPU and GL now retain the post-binding generation. image.test.js and image-browser.mjs preserve the regressions. No other UI defect is being repaired in this build job.
 
 ### Batch 258 text fields
 
@@ -10642,6 +10654,10 @@ cleanup and the default inspector's survival.
 Outside batch 262: tests/api-conventions.test.js:72 falsely rejects controls.globe.api.md GlobeControls. Its classes map reads exported declarations only, but GlobeControls inherits static attach from the unexported Controls declaration retained in that report. Repro: node --test tests/api-conventions.test.js. The runtime class has the inherited factory; the report scanner must include local bases while checking exported classes.
 
 Batch 171 job 6, small fix-phase follow-up under rule 22: clearing the optional demo UTC datetime input passes an invalid Date from its change handler to globe.setDate, which correctly rejects but leaves the event unhandled. Repro: clear Sun (UTC) in examples/sciviz-atmosphere.html. Cause: the demo does not validate the empty datetime value before calling the typed solar API. The default valid date, API input checks and complete globe feature pass.
+
+Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
+
+Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles remain resident until atlas eviction/renderer disposal. Repro: create, draw and remove a sequence of new ImageTexture objects; the colour atlas retains their tile slots. Cause: image tiles share the glyph atlas lifetime. These build-phase quality gaps are queued in private finish-later, with residency limits documented.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

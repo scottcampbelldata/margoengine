@@ -33,6 +33,19 @@ export interface TextCommand {
   outlineColor: Rgba;
 }
 
+/** A premultiplied RGBA tile from the optional image widget, in device pixels. */
+export interface ImageCommand {
+  type: 'image';
+  bitmap: import('@margoengine/text').GlyphBitmap;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Source texel rectangle within the bitmap, including its filter gutter. */
+  source: { x: number; y: number; width: number; height: number };
+  color: Rgba;
+}
+
 /** Start clipping to a rectangle in pixels, inside any clip already active. Matched by an {@link UnclipCommand}. */
 export interface ClipCommand {
   type: 'clip';
@@ -48,7 +61,7 @@ export interface UnclipCommand {
 }
 
 /** One step of a {@link DrawList}. */
-export type DrawCommand = RectCommand | TextCommand | ClipCommand | UnclipCommand;
+export type DrawCommand = RectCommand | TextCommand | ClipCommand | UnclipCommand | ImageCommand;
 
 /** Options for {@link DrawList.rect}; colours default to transparent. */
 export interface RectStyle {

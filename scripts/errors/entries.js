@@ -901,6 +901,15 @@ export const entries = [
     title: '@margoengine/ui: widgets, layout, themes and input',
     kind: 'family',
     messages: [
+      'ImageTexture needs positive integer dimensions and width * height * 4 RGBA bytes',
+      'ImageTexture.from needs a decoded image or a video with a current frame',
+      'Image needs an ImageTexture; load or create one first',
+      'Image fit must be contain, cover or fill',
+      'Image source must be an integer pixel rectangle inside its texture',
+      'Image borderScale must be finite and nonnegative and tint must contain four values in [0,1]',
+      'Image slice borders must be nonnegative and fit within the source rectangle',
+      'Could not decode the UI image; use a supported, CORS-accessible image URL in a browser',
+
       'TextInput value, placeholder and autocomplete must be strings',
       "TextInput type is 'text' or 'password'",
       'maxLength is -1 or a non-negative integer',
