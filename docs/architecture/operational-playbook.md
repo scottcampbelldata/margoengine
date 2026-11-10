@@ -6152,3 +6152,6 @@ Optional line entries supply shader transforms and owned bind-group resources to
 
 ### 5. Batch 229 imagery surface evidence
 The new optional terrain/imagery collection patches the lit surface color after the clipmap or RVT color call and before lighting, or the equivalent planet base color. PlanetTerrain gains the existing TerrainLighting contract in its own optional entry; core and stage stay untouched. imagery.test.js covers source addressing, bounded parents, ownership, validation, stale requests and restore; imagery.browser.mjs covers actual slope/planet draping and exact source equivalence on native WebGPU and WebGL2 compatibility. The complete terrain GPU suite runs on both backends; CPU dependents include biomes and the umbrella facade tests. Multi-GPU hardware coverage and quiet timing are not claimed.
+### Section 5 evidence: graph transition clocks (batch 211 job 3)
+
+Graph source selection and normalized destination entry are CPU pose controls; GPU skinning is unchanged. The fade uses elapsed seconds independently of destination time. CPU tests assert exact event boundaries, policy precedence, source chaining and continuity of the captured blended pose. The Fox GPU fixture exercises the new offset through the existing palette on both backends. No speed claim.

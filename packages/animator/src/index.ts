@@ -184,7 +184,7 @@ export interface AnimatorState {
   layers: AnimatorLayer[];
   rest: SavedPose;
   current: SavedPose;
-  fade?: { pose: SavedPose; elapsed: number; duration: number; from: string };
+  fade?: { pose: SavedPose; elapsed: number; duration: number; from: string; fromTime?: number };
 }
 const savePose = (p: Pose): SavedPose => ({
   position: p.position.map((v) => [...v]),
@@ -259,7 +259,7 @@ export class Animator implements EnginePlugin {
   private readonly weightNodes: number[];
   private readonly morphed: Set<number>;
   private readonly applied: Float64Array[];
-  private fade?: { pose: Pose; elapsed: number; duration: number; from: string };
+  private fade?: { pose: Pose; elapsed: number; duration: number; from: string; fromTime?: number };
   private entry = 0;
   private readonly clocks = new Map<string, StateClock>();
   private layers = new Set<AdditiveLayer>();
@@ -511,7 +511,8 @@ export class Animator implements EnginePlugin {
         !nonnegative(f.elapsed) ||
         !nonnegative(f.duration) ||
         f.duration === 0 ||
-        f.elapsed >= f.duration
+        f.elapsed >= f.duration ||
+        (f.fromTime !== undefined && !nonnegative(f.fromTime))
       )
         fail();
       fade = { ...f, pose: loadPose(f.pose) };
@@ -556,7 +557,7 @@ export class Animator implements EnginePlugin {
       );
     if (state === this.state) return this;
     const from = this.state;
-    this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration, from } : undefined;
+    this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration, from, fromTime: this.time } : undefined;
     this.state = state;
     this.time = 0;
     this.entry = 0;
@@ -571,6 +572,14 @@ export class Animator implements EnginePlugin {
   get normalizedTime(): number {
     const duration = this.durations.get(this.state) ?? 0;
     return duration > 0 ? this.time / duration : 1;
+  }
+  /** @internal Duration in seconds of a state's longest leaf clip. */
+  stateDuration(state: string): number {
+    return this.durations.get(state) ?? 0;
+  }
+  /** @internal Borrowed crossfade clock and source, for optional graph interruption policies. */
+  get transitionInfo(): Readonly<{ from: string; fromTime?: number; elapsed: number; duration: number }> | undefined {
+    return this.fade;
   }
   /** Sets a trigger: the next transition that lists it (and whose other conditions hold) is taken and clears it. */
   setTrigger(name: string): this {

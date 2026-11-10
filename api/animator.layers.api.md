@@ -52,6 +52,13 @@ class Animator implements EnginePlugin {
     restoreState(state: AnimatorState): this;
     transition(state: string, duration?: number): this;
     get normalizedTime(): number;
+    stateDuration(state: string): number;
+    get transitionInfo(): Readonly<{
+        from: string;
+        fromTime?: number;
+        elapsed: number;
+        duration: number;
+    }> | undefined;
     setTrigger(name: string): this;
     resetTrigger(name: string): this;
     hasTrigger(name: string): boolean;
@@ -157,6 +164,7 @@ interface AnimatorState {
         elapsed: number;
         duration: number;
         from: string;
+        fromTime?: number;
     };
 }
 
@@ -203,6 +211,8 @@ type GraphComparison = '>' | '>=' | '<' | '<=' | '==' | '!=';
 
 type GraphCondition = readonly [parameter: string] | readonly [parameter: string, comparison: GraphComparison, value: number | boolean];
 
+type GraphInterruptionSource = 'none' | 'current' | 'next' | 'both' | 'current-next' | 'next-current';
+
 type GraphParameter = GraphParameterType | {
     type: 'float' | 'int';
     default?: number;
@@ -222,6 +232,8 @@ interface GraphTransition {
     exitTime?: number;
     duration?: number;
     interruptible?: boolean;
+    offset?: number;
+    interruptionSource?: GraphInterruptionSource;
 }
 
 interface GroundHit {

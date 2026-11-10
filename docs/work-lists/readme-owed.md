@@ -568,3 +568,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/terrain | imagery: XYZ/WMTS/GPU sources, ordered alpha/brightness/bounds, cancellation, residency, credits and planet surface hooks | batch-229 job 1 |
 | margoengine | Generated terrain/imagery facade and lazy optional entry usage | batch-229 job 1 |
+- @margoengine/animator (batch 211 job 3): document graph offset, interruptionSource including both precedence orders, legacy interruptible defaults, event entry boundaries and independent fade/source clocks; examples deferred.
+
+- margoengine (batch 211 job 3): regenerated alias ordering after rebase; no example work during build phase.

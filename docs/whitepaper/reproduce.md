@@ -3225,3 +3225,6 @@ Build packages, then run node --test --test-timeout=120000 packages/lines/tests/
 
 ### Batch 229 imagery
 Build with npm run build:packages. Run node --test --test-timeout=120000 packages/terrain/test/imagery.test.js. Render with node scripts/gpu-lock.mjs run --owner=imagery-repro --wait-max=60 --max=4 -- node packages/terrain/test/imagery.browser.mjs; repeat with --compat appended to the browser command. The existing terrain GPU script covers the whole changed package. Reports are written to test-results/terrain-imagery.json. No full verify or README checks are lane gates.
+### Batch 211 job 3
+
+Build packages, then node --test packages/animator/test/transitions.test.js tests/modern-animator-graph.test.js. The animator GPU package suite runs through the shared GPU lock; run again with MARGO_COMPAT=1. The real Fox graph transitions to Run at normalized offset 0.25.

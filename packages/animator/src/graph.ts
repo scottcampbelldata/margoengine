@@ -30,6 +30,8 @@ export type GraphComparison = '>' | '>=' | '<' | '<=' | '==' | '!=';
 export type GraphCondition =
   | readonly [parameter: string]
   | readonly [parameter: string, comparison: GraphComparison, value: number | boolean];
+/** Which state may supply a transition during a crossfade. Both is current-next. */
+export type GraphInterruptionSource = 'none' | 'current' | 'next' | 'both' | 'current-next' | 'next-current';
 /** A transition of the graph. It is taken when every condition holds and its `exitTime`, when it has one, is reached. */
 export interface GraphTransition {
   /** The state it leaves, or `'*'` for any state but `to`. */
@@ -47,6 +49,10 @@ export interface GraphTransition {
    * false holds every other transition until the crossfade ends (a landing that must finish).
    */
   interruptible?: boolean;
+  /** Destination normalized start, 0..1. Default 0. */
+  offset?: number;
+  /** Allowed interruption sources and precedence. Default next, or none when interruptible is false. */
+  interruptionSource?: GraphInterruptionSource;
 }
 /** An animation state graph: plain data, so it saves and loads as JSON. */
 export interface AnimatorGraphDocument {
@@ -95,13 +101,17 @@ export class AnimatorGraph {
   private readonly triggers = new Set<string>();
   /** The transition whose `when` just passed, read by the statechange listener that follows it. */
   private taking?: GraphTransition;
-  /** Seconds into the current state during which no transition may cut in (an uninterruptible crossfade). */
-  private hold = 0;
+  /** The transition controlling the active crossfade's interruption policy. */
+  private active?: GraphTransition;
+  private source?: { state: string; time: number };
+  private takingSource?: { state: string; time: number };
+  private readonly document: AnimatorGraphDocument;
   private readonly off: () => void;
   private disposed = false;
 
   /** Validates `document` and builds its Animator on `animation` (not yet attached to the engine). */
   constructor(animation: Animation, document: AnimatorGraphDocument) {
+    this.document = document;
     if (!document || typeof document !== 'object')
       throw new TypeError('An animator graph needs a document: {states, initial, parameters?, transitions?}.');
     const parameters: Record<string, number> = {};
@@ -147,32 +157,82 @@ export class AnimatorGraph {
     return graph;
   }
 
+  private readonly compiled = new Map<GraphTransition, Compiled[]>();
   private compile(transition: GraphTransition): AnimatorTransition {
     if (!transition || typeof transition !== 'object')
       throw new TypeError('Animator graph transitions must be objects: {from, to, conditions?, exitTime?}.');
-    const { conditions = [], interruptible = true } = transition;
+    const { conditions = [], interruptible = true, offset = 0, interruptionSource } = transition;
     if (!Array.isArray(conditions) || typeof interruptible !== 'boolean')
       throw new TypeError('Animator graph transition conditions must be an array and interruptible a boolean.');
     if (!conditions.length && transition.exitTime === undefined)
       throw new TypeError(
-        `Animator graph transition ${transition.from} to ${transition.to} needs conditions or an exitTime; it would fire every frame.`,
+        'Animator graph transition needs conditions or an exitTime; add one to avoid firing every frame.',
+      );
+    if (
+      !Number.isFinite(offset) ||
+      offset < 0 ||
+      offset > 1 ||
+      (interruptionSource !== undefined &&
+        !['none', 'current', 'next', 'both', 'current-next', 'next-current'].includes(interruptionSource))
+    )
+      throw new TypeError(
+        'Animator graph offset must be 0..1 and interruptionSource none, current, next, both, current-next or next-current; correct the transition',
+      );
+    if (
+      (transition.from !== '*' && !Object.hasOwn(this.document.states, transition.from)) ||
+      !Object.hasOwn(this.document.states, transition.to) ||
+      (transition.exitTime !== undefined && (!Number.isFinite(transition.exitTime) || transition.exitTime < 0))
+    )
+      throw new TypeError(
+        'Animator graph transition needs known states and finite nonnegative exitTime; correct from, to or exitTime',
       );
     const compiled = conditions.map((condition) => this.condition(condition));
-    const consumed = compiled.filter((c) => c.type === 'trigger').map((c) => c.name);
+    this.compiled.set(transition, compiled);
     return {
-      from: transition.from,
+      from: '*',
       to: transition.to,
-      exitTime: transition.exitTime,
       duration: transition.duration,
       when: (values) => {
-        if (this.animator.time < this.hold) return false;
-        for (const c of compiled) if (!this.holds(c, values)) return false;
-        // The Animator takes the transition whenever `when` passes, so consume its triggers now.
-        for (const name of consumed) this.triggers.delete(name);
+        const choice = this.choose(values);
+        if (choice?.transition !== transition) return false;
+        this.takingSource = { state: choice.source, time: choice.time };
+        for (const c of compiled) if (c.type === 'trigger') this.triggers.delete(c.name);
         this.taking = transition;
         return true;
       },
     };
+  }
+
+  private choose(
+    values: Readonly<Record<string, number>>,
+  ): { transition: GraphTransition; source: string; time: number } | undefined {
+    const animator = this.animator,
+      fade = animator.transitionInfo;
+    const previous = this.source ?? { state: fade?.from ?? animator.state, time: fade?.fromTime ?? 0 };
+    let sources = [animator.state];
+    if (fade) {
+      const policy = this.active?.interruptionSource ?? (this.active?.interruptible === false ? 'none' : 'next');
+      if (policy === 'none') return undefined;
+      sources =
+        policy === 'current'
+          ? [previous.state]
+          : policy === 'next'
+            ? [animator.state]
+            : policy === 'next-current'
+              ? [animator.state, previous.state]
+              : [previous.state, animator.state];
+    }
+    for (const source of sources)
+      for (const transition of this.document.transitions ?? []) {
+        if (transition.to === animator.state || (transition.from !== '*' && transition.from !== source)) continue;
+        const time =
+          fade && source === previous.state ? previous.time + fade.elapsed * animator.clipRate : animator.time;
+        const duration = animator.stateDuration(source);
+        if (transition.exitTime !== undefined && (duration > 0 ? time / duration : 1) < transition.exitTime) continue;
+        if (this.compiled.get(transition)!.every((condition) => this.holds(condition, values)))
+          return { transition, source, time };
+      }
+    return undefined;
   }
 
   private condition(condition: GraphCondition): Compiled {
@@ -228,8 +288,10 @@ export class AnimatorGraph {
   private changed(change: AnimatorEventMap['statechange']): void {
     const taken = this.taking;
     this.taking = undefined;
-    // A state entered by animator.transition() (not a graph transition) holds nothing.
-    this.hold = taken?.interruptible === false ? change.duration : 0;
+    this.active = taken;
+    this.source = this.takingSource;
+    this.takingSource = undefined;
+    if (taken?.offset !== undefined) this.animator.enterAt(taken.offset * this.animator.stateDuration(change.to));
   }
 
   private check(name: string, type: GraphParameterType, value: unknown): number {

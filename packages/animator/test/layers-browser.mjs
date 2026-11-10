@@ -23,7 +23,13 @@ try {
     const upper = addStateLayer(animator, {
       graph: {
         initial: 'survey',
-        parameters: { a: { type: 'float', default: 1 }, b: { type: 'float', default: 1 }, x: 'float', y: 'float' },
+        parameters: {
+          a: { type: 'float', default: 1 },
+          b: { type: 'float', default: 1 },
+          x: 'float',
+          y: 'float',
+          go: 'trigger',
+        },
         states: {
           survey: createBlendTree({
             type: 'direct',
@@ -44,12 +50,22 @@ try {
           }),
           run: 'Run',
         },
+        transitions: [
+          {
+            from: 'survey',
+            to: 'run',
+            conditions: [['go']],
+            duration: 0.1,
+            offset: 0.25,
+            interruptionSource: 'current',
+          },
+        ],
       },
       weight: 0.5,
       mask: model.nodes.map((_, id) => id),
     });
     animator.onPreUpdate(0.2);
-    upper.graph.animator.transition('run', 0.1);
+    upper.graph.trigger('go');
     animator.onPreUpdate(0.15);
     await engine.render({ delta: 0 });
     window.layerFixture = { engine };
@@ -57,10 +73,15 @@ try {
       base: animator.state,
       layer: upper.graph.state,
       time: upper.graph.animator.time,
+      offset: upper.graph.animator.entryTime / upper.graph.animator.stateDuration('run'),
       finite: model.nodes.every((node) => Array.from(node.matrix).every(Number.isFinite)),
     };
   });
-  assert.deepEqual(result, { base: 'walk', layer: 'run', time: 0.15, finite: true });
+  assert.equal(result.base, 'walk');
+  assert.equal(result.layer, 'run');
+  assert.equal(result.offset, 0.25);
+  assert.ok(result.time > 0.15);
+  assert.equal(result.finite, true);
   const png = await decodePNG(await browser.page.locator('canvas').screenshot());
   let lit = 0;
   for (let i = 0; i < png.data.length; i += 4) if (png.data[i] + png.data[i + 1] + png.data[i + 2] > 80) lit++;

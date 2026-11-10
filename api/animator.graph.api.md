@@ -33,6 +33,8 @@ export type GraphComparison = '>' | '>=' | '<' | '<=' | '==' | '!=';
 
 export type GraphCondition = readonly [parameter: string] | readonly [parameter: string, comparison: GraphComparison, value: number | boolean];
 
+export type GraphInterruptionSource = 'none' | 'current' | 'next' | 'both' | 'current-next' | 'next-current';
+
 export type GraphParameter = GraphParameterType | {
     type: 'float' | 'int';
     default?: number;
@@ -52,6 +54,8 @@ export interface GraphTransition {
     exitTime?: number;
     duration?: number;
     interruptible?: boolean;
+    offset?: number;
+    interruptionSource?: GraphInterruptionSource;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -80,6 +84,13 @@ class Animator implements EnginePlugin {
     restoreState(state: AnimatorState): this;
     transition(state: string, duration?: number): this;
     get normalizedTime(): number;
+    stateDuration(state: string): number;
+    get transitionInfo(): Readonly<{
+        from: string;
+        fromTime?: number;
+        elapsed: number;
+        duration: number;
+    }> | undefined;
     setTrigger(name: string): this;
     resetTrigger(name: string): this;
     hasTrigger(name: string): boolean;
@@ -163,6 +174,7 @@ interface AnimatorState {
         elapsed: number;
         duration: number;
         from: string;
+        fromTime?: number;
     };
 }
 

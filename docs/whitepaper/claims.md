@@ -3755,3 +3755,6 @@ The optional stroke entry combines per-point width with normalized world-length 
 
 ### Batch 229 job 1: draped imagery layers
 terrain/imagery supplies the requested XYZ, WMTS and GPU imagery with ordered alpha, brightness and bounds on clipmap and planet surfaces. Evidence is packages/terrain/test/imagery.test.js plus imagery.browser.mjs, including RVT composition and native/compatibility runs. GPU, XYZ and WMTS versions of the CC0 photograph are exact pixel oracles; solid linear colors verify blend/order independently. This is a behavioral job-row claim, not a claim to implement every unrelated Cesium imagery option or a speed comparison.
+### Batch 211 job 3
+
+AnimatorGraph starts destinations at normalized offsets and restricts fade interruptions to current, next, neither or both states in either order. Proof: packages/animator/test/transitions.test.js covers offset events, fade elapsed time, trigger retention, chained interruptions and invalid snapshots; existing modern-animator-graph tests retain prior behaviour. layers-browser.mjs renders the real Fox at a 0.25 normalized entry on both backends. No timing or seamless-motion synthesis claim.

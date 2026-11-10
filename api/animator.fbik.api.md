@@ -84,6 +84,13 @@ class Animator implements EnginePlugin {
     restoreState(state: AnimatorState): this;
     transition(state: string, duration?: number): this;
     get normalizedTime(): number;
+    stateDuration(state: string): number;
+    get transitionInfo(): Readonly<{
+        from: string;
+        fromTime?: number;
+        elapsed: number;
+        duration: number;
+    }> | undefined;
     setTrigger(name: string): this;
     resetTrigger(name: string): this;
     hasTrigger(name: string): boolean;
@@ -167,6 +174,7 @@ interface AnimatorState {
         elapsed: number;
         duration: number;
         from: string;
+        fromTime?: number;
     };
 }
 

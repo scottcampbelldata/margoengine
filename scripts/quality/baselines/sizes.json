@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13215890,
+  "total": 13216978,
   "history": [
     {
       "date": "2026-10-24",
@@ -6660,6 +6660,11 @@
       "commit": "81738add5",
       "reason": "Batch 229 job 1: imagery new 5985 B gzip; planet 6429 to 7282 B for optional surface hooks. Keeping one renderer and lifecycle avoids a fork; no core/stage growth.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-211-job3",
+      "reason": "Graph 9719 -> 10177 B gzip and layers 10281 -> 10730 B. Raise graph ceiling 10011 -> 10483, layers 10436 -> 11052. Offset/source clock separation and complete interruption selection share one controller; splitting would duplicate graph state and trigger ownership."
     }
   ],
   "items": {
@@ -6682,9 +6687,9 @@
     "@margoengine/animator": 20643,
     "@margoengine/animator/blend-trees": 1841,
     "@margoengine/animator/fbik": 5618,
-    "@margoengine/animator/graph": 10011,
+    "@margoengine/animator/graph": 10483,
     "@margoengine/animator/inertialize": 2150,
-    "@margoengine/animator/layers": 10436,
+    "@margoengine/animator/layers": 11052,
     "@margoengine/animator/mirror": 2030,
     "@margoengine/animator/motion-matching": 7250,
     "@margoengine/animator/spline-ik": 4094,
