@@ -413,7 +413,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/ecs (batch 249 job 5): SharedWorld/SharedComponent storage, sharedIndex, ParallelSchedule read/write declarations, module worker assets, dependencies, isolation, update/abort/deadline/disposal, endpoint adapters, partial-write and failed-host semantics.
 - margoengine (batch 249 job 5): generated ecs/parallel alias.
-- @margoengine/selection: document hit-details HitDetails replacement for Picking, fields/defaults, batch staging, core zero UV, overlay/proxy contracts, AbortSignal and disposal (batch 199 job 1).
+- @margoengine/selection: document hit-details HitDetails replacement for Picking, fields/defaults, batch staging, core zero UV, overlay/proxy contracts, AbortSignal and disposal (batch 199 job 1). DONE (selection-readme-phase).
 - @margoengine/cache: replace stale Node-only prefetch/throttle and RangeCache browser/service worker limitations with batch-208 browser evidence; document worker flush lifetime and offline range behavior.
 - @margoengine/ui (batch 259 job 1): document /curved CurvedPanel arc dimensions, ray mapping, segment limits, layoutPanels arrangements and /world-gl renderer setup in the README phase.
 - margoengine (batch 259 job 1): document ui/curved alias in the README phase.
@@ -433,7 +433,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 | margoengine | Generated /sprites/spine alias | batch-245 job 4 |
 | margoengine | Restore the exporters/sparse alias for the export already on main | batch-245 landing mirror repair |
 
-- @margoengine/selection: document xray XRaySelection styling, default cosine pulse, manual time/play, multiview advancement, ownership and disposal (batch 199 job 2).
+- @margoengine/selection: document xray XRaySelection styling, default cosine pulse, manual time/play, multiview advancement, ownership and disposal (batch 199 job 2). DONE (selection-readme-phase).
 
 
 | @margoengine/react | useFrame numeric priorities, positive takeover, demand restoration and XR manual draws | batch 265 job 4  DONE (react-readme-phase) |
@@ -466,7 +466,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - margoengine: document mesh-edit/repair alias in the README phase (batch 224 job 3).
 - @margoengine/loaders (batch 202 job 2): document /vtk-legacy, all five datasets, preserved topology, line/vertex/triangle source cells, point/cell/global data, bounds and outer/all surface policy; examples deferred.
 - margoengine (batch 202 job 2): document loaders/vtk-legacy and the regenerated selection/hit-details alias for the already-landed picking entry.
-- @margoengine/selection: document area AreaPicking, rect/polygon CSS pixel-centre rules, even-odd lassos, view/scissor/layers, identity/order, source/overlay limits, pixel/memory budget, cancellation and shared pick queue (batch 199 job 3).
+- @margoengine/selection: document area AreaPicking, rect/polygon CSS pixel-centre rules, even-odd lassos, view/scissor/layers, identity/order, source/overlay limits, pixel/memory budget, cancellation and shared pick queue (batch 199 job 3). DONE (selection-readme-phase).
 
 - @margoengine/animation: document /playback import, loop modes/counts, events, finished/waitForFinished, negative rates, seek/restart and cancellation defaults (batch 210 job 2).
 - margoengine: document animation/playback and regenerated selection/hit-details aliases (batch 210 job 2).
@@ -509,7 +509,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - margoengine: document the generated sciviz/clip alias with its owning optional entry.
 - @margoengine/usdz: pointInstancers() optional /instancer entry, timeCode/maxNodes, prototype sharing, masks, nesting and worker usage; sampled layers need composition().
 - margoengine: generated usdz/instancer alias; generated selection/hit-details alias restores the export map checked by the existing umbrella test.
-- @margoengine/selection: document highlight Highlight glow/fill, independent colours/opacities, inner/outer toggles, radius/sigma, current-pose visible masks, multiview/lifecycle, memory/defaults and separate named groups (batch 199 job 4).
+- @margoengine/selection: document highlight Highlight glow/fill, independent colours/opacities, inner/outer toggles, radius/sigma, current-pose visible masks, multiview/lifecycle, memory/defaults and separate named groups (batch 199 job 4). DONE (selection-readme-phase).
 - @margoengine/loaders (batch 202 job 3): document /geo readers, mixed primitives, feature addressing, source CRS/precision, holed polygon mesh, Shapefile sidecars/Z/M, GPX/KML metadata, MVT tile conversion, limits and cancellation; examples deferred.
 - margoengine (batch 202 job 3): document loaders/geo and the regenerated selection/area alias for the already-landed entry.
 - @margoengine/road (batch 233 job 2): lanes widths, boundary styles/dashes/phase, curved arrows, reverse direction, junction connector curves/exclusions, height, defaults and runnable example after build phase.
@@ -1129,7 +1129,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/loaders (review 2): clarify the standard VTK type-13 wedge ordering and outward XML/legacy surface winding; examples deferred.
 
-- @margoengine/selection (review 2): describe per-axis CSS/backing-size fallback for SpatialPicking.ray on headless, detached and worker canvases; examples deferred.
+- @margoengine/selection (review 2): describe per-axis CSS/backing-size fallback for SpatialPicking.ray on headless, detached and worker canvases; examples deferred. DONE (selection-readme-phase).
 
 - @margoengine/exporters (review 2): describe optimize-extra pruning of off-scene animation targets, transform ancestors and their skin/joint dependencies; examples deferred.
 
@@ -1480,7 +1480,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/mesh-edit: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
-- @margoengine/selection: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+- @margoengine/selection: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase. DONE (selection-readme-phase).
 
 - @margoengine/cameras: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase. DONE (cameras-readme-phase).
 
@@ -1510,7 +1510,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/dof: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
 
-- @margoengine/selection: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
+- @margoengine/selection: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase. DONE (selection-readme-phase).
 
 - @margoengine/viewcube: after product lands, add its J6 Works with line for docs/integration-product.md during the README phase.
 
