@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13517432,
+  "total": 13521247,
   "history": [
     {
       "date": "2026-10-24",
@@ -6996,6 +6996,12 @@
       "commit": "batch-173",
       "reason": "Batch 173 job 1: optional sciviz/transfer 0 to 5996 B min+gzip, ceiling 6252 B; sciviz root measured parent 50597 to 52045 B, ceiling 51813 to 53607 B. Physical classifier hooks, slice rebinding and canvas-to-owned-buffer PNG readback preserve full rendering and export correctness. Editor, histogram, widgets, presets and preintegration share one optional entry; splitting the owning volume/export integration would fragment the existing API solely to save optional bytes. Core + stage unchanged 24209 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "b6e1cc6f7",
+      "reason": "batch236: optional weather/lens PostStack refraction and streaks with pure CPU/WGSL field; no root changes",
+      "grew": 1
     }
   ],
   "items": {
@@ -8264,6 +8270,7 @@
     "@margoengine/cameras/stereo": 3400,
     "@margoengine/text/curve": 10802,
     "@margoengine/mixer/dynamics": 3112,
-    "@margoengine/sciviz/transfer": 6252
+    "@margoengine/sciviz/transfer": 6252,
+    "@margoengine/weather/lens": 3815
   }
 }

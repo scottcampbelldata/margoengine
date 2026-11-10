@@ -62,6 +62,10 @@
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"
+    },
+    "./lens": {
+      "types": "./dist/lens.d.ts",
+      "import": "./dist/lens.js"
     }
   },
   "files": [

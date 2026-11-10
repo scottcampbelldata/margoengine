@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Lens drops GPU correctness</title></head><body><canvas style="width:256px;height:192px"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {LensDrops,lensField,lensWGSL} from '/packages/weather/dist/lens.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,5,9],target:[0,0,0]}});engine.stop();
+const d=engine.gpu,errors=[];d.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+for(let x=-6;x<6;x++)for(let z=-5;z<6;z++)engine.createMesh().setGeometry(box(1,0.1,1)).setPosition([x,0,z]).setMaterial(new PbrMaterial({color:(x+z)%2?'#d06020':'#2080d0',roughness:0.8}));
+const code='@group(0) @binding(0) var scene:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) i:vec3u){let s=textureDimensions(scene);if(any(i.xy>=s)){return;}result[i.y*s.x+i.x]=textureLoad(scene,vec2i(i.xy),0);}';
+const pipeline=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code}),entryPoint:'main'}});
+let latest;
+const probe={name:'lens-probe',setup(){},joinStack(){return {kind:'hdr',render(c,input){const size=c.width*c.height*16;const output=d.createBuffer({size,usage:128|4}),staging=d.createBuffer({size,usage:8|1});const p=c.encoder.beginComputePass();p.setPipeline(pipeline);p.setBindGroup(0,d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:input},{binding:1,resource:{buffer:output}}]}));p.dispatchWorkgroups(Math.ceil(c.width/8),Math.ceil(c.height/8));p.end();c.encoder.copyBufferToBuffer(output,0,staging,0,size);latest={output,staging};return input;}};}};
+const lens=new LensDrops({wetness:0,time:2});const stack=PostStack.attach(engine,[lens,probe,new Bloom({strength:0,threshold:100,exposure:0})]);
+async function shot(){engine.render({delta:0});await d.queue.onSubmittedWorkDone();const {output,staging}=latest;await staging.mapAsync(1);const result=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return result;}
+const count=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>1e-4)n++;return n;};
+async function maths(){
+ const input=[];for(let k=0;k<4400;k++)input.push(Math.fround((k*0.0173)%1.7),Math.fround((k*0.0319)%1),Math.fround((k%17)*0.7),k%3/2);
+ const data=new Float32Array(input),size=data.byteLength;
+ const shader=lensWGSL+'@group(0) @binding(0) var<storage,read> cases:array<vec4f>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) i:vec3u){if(i.x>=arrayLength(&cases)){return;}let c=cases[i.x];result[i.x]=vec4f(lens_field(c.xy,vec4f(c.w,c.z,0.025,0.08),vec4f(0.7,0.65,1,0)),0);}';
+ const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code:shader}),entryPoint:'main'}}),a=d.createBuffer({size,usage:128|8}),b=d.createBuffer({size,usage:128|4}),st=d.createBuffer({size,usage:8|1});d.queue.writeBuffer(a,0,data);const e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:a}},{binding:1,resource:{buffer:b}}]}));pass.dispatchWorkgroups(Math.ceil(data.length/4/64));pass.end();e.copyBufferToBuffer(b,0,st,0,size);d.queue.submit([e.finish()]);await st.mapAsync(1);const out=new Float32Array(st.getMappedRange());let worst=0,wet=0;for(let k=0;k<data.length;k+=4){const expected=lensField(data[k],data[k+1],data[k+2],{wetness:data[k+3]});for(let j=0;j<3;j++)worst=Math.max(worst,Math.abs(expected[j]-out[k+j]));if(expected[2]>0.1)wet++;}st.unmap();a.destroy();b.destroy();st.destroy();return {cases:data.length/4,worst,wet};
+}
+window.run=async()=>{d.pushErrorScope('validation');const math=await maths(),dry=await shot();lens.options.wetness=1;const wet=await shot(),repeat=await shot();lens.options.time=3;const moved=await shot();lens.options.streaks=0;const round=await shot();lens.options.seed=4;const seeded=await shot();lens.options.enabled=false;const disabled=await shot();const result={math,wet:count(dry,wet),repeat:count(wet,repeat),moved:count(wet,moved),streaks:count(moved,round),seeded:count(round,seeded),disabled:count(dry,disabled),validation:(await d.popErrorScope())?.message??null,errors};stack.dispose();return result;};window.ready=true;
+</script></body></html>

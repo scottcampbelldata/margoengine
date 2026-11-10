@@ -740,3 +740,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/gltf-pro (batch 243 job 3): thin-film text now shares the same internal implementation with mesh-pbr; public raster behavior is unchanged and README work is deferred by rule 20.
 
 - @margoengine/materials (batch 243 job 3): thin-film verification now reads the actual unchanged shared shader export; README review remains deferred by rule 20.
+
+- @margoengine/weather (batch 236 job 3): document /lens LensDrops in PostStack, refraction/streaks, wetness source, time/seed determinism, defaults and optical/half-float tier limits; examples deferred.
+- margoengine (batch 236 job 3): document weather/lens forwarding entry; examples deferred.
