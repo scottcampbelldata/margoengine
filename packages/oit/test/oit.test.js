@@ -9,6 +9,7 @@ import { OIT } from '../dist/index.js';
 import { addMesh } from '../dist/meshes.js';
 import { ExactOIT } from '../dist/exact.js';
 import { PeelOIT } from '../dist/peel.js';
+import { PreciseOIT } from '../dist/precise.js';
 import { MomentOIT } from '../dist/moments.js';
 import { TransparentDepth } from '../dist/depth.js';
 import { addEffect } from '../dist/vfx.js';
@@ -61,6 +62,69 @@ async function scene(samples = 4) {
 const of = (log, name) => log.filter((e) => e[0] === name);
 const passes = (log) => of(log, 'beginRenderPass').map((e) => e[1]);
 const draws = (log) => of(log, 'pass.drawIndexed').length;
+
+test('precise accumulation keeps all four sums in float32 at 1x and 4x without a hardware resolve', async () => {
+  for (const samples of [1, 4]) {
+    const { engine, model, gpu, frame } = await scene(samples);
+    gpu.device.features.add('float32-blendable');
+    const oit = PreciseOIT.attach(engine);
+    oit.add(model);
+    const log = frame(0),
+      pass = passes(log).find((p) => p.label === 'oit:precise:accumulate');
+    assert.equal(pass.colorAttachments.length, 5);
+    assert.ok(pass.colorAttachments.every((p) => !p.resolveTarget));
+    const textures = of(log, 'texture')
+      .map((e) => e[2])
+      .filter((t) => t.label?.startsWith('oit:precise:'));
+    assert.deepEqual(
+      textures.map((t) => [t.format, t.sampleCount]),
+      [
+        ['r32float', samples],
+        ['r32float', samples],
+        ['r32float', samples],
+        ['r32float', samples],
+        ['r16float', samples],
+      ],
+    );
+    const module = of(log, 'module').find((e) => e[2].code.includes('var map0:'))[2].code;
+    assert.equal(module.includes('texture_multisampled_2d'), samples === 4);
+    assert.ok(module.includes('sum.rgb/max(sum.a'));
+    await null;
+    assert.equal(of(frame(1), 'texture').length, 0);
+    oit.onDeviceRestored(engine);
+    assert.equal(of(frame(2), 'texture').filter((e) => e[2].label?.startsWith('oit:precise:')).length, 5);
+    oit.dispose();
+    assert.ok(!passes(frame(3)).some((p) => p.label?.startsWith('oit:precise:')));
+    engine.dispose();
+  }
+});
+
+test('precise accumulation refuses unavailable capabilities before allocation and validates depth scale', async () => {
+  for (const depthScale of [0, -1, NaN, Infinity]) assert.throws(() => new PreciseOIT({ depthScale }), RangeError);
+  for (const kind of ['native-no-feature', 'four-targets', 'compat-no-extension', 'compat-full']) {
+    const { engine, gpu } = await scene(1);
+    if (kind === 'four-targets') {
+      gpu.device.features.add('float32-blendable');
+      gpu.device.limits.maxColorAttachments = 4;
+    }
+    if (kind.startsWith('compat')) {
+      gpu.device.adapterInfo = { vendor: 'margo-webgl2' };
+      gpu.device.adapter = { capabilities: { tier: 'full', extensions: { EXT_float_blend: kind === 'compat-full' } } };
+    }
+    const oit = new PreciseOIT();
+    const log = gpu.record(() => {
+      if (kind === 'compat-full') oit.setup(engine);
+      else
+        assert.throws(
+          () => oit.setup(engine),
+          (e) => e.code === 'unsupported' && e.message.includes('https://margoengine.com/errors#'),
+        );
+    });
+    assert.equal(of(log, 'buffer').length, kind === 'compat-full' ? 1 : 0);
+    oit.dispose();
+    engine.dispose();
+  }
+});
 
 test('depth peeling stores nearest layers privately and composites far to near against scene depth', async () => {
   const { engine, model, view, frame, id } = await scene(4),

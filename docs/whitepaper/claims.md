@@ -1,5 +1,7 @@
 # Claims and evidence
 
+Batch 190 job 2: optional `oit/precise` removes half-float accumulation saturation while retaining the existing weighted approximation. At both 1x and 4x on native WebGPU and full WebGL2, eight half-opacity layers with radiance [1000,500,250] read [996,498,249] in the HDR scene target, against analytic [996.09375,498.046875,249.0234375]. The same scene in half-float OIT reads [16.3125,16.3125,16.3125]. Reordering gives the same result, ordinary radiance matches within 0.001, complete edge images match within one 8-bit count, and opaque occlusion plus a real PBR asset pass. This claims f32 accumulation range, not unlimited radiance, exact depth sorting or extra transmission support. No speed result.
+
 Batch 190 job 1: optional `oit/peel` provides exact depth-ordered alpha transport at distinct per-pixel raster depths on native WebGPU and full WebGL2 compatibility. The four analytic layers differ by at most 0.66 of 255 on the tested GPU at scene MSAA 1x and 4x, and reversing registration changes no pixel. Crossing sheets swap order per pixel; a two-layer budget keeps the nearest two and opaque surfaces hide farther ones. Post and transparent canvas alpha checks pass. This is single-sample peeling, with the limits in limits.md, not a claim of sample-frequency edge reconstruction or refraction. Public rival behavior and research comparisons are in clean-room.md; no performance comparison is claimed.
 
 Batch 256 job 4: ten tests in `packages/netcode/tests/migrate.test.js` establish

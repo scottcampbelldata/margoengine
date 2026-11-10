@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13703428,
+  "total": 13707461,
   "history": [
     {
       "date": "2026-10-24",
@@ -7150,6 +7150,12 @@
       "commit": "f4f1aa88b",
       "reason": "Batch 270 job 1: vfx root 31561 to 32530 B, base 11214 to 11311 B, new space 1441 B. Rigid frames, inheritance and distance births, accepted optional growth. A separate root facade would complicate the existing feature convention.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-190",
+      "reason": "oit/precise: new optional float32 weighted accumulation with scalar multisampled targets, 0 to 3777 B gzip; 4033 B ceiling; no core, stage or OIT root growth",
+      "grew": 1
     }
   ],
   "items": {
@@ -8443,6 +8449,7 @@
     "margoengine/web": 577,
     "@margoengine/voxel-net/replay": 3840,
     "@margoengine/usdz/clips": 23845,
-    "@margoengine/vfx/space": 1697
+    "@margoengine/vfx/space": 1697,
+    "@margoengine/oit/precise": 4033
   }
 }

@@ -1,5 +1,8 @@
 # README work owed
 
+- @margoengine/oit (batch 190 job 2): document /precise PreciseOIT, float32-blendable request, EXT_float_blend/five-target requirements, 1x/4x behavior, depthScale/order defaults, 18/72 B per pixel and finite radiance/sorted-path limits; examples deferred.
+- margoengine (batch 190 job 2): document the oit/precise forwarding entry; examples deferred.
+
 - @margoengine/oit (batch 190 job 1): document /peel PeelOIT, ten-layer default, adjustable layers/order, full WebGL2 support, resource costs and single-sample/coplanar/model-only limits; examples deferred.
 - margoengine (batch 190 job 1): document the oit/peel forwarding entry; examples deferred.
 

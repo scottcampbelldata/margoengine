@@ -1,5 +1,11 @@
 # Clean room
 
+## Batch 190 job 2: float32 weighted accumulation
+
+Research combined: Morgan McGuire and Louis Bavoil, *Weighted Blended Order-Independent Transparency*, JCGT 2(2), 2013, [equations 7 to 10 and precision discussion](https://jcgt.org/published/0002/02/09/paper-lowres.pdf); Louis Bavoil and Kevin Myers, *Order Independent Transparency with Dual Depth Peeling*, 2008, [weighted-average and blending discussion](https://developer.download.nvidia.com/SDK/10/opengl/src/dual_depth_peeling/doc/DualDepthPeeling.pdf); W3C GPU for the Web Working Group, *WebGPU*, 2026, [float32-blendable and plain colour format capabilities](https://www.w3.org/TR/webgpu/#plain-color-formats); Khronos WebGL Working Group, *EXT_float_blend*, 2019, [float32 blend enablement](https://registry.khronos.org/webgl/extensions/EXT_float_blend/). Papers and specifications only, no companion or rival source code.
+
+`oit/precise` keeps the existing OIT weight/coverage equations, replacing four half-float sums with four scalar R32F targets. The format table rules out multisampled RGBA32F, so scalar R32F preserves both 1x and 4x scene coverage. The composite reads/averages the samples before dividing the weighted colour sum by the weight sum, equivalent to the original resolved targets. Revealage remains R16F. Explicit unfilterable bindings avoid requiring float32 filtering. Native devices explicitly request float32-blendable; full WebGL2 devices use the existing public EXT_float_blend capability. Analytic emissive-intensity tests prove bright stacked transport and show the old half-float saturation side by side, with ordinary radiance and MSAA edges compared to OIT. Existing CC0 Khronos GlassVaseFlowers exercises PBR shading. No new external asset, code or benchmark.
+
 ## Batch 190 job 1: texture depth peeling
 
 Sources read, without reading companion or rival implementation code:

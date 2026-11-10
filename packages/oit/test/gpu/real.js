@@ -14,6 +14,7 @@ import { VFX } from '../../../vfx/dist/index.js';
 import { OIT } from '../../dist/index.js';
 import { ExactOIT } from '../../dist/exact.js';
 import { PeelOIT } from '../../dist/peel.js';
+import { PreciseOIT } from '../../dist/precise.js';
 import { MomentOIT } from '../../dist/moments.js';
 import { TransparentDepth } from '../../dist/depth.js';
 import { addEffect } from '../../dist/vfx.js';
@@ -27,6 +28,7 @@ const passes = {
   moments: () => MomentOIT.attach(engine),
   exact: () => ExactOIT.attach(engine),
   peel: () => PeelOIT.attach(engine),
+  precise: () => PreciseOIT.attach(engine),
 };
 let engine, canvas, pass, stack, model, centre, radius, taken;
 const draw = async () => {
@@ -44,7 +46,11 @@ window.check = {
     globalThis.margoLow = o.samples === 1 ? 1 : undefined;
     canvas = document.body.appendChild(document.createElement('canvas'));
     canvas.style.cssText = 'width:384px;height:384px;display:block';
-    engine = await Engine.create(canvas, { backend: 'webgpu', preserveDrawingBuffer: true });
+    engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      preserveDrawingBuffer: true,
+      features: o.mode === 'precise' ? ['float32-blendable'] : [],
+    });
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
     const environment = await Environment.attach(
       engine,

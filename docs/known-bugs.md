@@ -1,5 +1,7 @@
 # Known bugs and unverified features
 
+Batch 190 job 2: no open defect found in float32 weighted accumulation. The entry deliberately retains the original weighted-depth approximation and sorted paths for transmission/custom blending; finite f32 sums and final HDR target range are recorded in limits.md.
+
 Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
 
 ### Batch 238 follow-up: transformed bitmap alpha precision

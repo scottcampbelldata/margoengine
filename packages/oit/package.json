@@ -49,6 +49,10 @@
     "./peel": {
       "types": "./dist/peel.d.ts",
       "import": "./dist/peel.js"
+    },
+    "./precise": {
+      "types": "./dist/precise.d.ts",
+      "import": "./dist/precise.js"
     }
   },
   "files": [
@@ -71,7 +75,7 @@
     "build": "node ../../scripts/build-optional.js oit",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/oit/test/gpu/meshes-check.mjs && node packages/oit/test/gpu/exact-check.mjs && node packages/oit/test/gpu/moments-check.mjs && node packages/oit/test/gpu/blending-check.mjs && node packages/oit/test/gpu/depth-check.mjs && node packages/oit/test/gpu/vfx-check.mjs && node packages/oit/test/gpu/real-check.mjs && node packages/oit/test/gpu/peel-check.mjs"
+    "test:gpu": "cd ../.. && node packages/oit/test/gpu/meshes-check.mjs && node packages/oit/test/gpu/exact-check.mjs && node packages/oit/test/gpu/moments-check.mjs && node packages/oit/test/gpu/blending-check.mjs && node packages/oit/test/gpu/depth-check.mjs && node packages/oit/test/gpu/vfx-check.mjs && node packages/oit/test/gpu/real-check.mjs && node packages/oit/test/gpu/peel-check.mjs && node packages/oit/test/gpu/precise-check.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/materials": {
