@@ -2830,6 +2830,10 @@
       "types": "./dist/road/lanes.d.ts",
       "import": "./dist/road/lanes.js"
     },
+    "./road/geojson": {
+      "types": "./dist/road/geojson.d.ts",
+      "import": "./dist/road/geojson.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"

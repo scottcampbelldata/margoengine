@@ -6692,3 +6692,6 @@ algorithm, triangulation or evaluator was replaced, no rival source or companion
 and no speed claim is made. Existing geometry code does the same deterministic work.
 
 The downstream PBR per-primitive bound is retained. FBX partitions large materials at whole-triangle boundaries instead of raising the GPU storage-binding bound: W3C GPU for the Web Working Group, *WebGPU* (2026 living specification), https://www.w3.org/TR/webgpu/#dom-supported-limits-maxstoragebufferbindingsize . Existing public GLTFAsset/PBRModel and prepareGLTF APIs receive the configured byte/node caps; no missing glTF API or core change was needed.
+
+## Batch 233 job 3: road network import
+Compared RFC 7946, OSM XML/width/lane specifications, Md Kaisar Ahmed (2022) OSM network extraction and EPSG topocentric equations through PROJ documentation; full authors, dates, links and combination in [road-design.md](road-design.md). Real Times Square standard data is attributed in THIRD-PARTY-NOTICES.md and fixtures/osm-source.json. No rival source or companion code.

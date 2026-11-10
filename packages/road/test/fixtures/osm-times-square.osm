@@ -1,0 +1,139 @@
+<?xml version='1.0' encoding='utf-8'?>
+<osm version="0.6" attribution="OpenStreetMap contributors" license="https://opendatacommons.org/licenses/odbl/1-0/">
+  <node id="42428297" lon="-73.9855335" lat="40.7579634" />
+  <node id="42430342" lon="-73.9831665" lat="40.7561421" />
+  <node id="42432697" lon="-73.9867284" lat="40.7584619" />
+  <node id="42432700" lon="-73.9883858" lat="40.7591595" />
+  <node id="42439990" lon="-73.9850795" lat="40.7585968" />
+  <node id="42439994" lon="-73.9846194" lat="40.7592229" />
+  <node id="2435108452" lon="-73.9849674" lat="40.7585496" />
+  <node id="3944708047" lon="-73.9832969" lat="40.7561970" />
+  <node id="4707407261" lon="-73.9854818" lat="40.7580355" />
+  <node id="5475605303" lon="-73.9852442" lat="40.7583669" />
+  <node id="5522182777" lon="-73.9862271" lat="40.7582527" />
+  <node id="6597464445" lon="-73.9857320" lat="40.7580455" />
+  <node id="6598535157" lon="-73.9846758" lat="40.7591475" />
+  <node id="6598535159" lon="-73.9850272" lat="40.7586679" />
+  <node id="6598535188" lon="-73.9851316" lat="40.7585239" />
+  <node id="6598535204" lon="-73.9882592" lat="40.7591062" />
+  <node id="8250908767" lon="-73.9842778" lat="40.7582569" />
+  <node id="8318633104" lon="-73.9827028" lat="40.7575793" />
+  <node id="8396878495" lon="-73.9840416" lat="40.7565117" />
+  <node id="9235539560" lon="-73.9856903" lat="40.7572084" />
+  <node id="13915675578" lon="-73.9849062" lat="40.7568771" />
+  <way id="46522008">
+    <nd ref="6597464445" />
+    <nd ref="5522182777" />
+    <nd ref="42432697" />
+    <nd ref="6598535204" />
+    <nd ref="42432700" />
+    <tag k="cycleway:right" v="no" />
+    <tag k="hgv" v="destination" />
+    <tag k="highway" v="secondary" />
+    <tag k="lanes" v="1" />
+    <tag k="lit" v="yes" />
+    <tag k="name" v="West 45th Street" />
+    <tag k="name:ru" v="Западная 45-я стрит" />
+    <tag k="oneway" v="yes" />
+    <tag k="sidewalk:both" v="separate" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="226041026">
+    <nd ref="9235539560" />
+    <nd ref="13915675578" />
+    <nd ref="8396878495" />
+    <nd ref="3944708047" />
+    <nd ref="42430342" />
+    <tag k="bicycle" v="yes" />
+    <tag k="cycleway" v="shared_lane" />
+    <tag k="cycleway:left" v="lane" />
+    <tag k="highway" v="residential" />
+    <tag k="lanes" v="1" />
+    <tag k="lit" v="yes" />
+    <tag k="name" v="West 44th Street" />
+    <tag k="name:ru" v="Западная 44-я стрит" />
+    <tag k="oneway" v="yes" />
+    <tag k="sidewalk:both" v="separate" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="397795463">
+    <nd ref="42439990" />
+    <nd ref="6598535188" />
+    <nd ref="5475605303" />
+    <tag k="cycleway:left" v="track" />
+    <tag k="foot" v="designated" />
+    <tag k="hgv" v="destination" />
+    <tag k="highway" v="secondary" />
+    <tag k="lanes" v="5" />
+    <tag k="lit" v="yes" />
+    <tag k="maxspeed" v="25 mph" />
+    <tag k="name" v="7th Avenue" />
+    <tag k="name_1" v="7 Avenue" />
+    <tag k="name:ru" v="7-я Авеню" />
+    <tag k="oneway" v="yes" />
+    <tag k="sidewalk:both" v="separate" />
+    <tag k="surface" v="asphalt" />
+    <tag k="turn:lanes" v="through|through|through|through|right" />
+    <tag k="wikidata" v="Q109926" />
+    <tag k="wikipedia" v="en:Seventh Avenue (Manhattan)" />
+  </way>
+  <way id="420494981">
+    <nd ref="42439990" />
+    <nd ref="2435108452" />
+    <nd ref="8250908767" />
+    <nd ref="8318633104" />
+    <tag k="hgv" v="destination" />
+    <tag k="highway" v="secondary" />
+    <tag k="lanes" v="1" />
+    <tag k="lit" v="yes" />
+    <tag k="name" v="West 46th Street" />
+    <tag k="name:ru" v="Западная 46-я стрит" />
+    <tag k="oneway" v="yes" />
+    <tag k="sidewalk:both" v="separate" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="483360105">
+    <nd ref="42439994" />
+    <nd ref="6598535157" />
+    <nd ref="6598535159" />
+    <nd ref="42439990" />
+    <tag k="cycleway:left" v="lane" />
+    <tag k="foot" v="designated" />
+    <tag k="hgv" v="destination" />
+    <tag k="highway" v="secondary" />
+    <tag k="lanes" v="3" />
+    <tag k="lit" v="yes" />
+    <tag k="maxspeed" v="25 mph" />
+    <tag k="name" v="7th Avenue" />
+    <tag k="name_1" v="7 Avenue" />
+    <tag k="name:ru" v="7-я Авеню" />
+    <tag k="oneway" v="yes" />
+    <tag k="sidewalk:both" v="separate" />
+    <tag k="surface" v="asphalt" />
+    <tag k="wikidata" v="Q109926" />
+    <tag k="wikipedia" v="en:Seventh Avenue (Manhattan)" />
+  </way>
+  <way id="569345542">
+    <nd ref="5475605303" />
+    <nd ref="4707407261" />
+    <nd ref="42428297" />
+    <tag k="cycleway:left" v="track" />
+    <tag k="cycleway:left:oneway" v="yes" />
+    <tag k="cycleway:right" v="no" />
+    <tag k="foot" v="designated" />
+    <tag k="hgv" v="destination" />
+    <tag k="highway" v="secondary" />
+    <tag k="lanes" v="5" />
+    <tag k="lit" v="yes" />
+    <tag k="maxspeed" v="25 mph" />
+    <tag k="name" v="7th Avenue" />
+    <tag k="name_1" v="7 Avenue" />
+    <tag k="name:ru" v="7-я Авеню" />
+    <tag k="oneway" v="yes" />
+    <tag k="sidewalk:both" v="separate" />
+    <tag k="surface" v="asphalt" />
+    <tag k="turn:lanes" v="through|through|through|through|right" />
+    <tag k="wikidata" v="Q109926" />
+    <tag k="wikipedia" v="en:Seventh Avenue (Manhattan)" />
+  </way>
+</osm>

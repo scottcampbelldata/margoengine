@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13035002,
+  "total": 13040383,
   "history": [
     {
       "date": "2026-10-24",
@@ -6521,6 +6521,12 @@
       "commit": "94f328aed",
       "reason": "batch205-per-import-resource-caps-and-large-file-entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "1cd5069bd",
+      "reason": "Batch 233 job 3: new optional road/geojson entry 0 to 5125 B gzip, ceiling 5381 B. Shared projection/topology/metadata form one bounded network import; splitting would duplicate policy and node ownership.",
+      "grew": 1
     }
   ],
   "items": {
@@ -7728,6 +7734,7 @@
     "@margoengine/geometry/hull": 2327,
     "@margoengine/react/textures": 4940,
     "@margoengine/usdz/shapes": 1457,
-    "@margoengine/fbx/large": 795
+    "@margoengine/fbx/large": 795,
+    "@margoengine/road/geojson": 5381
   }
 }

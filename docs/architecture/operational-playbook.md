@@ -6063,3 +6063,6 @@ Batch 265 final evidence: all 24 texture comparisons are exact on both backends.
 ### Section 5 evidence: batch 206 implicit shapes
 
 The optional USD shapes entry uses existing geometry primitives with schema-correct axes, normals and caps. OpenUSD 26.11 provides 22 extent cases. The package owns its prepare hook and budgets; core/stage/backend code is unchanged. Both browser backends render all five types.
+
+### Section 5 evidence: batch 233 road import
+The optional road network reader builds CPU topology and exact WGS84 east/up/south coordinates; core/stage and rendering backends are unchanged. Independent equator/dateline and topology equations plus a real ODbL OSM fixture provide CPU evidence. The changed-package browser gate renders the real imported road on native WebGPU and WebGL2 compatibility and checks exact reboot/disposal. Metadata width defaults are assumptions, not survey or navigation certification.

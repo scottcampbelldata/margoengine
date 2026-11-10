@@ -501,3 +501,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/usdz and margoengine: implicitShapes() optional /shapes entry, schema defaults, axes, radialSegments/latitudeSegments, budgets, worker and instancer combination.
 - @margoengine/fbx (batch 205 large): document largeFBX, all per-import defaults, conservative allocation accounting and worker caps; examples deferred.
 - margoengine (batch 205 large): document generated fbx/large alias; examples deferred.
+
+- @margoengine/road (batch 233 job 3): GeoJSON/OSM imports, tags/width/lane defaults, source identity, grade-separated network topology, coordinate projection, bounds and runnable render/graph example after build phase.
+- margoengine (batch 233 job 3): road/geojson alias after build phase.

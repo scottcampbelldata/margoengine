@@ -4756,3 +4756,6 @@ Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker is 98,112 B
 The large configuration also reaches GLTFAsset attachment and worker prepareGLTF: the converted GLB uses outputBytes and nodes as its downstream caps. Ordinary attachment retains the pre-existing 64 MiB glTF cap. The 2,500,002-vertex test produces a buffer above 64 MiB and attaches both directly and from prepared worker output.
 
 Large material partitions are emitted as additional child mesh nodes at triangle boundaries, with at most 1,000,000 vertices per primitive, matching the existing PBR storage-binding safety cap. Every triangle and layer is retained; control-point maps still drive skin and morph remapping. Shared vertices on a chunk boundary may be duplicated and count against the configured vertex cap. This adds draw calls rather than reducing geometry. The 2,500,002-vertex independent-triangle fixture emits three full primitives and retains every position/index.
+
+### Batch 233 job 3: road network import
+road/geojson imports standard line GeoJSON and OSM XML/Overpass ways with lane/width tags, split at-grade graph connectivity, explicit OSM topology and local WGS84 projection. Bounds, policy defaults, warnings, precision, unsupported PBF/restriction relations and ownership: [road-design.md](road-design.md).

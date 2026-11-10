@@ -57,6 +57,10 @@
     "./lanes": {
       "types": "./dist/lanes.d.ts",
       "import": "./dist/lanes.js"
+    },
+    "./geojson": {
+      "types": "./dist/geojson.d.ts",
+      "import": "./dist/geojson.js"
     }
   },
   "files": [

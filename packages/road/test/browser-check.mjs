@@ -36,7 +36,7 @@ const failures = [];
 try {
   await server.listen();
   browser = await launchBrowser();
-  for (const feature of ['junctions', 'intersections', 'lanes', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
+  for (const feature of ['junctions', 'intersections', 'lanes', 'geojson', 'banking', 'terrain', 'repair', 'markings', 'graph']) {
   for (const mode of ['native', 'compat']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
     page.setDefaultTimeout(120000);
@@ -116,6 +116,15 @@ try {
         const curve=new Spline([[0,0,-10],[2,0,0],[0,0,10]]);
         data=road(curve,{crossSection:[[-4,0],[4,0]]});
         data.paint=lanes(curve,{widths:[3,3],lines:[{width:0.35},{width:0.35,dash:[2,2]},{width:0.35}],arrows:[{lane:1,distance:curve.length/2,length:4,width:1.5}]});
+      } else if (feature === 'geojson') {
+        const {importOSM}=await import('/packages/road/dist/geojson.js');
+        const {road}=await import('/packages/road/dist/index.js');
+        const xml=await (await fetch('/packages/road/test/fixtures/osm-times-square.osm')).text();
+        const network=importOSM(xml),link=network.roads.find(r=>r.curve.length>20);
+        if(!link||network.roads.length<10)throw new Error('Real OSM network oracle');
+        const [a,b]=link.points,mid=a.map((x,k)=>(x+b[k])/2),height=Math.max(link.curve.length,link.width)*1.6;
+        engine.camera.position=[mid[0],mid[1]+height,mid[2]+0.001];engine.camera.target=mid;engine.camera.far=height*4;
+        data=road(link.curve,{segments:1,crossSection:[[-link.width/2,0],[link.width/2,0]]});
       } else if (feature === 'markings') {
         const {road} = await import('/packages/road/dist/index.js');
         const {Spline} = await import('/packages/splines/dist/index.js');
@@ -222,7 +231,7 @@ try {
     const pixels = () => page.locator('canvas').screenshot().then(decodePNG);
     const first = await pixels();
     const rgb = (p, x, y) => Array.from(p.data.subarray((y * p.width + x) * 4, (y * p.width + x) * 4 + 3));
-    for (const [x, y] of (feature === 'lanes' ? [[64,24],[64,104]] : feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
+    for (const [x, y] of (feature === 'geojson' ? [[64,64]] : feature === 'lanes' ? [[64,24],[64,104]] : feature === 'markings' ? [[58,64],[58,24],[58,104]] : ['banking','repair'].includes(feature) ? [[64,64],[64,24],[64,104]] : [
       [64, 64],
       [24, 64],
       [104, 64],

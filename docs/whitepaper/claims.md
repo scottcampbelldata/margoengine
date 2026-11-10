@@ -3666,3 +3666,6 @@ GPU tests also prove custom vertex caps survive worker serialization and success
 through both backends. These are correctness claims without wall-clock or memory-usage claims.
 
 The large binary mesh is also attached as a real PBRModel on a CPU-only engine and through the actual parser worker. Both retain the configured 512 MiB byte cap, with decoded GLB buffers above 64 MiB; no GPU upload is mocked into the rendering proof. The separate browser proof uses the real GPU.
+
+### Batch 233 job 3: road network input
+GeoJSON lines and OSM XML/Overpass ways produce source-tagged local metre road networks, lane/width metadata, direction and grade separation. GeoJSON intersections split; OSM node identity governs connectivity. Proof: road/test/geojson.test.js with analytic WGS84 equations, topology/metadata/schema checks and real attributed Times Square ways; road/test/browser-check.mjs renders a real imported road on both backends with exact reboot and disposal. No complete GIS/routing-restriction or speed claim. [Limits and sources](../road-design.md).

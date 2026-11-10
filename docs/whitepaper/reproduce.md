@@ -3140,3 +3140,6 @@ Batch 206 shapes: node --test --test-timeout=120000 packages/usdz/tests/shapes.t
 After building, run `node --test --test-timeout=240000 packages/fbx/test/large.test.js`.
 The test generates its own independent standard-layout input. For GPU/worker proof run the
 package test:gpu command, then with `--compat`, through the shared GPU lock. No speed suite runs.
+
+### Batch 233 job 3: road import
+After build: node --test --test-timeout=120000 packages/road/test/geojson.test.js, then the shared-lock road browser gate above. Real data source/license is packages/road/test/fixtures/osm-source.json. Both backends render a source road in local WGS84 metres, restore identical pixels and dispose it. No timing assertion.
