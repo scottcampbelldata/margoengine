@@ -149,6 +149,7 @@ interface DrawDerivation {
         group: GPUBindGroup;
     } | undefined;
     mappedTint: boolean;
+    white?: boolean;
     modelFree: boolean;
     tintable?: boolean;
     blendStates?: BatchState[];

@@ -1006,7 +1006,7 @@ class Replayer {
     run(ops: readonly Op[]): void;
     sub(s: TextureStorage, level: number, layer: number): Sub;
     single(s: Sub): WebGLFramebuffer;
-    framebufferOf(t: CompatTexture): WebGLFramebuffer;
+    presentTexture(t: CompatTexture, opaque: boolean): void;
     readonly sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void;
     rebind(): void;
     beginPass(desc: PassDescriptor): void;
