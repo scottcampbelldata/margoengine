@@ -1,0 +1,7 @@
+{
+  "source": "https://raw.githubusercontent.com/sandialabs/seacas/480c580362b050ce8ca432ef0344aecd1e00d23a/packages/seacas/scripts/tests/exomerge_unit_test.e",
+  "revision": "480c580362b050ce8ca432ef0344aecd1e00d23a",
+  "sha256": "5faeed1f22a71f263b8ca1a664dfa64655239436e9278474be7a7ae3960c3ad8",
+  "license": "BSD-3-Clause (SEACAS)",
+  "description": "Original SEACAS exomerge unit-test Exodus displacement data: disp_x, disp_y, disp_z, time step index 4, 2185 nodes, 1300 HEX8 cells. Unmodified file; no implementation source used."
+}

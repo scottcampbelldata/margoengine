@@ -583,3 +583,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 227 job 2): document lines/stroke and lines/texture forwarding entries; examples deferred.
 - @margoengine/scatter: document /surface scatterSurface GeometryData inputs, exact area/paint density, normal alignment, world matrix/offset/scale/yaw defaults, returned arrays, limits, source updates and AbortSignal.
 - margoengine: document the /scatter/surface forwarding entry and its surface placement arrays.
+- @margoengine/sciviz: document /glyph input/selection, defaults, six sources, ownership, warp contracts and NOAA/SEACAS demo; examples deferred during build phase.
+
+- margoengine: document sciviz/glyph optional alias after build phase.

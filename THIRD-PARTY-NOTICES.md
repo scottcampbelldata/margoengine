@@ -325,3 +325,6 @@ Public-use NASA imagery under https://www.nasa.gov/nasa-brand-center/images-and-
 credit NASA's Scientific Visualization Studio. This standard data asset is the
 AGENTS.md sample-data exception; it is not code from another repository.
 Batch 205 FBX 6.1 standard sample assets: Samuli Raivio, ufbx data collection, MIT or Unlicense. Source, per-file Git blobs and SHA-256 hashes: `packages/fbx/test/fixtures/real/NOTICE.md`. Model data only; no importer source.
+
+## SEACAS Exodus displacement standard sample
+examples/assets/sciviz/glyph/displacement.e is the unmodified exomerge_unit_test.e standard data sample from Sandia SEACAS revision 480c580362b050ce8ca432ef0344aecd1e00d23a: https://github.com/sandialabs/seacas/blob/480c580362b050ce8ca432ef0344aecd1e00d23a/packages/seacas/scripts/tests/exomerge_unit_test.e . Copyright National Technology & Engineering Solutions of Sandia, LLC (NTESS). BSD-3-Clause; licence terms are retained in examples/assets/sciviz/glyph/LICENSE.txt, original byte hash in source.json. This is the standard-data exception, not copied implementation code. NOAA wind provenance remains in examples/assets/sciviz/wind.json.

@@ -6169,3 +6169,5 @@ Batch 266 section 5 portal evidence: RenderTexture uses existing target-bearing 
 ### Repeated stroke texture evidence (batch 227 job 2)
 Texture extensions append image/sampler/uniform bindings to the same line-owned layout for colour and picking. Shader sampling uses continuous explicit UV gradients before control-flow discard, preserving repeat seams and mip selection. GPU tests exercise colour/alpha picks, UV edits and restoration on WebGPU and compatibility at 1x/4x. Mips use the existing optional-package GPU generator. Core and stage remain unchanged.
 
+### Section 5 evidence: batch 172 glyphs and warp
+Optional /glyph consumes core's existing shared-Geometry instancing and Margo geometry/primitives and math/affine APIs. There is no new GPU pass or frozen core/stage feature. Glyph tests check one draw for the real NOAA sample, both backends, every source shape/custom geometry, exact restoration and ownership cleanup. Independent CPU orientation/warp oracles include antipodes, curvilinear images and the pinned SEACAS displacement file. Image assembly and Exodus metadata handling stay outside the engine runtime, in the demo.

@@ -3110,6 +3110,10 @@
       "types": "./dist/sciviz/clip.d.ts",
       "import": "./dist/sciviz/clip.js"
     },
+    "./sciviz/glyph": {
+      "types": "./dist/sciviz/glyph.d.ts",
+      "import": "./dist/sciviz/glyph.js"
+    },
     "./sciviz/calc": {
       "types": "./dist/sciviz/calc.d.ts",
       "import": "./dist/sciviz/calc.js"
