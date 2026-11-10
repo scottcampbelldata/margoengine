@@ -2984,3 +2984,8 @@ The optional save/opfs adapter supports binary/empty values, sorted keys, namesp
 ### Batch 197 orbit collision
 
 The optional controls/collide entry retracts orbit/map cameras before selected triangle blockers, retains input distance and extends after clearance. Evidence: packages/controls/tests/collide.test.js covers moving blockers, off-centre corner hits, filters, transforms, input, final-pose events, query failure and disposal; collide-browser.js checks visible target pixels and restored distance on WebGPU and WebGL2. Five samples do not claim continuous swept-volume coverage.
+
+
+## Batch 252 job 2: partial paths and Crowd
+
+The optional queries surface returns the precise nearest reachable point and a partial flag for unreachable goals, and Crowd follows it with an inspectable partial flag. `packages/navmesh/test/partial.test.js` proves disconnected islands, forbidden areas, outside goals, geometry-based nearest selection, directed jump links, ordinary full routes, tiled rebuilds, arrival and reopening a route. Compared with the published Detour partial/corridor contract, the endpoint is selected from reachable polygon geometry rather than a polygon center. No optimal continuous weighted-path or speed claim is made.

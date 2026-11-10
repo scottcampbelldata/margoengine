@@ -5,9 +5,20 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 
-export class NavMeshQuery {
+export class NavMeshQuery implements NavSurface {
     readonly mesh: QueryMesh;
     constructor(mesh: QueryMesh);
+    get version(): number;
+    locate(position: Vec3): number;
+    closestPoint(position: Vec3): {
+        point: Vec3;
+        polygon: number;
+    } | null;
+    heightAt(polygon: number, x: number, z: number): number;
+    polygonArea(polygon: number): number;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null;
+    path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
+    partialRoute(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null;
     raycast(start: Vec3, end: Vec3, options?: NavQueryOptions): NavRaycastHit | null;
     moveAlongSurface(start: Vec3, end: Vec3, options?: NavQueryOptions): NavMoveResult | null;
 }
@@ -16,6 +27,11 @@ export interface NavMoveResult {
     position: Vec3;
     polygon: number;
     visited: number[];
+}
+
+export interface NavPartialRoute extends NavRoute {
+    partial: boolean;
+    polygon: number;
 }
 
 export interface NavQueryOptions {
@@ -119,6 +135,7 @@ interface NavObstacle {
 }
 
 interface NavRoute {
+    partial?: boolean;
     points: Vec3[];
     offMesh: number[];
 }
@@ -132,6 +149,7 @@ interface NavSurface {
     } | null;
     heightAt(index: number, x: number, z: number): number;
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+    partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     polygonArea(index: number): number;
 }
 

@@ -43,3 +43,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 | margoengine | Generated save/opfs alias | batch-255 job 3 |
 - @margoengine/controls: document /collide OrbitControls and MapControls, explicit blockers, five-ray sampling, clearance, restoration, filters and disposal.
 - margoengine: document the generated /controls/collide alias.
+
+
+| @margoengine/navmesh | queries partial route/path, nearest endpoint metric, optional Crowd surface, agent.partial and partial-arrival replanning | batch-252 job 2 |

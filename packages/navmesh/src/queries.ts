@@ -1,7 +1,7 @@
 // Clean-room convex clipping and local portal searches. Sources: docs/clean-room.md, batch 252.
-import type { NavFilter, NavMesh, Vec3 } from './index.js';
+import type { NavFilter, NavMesh, NavSurface, Vec3 } from './index.js';
 import type { TiledNavMesh } from './tiles.js';
-import { checkFilter, copy, cross, point } from './search.js';
+import { CorridorSearch, checkFilter, copy, cross, point, routeThrough, type NavRoute } from './search.js';
 
 /** Meshes supported by the optional surface queries. Tile polygon ids are valid only until a rebuild. */
 export type QueryMesh = NavMesh | TiledNavMesh;
@@ -42,6 +42,14 @@ export interface NavMoveResult {
   visited: number[];
 }
 
+/** A complete or partial route to a reachable surface point. */
+export interface NavPartialRoute extends NavRoute {
+  /** True when the requested goal polygon is unreachable or the goal is outside the mesh. */
+  partial: boolean;
+  /** Reached polygon, disambiguating shared boundaries and overlapping floors. */
+  polygon: number;
+}
+
 const EPS = 1e-8;
 const squared = (a: Vec3, b: Vec3) => (a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2;
 const interpolate = (a: Vec3, b: Vec3, t: number): Vec3 => [
@@ -61,12 +69,93 @@ const corridor = (parent: Map<number, number>, last: number): number[] => {
 };
 
 /** Optional walkability and controller queries on ordinary and tiled navmeshes. No off-mesh jumps are taken. */
-export class NavMeshQuery {
+export class NavMeshQuery implements NavSurface {
   /** Surface queried live, including its area costs and rebuilt tiles. */
   readonly mesh: QueryMesh;
   /** Creates queries without copying polygons or changing the mesh. */
   constructor(mesh: QueryMesh) {
     this.mesh = mesh;
+  }
+  /** Live surface revision, allowing a Crowd to replan partial routes after a change. */
+  get version(): number {
+    return this.mesh.version;
+  }
+  /** Polygon under a finite point, choosing the nearest floor, or -1. */
+  locate(position: Vec3): number {
+    return this.mesh.locate(position);
+  }
+  /** Closest surface point, as for the underlying mesh. */
+  closestPoint(position: Vec3): { point: Vec3; polygon: number } | null {
+    return this.mesh.closestPoint(position);
+  }
+  /** Height of a polygon plane at world-space XZ. */
+  heightAt(polygon: number, x: number, z: number): number {
+    return this.mesh.heightAt(polygon, x, z);
+  }
+  /** Area number used by Crowd's filter. */
+  polygonArea(polygon: number): number {
+    return this.mesh.polygonArea(polygon);
+  }
+  /**
+   * Plans a complete path, or a partial path to the nearest reachable point (XZ distance, then vertical distance).
+   * Directed off-mesh links and area costs apply. Null means there is no allowed start polygon.
+   * @throws RangeError for invalid points or filters; use finite points and multipliers >= 1.
+   */
+  route(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null {
+    const from = this.start(start, end, { filter });
+    if (from < 0) return null;
+    const to = this.mesh.locate(end),
+      queue = [from],
+      seen = new Set(queue);
+    let last = from,
+      best = this.nearest(from, end),
+      distance = squared(best, end),
+      height = Math.abs(best[1] - end[1]);
+    for (let at = 0; at < queue.length; at++) {
+      const p = queue[at],
+        q = this.nearest(p, end),
+        d = squared(q, end),
+        h = Math.abs(q[1] - end[1]);
+      if (d < distance || (d === distance && h < height)) {
+        best = q;
+        last = p;
+        distance = d;
+        height = h;
+      }
+      for (const link of this.mesh.polygonLinks(p))
+        if (!seen.has(link.to) && this.allowed(link.to, filter)) {
+          seen.add(link.to);
+          queue.push(link.to);
+        }
+    }
+    const partial = !seen.has(to);
+    if (!partial) {
+      last = to;
+      best = this.project(to, end);
+    }
+    const mesh = this.mesh,
+      adjacency =
+        'vertices' in mesh
+          ? Array.from({ length: mesh.polygonCount }, (_, p) => mesh.polygonLinks(p))
+          : mesh.graph().adjacency,
+      costs = new Float64Array(adjacency.length).fill(Infinity);
+    let links = 0;
+    for (const p of queue) {
+      costs[p] = mesh.areaCost(p) * (filter?.[mesh.polygonArea(p)] ?? 1);
+      links += adjacency[p].length;
+    }
+    const search = new CorridorSearch();
+    search.reserve(adjacency.length, links);
+    const found = search.find(from, last, this.project(from, start), best, adjacency.length, adjacency, costs)!;
+    return { ...routeThrough(found, this.project(from, start), best), partial, polygon: last };
+  }
+  /** Complete or partial route waypoints, or null without an allowed starting polygon. */
+  path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null {
+    return this.route(start, end, filter)?.points ?? null;
+  }
+  /** Crowd hook: preserve an unsnapped goal so an outside destination stays flagged partial. */
+  partialRoute(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null {
+    return this.route(start, end, filter);
   }
   private vertices(p: number): readonly Vec3[] {
     const mesh = this.mesh;

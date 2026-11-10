@@ -37,6 +37,7 @@ export class CrowdAgent {
     state: CrowdAgentState;
     target: Vec3 | null;
     path: Vec3[];
+    partial: boolean;
     userData: unknown;
     readonly radius: number;
     maxSpeed: number;
@@ -127,6 +128,7 @@ export class NavMesh implements NavSurface {
 }
 
 export interface NavRoute {
+    partial?: boolean;
     points: Vec3[];
     offMesh: number[];
 }
@@ -140,6 +142,7 @@ export interface NavSurface {
     } | null;
     heightAt(index: number, x: number, z: number): number;
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+    partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     polygonArea(index: number): number;
 }
 

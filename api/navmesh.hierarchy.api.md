@@ -104,6 +104,7 @@ interface NavObstacle {
 }
 
 interface NavRoute {
+    partial?: boolean;
     points: Vec3[];
     offMesh: number[];
 }
@@ -117,6 +118,7 @@ interface NavSurface {
     } | null;
     heightAt(index: number, x: number, z: number): number;
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+    partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     polygonArea(index: number): number;
 }
 

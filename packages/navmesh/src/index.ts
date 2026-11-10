@@ -38,6 +38,8 @@ export interface NavSurface {
   closestPoint(position: Vec3): { point: Vec3; polygon: number } | null;
   heightAt(index: number, x: number, z: number): number;
   route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+  /** Optional partial planner accepting an unsnapped goal, used by Crowd when available. */
+  partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
   polygonArea(index: number): number;
 }
 interface Polygon {

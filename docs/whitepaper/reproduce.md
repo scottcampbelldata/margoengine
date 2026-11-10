@@ -2538,3 +2538,6 @@ After building packages, run node --test --test-timeout=120000 packages/save/tes
 ### Batch 197 orbit collision
 
 After build:packages, run node --test --test-timeout=30000 packages/controls/tests/collide.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js collide. The browser report is packages/controls/test-results/collide-browser.json and covers both backends. No timing benchmark.
+
+
+Batch 252 job 2: after building, run `node --test --test-timeout=120000 packages/navmesh/test/partial.test.js`. All fixtures are analytic CPU tests; Crowd walks through partial arrival and a subsequent surface revision.

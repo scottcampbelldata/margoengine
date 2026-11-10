@@ -84,6 +84,8 @@ export class CrowdAgent {
   target: Vec3 | null = null;
   /** Its current route corners (empty without a target). */
   path: Vec3[] = [];
+  /** Whether the current route ends at the nearest reachable point instead of the requested target. */
+  partial = false;
   /** Anything kept with the agent. */
   userData: unknown;
   readonly radius: number;
@@ -154,6 +156,7 @@ export class CrowdAgent {
     this.check();
     this.target = point(target, 'Agent target');
     this.planned = -1;
+    this.partial = false;
     this.state = 'moving';
     return this;
   }
@@ -162,6 +165,7 @@ export class CrowdAgent {
     this.check();
     this.target = null;
     this.path = [];
+    this.partial = false;
     this.links = [];
     this.state = 'idle';
     return this;
@@ -318,7 +322,7 @@ export class Crowd {
       });
     }
     for (const agent of this.agents) {
-      if (agent.target && agent.state !== 'arrived' && agent.planned !== agent.surface.version)
+      if (agent.target && (agent.state !== 'arrived' || agent.partial) && agent.planned !== agent.surface.version)
         this.plan(agent, agent.surface.version);
       this.steer(agent, dt);
     }
@@ -344,8 +348,11 @@ export class Crowd {
 
   private plan(agent: CrowdAgent, version: number): void {
     agent.planned = version;
+    agent.partial = false;
     const target = agent.surface.closestPoint(agent.target!),
-      route = target && agent.surface.route(agent.position, target.point, agent.filter);
+      route = agent.surface.partialRoute
+        ? agent.surface.partialRoute(agent.position, agent.target!, agent.filter)
+        : target && agent.surface.route(agent.position, target.point, agent.filter);
     if (!route) {
       agent.state = 'unreachable';
       agent.path = [];
@@ -354,6 +361,7 @@ export class Crowd {
       return;
     }
     agent.path = route.points;
+    agent.partial = route.partial ?? false;
     agent.links = route.offMesh;
     agent.corner = 1;
     if (agent.state !== 'offmesh') agent.state = 'moving';

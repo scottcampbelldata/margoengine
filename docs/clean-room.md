@@ -5285,3 +5285,10 @@ Sources compared (2026-11-10), papers and public API descriptions only:
 - Yomotsu, *camera-controls API reference* (accessed 2026-11-10), https://yomotsu.github.io/camera-controls/classes/CameraControls.html . Public colliderMeshes description informs explicit colliders and near-plane corner probes. No rival source opened.
 
 Combined design: preserve the requested orbit, immediately constrain its arm by centre and near-plane-corner triangle hits, then exponentially extend only on clearance. Reuse Margo's BVH query with a single refresh per update. Synthetic boxes are correctness fixtures, not an asset demo. No timing claim.
+
+
+## Batch 252 job 2: partial routes
+
+Sources compared before implementation: Peter E. Hart, Nils J. Nilsson and Bertram Raphael, *A Formal Basis for the Heuristic Determination of Minimum Cost Paths* (1968), https://doi.org/10.1109/TSSC.1968.300136; Douglas Demyen and Michael Buro, *Efficient Triangulation-Based Pathfinding* (2006), https://cdn.aaai.org/AAAI/2006/AAAI06-148.pdf; Mikko Mononen and Recast Navigation contributors, *dtNavMeshQuery API reference* (2009-present), https://recastnav.com/classdtNavMeshQuery.html. Compared graph-cost search, portal funneling and incomplete/reachable route contracts. No rival or companion implementation read.
+
+Combined design: explore the directed, filtered reachable component, minimize point-to-polygon XZ distance (vertical distance breaks a tie), then use the existing cost-aware corridor search and funnel to that precise reachable point. Reachable goal polygons remain complete; disconnected, forbidden and outside goals return partial=true. Off-mesh links remain marked and directed. NavMeshQuery implements NavSurface so Crowd can use the optional planner without importing it in the root. Crowd preserves unsnapped goals via the optional partialRoute hook and exposes agent.partial; an arrived partial agent replans when the surface changes. Analytic synthetic fixtures only; no new asset demo or speed claim.

@@ -17,6 +17,8 @@ export interface Link {
 
 /** A path with the waypoints where off-mesh links start. */
 export interface NavRoute {
+  /** Set by optional partial-path surfaces when the original goal is unreachable. Default false when absent. */
+  partial?: boolean;
   /** Corner points from the start to the end, both included. */
   points: Vec3[];
   /** Indices `i` into `points` where the segment from `points[i]` to `points[i + 1]` crosses an off-mesh link. */
