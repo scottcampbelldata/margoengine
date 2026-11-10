@@ -38,8 +38,24 @@ export function readAccessor(
   accepts: (accessor: GLTFAccessor) => boolean,
   index = false,
 ): Float32Array | Uint32Array {
-  const a = entry(doc.accessors, id, 'accessor'),
-    v = entry(doc.bufferViews, a.bufferView, 'bufferView'),
+  const a = entry(doc.accessors, id, 'accessor');
+  // Section 3.6.2.1: an accessor without a bufferView holds zeros (sparse values, which this loader does not read,
+  // could override them).
+  if (a.bufferView === undefined && !a.sparse) {
+    if (!accepts(a))
+      throw new MargoError(
+        'unsupported',
+        'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or load it with @margoengine/gltf-pro',
+      );
+    const count = integer(a.count, 'accessor count', 1);
+    if (count > 1_000_000)
+      throw new MargoError(
+        'unsupported',
+        'glTF accessor holds over one million values, the limit of the light loader; load it with @margoengine/gltf-pro',
+      );
+    return index ? new Uint32Array(count) : new Float32Array(count * components);
+  }
+  const v = entry(doc.bufferViews, a.bufferView, 'bufferView'),
     buffer = buffers[integer(v.buffer, 'buffer reference')];
   if (!buffer || a.sparse || !accepts(a))
     throw new MargoError(

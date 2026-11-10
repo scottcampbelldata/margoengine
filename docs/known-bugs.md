@@ -5572,3 +5572,11 @@ the Hermite curve (exact on that path; equal to the old value at the snapshots t
 Open: the playout papers behind `net/delay` (Ramjee et al. 1994, Moon, Kurose and Towsley 1998) were read by the author
 but could not be fetched for this audit; `WARM` (8 arrivals before the measurement replaces `initial`) and the 0.9995
 slerp cut-over are Margo's own numbers (the nlerp error at that cut-over is below 1e-6 rad).
+
+## Batch 132 audit: gltf (fixed)
+
+Fixed with a regression in `packages/gltf/test/audit-132.test.js` (fails on the code before the fix): an accessor with no
+`bufferView` and no `sparse` is valid glTF 2.0 and holds zeros (specification 3.6.2.1), but `readAccessor`
+(accessor.ts:42 before the fix) threw "Invalid glTF bufferView; the file is not valid glTF 2.0". A mesh whose NORMAL
+accessor had no bufferView failed to load. It now reads as zeros; a sparse accessor without a view is still refused
+as unsupported by the light loader.
