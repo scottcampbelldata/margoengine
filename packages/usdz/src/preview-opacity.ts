@@ -150,5 +150,6 @@ fn usdPrimvar(slot:u32,p:vec4f)->vec4f {let tri=u32(round(p.x));let u=p.z;let v=
   };
   const plugin = { name: 'usd-preview-opacity-' + id, setup, onDeviceRestored: setup, dispose: release };
   engine.use(plugin);
-  model.onDispose(() => engine.removePlugin(plugin.name));
+  // The scene it was attached to, not whichever scene is active when the model goes.
+  model.onDispose(() => engine.sceneOf(plugin)?.removePlugin(plugin.name));
 }

@@ -40,8 +40,9 @@ export function curves(options: CurvesOptions = {}): USDExtension {
     while (engine.hasPlugin('usd-curves-lines-' + id) || engine.hasPlugin('usd-curves-points-' + id)) id++;
     let lines: InstanceType<typeof Lines> | undefined, points: InstanceType<typeof PointsPlugin> | undefined;
     model.onDispose(() => {
-      if (lines) engine.removePlugin(lines.name);
-      if (points) engine.removePlugin(points.name);
+      // The scenes they were attached to, not whichever scene is active when the model goes.
+      if (lines) engine.sceneOf(lines)?.removePlugin(lines.name);
+      if (points) engine.sceneOf(points)?.removePlugin(points.name);
     });
     for (let node = 0; node < model.asset.doc.nodes!.length; node++) {
       const mesh = model.asset.doc.nodes![node].mesh;
