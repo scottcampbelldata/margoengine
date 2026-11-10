@@ -3724,6 +3724,8 @@ Batch 183 job 1: after build:packages, run the stage CPU suite and `node scripts
 Review 4: after build:packages, run packages/clustered/test/stochastic.test.js and ltc-edge.test.js with node --test; run scripts/clustered-cube-projector-gpu.mjs and scripts/shape-lights-gpu-check.js under the repository GPU lock, both normally and with --compat. The latter retains the 54 float64 mirror cases and their original limits.
 
 
+Review 2 VTK wedge orientation: after building packages, run node --test --test-timeout=120000 packages/loaders/tests/vtk-wedge.test.js packages/loaders/tests/vtk-legacy.test.js packages/loaders/tests/vtk-xml.test.js. The unit prism must have signed volume +0.5, the positive affine transform +12, with every triangle facing away from the interior in both parsers and surface policies.
+
 Review 2 canvas ray coordinates: after build:packages, run node --test --test-timeout=120000 packages/selection/test/spatial.test.js. The layout-free ray regression checks zero/absent client dimensions, mixed axes and scaled CSS dimensions. Run the selection package GPU suites on both backends for the existing raster contracts.
 
 Review 2 off-scene animation dependencies: after building packages, run `node --test --test-timeout=120000 packages/exporters/tests/optimize-extra.test.js`. The pruning regression covers a directly animated skinned mesh and an animation target below a skinned ancestor outside scene roots. It validates both GLBs and the retained transform/joint references.

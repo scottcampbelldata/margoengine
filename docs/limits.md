@@ -5927,6 +5927,10 @@ Review 4 LTC size evidence (current-main parent, 2026-11-10): clustered/area 105
 
 Review 3 C1: CurveEditor reconciles selected numeric channels against the current timeline document before graph evaluation. Removing the selected channel falls back to the first remaining channel and refits its values; an empty document clears selection and redo restores an available channel. JSDOM regression covers the real editor and shared undo history. No public API change.
 
+## Review 2: VTK wedge surfaces (2026-11-10)
+
+The shared legacy/XML VTK volume surface builder follows the published type-13 wedge point order. All five faces wind outward for positive cell orientation, matching the tetrahedron, voxel, hexahedron and pyramid conventions. Vertex coordinates, cell-to-triangle ownership, surface extraction policies and public API are unchanged. The independent wedge regression checks every triangle normal and signed volume, including a translated/scaled/sheared cell. No timing claim.
+
 ## Review 2: spatial rays without canvas layout (2026-11-10)
 
 SpatialPicking.ray uses half of clientWidth/clientHeight when each is nonzero, otherwise half of backing width/height for that axis, matching Picking and core's existing query coordinate convention. It therefore supports headless, detached and worker canvases that report zero or absent CSS layout dimensions. Camera orientation, range, projection, proximity selection and public API are unchanged. Regression: packages/selection/test/spatial.test.js.

@@ -1086,6 +1086,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/cutscene (review 3 C1): document graph channel reconciliation on undo/redo and fallback after track removal.
 
+- @margoengine/loaders (review 2): clarify the standard VTK type-13 wedge ordering and outward XML/legacy surface winding; examples deferred.
+
 - @margoengine/selection (review 2): describe per-axis CSS/backing-size fallback for SpatialPicking.ray on headless, detached and worker canvases; examples deferred.
 
 - @margoengine/exporters (review 2): describe optimize-extra pruning of off-scene animation targets, transform ancestors and their skin/joint dependencies; examples deferred.

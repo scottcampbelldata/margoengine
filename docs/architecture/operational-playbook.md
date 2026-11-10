@@ -5593,6 +5593,8 @@ checks LOD selection, outline pixels, viewcube navigation and lifetime cleanup o
 StrictMode unit coverage checks per-Scene plugin ownership and nested camera restoration. Independent rival pixel
 comparisons are not supplied; the public behavioural contract comparison is recorded in clean-room.md.
 
+Review 2 VTK wedge evidence (2026-11-10): the loaders shared legacy/XML cell builder now preserves standard type-13 outward winding. Original unit and transformed prism regressions check each triangle normal, signed volume, coordinates and cell provenance in outer/all modes. Existing volume-cell checks keep their original tolerance. No backend, core or stage math changed.
+
 ### Section 5 evidence addition: batch 268 XR pointers
 
 Review 2 (2026-11-10): spatial rays use the picker's per-axis CSS-size or backing-size coordinate convention, including zero/absent layout dimensions on headless and worker canvases. The spatial CPU regression checks zero, absent, mixed-axis and scaled CSS sizes while preserving the world ray camera; existing selection GPU suites cover rendering on both backends.
