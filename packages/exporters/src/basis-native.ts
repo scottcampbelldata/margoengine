@@ -1,5 +1,6 @@
 // One optional, lazy Rust/Wasm encoder. Public API and image decoding stay TS.
 import { MargoError } from '@margoengine/math/errors';
+import { fault, wasmError } from '../../shared/errors.js';
 import { imageForBasisJob, type BasisJob, type BasisResult, type RGBAImage } from './ktx2-encode.js';
 import { encodeBasisLZ, packKTX2, type EncodedLevel } from './basis-wire.js';
 
@@ -18,29 +19,59 @@ export interface NativeBasis extends WebAssembly.Exports {
     perceptual: number,
   ): number;
   encode_etc1s_shared_mips(
-    input: number, output: number, blocks: number, quality: number, effort: number,
-    perceptual: number, dimensions: number, slices: number,
+    input: number,
+    output: number,
+    blocks: number,
+    quality: number,
+    effort: number,
+    perceptual: number,
+    dimensions: number,
+    slices: number,
   ): number;
   encode_zstd(input: number, length: number, output: number, capacity: number): number;
   mip_rgba(input: number, output: number, width: number, height: number, srgb: number, normal: number): number;
 }
-const failed = (): MargoError =>
-  new MargoError('failed', 'KTX2 encoder rejected the image; check its pixels and dimensions');
+const failed = (): MargoError => fault('failed', 'KTX2 encoder rejected the image; check its pixels and dimensions');
 /** Loading happens only after an encode starts, in Node or the encoder worker. */
 export async function loadNativeBasis(url: URL): Promise<NativeBasis> {
-  let bytes: Uint8Array;
-  if (url.protocol === 'file:') {
-    const name = 'node:fs/promises',
-      { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ name);
-    bytes = await readFile(url);
-  } else {
-    const response = await fetch(url);
-    if (!response.ok)
-      throw new MargoError('failed', `Could not load the KTX2 encoder (${response.status}); check its Wasm URL`);
-    bytes = new Uint8Array(await response.arrayBuffer());
+  try {
+    let bytes: Uint8Array;
+    if (url.protocol === 'file:') {
+      const name = 'node:fs/promises',
+        { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ name);
+      bytes = await readFile(url);
+    } else {
+      const response = await fetch(url);
+      if (!response.ok)
+        throw fault('failed', `Could not load the KTX2 encoder (${response.status}); check its Wasm URL`);
+      bytes = new Uint8Array(await response.arrayBuffer());
+    }
+    const { instance } = await WebAssembly.instantiate(bytes as Uint8Array<ArrayBuffer>, {});
+    return instance.exports as NativeBasis;
+  } catch (error) {
+    const policy = wasmError(error);
+    if (policy !== error) throw policy;
+    // A valid, owned module containing v128.const and drop distinguishes missing
+    // SIMD support from a damaged encoder. validate does not compile under CSP.
+    if (
+      (error as Error)?.name === 'CompileError' &&
+      !WebAssembly.validate(
+        new Uint8Array([
+          0, 97, 115, 109, 1, 0, 0, 0, 1, 4, 1, 96, 0, 0, 3, 2, 1, 0, 10, 23, 1, 21, 0, 253, 12, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0, 0, 26, 11,
+        ]),
+      )
+    )
+      throw Object.assign(
+        fault('unsupported', 'KTX2 encoding requires WebAssembly SIMD; use a runtime with Wasm SIMD support'),
+        { cause: error },
+      );
+    if (error instanceof MargoError) throw error;
+    throw Object.assign(
+      fault('failed', 'Could not initialize the KTX2 encoder; check its Wasm URL and runtime support'),
+      { cause: error },
+    );
   }
-  const { instance } = await WebAssembly.instantiate(bytes as Uint8Array<ArrayBuffer>, {});
-  return instance.exports as NativeBasis;
 }
 function run(
   api: NativeBasis,
@@ -126,10 +157,20 @@ export function encodeNativeBasis(api: NativeBasis, job: BasisJob): BasisResult 
     try {
       const view = new DataView(api.memory.buffer, metadata, dimensions.length * 8);
       dimensions.forEach(([width, height], i) => {
-        view.setUint32(i * 8, width, true); view.setUint32(i * 8 + 4, height, true);
+        view.setUint32(i * 8, width, true);
+        view.setUint32(i * 8 + 4, height, true);
       });
       fitted = run(api, all, length / 8, (input, output) =>
-        api.encode_etc1s_shared_mips(input, output, length / 64, job.quality, job.effort, Number(job.srgb), metadata, dimensions.length),
+        api.encode_etc1s_shared_mips(
+          input,
+          output,
+          length / 64,
+          job.quality,
+          job.effort,
+          Number(job.srgb),
+          metadata,
+          dimensions.length,
+        ),
       );
     } finally {
       api.release(metadata, dimensions.length * 8);
@@ -150,17 +191,17 @@ export function encodeNativeBasis(api: NativeBasis, job: BasisJob): BasisResult 
         api.encode_uastc(input, output, data.length / 64, job.uastcLevel, 0),
       );
       if (job.uastcRDO > 0) {
-        const input = api.allocate(data.length),
-          output = api.allocate(fitted.length);
+        const input = api.allocate(data.length);
+        let output: number | undefined;
         try {
+          output = api.allocate(fitted.length);
           new Uint8Array(api.memory.buffer, input, data.length).set(data);
           new Uint8Array(api.memory.buffer, output, fitted.length).set(fitted);
-          if (api.condition_uastc(input, output, data.length / 64, job.uastcRDO, 0) !== 0)
-            throw failed();
+          if (api.condition_uastc(input, output, data.length / 64, job.uastcRDO, 0) !== 0) throw failed();
           fitted = new Uint8Array(api.memory.buffer, output, fitted.length).slice();
         } finally {
           api.release(input, data.length);
-          api.release(output, fitted.length);
+          if (output !== undefined) api.release(output, fitted.length);
         }
       }
       return {

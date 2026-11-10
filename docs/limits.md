@@ -6503,6 +6503,12 @@ AVIF review M2 (2026-11-10): chroma position 1 uses horizontal co-siting and ver
 
 ## Batch 137 encoder limits
 
+The default KTX2 encoder requires WebAssembly SIMD. A runtime without SIMD rejects
+with MargoError `unsupported` and a help link; there is no automatic scalar fallback.
+CSP compilation refusals use `failed` with the required permission and CSP help link.
+Failed loads are cleared, so each later encode call may make one fresh load attempt;
+successful modules remain cached. See [loader recovery](exporter-basis-loading.md).
+
 The clean-room ETC1S/UASTC encoder replaces the bundled prebuilt encoder, with the
 same public settings and a single lazy SIMD Wasm module. ETC1S uses shared endpoint
 and selector codebooks; all nineteen UASTC modes participate at level 2 and above.

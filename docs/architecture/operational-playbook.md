@@ -7151,6 +7151,12 @@ The optional exporter Rust/Wasm transform builder rejects nonrepresentable float
 
 ## Section 5 evidence: batch 137 clean-room ETC1S/UASTC encoder
 
+Review 5 loader repair: the lazy encoder retains successful loads and clears
+rejections in Node and the worker. Deterministic allocation-trap regressions
+cover RDO cleanup, and injected CSP/SIMD failures check coded errors and help
+links. SIMD is required; missing SIMD is simulated, with the diagnostic probe
+validated on the current runtime. See [reproduction and standards](../exporter-basis-loading.md).
+
 The optional exporters/ktx2 entry loads one Rust SIMD Wasm feature lazily. The
 TypeScript API, custom encoderPath route, browser worker cancellation, alpha,
 color/data/normal semantics, mip chains, effort, quality and RDO remain supported.

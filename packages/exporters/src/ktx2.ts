@@ -98,7 +98,10 @@ async function encode(jobs: BasisJob[], options: KTX2EncoderOptions): Promise<Ba
     const wasm = new URL('./basis-encoder/margo_basis_encoder.wasm', import.meta.url);
     if (typeof Worker === 'undefined') {
       const implementation = await import('./basis-native.js');
-      native ??= implementation.loadNativeBasis(wasm);
+      native ??= implementation.loadNativeBasis(wasm).catch((error) => {
+        native = undefined;
+        throw error;
+      });
       const api = await native;
       return inProcess(jobs, (job) => implementation.encodeNativeBasis(api, job), options.signal);
     }

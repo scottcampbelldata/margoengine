@@ -736,7 +736,7 @@ Draco has no place for morph targets and can reorder vertices, so a primitive wi
 
 ### KTX2 textures (`@margoengine/exporters/ktx2`)
 
-`compressTextures(glb, options)` stores the textures of a GLB as KTX2 with Basis Universal (`KHR_texture_basisu`), so they stay compressed on the GPU as well as on the wire. `encodeKTX2(image, options)` writes one `.ktx2` file from a PNG, a JPEG or RGBA8 pixels. The encoder is Binomial's own, in Wasm, and loads on the first call: in a worker in a browser, in process in Node. Image files are read there too, so a page never decodes a large image on its own frame, and neither needs a browser.
+`compressTextures(glb, options)` stores the textures of a GLB as KTX2 with Basis Universal (`KHR_texture_basisu`), so they stay compressed on the GPU as well as on the wire. `encodeKTX2(image, options)` writes one `.ktx2` file from a PNG, a JPEG or RGBA8 pixels. Margo's clean-room Rust/Wasm encoder requires WebAssembly SIMD and loads on the first call: in a worker in a browser, in process in Node. Image files are read there too, so a page never decodes a large image on its own frame, and neither needs a browser.
 
 ```ts
 import { exportGLB } from 'margoengine/exporters';
@@ -773,7 +773,7 @@ console.log(`${file.length} bytes of .ktx2`);
 | `effort` | 2 | ETC1S encoder effort, from 0 to 6 |
 | `uastcLevel` | 2 | UASTC encoder level, from 0, the fastest, to 4, the closest to the source |
 | `uastcRDO` | 0 | UASTC rate-distortion pass, from 0, off, to 10: smaller on the wire, further from the source, slower |
-| `encoderPath` | the bundled copy | URL of a folder with `basis_encoder.js` and `basis_encoder.wasm` |
+| `encoderPath` | Margo's lazy encoder | Optional compatibility override: URL of a folder with external `basis_encoder.js` and `basis_encoder.wasm` |
 | `signal` | none | Stops the encode: at once in a browser, between images in Node |
 
 `encodeKTX2` takes the last six, plus `mode` (`'etc1s'`, the default, or `'uastc'`), `colorSpace` (`'srgb'`, the default, or `'linear'`), `normalMap` (false) and `mipmaps` (true).

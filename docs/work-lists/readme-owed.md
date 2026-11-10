@@ -1511,3 +1511,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/webgl2-compat: document hardware implicit sampler footprints and the J6 product composition proof in docs/integration-product.md during the README phase.
 - @margoengine/ui: describe CurvedPanel and layoutPanels (ui/curved) with an example during the README phase (batch 132 audit).
+
+- @margoengine/exporters: cover clean-room Basis SIMD requirements, linked CSP/load errors, per-call load recovery and the external encoderPath override in README examples during the README phase.

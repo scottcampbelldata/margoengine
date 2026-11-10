@@ -58,7 +58,10 @@ self.onmessage = async ({ data }) => {
         result = encodeDracoMesh(module, data.job as DracoJob);
       self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
     } else if (data.kind === 'basis-native') {
-      nativeBasis ??= loadNativeBasis(new URL(data.wasmURL));
+      nativeBasis ??= loadNativeBasis(new URL(data.wasmURL)).catch((error) => {
+        nativeBasis = undefined;
+        throw error;
+      });
       const result = encodeNativeBasis(await nativeBasis, data.job as BasisJob);
       self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
     } else if (data.kind === 'basis') {

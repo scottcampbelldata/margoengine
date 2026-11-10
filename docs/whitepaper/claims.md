@@ -4589,6 +4589,13 @@ Draco encoder review L1: ranges near 1e-36 or beyond float32 range now produce a
 
 ## Batch 137 clean-room encoder replacement
 
+Review 5 corrects the encoder identity and external override description.
+Loader recovery, CSP/SIMD error codes and allocation cleanup have deterministic
+regressions in packages/exporters/tests/basis-loading.test.js. The default
+requires Wasm SIMD; no scalar fallback is claimed. Reproduce these checks from
+[Basis loader recovery](../exporter-basis-loading.md), which records the standards
+and the simulated missing-SIMD coverage limit.
+
 The optional exporters/ktx2 default encoder is Margo's Rust SIMD feature, without
 the third-party encoder wrapper or binary. Existing public options and the custom
 encoderPath compatibility route remain. All six measured mode/role cases fit the
