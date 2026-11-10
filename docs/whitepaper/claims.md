@@ -2974,3 +2974,5 @@ Refresh is manual or window-frame driven and never ticks the source. Pause,
 resume, AbortSignal and disposal clean up panel-local work. DOM proof is
 packages/behavior/tests/inspect.test.js; visual usability on large production
 trees has not been established.
+### Live FSM configuration view (batch 250 job 4)
+MachineView draws active hierarchy paths, parallel region paths, remembered state and bounded recent transitions in a live Inspector-compatible overlay. packages/fsm/test/inspect.test.js checks the actual Inspector shadow mount, filtering, cyclic payload safety, text escaping, live refresh and abort disposal. packages/fsm/test/inspect-browser.mjs checks rendered placement, live changes and removal in Chromium. Reference: Harel, Shneiderman and Stately public inspection descriptions in docs/clean-room.md; no editing or complete Stately feature claim.

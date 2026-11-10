@@ -49,6 +49,10 @@
     "./invoke": {
       "types": "./dist/invoke.d.ts",
       "import": "./dist/invoke.js"
+    },
+    "./inspect": {
+      "types": "./dist/inspect.d.ts",
+      "import": "./dist/inspect.js"
     }
   },
   "files": [
@@ -69,6 +73,10 @@
     "build": "node ../../scripts/build-optional.js fsm",
     "test": "npm run build && node --test test/*.test.js",
     "test:outside": "node test/outside/check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser": "node test/inspect-browser.mjs"
+  },
+  "margo": {
+    "gpuTestTimeoutMinutes": 2
   }
 }

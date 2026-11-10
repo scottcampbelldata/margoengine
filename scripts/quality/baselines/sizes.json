@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 12088250,
+  "total": 12091048,
   "history": [
     {
       "date": "2026-10-24",
@@ -5360,6 +5360,12 @@
       "commit": "5345be708",
       "reason": "New optional ui/input: absent -> 4600 B gzip, ceiling 4606 B. Native editor/mirror, readable selected text and caret/selection stay together; splitting would add coordination without reducing consumer work. Required text is already carried by ui. UI root 31885 B and core+stage 23950 B are unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-250",
+      "reason": "New optional fsm/inspect: 0 to 2542 B gzip, includes complete runtime and validation; splitting would add indirection",
+      "grew": 1
     }
   ],
   "items": {
@@ -6375,6 +6381,7 @@
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/vtk": 6201,
     "@margoengine/ui/input": 4606,
-    "leak @margoengine/ui/input -> @margoengine/text": 1
+    "leak @margoengine/ui/input -> @margoengine/text": 1,
+    "@margoengine/fsm/inspect": 2798
   }
 }

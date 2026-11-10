@@ -3564,3 +3564,7 @@ entry). UI root remains 31,885 B gzip and core + stage remains 23,950 B,
 below 25,000 B. The bytes keep native editing, selection and its mirror in one
 entry; splitting would require additional coordination without reducing the
 work a text-field consumer needs.
+### FSM live inspection (batch 250 job 4)
+Optional fsm/inspect provides a DOM hierarchy overlay with active ancestors, expandable outgoing edges, per-region paths, remembered history and the latest 32 trace entries by default. Capacity is 1 to 10,000. The Inspector structural element interface avoids loading its renderer dependencies; an explicit parent embeds the view, otherwise it overlays the bottom left. Live frames compare public trace fields and configuration, never serialize payloads. Existing traces remain caller-owned. Disposal removes frame callbacks and only the trace owned by the view. Internal optional-runtime edges are labelled internal in the topology; trace records retain public completion/delay metadata. It is a viewer, with no graph editing or remote actor session.
+
+Batch 250 job 4: fsm/inspect 0 to 2542 B min+gzip, ceiling 2798 B. Optional runtime is not loaded by the FSM root or core/stage.

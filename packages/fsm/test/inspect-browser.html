@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>FSM live view check</title>
+<style>body{background:#eef1f4;font:16px system-ui;margin:24px}h1{font-size:22px}</style>
+<h1>FSM inspector check</h1><p>Authored machine fixture: exploration, combat and pause.</p>
+<script type="module">
+import { Inspector } from '../../inspector/dist/index.js';
+import { StateMachine } from '../dist/index.js';
+import { MachineView } from '../dist/inspect.js';
+const inspector = new Inspector();
+const machine = new StateMachine({ play: { history: 'deep' }, explore: { parent: 'play' }, combat: { parent: 'play' }, pause: {} }, 'explore', {}, [
+  { from: 'explore', to: 'combat', event: 'enemy' }, { from: 'play', to: 'pause', event: 'pause' },
+]);
+const view = new MachineView(machine, { inspector });
+window.fsmCheck = { machine, view, inspector };
+</script></html>

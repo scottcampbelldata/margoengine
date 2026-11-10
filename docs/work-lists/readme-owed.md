@@ -36,3 +36,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/ui | Optional input: TextInput/TextArea/password, native bridge, selection, clipboard, IME, accessibility, defaults and disposal. | batch-258 job 1 |
 | margoengine | ui/input umbrella entry and native-editing attachment. | batch-258 job 1 |
+| @margoengine/fsm | inspect: MachineView mounting in Inspector shadow root or parent, existing trace ownership, refresh/live/capacity, filtering, AbortSignal and disposal | batch-250 job 4 |
+| margoengine | Generated fsm/inspect alias | batch-250 job 4 |

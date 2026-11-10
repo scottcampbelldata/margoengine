@@ -2529,3 +2529,4 @@ checks six format variants on WebGPU and the WebGL2 compatibility backend. Its J
 Batch 251 inspector: after building behavior, run
 `node --test --test-timeout=120000 packages/behavior/tests/inspect.test.js`.
 The CPU DOM fixtures verify hierarchy, live updates and scheduling cleanup.
+FSM view proof: build packages, run node --test --test-timeout=120000 packages/fsm/test/inspect.test.js, then node scripts/gpu-lock.mjs run --owner=fsm-inspect --max=2 --wait-max=60 -- node packages/fsm/test/inspect-browser.mjs; repeat the browser command with --compat. Screenshots go to test-results/batch250. The overlay itself uses DOM rendering and has no GPU math or backend-specific shaders.

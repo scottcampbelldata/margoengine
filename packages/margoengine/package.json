@@ -1138,6 +1138,10 @@
       "types": "./dist/fsm/invoke.d.ts",
       "import": "./dist/fsm/invoke.js"
     },
+    "./fsm/inspect": {
+      "types": "./dist/fsm/inspect.d.ts",
+      "import": "./dist/fsm/inspect.js"
+    },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"
