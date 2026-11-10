@@ -6543,3 +6543,7 @@ The optional datasets entry sends all normalized dataset kinds to the existing a
 ## Batch 177 statistical evidence (section 5 supplement)
 
 The CPU-only `/stats` entry adds no GPU shader or backend requirement. Shared `/maths` functions carry deterministic numerical/work bounds, including density integration, signed-stack/sample conservation and regression confidence checks. The thirteen real-data SVG charts are rasterized and downloaded in both browser launch modes; desktop and 390 px layouts are inspected. Existing renderer source is unchanged, so the already-passing sciviz renderer GPU checks are retained without repetition; the new chart browser test is the added GPU gate. Dependent CPU tests cover React and umbrella bindings. No timing claim or new core/stage bytes.
+
+### 5. Batch 274 CPU Wasm evidence
+
+compute/cpu-wasm keeps CPU storage/validation in the existing context and delegates numerical loops to a lazy, isolated Rust SIMD module. Exact paired JavaScript/Wasm outputs, the complete shared CPU cases, native Rust conversion/order checks, allocation-growth isolation and 59 real-GPU parity cases on each rendering route are the correctness evidence. work.simdGroups counts actual f64x2 arithmetic groups rather than inferred work. Both routes preserve the prior GPU tolerances. SIMD is required at creation; no silent fallback occurs. Quiet-machine timing remains owed in speed-phase.md. The existing CPU facade does not import this optional module, and core/stage are untouched.

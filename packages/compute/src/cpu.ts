@@ -20,6 +20,7 @@ import {
   type Program,
   type WaitOptions,
 } from './context.js';
+import type { CpuRuntime } from './cpu-runtime.js';
 import type { Kernel } from './kernel.js';
 import type { Operator } from './shaders.js';
 import type { ScanOptions } from './scan.js';
@@ -44,6 +45,8 @@ class HostBuffer {
   }
 }
 
+const runtimes = new WeakMap<ComputeContext, CpuRuntime>();
+
 const host = (buffer: unknown): HostBuffer => buffer as HostBuffer;
 
 const typed = (buffer: HostBuffer, dtype: DType): Typed =>
@@ -54,7 +57,7 @@ const typed = (buffer: HostBuffer, dtype: DType): Typed =>
       : new Uint32Array(buffer.bytes);
 
 /** The whole host buffer of an array, typed by its element type (index it from `array.offset`). */
-const viewOf = (array: GpuArray): Typed => typed(host(array.storage.buffer), array.dtype);
+export const cpuView = (array: GpuArray): Typed => typed(host(array.storage.buffer), array.dtype);
 
 /** The few device members the shared code reads, backed by host memory. */
 function hostDevice(): GPUDevice {
@@ -299,7 +302,7 @@ function compile(node: Node, shape: readonly number[]): Fill {
   if (node.kind === 'leaf') {
     const a = node.array;
     a.check(a.context);
-    const view = viewOf(a),
+    const view = cpuView(a),
       rank = shape.length;
     if (a.contiguous && a.shape.length === rank && a.shape.every((d, k) => d === shape[k])) {
       const offset = a.offset;
@@ -382,6 +385,8 @@ function compile(node: Node, shape: readonly number[]): Fill {
 
 /** Every element of `operand` in C order, as exact values of its element type. */
 function values(operand: Operand): Values {
+  const runtime = runtimes.get(operand.context);
+  if (runtime) return runtime.values(operand);
   const n = operand.size,
     out = new Float64Array(n);
   if (n === 0) return out;
@@ -391,6 +396,9 @@ function values(operand: Operand): Values {
 }
 
 // --- Shapes and folds ----------------------------------------------------------------------------------------------
+
+const typeCode = (t: DType) => (t === 'i32' ? 1 : t === 'u32' ? 2 : 0);
+const foldCode = (op: Operator) => ['sum', 'product', 'min', 'max'].indexOf(op as string);
 
 const sizeOf = (shape: readonly number[]) => shape.reduce((a, b) => a * b, 1);
 
@@ -525,12 +533,12 @@ const gpuOnly = (what: string) =>
 type Resources = Readonly<Record<string, unknown>>;
 
 /** A binding as host values: a GpuArray from its offset, a `{ buffer }` binding whole, or uniform bytes. */
-function bound(resource: unknown): { data: Typed; offset: number } {
-  if (resource instanceof GpuArray) return { data: viewOf(resource), offset: resource.offset };
+export function cpuBound(resource: unknown): { data: Typed; offset: number } {
+  if (resource instanceof GpuArray) return { data: cpuView(resource), offset: resource.offset };
   const buffer = host((resource as { buffer: unknown }).buffer);
   return { data: typed(buffer, buffer.dtype ?? 'f32'), offset: 0 };
 }
-const uniform = (resource: unknown) => {
+export const cpuUniform = (resource: unknown) => {
   const v = resource as ArrayBufferView;
   return new DataView(v.buffer, v.byteOffset, v.byteLength);
 };
@@ -572,10 +580,10 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   matmul(r) {
     const s = new Uint32Array((r.shape as Uint32Array).slice(0, 12)),
       [m, n, k, , aOffset, aBatch, aRow, aCol, bOffset, bBatch, bRow, bCol] = s,
-      left = bound(r.left).data,
-      right = bound(r.right).data,
+      left = cpuBound(r.left).data,
+      right = cpuBound(r.right).data,
       product = r.product as GpuArray,
-      out = viewOf(product),
+      out = cpuView(product),
       round = ROUND[product.dtype],
       F = isFloat(product.dtype),
       batches = product.size / (m * n || 1),
@@ -596,16 +604,16 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   },
   // fft.ts stockhamShader: one radix-2 pass.
   'fft.stockham'(r) {
-    const p = uniform(r.pass_),
+    const p = cpuUniform(r.pass_),
       n = p.getUint32(0, true),
       l = p.getUint32(4, true),
       lines = p.getUint32(8, true),
       inverse = p.getUint32(12, true) === 1,
-      reIn = bound(r.reIn),
-      imIn = bound(r.imIn),
-      reOut = bound(r.reOut),
-      imOut = bound(r.imOut),
-      twiddle = bound(r.twiddle),
+      reIn = cpuBound(r.reIn),
+      imIn = cpuBound(r.imIn),
+      reOut = cpuBound(r.reOut),
+      imOut = cpuBound(r.imOut),
+      twiddle = cpuBound(r.twiddle),
       half = n / 2,
       stride = half / l,
       f = Math.fround;
@@ -633,11 +641,11 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   },
   // signal.ts convolve1dShader.
   convolve(r) {
-    const c = uniform(r.conv),
+    const c = cpuUniform(r.conv),
       [n, m, length, start, lines] = [0, 4, 8, 12, 16].map((at) => c.getUint32(at, true)),
-      signal = bound(r.signal),
-      taps = bound(r.taps),
-      out = bound(r.out);
+      signal = cpuBound(r.signal),
+      taps = cpuBound(r.taps),
+      out = cpuBound(r.out);
     for (let t = 0; t < length * lines; t++) {
       const line = Math.floor(t / length),
         k = (t % length) + start,
@@ -651,11 +659,11 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   },
   // signal.ts convolve2dShader (zero fill).
   convolve2d(r) {
-    const c = uniform(r.conv),
+    const c = cpuUniform(r.conv),
       [h, w, kh, kw, oh, ow, y0, x0, batch] = [0, 4, 8, 12, 16, 20, 24, 28, 32].map((at) => c.getUint32(at, true)),
-      image = bound(r.image),
-      taps = bound(r.taps),
-      out = bound(r.out);
+      image = cpuBound(r.image),
+      taps = cpuBound(r.taps),
+      out = cpuBound(r.out);
     for (let t = 0; t < oh * ow * batch; t++) {
       const b = Math.floor(t / (oh * ow)),
         y = (Math.floor(t / ow) % oh) + y0,
@@ -675,12 +683,12 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   },
   // sparse.ts spmvShader: y[r] = sum of values[k] * x[colIdx[k]] over row r's entries, in f32.
   'sparse.spmv'(r) {
-    const rows = uniform(r.shape).getUint32(0, true),
-      ptr = bound(r.rowPtr),
-      col = bound(r.colIdx),
-      val = bound(r.values),
-      x = bound(r.x),
-      y = bound(r.y);
+    const rows = cpuUniform(r.shape).getUint32(0, true),
+      ptr = cpuBound(r.rowPtr),
+      col = cpuBound(r.colIdx),
+      val = cpuBound(r.values),
+      x = cpuBound(r.x),
+      y = cpuBound(r.y);
     for (let row = 0; row < rows; row++) {
       let sum = 0;
       for (let k = ptr.data[ptr.offset + row]; k < ptr.data[ptr.offset + row + 1]; k++)
@@ -690,11 +698,11 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   },
   // sparse.ts diagonalShader.
   'sparse.diagonal'(r) {
-    const rows = uniform(r.shape).getUint32(0, true),
-      ptr = bound(r.rowPtr),
-      col = bound(r.colIdx),
-      val = bound(r.values),
-      d = bound(r.d);
+    const rows = cpuUniform(r.shape).getUint32(0, true),
+      ptr = cpuBound(r.rowPtr),
+      col = cpuBound(r.colIdx),
+      val = cpuBound(r.values),
+      d = cpuBound(r.d);
     for (let row = 0; row < rows; row++) {
       let v = 0;
       for (let k = ptr.data[ptr.offset + row]; k < ptr.data[ptr.offset + row + 1]; k++)
@@ -704,7 +712,7 @@ const KERNELS: Record<string, (r: Resources) => void> = {
   },
   // random.ts randomShader: element i takes word i % 4 of the Philox block of counter (offset + i / 4, ...).
   random(r) {
-    const d = uniform(r.draw),
+    const d = cpuUniform(r.draw),
       [n, offset, offsetHigh, kind, key0, key1, stream, range] = [0, 4, 8, 12, 16, 20, 24, 28].map((at) =>
         d.getUint32(at, true),
       ),
@@ -712,7 +720,7 @@ const KERNELS: Record<string, (r: Resources) => void> = {
       b = d.getFloat32(36, true),
       base = d.getInt32(40, true),
       target = r.out as GpuArray,
-      out = viewOf(target),
+      out = cpuView(target),
       f = Math.fround,
       word = new Uint32Array(4),
       unit = (x: number) => f((x >>> 8) * 5.9604644775390625e-8),
@@ -749,8 +757,15 @@ const KERNELS: Record<string, (r: Resources) => void> = {
  */
 export class CpuContext extends ComputeContext {
   /** @internal Use `createCompute({ backend: 'cpu' })`. */
-  constructor() {
+  constructor(runtime?: CpuRuntime) {
     super(hostDevice(), false);
+    if (runtime) runtimes.set(this, runtime);
+  }
+
+  override dispose(): void {
+    runtimes.get(this)?.dispose();
+    runtimes.delete(this);
+    super.dispose();
   }
 
   /** `'cpu'`: work runs in JavaScript on the calling thread. */
@@ -772,6 +787,11 @@ export class CpuContext extends ComputeContext {
   override submit(passes: readonly Pass[], copies: readonly Copy[] = []): void {
     this.check();
     for (const pass of passes) {
+      const runtime = runtimes.get(this);
+      if (runtime) {
+        runtime.kernel(pass.program.label, pass.resources);
+        continue;
+      }
       const kernel = KERNELS[pass.program.label];
       if (!kernel) throw gpuOnly(`The ${pass.program.label} pass`);
       kernel(pass.resources);
@@ -833,7 +853,7 @@ export class CpuContext extends ComputeContext {
   /** @internal An array of `shape` holding `data` (exact values of `dtype`). */
   #result<T extends DType>(shape: readonly number[], dtype: T, data: ArrayLike<number>): GpuArray<T> {
     const out = this.empty(shape, dtype);
-    if (data.length) viewOf(out).set(data);
+    if (data.length) cpuView(out).set(data);
     return out;
   }
 
@@ -853,6 +873,13 @@ export class CpuContext extends ComputeContext {
       shape = shapeAfter(input.shape, axes, !!options.keepdims),
       data = values(input),
       acc = new Float64Array(sizeOf(shape)).fill(fold.identity);
+    const runtime = runtimes.get(this);
+    if (runtime)
+      return this.#result(
+        shape,
+        input.dtype,
+        runtime.run('reduce', [data, input.shape, axes], [typeCode(input.dtype), foldCode(op), acc.length])[0],
+      );
     if (axes.length === input.ndim) {
       let a = fold.identity;
       for (let i = 0; i < data.length; i++) a = fold.combine(a, data[i]);
@@ -919,6 +946,21 @@ export class CpuContext extends ComputeContext {
     if (input.size === 0) throw rangeError(`arg${which} of an empty array has no answer`, 'compute');
     const data = values(input),
       better = which === 'min' ? (v: number, b: number) => v < b : (v: number, b: number) => v > b;
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      const axis = options.axis === undefined ? undefined : axisOf(options.axis, input.ndim);
+      const len = axis === undefined ? data.length : input.shape[axis];
+      const inner = axis === undefined ? 1 : sizeOf(input.shape.slice(axis + 1));
+      return this.#result(
+        axis === undefined
+          ? options.keepdims
+            ? input.shape.map(() => 1)
+            : []
+          : shapeAfter(input.shape, [axis], !!options.keepdims),
+        'u32',
+        runtime.run('arg', [data], [len, inner, which === 'max' ? 1 : 0])[0],
+      );
+    }
     if (options.axis === undefined) {
       let best = 0;
       for (let i = 1; i < data.length; i++) if (better(data[i], data[best])) best = i;
@@ -974,6 +1016,17 @@ export class CpuContext extends ComputeContext {
       data = values(input),
       n = data.length,
       out = new Float64Array(n);
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      const axis = options.axis === undefined || input.ndim <= 1 ? undefined : axisOf(options.axis, input.ndim);
+      const len = axis === undefined ? n : input.shape[axis];
+      const inner = axis === undefined ? 1 : sizeOf(input.shape.slice(axis + 1));
+      return this.#result(
+        options.axis === undefined ? [n] : input.shape,
+        input.dtype,
+        runtime.run('scan', [data], [typeCode(input.dtype), foldCode(options.op ?? 'sum'), len, inner, +exclusive])[0],
+      );
+    }
     const line = (start: number, len: number, step: number) => {
       let acc = fold.identity;
       for (let k = 0; k < len; k++) {
@@ -1014,6 +1067,17 @@ export class CpuContext extends ComputeContext {
       data = values(values_),
       starts = values(flags),
       out = new Float64Array(data.length);
+    const runtime = runtimes.get(this);
+    if (runtime)
+      return this.#result(
+        [data.length],
+        values_.dtype,
+        runtime.run(
+          'segmented',
+          [data, starts],
+          [typeCode(values_.dtype), foldCode(options.op ?? 'sum'), +!!options.exclusive],
+        )[0],
+      );
     let acc = fold.identity;
     for (let i = 0; i < data.length; i++) {
       if (starts[i] !== 0) acc = fold.identity;
@@ -1041,6 +1105,11 @@ export class CpuContext extends ComputeContext {
       v = values(values_),
       outKeys: number[] = [],
       outValues: number[] = [];
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      const [rk, rv] = runtime.run('group', [k, v], [typeCode(values_.dtype), foldCode(options.op ?? 'sum')]);
+      return { keys: this.#result([rk.length], keys.dtype, rk), values: this.#result([rv.length], values_.dtype, rv) };
+    }
     for (let i = 0; i < k.length; i++) {
       if (i === 0 || k[i] !== k[i - 1]) {
         outKeys.push(k[i]);
@@ -1068,6 +1137,12 @@ export class CpuContext extends ComputeContext {
       key = keyOf(input.dtype),
       data = values(input),
       keys = new Uint32Array(data.length);
+    const runtime = runtimes.get(this);
+    if (runtime)
+      return {
+        data,
+        order: Uint32Array.from(runtime.run('order', [data], [typeCode(input.dtype), used, +!!options.descending])[0]),
+      };
     for (let i = 0; i < data.length; i++) {
       const k = options.descending ? ~key(data[i]) : key(data[i]);
       keys[i] = (k & mask) >>> 0;
@@ -1077,6 +1152,8 @@ export class CpuContext extends ComputeContext {
   override sort(input: Operand, options: SortOptions = {}): GpuArray {
     const { data, order } = this.#order(input, options),
       out = new Float64Array(data.length);
+    const runtime = runtimes.get(this);
+    if (runtime) return this.#result([data.length], input.dtype, runtime.run('gather', [data, order])[0]);
     for (let i = 0; i < out.length; i++) out[i] = data[order[i]];
     return this.#result([out.length], input.dtype, out);
   }
@@ -1095,6 +1172,12 @@ export class CpuContext extends ComputeContext {
       v = values(values_),
       k = new Float64Array(order.length),
       w = new Float64Array(order.length);
+    const runtime = runtimes.get(this);
+    if (runtime)
+      return {
+        keys: this.#result([order.length], keys.dtype, runtime.run('gather', [data, order])[0]),
+        values: this.#result([order.length], values_.dtype, runtime.run('gather', [v, order])[0]),
+      };
     for (let i = 0; i < order.length; i++) {
       k[i] = data[order[i]];
       w[i] = v[order[i]];
@@ -1114,7 +1197,7 @@ export class CpuContext extends ComputeContext {
       values: this.#result(
         [k],
         input.dtype,
-        Array.from(head, (i) => data[i]),
+        runtimes.get(this)?.run('gather', [data, head])[0] ?? Array.from(head, (i) => data[i]),
       ),
       indices: this.#result([k], 'u32', head),
     };
@@ -1129,6 +1212,9 @@ export class CpuContext extends ComputeContext {
       f = Math.fround;
     sorted.dispose();
     // NumPy's linear method in f32, as sort.ts computes it on the GPU.
+    const runtime = runtimes.get(this);
+    if (runtime)
+      return this.#result(typeof q === 'number' ? [] : [list.length], 'f32', runtime.run('quantile', [s, list])[0]);
     const out = list.map((v) => {
       const lower = Math.floor(v * (n - 1)),
         upper = Math.min(lower + 1, n - 1),
@@ -1150,6 +1236,13 @@ export class CpuContext extends ComputeContext {
       distinct: number[] = [],
       counts: number[] = [];
     sorted.dispose();
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      const [v, c] = runtime.run('unique', [s]);
+      return options.counts
+        ? { values: this.#result([v.length], input.dtype, v), counts: this.#result([c.length], 'u32', c) }
+        : { values: this.#result([v.length], input.dtype, v) };
+    }
     for (let i = 0; i < s.length; i++) {
       if (i === 0 || s[i] !== s[i - 1]) {
         distinct.push(s[i]);
@@ -1180,6 +1273,9 @@ export class CpuContext extends ComputeContext {
     const data = n ? values(input) : new Float64Array(0),
       count = Math.max(1, idx.length),
       out = new Float64Array(n);
+    const runtime = runtimes.get(this);
+    if (runtime)
+      return this.#result(shape, input.dtype, runtime.run('take', [data, idx], [len, inner, n, +(mode === 'wrap')])[0]);
     for (let o = 0; o < n; o++) {
       const j = o % inner,
         p = Math.floor(o / inner) % count,
@@ -1217,7 +1313,7 @@ export class CpuContext extends ComputeContext {
     if (n === 0) return target;
     const t = target.dtype,
       v = scalar ? new Float64Array([ROUND[t](values_ as number)]) : values((values_ as Operand).astype(t)),
-      out = viewOf(target),
+      out = cpuView(target),
       len = target.size,
       r = ROUND[t],
       combine =
@@ -1228,6 +1324,11 @@ export class CpuContext extends ComputeContext {
             : op === 'max'
               ? (a: number, b: number) => Math.max(a, b)
               : (_a: number, b: number) => b;
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      out.set(runtime.run('scatter', [out, idx, v], [typeCode(t), ['set', 'add', 'min', 'max'].indexOf(op)])[0]);
+      return target;
+    }
     for (let i = 0; i < n; i++) {
       let k = idx[i];
       if (k < 0) k += len;
@@ -1255,6 +1356,11 @@ export class CpuContext extends ComputeContext {
     const data = values(input),
       keep = values(mask),
       out = new Float64Array(data.length);
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      const [packed, count] = runtime.run('compact', [data, keep]);
+      return { values: this.#result([data.length], input.dtype, packed), count: this.#result([1], 'u32', count) };
+    }
     let count = 0;
     for (let i = 0; i < data.length; i++) if (keep[i] !== 0) out[count++] = data[i];
     return { values: this.#result([data.length], input.dtype, out), count: this.#result([1], 'u32', [count]) };
@@ -1262,8 +1368,8 @@ export class CpuContext extends ComputeContext {
   override async filter(input: Operand, mask: Operand, options: WaitOptions = {}): Promise<GpuArray> {
     aborted(options.signal);
     const { values: packed, count } = this.compact(input, mask),
-      n = viewOf(count)[0],
-      out = this.#result([n], input.dtype, viewOf(packed).subarray(0, n));
+      n = cpuView(count)[0],
+      out = this.#result([n], input.dtype, cpuView(packed).subarray(0, n));
     packed.dispose();
     count.dispose();
     return out;
@@ -1291,6 +1397,11 @@ export class CpuContext extends ComputeContext {
         throw rangeError(`Histogram range must be finite [min, max] with min <= max, got [${lo}, ${hi}]`, 'compute');
     }
     const data = values(input.dtype === 'f32' ? input : input.astype('f32'));
+    const runtime = runtimes.get(this);
+    if (runtime) {
+      const [counts, edges] = runtime.run('histogram', [data], [bins, given ? 1 : 0, given?.[0] ?? 0, given?.[1] ?? 1]);
+      return { counts: this.#result([bins], 'u32', counts), edges: this.#result([bins + 1], 'f32', edges) };
+    }
     // histogram.ts on the GPU: the range in f32 (the data's own min and max when not given), widened by 0.5 each
     // side when empty, then bin = min(u32((x - lo) * bins / (hi - lo)), bins - 1) for lo <= x <= hi.
     let lo = given ? f(given[0]) : n ? Infinity : 0,

@@ -3633,3 +3633,7 @@ After build:packages, run node --test --test-timeout=120000 packages/cutscene/te
 ## Batch 177 job 2
 
 Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/stats.test.js`. Browser proof: `node scripts/gpu-lock.mjs run --owner=codex-batch177 --wait-max=60 --max=3 -- node packages/sciviz/tests/stats-browser.mjs`. Open `/examples/sciviz-stats.html` for thirteen vector charts and SVG downloads; the page shows units, data dates and missing-error policy. `node packages/sciviz/scripts/prepare-stats.mjs` reproduces the frozen reductions from NOAA GHCN and a commit-pinned public NASA-table mirror. No rival source is used. Timing benchmarks are deferred during the build phase.
+
+### Batch 274 job 3: CPU SIMD correctness
+
+Build with node packages/compute/scripts/build-cpu.mjs, then npm run build:packages. Run node --test --test-timeout=120000 packages/compute/tests/cpu.test.js packages/compute/tests/cpu-wasm.test.js. Run cargo test --locked --manifest-path packages/compute/cpu-kernel/Cargo.toml with a 120 s process-tree limit. GPU correctness: node scripts/gpu-lock.mjs run --owner=cpu-wasm-proof --wait-max=60 --max=3 -- node packages/compute/tests/cpu-wasm-browser.mjs. This driver compares the new CPU factory with WebGPU and then WebGL2, with 59 checks each. It makes no elapsed-time assertion. The SIMD counter comes from actual Rust loop execution; the odd-sized exact A/B test also covers the scalar tail.

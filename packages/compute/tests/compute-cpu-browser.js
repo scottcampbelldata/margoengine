@@ -37,9 +37,9 @@ const same = (cpu, gpu, tolerance, label) => {
   }
 };
 
-window.runCpuParityTests = async () => {
+window.runCpuParityTests = async (makeCpu = () => createCompute({ backend: 'cpu' })) => {
   const gpu = await createCompute({ backend: 'webgpu' }),
-    cpu = await createCompute({ backend: 'cpu' });
+    cpu = await makeCpu();
   assert(gpu.backend === 'webgpu' && cpu.backend === 'cpu', 'backends');
   const n = 100_003,
     raw = floats(n, 11),

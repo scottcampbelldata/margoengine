@@ -32,7 +32,8 @@
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:gpu:jpeg": "node tests/jpeg-browser.mjs",
     "test:gpu:node-gltf": "node scripts/test-node-gltf.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:hdr6": "cd ../.. && node packages/decoders/tests/hdr6-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

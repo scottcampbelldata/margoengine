@@ -12,6 +12,14 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/compute',
+    file: 'packages/compute/dist/cpu-kernel.wasm',
+    label: 'cpu-kernel.wasm',
+    kind: 'Rust SIMD CPU backend',
+    measure: 'file',
+    when: 'createCpuWasm(), only from the optional /cpu-wasm entry; one isolated instance per context',
+  },
+  {
+    package: '@margoengine/compute',
     file: 'packages/compute/dist/decomp-kernel.wasm',
     label: 'decomp-kernel.wasm',
     kind: 'Rust SIMD dense decompositions',

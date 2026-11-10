@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14204902,
+  "total": 14246345,
   "history": [
     {
       "date": "2026-10-24",
@@ -7519,6 +7519,12 @@
       "commit": "439e938ec",
       "reason": "Batch175-optional-cloud-volume-entry-adds-multiscale-stores-and-clean-room-codecs-without-core-or-stage-growth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "003abfa2d",
+      "reason": "Batch274-job3-new-optional-CPU-SIMD-backend-0-to-40235-B-gzip-shared-context-preserves-validation-and-ownership-splitting-would-duplicate-the-facade-core-stage-unchanged-24209-B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8880,6 +8886,7 @@
     "@margoengine/sciviz/datasets": 13423,
     "@margoengine/cutscene/scroll": 2304,
     "@margoengine/sciviz/stats": 6975,
-    "@margoengine/sciviz/omezarr": 21492
+    "@margoengine/sciviz/omezarr": 21492,
+    "@margoengine/compute/cpu-wasm": 41443
   }
 }

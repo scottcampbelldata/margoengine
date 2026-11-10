@@ -694,6 +694,10 @@
       "types": "./dist/compute/decomp.d.ts",
       "import": "./dist/compute/decomp.js"
     },
+    "./compute/cpu-wasm": {
+      "types": "./dist/compute/cpu-wasm.d.ts",
+      "import": "./dist/compute/cpu-wasm.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"
