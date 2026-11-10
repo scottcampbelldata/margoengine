@@ -4885,6 +4885,10 @@
     "./web": {
       "types": "./dist/web.d.ts",
       "import": "./dist/web.js"
+    },
+    "./clustered/area-shapes": {
+      "types": "./dist/clustered/area-shapes.d.ts",
+      "import": "./dist/clustered/area-shapes.js"
     }
   },
   "dependencies": {

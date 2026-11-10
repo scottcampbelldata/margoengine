@@ -97,6 +97,8 @@ export interface ClusteredShadow {
    * light centre), `r` and `u` (half extents) that multiplies each area light. Undefined otherwise.
    */
   readonly areaShadow?: string;
+  /** Optional visibility call for the disk and sphere light loop. */
+  readonly shapeShadow?: string;
 }
 /** The `Clustered.area` hook (`AreaLights` from `@margoengine/clustered/area`): WGSL defining `clusterAreaLighting`, and its bindings. */
 export interface ClusteredArea {
@@ -110,9 +112,11 @@ export interface ClusteredArea {
 /** The `Clustered.shapes` hook (`ShapeLights` from `@margoengine/clustered/shapes`): WGSL defining `clusterShapeLighting`, and its bindings. */
 export interface ClusteredShapes {
   /** WGSL declarations in bind group `group`. */
-  declarations(group: number): string;
+  declarations(group: number, shadow?: string): string;
   /** Bind group entries matching `declarations`. */
   bindings(): GPUBindGroupEntry[];
+  /** Shadowed disk and sphere lights, indexed after the rectangle lights. */
+  shadowLights?(): readonly AreaShadowLight[];
 }
 /** The `Clustered.stochastic` hook (`StochasticLights` from `@margoengine/clustered/stochastic`): sampled light shadows. */
 export interface ClusteredStochastic {

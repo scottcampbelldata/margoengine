@@ -68,6 +68,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     invalidate(): void;
     get directionalShadow(): string | undefined;
     get areaShadow(): string | undefined;
+    get shapeShadow(): string | undefined;
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     setup(engine: Engine): void;
@@ -186,11 +187,13 @@ interface ClusteredShadow {
     bindings(): GPUBindGroupEntry[];
     readonly directionalShadow?: string;
     readonly areaShadow?: string;
+    readonly shapeShadow?: string;
 }
 
 interface ClusteredShapes {
-    declarations(group: number): string;
+    declarations(group: number, shadow?: string): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly AreaShadowLight[];
 }
 
 interface ClusteredStochastic {

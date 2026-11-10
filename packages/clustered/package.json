@@ -33,7 +33,8 @@
     "test:gpu:light-render": "cd ../.. && node scripts/light-render-gpu-check.js",
     "test:gpu:orthographic": "cd ../.. && node scripts/orthographic-gpu-check.js",
     "test:gpu:shapes": "cd ../.. && node scripts/shape-lights-gpu-check.js",
-    "test:gpu:stochastic": "cd ../.. && node scripts/stochastic-lights-gpu-check.js"
+    "test:gpu:stochastic": "cd ../.. && node scripts/stochastic-lights-gpu-check.js",
+    "test:gpu:area-shapes": "cd ../.. && node scripts/clustered-area-shapes-gpu.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -84,6 +85,10 @@
     "./stochastic": {
       "types": "./dist/stochastic.d.ts",
       "import": "./dist/stochastic.js"
+    },
+    "./area-shapes": {
+      "types": "./dist/area-shapes.d.ts",
+      "import": "./dist/area-shapes.js"
     }
   },
   "files": [

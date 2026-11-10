@@ -159,11 +159,13 @@ interface ClusteredShadow {
     bindings(): GPUBindGroupEntry[];
     readonly directionalShadow?: string;
     readonly areaShadow?: string;
+    readonly shapeShadow?: string;
 }
 
 interface ClusteredShapes {
-    declarations(group: number): string;
+    declarations(group: number, shadow?: string): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly AreaShadowLight[];
 }
 
 interface ClusteredStochastic {

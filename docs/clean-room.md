@@ -7422,3 +7422,13 @@ Compared WHATWG contributors, HTML Living Standard, Animation frames (2026), htt
 
 Batch 195 blocking manifest repair: Tim Bray (editor), The JavaScript Object Notation (JSON) Data Interchange Format (RFC 8259, 2017), https://www.rfc-editor.org/rfc/rfc8259 , object-member separators and unique names; ECMA International, ECMA-404 (2nd edition, 2017), https://ecma-international.org/publications-and-standards/standards/ecma-404/ . Remove a merge-created duplicate property and keep the complete existing GPU command; no runtime algorithm or outside code.
 Batch 270 manifest repair research: Sven Apel, Jorg Liebig, Benjamin Brandl, Christian Lengauer and Christian Kastner, Semistructured Merge: Rethinking Merge in Revision Control Systems (2011), https://www.cs.cmu.edu/~ckaestne/pdf/esec11.pdf, compared with Tim Bray, RFC 8259 (2017), https://www.rfc-editor.org/rfc/rfc8259.html. Applied format-aware resolution and parsing to the JSON manifest; document append conflicts remain text merges. No merge-tool code was read or imported.
+### Batch 186 job 1: disk and sphere shadow integration
+
+Clean-room implementation combines the existing Margo LTC shape integrator with its existing shadow caster pipeline. Sources compared before implementation:
+
+- Eric Heitz, Jonathan Dupuy, Stephen Hill and David Neubelt, 2016, *Real-Time Polygonal-Light Shading with Linearly Transformed Cosines*, https://doi.org/10.1145/2897824.2925895: common transformed-cosine framework and independent light visibility.
+- Eric Heitz and Stephen Hill, 2017, *Real-Time Line- and Disk-Light Shading with Linearly Transformed Cosines*, https://eheitzresearch.wordpress.com/757-2/: supports retaining shaped integration rather than substituting punctual shading.
+- Randima Fernando, 2005, *Percentage-Closer Soft Shadows*, https://developer.download.nvidia.com/shaderlibrary/docs/shadow_PCSS.pdf: blocker depth and emitter-size-dependent penumbra. Chosen over prefiltered moment shadows to reuse current depth comparisons and caster support.
+- PlayCanvas documentation, *Lights* and *Light component*, accessed 2026-11-10, https://developer.playcanvas.com/user-manual/graphics/lighting/lights/ and https://developer.playcanvas.com/user-manual/editor/scenes/components/light/: parity contract is disk/sphere shading plus opt-in shadows beside rectangles. No rival or paper companion source was read or copied.
+
+Margo-specific composition: separate rectangle and shape index ranges, up to four shadow slots each; disk frames follow their normal, sphere cube frames remain fixed while their filter footprint faces the receiver. Tests use procedural analytic fixtures authored in this repository; no imported demo assets or licence obligations.

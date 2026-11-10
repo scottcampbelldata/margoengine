@@ -1,5 +1,7 @@
 # Known bugs and unverified features
 
+Batch 186 job 1: disk/sphere shadows use the existing centre-map PCSS approximation and guard band (limits.md); no exact extended-emitter visibility claim. Native WebGPU and full WebGL2 production-shader visibility checks pass.
+
 Batch 190 job 2: no open defect found in float32 weighted accumulation. The entry deliberately retains the original weighted-depth approximation and sorted paths for transmission/custom blending; finite f32 sums and final HDR target range are recorded in limits.md.
 
 Batch 190 job 1: no open defect found in depth peeling's distinct-depth transport contract. Single-sample transparent coverage and coplanar depth coalescing are explicit limits in limits.md; finer edge reconstruction and coplanar tie handling remain future quality work, not exact-fragment-list claims.
@@ -4837,3 +4839,4 @@ Fur follow-up integration, outside the completed shell-controls row: combining a
 Fixed while landing batch 195 job 1: main 72642362b retained an old VFX test:gpu line beside its fuller replacement with no separator, so every manifest consumer rejected JSON. Remove the stale duplicate and retain all parity cases. Regression: tests/integration-json.test.js.
 
 Fixed batch 270 registration manifest merge: a text-only conflict resolver concatenated two package JSON property lines without a comma during the rebase onto an upstream dedicated parity script. The package manifest is now reconstructed as valid JSON, retaining the upstream script and placing both --all backend runs there. Existing test:gpu stays the original render suite, so CI does not duplicate parity runs. gpu-registration.test.js now checks all automatically discovered GPU scripts together with the same two-backend assertions. The lane resolver rejects other JSON conflicts for structural resolution, and landing validates changed JSON before a push.
+Batch 186 gate finding: gpu-package-tests.mjs --select=clustered/test:gpu fails during its global plan because packages/water/package.json places npm run build midway through test:gpu. Run the selected clustered scripts directly; water ownership must move that build to the start in the fix phase.

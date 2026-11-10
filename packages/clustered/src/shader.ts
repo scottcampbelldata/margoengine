@@ -62,7 +62,7 @@ export interface ClusteredSamplingHooks {
    */
   terms?: readonly { declarations(group: number): string; readonly term: string }[];
   /** WGSL defining `clusterShapeLighting` (sphere, disc and tube lights), added to the result like the area lights. */
-  shapes?: { declarations(group: number): string };
+  shapes?: { declarations(group: number, shadow?: string): string };
   /**
    * `StochasticLights` (`@margoengine/clustered/stochastic`): shadows of sampled lights only. Used only with shadows;
    * `lighting` gets the cluster lookup, the loop body's head, the radiance, the shadow factor and the shadowed test.
@@ -90,7 +90,7 @@ export function clusteredSampling(
   group: number,
   shadow?:
     | boolean
-    | { declarations(group: number): string; readonly directionalShadow?: string; readonly areaShadow?: string },
+    | { declarations(group: number): string; readonly directionalShadow?: string; readonly areaShadow?: string; readonly shapeShadow?: string },
   area?: { declarations(group: number, shadow?: string): string },
   integratedShadows = false,
   decay = false,
@@ -123,7 +123,7 @@ export function clusteredSampling(
     (area ? (areaShadow ? area.declarations(group, term(areaShadow)) : area.declarations(group)) : '') +
     (directional ? directional.declarations(group) : '') +
     terms.map((t) => t.declarations(group)).join('') +
-    (shapes ? shapes.declarations(group) : '') +
+    (shapes ? shapes.declarations(group, hook?.shapeShadow ? term(hook.shapeShadow) : undefined) : '') +
     (sampled ? sampled.declarations(group) : '') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;

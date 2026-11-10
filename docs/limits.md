@@ -5615,3 +5615,11 @@ quality/demand renderOnDemand stops the continuous engine loop and schedules onl
 
 Demand entry size: new 0 to 928 B gzip, ceiling 1184 B. Core plus stage remains 24,209 B. The optional scheduler keeps cancellation, control events and animation ownership in one entry.
 The VFX GPU checks are split into test:gpu (the existing render checks) and test:gpu:parity (all five parity features, both backends). CI discovers both scripts; each parity backend runs once. Runtime sizes are unchanged.
+### Batch 186: shadowed disk and sphere area lights
+
+`@margoengine/clustered/area-shapes` adds `AreaShapes`, with up to 64 disk/sphere emitters and the same LTC integration. Disk spelling is `disc`, consistent with /shapes. Disks and spheres accept `castShadow` (false by default) and `shadow` resolution/near/far. Four shaped emitters may cast beside four rectangles in LocalShadows. Disks use five faces, six for two-sided disks or spheres. Shadow near defaults to far/1000, far to 100; resolution defaults to LocalShadows resolution. Tubes belong to the existing /shapes entry; this entry rejects them. Empty lists remove the shader hook.
+
+Both diffuse and specular use centre-map PCSS visibility. The sphere's filtering footprint faces the receiver regardless of cube face; disks retain their projected elliptical footprint. This is the same centre approximation as rectangular PCSS, not exact visibility integration across the emitter. Existing 16 blocker / 24 filter tap, guard-band and near-blocker limits apply. LocalShadows extended uniform grows from 10,576 to 13,200 bytes only while an area or directional light casts; point-only uniform remains 6,416 bytes. Maps allocate only active faces. No core or stage changes.
+
+
+Batch 186 job 1 min+gzip: reconstructed prior shadows entry 11,522 B, current 11,791 B; ceiling 11,769 to 12,145 B. New /area-shapes 0 to 12,817 B, ceiling 13,202 B. The new entry reuses LTC and one shared caster pipeline rather than duplicating shading/lifecycle state. Core plus stage remains 24,209 B.

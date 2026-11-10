@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13982520,
+  "total": 13996098,
   "history": [
     {
       "date": "2026-10-24",
@@ -7400,6 +7400,12 @@
       "commit": "batch-195",
       "reason": "New optional demand scheduler: 0 to 928 B gzip, 1184 B ceiling; lifecycle and animation ownership stay together. Core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-186",
+      "reason": "Disk/sphere PCSS beside rectangle lights: shadows measured 11522 to 11791 B, new area-shapes 0 to 12817 B. Retains one shared caster pipeline and LTC ownership; splitting would duplicate lifecycle and shading state.",
+      "grew": 2
     }
   ],
   "items": {
@@ -7552,7 +7558,7 @@
     "@margoengine/clustered/ies": 4268,
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
-    "@margoengine/clustered/shadows": 11769,
+    "@margoengine/clustered/shadows": 12145,
     "@margoengine/clustered/shapes": 12255,
     "@margoengine/clustered/stochastic": 2513,
     "@margoengine/clustered/units": 1089,
@@ -8743,6 +8749,7 @@
     "@margoengine/post/halftone": 6556,
     "@margoengine/staging/accumulate-ambient": 10723,
     "@margoengine/sciviz/volume-quality": 8765,
-    "@margoengine/quality/demand": 1184
+    "@margoengine/quality/demand": 1184,
+    "@margoengine/clustered/area-shapes": 13202
   }
 }

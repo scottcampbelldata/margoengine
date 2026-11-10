@@ -7,6 +7,7 @@ import { Clustered } from '../packages/clustered/dist/index.js';
 import { LocalShadows } from '../packages/clustered/dist/shadows.js';
 import { DirectionalLights } from '../packages/clustered/dist/directional.js';
 import { AreaLights } from '../packages/clustered/dist/area.js';
+import { AreaShapes } from '../packages/clustered/dist/area-shapes.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -24,6 +25,7 @@ type Config = {
   points?: Light[];
   suns?: Light[];
   areas?: Light[];
+  shapes?: Light[];
   meshes: string[];
 };
 const canvas = document.querySelector('canvas')!,
@@ -55,6 +57,7 @@ mesh('topBar', [1, 0.05, 6], [0, 4.5, 0]);
 let lights: Clustered | undefined, local: LocalShadows | undefined, suns: DirectionalLights | undefined;
 let areas: AreaLights | undefined,
   shader = '';
+let shapes: AreaShapes | undefined;
 engine.frameGraph.add({
   name: 'clustered-shadow:capture',
   order: -2.5,
@@ -63,7 +66,8 @@ engine.frameGraph.add({
   },
 });
 function scene(config: Config) {
-  for (const plugin of [areas, suns, local, lights]) plugin?.dispose();
+  for (const plugin of [shapes, areas, suns, local, lights]) plugin?.dispose();
+  shapes = undefined;
   areas = suns = local = undefined;
   for (const [name, m] of Object.entries(meshes)) m.visible = config.meshes.includes(name);
   lights = Clustered.attach(engine, { grid: [4, 4, 4] });
@@ -74,6 +78,7 @@ function scene(config: Config) {
   }
   if (config.suns) (suns = DirectionalLights.attach(engine, { lights })).setLights(config.suns as never);
   if (config.areas) (areas = AreaLights.attach(engine, { lights })).setLights(config.areas as never);
+  if (config.shapes) (shapes = AreaShapes.attach(engine, { lights })).setLights(config.shapes as never);
 }
 async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   device.pushErrorScope('validation');
@@ -90,7 +95,7 @@ async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
 }
 const kinds: Record<number, GPUBindGroupLayoutEntry> = {};
 for (const binding of [4, 14]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
-for (const binding of [5, 6, 7, 17, 28, 141, 142, 143])
+for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 150])
   kinds[binding] = { binding, visibility: 0, buffer: { type: 'read-only-storage' } };
 for (const binding of [15, 29])
   kinds[binding] = { binding, visibility: 0, texture: { sampleType: 'depth', viewDimension: '2d-array' } };
@@ -200,7 +205,7 @@ async function messages(code: string): Promise<string[]> {
     });
   },
   dispose() {
-    for (const plugin of [areas, suns, local, lights]) plugin?.dispose();
+    for (const plugin of [shapes, areas, suns, local, lights]) plugin?.dispose();
     engine.dispose();
   },
 };

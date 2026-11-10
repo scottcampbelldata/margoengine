@@ -143,15 +143,16 @@ const MAX_LIGHTS = 16,
 // of the list (MAX_DIRECTIONAL_LIGHTS) and area light (MAX_AREA_LIGHTS) its first layer, slot and settings, then per
 // shadowed slot its cascades' or cube faces' data and sampling matrices. Their layers follow the point and spot ones.
 const SUN_LIST = 16,
-  AREA_LIST = 64,
+  AREA_LIST = 128,
+  AREA_SHADOW_SLOTS = MAX_AREA_SHADOWS * 2,
   SUN = FRAME_FLOATS,
   SUN_CASCADES = SUN + SUN_LIST * 4,
   SUN_MATRICES = SUN_CASCADES + MAX_DIRECTIONAL_SHADOWS * 4 * 4,
   AREA = SUN_MATRICES + MAX_DIRECTIONAL_SHADOWS * 4 * 16,
   AREA_SLOTS = AREA + AREA_LIST * 4,
-  AREA_MATRICES = AREA_SLOTS + MAX_AREA_SHADOWS * 4,
-  EXTENDED_FLOATS = AREA_MATRICES + MAX_AREA_SHADOWS * 6 * 16,
-  TOTAL_LAYERS = LAYERS + MAX_DIRECTIONAL_SHADOWS * 4 + MAX_AREA_SHADOWS * 6,
+  AREA_MATRICES = AREA_SLOTS + AREA_SHADOW_SLOTS * 4,
+  EXTENDED_FLOATS = AREA_MATRICES + AREA_SHADOW_SLOTS * 6 * 16,
+  TOTAL_LAYERS = LAYERS + MAX_DIRECTIONAL_SHADOWS * 4 + AREA_SHADOW_SLOTS * 6,
   SIGNATURE = 18,
   noSuns: readonly DirectionalShadowLight[] = [],
   noAreas: readonly AreaShadowLight[] = [];
@@ -181,7 +182,7 @@ fn clusterShadow(light:ClusterLight,position:vec3f,n:vec3f)->f32 {
 ` +
   (sun ? sunShadow : '') +
   (area ? areaShadow : '');
-const extendedFrame = `,sun:array<vec4f,${SUN_LIST}>,sunCascades:array<vec4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,sunMatrices:array<mat4x4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,area:array<vec4f,${AREA_LIST}>,areaSlots:array<vec4f,${MAX_AREA_SHADOWS}>,areaMatrices:array<mat4x4f,${MAX_AREA_SHADOWS * 6}>`;
+const extendedFrame = `,sun:array<vec4f,${SUN_LIST}>,sunCascades:array<vec4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,sunMatrices:array<mat4x4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,area:array<vec4f,${AREA_LIST}>,areaSlots:array<vec4f,${AREA_SHADOW_SLOTS}>,areaMatrices:array<mat4x4f,${AREA_SHADOW_SLOTS * 6}>`;
 // Directional light j: sun[j] is (first layer, slot + 1, cascades); per cascade, the world size of a texel and the UV box
 // whose 3x3 filter stays inside the map. The finest cascade holding the receiver shades it; outside all of them it is lit.
 // Cascaded shadow maps after Engel 2006 and Dimitrov 2007.
@@ -208,7 +209,7 @@ const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n
 // Taps on a Vogel 1979 spiral (golden angle 2.39996323); receiver-plane depth bias after Isidoro 2006 (GDC). The 16
 // blocker / 24 filter taps, the x3 reach and the 0.01 x distance tangent are Margo tuning.
 const areaShadow = /* wgsl */ `fn localShadowTap(i:u32,count:u32)->vec2f {let a=f32(i)*2.39996323;return vec2f(cos(a),sin(a))*sqrt(f32(i)/f32(count));}
-fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {
+fn localAreaVisibility(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {
   let info=localShadowFrame.area[j];if(info.y<0.5){return 1.0;}
   let slot=u32(info.y)-1u;let s=localShadowFrame.areaSlots[slot];let distance=length(c);let texel=s.x*distance;
   let p=position+n*(texel*localShadowFrame.settings.z)+c/max(distance,0.0001)*(texel*localShadowFrame.settings.y);
@@ -223,7 +224,10 @@ fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 
   let d1=vec3f(c1.xy/c1.w*vec2f(0.5,-0.5)+0.5-uv,c1.z/c1.w-z);let d2=vec3f(c2.xy/c2.w*vec2f(0.5,-0.5)+0.5-uv,c2.z/c2.w-z);
   let det=d1.x*d2.y-d1.y*d2.x;
   let slope=select(vec2f(0),vec2f(d1.z*d2.y-d2.z*d1.y,d1.x*d2.z-d2.x*d1.z)/det,abs(det)>1e-12);
-  let extent=(abs((m*vec4f(r,0)).xy)+abs((m*vec4f(u,0)).xy))*0.5/clip.w;
+  var extent=(abs((m*vec4f(r,0)).xy)+abs((m*vec4f(u,0)).xy))*0.5/clip.w;
+  if(sphere){let axis=normalize(c);let hint=select(vec3f(0,1,0),vec3f(0,0,1),abs(axis.y)>0.99);
+    let right=normalize(cross(hint,axis))*length(r);let up=cross(axis,right);
+    extent=(abs((m*vec4f(right,0)).xy)+abs((m*vec4f(up,0)).xy))*0.5/clip.w;}
   let size=vec2f(textureDimensions(localShadowMap));let reach=min(extent*3.0,vec2f(s.y));
   var blockers=0.0;var depth=0.0;
   for(var i=0u;i<16u;i++){
@@ -236,6 +240,8 @@ fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 
   for(var i=0u;i<24u;i++){let o=localShadowTap(i,24u)*radius;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
   return lit/24.0;
 }
+fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {return localAreaVisibility(j,position,n,c,r,u,false);}
+fn clusterShapeShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {return localAreaVisibility(j+64u,position,n,c,r,u,sphere);}
 `;
 // Same text shape as @margoengine/shadows' depth shader, so shared/instances.js instancedDepth applies.
 const depth = (pbr: boolean, transformed: boolean) => /* wgsl */ `
@@ -386,7 +392,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private readonly bases = new Int32Array(MAX_LIGHTS);
   /** First layer of each shadowed directional and area light (after the point and spot layers). */
   private readonly sunBases = new Int32Array(MAX_DIRECTIONAL_SHADOWS);
-  private readonly areaBases = new Int32Array(MAX_AREA_SHADOWS);
+  private readonly areaBases = new Int32Array(AREA_SHADOW_SLOTS);
   /** Per layer last drawn for a directional or area light: its depth-pass matrix and viewport (NaN: drawn for another). */
   private readonly signatures = new Float32Array(TOTAL_LAYERS * SIGNATURE).fill(NaN);
   /** Some directional (area) light casts: the WGSL and the frame carry their data. */
@@ -476,6 +482,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** ClusteredShadow: while an area light casts, `clusterAreaLighting`'s shadow call (`clusterAreaShadow`). */
   get areaShadow(): string | undefined {
     return this.areaShadows ? 'clusterAreaShadow(j,position,n,c,r,u)' : undefined;
+  }
+  /** Visibility for shapes; the last 64 area indices belong to disk and sphere emitters. */
+  get shapeShadow(): string | undefined {
+    return this.areaShadows ? 'clusterShapeShadow(j,position,n,a,r,u,light.a.w<0.5)' : undefined;
   }
   /** @internal ClusteredShadow: WGSL for the light loop. */
   declarations(group: number): string {
@@ -638,9 +648,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     // Directional and area lights with castShadow take the layers after the point and spot ones.
     const pointLayers = layers,
       suns = this.lights.directional?.shadowLights?.() ?? noSuns,
-      areas = this.lights.area?.shadowLights?.() ?? noAreas,
+      areas = [...(this.lights.area?.shadowLights?.() ?? noAreas), ...(this.lights.shapes?.shadowLights?.() ?? noAreas)],
       sunCount = Math.min(suns.length, MAX_DIRECTIONAL_SHADOWS),
-      areaCount = Math.min(areas.length, MAX_AREA_SHADOWS);
+      areaCount = Math.min(areas.length, AREA_SHADOW_SLOTS);
     for (let s = 0; s < sunCount; s++) {
       this.sunBases[s] = layers;
       layers += suns[s].bounds ? 1 : suns[s].cascades;

@@ -117,7 +117,7 @@ export interface ClusteredSamplingHooks {
         readonly term: string;
     }[];
     shapes?: {
-        declarations(group: number): string;
+        declarations(group: number, shadow?: string): string;
     };
     stochastic?: {
         declarations(group: number): string;
@@ -130,11 +130,13 @@ export interface ClusteredShadow {
     bindings(): GPUBindGroupEntry[];
     readonly directionalShadow?: string;
     readonly areaShadow?: string;
+    readonly shapeShadow?: string;
 }
 
 export interface ClusteredShapes {
-    declarations(group: number): string;
+    declarations(group: number, shadow?: string): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly AreaShadowLight[];
 }
 
 export interface ClusteredStochastic {
@@ -225,6 +227,7 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     declarations(group: number): string;
     readonly directionalShadow?: string;
     readonly areaShadow?: string;
+    readonly shapeShadow?: string;
 }, area?: {
     declarations(group: number, shadow?: string): string;
 }, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic }?: ClusteredSamplingHooks): string;

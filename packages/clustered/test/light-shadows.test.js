@@ -11,15 +11,15 @@ import { clusterBrdf } from '../../shared/light-terms.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
-// The frame grows from 1,604 floats to 2,644 while a directional or area light casts.
+// The frame grows from 1,604 floats to 3,300 while a directional or area light casts.
 const FRAME_BYTES = 6416,
-  EXTENDED_BYTES = 10576,
+  EXTENDED_BYTES = 13200,
   SUN = 1604,
   SUN_CASCADES = SUN + 64,
   SUN_MATRICES = SUN_CASCADES + 64,
   AREA = SUN_MATRICES + 256,
-  AREA_SLOTS = AREA + 256,
-  AREA_MATRICES = AREA_SLOTS + 16;
+  AREA_SLOTS = AREA + 512,
+  AREA_MATRICES = AREA_SLOTS + 32;
 function harness() {
   const h = optionalGPU(),
     gpu = h.engine.gpu,
@@ -255,7 +255,7 @@ test('a castShadow area light: five cube faces (six two-sided) around its centre
   area.setLights([{ ...light, castShadow: true, shadow: { far: 20 } }]);
   assert.equal(h.frame(), 5);
   assert.match(h.context.shader, /let radiance=light\.color\.rgb\*clusterAreaShadow\(j,position,n,c,r,u\);/);
-  assert.match(h.context.shader, /areaMatrices:array<mat4x4f,24>/);
+  assert.match(h.context.shader, /areaMatrices:array<mat4x4f,48>/);
   assert.equal(lights['unshadowed'].pbr(2).declarations, unshadowed, 'receiveShadow false receivers stay unshadowed');
   assert.match(
     clusteredSampling(0, local, area, false, false, true),
