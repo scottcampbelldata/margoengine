@@ -4141,7 +4141,7 @@ restoring its property descriptors and prior owner on cleanup. Regression: packa
 checks same-frame dolly, vertical views, fixedOrthographic, nested defaults and option/default changes.
 Instances, texture hooks, frame priorities and adaptive performance remain separate batch jobs.
 
-Open outside job 1: render Grid inside Scene name="hud" and draw only that scene with RenderView; the grid is missing there because packages/react/src/lines.tsx Grid attaches with engine.use instead of the enclosing world.use. Recorded under lane-efficiency rule 6; the new Line binding uses its owning Scene.
+Fixed in the lane G sweep: Grid inside Scene name="hud" was missing from a RenderView drawing only hud because it attached with engine.use. Grid now shares Line's attachBinding/detachBinding helpers, using the enclosing world for attachment and cleanup. kit-helpers.test.js fails on the parent and covers StrictMode, prop replacement, same-name default isolation and unmount. The extras browser proof renders a green grid while drawing only its secondary scene. All 278 changed-package/dependent CPU cases and all 13 package GPU scripts on both native and compatibility backends pass, without driver resets.
 
 ### Fixed 2026-11-10: XR manager secondary-scene disposal
 
@@ -4192,6 +4192,13 @@ Batch 251 job 1: no open defect found in reference expansion; missing registrati
 cycles and bounded expansion reject during construction (subtrees.test.js).
 
 Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+
+Lane G current-main repro update (2026-11-10): the unchanged RiggedFigure portion,
+isolated from the demo and other cases, now returns moved true, repeats true and
+zero GPU errors on compatibility. It uses the same archive, camera and seek times
+0/0.7/0. No repair commit or cause of the historical failure is established by
+this passing control, so no animation or capture code was changed and closure
+is not claimed. Local receipt: test-results/kb-g/gate-81788-0.log.
 
 ## Fixed: tests/gpu-lock.test.js stops after its fifth test (found 2026-11-10)
 

@@ -1042,6 +1042,28 @@ test('Grid draws one GridHelper with its props, and rebuilds when they change', 
   view.unmount();
 });
 
+test('Grid attaches, rebuilds and unmounts in its enclosing secondary Scene', async () => {
+  const scene = makeScene(),
+    world = { plugins: new Map(), use: scene.engine.use, removePlugin: scene.engine.removePlugin };
+  scene.world = world;
+  const view = render(tree(scene, React.createElement(Grid, { size: 4 })));
+  await flush();
+  assert.equal(scene.engine.plugins.size, 0, 'Grid leaked into the default scene');
+  assert.equal(world.plugins.size, 1);
+  const original = [...world.plugins.values()][0];
+  const primary = { name: original.name, setup() {} };
+  scene.engine.use(primary);
+  view.rerender(tree(scene, React.createElement(Grid, { size: 8 })));
+  await flush();
+  assert.ok(original.disposals >= 1);
+  assert.equal(world.plugins.size, 1);
+  assert.equal(scene.engine.plugins.get(primary.name), primary);
+  view.unmount();
+  assert.equal(world.plugins.size, 0);
+  assert.equal(scene.engine.plugins.get(primary.name), primary);
+  scene.engine.removePlugin(primary.name);
+});
+
 test('DevTools opens both panels, names meshes by their components, closes them, and stays out when disabled', async () => {
   const scene = makeScene(),
     inner = createRef();

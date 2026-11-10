@@ -95,12 +95,9 @@ export function Grid({ size, divisions, centerColor, color, position, onError }:
         grid.setMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
         // Each grid has its own plugin, so several can share a Canvas.
         const lines = new Lines({ name: `grid:${++serial}` });
-        scene.engine.use(lines);
+        attachBinding(scene, lines);
         lines.add(grid);
-        dispose = () => {
-          scene.engine.removePlugin(lines.name);
-          lines.dispose();
-        };
+        dispose = () => detachBinding(scene, lines);
       })
       .catch((error) => {
         if (active && !scene.engine.disposed) report(scene, error, latest.current.onError);

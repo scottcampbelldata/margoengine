@@ -62,6 +62,17 @@ try {
   assert.ok(dominant(right, 1), `the hud view shows its scene's green box, got ${right}`);
   result.checks.push({ name: 'View + Scene: two views, two scenes, side by side', left, right });
 
+  const greenPixels = (image) => {
+    let count = 0;
+    for (let i = 0; i < image.data.length; i += 4)
+      if (dominant(image.data.slice(i, i + 3), 1)) count++;
+    return count;
+  };
+  image = await shot('grid-scene', (image) => greenPixels(image) > 0);
+  const gridPixels = greenPixels(image);
+  assert.ok(gridPixels > 0, 'a view drawing only the secondary Scene must show its Grid');
+  result.checks.push({ name: 'Grid draws in its enclosing secondary Scene', gridPixels });
+
   image = await shot('batched', (i) => dominant(sample(i, 0.35, 0.5), 0) && dominant(sample(i, 0.65, 0.5), 2));
   const first = sample(image, 0.35, 0.5),
     second = sample(image, 0.65, 0.5);

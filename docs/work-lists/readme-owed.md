@@ -1364,6 +1364,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/viz: document the generated /sciviz/workers alias after the build phase.
 
 - @margoengine/xr (lane G known-bugs sweep): document manager disposal in secondary scenes and same-name plugin isolation.
+- @margoengine/react (lane G known-bugs sweep): document Grid inside Scene with RenderView, prop replacement and cleanup.
 
 - Integration J2 tooling: document the generated C2 Works with matrix and composition runner after all adapters land; README examples and Works with generation wait for the README phase.
 

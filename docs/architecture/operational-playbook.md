@@ -1,5 +1,23 @@
 
 
+### Section 5 evidence: React Grid scene ownership
+
+Grid uses the existing native-binding helpers to attach and detach its Lines
+plugin through the enclosing Scene. Its StrictMode unit regression fails on the
+parent, preserves a same-name default plugin during prop replacement and
+unmount, and releases the secondary registration. The extras browser fixture
+draws only the secondary Scene and requires visible green Grid pixels. No
+renderer, geometry, backend or public API changes. All 278 package/dependent
+CPU tests and all 13 package GPU scripts on each native/compat backend pass,
+with no driver reset. The new secondary-scene browser case passes both routes.
+
+Clean-room references compared: React contributors, *useContext*, *useEffect*
+and *StrictMode*, 2026, https://react.dev/reference/react/useContext,
+https://react.dev/reference/react/useEffect and
+https://react.dev/reference/react/StrictMode. The nearest provider supplies
+the scene, and cleanup must reverse that effect's attachment across dependency
+changes and development replay. No React or other-engine source was read.
+
 ### Section 5 evidence: XR manager registration cleanup
 
 XR.dispose resolves sceneOf(this) before removing its registration. It retains

@@ -21,7 +21,7 @@ import { Grid } from '@margoengine/react/lines';
 import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
 import { Voxels } from '@margoengine/react/voxel';
 
-type Mode = 'views' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off' | 'helpers' | 'hints' | 'hints-webgl2';
+type Mode = 'views' | 'grid-scene' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off' | 'helpers' | 'hints' | 'hints-webgl2';
 // A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).
 const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
@@ -55,11 +55,21 @@ function App({ mode }: { mode: Mode }) {
         backend={mode === 'hints-webgl2' ? 'webgl2' : 'webgpu'}
         loadFallback={mode === 'hints-webgl2' ? () => import('@margoengine/webgl2-compat/preview') : undefined}
         camera={
-          mode === 'voxels' ? { position: [6, 70, 9], target: [0, 64, 0] } : { position: [0, 0, 7], target: [0, 0, 0] }
+          mode === 'voxels' ? { position: [6, 70, 9], target: [0, 64, 0] }
+            : mode === 'grid-scene' ? { position: [3, 3, 5], target: [0, 0, 0] }
+              : { position: [0, 0, 7], target: [0, 0, 0] }
         }
         onError={(error) => state.errors.push(String(error))}
       >
         <Count />
+        {mode === 'grid-scene' && (
+          <>
+            <RenderView scene="grid" />
+            <Scene name="grid" background="#000000">
+              <Grid size={4} divisions={4} color="#00ff00" centerColor="#00ff00" />
+            </Scene>
+          </>
+        )}
         {mode === 'views' && (
           <>
             <RenderView viewport={[0, 0, 0.5, 1]} />
