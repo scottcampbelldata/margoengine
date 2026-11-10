@@ -59,7 +59,7 @@ test('hover installer restores CPU picking and never calls the CPU picker itself
   pick.attachHover();
   assert.equal(removals, 2);
 });
-test('ID shaders keep full integer indices and pick inputs never scan/project items on the CPU', () => {
+test('ID shaders keep full integer indices and pick inputs never project items on the CPU', () => {
   const source = readFileSync(new URL('../src/pick-gpu.ts', import.meta.url), 'utf8');
   assert.match(source, /format:\s*'rgba32uint'/);
   assert.match(source, /bytesPerRow:\s*256/);

@@ -1,5 +1,7 @@
 # README work owed
 
+- @margoengine/sciviz (review M1): document automatic GPU picking synchronization of in-place position and rectangle edits.
+
 - @margoengine/sciviz: browser proof readiness uses cinematic sample counts, progressive refinement state and setup-based CPU-load sampling; review test guidance in the README phase.
 - @margoengine/voxel: custom-model browser proof waits for pipeline and submitted-work readiness; review test guidance in the README phase.
 - @margoengine/inspector: relay state delivery and shader GPU readiness replace test sleeps; review test guidance in the README phase.

@@ -31,7 +31,10 @@ README examples are owed during the build phase.
 The pass renders a one-pixel `rgba32uint` attachment and a `depth32float` attachment. A hit
 stores layer ID, original item index, depth bits and scalar bits. A 256-byte aligned mapping
 reads back one texel. CPU work per query visits layers, performs constant-size matrix math and
-decodes one hit; it never projects or scans source items. GPU work still visits the points
+decodes one hit. CPU-backed positions and rectangles are compared with the last uploaded
+snapshot so in-place updates remain visible after the renderer consumes its dirty ranges;
+only the changed contiguous span uploads. This costs a linear content comparison and one
+CPU snapshot (12/16 bytes per item), without CPU projection. GPU work still visits the points
 or cells: this is not an acceleration structure or a constant-GPU-work claim.
 
 Volume samples use eight clamped texture loads and explicit f32 trilinear interpolation.
@@ -46,7 +49,8 @@ Picking near an exact shared voxel face can select either neighbouring voxel at 
 Construction allocates no GPU resources. CPU-backed point/rectangle inputs upload on first use, at
 12/16 bytes per item, plus a 320-byte uniform per supported layer. Each picker owns 276 bytes
 for the ID/depth targets and aligned readback (16 + 4 + 256), excluding driver overhead.
-Call `invalidate(layer)` after in-place point/rectangle edits, or `invalidate()` for all.
+In-place point/rectangle edits synchronize automatically. `invalidate(layer)` explicitly
+releases a cached input, or `invalidate()` releases all.
 Replacing a point array rebuilds automatically. Surfaces and unstructured grids borrow live
 GPU buffers; volume textures and classifiers are rebound each query. Never dispose the borrowed
 resources. Removed layers are pruned on the next query and picker disposal releases the rest.

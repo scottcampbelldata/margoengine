@@ -4487,3 +4487,5 @@ Proof: packages/compute/tests/quant.test.js and quant-browser.mjs share an indep
 float64 oracle, exact small dyadic byte results and the error bounds documented in
 docs/compute-quant.md. This is correctness evidence only, not a latency, universal
 accuracy or integer-only epilogue claim. Research is recorded in docs/clean-room.md.
+
+Sciviz review M1 (2026-11-10): pick-live-browser.mjs fails before the repair and passes after it on both GPU backends for cloud.updatePositions after a prior pick and render. Current and stale locations are checked. CPU snapshots and content comparison ensure freshness without CPU projection; see docs/sciviz-pick-gpu.md for the memory and work cost.

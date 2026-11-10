@@ -8256,3 +8256,6 @@ The original implementation combines packed signed bytes, exact int32 contractio
 f32 output rescaling and independent float64 reference/error-propagation tests.
 The rescale uses f32 rather than claiming Jacob's fixed-point-only epilogue.
 Details, limits and reproducible checks: docs/compute-quant.md. No speed result.
+
+## Sciviz review M1: live picking (2026-11-10)
+Compared GPU for the Web Working Group, WebGPU (2026), https://www.w3.org/TR/webgpu/ (writeBuffer snapshots host content); Markus Schuetz, Potree: Rendering Large Point Clouds in Web Browsers (2016), https://www.cg.tuwien.ac.at/research/publications/2016/SCHUETZ-2016-POT/ (point identity); and Alexander Wiebel, Frans M. Vos, David Foerster and Hans-Christian Hege, WYSIWYP: What You See Is What You Pick (2012), https://forschung.awmw.org/PDF/wiebel_2012_SciVis.pdf (visible selection). Mutable host array identity cannot prove device content freshness. Compare an owned snapshot and upload the changed span before encoding each query, including edits already consumed by rendering. No foreign source read. Regression: pick-live-browser.mjs failed at the moved location on both backends before the fix; no CPU projection or timing claim.

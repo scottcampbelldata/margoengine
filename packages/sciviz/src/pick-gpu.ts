@@ -37,6 +37,7 @@ interface RecordGPU {
   uniform: GPUBuffer;
   vertices?: GPUBuffer;
   source?: ArrayLike<number>;
+  snapshot?: Float32Array;
   count: number;
 }
 
@@ -46,7 +47,7 @@ const isMesh = (layer: Layer): layer is Layer & MeshLayer =>
 /**
  * Optional one-pixel integer ID pass for every scatter point, chart/surface cell and volume first hit.
  * IDs are full u32 indices, independent of the drawing point budget. CPU `figure.pick()` is unchanged.
- * CPU-backed point/rectangle arrays upload once; call invalidate after mutating them. Live surface buffers and
+ * CPU-backed point/rectangle arrays synchronize edited contents before each query. Live surface buffers and
  * volume textures are borrowed. Native WebGPU and the full WebGL2 compatibility backend are supported.
  */
 export class GpuPicking {
@@ -180,7 +181,21 @@ export class GpuPicking {
         throw rangeError('GPU picking supports at most 2^32 voxels per layer; split the volume', 'sciviz');
     } else return;
     const cached = this.#records.get(layer);
-    if (cached && cached.source === source) { cached.count = count; return cached; }
+    if (cached && cached.source === source) {
+      cached.count = count;
+      if (source && cached.snapshot) {
+        let first = 0;
+        while (first < source.length && Object.is(source[first], cached.snapshot[first])) first++;
+        if (first < source.length) {
+          let last = source.length;
+          while (last > first && Object.is(source[last - 1], cached.snapshot[last - 1])) last--;
+          const changed = source.subarray(first, last);
+          this.#device!.queue.writeBuffer(cached.vertices!, first * 4, changed as Float32Array<ArrayBuffer>);
+          cached.snapshot.set(changed, first);
+        }
+      }
+      return cached;
+    }
     this.invalidate(layer);
     const device = this.#device!,
       uniform = device.createBuffer({ size: 320, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -195,6 +210,7 @@ export class GpuPicking {
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       });
       device.queue.writeBuffer(record.vertices, 0, source as Float32Array<ArrayBuffer>);
+      record.snapshot = source.slice();
     }
     this.#records.set(layer, record);
     return record;

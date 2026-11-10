@@ -6885,3 +6885,5 @@ explicit quantization/error-propagation bounds (docs/compute-quant.md). Validati
 rejects potential accumulator overflow and invalid f32 multipliers before dispatch.
 Core, stage and protected browser lifecycle files are unchanged. No speed evidence
 or Wasm speed claim is introduced.
+
+Sciviz review M1 (2026-11-10): CPU-backed GPU pick inputs synchronize changed spans against an owned snapshot; array identity and renderer-consumed dirty ranges do not establish freshness. packages/sciviz/tests/pick-live-browser.mjs checks moved and stale positions on native WebGPU and WebGL2. Snapshot memory and linear comparison cost are documented in docs/sciviz-pick-gpu.md.
