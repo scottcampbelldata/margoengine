@@ -1,0 +1,1069 @@
+{
+  "kind": "diagnostic-cpu-samples",
+  "records": [
+    {
+      "scene": "p-math",
+      "calls": 1,
+      "output": {
+        "n": 100000,
+        "matrices": 605136.689,
+        "vectors": 47015.527,
+        "inFrustum": 94235,
+        "rayHits": 15165,
+        "rayPoints": 945.125
+      },
+      "samples": [
+        {
+          "function": "setFromEuler",
+          "url": "packages/math/dist/quaternion.js",
+          "line": 22,
+          "samples": 22
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-core.js",
+          "line": 161,
+          "samples": 15
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 9
+        },
+        {
+          "function": "intersectsBox",
+          "url": "packages/math/dist/frustum.js",
+          "line": 40,
+          "samples": 7
+        },
+        {
+          "function": "multiplyMatrices",
+          "url": "packages/math/dist/matrix4.js",
+          "line": 42,
+          "samples": 5
+        },
+        {
+          "function": "length",
+          "url": "packages/math/dist/vector3.js",
+          "line": 74,
+          "samples": 5
+        },
+        {
+          "function": "applyMatrix4",
+          "url": "packages/math/dist/vector3.js",
+          "line": 121,
+          "samples": 4
+        },
+        {
+          "function": "",
+          "url": "scripts/parity-task-profile.mjs",
+          "line": 35,
+          "samples": 3
+        },
+        {
+          "function": "intersectSphere",
+          "url": "packages/math/dist/ray.js",
+          "line": 40,
+          "samples": 3
+        },
+        {
+          "function": "compose",
+          "url": "packages/math/dist/matrix4.js",
+          "line": 105,
+          "samples": 2
+        },
+        {
+          "function": "composeComponents",
+          "url": "packages/math/dist/matrix4.js",
+          "line": 108,
+          "samples": 2
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "set",
+          "url": "packages/math/dist/matrix4.js",
+          "line": 23,
+          "samples": 1
+        },
+        {
+          "function": "set",
+          "url": "packages/math/dist/vector3.js",
+          "line": 7,
+          "samples": 1
+        },
+        {
+          "function": "divideScalar",
+          "url": "packages/math/dist/vector3.js",
+          "line": 46,
+          "samples": 1
+        },
+        {
+          "function": "setFromCenterAndSize",
+          "url": "packages/math/dist/box3.js",
+          "line": 32,
+          "samples": 1
+        },
+        {
+          "function": "set",
+          "url": "packages/math/dist/vector3.js",
+          "line": 7,
+          "samples": 1
+        },
+        {
+          "function": "intersectsBox",
+          "url": "packages/math/dist/frustum.js",
+          "line": 40,
+          "samples": 1
+        },
+        {
+          "function": "(program)",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-primitives",
+      "calls": 1,
+      "output": {
+        "geometries": 120,
+        "vertices": 164820,
+        "triangles": 250640
+      },
+      "samples": [
+        {
+          "function": "I",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 534,
+          "samples": 12
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-geometry.js",
+          "line": 42,
+          "samples": 8
+        },
+        {
+          "function": "v",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 350,
+          "samples": 7
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 6
+        },
+        {
+          "function": "add",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 423,
+          "samples": 5
+        },
+        {
+          "function": "P",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 506,
+          "samples": 4
+        },
+        {
+          "function": "done",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 433,
+          "samples": 4
+        },
+        {
+          "function": "h",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 357,
+          "samples": 4
+        },
+        {
+          "function": "",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 372,
+          "samples": 4
+        },
+        {
+          "function": "done",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 433,
+          "samples": 3
+        },
+        {
+          "function": "add",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 423,
+          "samples": 3
+        },
+        {
+          "function": "R",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 583,
+          "samples": 3
+        },
+        {
+          "function": "_",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 349,
+          "samples": 3
+        },
+        {
+          "function": "",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 575,
+          "samples": 2
+        },
+        {
+          "function": "add",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 423,
+          "samples": 2
+        },
+        {
+          "function": "g",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 342,
+          "samples": 2
+        },
+        {
+          "function": "add",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 423,
+          "samples": 2
+        },
+        {
+          "function": "post",
+          "url": "node:inspector",
+          "line": 115,
+          "samples": 1
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "",
+          "url": "scripts/parity-task-profile.mjs",
+          "line": 35,
+          "samples": 1
+        },
+        {
+          "function": "",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 543,
+          "samples": 1
+        },
+        {
+          "function": "L",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 545,
+          "samples": 1
+        },
+        {
+          "function": "done",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 433,
+          "samples": 1
+        },
+        {
+          "function": "x",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 408,
+          "samples": 1
+        },
+        {
+          "function": "s",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 389,
+          "samples": 1
+        },
+        {
+          "function": "m",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 353,
+          "samples": 1
+        },
+        {
+          "function": "A",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 452,
+          "samples": 1
+        },
+        {
+          "function": "done",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 433,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-extrude",
+      "calls": 1,
+      "output": {
+        "extruded": {
+          "vertices": 468,
+          "triangles": 156
+        },
+        "lathe": {
+          "vertices": 8256,
+          "triangles": 16128
+        },
+        "tube": {
+          "vertices": 8721,
+          "triangles": 16384
+        }
+      },
+      "samples": [
+        {
+          "function": "V",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 659,
+          "samples": 6
+        },
+        {
+          "function": "B",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 640,
+          "samples": 5
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-geometry.js",
+          "line": 81,
+          "samples": 2
+        },
+        {
+          "function": "getTangent",
+          "url": "packages/geometry/dist/curve-CYCEZ2iw.js",
+          "line": 58,
+          "samples": 2
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 2
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "lineTo",
+          "url": "packages/geometry/dist/path-XnKCypC4.js",
+          "line": 188,
+          "samples": 1
+        },
+        {
+          "function": "d",
+          "url": "packages/geometry/dist/extrude.js",
+          "line": 45,
+          "samples": 1
+        },
+        {
+          "function": "r",
+          "url": "packages/geometry/dist/math-DwK-SFQD.js",
+          "line": 10,
+          "samples": 1
+        },
+        {
+          "function": "R",
+          "url": "packages/geometry/dist/triangulate.js",
+          "line": 670,
+          "samples": 1
+        },
+        {
+          "function": "E",
+          "url": "packages/geometry/dist/triangulate.js",
+          "line": 481,
+          "samples": 1
+        },
+        {
+          "function": "add",
+          "url": "packages/geometry/dist/triangulate.js",
+          "line": 32,
+          "samples": 1
+        },
+        {
+          "function": "g",
+          "url": "packages/geometry/dist/triangulate.js",
+          "line": 257,
+          "samples": 1
+        },
+        {
+          "function": "d",
+          "url": "packages/geometry/dist/triangulate.js",
+          "line": 211,
+          "samples": 1
+        },
+        {
+          "function": "k",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 443,
+          "samples": 1
+        },
+        {
+          "function": "getTangentAt",
+          "url": "packages/geometry/dist/curve-CYCEZ2iw.js",
+          "line": 62,
+          "samples": 1
+        },
+        {
+          "function": "getPoint",
+          "url": "packages/geometry/dist/path-XnKCypC4.js",
+          "line": 90,
+          "samples": 1
+        },
+        {
+          "function": "getPoint",
+          "url": "packages/geometry/dist/path-XnKCypC4.js",
+          "line": 90,
+          "samples": 1
+        },
+        {
+          "function": "e",
+          "url": "packages/geometry/dist/math-DwK-SFQD.js",
+          "line": 2,
+          "samples": 1
+        },
+        {
+          "function": "l",
+          "url": "packages/geometry/dist/math-DwK-SFQD.js",
+          "line": 25,
+          "samples": 1
+        },
+        {
+          "function": "i",
+          "url": "packages/geometry/dist/math-DwK-SFQD.js",
+          "line": 14,
+          "samples": 1
+        },
+        {
+          "function": "d",
+          "url": "packages/geometry/dist/curve-CYCEZ2iw.js",
+          "line": 114,
+          "samples": 1
+        },
+        {
+          "function": "c",
+          "url": "packages/geometry/dist/math-DwK-SFQD.js",
+          "line": 21,
+          "samples": 1
+        },
+        {
+          "function": "",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 682,
+          "samples": 1
+        },
+        {
+          "function": "add",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 423,
+          "samples": 1
+        },
+        {
+          "function": "done",
+          "url": "packages/geometry/dist/primitives-TAN7IfVj.js",
+          "line": 433,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-geometry-utils",
+      "calls": 1,
+      "output": {
+        "mergedVertices": 24000,
+        "mergedTriangles": 12000,
+        "gridInputVertices": 614400,
+        "weldedVertices": 103041,
+        "weldedTriangles": 204800,
+        "tangents": 103041
+      },
+      "samples": [
+        {
+          "function": "v",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 313,
+          "samples": 634
+        },
+        {
+          "function": "w",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 465,
+          "samples": 84
+        },
+        {
+          "function": "g",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 314,
+          "samples": 63
+        },
+        {
+          "function": "S",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 396,
+          "samples": 40
+        },
+        {
+          "function": "x",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 392,
+          "samples": 35
+        },
+        {
+          "function": "x",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 392,
+          "samples": 28
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-geometry.js",
+          "line": 175,
+          "samples": 11
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 10
+        },
+        {
+          "function": "v",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 340,
+          "samples": 6
+        },
+        {
+          "function": "",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 291,
+          "samples": 4
+        },
+        {
+          "function": "(program)",
+          "url": "",
+          "line": 0,
+          "samples": 4
+        },
+        {
+          "function": "_",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 287,
+          "samples": 3
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "x",
+          "url": "packages/geometry/dist/utils-CYsSlv9j.js",
+          "line": 392,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-geometry-misc",
+      "calls": 1,
+      "output": {
+        "hullTriangles": 2872,
+        "roundedTriangles": 3468,
+        "kleinTriangles": 32768
+      },
+      "samples": [
+        {
+          "function": "c",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 182,
+          "samples": 55
+        },
+        {
+          "function": "o",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 39,
+          "samples": 38
+        },
+        {
+          "function": "distance",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 10,
+          "samples": 35
+        },
+        {
+          "function": "C",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 111,
+          "samples": 27
+        },
+        {
+          "function": "klein",
+          "url": "bench/scenes/parity/margo-geometry.js",
+          "line": 11,
+          "samples": 20
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 16
+        },
+        {
+          "function": "distance",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 10,
+          "samples": 14
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-geometry.js",
+          "line": 219,
+          "samples": 10
+        },
+        {
+          "function": "l",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 52,
+          "samples": 10
+        },
+        {
+          "function": "v",
+          "url": "packages/geometry/dist/extras.js",
+          "line": 110,
+          "samples": 9
+        },
+        {
+          "function": "a",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 25,
+          "samples": 5
+        },
+        {
+          "function": "l",
+          "url": "packages/geometry/dist/extras.js",
+          "line": 78,
+          "samples": 4
+        },
+        {
+          "function": "_",
+          "url": "packages/geometry/dist/extras.js",
+          "line": 101,
+          "samples": 4
+        },
+        {
+          "function": "n",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 14,
+          "samples": 2
+        },
+        {
+          "function": "t",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 7,
+          "samples": 2
+        },
+        {
+          "function": "C",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 223,
+          "samples": 2
+        },
+        {
+          "function": "o",
+          "url": "packages/geometry/dist/extras.js",
+          "line": 32,
+          "samples": 2
+        },
+        {
+          "function": "klein",
+          "url": "bench/scenes/parity/margo-geometry.js",
+          "line": 11,
+          "samples": 2
+        },
+        {
+          "function": "(program)",
+          "url": "",
+          "line": 0,
+          "samples": 2
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 164,
+          "samples": 1
+        },
+        {
+          "function": "m",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 214,
+          "samples": 1
+        },
+        {
+          "function": "p",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 214,
+          "samples": 1
+        },
+        {
+          "function": "i",
+          "url": "packages/geometry/dist/extras.js",
+          "line": 5,
+          "samples": 1
+        },
+        {
+          "function": "C",
+          "url": "packages/geometry/dist/convex-DDOeFRF1.js",
+          "line": 111,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-cube-lut",
+      "calls": 1,
+      "output": {
+        "size": 33,
+        "samples": 35937
+      },
+      "samples": [
+        {
+          "function": "g",
+          "url": "packages/tonemap/dist/index.js",
+          "line": 232,
+          "samples": 24
+        },
+        {
+          "function": "_",
+          "url": "packages/tonemap/dist/index.js",
+          "line": 272,
+          "samples": 13
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 7
+        },
+        {
+          "function": "RegExp: ^[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?$",
+          "url": "",
+          "line": 0,
+          "samples": 6
+        },
+        {
+          "function": "RegExp: ^TITLE\\s",
+          "url": "",
+          "line": 0,
+          "samples": 2
+        },
+        {
+          "function": "y",
+          "url": "packages/tonemap/dist/index.js",
+          "line": 283,
+          "samples": 2
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-loaders.js",
+          "line": 453,
+          "samples": 1
+        },
+        {
+          "function": "RegExp: \\r?\\n",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "(program)",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-mtl",
+      "calls": 1,
+      "output": {
+        "materials": 500,
+        "maps": 500
+      },
+      "samples": [
+        {
+          "function": "eachStatement",
+          "url": "packages/loaders/dist/obj.js",
+          "line": 18,
+          "samples": 3
+        },
+        {
+          "function": "",
+          "url": "packages/loaders/dist/obj.js",
+          "line": 120,
+          "samples": 2
+        },
+        {
+          "function": "resolvePath",
+          "url": "packages/loaders/dist/util.js",
+          "line": 202,
+          "samples": 2
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-loaders.js",
+          "line": 239,
+          "samples": 1
+        },
+        {
+          "function": "RegExp: \\s",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "scene": "p-export-mesh",
+      "calls": 1,
+      "output": {
+        "objChars": 14130060,
+        "objLines": 410882,
+        "stlBytes": 10240084,
+        "plyBytes": 5135650
+      },
+      "samples": [
+        {
+          "function": "exportOBJ",
+          "url": "packages/exporters/dist/obj.js",
+          "line": 10,
+          "samples": 123
+        },
+        {
+          "function": "(garbage collector)",
+          "url": "",
+          "line": 0,
+          "samples": 115
+        },
+        {
+          "function": "num",
+          "url": "packages/exporters/dist/shared/float-text.js",
+          "line": 31,
+          "samples": 30
+        },
+        {
+          "function": "task",
+          "url": "bench/scenes/parity/margo-exporters.js",
+          "line": 76,
+          "samples": 28
+        },
+        {
+          "function": "exportSTL",
+          "url": "packages/exporters/dist/stl.js",
+          "line": 10,
+          "samples": 23
+        },
+        {
+          "function": "",
+          "url": "packages/exporters/dist/obj.js",
+          "line": 122,
+          "samples": 20
+        },
+        {
+          "function": "exportPLY",
+          "url": "packages/exporters/dist/ply.js",
+          "line": 4,
+          "samples": 19
+        },
+        {
+          "function": "toWorld",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 1159,
+          "samples": 12
+        },
+        {
+          "function": "toWorld",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 1159,
+          "samples": 11
+        },
+        {
+          "function": "polygons",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 968,
+          "samples": 9
+        },
+        {
+          "function": "normalizeGeometry",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 133,
+          "samples": 8
+        },
+        {
+          "function": "toWorld",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 1159,
+          "samples": 8
+        },
+        {
+          "function": "triangleIndices",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 120,
+          "samples": 6
+        },
+        {
+          "function": "floats",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 76,
+          "samples": 6
+        },
+        {
+          "function": "triangleIndices",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 120,
+          "samples": 5
+        },
+        {
+          "function": "floats",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 76,
+          "samples": 4
+        },
+        {
+          "function": "normalizeGeometry",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 133,
+          "samples": 4
+        },
+        {
+          "function": "normalizeGeometry",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 133,
+          "samples": 4
+        },
+        {
+          "function": "shortest",
+          "url": "packages/exporters/dist/shared/float-text.js",
+          "line": 7,
+          "samples": 3
+        },
+        {
+          "function": "floats",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 76,
+          "samples": 3
+        },
+        {
+          "function": "triangleIndices",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 120,
+          "samples": 3
+        },
+        {
+          "function": "standZUp",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 1015,
+          "samples": 3
+        },
+        {
+          "function": "(program)",
+          "url": "",
+          "line": 0,
+          "samples": 3
+        },
+        {
+          "function": "standZUp",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 1015,
+          "samples": 2
+        },
+        {
+          "function": "",
+          "url": "packages/exporters/dist/ply.js",
+          "line": 9,
+          "samples": 2
+        },
+        {
+          "function": "dispatch",
+          "url": "",
+          "line": 0,
+          "samples": 1
+        },
+        {
+          "function": "",
+          "url": "scripts/parity-task-profile.mjs",
+          "line": 35,
+          "samples": 1
+        },
+        {
+          "function": "visit",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 833,
+          "samples": 1
+        },
+        {
+          "function": "fits",
+          "url": "packages/exporters/dist/shared/float-text.js",
+          "line": 10,
+          "samples": 1
+        },
+        {
+          "function": "geometry",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 563,
+          "samples": 1
+        },
+        {
+          "function": "visit",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 833,
+          "samples": 1
+        },
+        {
+          "function": "geometry",
+          "url": "packages/exporters/dist/scene.js",
+          "line": 563,
+          "samples": 1
+        }
+      ]
+    }
+  ],
+  "sourceCommit": "225f33c0a",
+  "node": "v26.12.0"
+}

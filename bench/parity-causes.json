@@ -250,5 +250,113 @@
   },
   "17.1": {
     "cause": "measured by margo-bench (docs/whitepaper/boxes-vs-threejs.md); moving instances against InstancedMesh at 10,000 to 250,000: \"Moving instances on the GPU (item 53.2)\", DynamicInstances in @margoengine/culling/dynamic, GPU loss open in known-bugs.md"
+  },
+  "1.9": {
+    "cause": "2026-11-10 diagnosis (batch 162 owns follow-up): CPU profile: Quaternion.setFromEuler is the largest named sampled function; the task performs 100,000 Euler conversions, matrix products, vector transforms, box tests and ray/sphere tests. Six half-angle trig evaluations per conversion remain in math/src/quaternion.ts. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "2.9": {
+    "cause": "2026-11-10 diagnosis (batch 159 owns follow-up): The adapter draws SceneTargets, then the normal core scene hidden under a raw display quad. The one-call native trace records five render passes, four indexed draws and one quad. The redundant visible-scene path is in bench/scenes/parity/margo-renderer.js, not an MRT attachment limitation. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "4.1": {
+    "cause": "Cause: repeated angular-column sin/cos per profile row. Fixed in `perf(geometry): reuse primitive angular columns` (Batch 162 job 1); 12,452 to 654 calls for the four affected scene primitives, identical geometry bytes. Temporary Float64 tables, no retained cache. [Proof and research](batch-162-workcounts.md#row-41-primitive-angular-columns). Timing pending the quiet rerun. Older first-operation inventory: [batch 159](parity-diagnoses.md)."
+  },
+  "4.2": {
+    "cause": "2026-11-10 diagnosis (batch 162 owns follow-up): CPU samples identify tube/lathe construction and the extrusion triangulator. One task produces 468 extrusion vertices, 8,256 lathe vertices and 8,721 tube vertices; tube construction computes 513 curve frames and 16 radial segments, with checked curve sampling and triangulation in geometry. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "4.5": {
+    "cause": "2026-11-10 diagnosis (batch 162 owns follow-up): CPU samples are dominated by mergeVertices, followed by tangent and angle-weighted normal work. The task welds 614,400 input corners to 103,041 vertices, computes normals/tangents over 204,800 triangles, and merges 1,000 boxes. Spatial-key creation and attribute comparisons in geometry/src/utils.ts are the main sampled path. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "4.7": {
+    "cause": "2026-11-10 diagnosis (batch 162 owns follow-up): CPU samples concentrate in convex hull point/face distance and horizon processing in geometry/src/convex.ts. The output contains 2,872 hull, 3,468 rounded-box and 32,768 parametric triangles. This is the JS hull construction path, not a GPU rendering cost. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "5.3": {
+    "cause": "2026-11-10 diagnosis (batch 159 owns follow-up): The physical path evaluates the selected sheen, clearcoat, anisotropy and iridescence lobes in materials/gltf-pro shading. The first-call traces record 17 indexed draws for p-physical; transmission separately records 20 render passes, 66 indexed draws and 15 full-screen draws (capture/mip/display initialization included). These are different workloads and need separate quiet GPU attribution; first-call counts do not explain the old steady-state ratio by themselves. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "5.10": {
+    "cause": "2026-11-10 diagnosis (batch 163 owns follow-up): PointCloud uses block draws and SpriteBatch uses instanced quads. The first point call uploads 20,000,496 bytes and makes 64 draws for 1,000,000 points; the sprite call uploads 640,464 bytes and makes one draw for 10,000 sprites. Initialization is included; neither upload count is claimed per steady frame. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "5.11": {
+    "cause": "2026-11-10 diagnosis (batch 163 owns follow-up): The scene owns 102 line objects (segments, dashed segments and 100 thick polylines), with 102 native draws and 103 render bind-group calls in the first operation. It constructs 306 buffers and 102 bind groups on that first operation. See lines/src and bench/scenes/parity/margo-objects.js; CPU/GPU steady costs await quiet attribution. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "6.1": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): This is decode plus upload plus mip generation, not decode alone. The task decodes a 1,024-square JPEG, uploads it through a textured quad, and records 11 render passes, 10 full-screen mip draws and a final indexed quad. The adapter note exposes the old spec mismatch (not a 2,048 PNG); catalog fixture parity must be resolved before a new speed claim. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "6.3": {
+    "cause": "2026-11-10 diagnosis (batch 163 owns follow-up): The first WgslMaterial operation creates six textures, writes four texture payloads and encodes one indexed draw; it initializes the 2D/3D/array bindings while the draw uses the same data-texture shader. The old small CPU loss needs a steady-operation trace, not attribution to the first-call resource setup. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "7.8": {
+    "cause": "2026-11-10 diagnosis (batch 159 owns follow-up): IES lights use clustered lighting plus core sun. The first operation encodes one cluster-culling compute dispatch and two indexed core batches for four profiled spots. The old comparison has a WebGPU-only rival for IES; there is no valid WebGL IES timing. Native call counts do not isolate shader cost, so the quiet pass-attribution check remains required. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "9.5": {
+    "cause": "2026-11-10 diagnosis (batch 164 owns follow-up): Margo uses a 160 x 90 x 32 froxel grid (460,800 cells), while the stated rival uses a half-resolution 32-step raymarch. The first call records two compute dispatches and eight render passes including initialization. This is a workload/algorithm mismatch, not a like-for-like speed verdict; retain both algorithms and build a matched row. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "9.7": {
+    "cause": "2026-11-10 diagnosis (batch 164 owns follow-up): The adapter uses a separate HDR Tonemap display path, with ACES fitted AP1 conversion rather than the rival ACESFilmic curve. The first call records six render passes, two scene indexed draws and three full-screen draws. Additional pass structure and different curve arithmetic are the code-level work; first-call compilation is not a steady-frame cost. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.2": {
+    "cause": "2026-11-10 diagnosis (batch 161 owns follow-up): parseGLTFAsync packs and uploads the model, then Animation.attach builds animation/deformation resources. The one-call inventory is 19 primitives, 7,214 vertices and 14 clips, with 49 GPU buffers, 59 writes (1,502,020 bytes) and seven buffer copies. This is GPU-ready parsing plus animation attachment, not CPU-only JSON loading. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.4": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The extension sample parses three primitives and decodes/uploads three images. The first task records 33 mip render passes/draws, three external image copies and 1,081,032 buffer-upload bytes. The timed adapter includes GPU preparation and previous-model disposal; the mip work is outside a CPU-only parser comparison. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.5": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The Draco adapter parses a small 406-vertex, 682-triangle mesh after decoder construction; it also packs the glTF geometry and creates five fallback textures, three buffers and two buffer writes. Warm decoder state is intentionally retained. The small decode is not separable from GPU-ready scene assembly in the old row; batch 133 owns decoder replacement evidence. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.10": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): CPU samples identify parseMTL, eachStatement/word tokenization and map path resolution. The full task builds 500 material records and 500 texture-map records. The parser retains physical statements and resolves map options/paths in loaders/src/obj.ts; no renderer work occurs. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.17": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The adapter parses 500 curved SVG paths, converts each to filled shapes, then calls shapeGeometry with 12 curve segments: 66,000 output vertices and 64,042 triangles. It includes triangulation after SVG parsing, so the source of work is loaders SVG plus geometry triangulation, not SVG XML parsing alone. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.20": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The task runs TGA, DDS, KTX and TIFF parsers to produce five 64-square images, one with seven mip levels. Margo validates container headers and decodes typed pixel payloads without GPU upload. The preflight also finds the rival DDS adapter rejects the supplied FourCC-zero fixture; do not publish a replacement ratio until that black-box fixture contract is corrected. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "10.21": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): CPU samples concentrate in parseCube numeric validation and the final LUT validation. A 33-cubed LUT contains 35,937 RGB rows: 107,811 numeric syntax/range checks, followed by a 143,748-word finite scan including alpha. The extra checked parse work is in tonemap/src/cube.ts; keep rejection behavior when removing duplicate scans. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "11.2": {
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): CPU samples identify exportOBJ string generation and garbage collection, followed by scene normalization/toWorld and float formatting. One task emits 14,130,060 OBJ characters, 410,882 vertex/normal/face lines, a 10,240,084-byte STL and a 5,135,650-byte PLY. Each public writer currently collects/validates the same input scene independently. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "12.1": {
+    "cause": "2026-11-10 diagnosis (batch 161 owns follow-up): The 100-robot crowd contains 19 primitives per robot. The first call records 1,900 indexed draws, 3,800 render bind-group calls, one deform dispatch and 2,179,104 uploaded buffer bytes. The scene seeks every rig each frame; draw submission and per-rig pose/palette work remain distinct costs. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "12.3": {
+    "cause": "2026-11-10 diagnosis (batch 161 owns follow-up): Same p-mixer-100 workload as row 12.1: 100 rigs, 19 primitives each, 1,900 indexed draws and one deformation dispatch on the first call. Skinning/animation sampling precede gltf-pro primitive submission; count those separately in batch 161 rather than attributing all CPU cost to the mixer. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "13.3": {
+    "cause": "Batch 164: SSAO resolved scene colour before extraction, although extraction and ambient replay only read depth. Depth-only extraction removes one unused 4x HDR colour resolve (40 logical B/pixel: four rgba16float source samples read and one destination written), with identical draws, bind groups, dispatches and uniform bytes. Exact native and ANGLE Vulkan pixels pass at 1x/4x and after resize. Default ANGLE D3D11 also varies unchanged control frames (59 channels, up to two levels); recorded under Scott's control-variance ruling, with native and Vulkan supplying exact-output evidence. Timing pending the quiet rerun; historical loss retained. [Reproduce](reproduce.md#batch-164-ssao-resolve-work). Older first-operation inventory: [batch 159](parity-diagnoses.md)."
+  },
+  "13.15": {
+    "cause": "2026-11-10 diagnosis (batch 164 owns follow-up): Same p-tonemap path as row 9.7: separate HDR/display pass structure and fitted AP1 ACES curve, with six first-call render passes and three full-screen draws. The old curve/image mismatch remains explicit; no new ratio or accepted equivalence is claimed. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "13.19": {
+    "cause": "2026-11-10 diagnosis (batch 164 owns follow-up): The adapter chains Tonemap, pixelate, rgbShift and vignette as separate NodePasses. The first call has nine render passes and six full-screen draws including initialization. The three LDR effects each read/write an image; vignette arithmetic also differs from the rival (documented in the adapter). Fusion must preserve sampling order and exact pixels. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "14.3": {
+    "cause": "Batch 170: every move replaced the carried-object list with filter, including 200 allocations in this row's gesture. Stable in-place compaction removes those 200 replacement arrays and still removes disposed members. Raw transform bytes match the parent replay. Fix: perf(controls): avoid consumed-motion and carried-list work. Timing pending the quiet rerun; the historical slower result stays until measured. Older first-operation inventory: [batch 159](parity-diagnoses.md)."
+  },
+  "14.4": {
+    "cause": "Batch 170: immediate pointer handling consumed motion, then the explicit update rebuilt a screen basis and temporary vectors. Idle follow-up updates now check live distance limits first: 10,000 screen-basis builds become zero. Raw camera bytes and change events match the parent replay, including damping and live limits. Fix: perf(controls): avoid consumed-motion and carried-list work. Timing pending the quiet rerun. Older first-operation inventory: [batch 159](parity-diagnoses.md)."
+  },
+  "15.2": {
+    "cause": "Batch 163 job 2: repeated circle endpoint trigonometry and endpoint arrays in live light helpers. `perf(lines): retain light-helper circle samples` reduces 1,152 trig calls to zero and 192 per-edge endpoint arrays to zero per moving point helper after its 66-call setup, with byte-identical geometry. The same edges, colours and draws remain. Timing pending the quiet rerun. [Proof and sources](bp-163-workcounts.md#job-2-live-light-helper-circles). Older first-operation inventory: [batch 159](parity-diagnoses.md)."
+  },
+  "15.3": {
+    "cause": "2026-11-10 diagnosis (batch 163 owns follow-up): 25 robots retain 19 primitives each (475 indexed draws) plus 25 SkeletonHelper line draws and one deformation dispatch. First operation records 976 render bind-group calls. The old CPU row includes animation/model rendering and line-helper updates; do not charge the whole frame to line drawing. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "16.1": {
+    "cause": "2026-11-10 diagnosis (batch 162 owns follow-up): The scene issues 1,000 first-hit queries and returns 251 hits in the boxes case. Raycaster.intersectEngine gathers mesh/model candidates and intersects in local space on every query; per-geometry BVHs are first built on the cold call. The mesh case separately queries a dense grid. The old task aggregate includes ray setup, candidate gathering and hit construction, not BVH traversal alone. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "17.4": {
+    "cause": "2026-11-10 diagnosis (batch 163 owns follow-up): Same million-point case as 5.10: block-budgeted PointCloud encodes 64 draws; first operation uploads 20,000,496 bytes, including initial positions/colors. The draw path uses quad point rasterization, not native GL point-size rasterization. Steady upload caching work from batch 163 needs a new trace, not reuse of this initialization count. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "17.6": {
+    "cause": "2026-11-10 diagnosis (batch 163 owns follow-up): Same 102-object line case as 5.11: one plain segment group, one dashed group and 100 thick polylines; first operation records 102 native draws and 103 render bind-group calls. Keep joins, caps, dashes and widths while reducing per-line submission. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "17.9": {
+    "cause": "2026-11-10 diagnosis (batch 159 owns follow-up): Water.attach uses the default 128 by 128 grid (32,768 triangles), two Gerstner swell trains, layered ripple normals, depth-based foam and foam history. No reflected scene texture is supplied: reflection is the procedural sky, as the adapter note says. The first call records ten render passes, three indexed draws and five full-screen draws including initialization. The old rival half-resolution mirror description is not a matched workload, so retain this as a diagnosed scene mismatch until the matched control and quiet pass attribution exist. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "18.1": {
+    "cause": "2026-11-10 diagnosis (batch 170 owns follow-up): For 64 sources over 1,000 steps, the task calls setPosition and setDirection 64,000 times each plus 1,000 listener poses. Both source setters call writePose, so 128,000 full panner-pose writes are requested before changed-value filtering. The rival task updates its scene graph once per step. Cause: two immediate pose updates per source versus one deferred graph update; keep final AudioParam values identical in the owning lane fix. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
   }
 }

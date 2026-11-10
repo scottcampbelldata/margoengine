@@ -3257,3 +3257,12 @@ match 22 rectangles exactly. Yoga uses one leaf callback on the nested cases; th
 width-only callback contract difference and zero-call explicit-size comparison are
 documented in [the batch record](batch-169.md). No benchmarks ran; timing pending
 the quiet rerun.
+
+### Batch 159 workload diagnoses (2026-11-10)
+
+The one-call inventory attempted 453 engine/case pairs: 424 succeeded, 23 explicitly
+lack an equivalent and six returned real errors. Eight CPU-only full tasks were
+profiled once. All 36 formerly empty slower-row causes now identify their code
+paths and work counts with lane ownership. First-call counts include initialization
+and do not replace steady-state timing attribution. No speed verdict changed; batch
+159 remains open. [Evidence, remaining gaps and reproduction](parity-diagnoses.md).

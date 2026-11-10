@@ -4024,3 +4024,10 @@ No companion implementation was read. The source-read count is 4 samples times
 logical resolve traffic is 40 times width times height. This excludes physical
 compression and attachment load/store traffic. No timings or rival numbers are
 regenerated here. Timing pending the quiet rerun.
+
+### Batch 159 CPU diagnosis
+
+After building packages, run node scripts/parity-task-profile.mjs for one complete
+operation of each of eight CPU-only catalog tasks. It writes function-sample counts
+and outputs, with no elapsed metrics. [Commands, limits and remaining matrix
+failures](parity-diagnoses.md). The historical speed ledger is unchanged.

@@ -2,6 +2,17 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { workCounter } from '../bench/lib/work-count.js';
+import { smokeStatus } from '../bench/lib/smoke-result.mjs';
+
+test('smoke status retains real errors and recognizes explicit adapter refusals', () => {
+  assert.equal(smokeStatus({ error: 'Error: unsupported: backend has no equivalent' }), 'unsupported');
+  assert.equal(smokeStatus({ unsupported: true }), 'unsupported');
+  assert.equal(smokeStatus({ error: 'TypeError: bad material' }), 'error');
+  assert.equal(smokeStatus({ error: 'RangeError: Truncated glTF buffer' }), 'error');
+  assert.equal(smokeStatus({ unsupported: true, pageErrors: ['GPU validation failed'] }), 'error');
+  assert.equal(smokeStatus({ errors: ['async failure'] }), 'error');
+  assert.equal(smokeStatus({}), 'ok');
+});
 
 test('work counter preserves native calls and counts exact typed-array upload ranges', () => {
   const received = [];

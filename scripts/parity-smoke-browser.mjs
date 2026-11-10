@@ -7,6 +7,7 @@ import { buildPages, browserSession, externalEngines, serve } from '../bench/lib
 import { root } from '../bench/lib/env.mjs';
 import { SCENES, caseId, sceneParams } from '../bench/scenes/catalog.js';
 import { parityCases } from '../bench/scenes/parity.js';
+import { smokeStatus } from '../bench/lib/smoke-result.mjs';
 import { browserLabel } from './lib/browser.mjs';
 
 const { values: o } = parseArgs({
@@ -50,7 +51,7 @@ try {
         entry = {
           id,
           engine,
-          status: r.unsupported ? 'unsupported' : r.error || r.errors?.length || r.pageErrors?.length ? 'error' : 'ok',
+          status: smokeStatus(r),
           calls: r.calls ?? 0,
           work: r.work,
           output: r.output,

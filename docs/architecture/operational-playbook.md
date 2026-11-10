@@ -7269,3 +7269,12 @@ is recorded under Scott's control-variance ruling; native and Vulkan supply the 
 post-stack tape retains every call except the explicitly counted unused early
 resolve and the equivalent depth attachment view. Physical bandwidth and rival
 speed gains remain unmeasured. [Reproduction and research](../whitepaper/reproduce.md#batch-164-ssao-resolve-work).
+
+
+### Batch 159 matrix diagnosis inventory (2026-11-10)
+
+Section 5 evidence now includes all 151 parity cases attempted on three engines,
+first-operation native call counts, eight one-call CPU profiles and the previously
+empty slower-row diagnoses. Initialization counts are not steady-frame evidence.
+The inventory retains six real errors and four absent Margo adapters/APIs, so quiet
+refresh readiness remains open. [Sources, evidence and reproduction](../whitepaper/parity-diagnoses.md).
