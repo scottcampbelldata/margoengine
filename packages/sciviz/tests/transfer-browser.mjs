@@ -102,6 +102,15 @@ for (const compat of [false, true]) {
       });
       constant.setClassification(await preintegrateTransfer(one, { step: 0.5, resolution: 32, samples: 32 }));
       const pre = await pixels(fig);
+      const temporary = bindTransfer(constant, tf, { resolution: 32 });
+      const replaced = await pixels(fig);
+      temporary.dispose();
+      const restored = await pixels(fig);
+      const restoration = {
+        before: hash(pre),
+        bound: hash(replaced),
+        after: hash(restored),
+      };
       constant.setClassification(one.table(32));
       const post = await pixels(fig);
       const centre = (80 * 160 + 80) * 4,
@@ -173,6 +182,7 @@ for (const compat of [false, true]) {
         difference,
         disposedReject,
         queuedBlue,
+        restoration,
       };
     });
     assert.ok(report.before.lit > 500 && report.after.lit > 500 && report.reference.lit > 500, JSON.stringify(report));
@@ -181,6 +191,8 @@ for (const compat of [false, true]) {
     assert.ok(report.difference <= 3, JSON.stringify(report));
     assert.ok(report.disposedReject);
     assert.ok(report.queuedBlue, 'PNG must await submitted work before reading the canvas');
+    assert.notEqual(report.restoration.bound.hash, report.restoration.before.hash);
+    assert.deepEqual(report.restoration.after, report.restoration.before);
     assert.deepEqual(errors, []);
     reports.push({ backend: compat ? 'WebGL2' : 'WebGPU', ...report });
     console.log(JSON.stringify(reports.at(-1)));

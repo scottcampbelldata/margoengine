@@ -528,6 +528,12 @@ export class VolumeLayer implements Drawable {
     });
   }
 
+  /** Owned snapshot of the custom classification, or undefined for the original map and opacity. */
+  getClassification(): VolumeClassification | undefined {
+    const value = this.#classification;
+    return value && { ...value, size: [...value.size], rgba: new Uint8Array(value.rgba) };
+  }
+
   /** Replace classification on an existing layer, or pass undefined to restore its original map and opacity. */
   setClassification(value?: VolumeClassification): void {
     if (this.#disposed)

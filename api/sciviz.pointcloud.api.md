@@ -814,6 +814,7 @@ class VolumeLayer implements Drawable {
     constructor(renderer: SciRenderer, data: DataSource, options?: VolumeLayerOptions);
     get clip(): readonly ClipPlane[];
     set clip(planes: readonly ClipPlane[]);
+    getClassification(): VolumeClassification | undefined;
     setClassification(value?: VolumeClassification): void;
     classificationData(): {
         readonly size: readonly [number, number];

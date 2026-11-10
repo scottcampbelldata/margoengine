@@ -400,6 +400,7 @@ export function bindTransfer(
   [Symbol.dispose](): void;
 } {
   options.signal?.throwIfAborted();
+  const previous = layer.getClassification();
   let disposed = false;
   const apply = () => {
     layer.setClassification(tf.table(options.resolution, layer.range));
@@ -412,7 +413,7 @@ export function bindTransfer(
     disposed = true;
     tf.removeEventListener('change', apply);
     options.signal?.removeEventListener('abort', dispose);
-    if (layer.valid) layer.setClassification();
+    if (layer.valid) layer.setClassification(previous);
   };
   options.signal?.addEventListener('abort', dispose, { once: true });
   return { dispose, [Symbol.dispose]: dispose };

@@ -1250,3 +1250,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - @margoengine/sciviz (batch 181 job 3): document /pick-gpu, GpuPicking pick/attachHover/invalidate/disposal, async hover and pickerror, original cell/voxel IDs, CPU-reference differences, shared-device restore, cancellation and real 2MASS/TCIA demo. No README examples written during the build phase.
 
 - margoengine (batch 181 job 3): document the generated sciviz/pick-gpu alias; README examples deferred.
+
+- @margoengine/sciviz (review 3 SV3): document getClassification snapshot ownership and bindTransfer restoration of previous custom gradient/preintegrated tables on disposal or abort; examples deferred.

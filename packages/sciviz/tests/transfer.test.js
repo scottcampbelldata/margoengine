@@ -194,6 +194,9 @@ test('binding updates any existing volume and lifetime removes listener, editor 
   const layer = {
       range: [0, 1],
       valid: true,
+      getClassification() {
+        return undefined;
+      },
       setClassification(v) {
         last = v;
         uploads++;
@@ -224,4 +227,72 @@ test('binding updates any existing volume and lifetime removes listener, editor 
   editor.dispose();
   assert.equal(dom.window.document.querySelector('main').children.length, 0);
   dom.window.close();
+});
+
+test('binding disposal and abort restore owned gradient and preintegrated classification snapshots', () => {
+  globalThis.GPUBufferUsage = { UNIFORM: 1, COPY_DST: 2 };
+  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 1, COPY_DST: 2 };
+  globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2 };
+  const resource = () => ({
+    destroy() {},
+    createView() {
+      return {};
+    },
+  });
+  const renderer = {
+    device: {
+      limits: { maxTextureDimension3D: 2048, maxTextureDimension2D: 4096 },
+      createTexture: resource,
+      createBuffer: resource,
+      createBindGroup: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createSampler: () => ({}),
+      queue: { writeTexture() {}, writeBuffer() {} },
+    },
+    remove() {},
+    add() {},
+  };
+  for (const kind of ['gradient', 'preintegrated']) {
+    for (const abort of [false, true]) {
+      const layer = new VolumeLayer(renderer, new Float32Array([0, 1, 0, 1, 0, 1, 0, 1]), {
+        dims: [2, 2, 2],
+        range: [0, 1],
+      });
+      assert.equal(layer.getClassification(), undefined);
+      const original = {
+        kind,
+        size: [2, 2],
+        rgba: Uint8Array.from({ length: 16 }, (_, i) => i * 10),
+        gradientMax: 3,
+        step: 2,
+        density: 0.75,
+      };
+      layer.setClassification(original);
+      const expected = structuredClone(original),
+        snapshot = layer.getClassification();
+      assert.deepEqual(snapshot, expected);
+      original.rgba.fill(0);
+      original.size[0] = 8;
+      snapshot.rgba.fill(255);
+      snapshot.size[1] = 8;
+      snapshot.density = 5;
+      assert.deepEqual(layer.getClassification(), expected);
+      const metadata = [...layer.classificationUniforms()],
+        data = layer.classificationData();
+      const controller = new AbortController(),
+        tf = transferPreset('mri');
+      const binding = bindTransfer(layer, tf, { resolution: 16, signal: controller.signal });
+      tf.update({ ...tf.state, mode: '2d' });
+      if (abort) controller.abort();
+      else binding[Symbol.dispose]();
+      binding.dispose();
+      tf.update(tf.state);
+      assert.deepEqual(layer.getClassification(), expected);
+      assert.deepEqual(layer.classificationUniforms(), metadata);
+      assert.deepEqual(layer.classificationData(), data);
+      layer.restore();
+      assert.deepEqual(layer.getClassification(), expected);
+      layer.dispose();
+    }
+  }
 });
