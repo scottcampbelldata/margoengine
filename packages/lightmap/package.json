@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/lightmap",
   "version": "1.0.0",
-  "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh) with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted).",
+  "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -45,6 +45,10 @@
     "./imported": {
       "types": "./dist/imported.d.ts",
       "import": "./dist/imported.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
     }
   },
   "files": [
@@ -67,6 +71,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js lightmap",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "node tests/gpu.browser.mjs"
   }
 }

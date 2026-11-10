@@ -14,8 +14,19 @@ export interface ImportedLightmap {
 /** Validate and copy an external bake (default scale 1); no colour conversion or re-baking. */
 export function readLightmap(input: Omit<ImportedLightmap, 'scale'> & { scale?: number }): ImportedLightmap {
   const { width, height, data, scale = 1 } = input;
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096 || !(data instanceof Uint8Array) || data.length !== width * height * 4)
-    throw new RangeError('Imported lightmap needs RGBA8 data for a 1 to 4096 pixel width and height; supply matching dimensions');
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    width > 4096 ||
+    height > 4096 ||
+    !(data instanceof Uint8Array) ||
+    data.length !== width * height * 4
+  )
+    throw new RangeError(
+      'Imported lightmap needs RGBA8 data for a 1 to 4096 pixel width and height; supply matching dimensions',
+    );
   if (!Number.isFinite(scale) || scale < 1 || scale > 1e20)
     throw new RangeError('Imported lightmap scale must be finite from 1 to 1e20; normalize the HDR bake');
   return { width, height, data: data.slice(), scale };
@@ -31,18 +42,27 @@ export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
   private readonly extensions = new Map<PBRPrimitive, MaterialExtension>();
   private unsubscribe?: () => void;
   private disposed = false;
-  constructor(private readonly model: PBRModel, lightmap: ImportedLightmap, nodes?: readonly number[]) {
-    const chosen = nodes === undefined ? model.primitives : model.primitives.filter(p => nodes.includes(p.nodeIndex));
-    if (model.disposed || !chosen.length || nodes?.some(n => !Number.isSafeInteger(n) || !model.nodes[n]))
+  constructor(
+    private readonly model: PBRModel,
+    lightmap: ImportedLightmap,
+    nodes?: readonly number[],
+  ) {
+    const chosen = nodes === undefined ? model.primitives : model.primitives.filter((p) => nodes.includes(p.nodeIndex));
+    if (model.disposed || !chosen.length || nodes?.some((n) => !Number.isSafeInteger(n) || !model.nodes[n]))
       throw new TypeError('Imported lightmap needs a live model and existing mesh node indices; select its mesh nodes');
-    if (chosen.some(p => p.extension || p.material.extension))
-      throw new TypeError('Imported lightmap needs the free material extension slot; remove the previous extension first');
+    if (chosen.some((p) => p.extension || p.material.extension))
+      throw new TypeError(
+        'Imported lightmap needs the free material extension slot; remove the previous extension first',
+      );
     // Prepared PBR always has both UV pairs in its 80-byte layout, with no accessor dictionary.
-    if (chosen.some(p => p.definition.attributes !== undefined && p.definition.attributes.TEXCOORD_1 === undefined))
+    if (chosen.some((p) => p.definition.attributes !== undefined && p.definition.attributes.TEXCOORD_1 === undefined))
       throw new TypeError('Imported lightmap needs TEXCOORD_1 on every selected primitive; export its lightmap UV set');
     const validated = readLightmap(lightmap);
     this.lightmap = validated;
-    this.texture = new Texture({ width: validated.width, height: validated.height, data: validated.data }, { colorSpace: 'linear', mipmaps: false, wrapS: 'clamp', wrapT: 'clamp' });
+    this.texture = new Texture(
+      { width: validated.width, height: validated.height, data: validated.data },
+      { colorSpace: 'linear', mipmaps: false, wrapS: 'clamp', wrapT: 'clamp' },
+    );
     for (const p of chosen) this.previous.set(p, p.extension);
   }
   setup(engine: Engine): void {
@@ -53,7 +73,8 @@ export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
         factors: new Float32Array([this.lightmap.scale / Math.PI, 0, 0, 0]),
         textures: [{ view: bound[0], sampler: bound[1] }],
         direct: 'direct=vec3f(0);',
-        ambient: 'materialAmbient=s.base.rgb*(1.0-s.metal)*textureSample(materialTexture0,materialSampler0,uv(i,1.0)).rgb*materialFactors[0].x;',
+        ambient:
+          'materialAmbient=s.base.rgb*(1.0-s.metal)*textureSample(materialTexture0,materialSampler0,uv(i,1.0)).rgb*materialFactors[0].x;',
         lighting: false,
       };
       this.extensions.set(p, extension);
@@ -61,7 +82,9 @@ export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
     }
     this.unsubscribe ??= this.model.onDispose(() => this.dispose());
   }
-  onDeviceRestored(engine: Engine): void { this.setup(engine); }
+  onDeviceRestored(engine: Engine): void {
+    this.setup(engine);
+  }
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -71,12 +94,23 @@ export class ImportedLightmapInstallation implements EnginePlugin, Disposable {
     this.texture.dispose();
     this.model.root.engine.removePlugin(this.name);
   }
-  [Symbol.dispose](): void { this.dispose(); }
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }
 
 /** Apply an external diffuse bake on UV1, replacing direct/ambient light; existing emission stays. */
-export function applyLightmap(model: PBRModel, lightmap: ImportedLightmap, nodes?: readonly number[]): ImportedLightmapInstallation {
+export function applyLightmap(
+  model: PBRModel,
+  lightmap: ImportedLightmap,
+  nodes?: readonly number[],
+): ImportedLightmapInstallation {
   const result = new ImportedLightmapInstallation(model, lightmap, nodes);
-  try { model.root.engine.use(result); return result; }
-  catch (error) { result.dispose(); throw error; }
+  try {
+    model.root.engine.use(result);
+    return result;
+  } catch (error) {
+    result.dispose();
+    throw error;
+  }
 }

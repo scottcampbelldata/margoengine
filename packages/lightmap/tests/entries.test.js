@@ -18,12 +18,14 @@ test('each entry loads only its own passes', async () => {
     global = await loaded('global.js'),
     refracted = await loaded('refracted.js'),
     mesh = await loaded('mesh.js'),
-    directional = await loaded('directional.js');
+    directional = await loaded('directional.js'),
+    gpu = await loaded('gpu.js');
   for (const name of [
     'bakeGlobalLightmap',
     'bakeRefractedLightmap',
     'bakeMeshLightmap',
     'bakeDirectionalLightmap',
+    'GPULightmapBaker',
     'glass',
   ])
     assert.ok(!plain.includes(name), name);
@@ -36,4 +38,5 @@ test('each entry loads only its own passes', async () => {
   );
   assert.ok(global.includes('bakeGlobalLightmap') && !global.includes('bakeRefractedLightmap'));
   assert.ok(refracted.includes('bakeRefractedLightmap') && !refracted.includes('bakeGlobalLightmap'));
+  assert.ok(gpu.includes('GPULightmapBaker') && !gpu.includes('packAtlas') && !mesh.includes('GPULightmapBaker'));
 });

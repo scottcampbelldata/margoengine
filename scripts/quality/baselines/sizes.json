@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 13275041,
+  "total": 13282683,
   "history": [
     {
       "date": "2026-10-24",
@@ -6747,6 +6747,12 @@
       "commit": "9d6d24c0e",
       "reason": "Batch 222 readiness: webgl2-compat/device 105937 to 106384 B; lazy compute/readback 31753 to 31757 B crosses its 31756 B ceiling by 1 B. Keep nonforcing buffer-local mapping and queued/loss semantics; splitting a four-byte lazy increase would add an artificial boundary.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "373ebb82d",
+      "reason": "batch 54 job 2: new @margoengine/lightmap/gpu entry (progressive GPU baker)",
+      "grew": 2
     }
   ],
   "items": {
@@ -7178,8 +7184,9 @@
     "@margoengine/lighting2d/sdf": 2923,
     "@margoengine/lighting2d/soft": 6392,
     "@margoengine/lightmap": 4053,
-    "@margoengine/lightmap/directional": 4473,
+    "@margoengine/lightmap/directional": 4471,
     "@margoengine/lightmap/global": 7409,
+    "@margoengine/lightmap/gpu": 7965,
     "@margoengine/lightmap/imported": 1535,
     "@margoengine/lightmap/mesh": 3272,
     "@margoengine/lightmap/refracted": 7846,
@@ -7229,6 +7236,7 @@
     "@margoengine/loaders/xml": 1561,
     "@margoengine/lod": 14316,
     "@margoengine/lod/auto": 9492,
+    "@margoengine/lod/clusters": 3680,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
     "@margoengine/materials": 64979,
@@ -7723,7 +7731,7 @@
     "@margoengine/usdz dist/workers/usdz.js": 121784,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/compose": 19101,
-    "@margoengine/usdz/curves": 3531,
+    "@margoengine/usdz/curves": 3523,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7905,
@@ -7916,6 +7924,7 @@
     "leak @margoengine/lightmap -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/directional -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/global -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/lightmap/gpu -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/imported -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/lightmap/imported -> @margoengine/materials": 1,
     "leak @margoengine/lightmap/mesh -> @margoengine/bvh/tree": 1,
@@ -7970,10 +7979,8 @@
     "leak @margoengine/usdz/compose -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
-    "margoengine/fbx/surfaces": 314,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/lod/clusters": 3680
+    "margoengine/web": 577
   }
 }

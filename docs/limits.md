@@ -4999,3 +4999,10 @@ The optional /clusters entry accepts core Geometry (positions/normals), with 4-2
 Compatibility queue/readback polling now yields delayed scheduler tasks, with a fresh-timer message fallback; mapping polls its buffer readiness after pending submits, retaining a queue fence for invalid GPU-only shadows. No timeout or picking tolerance increased. No speed claim is made.
 Measured batch 222 entries (minified gzip, bare package imports external): lod/clusters 3,427 B (new, before 0); lod/fade 2,413 B; mesh-edit/modeling 34,616 B; webgl2-compat/device 106,384 B. Core + stage remains 24,209 B. The new cluster entry budget records the complete builder/selector/renderer together; splitting this small entry would add API and lifecycle complexity without removing a heavy static import.
 Readback entry size evidence (batch 222, same library build settings against the parent source): webgl2-compat/device 105937 -> 106384 B gzip; the lazy compute/readback portion 31753 -> 31757 B, crossing its recorded 31756 B ceiling by one byte. The ceiling is raised with this job: preserving local asynchronous readiness, queued-submit ordering and device-loss correctness is worth the bytes; splitting a four-byte lazy change would add an artificial boundary. The existing core + stage limit is unchanged.
+
+## GPU progressive lightmaps (batch 54)
+
+`@margoengine/lightmap/gpu` needs WebGPU compute (no WebGL2 path). One reflectance (`albedo`) per mesh and per
+occluder, diffuse only; no emissive surfaces, area lights, glass or textures in the path. Ambient lights add their
+irradiance at every path vertex, unoccluded in physical radiometry. The live `texture` is undilated (empty texels stay
+0); `read()` dilates. Lights are point, spot, directional and ambient only. Texel finding runs on the CPU first.

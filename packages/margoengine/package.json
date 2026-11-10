@@ -1730,6 +1730,10 @@
       "types": "./dist/lightmap/imported.d.ts",
       "import": "./dist/lightmap/imported.js"
     },
+    "./lightmap/gpu": {
+      "types": "./dist/lightmap/gpu.d.ts",
+      "import": "./dist/lightmap/gpu.js"
+    },
     "./lines": {
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"
@@ -1901,6 +1905,10 @@
     "./loaders/threemf-lattice": {
       "types": "./dist/loaders/threemf-lattice.d.ts",
       "import": "./dist/loaders/threemf-lattice.js"
+    },
+    "./lod/clusters": {
+      "types": "./dist/lod/clusters.d.ts",
+      "import": "./dist/lod/clusters.js"
     },
     "./lod": {
       "types": "./dist/lod.d.ts",

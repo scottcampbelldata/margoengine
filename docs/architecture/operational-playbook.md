@@ -139,6 +139,16 @@ losses remain. Further storage changes need the same proof before closing
 those losses. GPU ETC2/EAC proof remains absent on RTX A6000.
 
 
+### Section 5 evidence: batch 54 GPU progressive lightmaps
+
+`@margoengine/lightmap/gpu` traces lightmap texels in WebGPU compute through the `@margoengine/bvh/gpu` WGSL walker
+(watertight Woop, Benthin and Wald test). Evidence on the M6 Mac mini (Metal): one pass equals the CPU `./mesh` bake on
+all 1,024 texels of a shadowed floor within 1e-3 of the lightmap scale (measured worst 0); 516-pass AO has a mean
+signed difference of 0.0016 against a 128-ray CPU bake and its RMS falls from 0.132 (4 passes) to 0.025; one diffuse
+bounce off a lit wall matches the exact point-to-polygon form factor within 0.019 (2,048 passes). The pipeline uses 8
+storage buffers, the WebGPU default per-stage limit. Missing: the WebGL2 compatibility path (compute only), Windows
+and Vulkan runs, and speed numbers (deferred by the build phase).
+
 ### Section 5 evidence: batch 133 lazy catalog ordering
 
 The native worker and Wasm registrations now remain in the decoder row group.

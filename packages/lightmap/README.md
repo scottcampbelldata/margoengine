@@ -98,6 +98,45 @@ reaches the texel. The direction is the luminance-weighted mean of the light dir
 direction); ambient light and AO stay non-directional. The flat `lightmap` is the one `bakeMeshLightmap` bakes, with
 no extra rays.
 
+## Progressive GPU baking: `@margoengine/lightmap/gpu`
+
+`GPULightmapBaker` bakes the same meshes as `./mesh` in WebGPU compute. Each `step()` adds passes and `texture` (an
+`rgba16float` texture at the lightmap size) holds the running mean, so a viewer can draw it while it improves.
+
+```ts
+import { bakeMeshLightmapGPU, GPULightmapBaker } from 'margoengine/lightmap/gpu';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice(); // or pass an engine: its `gpu` is used
+const mesh = {
+  positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+  uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+};
+const options = {
+  width: 64,
+  radiometry: 'physical' as const,
+  bounces: 2,
+  lights: [{ type: 'directional' as const, direction: [0.3, 1, 0.2], intensity: 2 }],
+};
+{
+  using baker = await GPULightmapBaker.create(device, mesh, options);
+  for (let i = 0; i < 8; i++) await baker.step(8); // sample baker.texture between steps to watch it converge
+  const baked = await baker.read(); // the same record as bakeMeshLightmap
+  console.log(baker.passes, baked.lightmapScale);
+}
+const done = await bakeMeshLightmapGPU(device, mesh, { ...options, passes: 128 });
+console.log(done.samples);
+```
+
+- **Per pass, per texel.** A shadow ray to each light (the same falloff, cone and shadow rules as the CPU bake) and
+  one cosine-weighted path: its first ray is the AO sample, and with `bounces` (0 to 8, physical radiometry) each hit
+  adds `albedo` times the light arriving there (next-event estimation). One pass equals the CPU direct light; more
+  passes make AO and indirect light converge (Monte Carlo, error falling as one over the square root of passes).
+- **Materials.** `albedo` (default 0.8 grey) for the mesh, and per occluder. Diffuse only.
+- **Results.** `read()` averages, dilates and encodes like `bakeMeshLightmap`. `passes` counts the passes run.
+  Dispose the baker (`using`, or `[Symbol.dispose]()`) to free its buffers, texture and tree.
+
 ## More light: `@margoengine/lightmap/global`
 
 `bakeGlobalLightmap(quads, options)` takes every `bakeLightmap` option and adds:

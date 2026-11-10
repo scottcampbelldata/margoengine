@@ -350,7 +350,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/environment`](packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh) with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
+| [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional); optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/weather`](packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
@@ -7584,6 +7584,18 @@ Batch 218 job 1 measured entries (gzip): transitions root 4562 B, custom 5326 B,
 ## Batch 213 VRM node constraints
 
 The new optional rigging/vrm-constraints entry is 2,998 B min+gzip (previously 0 B), ceiling 3,254 B. Keeping the reader, evaluator and scene/Animator controller together shares rest-space math and lifecycle state; a split would duplicate setup without saving an optional import. Core plus stage stays 24,209 B, below 25,000 B; core and stage source is untouched. Weights default to one and accept finite values zero through one. Axis choices, dependency ordering, immutable references, metadata retention, singularity policy, disposal and exact evidence are documented in rigging-vrm-constraints.md. No new GPU shader or numerical tolerance is introduced. Evidence is RTX A6000 native and complete compatibility, not a speed claim or physical cross-vendor certification. Eight unrelated incoming-main ceilings and six obsolete umbrella baseline keys are restored after the preceding landing helper's merge mistake; the quality size gate checks the fresh build against them.
+### Cluster hierarchy and task-based readback (batch 222)
+The optional /clusters entry accepts core Geometry (positions/normals), with 4-256 triangles per leaf (default 124), 3-256 distinct vertices per rendered meshlet (default 64), parent ratio in (0,1) (default 0.5), and AbortSignal. The current builder is synchronous after its lazy simplifier import; cancellation is checked between regions and by simplification. A tree, rather than regrouped DAG, preserves all inter-region boundaries exactly; a heavily split-normal mesh or dense region boundary can limit simplification. The error is a conservative accumulated vertex displacement bound; the sphere projection is an error estimate, not a raster-space Hausdorff guarantee. Default error is 1 backbuffer pixel with a 20% dither band. Each selected meshlet uses a core mesh/draw, with normal engine frustum culling; no GPU selection, virtual streaming or Nanite throughput is claimed. The full WebGL2 compatibility layer is supported; the small preview must be promoted. Materials inherit the anchor's core material. PBR/UV geometry uses the existing model/auto LOD path. No source input is disposed by the renderer.
+Compatibility queue/readback polling now yields delayed scheduler tasks, with a fresh-timer message fallback; mapping polls its buffer readiness after pending submits, retaining a queue fence for invalid GPU-only shadows. No timeout or picking tolerance increased. No speed claim is made.
+Measured batch 222 entries (minified gzip, bare package imports external): lod/clusters 3,427 B (new, before 0); lod/fade 2,413 B; mesh-edit/modeling 34,616 B; webgl2-compat/device 106,384 B. Core + stage remains 24,209 B. The new cluster entry budget records the complete builder/selector/renderer together; splitting this small entry would add API and lifecycle complexity without removing a heavy static import.
+Readback entry size evidence (batch 222, same library build settings against the parent source): webgl2-compat/device 105937 -> 106384 B gzip; the lazy compute/readback portion 31753 -> 31757 B, crossing its recorded 31756 B ceiling by one byte. The ceiling is raised with this job: preserving local asynchronous readiness, queued-submit ordering and device-loss correctness is worth the bytes; splitting a four-byte lazy change would add an artificial boundary. The existing core + stage limit is unchanged.
+
+## GPU progressive lightmaps (batch 54)
+
+`@margoengine/lightmap/gpu` needs WebGPU compute (no WebGL2 path). One reflectance (`albedo`) per mesh and per
+occluder, diffuse only; no emissive surfaces, area lights, glass or textures in the path. Ambient lights add their
+irradiance at every path vertex, unoccluded in physical radiometry. The live `texture` is undilated (empty texels stay
+0); `read()` dilates. Lights are point, spot, directional and ambient only. Texel finding runs on the CPU first.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -8044,11 +8056,7 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   units after translation. The fixture counts WGSL sampled textures but does not
   include the layer's storage-buffer data textures. Ownership of a viable route
   or an explicit hardware-limit diagnostic still needs review; do not drop maps.
-- `lod/test:gpu`: after the initial browser scene completes, `imposter-check.mjs`
-  does not finish its picking operation before the continuation's 172 s body
-  deadline; the process tree was killed. Native evidence for the complete suite
-  was 113 s. No new timeout or speed claim is justified; isolate the await and
-  determine actual compatibility work before changing a limit.
+- Resolved `lod/test:gpu` imposter picking hang (batch 222): mapping waits the buffer's own readback readiness after queued submits instead of adding a device-wide fence. Delayed scheduler tasks leave the event loop idle for WebGL sync status. The unchanged 16384-pick grid and all atlas sweeps pass on both backends; task-polling.test.js retains nonforcing, queued-write and device-loss regressions. No limit or tolerance changed.
 - Resolved `materials/test:gpu:features`: the fixture assumed every adapter
   advertises optional `clip-distances`. The canonical leaf now selects native
   and full compatibility explicitly, preserving native rasterizer coverage and
@@ -11962,7 +11970,7 @@ error before any assertion ran. It now selects the repository root like the
 adjacent React browser suites. `packages/react/tests/browser-working-directory.test.js`
 reproduces the package invocation with a mocked browser entry and no GPU.
 
-Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-browser.mjs --compat fails frame40 particle bytes (397093820 vs 3932506386), with identical 110 live particles and picture 396217175; lane R batch 215 reproduced it on clean main. LOD also reaches its 600-second hard limit on clean origin/main b47fdef13, with that commit fully built before the run: `node scripts/gpu-lock.mjs run --owner=lane-P-animation-baseline --gpu=16384-pick-grid-readback --wait-max=60 --max=10 -- node packages/lod/test/imposter-check.mjs main-animation-baseline --compat` exits 124 in the unchanged 16384-pick grid (test-results/animation-clean-main-lod-compat.log). Compatibility mapAsync waits on device.idle(), then polls readback/query readiness through nested 1 ms timers; browser timer nesting/clamping compounds serial pick waits. This is a source-level candidate cause, not a GPU-proved repair. Neither dependent GPU issue is caused by the animation ownership change; both wait for the owning packages in the fix phase.
+Animation dependent findings (2026-11-10, rules 21/23): cutscene/tests/vfx-browser.mjs --compat fails frame40 particle bytes (397093820 vs 3932506386), with identical 110 live particles and picture 396217175; lane R batch 215 reproduced it on clean main. The dependent LOD imposter hang is resolved by batch 222: buffer mapping now waits its own nonforcing readback readiness after queued submits, retaining a device fence only for an invalid GPU-only shadow. Delayed scheduler tasks (fresh-timer message fallback) leave the event loop idle for WebGL sync state. The unchanged 16384-pick grid passes with 16362 agreements, every 262 imposter pixel and 1128 full-detail pixel picking correctly, and all original atlas sweep assertions pass (test-results/batch222-imposter-local.log). Cutscene remains with its owning package for the fix phase.
 
 GPU runner registration on clean origin/main b47fdef13: `node scripts/gpu-package-tests.mjs --plan --select=animation/test:gpu` rejects MCP assets-browser/live-browser, WebGL2 Firefox support and worker browser-matrix leaves as unregistered. This animation job changes none of their registrations; owning packages must register or classify those leaves in the fix phase.
 
@@ -12146,6 +12154,7 @@ The former crossfade-only live composition gap is closed for all four built-ins,
 
 Fixed for this landing: compatibility render pipelines accepted explicit layouts missing statically used resources, and async validation also emitted uncaptured errors. render.ts now checks the reflected resource interface and routes async failure only to rejection. device.test.js and compute-limits.test.js retain the regressions. The global WGSL corpus also lacked labels shaders already on main; a scoped real-GPU recording refresh now covers it for the owning package CPU gate. Recorded labels shader ownership is identified by exact equality to packages/labels/src/gpu-shader.ts.
 Batch 213 landing correction: the job 2 local rebase helper took maxima for unrelated size ceilings, restoring eight older limits and six stale umbrella keys. Job 3 restores the incoming main limits and removes those stale keys; the helper now applies only the job delta to incoming main, with a three-way check. No runtime, test or tolerance was changed for this correction.
+- Build gate concurrency finding (batch 222): running quality while React's subpath tests create and remove packages/react/tests/.subpaths-* can make quality's untracked-file snapshot read a deleted orbit-cube.js (ENOENT). Source: repoFiles includes temporary test outputs that disappear before cleanRoomGate reads them. Repro: run those CPU tests concurrently with quality; serialize the gates during the build phase. Owning quality scanner cleanup waits for the fix phase.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
