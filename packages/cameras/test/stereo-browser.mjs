@@ -23,7 +23,11 @@ const dubois = (l, r) => {
       [0.377, 0.761, 0.009],
       [-0.026, -0.093, 1.234],
     ];
-  return lm.map((row, i) => srgb(row.reduce((s, v, c) => s + v * a[c] + rm[i][c] * b[c], 0)));
+  // Dubois (2009): each eye's term is clipped to [0, 1] before the two are added.
+  const clip = (x) => Math.max(0, Math.min(1, x));
+  return lm.map((row, i) =>
+    srgb(clip(row.reduce((s, v, c) => s + v * a[c], 0)) + clip(rm[i].reduce((s, v, c) => s + v * b[c], 0))),
+  );
 };
 try {
   await browser.page.waitForFunction(() => window.ready, null, { timeout: 30000 });

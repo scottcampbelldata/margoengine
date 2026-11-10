@@ -6811,6 +6811,13 @@ after disposal. If setup and restoration both fail, its AggregateError retains
 both errors with code failed and a help link. Default LUT resolution remains 256.
 Regressions: packages/sciviz/tests/pick.test.js and transfer.test.js.
 
+## Figure legend visibility (2026-11-10)
+Legends retain their native hidden-state rendering and three-pixel row/title
+separation. The default Figure hides the legend below two named layers; adding a
+second named layer restores current labels. DOM and spec-browser regressions
+check hidden computed display, empty layout boxes, reappearance and row spacing.
+No layer, numeric or exported-image quality bound changed.
+
 ## Vector parser pre-abort ordering (2026-11-10)
 GeoJSON, GPX, KML, Shapefile and MVT reject a pre-aborted signal with the existing
 LoaderError code aborted before binary conversion, decoding or caller toJSON
@@ -14562,7 +14569,7 @@ API conventions lane (2026-11-10): unchanged materials dispersion compatibility 
 - Batch 174 multivariate brush history: after two axis brushes, SelectionStore.undo restores row highlights but the controller retains its last local range map; a later axis gesture can reapply an undone other-axis range. Cause: selection history snapshots row-key brushes, not controller predicate metadata. Repro: period brush, radius brush, undo, then change period. Rendered undo itself is correct; predicate/control restoration is owed in the fix phase.
 Batch 180 gate finding, existing glyph capture: node packages/sciviz/tests/glyph-browser.mjs once failed the unchanged >20 lit-pixel assertion for the thin line glyph on WebGL2 after shape replacement. Native had 151 pixels; subsequent unchanged assertions on both backends had exactly 151 and identical hashes. Cause is not isolated: the captured shape-transition frame lost expected thin-tube coverage; this is a value/capture nondeterminism, not a timing-only budget miss. No test threshold changed. Preserve the diagnostic and investigate readiness/resize/capture ordering in the glyph owner during the fix phase.
 Batch 180 job 2: no open correctness defect in the requested vector-geography contract. Future near-plane ribbons and runtime style mutation are documented quality follow-ups. The fallback and newly rebased engineering/pointcloud browser scripts gained the same repository-root bootstrap as other sciviz browser scripts; existing browser-root.test.js caught the missing registrations.
-Batch 183 gate finding, deferred by build-phase rule 21: npm test --workspace packages/navmesh fails its border/SIMD bundle probes because test/border.test.js:21 and test/wasm.test.js:97 pass packages/navmesh/src/pipeline.ts to bundleBytes relative to the package cwd. The same complete CPU suite runs from the repository root; fix the probes to anchor entries to the repository rather than process.cwd during the fix phase.
+Fixed upstream: batch 183 navmesh package-directory bundle probes. e295cc68a anchors both pipeline inputs with fileURLToPath(new URL('../src/pipeline.ts', import.meta.url)); 3296cce94 creates their repository-anchored output directory and 6ede7aa75 removes duplicate imports. Rechecked 2026-11-10: all 121 unchanged navmesh CPU tests pass from packages/navmesh, including border and SIMD probes. No navigation algorithm or assertion changed in this sweep.
 Batch 183 gate finding, deferred by build-phase rule 21: sciviz package-local npm test lacks --experimental-test-module-mocks although tests/pointcloud.test.js:28 calls mock.module. Run its complete CPU suite with that Node flag, as root test:all already does; repair the package test command in the owning lane/fix phase.
 Fixed batch 180 landing integration: the generated margoengine/sciviz/monitor alias was present in the working tree but omitted by tracked-only staging while its generated manifest mapping was committed. A clean checkout could not build that entry. The generated source is now committed. The new packages/margoengine/tests/export-order.test.js index-membership regression catches this class even when an unstaged generated source exists locally; it runs in the normal merge CPU suite. Existing tests/umbrella.test.js also checks complete generator output and every runtime alias.
 
@@ -14597,7 +14604,7 @@ Batch 178 job 4: no open correctness defect in the requested colour/legend contr
 
 Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with MARGO_COMPAT=1 and no --compat argument writes compatibility hardware/results under a webgpu suffix (now test-results/water-query-webgpu.json after the separate tracked-record correction). Cause: its output suffix reads argv instead of actual browser hardware.compat. Numerical assertions pass; output labeling is a build-phase tooling follow-up.
 
-- Batch 203 dependent-test finding: npm test --workspace @margoengine/navmesh fails border.test.js and wasm.test.js because their bundleBytes('packages/navmesh/src/pipeline.ts') paths resolve from the package working directory. The complete 121-test suite passes from the repository root, as local CI runs it. This package-command path repair is deferred under build-phase rule 21.
+Fixed upstream: batch 203 duplicate navmesh package-directory probe finding. The entry anchoring in e295cc68a, output-directory creation in 3296cce94 and import repair in 6ede7aa75 are on main. All 121 unchanged CPU tests pass from the package directory on 2026-11-10, including both affected probes.
 
 - Batch 203 AVIF validation tail: malformed prem item references with no auxiliary alpha, multiple targets or a target other than the actual alpha are ignored rather than rejected. Repro: add such a prem reference to a valid AVIF primary item. Cause: image.rs tests equality with the one alpha ID and treats a mismatch as straight alpha. Valid straight/premultiplied alpha decoding is implemented; strict invalid-reference rejection is a fix-phase item under rule 22.
 
@@ -14656,7 +14663,7 @@ Fixed 2026-11-10: Batch 181 gate observation. GPU planner registrations and comm
 
 Fixed 2026-11-10: Batch 180 job 5 incidental gate finding (base b4404cddb). GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
-- Batch 180 job 5 visual review: add two named heatmaps to a default Figure, then remove the first. Figure.#updateLegend sets element.hidden=true when only one remains, but Legend's inline display:grid overrides the browser's hidden rule, leaving both old legend rows visible. Repro: select several field reductions in examples/sciviz-temporal.html; evidence test-results/sciviz-temporal-webgpu.png. Numerical fields and exported pixels without overlays are correct. Small existing legend presentation gap deferred under rules 21/22; fix the owning legend visibility and add its DOM/browser regression in the fix phase.
+Fixed 2026-11-10: batch 180 job 5 stale legend visibility. The legend root now retains native block display, so its hidden attribute removes it from rendering when fewer named layers remain. Row margins and title spacing retain the existing three-pixel separation. Regression: packages/sciviz/tests/legend.test.js fails on the old inline grid override; spec-browser.mjs reproduces two named heatmaps, removal to one, reappearance with current labels and exact row spacing on both backends. Existing fixture layers and pixel assertions remain intact.
 
 Batch 181 job 4 fixed before landing: density scatter replacement must retain the source's original visibility across native updateData cloud replacement, including when the replacement is hidden and disposed before its next frame. Cause: capturing the new cloud's logical replacement visibility overwrote the original source visibility, and disposal could still address the old cloud. Regression: packages/sciviz/tests/density.test.js, hidden replacement before/after preparation. All source votes and analytical counts are unaffected.
 

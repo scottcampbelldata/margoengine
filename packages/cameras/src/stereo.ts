@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Clean room: off-axis stereo geometry, Dubois (2001/2009) colour projection, pixel interleaving.
+// Clean room: off-axis stereo geometry, Dubois (2001/2009) colour projection (each eye's term clipped to [0, 1]
+// before the sum, as Dubois 2009 says), pixel interleaving.
 import type { EngineKernel } from '@margoengine/core';
 import { Camera, engineRuntime, type RenderView, type Vec3 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
@@ -116,7 +117,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0),vec3f(1));return select(1.055*po
   let a=linear(l.rgb);let b=linear(r.rgb);
   let lc=vec3f(dot(a,vec3f(0.437,0.449,0.164)),dot(a,vec3f(-0.062,-0.062,-0.024)),dot(a,vec3f(-0.048,-0.050,-0.017)));
   let rc=vec3f(dot(b,vec3f(-0.011,-0.032,-0.007)),dot(b,vec3f(0.377,0.761,0.009)),dot(b,vec3f(-0.026,-0.093,1.234)));
-  return vec4f(srgb(lc+rc),max(l.a,r.a));
+  return vec4f(srgb(clamp(lc,vec3f(0),vec3f(1))+clamp(rc,vec3f(0),vec3f(1))),max(l.a,r.a));
  }
  return select(l,r,eye>0.5);
 }`;
