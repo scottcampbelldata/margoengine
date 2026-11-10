@@ -183,3 +183,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 249 job 1): generated ecs/objects alias.
 >>>>>>> d3eba2dfb (feat(ecs): add packed object and string component fields)
 >>>>>>> 7e7892c52 (feat(ecs): add packed object and string component fields)
+
+- @margoengine/stats: document /gl asynchronous frame/pass timing, early plugin registration, explicit scopes, disjoint/loss handling, limits, unavailable state, draw counts, reports, panel and disposal.
+- margoengine: document /stats/gl alias.

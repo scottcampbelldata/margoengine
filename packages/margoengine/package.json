@@ -3138,6 +3138,10 @@
       "types": "./dist/stats/geometry.d.ts",
       "import": "./dist/stats/geometry.js"
     },
+    "./stats/gl": {
+      "types": "./dist/stats/gl.d.ts",
+      "import": "./dist/stats/gl.js"
+    },
     "./taa": {
       "types": "./dist/taa.d.ts",
       "import": "./dist/taa.js"

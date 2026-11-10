@@ -3267,3 +3267,5 @@ Batch 257 job 3: worker canvas pointer-lock forwarding supports page/worker requ
 Batch 249 job 1: ecs/objects stores arbitrary JS values beside numeric fields and participates in existing queries, tracking and destruction. Proof: packages/ecs/test/objects.test.js. No performance or GPU claim.
 >>>>>>> d3eba2dfb (feat(ecs): add packed object and string component fields)
 >>>>>>> 7e7892c52 (feat(ecs): add packed object and string component fields)
+
+- Stats WebGL2 (batch 264): asynchronous GPU frame and named-pass elapsed times with native preview draw counters. Proof: packages/stats/test/gl.test.js and scripts/test-stats-parity.mjs. Disjoint/lost/overflow samples invalidate atomically; unsupported timing never substitutes a CPU duration. No benchmark or presentation-latency claim.

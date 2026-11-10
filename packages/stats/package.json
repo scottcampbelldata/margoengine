@@ -49,6 +49,10 @@
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"
+    },
+    "./gl": {
+      "types": "./dist/gl.d.ts",
+      "import": "./dist/gl.js"
     }
   },
   "files": [

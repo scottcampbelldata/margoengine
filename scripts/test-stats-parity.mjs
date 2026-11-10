@@ -10,6 +10,8 @@ try {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
     const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const { GeometryStats } = await import('/packages/stats/dist/geometry.js');
+    const { GLStats } = await import('/packages/stats/dist/gl.js');
+    const { engineRuntime } = await import('/packages/core/dist/extension.js');
     const check = (ok, message) => {
       if (!ok) throw new Error(message);
     };
@@ -27,6 +29,16 @@ try {
       });
       const geometry = GeometryStats.attach(engine),
         shape = box();
+      const glStats = backend === 'webgl2' ? GLStats.attach(engine) : undefined;
+      if (glStats)
+        engineRuntime(engine).frameGraph.add({
+          name: 'timer-probe',
+          order: 2,
+          execute: (context) => {
+            context.gl.clearColor(0.2, 0.3, 0.4, 1);
+            context.gl.clear(context.gl.COLOR_BUFFER_BIT);
+          },
+        });
       engine.createMesh().setGeometry(shape);
       engine.createMesh().setGeometry(shape);
       try {
@@ -41,7 +53,33 @@ try {
         engine.render();
         check(geometry.triangles === 24, backend + ': reset on next frame');
         results[backend] = report;
+        if (glStats) {
+          await new Promise(requestAnimationFrame);
+          check(glStats.supported, 'Hardware EXT_disjoint_timer_query_webgl2 is required for this proof');
+          for (let i = 0; i < 120 && !glStats.poll(); i++) await new Promise(requestAnimationFrame);
+          const timing = glStats.toJSON();
+          check(timing.sampleId > 0 && timing.frameMilliseconds >= 0, 'Completed asynchronous GL frame query');
+          check(timing.drawCalls === 1, 'Native preview draw count');
+          check(
+            timing.passes.some((pass) => pass.name === 'main'),
+            'Named main pass',
+          );
+          check(
+            timing.passes.some((pass) => pass.name === 'timer-probe'),
+            'Named custom pass',
+          );
+          check(
+            timing.passes.every((pass) => pass.milliseconds >= 0),
+            'Nonnegative native pass times',
+          );
+          check(
+            timing.passes.reduce((sum, pass) => sum + pass.milliseconds, 0) <= timing.frameMilliseconds + 1e-9,
+            'Passes lie inside segmented GPU frame',
+          );
+          results.glTiming = timing;
+        }
       } finally {
+        glStats?.dispose();
         geometry.dispose();
         engine.dispose();
         canvas.remove();
