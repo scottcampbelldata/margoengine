@@ -1168,3 +1168,5 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/blender: document origin-anchored live Ping-Pong, signed scale and zero-scale behavior with the /nodes entry.
 - @margoengine/blender: record the four package browser commands and their repository-root serving behavior during the README phase.
+- @margoengine/stage (batch 183 job 3): document viewer-extras controller, explicit margo-viewer registration, attributes/defaults, annotations, animation/variants/picking/poster, WebXR requirements and cancellation/ownership; examples deferred.
+- margoengine (batch 183 job 3): document the generated stage/viewer-extras alias; examples deferred.

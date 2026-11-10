@@ -7654,6 +7654,18 @@
       "commit": "batch178-job3",
       "reason": "Batch 178 job 3: media entry 0 -> 6994 B, lines/tiles 0 -> 409 B, lines/batch 6263 -> 6592 B, lines/pick 5989 -> 6465 B, headless/video 7031 -> 7297 B gzip. Real tiled publication, full-image line construction and provenance retain one lifetime and frame-layout contract; splitting would duplicate GPU state and file writers. Core + stage unchanged at 24209 B.",
       "grew": 5
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "813e39082",
+      "reason": "batch183-viewer-extras-new-optional-entry-0-to-9619B-complete-viewer-lifecycle-and-declarative-element-splitting-adds-coordination-root-24209B-unchanged",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7669633ec",
+      "reason": "batch183-landing-main-lines-debug-shared-tile-frame-9549-to-9874B-ceiling-9836-to-10171B-keeps-complete-batch-debug-path-no-split-root-24209B-unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -8120,7 +8132,7 @@
     "@margoengine/lightmap/refracted": 9015,
     "@margoengine/lines": 20524,
     "@margoengine/lines/batch": 6848,
-    "@margoengine/lines/debug": 9836,
+    "@margoengine/lines/debug": 10171,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
     "@margoengine/lines/pick": 6721,
@@ -9047,7 +9059,8 @@
     "@margoengine/stage/lights": 1957,
     "@margoengine/sciviz/spec": 25645,
     "@margoengine/lines/tiles": 665,
-    "@margoengine/sciviz/export-media": 7250
+    "@margoengine/sciviz/export-media": 7250,
+    "@margoengine/stage/viewer-extras": 9908
   },
-  "total": 14564085
+  "total": 14574328
 }

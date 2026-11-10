@@ -3947,6 +3947,10 @@
       "types": "./dist/stage/scene.d.ts",
       "import": "./dist/stage/scene.js"
     },
+    "./stage/viewer-extras": {
+      "types": "./dist/stage/viewer-extras.d.ts",
+      "import": "./dist/stage/viewer-extras.js"
+    },
     "./staging": {
       "types": "./dist/staging.d.ts",
       "import": "./dist/staging.js"

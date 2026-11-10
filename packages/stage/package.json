@@ -81,6 +81,10 @@
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
+    },
+    "./viewer-extras": {
+      "types": "./dist/viewer-extras.d.ts",
+      "import": "./dist/viewer-extras.js"
     }
   },
   "files": [
@@ -103,7 +107,9 @@
     "@margoengine/physics": "^1.0.0",
     "@margoengine/save": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
-    "@margoengine/clustered": "^1.0.0"
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/labels": "^1.0.0",
+    "@margoengine/selection": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animation": {
@@ -143,6 +149,12 @@
       "optional": true
     },
     "@margoengine/save": {
+      "optional": true
+    },
+    "@margoengine/labels": {
+      "optional": true
+    },
+    "@margoengine/selection": {
       "optional": true
     }
   }
