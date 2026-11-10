@@ -3406,6 +3406,10 @@
       "types": "./dist/sciviz/contour2d.d.ts",
       "import": "./dist/sciviz/contour2d.js"
     },
+    "./sciviz/link": {
+      "types": "./dist/sciviz/link.d.ts",
+      "import": "./dist/sciviz/link.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

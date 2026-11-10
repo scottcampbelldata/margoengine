@@ -984,3 +984,6 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 272 job 3): document staging/caustics forwarding; examples deferred.
 
 - margoengine: retain canonical package-group and entry order when maintaining generated aliases; this repair adds no API.
+- @margoengine/sciviz (batch 174 job 1): document SelectionStore, bindSelection, row/group keys, resolve/empty semantics, modifier operations, events, history, mask ownership, disposal and the real-data linked stars demo in the README phase.
+- margoengine (batch 174 job 1): document generated sciviz/link alias in the README phase.
+- @margoengine/vfx (batch 174 landing repair): no API change; retain documentation of the recurring GPU parity command during the README phase.

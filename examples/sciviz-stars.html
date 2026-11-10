@@ -14,11 +14,13 @@
     <label>Drag <select id="drag"><option value="orbit">Orbit</option><option value="box">Box selection</option><option value="lasso">Lasso selection</option></select></label>
     <label><input id="edl" type="checkbox" checked> Eye-dome lighting</label>
     <button id="reset" type="button">Show all sources</button>
+    <button id="undo" type="button">Undo selection</button>
     <button id="export" type="button">Save PNG</button>
   </div>
   <div class="catalogue">
     <div class="view"><canvas id="viewport" aria-label="One million 2MASS sources in sky position and colour space"></canvas></div>
     <div class="view"><canvas id="histogram" aria-label="J minus Ks magnitude histogram for the selected sources"></canvas></div>
+    <div class="view"><canvas id="heatmap" aria-label="Linked J minus Ks colour against Ks magnitude heatmap"></canvas></div>
   </div>
   <p id="status" role="status" data-webgpu-status>Loading 2MASS catalogue...</p>
   <footer><a href="https://irsa.ipac.caltech.edu/Missions/2mass.html">2MASS</a>, a joint project of the University of Massachusetts and IPAC/Caltech, funded by NASA and NSF. Public domain. Sample: one million rows with quality AAA, contamination flags 000 and catalogue key divisible by 100. This is a demonstration subset with a selection bias. Unresolved sources can include galaxies. <a href="./assets/sciviz/README.md">Query and data preparation</a>.</footer>

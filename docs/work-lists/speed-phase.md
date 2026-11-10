@@ -401,3 +401,4 @@ Batch 208: quiet-machine real-network throttle throughput, burst behavior and pr
 
 
 - Batch 173 job 4: quiet speed-phase timings owed for fixed versus block-skipped/adaptive volume sampling and explicit float32 isosurface refinement on constant, sparse and CC0 T1 fields. Compare identical fields/classifiers; include depth capture/snapshot, opacity-envelope rebuild and min/max preparation work. Correctness images are already exact in the defined fixtures; no build-phase wall-clock benchmark.
+Batch 174 job 1: shared selection mask uploads have deterministic one-write evidence at two million plotted marks; quiet-machine throughput and latency measurements remain owed before release. Run link-browser.mjs with the same pinned 2MASS observations and membership readback; no timing assertions run in the build phase.

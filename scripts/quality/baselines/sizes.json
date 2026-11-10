@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14122341,
+  "total": 14127127,
   "history": [
     {
       "date": "2026-10-24",
@@ -7459,6 +7459,12 @@
       "commit": "3c91db384",
       "reason": "Batch272-caustics-new5447B-ceiling5703B-public-GPU-BVH-and-integer-photon-ledger",
       "grew": 1
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "0d91c9875",
+      "reason": "Batch174-job1:new-optional-sciviz/link-from-0-to-4544B-min-gzip-ceiling-4800B",
+      "grew": 1
     }
   ],
   "items": {
@@ -7897,7 +7903,7 @@
     "@margoengine/kinematics-constraints/joint-limits": 1468,
     "@margoengine/kinematics-constraints/multi-goal": 3631,
     "@margoengine/kinematics-constraints/sdf": 7229,
-    "@margoengine/kinematics-constraints/swept": 9491,
+    "@margoengine/kinematics-constraints/swept": 9486,
     "@margoengine/labels": 5806,
     "@margoengine/labels/callouts": 1603,
     "@margoengine/labels/callouts-route": 2706,
@@ -8434,7 +8440,7 @@
     "@margoengine/text": 17109,
     "@margoengine/text/animate": 11783,
     "@margoengine/text/curve": 10802,
-    "@margoengine/text/extrude": 15342,
+    "@margoengine/text/extrude": 15341,
     "@margoengine/text/fit": 10636,
     "@margoengine/text/msdf": 4494,
     "@margoengine/text/rich": 11403,
@@ -8506,7 +8512,7 @@
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/clips": 23845,
     "@margoengine/usdz/compose": 19970,
-    "@margoengine/usdz/curves": 3531,
+    "@margoengine/usdz/curves": 3523,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7905,
@@ -8811,6 +8817,7 @@
     "@margoengine/decoders/ktx2-hdr6": 44540,
     "@margoengine/sciviz/contour2d": 4058,
     "@margoengine/environment/reflector-pbr": 3556,
-    "@margoengine/staging/caustics": 5703
+    "@margoengine/staging/caustics": 5703,
+    "@margoengine/sciviz/link": 4800
   }
 }
