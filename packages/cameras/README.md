@@ -60,12 +60,14 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
 - **Fixed size.** With an explicit `height` or all four bounds, `projection.fixedOrthographic` (also readable on the
   attached camera) is true: dolly changes only the distance, so `@margoengine/controls` zoom-to-cursor adds no pan.
 - **Depth** is reversed-Z on WebGPU (near 1, far 0) like core, and -1..1 on WebGL. Orthographic depth is linear.
-- **Vertical views**: core's `Camera.update` throws `Vertical camera` when the view is parallel to `camera.up`, which with the default +Y up means looking straight up or down. With the plugin,
-  such a view renders exactly vertical with screen up = `up` (default `[0, 0, -1]`, north up looking down; it needs a
-  horizontal component). While attached, `camera.up` reads as `up` for such views (horizontal part at most 1e-9 of the
-  distance) and as the world up (`[0, 1, 0]`) otherwise; assigning `camera.up` sets that world up. The position is
-  not moved, and passes that rebuild the view (shadows, SSAO, gltf-pro) read `camera.up` too. Orbit controls stay
-  1e-6 rad from the pole, so orbiting never snaps the roll.
+- **Vertical views**: pole detection follows the camera's current world-up vector,
+  including a custom world up, rather than assuming the world Y axis. At a pole,
+  screen up comes from projection.up (default [0,0,-1]); it must be finite and
+  nonparallel to the view axis. Away from the pole, camera.up returns world up.
+  Assigning camera.up changes world up while the projection is attached. The
+  camera position stays exact; passes that rebuild the view read the same camera.up.
+  With world up [0,0,1] and a view down Z, supply projection.up [0,1,0] instead of
+  the default. Invalid world/screen up throws RangeError when evaluated.
 - **Culling** is exact and stays on: core derives the culling planes from the matrix the `project` hook builds. No
   `culling: false` and no extra cost.
 - **Detecting it**: `camera.matrix` is orthographic when entries 3, 7 and 11 are zero.
@@ -382,6 +384,155 @@ wide.dispose();                                            // the effect, its st
 - **Errors**: `Invalid wide angle fov ...` and the `WideAngle` errors; MargoError `state` outside a PostStack, with no cube,
   or for `capture()` before attaching; `unsupported` on WebGL2, `attached` and `disposed`.
 
-Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; `/origin` and `/layers` are separate entries; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras
+
+## Spherical capture: optional /panorama
+
+capturePanorama(engine, options) returns one complete 360 by 180 degree
+equirectangular image. It requires WebGPU or the full WebGL2 compatibility layer;
+the native WebGL2 preview does not supply this WebGPU texture/readback API. Without
+a cube option it lazily imports the optional environment/cube-camera entry, creates
+a temporary CubeCamera at position (default engine.camera.position), captures all
+six faces and disposes it, including on failure. Install that optional peer when
+using this route. The main camera, canvas dimensions and scene state are preserved.
+
+size is the temporary cube's power-of-two face edge (8..2048, default 256). width
+defaults to 4*size, must be an even integer >=2, and height is width/2. The device's
+maxTextureDimension2D and maxBufferSize also apply, including 256-byte row padding
+in the readback buffer. Large captures allocate six cube faces, an output texture
+and a readback buffer; choose a size appropriate to the device.
+
+With cube, pass a caller-owned linear-light GPUTextureView and optional update(faces).
+The view must be a compatible cube on the engine device. An update method is called
+with 6 and must return 6; omit it for an already baked cube. The caller keeps cube
+ownership. The image runs top-to-bottom, +Y at the top and -Z at the center. yaw
+defaults 0 radians; positive yaw turns the center toward +X. panoramaDirection(u,v,yaw)
+exposes the same mapping, with wrapping u and v in [0,1].
+
+format defaults srgb: Uint8ClampedArray RGBA8 display pixels, with exposure (default
+0 stops) applied before the sRGB transfer and clipping. linear returns Float32Array
+RGBA32F in linear light, without exposure or display clipping. It does not restore
+HDR range absent from the supplied cube. panoramaPNG(image, signal?) encodes an srgb
+image as a PNG Blob and rejects linear data. Both operations accept AbortSignal;
+abort rejects with its reason, ends the wait and releases owned temporary resources.
+Borrowed cubes remain live. An abort cannot undo GPU work already submitted.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {capturePanorama, panoramaPNG, panoramaDirection} from '@margoengine/cameras/panorama';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial()).setPosition([0, 0, -3]);
+const controller = new AbortController();
+const image = await capturePanorama(engine, {size: 64, width: 256, signal: controller.signal});
+if (image.width !== 256 || image.height !== 128) throw new Error('Unexpected panorama dimensions');
+const png = await panoramaPNG(image, controller.signal);
+console.log(png.size, panoramaDirection(0.5, 0.5)); // Center looks along -Z.
+const reason = new Error('Capture cancelled by the application');
+const cancelled = await capturePanorama(engine, {signal: AbortSignal.abort(reason)})
+  .then(() => false, error => error === reason);
+if (!cancelled) throw new Error('Capture did not preserve the abort reason');
+engine.dispose(); canvas.remove();
+```
+
+A reusable cube keeps its ownership across both display and linear captures:
+
+```ts
+import {Engine} from '@margoengine/core';
+import {CubeCamera} from '@margoengine/environment/cube-camera';
+import {capturePanorama} from '@margoengine/cameras/panorama';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const cube = CubeCamera.attach(engine, {size: 64});
+const linear = await capturePanorama(engine, {cube, width: 256, format: 'linear', yaw: Math.PI / 2});
+console.log(linear.data instanceof Float32Array, linear.data.length);
+cube.dispose(); engine.dispose(); canvas.remove();
+```
+
+## Non-XR stereo: optional /stereo
+
+StereoRig derives two parallel off-axis cameras from a source Camera without
+changing its pose or projection. eyeSeparation defaults to 0.064 world units
+(normally metres) and must be finite/nonnegative. focusDistance defaults to the
+camera-to-target distance and must be positive, with Infinity allowed. It is the
+zero-parallax distance, not camera convergence by toe-in. With an orthographic
+source the projection has no binocular depth disparity. Call rig.update(source,
+aspect) after source changes; aspect may be a function read after canvas resize.
+rig.left and rig.right are reusable camera objects, not separately owned devices.
+
+StereoOutput owns the rig, two RGBA8 eye textures, uniforms and packing pipeline.
+Construct it with an engine and call render(deltaSeconds) from the application's
+frame loop. Do not also call engine.start or engine.render for that same frame.
+Scene/plugin animation advances once for the eye pair; scene rendering runs twice.
+The default camera/scene are engine.camera/engine.scene; layers defaults to the
+source camera's layer mask. Explicit camera, scene and layers override those choices.
+
+mode defaults side-by-side; top-bottom, anaglyph and parallax-barrier are also
+available. The packed modes give each eye half the corresponding canvas dimension
+(rounded up); other modes use full-size eye images. Anaglyph uses the documented
+Dubois red/cyan matrix in linear light with per-eye clipping; glasses and display
+color affect its perceived result. parallax-barrier interleaves physical drawing-
+buffer columns by default, or rows with barrierAxis. barrierPhase 0 (default) or 1
+sets left-eye stripe parity. swapEyes defaults false. These are non-XR display
+layouts; the application supplies any display alignment or viewing hardware.
+
+Options are mutable and validated on render. Eye targets rebuild after canvas size,
+packing size, device or output format changes. StereoOutput requires WebGPU or the
+full compatibility layer, and does not attach a clock/plugin or dispose the engine.
+dispose() releases its eye textures/uniforms and is idempotent; subsequent render
+throws a coded disposed error. Do not reuse a disposed output.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {StereoOutput, StereoRig} from '@margoengine/cameras/stereo';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 640; canvas.height = 320;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+const rig = new StereoRig({eyeSeparation: 0.064, focusDistance: 4});
+rig.update(engine.camera, canvas.width / canvas.height / 2);
+console.log(rig.left.position, rig.right.position);
+const output = new StereoOutput(engine, {mode: 'side-by-side', eyeSeparation: 0.064, focusDistance: 4});
+// The application owns this frame loop. Delta is seconds, measured by that loop.
+const frame = (delta: number) => output.render(delta);
+for (const mode of ['side-by-side', 'top-bottom', 'anaglyph', 'parallax-barrier'] as const) {
+  output.options.mode = mode;
+  frame(1 / 60);
+}
+output.options.mode = 'parallax-barrier';
+output.options.barrierAxis = 'rows';
+output.options.barrierPhase = 1;
+output.options.swapEyes = true;
+frame(1 / 60);
+output.dispose(); engine.dispose(); canvas.remove();
+```
+
+## Attachment ownership and validation
+
+CameraProjection.attach(engine) registers the projection with the engine, while
+new CameraProjection(options).attach(camera) only owns that camera's projection/up
+hooks. The latter needs caller updates for fitting. dispose restores the camera's
+plain world-up field and removes its owned project/fixedOrthographic hooks. It does
+not destroy a camera or engine. Disposing the owning engine removes its registered
+plugins. FloatingOrigin.dispose clears root tracking and listeners without undoing rebased
+coordinates. onRebase returns an unsubscribe function for shorter subscriptions.
+WideAngle/WideAngleCube keep their owning scene registration and borrowed cube
+ownership as shown at the start of this README. Use Symbol.dispose/using for
+lifetimes scoped to a block where the target runtime supports explicit disposal.
+
+Run from the repository root after npm run build:packages:
+
+- npm run test:gpu --workspace @margoengine/cameras checks projection, picking,
+  view-offset and wide-angle rendering on a real adapter.
+- npm run test:browser:panorama --workspace @margoengine/cameras checks spherical
+  orientation, PNG pixels, float output, borrowed cubes, limits, abort and cleanup.
+- npm run test:browser:stereo --workspace @margoengine/cameras checks geometry,
+  packing/stripe parity, layers, resize, disposal and device restoration.
+  Repeat these three commands with -- --compat for the full WebGL2 compatibility
+  layer; they use the same scenes and assertions.
+
+These correctness fixtures make no speed or cross-device quality claim. Works with
+the [J6 public CAD-format viewer](../../docs/integration-engineering.md), including
+its orthographic camera and navigation-profile attachment/restoration checks.

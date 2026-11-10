@@ -52,7 +52,7 @@
 - @margoengine/oit (batch 190 job 1): document /peel PeelOIT, ten-layer default, adjustable layers/order, full WebGL2 support, resource costs and single-sample/coplanar/model-only limits; examples deferred.
 - margoengine (batch 190 job 1): document the oit/peel forwarding entry; examples deferred.
 
-Scott (2026-11-09): README examples and `check:readme-run` wait until the features are built. Each job that changes a package adds one line here. The README phase before release clears this list; it must be empty at release.
+Scott (2026-11-10): README phase is ON. Package changes include runnable README examples and `npm run check:readme-run -- --packages=<changed packages>` before the push. Unmarked rows remain owed; DONE rows record completed work. Clear all remaining debt before release.
 
 | Package | What its README must cover | Added by |
 |---|---|---|
@@ -757,7 +757,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - margoengine (batch 244 job 2): generated culling/depth and scatter/occlusion facades restored to generator output; existing exports retained, no new example work.
 
-| @margoengine/cameras | panorama: capturePanorama, borrowed cubes, RGBA8/linear output, panoramaPNG, orientation, limits and AbortSignal | batch-196 job 1 |
+| @margoengine/cameras | panorama: capturePanorama, borrowed cubes, RGBA8/linear output, panoramaPNG, orientation, limits and AbortSignal | batch-196 job 1 DONE (cameras-readme-phase) |
 | margoengine | cameras/panorama alias | batch-196 job 1 |
 
 - @margoengine/scatter (batch 231 job 4): document AttributedScatter, initial batch arrays, set/getColorAt, set/getAttributeAt, attributeIndex, custom WGSL appearance contract and restoration/memory limits.
@@ -781,7 +781,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 | @margoengine/lightmap | apply: applyLightmap on a materials mesh, a glTF-pro model, a core mesh (uv1) and a live GPULightmapBaker; lightmapTexture; dispose | batch-54 job 3 |
 
-| @margoengine/cameras | stereo: StereoRig, StereoOutput.render in an app loop, four modes, geometry, layers, swap, stripe parity, disposal and resize behaviour | batch-196 job 2 |
+| @margoengine/cameras | stereo: StereoRig, StereoOutput.render in an app loop, four modes, geometry, layers, swap, stripe parity, disposal and resize behaviour | batch-196 job 2 DONE (cameras-readme-phase) |
 | margoengine | cameras/stereo alias | batch-196 job 2 |
 
 - @margoengine/text (batch 248 job 4): document /curve CurvedText, signed radius, subdivisions, unwrapped caret coordinates, PathText frames/offset/closure, update and lifecycle.
@@ -841,7 +841,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/viewcube (batch 198 job 1): document /up UpViewCube, up/front defaults, widget tuple directions, world home poses, frame conversion, pole and control conventions.
 - margoengine (batch 198 job 1): document viewcube/up forwarding.
-- @margoengine/cameras (batch 198 job 1): document that pole detection follows camera world up and that projection.up must be nonparallel to the view axis.
+- @margoengine/cameras (batch 198 job 1): document that pole detection follows camera world up and that projection.up must be nonparallel to the view axis. DONE (cameras-readme-phase).
 - @margoengine/gltf-pro (batch 201 job 1): document automatic async spec/gloss loading, explicit synchronous specGlossMaterials, the linear CPU conversion helper, independent texture UVs/transforms and the metal/rough approximation limits; add runnable examples in the README phase.
 - margoengine (batch 201 job 1): include the generated gltf-pro/spec-gloss alias in import guidance during the README phase.
 
@@ -975,7 +975,8 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 - margoengine (batch 189): document generated sky/compat-clouds alias and the incoming post/pixelate alias; README examples deferred.
 - @margoengine/compute/decomp: document solve, inv, det, cholesky, reduced/full qr/svd, eigh/eigvalsh, batches/broadcast RHS, async signal, owned f32 factors, lazy SIMD Wasm limits and GPU readback route; add runnable examples after the build phase.
 - margoengine/compute/decomp: document the generated optional decomposition alias after the build phase.
-- @margoengine/cameras and @margoengine/weather: document the panorama/parity browser-suite commands after the build phase (batch 274 landing registration repair).
+- @margoengine/cameras: document the panorama browser-suite command and WebGL2 compatibility reproduction. DONE (cameras-readme-phase).
+- @margoengine/weather: document the parity browser-suite command after the build phase (batch 274 landing registration repair).
 - @margoengine/splats and @margoengine/voxel-edit: document lod-sog and font-mask browser suite commands after the build phase (batch 274 registration repair).
 - @margoengine/water: retain the GPU command with its build first when documenting test commands after the build phase.
 - @margoengine/vfx: document the existing parity GPU suite command after the build phase (batch 274 registration repair).
@@ -1145,7 +1146,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/animation: document the API conventions lifecycle repair, attachment ownership and disposal.
 
-- @margoengine/cameras: document the API conventions lifecycle repair, attachment ownership and disposal.
+- @margoengine/cameras: document the API conventions lifecycle repair, attachment ownership and disposal. DONE (cameras-readme-phase).
 
 - @margoengine/cutscene: document the API conventions lifecycle repair, attachment ownership and disposal.
 
@@ -1481,7 +1482,7 @@ Scott (2026-11-09): README examples and `check:readme-run` wait until the featur
 
 - @margoengine/selection: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
 
-- @margoengine/cameras: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase.
+- @margoengine/cameras: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase. DONE (cameras-readme-phase).
 
 - @margoengine/controls: add J6 public CAD-format viewer Works with line for the integration group in docs/integration-engineering.md after the build phase. DONE (controls-readme-phase).
 
