@@ -273,7 +273,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 | @margoengine/environment | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/exporters | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/geometry | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
-| @margoengine/labels | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
+| @margoengine/labels | Core version guard build declarations, attachment rejection and linked version errors. | version-guard DONE (labels-readme-phase) |
 | @margoengine/lines | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/loaders | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
 | @margoengine/physics | Core version guard build declarations, attachment rejection and linked version errors. | version-guard |
@@ -583,7 +583,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/road (batch 233 job 4): structures automatic/authored spans, bridge supports, tunnel profiles/open portals, terrain entrance integration, crossing clearance, bounds and runnable example after build phase.
 - margoengine (batch 233 job 4): road/structures forwarding entry after build phase.
 
-- @margoengine/labels (batch 261 job 1): document optional GPU layer creation, collections, CSS sizing, grid priorities, atlas limits, cancellation and disposal; README examples deferred.
+- @margoengine/labels (batch 261 job 1): document optional GPU layer creation, collections, CSS sizing, grid priorities, atlas limits, cancellation and disposal; README examples deferred. DONE (labels-readme-phase).
 - margoengine (batch 261 job 1): document labels/gpu alias; README examples deferred.
 
 
@@ -604,7 +604,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 | @margoengine/tilemap | plane: PlaneTileMap transforms, world units, active core/view camera, depth writes/testing, cutouts, transparent order, finite-map repeat, runtime edits and disposal | batch-246 job 3 |
 | margoengine | Generated tilemap/plane alias | batch-246 job 3 |
 
-- @margoengine/labels (batch 261 job 2): document DistanceLabels per-label policies, clamped opacity/scale, inclusive ranges, composition, original-opacity restoration and evaluateLabelDistance for GPU consumers.
+- @margoengine/labels (batch 261 job 2): document DistanceLabels per-label policies, clamped opacity/scale, inclusive ranges, composition, original-opacity restoration and evaluateLabelDistance for GPU consumers. DONE (labels-readme-phase).
 - margoengine (batch 261 job 2): document labels/distance alias.
 
 - @margoengine/splats: document /progressive readSplatsProgressive and loadProgressiveSplats, early frames with engine.start(), count and batchSize, cancellation, SPZ base preview/final SH, retained bytes and available-record coarse ordering.
@@ -634,7 +634,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - margoengine (batch 211 job 3): regenerated alias ordering after rebase; no example work during build phase.
 
-- @margoengine/labels (batch 261 job 3): document ClusterLabels radius components, minCount, camera/logical zoom, bubble styling and member handles, nested layouts and disposal.
+- @margoengine/labels (batch 261 job 3): document ClusterLabels radius components, minCount, camera/logical zoom, bubble styling and member handles, nested layouts and disposal. DONE (labels-readme-phase).
 - margoengine (batch 261 job 3): document labels/cluster alias.
 
 | @margoengine/clustered | shapes: ShapeLights (sphere, disc, tube), setLights validation, MAX_SHAPE_LIGHTS, radianceFromPower and shapeLightArea, Clustered.shapes hook, no shadows | batch-52 job 3 |
@@ -677,7 +677,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/blender (batch 207 job 4): document nodes export toggle, parse/loadMargoNodes, controller parameters/get/set/reset/seek, disposal, node coverage, bounds, cancellation and accepted noise/subframe differences.
 - margoengine (batch 207 job 4): document blender/nodes alias.
 
-- @margoengine/labels (batch 261 job 4): document RoutedCallouts, angled elbow/port reordering, side and overflow settings, pure routeCalloutLeaders preconditions, exact predicates, complexity and disposal.
+- @margoengine/labels (batch 261 job 4): document RoutedCallouts, angled elbow/port reordering, side and overflow settings, pure routeCalloutLeaders preconditions, exact predicates, complexity and disposal. DONE (labels-readme-phase).
 - margoengine (batch 261 job 4): document labels/callouts-route alias.
 
 - @margoengine/lines (batch 227 job 3): document /debug immediate lifetime, depth/width/colour grouping, limits, persistent ArcLine, planar tilt and spherical arc defaults and degeneracies; examples deferred.
@@ -1149,7 +1149,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/cutscene: document the API conventions lifecycle repair, attachment ownership and disposal.
 
-- @margoengine/labels: document the API conventions lifecycle repair, attachment ownership and disposal.
+- @margoengine/labels: document the API conventions lifecycle repair, attachment ownership and disposal. DONE (labels-readme-phase).
 
 - @margoengine/lightmap: document the API conventions lifecycle repair, attachment ownership and disposal.
 
@@ -1461,7 +1461,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/lines: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
 
-- @margoengine/labels: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
+- @margoengine/labels: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase. DONE (labels-readme-phase).
 
 - @margoengine/compute: add J6 scientific dashboard Works with line for the integration group in docs/integration-sciviz.md after the build phase.
 

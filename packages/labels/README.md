@@ -9,7 +9,6 @@ Build from source with `npm run build` in `packages/labels`.
 ```ts
 import {LabelRenderer} from 'margoengine/labels';
 import {Engine} from 'margoengine/core';
-import {createMesh} from 'margoengine/materials';
 import {box} from 'margoengine/core';
 const makeButton = () => Object.assign(document.createElement('button'), {textContent: 'Open'});
 const isBlocked = (from: readonly number[], to: readonly number[]) => to[1] < from[1] - 10; // your own ray test
@@ -28,13 +27,17 @@ const label = labels.add(name, {mesh: pump, offset: [0, 0.8, 0], anchor: [0.5, 1
 const button = labels.add(makeButton(), {position: [2, 1, 0], pointerEvents: 'auto'});
 
 // A CSS 3D panel that rotates and scales with its mesh: 1 CSS pixel = 0.01 world units.
-const panel = labels.add3D(document.querySelector<HTMLElement>('#manual')!, {mesh: screen, pixelScale: 0.005});
+const manual = Object.assign(document.createElement('div'), {textContent: 'Pump manual'});
+const panel = labels.add3D(manual, {mesh: screen, pixelScale: 0.005});
 
 // Custom occlusion, for example a BVH raycast from the camera.
 labels.occlude = (label, info) => isBlocked(engine.camera.position, info.world); // your own test
 
+engine.render();
 label.remove();
-engine.removePlugin(labels.name); // or engine.dispose(): removes every element and the overlay
+labels.dispose(); // Direct disposal detaches the renderer.
+engine.dispose();
+// engine.removePlugin(labels.name) also disposes the renderer.
 ```
 
 `attach` uses plugin name `margoengine-labels` by default. If a subsystem such as
@@ -171,6 +174,205 @@ for (const [name, position, screenOffset] of notes) {
 | `minLength` (shorter lines are not drawn, CSS px) | 2 |
 | `className` (of the SVG) | none |
 
+## GPU label collections: /gpu
+
+`GPULabelLayer` draws SDF text in the canvas, with no DOM element per label.
+Importing the labels root does not load it; `create`/`attach` loads text support
+lazily. `await GPULabelLayer.attach(engine, options)` creates and registers the
+layer, or call `create(options)` and then `engine.use(layer)` yourself.
+Creation checks `signal` before and after loading the font; passing a font
+keeps font ownership with the caller.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {GPULabelLayer} from '@margoengine/labels/gpu';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, {camera: {position: [0, 0, 4]}});
+const controller = new AbortController();
+const layer = await GPULabelLayer.attach(engine, {signal: controller.signal});
+layer.setLabels([
+  {text: 'Pump 3', position: [0, 0, 0], fontSize: 18, color: [1, 0.7, 0, 1], priority: 2},
+  {text: 'Outlet', position: [1, 0, 0], offset: [0, -12]},
+]);
+engine.start();
+// On teardown: layer.dispose(); engine.dispose(); canvas.remove();
+```
+
+Label positions are world units; fontSize (16) and offset ([0, 0]) are CSS
+pixels independent of camera distance and device pixel ratio. Color defaults
+to white straight RGBA, visible to true, priority to 0. `setLabels` replaces
+the borrowed collection; fields may be edited between frames. Higher priority
+wins text-bound decluttering, with input order breaking ties. This is
+screen annotation, without per-pixel occlusion by scene geometry.
+
+| Layer option | Default | Meaning |
+| --- | --- | --- |
+| name / order | gpu-labels / 24 | Plugin name and frame-pass order |
+| font | new Font() | Lazily loaded text font |
+| declutter | true | Hide overlapping labels |
+| cell / padding | 64 / 2 | Grid cell and label spacing, CSS pixels |
+| atlasSize / maxPages | 1024 / 32 | Atlas side in texels and page cap, subject to GPU limits |
+| signal | none | Cancel asynchronous creation |
+
+`stats` reports labels, glyphs, hidden, comparisons and drawCalls for the
+latest preparation/render. Glyphs across atlas pages share one instanced draw
+per rendered view. `prepare(matrix, cssWidth, cssHeight, backend?)` returns
+reused packed storage for headless layout inspection (backend defaults to
+webgpu); copy it before another call. Atlas overflow and unsupported device
+limits reject rather than silently dropping glyphs. Resources allocate lazily
+on drawing, rebuild after device restoration, and are freed by `dispose()` or
+`using`; the layer's label collection and CPU font data can be reused on
+reattachment. Disposal detaches from the owning scene, including secondary
+scenes. Native WebGPU, full compatibility and the WebGL2 preview have draw
+paths; GPU glyphs do not become accessible HTML or interactive buttons.
+
+## Distance policies: /distance
+
+`DistanceLabels` runs before an optional nested layout, so decluttering and
+callout boxes see the final scale. It leaves `label.visible` alone. Defaults
+show distances from 0 through Infinity (inclusive), opacity 1 and scale 1.
+Each opacity/scale curve is `{near, nearValue, far, farValue}`: finite distances
+must satisfy `0 <= near < far`; linear interpolation clamps to its endpoint
+values outside that range. Opacity values are 0..1 and scale is nonnegative.
+A zero opacity or scale hides the label even at an inclusive show boundary.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {LabelRenderer} from '@margoengine/labels';
+import {DistanceLabels, evaluateLabelDistance} from '@margoengine/labels/distance';
+import {Declutter} from '@margoengine/labels/declutter';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, {camera: {position: [0, 0, 4]}});
+const distance = new DistanceLabels({layout: new Declutter()});
+const labels = LabelRenderer.attach(engine, {layout: distance});
+const element = Object.assign(document.createElement('span'), {textContent: 'Valve'});
+element.style.opacity = '0.8';
+const label = labels.add(element, {position: [0, 0, 0]});
+const policy = {
+  near: 0, far: 20,
+  opacity: {near: 5, nearValue: 1, far: 20, farValue: 0},
+  scale: {near: 5, nearValue: 1, far: 20, farValue: 0.5},
+};
+distance.set(label, policy);
+console.log(evaluateLabelDistance(10, policy)); // Same policy for a GPU consumer.
+engine.start();
+// On teardown: labels.dispose(); distance.dispose(); engine.dispose(); canvas.remove();
+```
+
+`defaults` supplies the policy for labels without a `set(label, policy)`
+override. Policies are validated and copied. Opacity multiplies the original
+inline opacity and scale multiplies the renderer's distanceScale; projected
+orthographic zoom behavior remains the renderer's. `delete(label)` restores
+its opacity and drops the override. `clear`/`dispose` restores all managed
+opacities and clears policies, without disposing the nested layout. Detach a
+layout before clearing it if rendering continues. `evaluateLabelDistance`
+returns `{opacity, scale, visible}` without DOM access and requires a finite,
+nonnegative distance.
+
+## Screen-space clusters: /cluster
+
+`ClusterLabels` forms connected components of projected anchors within
+`radius` CSS pixels (default 40). A chain may span more than radius end to end.
+Groups with at least `minCount` (2) show a count bubble at the centroid; their
+original label handles remain in `clusters[i].members`, in input order. Camera
+motion and projection zoom recompute the groups each update.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {LabelRenderer} from '@margoengine/labels';
+import {ClusterLabels} from '@margoengine/labels/cluster';
+import {Declutter} from '@margoengine/labels/declutter';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, {camera: {position: [0, 0, 4]}});
+const clusters = new ClusterLabels({radius: 40, maxZoom: 8, layout: new Declutter()});
+const labels = LabelRenderer.attach(engine, {layout: clusters});
+for (let i = 0; i < 8; i++) {
+  const element = Object.assign(document.createElement('span'), {textContent: `Sensor ${i}`});
+  labels.add(element, {position: [i * 0.02, 0, 0]});
+}
+engine.render();
+for (const group of clusters.clusters) {
+  group.element.style.background = '#384050';
+  group.element.onclick = () => console.log(group.members, group.count);
+}
+clusters.setZoom(9); // Logical application zoom; above maxZoom, show individual labels.
+engine.start();
+// On teardown: labels.dispose(); clusters.dispose(); engine.dispose(); canvas.remove();
+```
+
+Logical `zoom` defaults to 0 and `maxZoom` to Infinity; they do not move the
+camera. `setZoom` controls only this threshold. `className` defaults to
+margo-label-cluster; bubbles have pointer-events auto and can be styled via
+`clusters[i].element`. The nested layout sees only unclustered labels, not
+bubbles. Each cluster also exposes x/y and zoom; `comparisons` counts exact
+distance tests in the last update. Radius must be finite and >= 1, minCount
+an integer >= 2. `clear`/`dispose` removes bubbles, leaving original labels and
+the nested layout owned by their callers; a still-attached layout recreates
+bubbles on its next update.
+
+## Routed external callouts: /callouts-route
+
+`RoutedCallouts` places labels in a side column and may reorder their ports to
+keep the angled-elbow leaders from crossing each other. This is distinct from
+Callouts' direct straight leaders. Boxes must have nonzero finite measured
+sizes; call `remeasure()` after changing text/styles. It does not solve
+arbitrary obstacle avoidance through other scene objects.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {LabelRenderer} from '@margoengine/labels';
+import {RoutedCallouts, routeCalloutLeaders} from '@margoengine/labels/callouts-route';
+
+const canvas = document.createElement('canvas');
+canvas.style.cssText = 'width:640px;height:360px'; document.body.append(canvas);
+const engine = await Engine.create(canvas, {camera: {position: [0, 0, 4]}});
+const routes = new RoutedCallouts({side: 'right', gap: 16, color: '#ffd166'});
+const labels = LabelRenderer.attach(engine, {layout: routes});
+for (let i = 0; i < 3; i++) {
+  const element = Object.assign(document.createElement('span'), {textContent: `Port ${i}`});
+  element.style.cssText = 'display:block;width:72px;height:22px';
+  labels.add(element, {position: [0, i * 0.3, 0]});
+}
+console.log(routeCalloutLeaders([[10, 10], [20, 40]], [[100, 15], [100, 50]], 80));
+engine.start();
+// On teardown: labels.dispose(); routes.dispose(); engine.dispose(); canvas.remove();
+```
+
+Defaults: side auto (more room), gap 16, padding 4, margin 8 CSS pixels,
+color currentColor, stroke width 1, overflow true. Auto chooses one side for
+the entire group. Overflow permits a column outside the view and temporarily
+sets the overlay's overflow to visible; false throws if it cannot fit.
+`routes` reports source index, assigned port index and three CSS-coordinate
+points. `writes` counts changed SVG point attributes. `clear`/`dispose` removes
+the SVG and restores the original overlay overflow.
+
+The pure `routeCalloutLeaders(sources, ports, bendX)` requires equal counts of
+finite 2D points, ports in one x column at distinct y values, and bendX strictly
+between every source and that column. Empty inputs return []. Invalid inputs
+throw RangeError. It returns routes in source order, allowing coincident
+sources to share an origin without sharing leader segments. Near-collinear
+orientation uses exact binary64 integer predicates. Recursive angular
+partitions have worst-case O(n squared log n) sorting work; budget dense
+annotation sets accordingly. No wall-clock performance claim is implied.
+
+## Ownership and core compatibility
+
+`LabelRenderer.dispose()` detaches itself and removes its overlay and owned
+label/CSS3D elements. Removing it from the engine has the same effect. It does
+not dispose a caller-supplied layout: detach the renderer, then dispose or
+clear DistanceLabels, ClusterLabels or RoutedCallouts yourself. `using` is
+available for these helpers. Each renderer/layer needs its own plugin name;
+reuse an existing renderer when sharing one overlay.
+
+Built packages declare the core requirements checked at attachment. A
+mismatched core rejects with linked MargoError code version; use matching
+packages built from this repository. Merely importing an entry neither creates
+an overlay nor loads GPU label fonts.
+
+
 ## Depth with CSS 3D objects
 
 CSS 3D objects are HTML in the overlay, so they sit above the canvas, and CSS perspective draws whatever is behind the camera inverted. The renderer measures each element once (`offsetWidth`, `offsetHeight`), works out how far each of its four corners is in front of the camera's near plane, and then shows it whole, cuts it at the plane with `clip-path: polygon(...)` in the element's own pixels, or hides it when no part is in front. A panel you walk through stays drawn up to the plane instead of vanishing. Scene geometry in front of an object is your `occlude` hook's call, as for labels.
@@ -239,15 +441,21 @@ panel.remeasure(); // its size changed: measure it again at the next update
 - CSS 3D objects are not depth-tested per pixel against WebGL/WebGPU geometry and sit above the canvas; the `occlude` hook hides a whole object. They are cut at the near plane by their rectangle, so content painted outside the element box (shadows, overflow) is cut with it.
 - Overlay alignment follows CSS scales on the canvas's ancestors, not rotations, skews or a transform on the canvas itself.
 - Occlusion against scene geometry is left to the `occlude` hook.
-- Leader lines are straight and drawn under every label; nothing keeps them from crossing labels or each other.
+- Callouts draws straight leaders under labels; those leaders can cross. RoutedCallouts offers reordered side-column leaders instead.
 - Decluttering tests the element's box, not its painted shape, and measures it once; a box that changes size needs `remeasure()`.
 
 ## Tests
 
-`npm test` in `packages/labels` runs Node checks: `projectPoint` against hand-computed values on both clip spaces (near, far, behind, outside), `lookAtView` against the core camera matrix, a CSS transform-chain evaluator showing CSS 3D element corners land on the projected world corners, and the renderer on a fake DOM (overlay placement, mesh following, local and world offsets, anchors, frustum and visibility hiding, z-order, zero writes on a static frame, distance scaling, occlusion hooks, WebGL2, CSS 3D transforms, dispose), decluttering (priority wins, positions tried in order, padding, `inside`, sticky ties, distance-scaled boxes, sizes measured once, still frames write nothing, and 400 random labels placed exactly as a test of every pair places them), CSS 3D depth (panels through the near plane with the origin on either side shown and cut, every polygon point on or in front of the plane, 60 random poses checked on a 21 x 21 grid of element points against the plane, an orthographic cut at depth 0, `clip-path` written only while cut, the CSS 3D `occlude` hook), scaled ancestors (the overlay on the content box in one update at scales 0.5 to 4 beside the canvas with no scale of its own, an overlay in another parent scaled to the canvas, the scale cleared again, still frames writing nothing), callouts (a line from the point to the nearest corner or edge of the moved box with a dot, none for labels on their point and those not measured, lines that follow, hide with their labels, hide when no label is shown and are deleted with removed ones, a still frame writing nothing, a wrapped `Declutter` whose hidden labels get no line and whose boxes use the offset, anchors placed by a wrapped layout, checked options), plus orthographic cameras from `@margoengine/cameras` (projection on both clip spaces, CSS 3D corners and depth order, `perspective: none`, near-plane hiding, zoom-based `distanceScale`). `npm run test:browser` (a real-GPU script, not in CI) runs a real engine in Chromium on WebGPU and then WebGL2: a label sits over its mesh's projected center within 1 px (with the mesh color read back under it), follows a moving mesh, hides behind the camera, stays within 1 px of its point in one update with the canvas's frame scaled by 0.75 and 2 (and a second overlay in `document.body` too, drawn at the frame's scale), passes pointer events through, z-orders by depth under hit testing and re-sorts when the camera moves, CSS 3D corner markers land within 2 px of the projected world corners, a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not in its near half, a callout's line starts within 1 px of the projected point and ends within 1 px of the nearest point of the label's laid-out box, there are zero WebGPU validation errors, and removing the plugin leaves no overlay elements.
+`npm test` in `packages/labels` runs Node checks: `projectPoint` against hand-computed values on both clip spaces (near, far, behind, outside), `lookAtView` against the core camera matrix, a CSS transform-chain evaluator showing CSS 3D element corners land on the projected world corners, and the renderer on a fake DOM (overlay placement, mesh following, local and world offsets, anchors, frustum and visibility hiding, z-order, zero writes on a static frame, distance scaling, occlusion hooks, WebGL2, CSS 3D transforms, dispose), decluttering (priority wins, positions tried in order, padding, `inside`, sticky ties, distance-scaled boxes, sizes measured once, still frames write nothing, and 400 random labels placed exactly as a test of every pair places them), CSS 3D depth (panels through the near plane with the origin on either side shown and cut, every polygon point on or in front of the plane, 60 random poses checked on a 21 x 21 grid of element points against the plane, an orthographic cut at depth 0, `clip-path` written only while cut, the CSS 3D `occlude` hook), scaled ancestors (the overlay on the content box in one update at scales 0.5 to 4 beside the canvas with no scale of its own, an overlay in another parent scaled to the canvas, the scale cleared again, still frames writing nothing), callouts (a line from the point to the nearest corner or edge of the moved box with a dot, none for labels on their point and those not measured, lines that follow, hide with their labels, hide when no label is shown and are deleted with removed ones, a still frame writing nothing, a wrapped `Declutter` whose hidden labels get no line and whose boxes use the offset, anchors placed by a wrapped layout, checked options), plus orthographic cameras from `@margoengine/cameras` (projection on both clip spaces, CSS 3D corners and depth order, `perspective: none`, near-plane hiding, zoom-based `distanceScale`). `npm run test:browser` (a real-GPU script) runs a real engine in Chromium on WebGPU and then WebGL2: a label sits over its mesh's projected center within 1 px (with the mesh color read back under it), follows a moving mesh, hides behind the camera, stays within 1 px of its point in one update with the canvas's frame scaled by 0.75 and 2 (and a second overlay in `document.body` too, drawn at the frame's scale), passes pointer events through, z-orders by depth under hit testing and re-sorts when the camera moves, CSS 3D corner markers land within 2 px of the projected world corners, a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not in its near half, a callout's line starts within 1 px of the projected point and ends within 1 px of the nearest point of the label's laid-out box, there are zero WebGPU validation errors, and removing the plugin leaves no overlay elements.
 
 Apache-2.0 licensed.
 
 ## Preview tier contract
 
 `GPULabelLayer` (`@margoengine/labels/gpu`) is a reviewed preview route in `scripts/check-preview-contract.mjs` (2026-11-10, 1 `backend` test): on the small WebGL2 preview it draws its glyph batch with WebGL2, elsewhere with WebGPU. Pixel evidence for native WebGPU, the WebGL2 preview and the full compatibility layer: `tests/gpu-browser.js` (`npm run test:browser`). No behaviour changed; the missing row kept `npm run verify` red.
+
+## Works with
+
+The [scientific dashboard](../../docs/integration-sciviz.md) composes labels with
+scientific visualization and camera controls. Its guide gives the runnable
+page, test command and measured limits of the integration fixture.
