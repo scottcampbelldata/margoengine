@@ -190,8 +190,10 @@ export class LODSystem implements EnginePlugin {
   private swaps = new Uint8Array(0);
   private radius = new Float32Array(0);
   private readonly proxies: LOD[] = [];
-  private thresholds = new Float32Array(0);
-  private bands = new Float32Array(0);
+  // Float64: an authored distance or 1 / screen size rounded to float32 can land above the metric that reaches it
+  // exactly, and "equality counts" would then keep the finer level.
+  private thresholds = new Float64Array(0);
+  private bands = new Float64Array(0);
   private slots = new Int16Array(0);
   private levelSlots = new Int16Array(0);
   private anchors: Mesh[] = [];
@@ -391,7 +393,7 @@ export class LODSystem implements EnginePlugin {
     lod.index = -1;
   }
   private grow(size: number): void {
-    const copy = <T extends Int32Array | Uint8Array | Int8Array | Float32Array | Int16Array>(a: T, stride = 1): T => {
+    const copy = <T extends Int32Array | Uint8Array | Int8Array | Float32Array | Float64Array | Int16Array>(a: T, stride = 1): T => {
       const out = new (a.constructor as { new (length: number): T })(size * stride);
       out.set(a);
       return out;

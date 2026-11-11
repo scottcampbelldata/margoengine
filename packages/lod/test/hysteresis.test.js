@@ -214,7 +214,7 @@ test('the shown level holds without writes for a fixed metric and never oscillat
     assert.equal(lod.level, level, `distance ${d} is stable`);
     assert.equal(writes, before, `distance ${d} makes no extra writes`);
   }
-  // Level 3's 0.9 band keeps it down to 3 world units (3.1 here; 0.9 is stored as float32), then the plain pick applies.
+  // Level 3's 0.9 band keeps it down to 3 world units (3.1 here), then the plain pick applies.
   e.camera.position = [0, 0, 40 - 10];
   lods.update();
   e.camera.position = [0, 0, 3.1 - 10];
@@ -223,6 +223,20 @@ test('the shown level holds without writes for a fixed metric and never oscillat
   e.camera.position = [0, 0, 2.9 - 10];
   lods.update();
   assert.equal(lod.level, 0);
+  e.dispose();
+});
+
+test('an object exactly at an authored switch distance takes the coarser level', async () => {
+  const e = await engine(),
+    lods = new LODSystem({ hysteresis: 0 });
+  e.use(lods);
+  // sqrt(5) rounds up to float32, above the distance an object at exactly sqrt(5) has.
+  e.camera.position = [0, 0, 0];
+  e.camera.target = [0, 0, -1];
+  const far = lods.add(e.createMesh().setPosition([1, 2, 0]), [{ object: null }, { object: null, distance: Math.sqrt(5) }]);
+  lods.update();
+  assert.equal(far.level, 1, 'distance sqrt(5): equality counts');
+  assert.ok(Math.fround(Math.sqrt(5)) > Math.sqrt(5));
   e.dispose();
 });
 
