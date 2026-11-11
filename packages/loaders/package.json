@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --experimental-test-module-mocks --test tests/*.test.js",
+    "test": "npm run build && node --experimental-test-module-mocks --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:render:browser": "npm run build && node scripts/test-render-browser.mjs",
     "test:real-files": "npm run build && node scripts/test-real-files.mjs",

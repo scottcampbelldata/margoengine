@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js vfx",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:parity": "cd ../.. && node packages/vfx/test/parity.mjs --all && node packages/vfx/test/parity.mjs --all --compat",
     "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs && node packages/vfx/test/lit-check.mjs && node packages/vfx/test/flipbook-webgl2.mjs && node packages/vfx/test/shadows-nodes-webgl2.mjs"

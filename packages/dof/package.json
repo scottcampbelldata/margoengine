@@ -52,7 +52,7 @@
   "scripts": {
     "build": "node ../../scripts/build-postfx.js dof",
     "prepack": "npm run build",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js",
     "test:gpu": "cd ../.. && node packages/dof/tests/gpu/lens-check.mjs && node packages/dof/tests/gpu/compat-check.mjs",

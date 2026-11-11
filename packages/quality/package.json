@@ -68,7 +68,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs && node packages/quality/test/power-browser.mjs && node packages/quality/test/scene-owner-browser.mjs && node packages/quality/test/demand-browser.mjs && node packages/quality/test/events-browser.mjs && node packages/quality/test/knobs-browser.mjs",
     "prepack": "npm run build"
   }

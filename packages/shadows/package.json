@@ -24,7 +24,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test test/*.test.js ../../tests/modern-game.test.js ../../tests/modern-shadow-texture-transform.test.js",
+    "test": "node --test test/*.test.js ../../tests/modern-game.test.js ../../tests/modern-shadow-texture-transform.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:gpu": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs",
     "test:gpu:colored": "cd ../.. && node packages/shadows/test/colored-browser.mjs",
     "test:gpu:distance": "cd ../.. && node packages/shadows/test/distance-browser.mjs",

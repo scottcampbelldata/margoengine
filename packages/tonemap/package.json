@@ -65,7 +65,7 @@
   "scripts": {
     "build": "node ../../scripts/build-postfx.js tonemap",
     "prepack": "npm run build",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js",
     "test:gpu:lut-sizes": "cd ../.. && node scripts/tonemap-lut-sizes-gpu-check.js",

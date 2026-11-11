@@ -13,30 +13,10 @@ import { spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { resolve } from 'node:path';
+import { ongoing as guarded } from './ongoing.js';
 
 // Proofs whose claim is a standing guarantee ("feature off: identical GPU calls"); the others record a one-time change.
-const ongoing = [
-  'clustered-area-lights',
-  'clustered-light-hooks',
-  'clustered-local-shadows',
-  'color-output',
-  'deformed-shadows',
-  'environment-hemisphere',
-  'environment-volumetric',
-  'gltf-pro-lighting-hooks',
-  'lines-perspective',
-  'materials-uv-transform',
-  'math-consolidation',
-  'oit-detached',
-  'post-ssr',
-  'post-ssr-models',
-  'post-stack',
-  'quality-presets',
-  'selection-xray-off',
-  'taa-velocity',
-  'terrain-ssr',
-  'water-ssr',
-];
+const ongoing = Object.keys(guarded);
 const current = process.argv.includes('--current'),
   only = process.argv
     .find((arg) => arg.startsWith('--only='))

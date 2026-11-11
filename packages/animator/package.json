@@ -24,7 +24,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test test/*.test.js ../../tests/modern-animator*.test.js ../../tests/modern-game.test.js",
+    "test": "node --test test/*.test.js ../../tests/modern-animator*.test.js ../../tests/modern-game.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:gpu": "cd ../.. && node packages/animator/test/scene-owner-browser.mjs && node packages/animator/test/layers-browser.mjs",
     "test:avoidance:browser": "cd ../.. && node packages/animator/test/avoidance-browser.mjs",
     "prepack": "npm --prefix ../.. run build:packages"

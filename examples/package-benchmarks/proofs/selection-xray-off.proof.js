@@ -43,6 +43,10 @@ function story(module, samples, xray) {
     frameGraph: graph,
     plugins: new Map([['model', model]]),
     removePlugin() {},
+    // Direct setup registers nothing, so like the real Engine it names no scene for the plugin.
+    sceneOf() {
+      return undefined;
+    },
   };
   const view = context(gpu, { samples });
   return gpu.record(() => {

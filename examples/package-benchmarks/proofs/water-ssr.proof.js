@@ -34,6 +34,10 @@ function story(m, options) {
     lighting: { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 0.9, 0.8, 0.15]) },
     stats: { drawCalls: 0 },
     removePlugin() {},
+    // Direct setup registers nothing, so like the real Engine it names no scene for the plugin.
+    sceneOf() {
+      return undefined;
+    },
   };
   const heightmap = gpu.device.createTexture({
     size: [64, 64],

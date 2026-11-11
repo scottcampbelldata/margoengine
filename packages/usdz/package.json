@@ -82,7 +82,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js usdz",
-    "test": "npm run build && node --test tests/*.test.js",
+    "test": "npm run build && node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {
