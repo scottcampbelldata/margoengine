@@ -283,5 +283,40 @@ window.benchSoft=async(capacity,batches,frames)=>{
  for(const e of [plain,soft])e.dispose();color.destroy();depth.destroy();
  return {errors:errors.splice(0),plain:a,soft:b};
 };
+// Scale: the largest capacity the device holds (64-byte slots in one storage binding: 2,097,152 on a default device),
+// every slot born on the first frame and kept alive, simulated and drawn at 1280 x 720. One more slot is refused at
+// attach with the device's figure in the message. GPU time per frame from timestamp queries around the frame's passes
+// (diagnostic only on a busy machine; the speed phase times it properly), wall time where timestamps are missing.
+window.checkScale=async(frames)=>{
+ const a=await navigator.gpu.requestAdapter({powerPreference:'high-performance'}),timed=a.features.has('timestamp-query'),
+  d=await a.requestDevice({requiredFeatures:timed?['timestamp-query']:[]}),errs=[];
+ d.addEventListener('uncapturederror',e=>errs.push(e.error.message));
+ const L=d.limits,capacity=Math.floor(Math.min(L.maxStorageBufferBindingSize,L.maxBufferSize)/64),w=1280,h=720;
+ const cam=new Camera({position:[0,2,14],target:[0,1.5,0],fov:50,near:0.1,far:200});cam.update(w/h,true);
+ const make=c=>new VFX({capacity:c,initialCount:c,rate:0,position:[0,1.5,0],emissionExtent:[6,1.5,3],velocity:[0,0,0],spread:0.3,gravity:[0,0,0],turbulence:0.3,ground:-100,size:0.02,lifetime:[1000,1000],color:[1,0.6,0.3,0.2]});
+ let refused=null;try{make(capacity+1).setup({gpu:d,stats:{drawCalls:0},removePlugin(){}});}catch(e){refused=e.message;}
+ const effect=make(capacity);d.pushErrorScope('validation');d.pushErrorScope('out-of-memory');
+ effect.setup({gpu:d,stats:{drawCalls:0},removePlugin(){}});
+ const target=(format,usage)=>d.createTexture({size:[w,h],format,usage}),color=target('rgba8unorm',GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC),
+  depth=target('depth32float',GPUTextureUsage.RENDER_ATTACHMENT),counts=d.createBuffer({size:40,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const query=timed?d.createQuerySet({type:'timestamp',count:2}):null,resolve=timed?d.createBuffer({size:16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}):null,
+  times=timed?d.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}):null,gpu=[],wall=[];
+ for(let frame=0;frame<frames;frame++){
+  const encoder=d.createCommandEncoder(),start=performance.now();
+  if(timed)encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:0}}).end();
+  encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,1]}],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:1}}).end();
+  const context={backend:'webgpu',device:d,delta:1/60,camera:cam,width:w,height:h,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:1},depthStencil:{format:'depth32float'}},encoder};
+  effect.simulate(context);effect.draw(context);
+  if(timed){encoder.beginComputePass({timestampWrites:{querySet:query,endOfPassWriteIndex:1}}).end();encoder.resolveQuerySet(query,0,2,resolve,0);encoder.copyBufferToBuffer(resolve,0,times,0,16);}
+  if(frame===frames-1){encoder.copyBufferToBuffer(effect.gpuState.indirect,0,counts,0,20);encoder.copyBufferToBuffer(effect.gpuState.visible,0,counts,20,20);}
+  d.queue.submit([encoder.finish()]);await d.queue.onSubmittedWorkDone();wall.push(performance.now()-start);
+  if(timed){await times.mapAsync(GPUMapMode.READ);const t=new BigUint64Array(times.getMappedRange());gpu.push(Number(t[1]-t[0])/1e6);times.unmap();}
+ }
+ await counts.mapAsync(GPUMapMode.READ);const c=new Uint32Array(counts.getMappedRange().slice(0));counts.unmap();
+ const oom=await d.popErrorScope(),error=await d.popErrorScope();
+ effect.dispose();color.destroy();depth.destroy();counts.destroy();query?.destroy();resolve?.destroy();times?.destroy();d.destroy();
+ const median=v=>v.length?[...v].sort((x,y)=>x-y)[v.length>>1]:null;
+ return {capacity,refused,live:c[1],visible:c[6],error:error?.message??null,oom:oom?.message??null,errors:errs,timed,gpuMs:median(gpu.slice(1)),wallMs:median(wall.slice(1)),compat:!!globalThis.__margoCompat};
+};
 window.ready=true;
 </script></body></html>

@@ -26,6 +26,16 @@ declare const GPUBufferUsage: {
   COPY_SRC: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** The largest capacity the constructor accepts: 65,535 workgroups of 256 slots (the WebGPU default dispatch limit). */
+const MAX_CAPACITY = 65_535 * 256;
+/** The largest capacity a device holds: 64-byte slots in one storage binding and one buffer, 256 slots a workgroup. */
+function deviceCapacity(limits: GPUSupportedLimits): number {
+  return Math.min(
+    MAX_CAPACITY,
+    Math.floor(Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize) / 64),
+    limits.maxComputeWorkgroupsPerDimension * 256,
+  );
+}
 const defaultPosition: Vec3 = [0, 1, 0],
   defaultVelocity: Vec3 = [0, 3, 0],
   defaultGravity: Vec3 = [0, -9.81, 0],
@@ -37,7 +47,11 @@ const defaultPosition: Vec3 = [0, 1, 0],
  * of range.
  */
 export interface VFXOptions {
-  /** Particle slots, an integer 1-1,000,000 (64 bytes each). Fixed at construction. Default 1,000,000 (or the quality preset's). */
+  /**
+   * Particle slots, an integer 1-16,776,960 (64 bytes each). Fixed at construction. Default 1,000,000 (or the quality
+   * preset's). The device bounds it at attach: 64 x capacity must fit one storage binding, so a default WebGPU device
+   * (128 MiB) holds up to 2,097,152.
+   */
   capacity?: number;
   /** Births queued on attach and after device restoration, an integer 0..capacity. Default 0. */
   initialCount?: number;
@@ -679,7 +693,7 @@ export class VFX implements EnginePlugin {
     if (
       !Number.isInteger(this.capacity) ||
       this.capacity < 1 ||
-      this.capacity > 1_000_000 ||
+      this.capacity > MAX_CAPACITY ||
       (o.capacity !== undefined && o.capacity !== this.capacity) ||
       !Number.isFinite(o.rate ?? this.capacity / 2) ||
       (o.rate ?? this.capacity / 2) < 0 ||
@@ -802,13 +816,19 @@ export class VFX implements EnginePlugin {
       );
     this.engine = engine;
     this.device = engine.gpu;
+    const limits = this.device.limits;
     if (
-      this.capacity * 64 > this.device.limits.maxStorageBufferBindingSize ||
-      this.capacity * 64 > this.device.limits.maxBufferSize ||
-      this.device.limits.maxComputeInvocationsPerWorkgroup < 256 ||
-      this.device.limits.maxComputeWorkgroupSizeX < 256
+      this.capacity * 64 > limits.maxStorageBufferBindingSize ||
+      this.capacity * 64 > limits.maxBufferSize ||
+      Math.ceil(this.capacity / 256) > limits.maxComputeWorkgroupsPerDimension ||
+      // The draw-order sort pads to a power of two and runs one workgroup per 256 padded slots.
+      (this.options.sort && 2 ** Math.ceil(Math.log2(this.capacity)) / 256 > limits.maxComputeWorkgroupsPerDimension) ||
+      limits.maxComputeInvocationsPerWorkgroup < 256 ||
+      limits.maxComputeWorkgroupSizeX < 256
     )
-      throw new RangeError('VFX capacity exceeds the device limits; reduce capacity.');
+      throw new RangeError(
+        `VFX capacity ${this.capacity} exceeds the device limits (64 bytes a slot: at most ${deviceCapacity(limits)} here); reduce capacity.`,
+      );
     const buffer = (size: number, usage: number) =>
         this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST }),
       o = this.options,

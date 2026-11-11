@@ -217,3 +217,16 @@ test('a far particle is drawn at least 1.5 px across with its alpha scaled by th
   assert.ok(source.includes('*p.velocitySize.w*0.5*grow;'));
   assert.ok(source.includes('/(grow*grow));return o;'));
 });
+
+test('capacity reaches what the device holds: 2,097,152 slots on a default device, one more is refused at attach', () => {
+  // 64-byte slots in one 128 MiB storage binding; the constructor once stopped at 1,000,000 (half the device).
+  assert.equal(new VFX({ capacity: 2_097_152 }).capacity, 2_097_152);
+  assert.equal(new VFX({ capacity: 65_535 * 256 }).capacity, 16_776_960, 'adapter-raised devices bound it at attach');
+  assert.throws(() => new VFX({ capacity: 65_535 * 256 + 1 }), /out of range/);
+  const h = optionalGPU();
+  h.engine.stats = { drawCalls: 0 };
+  assert.throws(
+    () => h.engine.use(new VFX({ capacity: 2_097_153 })),
+    (e) => e instanceof RangeError && /capacity 2097153 exceeds the device limits .*at most 2097152 here/.test(e.message),
+  );
+});

@@ -486,3 +486,16 @@ Build-ready controls and external-install commands: [sciviz-rivals](../sciviz-ri
 - Batch 169 job 6 wfc: time HeapWFC (typescript and SIMD) and legacy WFC on the full-domain-workcount sets in the quiet window; bit scans 6656 to 4608 (heap) and 4608 to 512 (legacy), identical outputs and stats.
 
 - Batch 169 job 7 procedural: time Noise.worley over the worley-workcount samples in the quiet window; hash multiplies 1,536,000 to 183,696 with identical values.
+
+## Default size limits at scale (limits audit, 2026-11-10)
+
+Scott's ruling (2026-11-10): a raised limit counts only if it runs fast. Each case below is timed on a quiet machine
+with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no timestamps), with its work count.
+
+- VFX at the device capacity: 2,097,152 live particles, all on screen, 1280 x 720, simulate and draw
+  (`node packages/vfx/test/browser-check.mjs`, scale case, native and `MARGO_COMPAT=1`). Work per frame: four compute
+  dispatches over 8,192 workgroups, one indirect draw of 3 vertices per listed particle, one 224 B uniform write.
+  Target: 60 fps (16.7 ms) on the RTX A6000 natively and on the WebGL2 layer; mid laptop iGPU (Radeon 680M) 60 fps at
+  the 1,000,000 default natively and 30 fps at the 100,000 light preset on the WebGL2 layer. Busy-machine diagnostic
+  2026-11-10: native GPU 1.77 ms; WebGL2 layer 107 ms wall, a speed bug to diagnose (likely the compute emulation
+  path at 8,192 workgroups) before release.

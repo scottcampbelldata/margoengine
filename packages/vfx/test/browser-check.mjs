@@ -109,6 +109,20 @@ try {
       `ok ${name}: gaps ${gaps.map((g) => g.toFixed(2))}, alpha ${r.rows.map((row) => row.got)} (${hard.rows.map((row) => row.got)} without), largest difference ${off(r, 'soft')}/255`,
     );
   }
+  {
+    const r = await page.evaluate((frames) => window.checkScale(frames), 8);
+    report.results.scale = r;
+    assert.equal(r.error, null, 'scale');
+    assert.equal(r.oom, null, 'scale: no out-of-memory');
+    assert.deepEqual(r.errors, [], 'scale');
+    assert.ok(r.capacity >= 2_097_152, `scale: a default device holds 2,097,152 slots (${r.capacity})`);
+    assert.match(String(r.refused), /exceeds the device limits .*at most \d+ here/, 'scale: one more slot is refused');
+    assert.equal(r.live, r.capacity, 'scale: every slot is born and alive');
+    assert.ok(r.visible > r.capacity * 0.9 && r.visible <= r.capacity, `scale: on-screen particles listed (${r.visible})`);
+    console.log(
+      `ok scale${r.compat ? ' (compat)' : ''}: ${r.capacity} particles live, ${r.visible} drawn, GPU ${r.gpuMs ?? 'n/a'} ms, wall ${r.wallMs} ms a frame`,
+    );
+  }
   assert.deepEqual(pageErrors, []);
   await writeFile('test-results/vfx-browser-check.json', JSON.stringify(report, null, 1));
   console.log('vfx browser check passed');
