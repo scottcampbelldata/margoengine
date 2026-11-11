@@ -137,7 +137,12 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
       assert.deepEqual(pipeline.vertex.buffers, [
         {
           arrayStride: 80,
-          attributes: Array.from({ length: 5 }, (_, i) => ({ shaderLocation: i, offset: i * 16, format: 'float32x4' })),
+          // Position and normal are read only as xyz, so every draw fetches them as three floats (gltf-pro vertexLayout).
+          attributes: Array.from({ length: 5 }, (_, i) => ({
+            shaderLocation: i,
+            offset: i * 16,
+            format: i < 2 ? 'float32x3' : 'float32x4',
+          })),
         },
       ]);
       assert.equal(pipeline.vertex.entryPoint, 'vertex');
