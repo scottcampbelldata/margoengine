@@ -2,11 +2,16 @@
 // Clean room, from these sources only:
 // - Pike 1977, "Size-Dependence in the Shape of Fresh Impact Craters on the Moon", in Impact and Explosion Cratering
 //   (Pergamon), pp. 489-509: simple craters have depth about 0.196 D^1.01 and rim height about 0.036 D^1.01 (kilometres);
-//   apparent depth never exceeds about 3,400 m.
+//   apparent depth never exceeds about 3,400 m. Checked against secondary sources (2026-11-11): Pike's own summary gives
+//   depth/diameter about 0.2 for simple lunar craters under 15 km (NASA NTRS 19780057837, Pike 1977, "Apparent
+//   depth/apparent diameter relation for lunar craters", Proc. Lunar Sci. Conf. 8, 3427-3436), and "IMPACTS: A program
+//   to calculate the effects of a hypervelocity impact into a Solar System body" (2022, arXiv:2203.07476) cites Pike
+//   for a simple-crater rim height of 0.036 D. Both match the coefficients here; the exponents (1.01) are not stated in
+//   those two sources, so they stand on the Pike 1977 citation above alone.
 // - Neukum, Ivanov and Hartmann 2001, "Cratering Records in the Inner Solar System in Relation to the Lunar Reference
 //   System", Space Science Reviews 96: sizes follow a power law in diameter (cumulative exponent about -2).
 // - McGetchin, Settle and Head 1973, "Radial thickness variation in impact crater ejecta", Earth and Planetary Science
-//   Letters 20: ejecta thickness t = 0.14 R^0.74 (r / R)^-3 beyond the rim.
+//   Letters 20: ejecta thickness t = 0.14 R^0.74 (r / R)^-3 beyond the rim, t and R in metres (as used below).
 // - Rosenburg 2014, PhD thesis, Caltech, chapter 4: synthetic cratered terrain by accumulating craters of a power-law size
 //   distribution, a younger crater cutting an older one.
 // Placement is a jittered 3D lattice (a spatial hash) instead of equal-area cube-sphere cells: points are Poisson in a

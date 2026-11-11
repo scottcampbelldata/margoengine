@@ -563,3 +563,6 @@ was 214 ms before the range kernels left the JavaScript compute tier. The WebGL2
 CPU, Node: `planetPreset` samples at 4.3 to 5.5 us (moon 5.5) against 1.0 us for `planetNoise`; a 1,089-vertex patch about 6 ms against the
 4 ms default `budget`. Work: per octave of diameter 27 hashed cells, one Poisson draw each. Target: under 2 ms a patch (a cheap
 cell test against the sphere shell before drawing, or a Wasm kernel per the Rust rule if measured worth it). Rerun on the quiet machine.
+Checked 2026-11-11 (Rust port R22): the shell test is in (`planet-craters.ts`, before any draw), so what is left is the
+27-cell walk per octave and the per-crater `Math.hypot`, `asin` and powers; no change with identical output was proven
+in this pass, so it stays on this list for the quiet phase.
