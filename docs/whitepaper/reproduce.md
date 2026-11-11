@@ -4079,9 +4079,9 @@ the actual encoder calls with the previous resolve path. Twelve image pairs per
 backend compare every canvas byte, with zero tolerance: standalone/stacked SSAO
 and stacked GTAO, 1x/4x MSAA, initial and resized frames. The old path is injected
 only at the pre-extraction resolve; both paths run the same shipped shaders and
-scene. The existing post-stack proof retains its historical tape and accounts
-for exactly one removed resolve in each valid 4x SSAO frame, including sample
-count changes. It still compares every other call and shader byte.
+scene. The post-stack, post-ssr, post-ssr-models and quality-presets proofs
+took this change with their goldens recaptured on 2026-11-10 (claims.md); they
+compare every call and shader byte against the depth-only resolve.
 
 Recorded result: native WebGPU and ANGLE Vulkan each pass all 12 exact pairs.
 To select Vulkan, also set `BROWSER_ARGS` to `["--use-angle=vulkan"]`. Default

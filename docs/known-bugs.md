@@ -1,5 +1,16 @@
 # Known bugs and unverified features
 
+### Lines without tiles pay for tiled capture (proofs lane, 2026-11-10, open)
+
+- **Repro:** `node examples/package-benchmarks/proofs/lines-perspective.proof.js 3e6479d7e^ 3e6479d7e`: a scene that
+  never imports `@margoengine/lines/tiles` uploads a 112-byte frame block instead of 96 (the new `tile` row is
+  always (1, 1, 0, 0)), and every line shader carries `captureClip`, a branch on `frame.extra.y` per vertex.
+- **Cause:** `3e6479d7e` (sciviz tiled export) added the tile row to the root `Frame` struct and `fillFrame`, and
+  `tileClipWGSL` to the root line shader, so the root grew from 19,926 to 20,291 B gzip for an optional entry.
+- **Fix to build:** let `lines/tiles` widen the frame block and patch the shader through the existing
+  `LineExtension` hook, so the root's frame, shader and size return to what they were without it. The
+  lines-perspective golden was recaptured past it on 2026-11-10 (claims.md) and moves back with that fix.
+
 ### Terrain clipmaps and the virtual texture do not follow a FloatingOrigin (Rust finding U6, 2026-11-10, open)
 
 - **Repro:** attach `FloatingOrigin` (`@margoengine/cameras/origin`) to an engine with a `Terrain` whose `origin` is

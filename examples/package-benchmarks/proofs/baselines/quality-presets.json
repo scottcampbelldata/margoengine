@@ -1,21 +1,21 @@
 {
  "proof": "quality-presets",
- "ref": "da12bd07e",
- "revision": "da12bd07e10e2f6a3eea55fb0e33f4522618edae",
- "capturedAt": "210ceff1f1d99eddb10d30c3f816fafbce5fa89c",
+ "ref": "376d1021c",
+ "revision": "376d1021c822b8290f76e28ce304fb78ee72a418",
+ "capturedAt": "38ac115756e74eec02daec3a2e52d207aab1ecc7",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
   "shadows 1x": "5d24998a082b7f248cbe3196033a2aa3425f3f0a78f0b002fc4f9d7b60160dc9",
   "shadows 4x": "916aec9c0f50254719b2496bd8193139565f7daea27c4fb6918d7154b1c8e574",
   "ssao 1x": "95c0b01be3dba8677653857d1aff827d0652b0869e0cf7f6b8a6ed9ad8656d38",
-  "ssao 4x": "ebe60ed78a7b0689de844452d5990d9214054030bc7f3d37aafe9bffca98e6c6",
+  "ssao 4x": "e2d20571009419e84d50bd164ccaa6c72fbffa126204c9e5f6094d1f642de35b",
   "ssr 1x": "36832a376e3e74af1ee3b44b5f69d89aba82fa58a2f0171a1a1e73df378f3332",
   "ssr 4x": "ffce9528f619d636e7a23bd220d8c2863d6d80de9baaf5942d81abe2b0bc2ea9",
   "volumetric 1x": "04be71f9a9f12830cee1acce6c16cf000b61ad4de8d989f0e4c359d8d8eaf194",
-  "volumetric 4x": "d96c8c851c72da5e46f7660667022e540b2ae2b9755efa762d03b7e005057f72",
-  "localShadows 1x": "e0643e62558e0ba7e4328b1d3a5b9c155ecb1c06aad37442413c91812bdffe32",
-  "localShadows 4x": "6130b65fdd5d20a38c90e00d6c117cdca935953f1a0b46abeca0ef9254fbee72",
+  "volumetric 4x": "b2d46ec93b760a91bd2f64341945bd20a1075cb636f8ff72671d3b8c4b8fc395",
+  "localShadows 1x": "b1fee742f49cde3b806563d1ef9de7383a2d61c58c597e07040ae4c8ceef8dee",
+  "localShadows 4x": "8eb419fd97ac0b80f96cbba67eb844acb133ed7e3ef4b2a39a1664032ae39d2e",
   "vfx 1x": "15ec20edf6972875bf116e1bfc7b664af840dfb79f184ce8e50ffa98242391dd",
   "vfx 4x": "766d275a3ac68781e0bda338b34595d8df46a1f32c1928b35758e6a575618d47"
  }

@@ -1,15 +1,15 @@
 {
  "proof": "color-output",
- "ref": "da12bd07e",
- "revision": "da12bd07e10e2f6a3eea55fb0e33f4522618edae",
- "capturedAt": "210ceff1f1d99eddb10d30c3f816fafbce5fa89c",
+ "ref": "9c9479d3c",
+ "revision": "9c9479d3c0a4937b5cf969918e07857df58f9b34",
+ "capturedAt": "1bafe1b017a1202e2ddde67014473a3e73d499e3",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "da12bd07e descends from eaddd64": false
+  "9c9479d3c descends from eaddd64": false
  },
  "outputs": {
-  "Tonemap alone 1x": "a266f93dc8f68339c5dc7289b74849898cbfe9b099d10437ce4091d0117cfdee",
-  "Tonemap alone 4x": "afc1732cb4134cd925b27a598a72ef48db2279b98727c965863d0249cf117285",
+  "Tonemap alone 1x": "29c8941a7486e52e3043ee4c2e805eec0721c247610cb3ab2625daab9fedcdfc",
+  "Tonemap alone 4x": "e4becd84d02fece45c4dc29c8c2d31334478df72d164f851688a95838261a1ce",
   "DOF -> Tonemap 1x": "5dcf0786c63695028b75a0469e3f3f1b37b1e9d61ad18286308c88ec78e1eb03",
   "DOF -> Tonemap 4x": "58ff2f4ff3dd790d9e4dc98c0c09e5c16f68885b3dfc7b627065a9dc5dee3a88",
   "PostStack Bloom + Tonemap + FXAA 1x": "f11c9b05054e8ad34c8d19db4c2838d23e8412a816803316ade6ee7074d827e0",

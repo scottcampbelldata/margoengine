@@ -15,7 +15,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('15c87f1', 'cf2953e', 'da12bd07e');
+const { ref, pin } = refs('15c87f1', 'cf2953e', '376d1021c');
 const load = async () => {
   const all = await Promise.all(
     ['gltf-pro', 'shadows', 'clustered', 'environment'].map((name) => versions(name, ref, undefined, pin)),

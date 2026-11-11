@@ -11,7 +11,7 @@ import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('6c20076d', 'e1a20e13', 'da12bd07e'),
+const { ref, pin } = refs('6c20076d', 'e1a20e13', '5f1d85b3c'),
   { baseline, candidate } = await versions('taa', ref, undefined, pin);
 
 /** One engine with TAA attached: core meshes (stride 24), an optional PBR velocity source (stride 80), and a frame driver. */

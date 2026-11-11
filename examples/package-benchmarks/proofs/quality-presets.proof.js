@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, entryAt, save, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('96daac7', '01e5e35', 'da12bd07e'),
+const { ref, pin } = refs('96daac7', '01e5e35', '376d1021c'),
   { Engine, TransformStore, wgsl } = await coreAt(pin);
 const [{ Clustered }, { Tonemap }, { QUALITY_PRESETS }] = await Promise.all(
     ['clustered', 'tonemap', 'quality'].map((name) => entryAt(name, 'src/index.ts', pin)),
