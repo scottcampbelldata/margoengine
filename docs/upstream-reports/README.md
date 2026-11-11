@@ -22,3 +22,4 @@ the owner files them.
 | KB5185b | `KB5185b` | ANGLE, NVIDIA | draft only, no standalone repro |
 | KB5247d | `KB5247d` | ANGLE, NVIDIA | draft only, no standalone repro |
 | KB6171a | `KB6171a` | ANGLE, Apple | draft only, needs a Mac |
+| KBL3c | `KBL3c` | Mozilla (Firefox WebGL) | yes, Firefox 157 |

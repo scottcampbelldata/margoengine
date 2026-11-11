@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WebGL2 texSubImage2D from a pixel unpack buffer: final-row advisory</title>
+<pre id="out">running</pre>
+<script type="module">
+// Uploads one 4 x 4 RGBA8 texture from a PIXEL_UNPACK_BUFFER holding exactly 4 rows of 16 bytes (UNPACK_ALIGNMENT 1, 4
+// and 8), the same upload from a Uint8Array, and an RGBA32UI 2,048 x 12 upload from an exact buffer. Every texture is
+// written in full right after texStorage2D, so nothing is partial or uninitialised. The browser's console shows any
+// WebGL warning; the page reads back the texels to prove each upload landed. Each case has its own context. With
+// `?wait` the page waits for `window.run()`, so a driver can listen to the console first.
+const result = { userAgent: navigator.userAgent, cases: {} };
+window.run = async () => {
+const cases = {
+  'rgba8 4x4 from buffer': { format: 'RGBA8', w: 4, h: 4, bytes: 4, buffer: true },
+  'rgba8 4x4 from array': { format: 'RGBA8', w: 4, h: 4, bytes: 4, buffer: false },
+  'rgba32ui 2048x12 from buffer': { format: 'RGBA32UI', w: 2048, h: 12, bytes: 16, buffer: true },
+};
+for (const align of [1, 4, 8])
+  for (const [label, c] of Object.entries(cases)) {
+    const name = `${label}, UNPACK_ALIGNMENT ${align}`;
+    console.log(`begin: ${name}`);
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const integer = c.format === 'RGBA32UI';
+    const data = integer ? new Uint32Array(c.w * c.h * 4).map((_, i) => i) : new Uint8Array(c.w * c.h * 4).map((_, i) => i & 255);
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl[c.format], c.w, c.h);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, align);
+    const format = integer ? gl.RGBA_INTEGER : gl.RGBA, type = integer ? gl.UNSIGNED_INT : gl.UNSIGNED_BYTE;
+    if (c.buffer) {
+      const pbo = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, pbo);
+      gl.bufferData(gl.PIXEL_UNPACK_BUFFER, data, gl.STATIC_DRAW);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, c.w, c.h, format, type, 0);
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+    } else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, c.w, c.h, format, type, data);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    const back = integer ? new Uint32Array(c.w * c.h * 4) : new Uint8Array(c.w * c.h * 4);
+    gl.readPixels(0, 0, c.w, c.h, format, type, back);
+    result.cases[name] = { glError: gl.getError(), landed: back.every((v, i) => v === data[i]), bytes: data.byteLength };
+    // A frame between cases, so each case's console lines come before the next one starts.
+    await new Promise(requestAnimationFrame);
+    console.log(`end: ${name}`);
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+};
+if (!location.search.includes('wait')) window.run();
+</script>
