@@ -2527,6 +2527,8 @@ Known rendering gaps:
 
 **Anti-aliased splats (2026-11-08).** `Splats.antialias` sets `counts.z` of the projection uniform; the projection pass then scales the ellipse opacity (ellipse centre w, which the render, depth, lighting and brush passes read) by sqrt(det(S) / det(S + 0.3 I)) of the dilated screen covariance. No recompile and no extra pass. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M; missing: a real capture trained with the filter.
 
+**Sky shaders carry one day model (2026-11-11, KB2224a).** Apple's shader compile under WebKit rounds by the shape of the code: a uniform branch between the Preetham and Bruneton day models moved one sky pixel by one half-float step against `sky/base`, while Chrome on the same M6 and the RTX A6000 gave 0. `Sky` now composes only the model in use; a live `options.model` edit recompiles the sky, fog, reflection and lighting shaders once and keeps `reflectionTexture` and the lighting resources. Steady frames compile nothing and the recorded GPU traces keep their command and resource counts. Evidence: Playwright WebKit `browser-check.mjs` on the M6, 12 of 12 runs at 0 differing pixels (origin/main: 1 pixel in `afterlight`); `packages/sky/test/sky.test.js` "KB2224a". General lesson: on WebKit, equal maths in a different branch shape is not bit-identical; compare identical module text.
+
 ## 4. Quality architecture
 
 ### 4.0 How work lands during the build phase (Scott, 2026-11-09)

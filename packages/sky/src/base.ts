@@ -206,7 +206,7 @@ export interface SkyFeatures {
       code: string,
       entries: GPUBindGroupEntry[],
       owned: Owned,
-    ): { texture: GPUTexture; run(c: SkyPassContext): void };
+    ): { texture: GPUTexture; run(c: SkyPassContext): void; recode(code: string, entries: GPUBindGroupEntry[]): void };
   };
   lighting?: {
     validate(lighting: SkyLightingOptions): void;
@@ -224,15 +224,19 @@ export interface SkyFeatures {
         night: number,
       ): void;
       pass(c: SkyPassContext): void;
+      recode(code: string, entries: GPUBindGroupEntry[]): void;
       pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined;
       bindings(): GPUBindGroupEntry[];
     };
   };
 }
-// Absent features leave out their WGSL; with every feature the text is the root `Sky`'s shader.
-function compose(f: SkyFeatures): [string, string] {
-  const p = !!f.preetham,
-    b = f.bruneton,
+// Absent features leave out their WGSL; with every feature the text is the root `Sky`'s shader. Only the day model in
+// use is called (KB2224a): Apple's compile under WebKit rounds by the shape of the code, so a branch between the two
+// models moved pixels by one half-float step; a model switch recompiles instead (Sky.recode).
+function compose(f: SkyFeatures, model: SkyOptions['model']): [string, string] {
+  const b = f.bruneton,
+    p = !!f.preetham && model !== 'bruneton',
+    day = model === 'bruneton' && b,
     atmosphere = head + (b?.phase ?? '') + mid + (b?.tail ?? '');
   return [
     atmosphere,
@@ -265,9 +269,8 @@ fn nightSky(w:vec3f,footprint:f32)->vec3f {
  let w=normalize(vec3f(direction.x,max(0.01,direction.y),direction.z));
  let s=frame.sun.xyz;
  var color=vec3f(0);` +
-      (p ? 'if(frame.settings.x<0.5){color=preetham(w,s);}' : '') +
-      (p && b ? 'else' : '') +
-      (b ? '{let r=R+clamp(frame.eye.w,0.001,99.9);color=lookup(scattering,r,w.y,s.y,dot(w,s));}' : '') +
+      (p ? 'color=preetham(w,s);' : '') +
+      (day ? 'let r=R+clamp(frame.eye.w,0.001,99.9);color=lookup(scattering,r,w.y,s.y,dot(w,s));' : '') +
       `
  return color;
 }
@@ -327,7 +330,8 @@ export class Sky implements EnginePlugin {
   private reflectionRequested = false;
   private owned: Owned = [];
   private readonly atmosphere: string;
-  private readonly code: string;
+  private code: string;
+  private model: SkyOptions['model'];
   private reflection?: ReturnType<NonNullable<SkyFeatures['reflection']>['create']>;
   private fogPass?: ReturnType<NonNullable<SkyFeatures['fog']>['create']>;
   private lit?: ReturnType<NonNullable<SkyFeatures['lighting']>['create']>;
@@ -360,7 +364,8 @@ export class Sky implements EnginePlugin {
     readonly options: SkyOptions = {},
     private readonly features: SkyFeatures = {},
   ) {
-    [this.atmosphere, this.code] = compose(features);
+    this.model = options.model;
+    [this.atmosphere, this.code] = compose(features, this.model);
     this.validate();
   }
   /** Adds this sky's native diffuse and specular ambient to a PBR model or VoxelRenderer; returns a remover. */
@@ -478,7 +483,7 @@ export class Sky implements EnginePlugin {
     });
     const t = this.transmission.createView();
     this.tables = f.bruneton?.create(d, u, t, this.owned);
-    this.entries = [{ binding: 0, resource: u }, ...(this.tables ? [{ binding: 1, resource: this.tables.view }] : [])];
+    this.entries = this.skyEntries(u);
     this.pipeline = compute(d, this.atmosphere + transmittance);
     this.group = group(d, this.pipeline, [u, t]);
     this.reflection = f.reflection?.create(d, this.code, this.entries, this.owned);
@@ -573,6 +578,7 @@ export class Sky implements EnginePlugin {
   /** Uploads this frame's uniform and refreshes the tables; idempotent within a frame (lighting runs it earlier). */
   private prepare(c: SkyPassContext): void {
     this.validate();
+    if (this.options.model !== this.model) this.recode();
     if (!invertMatrixStable(c.camera.matrix, this.inverse, this.scratch))
       throw new MargoError('state', 'Invalid sky camera; give the camera a finite, invertible projection');
     this.values.set(c.camera.position, 16);
@@ -605,6 +611,27 @@ export class Sky implements EnginePlugin {
       for (let i = 0; i < 3; i++) this.scatteringA[i] = a[i];
     }
     this.computedT = turbidity;
+  }
+  /**
+   * A live model switch: the sky, fog, reflection and lighting shaders are compiled again with the new day model;
+   * `reflectionTexture` and the lighting resources stay the same objects.
+   */
+  private recode(): void {
+    this.model = this.options.model;
+    this.code = compose(this.features, this.model)[1];
+    this.entries = this.skyEntries(this.entries[0].resource as GPUBufferBinding);
+    this.format = '';
+    this.fogPass?.release();
+    this.fogPass = undefined;
+    this.reflection?.recode(this.code, this.entries);
+    this.lit?.recode(this.code, this.entries);
+  }
+  /** The uniform, and the Bruneton tables only when the shaders read them (auto layouts drop unused bindings). */
+  private skyEntries(u: GPUBufferBinding): GPUBindGroupEntry[] {
+    return [
+      { binding: 0, resource: u },
+      ...(this.tables && this.model === 'bruneton' ? [{ binding: 1, resource: this.tables.view }] : []),
+    ];
   }
   private draw(c: SkyPassContext): void {
     this.prepare(c);

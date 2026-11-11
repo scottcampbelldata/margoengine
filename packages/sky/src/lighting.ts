@@ -100,15 +100,16 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       owned.push(buffer, map);
       const level = (i: number) => map.createView({ baseMipLevel: i, mipLevelCount: 1 }),
         render = compute(d, code + environment + renderLight, 'renderLight'),
+        top = level(0),
         down = compute(d, downsample),
         reduce = compute(d, project);
       const pipelines = [render, down, down, down, reduce],
         groups = [
           d.createBindGroup({
             layout: render.getBindGroupLayout(0),
-            entries: [...entries, { binding: 3, resource: level(0) }],
+            entries: [...entries, { binding: 3, resource: top }],
           }),
-          group(d, down, [level(0), level(1)]),
+          group(d, down, [top, level(1)]),
           group(d, down, [level(1), level(2)]),
           group(d, down, [level(2), level(3)]),
           group(d, reduce, [level(1), { buffer }]),
@@ -121,6 +122,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       });
       return {
         buffer,
+        top,
         pipelines,
         groups,
         bindings: [
@@ -156,6 +158,18 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       },
       bindings() {
         return gpu?.bindings ?? [];
+      },
+      recode(next, bindings) {
+        code = next;
+        entries = bindings;
+        if (!gpu) return;
+        // A model switch: only the sky render step reads the sky's code; the map, buffer and bindings stay.
+        const render = compute(d, code + environment + renderLight, 'renderLight');
+        gpu.pipelines[0] = render;
+        gpu.groups[0] = d.createBindGroup({
+          layout: render.getBindGroupLayout(0),
+          entries: [...entries, { binding: 3, resource: gpu.top }],
+        });
       },
       update({ direction, radiance }, sky, l, ambient, night) {
         if (ambient) for (let i = 0; i < 3; i++) floor[i] = ambient.day[i] * (1 - night) + ambient.night[i] * night;

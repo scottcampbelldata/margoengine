@@ -752,3 +752,70 @@ test('a second Sky.attach on one scene says it is a second sky, and the first ke
     again.dispose();
   }
 });
+
+test('KB2224a: the sky compiles only the day model in use; a live switch recompiles sky, fog, reflection and lighting', () => {
+  const h = optionalGPU(),
+    depth = Object.assign(
+      h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
+      { depthOrArrayLayers: 1 },
+    );
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
+  const sky = new Sky({
+    hours: 12,
+    timeScale: 0,
+    fog: { depth: () => depth, density: 0.01 },
+    lighting: { ambient: { day: [0.1, 0.1, 0.1], night: [0.01, 0.01, 0.01] } },
+  });
+  h.engine.use(sky);
+  h.frame = () => {
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  };
+  const texture = sky.reflectionTexture;
+  const daySky = (entry) => {
+    const pipeline = h.pipelines.findLast((p) => (p.fragment ?? p.compute)?.entryPoint === entry),
+      code = (pipeline.fragment ?? pipeline.compute).module.code,
+      start = code.indexOf('fn daySky(');
+    return code.slice(start, code.indexOf('return color;', start));
+  };
+  const entries = ['fragment', 'fogFragment', 'reflectSky', 'renderLight'];
+  const check = (model) => {
+    for (const entry of entries) {
+      const body = daySky(entry);
+      // No branch between the models: WebKit's Apple compile rounds by the branch's shape (one half-float step).
+      assert.doesNotMatch(body, /settings\.x|if\(|else/, `${entry}: ${model} without a model branch`);
+      if (model === 'bruneton') {
+        assert.match(body, /color=lookup\(scattering,/, `${entry} reads the Bruneton tables`);
+        assert.doesNotMatch(body, /preetham\(/, `${entry} leaves Preetham out`);
+      } else {
+        assert.match(body, /color=preetham\(w,s\);/, `${entry} evaluates Preetham`);
+        assert.doesNotMatch(body, /lookup\(/, `${entry} leaves the Bruneton lookup out`);
+      }
+    }
+  };
+  try {
+    h.frame();
+    h.frame();
+    check('preetham');
+    const steady = h.pipelines.length;
+    h.frame();
+    assert.equal(h.pipelines.length, steady, 'Steady frames compile nothing');
+    sky.options.model = 'bruneton';
+    h.frame();
+    check('bruneton');
+    assert.equal(sky.reflectionTexture, texture, 'The borrowed reflection texture survives the switch');
+    const switched = h.pipelines.length;
+    h.frame();
+    assert.equal(h.pipelines.length, switched, 'One recompile per switch');
+    sky.options.model = 'preetham';
+    h.frame();
+    check('preetham');
+    assert.equal(sky.reflectionTexture, texture);
+  } finally {
+    sky.dispose();
+    depth.destroy();
+  }
+  assert.ok(h.resources.every((r) => r.destroyed));
+});

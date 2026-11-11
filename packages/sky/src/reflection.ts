@@ -25,19 +25,26 @@ export const reflection: NonNullable<SkyFeatures['reflection']> = {
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
       });
       owned.push(texture);
+      return (built = { texture, ...compile(texture) });
+    };
+    const compile = (texture: GPUTexture) => {
       const pipeline = compute(d, code + environment + reflectSky, 'reflectSky');
-      return (built = {
-        texture,
+      return {
         pipeline,
         group: d.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
           entries: [...entries, { binding: 3, resource: texture.createView() }],
         }),
-      });
+      };
     };
     return {
       get texture() {
         return build().texture;
+      },
+      recode(next, bindings) {
+        code = next;
+        entries = bindings;
+        if (built) built = { texture: built.texture, ...compile(built.texture) };
       },
       run(c) {
         const { pipeline, group } = build(),

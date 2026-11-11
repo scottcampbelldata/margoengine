@@ -2290,13 +2290,22 @@ Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cas
 Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6, macOS 27.2). Repro for each: on a Mac,
 `MARGO_BROWSER=chrome` or `MARGO_BROWSER=webkit` with the named script.
 
-- **`sky` `test:gpu`, Playwright WebKit only: full Sky and `sky/base` differ by one half-float step.** Up to 2 pixels a frame in `afterlight`, `meadow`, `preetham` and
+- **Fixed (2026-11-11, L4, KB2224a): `sky` `test:gpu`, Playwright WebKit only: full Sky and `sky/base` differ by one half-float step.** Up to 2 pixels a frame in `afterlight`, `meadow`, `preetham` and
   `preetham-clouds-fog`, the same on every run and at 1x and 4x. Cause proved (2026-11-06): Apple's compile under WebKit rounds by the shape of the code. The only trigger is the
   day model branch of the full Sky, `if(frame.settings.x<0.5){color=preetham(w,s);}else{...lookup...}`, of which each frame takes one side. With that branch alone patched out of
   the full module, keeping the side in use, all 12 runs (6 configurations, 1x and 4x) give 0 differing pixels. Moving `lookup` ahead of the branch, which is the same maths, moves
   the differing pixels instead of removing them. The night branch changes nothing. Chrome on the same M6 gives 0 with every one of these texts, so the values are right and only
   the rounding of one compile moves. Ruled out: a stale read, inputs, and an empty branch added to `sky/base` (folded away, same pixels). To close it, Sky would compile only the
   day model in use, and a model switch would recompile the sky, fog, reflection and lighting shaders with `reflectionTexture` kept: Scott's call. No tolerance was raised.
+  Fix (2026-11-11, Scott approved): Sky compiles only the day model in use (`compose` in `packages/sky/src/base.ts`); editing
+  `options.model` live recompiles the sky, fog, reflection and lighting shaders on the next frame, with `reflectionTexture` and
+  the lighting map, buffer and bindings kept, and binds the Bruneton tables only for the Bruneton model (auto layouts drop an
+  unread binding). Steady frames compile nothing; the recorded traces keep their command and resource counts. Mac mini M6,
+  macOS 27.2, Playwright WebKit, `browser-check.mjs`: origin/main still fails `afterlight 4x frame 1 scene vs narrow` (1 pixel,
+  0.0000153); with the fix all 12 runs (6 configurations, 4x and 1x) give 0 differing pixels, so the KB2224b baselines need no
+  re-record for this. Regression: `packages/sky/test/sky.test.js` "KB2224a" (fails on the old build: a model branch in every
+  shader). A first run in a freshly copied folder once failed `night-citadel 4x frame 0 scene vs control` (44,792 pixels) and
+  passed on the rerun; logged as a sweep row (harness, not sky).
 - **Fixed (2026-11-10, Mac lane H): `culling` `test:gpu`, Playwright WebKit and Chrome: parts and core meshes differ by 1 level with shadows on.** Chrome 156 on the same M6 shows it too (2026-11-07, `shadows frustum step 2`, 1 pixel). `parts-check.mjs`, `shadows frustum step 2`: 1 pixel reads 145 against 146;
   the close view has 2. Cause proved (2026-11-06): the two engines draw the same surface with two specializations of one shader. A shader patched by Shadows makes core draw single-sided
   meshes with its plain pipeline (`C` false, back faces discarded; the culled pipeline in `renderer.ts` serves only the unpatched shader), while CulledParts keeps its back-culled pipeline

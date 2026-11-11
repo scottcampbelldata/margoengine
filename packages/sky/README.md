@@ -89,6 +89,10 @@ timeScale is clock hours per real second. Sun direction is exposed in the reused
 The default Preetham model computes the shared sun transmittance table. Scattering
 tables are computed when Bruneton is first rendered, including after a model
 switch or device restoration; changes to turbidity refresh the tables each model uses.
+The shaders call only the model in use, so editing `sky.options.model` live compiles the sky, fog, reflection and
+lighting shaders again on the next frame (one compile per switch; `reflectionTexture` and the lighting resources
+stay the same objects). Steady frames compile nothing. A branch between the two models let Apple's compile under
+WebKit round the sky one half-float step apart from `sky/base`.
 
 `reflectionTexture` exposes a borrowed 64 × 32 linear HDR equirectangular environment
 for optional water reflection. Reading the getter enables its GPU refresh on
