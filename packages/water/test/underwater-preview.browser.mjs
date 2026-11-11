@@ -71,7 +71,7 @@ try {
     window.preview = { engine, ocean };
   }, wind);
   await mkdir('test-results/batch234', { recursive: true });
-  const mode = process.argv.includes('--compat') ? 'compat' : 'webgpu';
+  const mode = browser.hardware?.compat ? 'compat' : 'webgpu';
   for (const [name, time, position, target] of [
     ['below', 3, [5, -2, 8], [0, 1, -5]],
     ['animated', 5, [5, -2, 8], [0, 1, -5]],

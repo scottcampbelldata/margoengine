@@ -2669,9 +2669,15 @@ Measured but not fixed. Their history, sources and rerun commands are in
   repository. Cause not yet found. Publishing the number does not close it.
 - **Navmesh path on that floor is longer than Detour's** (`@margoengine/navmesh`, perf history entry 94): Margo 24.212
   (north hall, 4 points) against recast-navigation 0.44.0 at 23.778 (south hall, 5 points). The corner route through
-  either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Cause not yet
-  found. `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the
-  hole. It does not freeze Detour's length. Publishing the number does not close it.
+  either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Measured cause
+  (2026-11-11, lane L4): the path is the shortest one on Margo's mesh (either hall gives the same 12.217 halves), and the
+  mesh keeps the agent radius plus the dropped ledge cell from the hole, as `build.test.js`'s recorded queries require,
+  with the corner cell cut by the chamfer erosion; Douglas-Peucker then takes the corner at (1.25, 8.5). With
+  `walkableRadius` 0 Margo's path is 23.645, under Detour's. Measuring the radius from the drop instead of from the
+  ledge ring gives 23.823 but breaks those recorded queries, so it was not landed. Detour's side is a black box. Next:
+  compare the two meshes' boundary cells on this floor before changing the ledge rule.
+  `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the hole. It
+  does not freeze Detour's length. Publishing the number does not close it.
 - **Volume-64 frame is slower than VTK.js 38.0.5** (`@margoengine/sciviz`, perf history entry 102): 1.500 ms against
   1.300 ms, one 256 x 256 frame plus the pixel read, paired turns, per-round minimum, busy machine, diagnostic. The
   rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). Mean absolute channel difference of the last pair is 1.801.
@@ -2685,7 +2691,14 @@ Measured but not fixed. Their history, sources and rerun commands are in
   `Splats.attach` refuses that buffer because the device's `maxStorageBufferBindingSize` stays at the WebGPU minimum
   of 134,217,728 bytes. Core does not request a higher limit. The largest degree-3 cloud that attaches is 699,050
   splats. The batch 168 row uses that prefix of the ply on both sides. Cause: the storage binding is not raised, and
-  the SH buffer is one binding. Publishing the prefix does not close it.
+  the SH buffer is one binding. Publishing the prefix does not close it. Rerun 2026-11-11 (lane L4): natively it now
+  attaches and draws, since core asks the adapter for its binding limit (d9be88943f): `scale-check.mjs` with a
+  1,692,538-splat degree-3 case covers 61.0% of the frame on the RTX A6000. On the WebGL2 layer even the existing
+  3,000,000-splat case (no SH) now refuses at attach: `createBindGroup: its storage bindings total 360000016 bytes, over
+  the 268435456 bytes one WebGL2 data texture holds` (from 1e5d2f94d3), so `MARGO_COMPAT=1 node
+  packages/splats/test/gpu/scale-check.mjs` fails on main. Next: splats splits its compute bindings across bind groups
+  under that per-group total, or the layer spreads one group over several textures; then the truck row reruns at full
+  size.
 - **Truck 7k prefix frame is slower than GaussianSplats3D 0.4.7** (`@margoengine/splats`, perf history entry 103):
   10.765 ms against 4.500 ms, one still frame of the 699,050 prefix at 979 x 546, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470).
@@ -5579,7 +5592,7 @@ Batch 270 job 1: no new open defects identified in space. The cutscene compatibi
 
 Dual-phase flow shading is optional and stays out of geometric wave captures, so WaveQuery and caustic capture retain valid layouts. GPU regression: packages/water/test/flow-map.browser.mjs composes flow with ripple geometry and queries, checks independent vector/normal values and fixed-time rendering on both backends. No open defect identified in this job.
 
-- Batch 235 follow-up: force GPUDevice.createBuffer to throw during Ripples.readFrame after a successful render, then read again; the second call reports a pending read because the reading flag is set before staging allocation. Non-rendering allocation-error cleanup gap; fix-phase regression should inject allocation failure and move flag assignment after allocation.
+- Fixed 2026-11-11 (lane L4): `Ripples.readFrame` marked a read pending before its staging allocation, so a refused `createBuffer` left every later read refused as pending. The flag is now set once the buffer exists. Regression: `packages/water/test/ripples.test.js` "a read whose buffer allocation fails leaves no read pending".
 
 # Batch 185 job 2
 
@@ -5805,7 +5818,7 @@ Fixed 2026-11-10: review 3 P1 PixelFollow extreme finite deltas (cde120852). Smo
 - Existing atmosphere exact-capture defect after main merge: run SPEC_DEMOS=atmosphere SPEC_BACKENDS=webgl2 with packages/sciviz/tests/spec-demos-browser.mjs under the GPU lock. In batch174/j4-land-gpu.log, three blue-channel bytes differ by 1 (offsets 1360474, 1360478, 1365274); sameSourceDiff is also 3 for the unchanged source figure, and camera/limits match. The failure originates in repeated atmosphere compatibility drawing, rather than date/log window restoration; the particular nondeterministic draw operation is not isolated. Record for fix phase under rule 21; exact assertion is unchanged.
 Batch 178 job 4: no open correctness defect in the requested colour/legend contract. Surface NaN heights still form holes because they have no geometric position; diagnostic CVD simulation makes no universal distinguishability promise. The PDF equal-stop gap and finite-first volume MIP state are covered by regression tests in the same job.
 
-Review 2 evidence follow-up: running packages/water/test/query.browser.mjs with MARGO_COMPAT=1 and no --compat argument writes compatibility hardware/results under a webgpu suffix (now test-results/water-query-webgpu.json after the separate tracked-record correction). Cause: its output suffix reads argv instead of actual browser hardware.compat. Numerical assertions pass; output labeling is a build-phase tooling follow-up.
+Fixed 2026-11-11 (lane L4): water browser checks run with MARGO_COMPAT=1 and no --compat argument wrote WebGL2-layer results under a webgpu name (query, caustics, fft, flow-map, reflector, ripples, rivers, underwater, bodies, rain and scatter): each read argv instead of the browser's `hardware.compat`. They now read the hardware record. Regression: `packages/water/test/results-path.test.js` fails on any water browser check that names a result or backend from argv.
 
 Fixed upstream: batch 203 duplicate navmesh package-directory probe finding. The entry anchoring in e295cc68a, output-directory creation in 3296cce94 and import repair in 6ede7aa75 are on main. All 121 unchanged CPU tests pass from the package directory on 2026-11-10, including both affected probes.
 

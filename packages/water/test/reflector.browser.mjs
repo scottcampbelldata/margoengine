@@ -87,7 +87,7 @@ try {
   assert.equal(first.matches, true);
   assert.ok(first.direct[1] < 0, 'marker centre is outside the main camera');
   const reflected = await page.locator('canvas').screenshot({
-    path: `test-results/water-reflector-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.png`,
+    path: `test-results/water-reflector-${browser.hardware?.compat ? 'compat' : 'webgpu'}.png`,
   });
   assert.ok(!baseline.equals(reflected), 'planar scene reflection changes the water');
   const images = await Promise.all([decodePNG(baseline), decodePNG(reflected)]);
@@ -193,7 +193,7 @@ try {
   const report = { hardware, first, lifecycle, redGain, visibleChange: true, unreadyExact: true, windBearing: wind };
   console.log(JSON.stringify(report));
   await writeFile(
-    `test-results/water-reflector-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-reflector-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(report, null, 2),
   );
 } finally {

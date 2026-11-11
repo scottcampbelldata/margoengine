@@ -34,3 +34,27 @@ test('ripple reads require a rendered field and honour an already aborted signal
   await assert.rejects(ripples.readFrame({ signal }), { name: 'AbortError' });
   ripples.dispose();
 });
+
+// Known bug it guards (docs/known-bugs.md, fixed 2026-11-11): readFrame marked a read pending before it made its read
+// buffer, so a refused allocation left every later read refused as "pending".
+test('a read whose buffer allocation fails leaves no read pending', async () => {
+  globalThis.GPUBufferUsage ??= { MAP_READ: 1, COPY_DST: 8 };
+  const surface = new Water(),
+    ripples = new Ripples({ surface, size: 16, resolution: 16 });
+  let calls = 0;
+  ripples.engine = {
+    gpu: {
+      createBuffer() {
+        calls++;
+        throw new RangeError('buffer allocation failed');
+      },
+    },
+  };
+  ripples.rendered = true;
+  await assert.rejects(ripples.readFrame(), /buffer allocation failed/);
+  await assert.rejects(ripples.readFrame(), /buffer allocation failed/);
+  assert.equal(calls, 2);
+  ripples.engine = undefined;
+  ripples.dispose();
+  surface.dispose();
+});

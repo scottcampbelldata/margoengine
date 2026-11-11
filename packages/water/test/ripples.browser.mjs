@@ -151,7 +151,7 @@ try {
     observation: { station: '46042', utc: '2023-01-01T00:00:00Z', windFrom: observation[5] },
   };
   await writeFile(
-    `test-results/water-ripples-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-ripples-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report));

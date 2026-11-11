@@ -279,7 +279,7 @@ struct Case {a:vec4f,b:vec4f,c:vec4f,sun:vec4f,step:vec4f}
   assert.equal(result.focus.troughOverOne, 0, 'a trough spreads sunlight (1/|J| < 1)');
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-underwater-optics-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-underwater-optics-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(result, null, 2),
   );
 } finally {

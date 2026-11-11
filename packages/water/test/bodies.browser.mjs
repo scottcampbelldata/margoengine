@@ -8,9 +8,9 @@ import { decodePNG } from '../../../tests/support/png.js';
 // heights and velocities that match the CPU body map, and a clean detach, restore and re-rasterize.
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 await mkdir('test-results', { recursive: true });
-const mode = process.argv.includes('--compat') ? 'compat' : 'webgpu';
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' }),
   { page, hardware } = browser,
+  mode = hardware?.compat ? 'compat' : 'webgpu',
   errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => {

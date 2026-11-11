@@ -123,7 +123,7 @@ try {
       assert.ok(maxMagnitude > 0.001, 'ocean cannot be a flat placeholder');
     }
     await page.locator('canvas').screenshot({
-      path: `test-results/water-fft-${spectrum}-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.png`,
+      path: `test-results/water-fft-${spectrum}-${browser.hardware?.compat ? 'compat' : 'webgpu'}.png`,
     });
   }
   const folding = await page.evaluate(async (base) => {
@@ -202,7 +202,7 @@ try {
   });
   assert.deepEqual(errors, []);
   report.lifecycle = lifecycle;
-  const backend = process.argv.includes('--compat') ? 'compat' : 'webgpu';
+  const backend = browser.hardware?.compat ? 'compat' : 'webgpu';
   await writeFile(`test-results/water-fft-${backend}.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 } finally {

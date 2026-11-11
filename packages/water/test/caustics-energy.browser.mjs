@@ -179,7 +179,7 @@ fn oceanAt(base:vec2f)->SurfaceSample {
   }
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-caustics-energy-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-caustics-energy-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify({ reports, hardware: browser.hardware }, null, 2),
   );
   for (const report of reports) {

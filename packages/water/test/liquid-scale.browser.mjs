@@ -90,7 +90,7 @@ try {
       return { work, firstMs, steadyMs, gpuMs, spacing, error: error?.message ?? null };
     }, c);
     assert.equal(result.error, null, `${c.name}: GPU validation error ${result.error}`);
-    if (c.count) assert.deepEqual(result.work, { passes: 6, draws: 6, bytes: 320, particles: c.count, groups: 0 });
+    if (c.count) assert.deepEqual(result.work, { passes: 6, draws: 6, bytes: 320, particles: c.count, groups: 0, whitewater: 0 });
     console.log(
       `${c.name}: ${c.count} particles at ${c.width} x ${c.height} (radius ${result.spacing.toFixed(4)} m); first ${result.firstMs.toFixed(0)} ms, steady ${result.steadyMs.toFixed(1)} ms wall, GPU ${result.gpuMs?.toFixed(2) ?? 'n/a'} ms`,
     );

@@ -284,14 +284,15 @@ fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleGrid.xy)/rippleGrid.z-0.5;let 
     options.signal?.throwIfAborted();
     if (!this.engine?.gpu || !this.rendered) throw fault('state', 'Render the water before reading ripples');
     if (this.reading) throw fault('state', 'Ripple read pending; await it before reading again');
-    this.reading = true;
     const device = this.engine.gpu,
       generation = this.generation,
       origin = Object.freeze([...this.origin]) as readonly [number, number];
+    // Pending only once the buffer exists: a refused allocation throws here and leaves the next read free.
     const buffer = device.createBuffer({
       size: this.resolution ** 2 * 8,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     });
+    this.reading = true;
     const abort = () => buffer.destroy();
     options.signal?.addEventListener('abort', abort, { once: true });
     try {

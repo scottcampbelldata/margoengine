@@ -212,7 +212,7 @@ try {
   console.log(JSON.stringify(result));
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-caustics-project-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-caustics-project-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify({ ...result, hardware: browser.hardware }, null, 2),
   );
   assert.equal(result.validation, undefined);

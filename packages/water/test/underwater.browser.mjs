@@ -393,7 +393,7 @@ try {
   assert.ok(result.environmentError < 0.002, `borrowed environment ${result.environmentError}`);
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-underwater-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}${result.single ? '-single' : ''}.json`,
+    `test-results/water-underwater-${browser.hardware?.compat ? 'compat' : 'webgpu'}${result.single ? '-single' : ''}.json`,
     JSON.stringify({ ...result, hardware: browser.hardware }, null, 2),
   );
 } finally {

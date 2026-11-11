@@ -165,7 +165,7 @@ try {
   assert.ok(Object.values(result.timings).every((t) => Number.isFinite(t) && t > 0));
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-rivers-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-rivers-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify({ ...summary, hardware: browser.hardware }, null, 2),
   );
 } finally {

@@ -357,7 +357,7 @@ return Probe(vec4f(i.world,1),vec4f(${fft ? 'oceanAt(i.base).normal' : 'normaliz
   }
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-query-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-query-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(
       { hardware: browser.hardware, observation: { station: '46042', windSpeed: observation[6] }, ...result },
       null,

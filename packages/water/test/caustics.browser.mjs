@@ -356,7 +356,7 @@ fn shadowLit(color:vec3f,p:vec3f,n:vec3f)->f32{return select(1.0,0.0,(p.x<0.0)&&
   assert.equal(result.detachedCode, 'state');
   await mkdir('test-results', { recursive: true });
   await writeFile(
-    `test-results/water-caustics-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-caustics-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify({ ...result, hardware: browser.hardware }, null, 2),
   );
 } finally {

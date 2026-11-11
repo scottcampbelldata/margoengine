@@ -189,7 +189,7 @@ try {
   });
   const changed = await page
     .locator('canvas')
-    .screenshot({ path: `test-results/water-flow-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.png` });
+    .screenshot({ path: `test-results/water-flow-${browser.hardware?.compat ? 'compat' : 'webgpu'}.png` });
   assert.ok(!a.equals(changed), 'flow changes visible water shading');
   await page.evaluate(async () => {
     const t = window.flowTest;
@@ -236,7 +236,7 @@ try {
   };
   console.log(JSON.stringify(report));
   await writeFile(
-    `test-results/water-flow-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/water-flow-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(report, null, 2),
   );
 } finally {

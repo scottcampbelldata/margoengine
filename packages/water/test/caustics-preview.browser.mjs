@@ -87,7 +87,7 @@ try {
     await browser.page.locator('canvas').screenshot({ path: `test-results/batch234/caustics-${name}.png` });
   }
   await writeFile(
-    `test-results/batch234/caustics-preview-${process.argv.includes('--compat') ? 'compat' : 'webgpu'}.json`,
+    `test-results/batch234/caustics-preview-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify({ hardware: browser.hardware, wind }, null, 2),
   );
   await browser.page.evaluate(() => window.preview.engine.dispose());

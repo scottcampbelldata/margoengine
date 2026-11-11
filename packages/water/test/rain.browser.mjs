@@ -9,9 +9,9 @@ import { decodePNG } from '../../../tests/support/png.js';
 // attach order, splashes move a Ripples field, and disposing restores the plain frame exactly.
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 await mkdir('test-results', { recursive: true });
-const mode = process.argv.includes('--compat') ? 'compat' : 'webgpu';
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' }),
   { page, hardware } = browser,
+  mode = hardware?.compat ? 'compat' : 'webgpu',
   errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => {
