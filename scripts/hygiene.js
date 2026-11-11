@@ -34,6 +34,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { assertErrorPageCurrent } from './errors/check.mjs';
 import { entries as errorHelp } from './errors/entries.js';
 import { plan as gpuPlan } from './gpu-package-tests.mjs';
 import { assertCitedResultsTracked } from './support/cited-results.mjs';
@@ -50,6 +51,10 @@ assertValidTrackedManifests(root);
 assertCitedResultsTracked(root);
 // Every committed Wasm blueprint must match the crate sources it was built from (scripts/wasm-blueprints.mjs).
 assertWasmBlueprintsCurrent(root);
+// margoengine.com/errors must list every message the coded throws link to (scripts/errors/check.mjs). Checked here
+// because the fast gate runs hygiene on every push while a lane runs only its own package tests; an unlisted sciviz
+// message once reached main that way (KB-ERR1).
+assertErrorPageCurrent(root);
 // Every browser test file must have a script check:gpu-packages runs; its plan throws otherwise. Checked here because
 // the fast gate runs hygiene on every push and the plan would only fail later, in local CI's full check.
 gpuPlan();

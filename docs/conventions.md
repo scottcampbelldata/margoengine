@@ -75,8 +75,11 @@ Core and the stage facade follow the same table, but keep messages short and lin
 `fault(code, message, anchor?)`, `typeError(message, anchor)` and `rangeError(message, anchor)` from
 `packages/shared/errors.js` (bundled into their dist), which append `; see https://margoengine.com/errors#<anchor>`
 (the anchor defaults to the code). The page is generated from `scripts/errors/entries.js` (`node
-scripts/errors/page.mjs`); `tests/errors-page.test.js` checks that every link points at an entry, that every
-MargoError code has one, and that the page matches the file. The quality gate counts a linked message as naming its
+scripts/errors/page.mjs`); `scripts/errors/check.mjs` checks that every link points at an entry, that every
+MargoError code has one, that every literal message is listed under the entry it links to, and that the page matches
+the file, for core, stage, compute, sciviz, ui, mcp, biomes and cache. `tests/errors-page.test.js` runs it, and so
+does `npm run hygiene`, so the fast gate of any lane fails on an unlisted message even when it runs only its own
+package tests (an unlisted sciviz message once reached `main` that way). The quality gate counts a linked message as naming its
 fix, and a link to a missing entry as naming none.
 
 Optional packages use the same helpers and help page entries (add them to

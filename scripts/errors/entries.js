@@ -1219,6 +1219,8 @@ export const entries = [
       'One row key or group is required per mark',
       'Unknown selection display mode',
       'Selection fade must be in [0,1]',
+      'The layer and its drawn marks differ in count',
+      'The layer is already bound; dispose that binding first',
       'Selection row keys must be strings or finite numbers',
       'Selection dataset row keys must be unique',
       'Unknown selection universe',
