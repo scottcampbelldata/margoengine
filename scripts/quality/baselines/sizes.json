@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15015791,
+  "total": 15047576,
   "history": [
     {
       "date": "2026-10-24",
@@ -8411,6 +8411,12 @@
       "commit": "8f31169fbf",
       "reason": "loaders root +8 B gzip (53,650 to 53,658): toGeometries checks maxPartVertices and splitTriangles caps a part at 67,108,864 indices now that parts follow core's 11,184,810-vertex limit; no split possible for a check inside the function",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "6d0836c488",
+      "reason": "new optional entry text/vector (lague plan 2): exact GPU glyph coverage from font curves. About 12 KB of it is the OpenType outline parser shared with text/extrude (moved out of extrude.ts into font-outlines.ts so vector does not pull in the triangulator); the plan's 9,000 B estimate left the parser out. Splitting the parser again would only move bytes, and a lighter parser would drop CFF2 and variations.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9501,6 +9507,7 @@
     "@margoengine/text/msdf": 4494,
     "@margoengine/text/rich": 12041,
     "@margoengine/text/selection": 958,
+    "@margoengine/text/vector": 31785,
     "@margoengine/tilemap": 7435,
     "@margoengine/tilemap/autotile": 2087,
     "@margoengine/tilemap/fov": 1843,

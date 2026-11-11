@@ -90,7 +90,7 @@ export function toQuadratics(contours: readonly (readonly (readonly number[])[])
           out.push([start[0], start[1], (3 * (c1x + c2x) - start[0] - end[0]) / 4, (3 * (c1y + c2y) - start[1] - end[1]) / 4, end[0], end[1]]);
           start = end;
         }
-      } else throw new RangeError('Outline segments have 4, 6 or 8 coordinates');
+      } else throw new RangeError('Outline segments have 4, 6 or 8 coordinates; pass each line, quadratic or cubic as its points [x0, y0, ..., xn, yn]');
     }
   return out;
 }

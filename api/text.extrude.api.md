@@ -59,6 +59,7 @@ export class FontOutlines {
     glyphIndex(charOrCode: string | number): number;
     glyphAdvance(glyphIndex: number): number;
     getGlyphContours(glyphIndex: number, curveSegments?: number): Point2D[][];
+    getGlyphSegments(glyphIndex: number): number[][][];
 }
 
 export interface FontVariationAxis {

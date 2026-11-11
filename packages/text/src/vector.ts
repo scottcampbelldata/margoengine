@@ -588,9 +588,9 @@ export class VectorTextRenderer implements EnginePlugin {
     for (const text of [...this.resources.keys()]) this.release(text);
     for (const gpu of this.fonts.values()) gpu.buffer.destroy();
     this.fonts.clear();
+    this.pipelines.clear();
     this.frameBuffer?.destroy();
     this.frameBuffer = this.frameGroup = this.module = this.layouts = this.device = undefined;
-    this.pipelines.clear();
   }
 
   /** Releases every GPU resource. Texts stay registered, so the plugin can be used again. */
