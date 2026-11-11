@@ -27,8 +27,16 @@
   count smaller than the row stride` (142 calls of one 2048x12 `RGBA_INTEGER` upload from a 393,216-byte pixel buffer,
   alignment 1, in the lod page) and, in materials, `Tex image TEXTURE_2D level N is incurring lazy initialization`. Cause
   of (3) not found: the same call in a plain page (exact, larger or partly filled buffer, any usage) prints nothing.
-- **Next:** decide whether the checks ignore Firefox's own advisory warnings (a test change, so not made here) or the layer
-  stops causing them; (3) needs a smaller repro first. Owner: webgl2-compat (layer) and the two checks.
+- **Fixed 2026-11-11, (1):** Firefox 157's `RENDERER` names the GPU (the same string as the extension, measured in a plain
+  page under Playwright), so the layer asks for `WEBGL_debug_renderer_info` only where `RENDERER` is empty or the masked
+  `WebKit WebGL` (Chromium, WebKit). Regression: `packages/webgl2-compat/test/capabilities.test.js`, "the unmasked
+  renderer is asked for only where RENDERER is masked".
+- **Measured 2026-11-11, (3):** a plain Firefox 157 page prints the "final row" advisory for every `texSubImage2D` from a
+  pixel buffer, full rows from an exact buffer included, and "partial upload ... lazy initialization" for a partial
+  upload into a `texStorage2D` texture. Earlier "prints nothing" runs did not catch the console.
+- **Next:** (2) the checks assert the deliberate `loseContext()` line exactly once (coordinator call); (3) initialise data
+  textures at creation, and test whether another unpack alignment stops the "final row" advisory, else an upstream
+  report draft. Owner: webgl2-compat (layer) and the two checks.
 
 ### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
 
@@ -2376,18 +2384,17 @@ render at half-float. Regression: that check (failed on 16fbe3c86c, passes now).
 - **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.
 - **Still open, surfels:** `SurfelPlugin` at 4x refuses with `unsupported`: its sums need a multisampled float target to add into and the level multisamples neither `r32float` nor `rgba16float`. A 1x pass needs a sampleable copy of the scene depth, which core's own 4x attachments do not have. Next idea: two `rg11b10ufloat` sum targets where the adapter has `rg11b10ufloat-renderable` (6-bit mantissa sums, to be measured), front depth packed into `rgba8unorm` as eye-dome lighting packs it, resolve by masked draws per sample.
 
-### Sky and other packages draw HDR as display colour over PostStack's rg11b10ufloat capture (found 2026-11-11, open)
+### Fixed 2026-11-11: sky and other packages drew HDR as display colour over PostStack's rg11b10ufloat capture
 
-- **What:** at WebGPU's compatibility level, `PostStack` captures 4x in `rg11b10ufloat`. `@margoengine/sky` (base, aerial, Hillaire, shafts, volumetric clouds) decides linear HDR output by `format === 'rgba16float'`, so over that capture it encodes for display and then the stack tonemaps again: the sky draws up to 19 of 255 brighter than at the full level (11,842 of 12,288 bytes differ, RTX A6000). About 25 more sites in animation, creative, environment, gltf-pro, lod, scatter, splats, terrain, voxel, voxel-pathtracer and water test the same way.
-- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, read `levels.sky`.
-- **Cause:** no shared "linear target" test; each package names `rgba16float` (some also `rgba32float`).
-- **Needed:** one predicate in `packages/shared` (float formats are linear) used at every site, then compare `levels.sky` at 0 and assert the fogged frames equal.
+- **Was:** at WebGPU's compatibility level `PostStack` captures 4x in `rg11b10ufloat`. Sky (base, aerial, Hillaire, shafts, volumetric clouds) and 25 more sites in animation, creative, environment, gltf-pro, lod, materials, scatter, splats, terrain, voxel, voxel-pathtracer and water decided linear HDR output by `format === 'rgba16float'` (some also `rgba32float`), so over that capture they encoded for display and the stack tonemapped again: the sky drew up to 19 of 255 brighter than at the full level.
+- **Fix:** one predicate, `linearHdr` in `packages/shared/hdr-format.js` (every float format is linear), at every site; creative's planet and grass passes also accept the `rg11b10ufloat` capture instead of refusing it. The sky now differs from the full level by at most 3 of 255 and the fogged frame by 4, all in blue, the capture's 5-bit blue mantissa against rgba16float's 10 bits.
+- **Regression:** `tests/hdr-format.test.js` (fails on the old source: 25 sites compare a pass format with `rgba16float` alone); `packages/webgl2-compat/test/adapter-browser.mjs` asserts the sky and fogged frames within 4 of 255 (19 before); `packages/creative/tests/planet.test.js` draws into `rg11b10ufloat`.
 
-### Lone Bloom fails at 4x on WebGPU's compatibility level (found 2026-11-11, open)
+### Fixed 2026-11-11: a lone Bloom failed at 4x on WebGPU's compatibility level
 
-- **What:** `Bloom.attach(engine)` without `PostStack` creates a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"). `PostStack` picks `rg11b10ufloat` there; Bloom alone does not.
-- **Repro:** in `packages/webgl2-compat/test/adapter-browser.js` attach `Bloom` alone in a `PACKAGES` case.
-- **Needed:** the same capture-format choice as `PostStack` (`captureFormat` in `packages/post/src/stack.ts`), with a case in the adapter check.
+- **Was:** `Bloom.attach(engine)` without `PostStack` created a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"); `PostStack` picked `rg11b10ufloat` there, Bloom alone did not.
+- **Fix:** both take the capture format from one function, `captureFormat` in `packages/post/src/capture.ts`; Bloom's scene pipelines target the capture's format.
+- **Regression:** `packages/webgl2-compat/test/adapter-browser.mjs` case `post bloom alone 4x` (threw on the old source).
 
 ### Fixed 2026-11-11: external PBR display passes blend glass in encoded values (KB2281)
 
@@ -5300,7 +5307,7 @@ Fixed 2026-11-10: animation dependent cutscene replay (326c67544). The unchanged
 
 Fixed 2026-11-10: GPU runner registration on clean origin/main b47fdef13. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
-Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.
+Fixed 2026-11-11 (KB5128a, bug sweep L3): CompatBuffer.mapAsync ignored offset and size, and getMappedRange sliced without enforcing the mapped interval or non-overlap. Both now follow WebGPU's rules: mapAsync rejects with OperationError (and reports a validation error) for a mode the buffer lacks, an offset not on 8 bytes, a size not of whole words or a range past the buffer; getMappedRange throws OperationError outside the mapped range, unaligned or overlapping a range already returned. Regression: packages/webgl2-compat/test/device.test.js, "mapAsync and getMappedRange keep to the mapped range".
 
 Batch 220 job 2: the requested scalar interpolants/keyed-curve gap is implemented in math/curve; no open defect found by its analytic and ownership tests. Cubic overshoot and clamped time evaluation are explicit contracts in limits, not monotonic or periodic interpolation claims.
 

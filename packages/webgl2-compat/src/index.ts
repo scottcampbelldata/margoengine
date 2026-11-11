@@ -155,8 +155,11 @@ export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities {
       ? 'half-float'
       : 'ldr';
   const text = (pname: number) => String(gl.getParameter(pname) ?? '');
-  // The unmasked name where the browser still offers it (WEBGL_debug_renderer_info, UNMASKED_RENDERER_WEBGL).
-  const unmasked = gl.getExtension('WEBGL_debug_renderer_info') != null ? text(0x9246) : '';
+  // RENDERER names the GPU in Firefox, which deprecates WEBGL_debug_renderer_info and warns when it is asked for; where
+  // RENDERER is the masked 'WebKit WebGL' (Chromium, WebKit) the unmasked name comes from that extension instead.
+  const plain = text(gl.RENDERER),
+    unmasked =
+      (!plain || plain === 'WebKit WebGL') && gl.getExtension('WEBGL_debug_renderer_info') != null ? text(0x9246) : '';
   return {
     tier,
     supported: tier === 'full',
@@ -164,7 +167,7 @@ export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities {
     highpFragment,
     extensions,
     limits,
-    renderer: unmasked || text(gl.RENDERER),
+    renderer: unmasked || plain,
     version: text(gl.VERSION),
     shadingLanguageVersion: text(gl.SHADING_LANGUAGE_VERSION),
   };

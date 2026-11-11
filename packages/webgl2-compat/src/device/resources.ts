@@ -63,6 +63,8 @@ export class CompatBuffer {
   mapState: 'unmapped' | 'pending' | 'mapped' = 'unmapped';
   private mapMode = 0;
   private ranges: { offset: number; data: ArrayBuffer }[] = [];
+  /** The mapped byte range [start, end) of mapAsync or mappedAtCreation; getMappedRange reads only inside it. */
+  private mapped = [0, 0];
   readonly readbacks: Readback[] = [];
   /** Bumped by every change of the contents, so the data texture knows when to refresh. */
   version = 0;
@@ -127,6 +129,7 @@ export class CompatBuffer {
       if (size % 4) throw new RangeError('A buffer mapped at creation needs a size that is a multiple of 4');
       this.mapState = 'mapped';
       this.mapMode = 2;
+      this.mapped = [0, size];
     }
   }
 
@@ -246,10 +249,18 @@ export class CompatBuffer {
       return Promise.reject(new DOMException('The buffer is already mapped or mapping', 'OperationError'));
     if (!this.shadow)
       return Promise.reject(new DOMException('The buffer has no MAP_READ or MAP_WRITE usage', 'OperationError'));
-    void offset;
-    void size;
+    // WebGPU's mapAsync rules: an 8-byte aligned offset, a size of whole words, the range inside the buffer, and one
+    // mode the buffer was made for. Before 2026-11-11 offset and size were ignored and every range mapped the whole buffer.
+    const n = size ?? Math.max(0, this.size - offset);
+    // GPUMapMode READ and WRITE have the bit values of the MAP_READ and MAP_WRITE usages.
+    if (!((mode === 1 || mode === 2) && this.usage & mode) || offset % 8 || n % 4 || offset + n > this.size) {
+      const bad = `mapAsync: mode ${mode} or bytes ${offset} to ${offset + n} break WebGPU's map rules`;
+      this.device.validationError(bad);
+      return Promise.reject(new DOMException(bad, 'OperationError'));
+    }
     this.mapState = 'pending';
     this.mapMode = mode;
+    this.mapped = [offset, offset + n];
     return Promise.resolve(this.device.queue.waiting).then(async () => {
       // Mapping waits for this buffer's writes, not a new fence after the entire device queue. Texture/query
       // readbacks carry their own readiness; a GPU-only buffer copy without one still needs the queue fence.
@@ -278,8 +289,18 @@ export class CompatBuffer {
   getMappedRange(offset = 0, size?: number): ArrayBuffer {
     if (this.mapState !== 'mapped' || !this.shadow)
       throw new DOMException('The buffer is not mapped; await mapAsync() first', 'OperationError');
-    const n = size ?? this.size - offset;
-    const data = this.shadow.slice(offset, offset + n).buffer;
+    // WebGPU's getMappedRange rules: aligned, inside the mapped range and overlapping no range already handed out.
+    const n = size ?? Math.max(0, this.size - offset),
+      end = offset + n;
+    if (
+      offset % 8 ||
+      n % 4 ||
+      offset < this.mapped[0] ||
+      end > this.mapped[1] ||
+      this.ranges.some((r) => offset < r.offset + r.data.byteLength && r.offset < end)
+    )
+      throw new DOMException(`getMappedRange: bytes ${offset} to ${end} break WebGPU's map rules`, 'OperationError');
+    const data = this.shadow.slice(offset, end).buffer;
     this.ranges.push({ offset, data });
     return data;
   }

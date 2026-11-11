@@ -123,6 +123,9 @@ test('map readiness also yields a port task, checks every pending result and rej
     readbacks: [{}],
     shadowValid: true,
     mapState: 'unmapped',
+    // A 4-byte MAP_READ buffer: mapAsync checks the mode and range against them (KB5128a).
+    size: 4,
+    usage: 1,
     shadow: new Uint8Array(4),
     settle: () => ++checks % 4 === 0,
   };
@@ -161,6 +164,9 @@ test('mapping waits queued writes first and retains the fence for an invalid GPU
   const buffer = {
     destroyed: false,
     mapState: 'unmapped',
+    // A 4-byte MAP_READ buffer: mapAsync checks the mode and range against them (KB5128a).
+    size: 4,
+    usage: 1,
     shadow: new Uint8Array(4),
     shadowValid: false,
     readbacks: [],

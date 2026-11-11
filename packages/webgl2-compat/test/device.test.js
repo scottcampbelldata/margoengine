@@ -506,6 +506,27 @@ test('a bind group whose storage bindings pass 2,048 x maxTextureDimension2D row
   device.destroy();
 });
 
+// Bug KB5128a (bug sweep L3): mapAsync ignored its offset and size, and getMappedRange handed out any range, overlapping
+// ones included, so a write through one range could be lost under another at unmap. Both now follow WebGPU's rules.
+test('mapAsync and getMappedRange keep to the mapped range, aligned and without overlaps', async () => {
+  const gl = new Proxy(fakeContext(), { get: (context, key) => (key in context ? context[key] : () => ({})) });
+  const device = await (await createCompatGPU({ createContext: () => gl }).requestAdapter()).requestDevice();
+  const read = device.createBuffer({ size: 64, usage: 0x1 | 0x8 });
+  device.pushErrorScope('validation');
+  for (const [mode, offset, size] of [[1, 4], [1, 8, 6], [1, 32, 64], [2, 0], [3, 0]])
+    await assert.rejects(read.mapAsync(mode, offset, size), { name: 'OperationError' }, `${mode} ${offset} ${size}`);
+  assert.match((await device.popErrorScope())?.message ?? '', /^mapAsync: /);
+  assert.equal(read.mapState, 'unmapped');
+  const made = device.createBuffer({ size: 64, usage: 0x8, mappedAtCreation: true });
+  const first = made.getMappedRange(8, 16);
+  assert.equal(first.byteLength, 16);
+  for (const [offset, size] of [[4, 8], [8, 8], [16, 8], [56, 16], [8, 6]])
+    assert.throws(() => made.getMappedRange(offset, size), { name: 'OperationError' }, `${offset} ${size}`);
+  assert.equal(made.getMappedRange(24).byteLength, 40);
+  made.unmap();
+  device.destroy();
+});
+
 // Explicit installation on a native WebGPU browser must explain why the renderer did not change.
 test('install keeps native WebGPU with a coded warning and forcing installs the full layer', async () => {
   const { installCompat, uninstallCompat } = await import('../dist/device.js');

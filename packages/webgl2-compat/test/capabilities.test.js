@@ -11,7 +11,7 @@ import {
 } from '../dist/index.js';
 
 /** A stand-in WebGL2 context with the given extensions and highp support. */
-function fakeContext({ extensions = [], highp = true, limits = {} } = {}) {
+function fakeContext({ extensions = [], highp = true, limits = {}, renderer = 'Stand-in renderer' } = {}) {
   const enums = Object.fromEntries(COMPAT_LIMITS.map((name, i) => [name, 0x1000 + i]));
   const values = new Map(COMPAT_LIMITS.map((name, i) => [0x1000 + i, limits[name] ?? 16 + i]));
   const asked = [];
@@ -31,7 +31,8 @@ function fakeContext({ extensions = [], highp = true, limits = {} } = {}) {
       return extensions.includes(name) ? {} : null;
     },
     getParameter(p) {
-      if (p === 0x1f01) return 'Stand-in renderer';
+      if (p === 0x1f01) return renderer;
+      if (p === 0x9246) return 'Unmasked GPU';
       if (p === 0x1f02) return 'WebGL 2.0';
       if (p === 0x8b8c) return 'WebGL GLSL ES 3.00';
       return values.get(p) ?? null;
@@ -106,4 +107,16 @@ test('probeWebGL2 resolves null without WebGL2, and names the fix outside a brow
       () => probeWebGL2(),
       (e) => e instanceof TypeError && /pass \{canvas\}/.test(e.message),
     );
+});
+
+// Bug (bug sweep L3, Firefox reruns): asking for WEBGL_debug_renderer_info prints a deprecation warning in Firefox, whose
+// RENDERER already names the GPU, so every Firefox page on the layer failed its no-warnings check. The layer asks for
+// the extension only where RENDERER is masked.
+test('the unmasked renderer is asked for only where RENDERER is masked', () => {
+  const named = fakeContext({ extensions: ['WEBGL_debug_renderer_info'], renderer: 'ANGLE (NVIDIA RTX A6000)' });
+  assert.equal(webgl2Capabilities(named).renderer, 'ANGLE (NVIDIA RTX A6000)');
+  assert.equal(named.asked.includes('WEBGL_debug_renderer_info'), false);
+  const masked = fakeContext({ extensions: ['WEBGL_debug_renderer_info'], renderer: 'WebKit WebGL' });
+  assert.equal(webgl2Capabilities(masked).renderer, 'Unmasked GPU');
+  assert.equal(webgl2Capabilities(fakeContext({ renderer: 'WebKit WebGL' })).renderer, 'WebKit WebGL');
 });
