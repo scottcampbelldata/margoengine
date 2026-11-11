@@ -13,6 +13,7 @@ import { Tonemap } from '/packages/tonemap/dist/index.js';
 import { allowCompatibilityAdapters } from '/packages/webgl2-compat/dist/adapter.js';
 import { SceneTarget } from '/packages/shared/msaa.js';
 import { PointCloud, PointsPlugin } from '/packages/points/dist/index.js';
+import { SurfelPlugin } from '/packages/points/dist/surfels.js';
 import { Sky } from '/packages/sky/dist/index.js';
 import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
 import { Water } from '/packages/water/dist/index.js';
@@ -76,6 +77,18 @@ const edlScene = (engine) => {
   const plugin = new PointsPlugin();
   engine.use(plugin);
   plugin.add(new PointCloud({ positions: sheet(), material: { size: 6, color: '#ffc040', edl: true } }));
+};
+/**
+ * Surfels over PostStack's 4x capture: a two-colour sheet in front of the box, whose discs blend across the seam. The
+ * level packs the front depth into rgba8unorm and adds the sums in two rg16float targets (bug sweep L3).
+ */
+const surfelScene = (engine, drawn = true) => {
+  scene(engine);
+  PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
+  if (!drawn) return;
+  const positions = sheet(),
+    colors = positions.map((value, i) => (i % 3 === 0 ? +(value < 0) : i % 3 === 2 ? +(positions[i - 2] >= 0) : 0.3));
+  SurfelPlugin.attach(engine, { overlap: 2 }).add(new PointCloud({ positions, colors, material: { size: 0.06, sizeUnits: 'world' } }));
 };
 /** Sky fog over PostStack's 4x capture: per sample by sample_index at the full level, by masked draws at the level. */
 const fogScene = (engine, density = 0.2) => {
@@ -229,6 +242,7 @@ export const PACKAGES = {
     PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
     VolumetricFog.attach(engine, { density: 0.05 });
   },
+  'points surfels 4x': surfelScene,
   'water spray 4x'(engine) {
     scene(engine);
     PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
@@ -261,7 +275,8 @@ window.check = {
       postFull = await frames(postScene),
       edlFull = await frames(edlScene),
       fogFull = await frames(fogScene),
-      skyFull = await frames(skyScene);
+      skyFull = await frames(skyScene),
+      surfelFull = await frames(surfelScene);
 
     const adapters = allowCompatibilityAdapters({ force: true }),
       compat = await open({}),
@@ -294,7 +309,11 @@ window.check = {
       edlLevel = await frames(edlScene),
       fogLevel = await frames(fogScene),
       skyLevel = await frames(skyScene),
+      surfelLevel = await frames(surfelScene),
+      surfelBare = await frames((engine) => surfelScene(engine, false)),
       levels = {
+        surfels: compare(surfelFull.bytes, surfelLevel.bytes),
+        surfelsBare: compare(surfelBare.bytes, surfelLevel.bytes),
         sky: compare(skyFull.bytes, skyLevel.bytes),
         fog: compare(fogFull.bytes, fogLevel.bytes),
         fogFullDrawn: compare(skyFull.bytes, fogFull.bytes),
@@ -314,6 +333,8 @@ window.check = {
           ...fogLevel.errors,
           ...skyFull.errors,
           ...skyLevel.errors,
+          ...surfelFull.errors,
+          ...surfelLevel.errors,
         ],
       };
 

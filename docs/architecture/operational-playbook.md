@@ -1770,8 +1770,10 @@ views of one texture in a dispatch) and `PostStack` captures 4x in `rg11b10ufloa
 0 bytes apart from the full level with a real shadow on the floor, four depth samples read back as written, the post
 frame within 2 of 255. Sky fog, the VolumetricFog composite and water spray also draw once per sample with a constant
 sample index and a one-sample mask (`perSample` in `packages/shared/msaa.js`, 2026-11-11), proved by the adapter check's
-4x cases and its fogged frame. Missing: surfels at 4x, a lone Bloom at 4x, and the float-target test the sky and about
-25 other sites make by naming rgba16float, which misreads the rg11b10ufloat capture (known-bugs.md).
+4x cases and its fogged frame. Surfels at 4x (2026-11-11) pack their front depth into rgba8unorm and add their sums in
+two rg16float targets (r, g and b, weight: the full level's half floats), resolved by a masked draw per sample; the
+adapter check's surfel frame is within 4 of 255 of the full level's. A lone Bloom at 4x and the float-target test
+(`linearHdr`) were fixed the same day (known-bugs.md).
 
 `@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
 runs with no page. Stages alive at once share one `gpu`, because `installGPU` changes globals, and `engine.start()` needs

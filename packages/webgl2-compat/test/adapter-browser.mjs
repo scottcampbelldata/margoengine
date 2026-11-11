@@ -64,6 +64,13 @@ try {
     assert.ok(result.levels[name].largest <= 4, `the ${name} frame stays within the capture's rounding, got ${JSON.stringify(result.levels[name])}`);
   assert.ok(result.levels.fogFullDrawn.count > 6000, 'the fog changes the full-level frame');
   assert.ok(result.levels.fogDrawn.count > 6000, 'the fog changes the frame at the level');
+  // Surfels at 4x: the level packs the front depth into rgba8unorm and adds the sums in two rg16float targets, the same
+  // half floats as the full level's rgba16float, resolved by a masked draw per sample (bug sweep L3; they refused 4x
+  // before). What is left is PostStack's rg11b10ufloat capture under them, as on the sky frame: measured at most 4 of
+  // 255 (red 3, blue 4) on 2026-11-11, A6000 D3D12.
+  console.log('surfels', JSON.stringify({ surfels: result.levels.surfels, bare: result.levels.surfelsBare }));
+  assert.ok(result.levels.surfelsBare.count > 3000, 'the surfels reach the frame at the level');
+  assert.ok(result.levels.surfels.largest <= 4, `the surfel frame stays within the capture's rounding, got ${JSON.stringify(result.levels.surfels)}`);
   // Each of these runs on the level.
   for (const name of [
     'core alone',
@@ -77,6 +84,7 @@ try {
     'sky fog 4x',
     'environment volumetric 4x',
     'water spray 4x',
+    'points surfels 4x',
   ])
     assert.match(result.packages[name], /^ok, [1-9]/, name);
   assert.deepEqual(pageErrors, []);
