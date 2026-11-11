@@ -4848,8 +4848,8 @@ changed with them; the files hold every field):
 
 Trade-off: iridescence and clearcoat now sit further from the Sample Viewer picture because Margo filters the
 displayed texture and keeps the light direction exact; the other moves are gains. The clustered and clustered-point
-Cornell budgets did not move. The environment IBL budget is not re-recorded: its native direct row is 1 over since
-`40e6f183dc`, a change outside this ruling (docs/known-bugs.md). The AMD rows (`amd` in specular and ior,
+Cornell budgets did not move. The environment IBL budget was not re-recorded by this ruling: its native direct row was 1 over since
+`40e6f183dc`; Scott's separate ruling of the same day (KB3574) re-recorded it at 2,294,442 (batch 160 job 7 below). The AMD rows (`amd` in specular and ior,
 `batch-160-amd-*.json`) were measured before these changes and are not re-measured; an AMD rerun is owed.
 Reproduce: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
 scripts/reference-rendering/run.mjs --case=<case> [--compat]`, then `transport.mjs --case=<transmission|volume>`.
@@ -5153,7 +5153,7 @@ Optional media entry: 1954 B gzip with bare peers external, budget 2210 B.
 Tracer root after the boundary-distance repair: 80841 B (within its existing budget); core plus stage
 23837 B, strictly below 25000. Proof: docs/whitepaper/results/batch-99-media-20261109.json.
 
-Batch 160 job 7: environment IBL of the complete MetalRoughSpheresNoTextures scene, 512 x 512, linear constant radiance [0.3,0.5,0.7], no direct sun, black background. Mitsuba 3.9.1 scalar_rgb, 128 spp, seed 160, no denoising, direct max depth 2 and full max depth 8. All RGB pixels after shared PBR Neutral/sRGB: native absolute 2,294,441 / 1,482,507 and compatibility 2,294,432 / 1,482,506 (direct/full). Each exact measured square/max/coverage budget is in whitepaper/results/batch-160-environment.json. Native WebGL2 explicitly refuses this PBR/IBL path; actual WebGL2 compatibility is measured. Principled/glTF BSDF differences, missing geometric IBL occlusion/reflections, finite reference noise and antialiasing remain open picture losses. A constant furnace does not prove nonuniform skies or directional prefilter accuracy; batch 168 sky evidence is reused rather than repeated. No speed or physical-equivalence claim.
+Batch 160 job 7: environment IBL of the complete MetalRoughSpheresNoTextures scene, 512 x 512, linear constant radiance [0.3,0.5,0.7], no direct sun, black background. Mitsuba 3.9.1 scalar_rgb, 128 spp, seed 160, no denoising, direct max depth 2 and full max depth 8. All RGB pixels after shared PBR Neutral/sRGB: native absolute 2,294,442 / 1,482,507 and compatibility 2,294,432 / 1,482,506 (direct/full). Each exact measured square/max/coverage budget is in whitepaper/results/batch-160-environment.json. Native WebGL2 explicitly refuses this PBR/IBL path; actual WebGL2 compatibility is measured. Principled/glTF BSDF differences, missing geometric IBL occlusion/reflections, finite reference noise and antialiasing remain open picture losses. A constant furnace does not prove nonuniform skies or directional prefilter accuracy; batch 168 sky evidence is reused rather than repeated. No speed or physical-equivalence claim. The native direct budget was re-recorded from 2,294,441 (square 76,817,341) to 2,294,442 (square 76,817,356) on 2026-11-11 by Scott's ruling (KB3574): the deliberate GGX importance-sampling fix 40e6f183dc (sin theta from alpha sqrt(xi / d), Walter et al. 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR, eq. 35) moves 58 of 262,144 pixels by one 8-bit level; putting the two old lines back renders 2,294,441. No other budget moved.
 
 Batch 160 job 8: diffuse Cornell direct-light pictures against Mitsuba 3.9.1 scalar_rgb, 512 x 512, 128 spp, seed 160, max depth 2, no ambient/indirect/emissive light. Existing batch 168 geometry/spectrum transcription reused; this is not another irradiance-bake measurement. All RGB pixels after PBR Neutral/sRGB. Directional intensity 3, direction [0.2,-0.6,1], explicit world bounds: shadowed absolute 567,377 and MAE 0.7214571634928385 on both backends; unshadowed control absolute 38,244,516 and MAE 48.63041687011719. Point [2.78,4.8,1], intensity 70, range 20: shadowed absolute 730,273 / 730,276 and MAE 0.9285901387532552 / 0.9285939534505209; unshadowed absolute 6,010,641 / 6,010,645. Each first integer square/max/coverage budget is frozen separately in batch-160-clustered.json and batch-160-clustered-point.json. Default 512-map, 3x3 PCF, bias 1 and normal bias 1.5 differ from hard ray shadows; the authored point range window differs from Mitsuba inverse square. These intentional model/filter differences are retained, while residual contact/visibility losses stay open. Native WebGL2 explicitly refuses clustered lighting; real compatibility is measured. No point/spot-grid stress, area-light, GI, speed or physical-equivalence claim.
 
@@ -10120,6 +10120,19 @@ is not an option, and the normal path builds with the hardware branch only.
   Firefox on a quiet machine, and see whether the case finishes given the time.
 
 
+### Accepted 2026-11-11: batch 160 environment native direct budget re-recorded one level higher (KB3574)
+
+`node scripts/reference-rendering/environment.mjs` (native, RTX A6000) measured absolute 2,294,442 (square
+76,817,356) against its budget 2,294,441 (square 76,817,341). Cause, bisected: 40e6f183dc, the deliberate GGX
+importance-sampling fix (sin theta from alpha sqrt(xi / d) instead of sqrt(1 - cos^2); Walter et al. 2007,
+"Microfacet Models for Refraction through Rough Surfaces", EGSR, eq. 35), which moves the split-sum LUT toward an
+f64 integration (worst cell error 1.17e-3 to 4.9e-4, pinned by `packages/environment/tests/environment-browser.js`).
+Putting the two old lines back renders 2,294,441; between the two renders 58 of 262,144 pixels move by one 8-bit
+level. Scott ruled "re record" on 2026-11-11: the native direct budget is now 2,294,442 in
+docs/whitepaper/results/batch-160-environment.json, pinned by `tests/reference-environment.test.js`; docs/limits.md
+records the before and after. No other budget moved; the compatibility rows already measured lower and pass. The
+furnace picture loss itself (batch 160 job 7) stays open below.
+
 ### Fixed 2026-11-11: gltf-pro parts culled one by one only under CulledModels (bug sweep L2, KB0027)
 
 - **Repro:** `npm run test:gpu:parts` in packages/gltf-pro: without `CulledModels`, a 20-part 10M-triangle field draws
@@ -13707,16 +13720,6 @@ to 1,590,805, foreground 67,050 to 67,046). The height-correlated Smith G (KB587
 direct-light cases. Every budget is re-recorded at its measured value; before and after figures and causes are in
 docs/limits.md, "Batch 160 budgets re-recorded". The picture residual against the Sample Viewer stays open above.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3497/report.md`; it points at the KB3508 NVIDIA page and says the link is consistent, not proven.
-
-### Batch 160 environment IBL budget 1 over since 40e6f183dc (open, needs Scott's ruling)
-
-Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
-scripts/reference-rendering/environment.mjs` after `npm run build:packages`. Native direct row: absolute 2,294,442
-against its budget 2,294,441 (square 76,817,356 against 76,817,341); the full row and both compatibility rows pass.
-Cause, bisected 2026-11-11 on the RTX A6000: 40e6f183dc (environment keeps the GGX lobe width when cosTheta rounds to
-one) gives 2,294,441 at its parent and 2,294,442 at the commit; the height-correlated Smith G does not touch this
-scene (no sun). The change is a deliberate fix, but this budget is outside the 2026-11-11 re-record ruling, so it is
-unchanged until Scott rules. The compatibility rows already measured lower (2,294,384 and 1,482,472) before that.
 
 ### Batch 160 AMD budgets not re-measured after the 2026-11-11 changes (open)
 

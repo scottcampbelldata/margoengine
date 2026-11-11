@@ -2120,7 +2120,7 @@ evidence and the batch 168 physical contact-shadow loss remain unchanged.
 
 ### Batch 160 budgets re-recorded, 2026-11-11
 
-Scott's ruling of 2026-11-11 ("Yes, re-record"): the NVIDIA reference-rendering budgets of the batch 160 cases are re-recorded at the values measured after da12bd07e1 (unit light direction), 65098f33fe (alpha-weighted area-filter mips), 401c2e032b (linear glass) and edcb6debb (height-correlated Smith G2, KB5875a). Each is a measured accepted difference; before and after figures, the bisected cause of each move and the trade-off are in docs/limits.md ("Batch 160 budgets re-recorded"). The claims below give the new figures. The environment IBL budget and the AMD rows are not re-recorded (docs/known-bugs.md).
+Scott's ruling of 2026-11-11 ("Yes, re-record"): the NVIDIA reference-rendering budgets of the batch 160 cases are re-recorded at the values measured after da12bd07e1 (unit light direction), 65098f33fe (alpha-weighted area-filter mips), 401c2e032b (linear glass) and edcb6debb (height-correlated Smith G2, KB5875a). Each is a measured accepted difference; before and after figures, the bisected cause of each move and the trade-off are in docs/limits.md ("Batch 160 budgets re-recorded"). The claims below give the new figures. The environment IBL native direct budget (re-recorded separately at 2,294,442 under KB3574, Scott 2026-11-11) and the AMD rows are not re-recorded (docs/known-bugs.md).
 
 ### Batch 160 specular and IOR, job 5
 
@@ -2135,7 +2135,7 @@ IBL, cross-vendor byte-equality or speed claim.
 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
-| Direct-only RGB-byte MAE 2.9175326029459634 / 2.9175211588541665 | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. |
+| Direct-only RGB-byte MAE 2.9175338745117188 / 2.9175211588541665 (native re-recorded 2026-11-11, KB3574) | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. |
 | Full-transport MAE 1.8851051330566406 / 1.8851038614908855 | Same result and contracts; GPU-locked environment.mjs | Mitsuba max depth 8, constant radiance, no sun, shared display transform. Geometric IBL occlusion/reflections and BSDF mismatch remain open; no path-tracing equivalence or nonuniform-sky claim. |
 
 ### Batch 160 clustered and shadowed Cornell, job 8

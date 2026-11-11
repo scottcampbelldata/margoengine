@@ -42,6 +42,19 @@
   Firefox on a quiet machine, and see whether the case finishes given the time.
 
 
+### Accepted 2026-11-11: batch 160 environment native direct budget re-recorded one level higher (KB3574)
+
+`node scripts/reference-rendering/environment.mjs` (native, RTX A6000) measured absolute 2,294,442 (square
+76,817,356) against its budget 2,294,441 (square 76,817,341). Cause, bisected: 40e6f183dc, the deliberate GGX
+importance-sampling fix (sin theta from alpha sqrt(xi / d) instead of sqrt(1 - cos^2); Walter et al. 2007,
+"Microfacet Models for Refraction through Rough Surfaces", EGSR, eq. 35), which moves the split-sum LUT toward an
+f64 integration (worst cell error 1.17e-3 to 4.9e-4, pinned by `packages/environment/tests/environment-browser.js`).
+Putting the two old lines back renders 2,294,441; between the two renders 58 of 262,144 pixels move by one 8-bit
+level. Scott ruled "re record" on 2026-11-11: the native direct budget is now 2,294,442 in
+docs/whitepaper/results/batch-160-environment.json, pinned by `tests/reference-environment.test.js`; docs/limits.md
+records the before and after. No other budget moved; the compatibility rows already measured lower and pass. The
+furnace picture loss itself (batch 160 job 7) stays open below.
+
 ### Fixed 2026-11-11: gltf-pro parts culled one by one only under CulledModels (bug sweep L2, KB0027)
 
 - **Repro:** `npm run test:gpu:parts` in packages/gltf-pro: without `CulledModels`, a 20-part 10M-triangle field draws
@@ -3630,16 +3643,6 @@ direct-light cases. Every budget is re-recorded at its measured value; before an
 docs/limits.md, "Batch 160 budgets re-recorded". The picture residual against the Sample Viewer stays open above.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3497/report.md`; it points at the KB3508 NVIDIA page and says the link is consistent, not proven.
 
-### Batch 160 environment IBL budget 1 over since 40e6f183dc (open, needs Scott's ruling)
-
-Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
-scripts/reference-rendering/environment.mjs` after `npm run build:packages`. Native direct row: absolute 2,294,442
-against its budget 2,294,441 (square 76,817,356 against 76,817,341); the full row and both compatibility rows pass.
-Cause, bisected 2026-11-11 on the RTX A6000: 40e6f183dc (environment keeps the GGX lobe width when cosTheta rounds to
-one) gives 2,294,441 at its parent and 2,294,442 at the commit; the height-correlated Smith G does not touch this
-scene (no sun). The change is a deliberate fix, but this budget is outside the 2026-11-11 re-record ruling, so it is
-unchanged until Scott rules. The compatibility rows already measured lower (2,294,384 and 1,482,472) before that.
-
 ### Batch 160 AMD budgets not re-measured after the 2026-11-11 changes (open)
 
 The `amd` rows of batch-160-specular.json and batch-160-ior.json and the budgets in batch-160-amd-transmission.json
@@ -3702,16 +3705,6 @@ The same regression covers a second cause exposed by the physical-origin repair:
 selection at a negative grazing boundary can repeatedly select the previous medium when the query
 advance rounds away. The walk now selects the forward half-open interval for each direction. A
 one-pixel two-material emissive path produced about 0.997 instead of 3.5 without this correction.
-
-### KB3574: batch 160 environment native direct row 1 over its budget (open, awaiting Scott's ruling)
-
-`node scripts/reference-rendering/environment.mjs` (native) fails `absolute: 2294442 > measured 2294441` on main
-(d33be0d67c, RTX A6000). Cause: 40e6f183dc, the deliberate GGX importance-sampling fix (sinTheta from
-alpha sqrt(xi / d) instead of sqrt(1 - cos^2), Walter et al. 2007 eq. 35), which moves the split-sum LUT toward an
-f64 integration (worst cell error 1.17e-3 to 4.9e-4, pinned by `packages/environment/tests/environment-browser.js`).
-On current main, putting the two old lines back renders at 2,294,441 and passes; between the two renders 58 of
-262,144 pixels move by one 8-bit level (32 up, 27 down, 59 channels). The budget is not moved here; re-recording
-it at 2,294,442 needs Scott's yes. Compat rows are lower and pass.
 
 ### Batch 160 job 7: environment furnace picture loss (open)
 

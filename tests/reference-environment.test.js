@@ -51,7 +51,7 @@ test('IBL furnace preserves all source material and mesh data and uses no direct
 test('IBL has exact first-measured direct/full budgets on each actual backend', () => {
   const b = JSON.parse(readFileSync(new URL('../docs/whitepaper/results/batch-160-environment.json', import.meta.url)));
   for (const [row, abs, square] of [
-    [b, [2294441, 1482507], [76817341, 31967589]],
+    [b, [2294442, 1482507], [76817356, 31967589]],
     [b.compat, [2294432, 1482506], [76816910, 31967280]],
   ]) {
     assert.equal(row.margo.primitives, 123);
