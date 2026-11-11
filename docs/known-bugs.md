@@ -6463,13 +6463,18 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
   because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
   unrotated image once, from float32, so parts that share an edge meet there. Regression: packages/sprites/tests/slice.test.js
   (KB6013a case).
-- Spine IK keys that leave out `bendPositive`, `compress` or `stretch` keep the setup values; the JSON export format
-  page says "Assume false if omitted" for keys, but it shows a 3.8 export and the 4.x default was not confirmed from a
-  specification, so this is left as it is (spine.ts applyAnimation constraint loop).
+- Fixed 2026-11-11 (KB6013b): Spine IK keys that left out `bendPositive`, `compress` or `stretch` kept the setup
+  values. Three Spine 4.2.22 example exports (raptor-pro, spineboy-pro, stretchyman-pro, read as data) write
+  `bendPositive` in keys only as false and `stretch` only as true, so a left-out bendPositive means true and a left-out
+  compress or stretch false; the JSON format page agrees for compress and stretch (its "false" for bendPositive does not
+  match those exports). Regression: packages/sprites/tests/audit-132.test.js (KB6013b case).
 - Fixed 2026-11-11: `sortBillboards` takes an optional `forward` direction and the layer sorts by depth along the view direction, which is right under an orthographic camera. Regression: packages/sprites/tests/billboard.test.js (depth sort test).
 - `BlendLayer` and `SkeletalLayer` multiply issue two draws per sprite or triangle; speed unmeasured.
-- Aseprite group compositing: header flag 2 says groups composite separately first; the parser multiplies a group's
-  opacity into its children (documented in the README, not fixed).
+- Fixed 2026-11-11 (KB6013d): Aseprite group compositing. Header flag 2 says groups composite separately first; the
+  parser multiplied a group's opacity into each child, so overlapping children showed through each other. A group below
+  full opacity now draws its children into an image of its own and lays it down at its opacity (over is associative,
+  so full-opacity groups need no image). Regression: packages/sprites/tests/aseprite.test.js (KB6013d case); doc:
+  packages/sprites/README.md.
 
 ## Batch 132 audit: behavior (fixed and open)
 

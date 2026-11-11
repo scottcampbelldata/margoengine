@@ -496,6 +496,10 @@ export class SpineSkeleton extends Skeleton2D {
         ]);
         fields.delete('time');
         fields.delete('curve');
+        // An IK key's left-out flags are not the setup values (KB6013b): Spine 4.2.22 exports write bendPositive only
+        // when false and stretch or compress only when true, so a left-out bendPositive means true and a left-out
+        // compress or stretch false (the JSON format page agrees for compress and stretch).
+        if (kind === 'ik') Object.assign(c, { bendPositive: true, compress: false, stretch: false });
         for (const field of fields) {
           const value = pair[0][field];
           if (typeof value === 'boolean') c[field] = value;

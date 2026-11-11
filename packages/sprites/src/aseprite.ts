@@ -189,8 +189,8 @@ const clipsOf = (frames: readonly SpriteFrame[], tags: readonly AsepriteTag[]): 
  * Reads an `.aseprite` or `.ase` file: frames composited to RGBA from its visible layers, frame times, tags as
  * `SpriteAnimation` clips, slices with pivots and 9-slice centres, the palette and user data text. Handles RGBA,
  * grayscale and indexed sprites; raw, linked and compressed cels; layer and cel opacity; z-index. Every layer
- * composites as Normal (each layer's stored mode is in `layers[i].blend`), and a group's opacity multiplies into its
- * children. Runs anywhere with DecompressionStream, Node included.
+ * composites as Normal (each layer's stored mode is in `layers[i].blend`); with the header's group flag, a group below
+ * full opacity composites its children on their own first, then at its opacity. Runs anywhere with DecompressionStream, Node included.
  * @example
  * ```ts
  * import {encodeAseprite, parseAseprite} from 'margoengine/sprites/aseprite';
@@ -390,57 +390,91 @@ export async function parseAseprite(bytes: Uint8Array, options: AsepriteOptions 
     r.at = start + size;
   }
   const table = palette ?? oldPalette ?? new Uint8Array(0),
-    // A layer's opacity through its groups, and whether all of them show.
-    shown: number[] = [],
-    parents: number[] = [];
+    // Each layer's parent group (-1 at the top) and whether it and all its groups show.
+    parentOf: number[] = [],
+    visible: boolean[] = [],
+    stack: number[] = [];
   layers.forEach((layer, i) => {
-    parents[layer.level] = i;
-    const parent = layer.level ? shown[parents[layer.level - 1]] : 1;
-    shown.push(layer.visible ? (parent ?? 0) * (layer.opacity / 255) : 0);
+    stack[layer.level] = i;
+    parentOf.push(layer.level ? (stack[layer.level - 1] ?? -1) : -1);
+    visible.push(layer.visible && (parentOf[i] < 0 || visible[parentOf[i]]));
   });
+  // Header flag 2 (KB6013d): a group composites its children on their own first, then onto what lies below at the
+  // group's opacity. Over is associative, so only a group below full opacity needs its own image.
+  const isolated = (i: number): boolean => layers[i].type === 1 && layers[i].opacity < 255;
+  /** The outermost isolated group holding layer `i` below group `inside` (-1 for the top), or -1. */
+  const isolatingGroup = (i: number, inside: number): number => {
+    let found = -1;
+    for (let p = parentOf[i]; p >= 0 && p !== inside; p = parentOf[p]) if (isolated(p)) found = p;
+    return found;
+  };
+  /** The opacity of layer `i` through its groups below `inside` (whose own opacity applies when it is drawn). */
+  const through = (i: number, inside: number): number => {
+    let o = layers[i].opacity / 255;
+    for (let p = parentOf[i]; p >= 0 && p !== inside; p = parentOf[p]) o *= layers[p].opacity / 255;
+    return o;
+  };
+  const over = (image: Uint8Array, to: number, red: number, green: number, blue: number, source: number): void => {
+    const under = image[to + 3] / 255,
+      result = source + under * (1 - source);
+    if (!source) return;
+    const mix = (a: number, b: number): number => Math.round((a * source + b * under * (1 - source)) / result);
+    image[to] = mix(red, image[to]);
+    image[to + 1] = mix(green, image[to + 1]);
+    image[to + 2] = mix(blue, image[to + 2]);
+    image[to + 3] = Math.round(result * 255);
+  };
   const frames = celsByFrame.map((cels) => {
-    const image = new Uint8Array(width * height * 4);
     // Order: the layer plus the z-index, then the z-index for ties.
     const sorted = cels
-      .filter((cel) => shown[cel.layer] > 0 && layers[cel.layer].type !== 1)
+      .filter((cel) => visible[cel.layer] && layers[cel.layer].type !== 1)
       .sort((a, b) => a.layer + a.z - (b.layer + b.z) || a.z - b.z);
-    for (const cel of sorted) {
-      const scale = (shown[cel.layer] * cel.opacity) / 255,
-        { pixels } = cel,
-        keepIndex = backgrounds[cel.layer];
-      for (let y = Math.max(0, -cel.y); y < cel.height && y + cel.y < height; y++)
-        for (let x = Math.max(0, -cel.x); x < cel.width && x + cel.x < width; x++) {
-          const from = (y * cel.width + x) * channels;
-          let red: number, green: number, blue: number, alpha: number;
-          if (depth === 32)
-            [red, green, blue, alpha] = [pixels[from], pixels[from + 1], pixels[from + 2], pixels[from + 3]];
-          else if (depth === 16)
-            [red, green, blue, alpha] = [pixels[from], pixels[from], pixels[from], pixels[from + 1]];
-          else {
-            const index = pixels[from];
-            if (index === transparent && !keepIndex) continue;
-            [red, green, blue, alpha] = [
-              table[index * 4],
-              table[index * 4 + 1],
-              table[index * 4 + 2],
-              table[index * 4 + 3],
-            ];
-            // An index past the palette has no colour.
-            alpha ??= 0;
-          }
-          const to = ((y + cel.y) * width + x + cel.x) * 4,
-            source = (alpha / 255) * scale,
-            under = image[to + 3] / 255,
-            result = source + under * (1 - source);
-          if (!source) continue;
-          const mix = (a: number, b: number): number => Math.round((a * source + b * under * (1 - source)) / result);
-          image[to] = mix(red, image[to]);
-          image[to + 1] = mix(green, image[to + 1]);
-          image[to + 2] = mix(blue, image[to + 2]);
-          image[to + 3] = Math.round(result * 255);
+    const draw = (list: typeof sorted, inside: number): Uint8Array => {
+      const image = new Uint8Array(width * height * 4);
+      for (let k = 0; k < list.length; ) {
+        const group = isolatingGroup(list[k].layer, inside);
+        if (group >= 0) {
+          // The run of cels inside this group, drawn on their own, then laid down at the group's opacity.
+          let end = k + 1;
+          while (end < list.length && isolatingGroup(list[end].layer, inside) === group) end++;
+          const own = draw(list.slice(k, end), group),
+            scale = through(group, inside);
+          for (let to = 0; to < own.length; to += 4)
+            over(image, to, own[to], own[to + 1], own[to + 2], (own[to + 3] / 255) * scale);
+          k = end;
+          continue;
         }
-    }
-    return image;
+        const cel = list[k++],
+          scale = (through(cel.layer, inside) * cel.opacity) / 255,
+          { pixels } = cel,
+          keepIndex = backgrounds[cel.layer];
+        if (!scale) continue;
+        for (let y = Math.max(0, -cel.y); y < cel.height && y + cel.y < height; y++)
+          for (let x = Math.max(0, -cel.x); x < cel.width && x + cel.x < width; x++) {
+            const from = (y * cel.width + x) * channels;
+            let red: number, green: number, blue: number, alpha: number;
+            if (depth === 32)
+              [red, green, blue, alpha] = [pixels[from], pixels[from + 1], pixels[from + 2], pixels[from + 3]];
+            else if (depth === 16)
+              [red, green, blue, alpha] = [pixels[from], pixels[from], pixels[from], pixels[from + 1]];
+            else {
+              const index = pixels[from];
+              if (index === transparent && !keepIndex) continue;
+              [red, green, blue, alpha] = [
+                table[index * 4],
+                table[index * 4 + 1],
+                table[index * 4 + 2],
+                table[index * 4 + 3],
+              ];
+              // An index past the palette has no colour.
+              alpha ??= 0;
+            }
+            over(image, ((y + cel.y) * width + x + cel.x) * 4, red, green, blue, (alpha / 255) * scale);
+          }
+      }
+      return image;
+    };
+    return draw(sorted, -1);
   });
   const across = columns ?? count,
     sheet: SpriteFrame[] = durations.map((ms, i) => ({

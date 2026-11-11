@@ -361,6 +361,8 @@ console.log(Object.keys(sheet.clips), sheet.rects, sheet.slices);
 - RGBA, grayscale and indexed sprites; raw, linked and compressed cels; layer, group and cel opacity; z-index; tags;
   slices with 9-slice and pivot; palettes (old chunks too); user data text on the sprite, layers, tags and slices.
 - **Blend modes:** every layer composites as Normal. A layer's stored mode is in `layers[i].blend`.
+- **Groups:** with the header's group flag (flag 2), a group below full opacity composites its children on their own
+  first, then onto the layers below at its opacity, as the file format describes; without it a group's opacity is ignored.
 - **Tilemap layers:** a visible one is refused with `unsupported`; flatten or hide it in Aseprite.
 - **Tags:** without a repeat, a clip loops or ping-pongs through its mode. With one, its frames are written out and it
   plays once; a ping-pong repeat counts legs. A tag's frame times come from the file.

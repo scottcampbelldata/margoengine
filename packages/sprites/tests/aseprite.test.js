@@ -184,6 +184,29 @@ test('layer opacity counts only when the header says so, and a group opacity rea
   assert.equal(await alpha(3), 10);
 });
 
+test('with the group flag, a group composites its children first, then at its opacity (KB6013d)', async () => {
+  // Red under blue inside a group at opacity 128: the group's own image is blue, laid down at 128/255.
+  const build = (flags) =>
+      file(
+        [
+          {
+            chunks: [
+              layer('g', { type: 1, opacity: 128 }),
+              layer('red', { level: 1 }),
+              layer('blue', { level: 1 }),
+              raw(1, 1, 1, RED),
+              raw(2, 1, 1, BLUE),
+            ],
+          },
+        ],
+        { width: 1, flags },
+      ),
+    pixel = async (flags) => [...(await parseAseprite(build(flags))).frames[0]];
+  assert.deepEqual(await pixel(3), [0, 0, 255, 128]);
+  // Without the group flag the group's opacity means nothing: plain blue over red.
+  assert.deepEqual(await pixel(1), BLUE);
+});
+
 test('indexed sprites use the palette and its transparent index, except on a background layer', async () => {
   const palette = chunk(0x2019, [
       ...u32(3),

@@ -223,3 +223,46 @@ test('a Spine IK key without mix applies mix 1, not the setup mix', () => {
     end = [tip.world[4] + tip.world[0] * 3, tip.world[5] + tip.world[1] * 3];
   assert.ok(Math.hypot(end[0] - 4, end[1] - 2) < 1e-6, `tip end ${end} did not reach the target`);
 });
+
+test('a Spine IK key without bendPositive, compress or stretch means true, false, false, not the setup (KB6013b)', () => {
+  // Spine 4.2.22 exports (raptor-pro, spineboy-pro, stretchyman-pro) write bendPositive only as false and stretch only
+  // as true in IK keys, so a key that leaves them out means bendPositive true and stretch/compress false.
+  const rig = (setup, key = { time: 0 }) => {
+    const r = parseSpineJSON({
+      skeleton: { spine: '4.2.22' },
+      bones: [
+        { name: 'root', length: 5 },
+        { name: 'tip', parent: 'root', x: 5, length: 3 },
+        { name: 'target', x: 4, y: 2 },
+        { name: 'far', x: 20, y: 0 },
+      ],
+      slots: [],
+      ik: [{ name: 'arm', bones: ['root', 'tip'], ...setup }],
+      animations: { reach: { ik: { arm: [key] } } },
+    }).createSkeleton({ yDown: false });
+    r.pose('reach', 0, { loop: false });
+    const root = r.bone('root');
+    return [root.world[0], root.world[1], root.world[4], root.world[5]];
+  };
+  // Setup bends negative; a key that leaves bendPositive out bends positive, like a setup that bends positive.
+  assert.deepEqual(rig({ target: 'target', bendPositive: false }), rig({ target: 'target', bendPositive: true }));
+  assert.notDeepEqual(
+    rig({ target: 'target', bendPositive: false }, { time: 0, bendPositive: false }),
+    rig({ target: 'target', bendPositive: true }),
+    'a key that says false still bends negative',
+  );
+  // Setup stretches toward a far target; a key that leaves stretch out does not stretch.
+  const scale = (setup, key) => {
+    const r = parseSpineJSON({
+      skeleton: { spine: '4.2.22' },
+      bones: [{ name: 'root', length: 5 }, { name: 'far', x: 20, y: 0 }],
+      slots: [],
+      ik: [{ name: 'one', bones: ['root'], target: 'far', ...setup }],
+      animations: { reach: { ik: { one: [key] } } },
+    }).createSkeleton({ yDown: false });
+    r.pose('reach', 0, { loop: false });
+    return Math.hypot(r.bone('root').world[0], r.bone('root').world[1]);
+  };
+  assert.ok(Math.abs(scale({ stretch: true }, { time: 0 }) - 1) < 1e-9, 'left-out stretch does not stretch');
+  assert.ok(scale({ stretch: false }, { time: 0, stretch: true }) > 3, 'a key that says true stretches');
+});
