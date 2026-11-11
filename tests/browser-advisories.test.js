@@ -8,6 +8,8 @@ import {
   expectedContextLosses,
   firefoxContextLost,
   watchConsole,
+  FIREFOX_DEPTH_COMPARE_LINES,
+  FIREFOX_DEPTH_COMPARE_VERSIONS,
   FIREFOX_FINAL_ROW_LINE,
   FIREFOX_FINAL_ROW_VERSIONS,
 } from '../scripts/support/browser-advisories.mjs';
@@ -73,4 +75,25 @@ test('watchConsole counts losses, drops the accepted advisory and keeps every ot
   assert.equal(expectedContextLosses(hardware), 1);
   assert.equal(expectedContextLosses({ ...hardware, webgpu: { vendor: 'nvidia' } }), 0, 'native WebGPU probes nothing');
   assert.equal(expectedContextLosses({ browserName: 'chromium', webgpu: { vendor: 'margo-webgl2' } }), 0);
+});
+
+// Firefox (b), bug sweep L3a: the materials check's shadow sampler (compare 'less-equal', linear filtering) draws
+// Firefox's depth-comparison advisory once per context. WebGPU leaves such filtering to the implementation, so the line
+// is accepted exactly, on Firefox 157, for the draw calls the layer makes; nothing near it is.
+const DEPTH_COMPARE_SEEN =
+  '[JavaScript Warning: "WebGL warning: drawElementsInstanced: Depth texture comparison requests (e.g. `LINEAR`) Filtering, but behavior is implementation-defined, and so on some systems will sometimes behave as `NEAREST`. (warns once)"]';
+
+test('the depth-comparison line, as seen in the materials check, is accepted on Firefox 157 only', () => {
+  assert.deepEqual({ ...FIREFOX_DEPTH_COMPARE_VERSIONS }, { first: 157, last: 157 });
+  assert.ok(FIREFOX_DEPTH_COMPARE_LINES.includes(DEPTH_COMPARE_SEEN));
+  assert.equal(acceptedAdvisory(DEPTH_COMPARE_SEEN, firefox('157.0')), true);
+  for (const hardware of [firefox('156.0'), firefox('158.0'), { browserName: 'chromium', browserVersion: '157.0' }])
+    assert.equal(acceptedAdvisory(DEPTH_COMPARE_SEEN, hardware), false, JSON.stringify(hardware));
+  for (const text of [
+    DEPTH_COMPARE_SEEN.replace('drawElementsInstanced', 'clear'),
+    DEPTH_COMPARE_SEEN.replace('(warns once)', ''),
+    DEPTH_COMPARE_SEEN.slice(0, -1),
+    DEPTH_COMPARE_SEEN.replace('`LINEAR`', '`NEAREST`'),
+  ])
+    assert.equal(acceptedAdvisory(text, firefox('157.0')), false, text);
 });
