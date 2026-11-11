@@ -13,6 +13,7 @@ the owner files them.
 | KB0401 | `KB0401` | WebKit | not run here (no MediaRecorder in Playwright WebKit for Windows); Mac record only |
 | KB0425 | `KB0425` | WebKit | not run here (no WebGPU in Playwright WebKit for Windows); Mac record only |
 | KB1703 | `KB1703` | Microsoft, Chromium | multi-second case not reproduced on a quiet PC; latency grows with load |
+| KB1042f | `KB1042f` | ANGLE, NVIDIA | standalone page does not trigger it (0 of 300 frames); full Margo grid still does (KB5822a) |
 | KB2224c | `KB2224c` | Playwright, WebKit | draft only, no repro |
 | KB2426 | `KB2426` | NVIDIA | evidence only, no trigger |
 | KB2481 | `KB2481` | Intel, NVIDIA | NVIDIA half yes; Intel half needs an Arc |
