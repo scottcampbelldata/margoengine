@@ -20,6 +20,8 @@ export interface FontVariationOptions {
 
 const tail = (r: Reader, offset: number) => r.slice(offset, r.length - offset);
 const f2 = (r: Reader) => r.i16() / 16384;
+/** a*b/c of 16.16 integers, rounded half away from zero (all three fit 2^17, so the product is exact in a double). */
+const mulDiv = (a: number, b: number, c: number) => { const q = a * b / c; return Math.sign(q) * Math.round(Math.abs(q)); };
 
 /** Internal OpenType ItemVariationStore, shared by CFF2 blending and HVAR widths. */
 export class FontItemStore {
@@ -92,6 +94,8 @@ function mappedIndex(r: Reader, offset: number, index: number): [number, number]
 export class FontVariations {
   readonly axes: FontVariationAxis[]=[];
   readonly coordinates: number[]=[];
+  /** 16.16 normalized coordinates before the final F2Dot14 step. */
+  private readonly fixed: number[]=[];
   private readonly hvar?: {reader:Reader;store:FontItemStore;map:number};
   private readonly gvar?: {reader:Reader;offsets:number[];tuples:number[][];base:number};
   constructor(tables: Map<string,Reader>, glyphCount:number, values:Readonly<Record<string,number>>={}) {
@@ -104,13 +108,16 @@ export class FontVariations {
       fvar.check(offset,count*size);
       for(let i=0;i<count;i++) {
         fvar.seek(offset+i*size);
-        const axis={tag:fvar.tag(),min:fvar.i32()/65536,default:fvar.i32()/65536,max:fvar.i32()/65536};
+        const tag=fvar.tag(),min=fvar.i32(),def=fvar.i32(),max=fvar.i32();
+        const axis={tag,min:min/65536,default:def/65536,max:max/65536};
         if(axis.min>axis.default||axis.default>axis.max||this.axes.some(a=>a.tag===axis.tag)) fontError('fvar axis bounds or tags are invalid');
         const user=values[axis.tag]??axis.default;
         if(!Number.isFinite(user)) fontError('variation axis value is not finite');
-        const v=Math.max(axis.min,Math.min(axis.max,user));
+        // OpenType "Coordinate scales and normalization": the user value as 16.16 Fixed, clamped, then the default
+        // normalization in 16.16 (kept here as a 16.16 integer until the final F2Dot14 step below).
+        const v=Math.max(min,Math.min(max,Math.round(user*65536)));
         this.axes.push(axis);
-        this.coordinates.push(v===axis.default?0:v<axis.default?(v-axis.default)/(axis.default-axis.min):(v-axis.default)/(axis.max-axis.default));
+        this.fixed.push(v===def?0:v<def?-mulDiv(def-v,65536,def-min):mulDiv(v-def,65536,max-def));
       }
     }
     for(const key of Object.keys(values)) if(!this.axes.some(a=>a.tag===key)) fontError(`variation axis ${key} is absent from fvar`);
@@ -123,17 +130,20 @@ export class FontVariations {
         avar.check(avar.pos,count*4);
         // OpenType avar: a record whose from (or to) does not increase on the last kept one may be ignored; a map
         // without all of -1 to -1, 0 to 0 and 1 to 1 (an empty map included) leaves the axis unmodified.
-        for(let j=0;j<count;j++){const p=[f2(avar),f2(avar)],last=pairs[pairs.length-1];if(!last||(p[0]>last[0]&&p[1]>=last[1]))pairs.push(p);}
-        if(![-1,0,1].every(v=>pairs.some(p=>p[0]===v&&p[1]===v))) continue;
+        // Map values are F2Dot14, widened to 16.16 (x4) so the interpolation runs in 16.16 like the normalization.
+        for(let j=0;j<count;j++){const p=[avar.i16()*4,avar.i16()*4],last=pairs[pairs.length-1];if(!last||(p[0]>last[0]&&p[1]>=last[1]))pairs.push(p);}
+        if(![-65536,0,65536].every(v=>pairs.some(p=>p[0]===v&&p[1]===v))) continue;
         for(let j=1;j<pairs.length;j++) {
-          const v=this.coordinates[i];
+          const v=this.fixed[i];
           if(v>=pairs[j-1][0]&&v<=pairs[j][0]) {
-            this.coordinates[i]=pairs[j-1][1]+(pairs[j][1]-pairs[j-1][1])*(v-pairs[j-1][0])/(pairs[j][0]-pairs[j-1][0]);
+            this.fixed[i]=pairs[j-1][1]+mulDiv(v-pairs[j-1][0],pairs[j][1]-pairs[j-1][1],pairs[j][0]-pairs[j-1][0]);
             break;
           }
         }
       }
     }
+    // The final normalized coordinate is F2Dot14: (v + 2) >> 2 of the 16.16 value (OpenType, same section).
+    for(const v of this.fixed) this.coordinates.push(((v+2)>>2)/16384);
     const hvar=tables.get('HVAR');
     if(hvar) {
       hvar.seek(0);if(hvar.u16()!==1)fontError('HVAR version is unsupported');hvar.u16();

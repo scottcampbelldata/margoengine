@@ -13,6 +13,10 @@ for(const extension of ['ttf','otf']) test(`variable ${extension} outlines and w
  const font=parseFontOutlines(bytes);
  assert.deepEqual(font.variationAxes,ref.axes);
  for(const sample of ref.samples) {
+  // The oracle draws at the spec's F2Dot14 coordinate; FontTools' own floating normalization (floatingAdvance) is kept
+  // as a different reference: it agrees only where no rounding happens (the axis ends) (KB5472d).
+  if(sample.weight===200||sample.weight===900) assert.equal(sample.floatingAdvance,sample.advance);
+  else assert.notEqual(sample.floatingAdvance,sample.advance);
   const instance=font.withVariations({wght:sample.weight});
   assert.equal(instance.glyphIndex(sample.char),sample.index);
   close(instance.glyphAdvance(sample.index),sample.advance);
@@ -126,4 +130,18 @@ test('avar: a segment map without its required -1, 0, +1 maps, or with none, lea
  const mapped=variableSquare(gvar,new Map([['avar',avar([[-1,-1],[0,0],[0.5,0.25],[1,1]])]]));
  const base=xs(mapped);
  xs(mapped.withVariations({wght:650})).forEach((x,i)=>close(x-base[i],25/mapped.unitsPerEm,1e-12));
+});
+test('normalization runs in OpenType 16.16 and ends in F2Dot14 (KB5472d, "Coordinate scales and normalization")',()=>{
+ // One region peaking at +1 (and one at -1) moving x by 100 units: the x shift is 100 times the final coordinate.
+ const up=variableSquare([{peak:1,data:[0,0x07,100,100,100,100,0,0,0,0,0x87]}]);
+ const down=variableSquare([{peak:-1,data:[0,0x07,100,100,100,100,0,0,0,0,0x87]}]);
+ const shift=(font,wght)=>{const base=xs(font);return xs(font.withVariations({wght}))[0]-base[0];};
+ // wght 450 on 100..400..900: 50/500 = 0.1 in floating point; 16.16 gives 6554, F2Dot14 (6554 + 2) >> 2 = 1639.
+ close(shift(up,450)*up.unitsPerEm,100*1639/16384,1e-9);
+ // wght 200: -200/300; 16.16 gives -43691, F2Dot14 (-43691 + 2) >> 2 = -10923, so the -1 region weighs 10923/16384.
+ close(shift(down,200)*down.unitsPerEm,100*10923/16384,1e-9);
+ // avar in 16.16 too: 0.1 (6554) on the segment 0 to 0.5 mapped to 0 to 0.25 gives 3277, then (3277 + 2) >> 2 = 819.
+ const avar=[...be16(1),...be16(0),...be16(0),...be16(1),...be16(4),...[[-1,-1],[0,0],[0.5,0.25],[1,1]].flatMap(([a,b])=>[...f2(a),...f2(b)])];
+ const mapped=variableSquare([{peak:1,data:[0,0x07,100,100,100,100,0,0,0,0,0x87]}],new Map([['avar',avar]]));
+ close(shift(mapped,450)*mapped.unitsPerEm,100*819/16384,1e-9);
 });
