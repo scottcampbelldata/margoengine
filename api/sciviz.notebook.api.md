@@ -719,6 +719,7 @@ interface SpecIOOptions {
     readonly signal?: AbortSignal;
     readonly maxBytes?: number;
     readonly buffers?: ReadonlyMap<string, ArrayBufferView>;
+    readonly colormaps?: readonly Colormap[];
 }
 
 type SpecValue = null | boolean | number | string | readonly SpecValue[] | {

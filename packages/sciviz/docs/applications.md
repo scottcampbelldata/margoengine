@@ -10,8 +10,21 @@ with application codecs and pipeline names with a trusted registry. Unknown cust
 kinds reject; absent pipeline registries preserve dormant descriptions. `/link`
 serializes brush and undo history, while timelines retain frame snapshots/options.
 Exact-size round trips refer to recorded source arrays and state, not arbitrary
-unregistered application closures. `Figure.record` must precede additions to an
-existing empty figure. Factories affect only that instance, never a global prototype.
+unregistered application closures. A colour map is saved as its 256-entry table; pass
+your own maps as the `colormaps` load option (built-ins match on their own) and a saved
+map with the same name, kind and table comes back with its exact `sample(t)`, so CPU
+colours do not drift to the table's interpolation. `Figure.record` must precede additions to an
+existing empty figure.
+
+```ts
+import { Colormap } from '@margoengine/sciviz/colormaps';
+import { encodeFigureValue, decodeFigureValue } from '@margoengine/sciviz/spec';
+
+const quadratic = new Colormap('quadratic', 'sequential', (t) => [t * t, 0, 0]);
+const saved = await encodeFigureValue(quadratic);
+const restored = (await decodeFigureValue(saved, { colormaps: [quadratic] })) as Colormap;
+console.log(restored.sample(0.123)[0] === 0.123 * 0.123); // true
+``` Factories affect only that instance, never a global prototype.
 
 ```ts
 import { Figure } from '@margoengine/sciviz/provenance';

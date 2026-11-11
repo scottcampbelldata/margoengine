@@ -465,8 +465,26 @@ export async function openHDF5(input: FileInput, options: FileOptions = {}): Pro
   async function attributes(ms: readonly Message[], signal?: AbortSignal, names?: readonly string[]) {
     alive(signal).throwIfAborted();
     const out: Record<string, HDF5Values> = Object.create(null);
-    for (const m of ms.filter((x) => x.type === 12)) {
-      const c = new Cursor(m.data),
+    // Compact attributes are messages 12; dense ones (more than 8 on an object) are attribute messages stored in a
+    // fractal heap, found through the name index (v2 B-tree, type 8 records) of the attribute info message 21.
+    const stored = ms.filter((x) => x.type === 12).map((x) => x.data);
+    for (const m of ms.filter((x) => x.type === 21)) {
+      const c = new Cursor(m.data);
+      if (c.uint() !== 0) bad('unknown attribute info version');
+      const flags = c.uint();
+      if (flags & 1) c.take(2);
+      const heap = addr(c),
+        names = addr(c);
+      if (heap < 0 || names < 0) continue;
+      // A type 8 record is the heap ID, a message flags byte, a creation order (4) and a name hash (4).
+      for (const record of await btree2(names, signal)) {
+        if (record.length <= 9) bad('invalid dense attribute record');
+        if (record[record.length - 9] & 2) bad('shared attribute metadata');
+        stored.push(await heapObject(heap, record.subarray(0, record.length - 9), signal));
+      }
+    }
+    for (const bytes of stored) {
+      const c = new Cursor(bytes),
         version = c.uint(),
         flags = c.uint(),
         n = c.uint(2),

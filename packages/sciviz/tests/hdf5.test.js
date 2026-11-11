@@ -141,4 +141,72 @@ test('HDF5 implicit chunk index visits only the chunks a selection touches (KB05
   stop.abort();
   await assert.rejects(tall.read({ start: [0, 0], count: [1, 4], signal: stop.signal }), /abort/i);
 });
-
+
+// A root group whose attributes live in a fractal heap (attribute info message 21) indexed by name in a v2 B-tree of
+// type 8 records, as HDF5 writes an object with more than 8 attributes (dense storage). The attribute messages are
+// managed objects in the heap's root direct block.
+function denseAttributesFile(count) {
+  const u = (n, w) => {
+      const b = new Uint8Array(w);
+      let v = BigInt(n);
+      for (let i = 0; i < w; i++, v >>= 8n) b[i] = Number(v & 255n);
+      return b;
+    },
+    cat = (...a) => {
+      const out = new Uint8Array(a.reduce((n, b) => n + b.length, 0));
+      let at = 0;
+      for (const b of a) out.set(b, (at += b.length) - b.length);
+      return out;
+    },
+    ascii = (s) => new TextEncoder().encode(s);
+  // Version 3 attribute messages: one float64 scalar each, value 10 * i + 0.5.
+  const attribute = (name, value) => {
+    const n = cat(ascii(name), u(0, 1)),
+      type = cat(u(0x11, 1), u(0x20, 1), u(0x3f, 1), u(0, 1), u(8, 4), u(0, 2), u(64, 2), u(52, 1), u(11, 1), u(0, 1), u(52, 1), u(1023, 4)),
+      space = cat(u(2, 1), u(0, 1), u(0, 1), u(0, 1)),
+      data = new Uint8Array(Float64Array.of(value).buffer);
+    return cat(u(3, 1), u(0, 1), u(n.length, 2), u(type.length, 2), u(space.length, 2), u(0, 1), n, type, space, data);
+  };
+  const names = Array.from({ length: count }, (_, i) => `attr${String(i).padStart(2, '0')}`),
+    objects = names.map((name, i) => attribute(name, 10 * i + 0.5));
+  const heapAt = 1024,
+    blockAt = 2048,
+    treeAt = 6144,
+    leafAt = 6400,
+    headerSize = 5 + 8 + 2;
+  let offset = headerSize;
+  const ids = objects.map((object) => {
+    const id = cat(u(0, 1), u(offset, 2), u(object.length, 5));
+    offset += object.length;
+    return id;
+  });
+  const block = cat(ascii('FHDB'), u(0, 1), u(heapAt, 8), u(0, 2), ...objects);
+  const heap = cat(
+    ascii('FRHP'), u(0, 1), u(8, 2), u(0, 2), u(0, 1), u(4096, 4),
+    u(0, 8), u(2n ** 64n - 1n, 8), u(0, 8), u(2n ** 64n - 1n, 8), u(4096, 8), u(4096, 8), u(0, 8), ...Array.from({ length: 5 }, () => u(0, 8)),
+    u(4, 2), u(4096, 8), u(4096, 8), u(16, 2), u(0, 2), u(blockAt, 8), u(0, 2), u(0, 4),
+  );
+  const records = ids.map((id, i) => cat(id, u(0, 1), u(i, 4), u(i, 4)));
+  const tree = cat(ascii('BTHD'), u(0, 1), u(8, 1), u(512, 4), u(records[0].length, 2), u(0, 2), u(100, 1), u(40, 1), u(leafAt, 8), u(records.length, 2), u(records.length, 8), u(0, 4));
+  const leaf = cat(ascii('BTLF'), u(0, 1), u(8, 1), ...records, u(0, 4));
+  const info = cat(u(0, 1), u(0, 1), u(heapAt, 8), u(treeAt, 8));
+  const body = cat(u(21, 1), u(info.length, 2), u(0, 1), info),
+    root = cat(ascii('OHDR'), u(2, 1), u(2, 1), u(body.length, 4), body, u(0, 4));
+  const end = leafAt + leaf.length + 512,
+    file = new Uint8Array(end);
+  file.set(cat(Uint8Array.of(137, 72, 68, 70, 13, 10, 26, 10), u(2, 1), u(8, 1), u(8, 1), u(0, 1), u(0, 8), u(2n ** 64n - 1n, 8), u(end, 8), u(48, 8), u(0, 4)));
+  file.set(root, 48);
+  file.set(heap, heapAt);
+  file.set(block, blockAt);
+  file.set(tree, treeAt);
+  file.set(leaf, leafAt);
+  return file;
+}
+test('HDF5 reads dense attributes from the fractal heap and its name index (KB0535a)', { timeout: 10000 }, async () => {
+  using file = await openHDF5(denseAttributesFile(12));
+  const root = await file.get('/'),
+    all = await root.attributes();
+  assert.equal(Object.keys(all).length, 12);
+  for (let i = 0; i < 12; i++) assert.deepEqual([...all[`attr${String(i).padStart(2, '0')}`]], [10 * i + 0.5]);
+  assert.deepEqual(Object.keys(await root.attributes(undefined, ['attr07'])), ['attr07']);
+});

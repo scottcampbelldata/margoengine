@@ -162,9 +162,12 @@ export class CurvilinearVolume implements Drawable {
     v.set(this.source.model);
     invertMatrix(this.source.model, v.subarray(16, 32));
     v.set([...g.dims, g.spherical ? 1 : 0], 32);
+    // Lengths are measured in units of the longest box side, so the march never squares a raw physical span
+    // (1e20 overflows float32, 1e-20 underflows; KB5700b). The ratio of step to reference is unchanged.
+    const longest = Math.max(g.bounds[1] - g.bounds[0], g.bounds[3] - g.bounds[2], g.bounds[5] - g.bounds[4]);
     v.set(
       [
-        this.#reference,
+        this.#reference / longest,
         this.source.quality * (this.#figure.renderer.samplingScale ?? 1),
         this.source.density,
         this.source.mode === 'mip' ? 1 : this.source.mode === 'minip' ? 2 : 0,

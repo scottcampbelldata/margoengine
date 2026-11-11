@@ -142,6 +142,40 @@ for (const compat of [false, true]) {
         const opaque = center(await pixels());
         v.dispose();
         f.dispose();
+        // KB5700b: the physical metric squares span-scaled lengths; at 1e20 (or 1e-20) units they overflowed (or
+        // underflowed) float32. A unit cube scaled with its referenceStep and limits draws the same pixel.
+        const scaled = [];
+        for (const s of [1e20, 1e-20]) {
+          const own = document.createElement('canvas');
+          own.width = own.height = 96;
+          own.style.cssText = 'width:96px;height:96px';
+          document.body.append(own);
+          const g = await Figure.create(own, {
+            axes: false,
+            controls: false,
+            aspect: [1, 1, 1],
+            limits: [-s, s, -s, s, -s, s],
+          });
+          g.engine.stop();
+          g.engine.camera.position = [0, 0, 4];
+          g.engine.camera.target = [0, 0, 0];
+          g.engine.scene.background = '#000000';
+          g.renderer.device.addEventListener('uncapturederror', (e) => gpuErrors.push(e.error.message));
+          const layer = curvilinearVolume(g, { dims, points: points.map((p) => p * s) }, new Float32Array(125).fill(0.5), {
+            ...opts,
+            referenceStep: 0.5 * s,
+          });
+          await g.ready();
+          const b = await createImageBitmap(await g.toPNG({ overlays: false })),
+            c = new OffscreenCanvas(96, 96),
+            x = c.getContext('2d');
+          x.drawImage(b, 0, 0);
+          b.close();
+          scaled.push(center(x.getImageData(0, 0, 96, 96).data));
+          layer.dispose();
+          g.dispose();
+          own.remove();
+        }
         return {
           classified,
           interior,
@@ -159,6 +193,7 @@ for (const compat of [false, true]) {
           regularPixel,
           mask,
           opaque,
+          scaled,
           gpuErrors,
         };
       },
@@ -181,6 +216,8 @@ for (const compat of [false, true]) {
     assert.ok(Math.abs(report.warpedPixel[0] - report.regularPixel[0]) <= 1);
     assert.deepEqual(report.mask, [0, 0, 0]);
     assert.deepEqual(report.opaque, [255, 0, 0], 'opacity 1 is opaque at referenceStep 1000');
+    for (const pixel of report.scaled)
+      assert.ok(Math.abs(pixel[0] - report.expectedCube) <= 1, `scaled cube ${pixel} vs ${report.expectedCube}`);
     await browser.page.goto(new URL('/examples/sciviz-curvilinear.html', browser.page.url()).href);
     await browser.page.waitForFunction(
       () => document.querySelector('#status').textContent.startsWith('Ready.'),

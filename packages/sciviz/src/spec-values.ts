@@ -1,5 +1,5 @@
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { Colormap, colorScale, type ColorScaleOptions } from './colormaps.js';
+import { Colormap, colormap, colormapNames, colorScale, type ColorScaleOptions } from './colormaps.js';
 import { isGpuArray } from './layer.js';
 import type { BrickSource } from './bricks-plan.js';
 import { selectionValue } from './spec-hooks.js';
@@ -31,6 +31,12 @@ export interface SpecIOOptions {
   readonly maxBytes?: number;
   /** Hash-checked binary comm attachments, addressed by an array value's $buffer key. Borrowed until loading settles. */
   readonly buffers?: ReadonlyMap<string, ArrayBufferView>;
+  /**
+   * Colour maps to restore exactly. A saved map stores its 256-entry table, not its `sample(t)` function; on load, a
+   * map here (or a built-in) with the same name, kind and table comes back as itself, so CPU colours keep its exact
+   * function instead of the table's interpolation. Default none (built-ins still match).
+   */
+  readonly colormaps?: readonly Colormap[];
 }
 const halfArray = (globalThis as unknown as { Float16Array?: typeof Float32Array }).Float16Array;
 const arrays = {
@@ -397,7 +403,20 @@ export class ValueIO {
       const table = (await this.decode(v.table, references, depth + 1)) as Float32Array;
       if (!(table instanceof Float32Array) || table.length !== 1024)
         throw typeError('Invalid colormap table; supply 256 RGBA samples', 'sciviz');
-      const base = new Colormap(v.$colormap as string, v.kind as 'sequential', (t) => {
+      // The saved table identifies the map: a registered or built-in map with the same name, kind and every table
+      // value restores as itself (KB5700h); any other map is rebuilt from the table.
+      const candidates = [
+        ...(this.options.colormaps ?? []),
+        ...((colormapNames as readonly string[]).includes(v.$colormap as string)
+          ? [colormap(v.$colormap as (typeof colormapNames)[number])]
+          : []),
+      ];
+      const known = candidates.find((map) => {
+        if (map.name !== v.$colormap || map.kind !== v.kind) return false;
+        const own = map.unscaled().table(256);
+        return own.length === table.length && own.every((x, i) => x === table[i]);
+      });
+      const base = known?.unscaled() ?? new Colormap(v.$colormap as string, v.kind as 'sequential', (t) => {
         const x = Math.min(255, Math.max(0, (v.kind === 'cyclic' ? t - Math.floor(t) : t) * 255)),
           i = Math.min(254, Math.floor(x)),
           f = x - i;

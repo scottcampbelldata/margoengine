@@ -68,7 +68,7 @@ fn scalar(q:vec3f)->vec2f {
 }
 fn sample(p:vec3f)->vec2f {let q=inverseMap(p);if(q.w==0.0){return vec2f(0.0);}return scalar(q.xyz);}
 fn gradient(p:vec3f,v:f32)->vec3f {
- let h=u.options.x/max(max(u.span.x,u.span.y),u.span.z)*0.5;var g=vec3f(0.0);
+ let h=u.options.x*0.5;var g=vec3f(0.0);
  for(var a=0u;a<3u;a++){var delta=vec3f(0.0);delta[a]=h;let lo=sample(p-delta);let hi=sample(p+delta);g[a]=(select(v,hi.x,hi.y>0.0)-select(v,lo.x,lo.y>0.0))/(2.0*h*u.span[a]);}
  return g;
 }
@@ -89,7 +89,7 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
  for(var axis=0u;axis<3u;axis++){if(abs(d[axis])<1e-20){if(origin[axis]<0.0||origin[axis]>1.0){discard;}}else{let lo=-origin[axis]/d[axis];let hi=(1.0-origin[axis])/d[axis];enter=max(enter,min(lo,hi));exit=min(exit,max(lo,hi));}}
  let opaque=opaquePoint(in.position.xy,in.ndc);if(opaque.w>0.0){exit=min(exit,dot(opaque.xyz-world,worldDir)*speed);}
  if(exit<=enter){discard;}
- let physicalSpeed=length(d*u.span.xyz);let step=max(u.options.x/physicalSpeed/u.options.y,(exit-enter)/4096.0);var t=enter;var total=vec4f(0.0);var peak=-1.0;var found=false;var peakPoint=vec3f(0.0);var peakQ=vec3f(0.0);
+ let physicalSpeed=length(d*(u.span.xyz/max(max(u.span.x,u.span.y),u.span.z)));let step=max(u.options.x/physicalSpeed/u.options.y,(exit-enter)/4096.0);var t=enter;var total=vec4f(0.0);var peak=-1.0;var found=false;var peakPoint=vec3f(0.0);var peakQ=vec3f(0.0);
  for(var i=0u;i<4096u && t<exit;i++) {
   let ds=min(step,exit-t);let p=origin+d*(t+ds*0.5);t+=ds;
   let q=inverseMap(p);if(q.w==0.0 || !kept(q.xyz)){continue;}let v=scalar(q.xyz);if(v.y==0.0){continue;}

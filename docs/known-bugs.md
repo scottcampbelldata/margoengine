@@ -628,11 +628,14 @@ Found by reading the shaders against Max 1995 and the package's own docs; fixed 
   so a wrapped read is seamless), and the portable figure format restores tables the same way. Regression:
   packages/sciviz/tests/colormaps.test.js (cyclic lookup case).
 
-### Open from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
+### Fixed 2026-11-11 from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
 
-- **Dense attributes are not read.** `src/hdf5.ts` reads attribute messages (type 12) only; an object with more than 8
-  attributes stores them in a fractal heap (attribute info message, type 21) and `attributes()` returns none or some.
-  Repro needs a file written with h5py and 9 or more attributes on one object; no fixture has one yet.
+- **Fixed 2026-11-11 (KB0535a): dense attributes were not read.** `src/hdf5.ts` read attribute messages (type 12) only;
+  an object with more than 8 attributes stores them in a fractal heap (attribute info message, type 21) and
+  `attributes()` returned none or some. It now walks the attribute info message's name index (v2 B-tree, type 8
+  records) and reads each attribute message from the heap; shared attribute messages still raise the coded error.
+  Regression: packages/sciviz/tests/hdf5.test.js (dense attributes case: the test writes a 12-attribute object with
+  its own fractal heap and B-tree, after the HDF5 file format specification 3.0, since no h5py was available).
 - **Fixed 2026-11-11 (KB0535b): the implicit chunk index walked every chunk.** `src/hdf5.ts` looped over all chunks of
   a dataset with an implicit index whatever the selection, with no abort check, so a large shape with chunk size 1 took
   very long (2^40 x 4 in 1 x 4 chunks never finished). It now lists, per axis, only the chunks holding a selected value
@@ -5780,7 +5783,7 @@ Batch 177 job 4: no open correctness defect in the checked chart presentation pa
 
 API conventions lane (2026-11-10): unchanged materials dispersion compatibility reproduces the tracked 4x live-reset error 0.000244140625 against 0; native passes 278 checks/254 captures. The changed optional Fur.attach entry is never imported by this fixture, whose materials root is unchanged. Retain the existing fix-phase item under rules 21/22 without a tolerance or renderer change.
 - Fixed 2026-11-11 (KB5700a): opacity 1 in the scalar, bricked, multi-volume, quality and curvilinear marches stayed partly transparent when the per-step length was a tiny fraction of the reference (curvilinear referenceStep 1000, or density 1e-4), because the opacity correction capped alpha first (log of max(1 - a, 1e-6), or a clamp to 0.999999). Opacity 1 is infinite extinction, so each march now takes alpha exactly 1 for any positive step (density 0 stays clear); GPU picking does the same, so `opacityThreshold: 1` finds an opacity-1 voxel. Regressions: packages/sciviz/tests/volume-physics-browser.mjs case 8, curvilinear-browser.mjs `opaque`, bricks-browser.js, pick-gpu-browser.mjs.
-- Fix-phase follow-up in existing curvilinear physical metrics: scale a unit cube and referenceStep together by 1e20 or 1e-20, with matching figure limits. Its raw physical length(d*span) squares can overflow/underflow float32 before opacity correction. The tetrahedral entry normalizes extents/reference together and covers both scales; port that bounded metric to the other owning optional paths in the fix phase.
+- Fixed 2026-11-11 (KB5700b): curvilinear physical metrics: scale a unit cube and referenceStep together by 1e20 or 1e-20, with matching figure limits. Its raw physical length(d*span) squared overflowed or underflowed float32 before the opacity correction (1e20 drew fully opaque). The march now measures lengths and the reference in units of the longest box side, as the tetrahedral and AMR entries already did. Regression: packages/sciviz/tests/curvilinear-browser.mjs `scaled` (both scales match the unit cube within 1 of 255).
 
 
 - Fixed 2026-11-11 (KB5700c, batch 174 multivariate brush history): after two axis brushes and SelectionStore.undo the controller kept its last range map, so the next axis gesture reapplied the undone range. SelectionStore brushes now carry an optional `predicate` kept through undo, redo, toJSON and fromJSON; parallel coordinates and scatter matrices store their ranges there and rebuild them on every store change. Regressions: packages/sciviz/tests/link.test.js (predicate history), parcoords-browser.mjs (period, radius, undo, then period).
@@ -5794,7 +5797,7 @@ Batch 179 state capture: default MSAA transparent rendering is not self-bit-stab
 
 Quality scanner race: running quality alongside React subpath tests can list then read a temporary .subpaths-* fixture after the test deletes it, yielding ENOENT in clean-room.js; run these gates sequentially until the scanner owns a stable file list. Found during batch 179, outside the state codec.
 
-Batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t => [t*t, 0, 0]) sampled by a CPU-coloured line at t=0.123 is restored from a 256-entry Float32 table, with interpolation error versus the original closure. Cause: executable closures cannot be serialized and the table matches GPU texture sampling, not arbitrary analytic CPU sampling. Preserve exact CPU colours or a registered declarative map definition in the fix phase.
+Fixed 2026-11-11 (KB5700h): batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t => [t*t, 0, 0]) sampled by a CPU-coloured line at t=0.123 was restored from a 256-entry Float32 table, with interpolation error versus the original closure. Loading now takes a `colormaps` option: a registered map (or a built-in) whose name, kind and saved table all match restores as itself, exact; any other map still rebuilds from the table. Regression: packages/sciviz/tests/color-scales.test.js (KB5700h case). Original note: Cause: executable closures cannot be serialized and the table matches GPU texture sampling, not arbitrary analytic CPU sampling. Preserve exact CPU colours or a registered declarative map definition in the fix phase.
 - Batch 178 job 3 media quality: manually setting a scatter cloud material to world size before perspective tiled capture makes its splats too small in short tiles. Repro: scatter.cloud.material.sizeUnits = world, capture with tileSize below image height. Cause: the points focal-length uniform uses tile height while the capture camera retains its full-view fov. Default sciviz pixel-size scatter is unaffected. Fix-phase item under rule 22; all required media formats are built.
 
 Batch 177 job 5: no open correctness defect in the checked live-data paths. Source cancellation covers asynchronous parse waits, including a parser that synchronously aborts its signal. A removed trace no longer appears in ChartPolish unified hover. The streaming SVG regression counts its 64 clipped data circles separately from the intentional legend swatch. Protocol fixtures close the RFC 6455 connection once; no renderer/browser shutdown code changed.

@@ -498,6 +498,7 @@ export interface SpecIOOptions {
     readonly signal?: AbortSignal;
     readonly maxBytes?: number;
     readonly buffers?: ReadonlyMap<string, ArrayBufferView>;
+    readonly colormaps?: readonly Colormap[];
 }
 
 export type SpecValue = null | boolean | number | string | readonly SpecValue[] | {

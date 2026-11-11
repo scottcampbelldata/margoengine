@@ -193,3 +193,22 @@ test('portable figure values preserve exact bin edges, scale transforms and exce
     1e-12,
   );
 });
+
+test('a saved custom or built-in colour map restores its exact sample function (KB5700h)', async () => {
+  const { Colormap } = await import('@margoengine/sciviz/colormaps'),
+    { encodeFigureValue, decodeFigureValue } = await import('@margoengine/sciviz/spec');
+  const quadratic = new Colormap('quadratic', 'sequential', (t) => [t * t, 0, 0]),
+    saved = JSON.parse(JSON.stringify(await encodeFigureValue(quadratic)));
+  // Without the map registered the table interpolates: not the closure's exact value between entries.
+  const fromTable = await decodeFigureValue(saved);
+  assert.notEqual(fromTable.sample(0.123)[0], 0.123 * 0.123);
+  const exact = await decodeFigureValue(saved, { colormaps: [quadratic] });
+  assert.equal(exact.sample(0.123)[0], 0.123 * 0.123);
+  // A map with the same name but other colours is not mistaken for it.
+  const other = new Colormap('quadratic', 'sequential', (t) => [t, 0, 0]);
+  assert.notEqual((await decodeFigureValue(saved, { colormaps: [other] })).sample(0.123)[0], 0.123);
+  // Built-ins restore as themselves with no registration.
+  const viridis = colormap('viridis'),
+    back = await decodeFigureValue(JSON.parse(JSON.stringify(await encodeFigureValue(viridis))));
+  assert.deepEqual(back.sample(0.123), viridis.sample(0.123));
+});
