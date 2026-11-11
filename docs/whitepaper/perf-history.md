@@ -2842,7 +2842,8 @@ Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner
   zenith-luminance normalization per case because Margo has no shared absolute radiometric scale.
 - **Result:** loss. Normalized RGB MAE 1.439228, max 70.681783; per-case relative MAE 0.199319 to 0.765628.
   [All cases](results/batch-168-sky.json). Different analytic models and Margo chromaticity/clamp tuning;
-  not a measured atmosphere or absolute-irradiance claim. Publishing does not close the loss. No speed row.
+  not a measured atmosphere or absolute-irradiance claim. No speed row. Accepted difference (KB3148c, 2026-11-11):
+  the paper Preetham model alone measures MAE 1.436382; Margo's tuning moves the grid by MAE 0.012108.
 - **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
   External Mitsuba setup is in reproduce.md. Coordinate and metric oracle: `packages/sky/test/sunsky-reference.test.js`.
 

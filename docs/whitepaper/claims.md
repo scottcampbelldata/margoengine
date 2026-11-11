@@ -1966,7 +1966,7 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 
 | Claim | Evidence | Scope |
 | --- | --- | --- |
-| Default Preetham has measured angular radiance error against external sunsky | [Entry 110](perf-history.md), [per-case result](results/batch-168-sky.json), `packages/sky/test/sunsky-reference.test.js` | Shipped WGSL, Mitsuba 3.9.1 scalar_rgb, 297 directions, per-sky zenith-Y normalization; MAE 1.439228; no absolute-unit, physical atmosphere or speed parity |
+| Default Preetham has measured angular radiance error against external sunsky | [Entry 110](perf-history.md), [per-case result](results/batch-168-sky.json), `packages/sky/test/sunsky-reference.test.js` | Shipped WGSL, Mitsuba 3.9.1 scalar_rgb, 297 directions, per-sky zenith-Y normalization; MAE 1.439228, of which Margo tuning MAE 0.012108 (accepted model difference, KB3148c); no absolute-unit, physical atmosphere or speed parity |
 
 
 ## Batch 168 staging reference

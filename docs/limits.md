@@ -1748,7 +1748,16 @@ nonbinary display-domain material blending remains a separate open defect. Busy-
 The default Preetham sky does not match Mitsuba 3.9.1 sunsky (Hosek-Wilkie): zenith-Y-normalized RGB
 MAE 1.439228 over 297 directions, max 70.681783. Per-case relative MAE is 0.199319 to 0.765628.
 Sun elevations 10/45/75 degrees, turbidity 2/3/6, ground albedo 0, sun disk off. This is a sampled
-angular-radiance comparison, not hemisphere integration or absolute physical-unit equivalence. Loss open.
+angular-radiance comparison, not hemisphere integration or absolute physical-unit equivalence.
+
+Accepted difference (KB3148c, 2026-11-11): the gap is the model. Margo's default is the 1999 Preetham fit, the
+same model as three.js `Sky` and Babylon's `SkyMaterial`; Mitsuba sunsky is the 2012 Hosek-Wilkie fit, which its
+authors and Zotti et al. 2007 show corrects Preetham's horizon brightening and high-turbidity behaviour. The paper
+Preetham model alone, without Margo's tuning, measures MAE 1.436382 on the same 297 directions; Margo's daylight-locus
+floor moves the grid by MAE 0.012108 (relative 1.74 % at most, `packages/sky/test/sunsky-reference.test.js`), and its
+clamps do not act on this grid. Hosek-Wilkie's coefficients are published only inside the authors' source code, so
+Margo cannot ship that model clean room without fitting its own coefficients; for a physically based sky use
+`model: 'bruneton'` or `HillaireSky`. Sources: A. J. Preetham, P. Shirley and B. Smits, "A Practical Analytic Model for Daylight", SIGGRAPH 1999, https://doi.org/10.1145/311535.311545; L. Hosek and A. Wilkie, "An Analytic Model for Full Spectral Sky-Dome Radiance", ACM TOG 31(4) 2012, https://cgg.mff.cuni.cz/projects/SkylightModelling/HosekWilkie_SkylightModel_SIGGRAPH2012_Preprint.pdf; G. Zotti, A. Wilkie and W. Purgathofer, "A Critical Review of the Preetham Skylight Model", WSCG 2007, https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf.
 
 ## Audio Doppler (batch 110)
 

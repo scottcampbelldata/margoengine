@@ -38,3 +38,23 @@ test('radiance comparison removes only one zenith luminance scale and retains co
   assert.throws(() => radianceError([], []));
   assert.throws(() => radianceError([[0, 0, 0]], [[1, 1, 1]]));
 });
+
+// KB3148c: the Mitsuba sunsky gap (MAE 1.439 over this grid, perf history 110) is the model, Preetham, Shirley and
+// Smits 1999 against Hosek and Wilkie 2012, not Margo's tuning. The daylight-locus floor is the only Margo change that
+// acts on this grid (sun 10 to 75 degrees, turbidity 2 to 6, nothing below 5 degrees), and it moves the normalized
+// radiance by MAE 0.0121 (relative 1.7 % at most): the paper model alone measures MAE 1.436 against Mitsuba.
+test('Margo tuning moves the rival grid at most 2 % from the paper Preetham model', async () => {
+  const { preethamRGB } = await import('./preetham-reference.js');
+  let mae = 0,
+    relative = 0;
+  for (const c of skyCases()) {
+    const e = radianceError(
+      c.directions.map((d) => preethamRGB(d, c.sun, c.turbidity)),
+      c.directions.map((d) => preethamRGB(d, c.sun, c.turbidity, { locus: false })),
+    );
+    mae += e.mae / 9;
+    relative = Math.max(relative, e.relative);
+  }
+  assert.ok(mae < 0.013, `tuning MAE ${mae}`);
+  assert.ok(relative < 0.02, `tuning relative ${relative}`);
+});

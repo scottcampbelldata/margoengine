@@ -3221,17 +3221,11 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   copies retain the canvas before presentation expiry. Neither cause is closed.
 
 
-- **Default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`, perf history 110):
-  297 directions across sun elevations 10/45/75 degrees and turbidity 2/3/6. Normalize each sky by its own
-  zenith Y. RGB MAE 1.439228, max 70.681783, per-case relative MAE 0.199319 to 0.765628 against Mitsuba
-  3.9.1 scalar_rgb Hosek-Wilkie sunsky with disk off and albedo 0. Cause: the default model is Preetham,
-  with Margo horizon/turbidity clamps and daylight-locus chromaticity adjustment, not the newer fitted
-  sunsky model. Absolute units are also not interchangeable. Repro under the shared GPU lock:
-  `node packages/sky/scripts/rival-bench.mjs`. The normalized model loss remains open.
-
-  Lane G repeated only the original 297-direction value comparison against
-  the retained Mitsuba values, without timing: MAE 1.4392275140102735 and
-  max 70.6817830576387. The formulation difference remains.
+- **Accepted 2026-11-11 (KB3148c): default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`,
+  perf history 110): MAE 1.439228 over 297 directions against Mitsuba 3.9.1 sunsky (Hosek-Wilkie). The paper Preetham
+  model alone measures MAE 1.436382; Margo's tuning moves the grid by MAE 0.012108
+  (`packages/sky/test/sunsky-reference.test.js`). A model difference, recorded as an accepted difference in
+  docs/limits.md ("Batch 168 sky radiance reference"); not a defect.
 
 ### Audio Doppler (batch 110)
 

@@ -29,7 +29,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels | MAE 0.069543, relative 0.211475 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error |
 | `@margoengine/oit` | five panes, 1280 x 720, frame plus completion | 2.000 ms | Babylon.js 8.33.0 dual depth peeling, 7.100 ms | win, busy machine |
 | `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss |
-| `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | loss |
+| `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | accepted difference (different model; Margo tuning share MAE 0.012108) |
 | `@margoengine/staging` | default ContactShadows, sphere on ground, ray-traced hemispherical occlusion | MAE 0.048174, RMSE 0.074416 | 4096 cosine rays/pixel; projected-solid-angle oracle | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
@@ -168,8 +168,9 @@ own zenith luminance: Margo's artistic luminance scale does not provide Mitsuba-
 Thus this is an angular-radiance and colour comparison, not an absolute power calibration, hemisphere
 integral, display picture or measured atmosphere. Mean normalized RGB error 1.439228; relative MAE
 ranges from 0.199319 to 0.765628 by case. Largest channel error 70.681783 (sun 10 degrees, turbidity 6).
-Preetham and Hosek-Wilkie are different models; Margo also clamps turbidity/horizon and adjusts chromaticity.
-These differences explain the model loss, which remains open. No coefficients were copied or invented.
+Preetham and Hosek-Wilkie are different models. The paper Preetham model without Margo's tuning measures MAE
+1.436382 on the same grid; Margo's daylight-locus floor moves it by MAE 0.012108 and its clamps do not act here, so
+the difference is the model (accepted difference KB3148c, docs/limits.md). No coefficients were copied or invented.
 [Per-case values](results/batch-168-sky.json). Rerun under the shared GPU lock:
 `node packages/sky/scripts/rival-bench.mjs`. No speed comparison is claimed.
 
