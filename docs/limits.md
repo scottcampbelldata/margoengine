@@ -29,7 +29,7 @@
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (81 of 102 on 2026-11-11, many with no engine plugin at all, such as math or input). Core and the physics
+  pending (80 of 102 on 2026-11-11, many with no engine plugin at all, such as math or input). Core and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`.
 - The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,
   completed in `tests/support/owner-lifetime-node.js` (pipeline layouts, error scopes, texture writes, limits, the
