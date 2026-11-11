@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15005047,
+  "total": 15005416,
   "history": [
     {
       "date": "2026-10-24",
@@ -8387,6 +8387,12 @@
       "commit": "bbd2a5a1e5",
       "reason": "Two changes, measured origin/main against this stack. R13 mip area filter (shared/mipmaps.js, every level averages each overlapping source texel; the sampler path is gone so plain callers carry one path): materials/mips 10985 to 11200, materials/skin 11449 to 11666, points 24782 to 24999, rigging/mtoon 9633 to 9871, sprites 7646 to 7847, sprites/slice 8794 to 8989, lines/texture 6439 to 6699 B; the loop is the fix itself. math/color primariesToLinearSRGB plus side-effect-free 3x3 helpers and pure P3 constants: math/color 2987 to 3204, lines/edges 4786 to 4821, splats 32196 to 32233 B (the kept pure annotations), against lines/pick 6281 to 5957, splats/data 22363 to 22068 and environment 32108 to 31753 B, which now drop the unused P3 derivation; the web template falls from 80419 to 79789 B under its 80000 B bound.",
       "grew": 9
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "a218d76ff1",
+      "reason": "usdz/skel checks joint indices against the skeleton and the 16-bit JOINTS range: 7,987 to 8,100 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -9550,7 +9556,7 @@
     "@margoengine/usdz/materialx": 7561,
     "@margoengine/usdz/preview-surface": 5006,
     "@margoengine/usdz/shapes": 1457,
-    "@margoengine/usdz/skel": 7987,
+    "@margoengine/usdz/skel": 8356,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13900,
     "@margoengine/vfx": 35711,

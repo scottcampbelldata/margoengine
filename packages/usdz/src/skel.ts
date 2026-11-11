@@ -177,7 +177,14 @@ function scene(read: SceneRead): void {
       for (let i = 0; i < size; i++) {
         const w = weights[p * size + i],
           j = indices[p * size + i];
-        if (w) own.push([remap ? remap[j] : j, w]);
+        if (!w) continue;
+        const joint = remap ? remap[j] : j;
+        // glTF JOINTS hold unsigned 16-bit indices: a larger one would wrap onto another joint.
+        if (!Number.isInteger(joint) || joint < 0 || joint >= skeleton.names.length)
+          return read.soft(`a joint index of ${mesh.path} is outside its skeleton's ${skeleton.names.length} joints`);
+        if (joint > 65_535)
+          return read.soft(`${mesh.path} uses joint ${joint}; glTF JOINTS hold at most 65,536 joints, so it is not skinned`);
+        own.push([joint, w]);
       }
       own.sort((a, b) => b[1] - a[1]);
       let scale = 1;

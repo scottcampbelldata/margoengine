@@ -125,3 +125,21 @@ test('without the entry the same stage has no skin', async () => {
   const { specs } = await composeUSDFiles('root.usda', () => new TextEncoder().encode(influences(2)));
   assert.equal(specs['/Rig/Tri'].fields.typeName, 'Mesh');
 });
+
+test('a joint index outside the skeleton leaves the mesh unskinned and is listed', async () => {
+  const text = influences(2).replace(/jointIndices = \[[^\]]*\]/, 'jointIndices = [0, 5]'),
+    asset = await stage(text);
+  assert.ok(asset.issues.some((i) => /outside its skeleton's 2 joints/.test(i.message)));
+  assert.equal(asset.document.meshes[0].primitives[0].attributes.JOINTS_0, undefined);
+  assert.equal(asset.meshes.length, 1);
+});
+
+test('a joint past 65,535 is refused instead of wrapping onto joint 0 in the 16-bit JOINTS', async () => {
+  const count = 65_537,
+    text = influences(count)
+      .replace(/jointIndices = \[[^\]]*\] \(elementSize = \d+/, 'jointIndices = [65536] (elementSize = 1')
+      .replace(/jointWeights = \[[^\]]*\] \(elementSize = \d+/, 'jointWeights = [1] (elementSize = 1'),
+    asset = await stage(text);
+  assert.ok(asset.issues.some((i) => /uses joint 65536; glTF JOINTS hold at most 65,536 joints/.test(i.message)));
+  assert.equal(asset.document.meshes[0].primitives[0].attributes.JOINTS_0, undefined);
+});
