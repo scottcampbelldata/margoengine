@@ -207,7 +207,7 @@ Both native WebGPU and the WebGL2 compute route are supported; neither changes c
 through a 3D field. Noise and image resolution are independent of the input grid. Bidirectional midpoint
 streamline integration convolves deterministic bilinear noise, renormalizing at boundaries and missing data.
 The GPU retains the image between changes; orbiting the camera does not regenerate it. WebGPU and the real
-WebGL2 compatibility backend work; the native `sciviz/webgl2` driver does not yet support this entry.
+WebGL2 compatibility backend work.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';
@@ -367,8 +367,7 @@ The optional `@margoengine/sciviz/fallback` entry provides `marchingCubes`, the 
 the WebGL2 work, and `createFallbackFigure(canvas, { compat, ...figureOptions })`, which creates a complete figure on
 the shared WebGL2 compatibility layer. Sciviz never imports or depends on that layer: pass it as
 `compat: await import('@margoengine/webgl2-compat')`, and the call installs it page-wide with `force: true`. Without
-`compat` the call rejects with a TypeError naming that option. Extraction is separate from drawing and requests no device. The new `webgl2` entry below
-attaches the first native drawing paths; the complete WebGL2 job is still in progress.
+`compat` the call rejects with a TypeError naming that option. Extraction is separate from drawing and requests no device.
 
 ```ts
 import { marchingCubes } from '@margoengine/sciviz/fallback';
@@ -397,55 +396,31 @@ ships the committed asset and needs no Rust toolchain. Tests compare every case,
 boundaries with an independent scalar reference and pin the real MRI's 216,150 triangles at intensity 300.
 No end-to-end rendering or public speed claim is made for this entry yet.
 
-## Native WebGL2 drawing (batch 181, first drawing piece)
+## WebGL2 without WebGPU
 
-`attachWebGL2(engine, options)` from `@margoengine/sciviz/webgl2` attaches the existing surface, bar,
-histogram and heatmap APIs to an engine with `backend: 'webgl2'`. It returns an ordinary `Figure`;
-the caller owns the engine, camera, controls and rendering loop. It installs no WebGPU compatibility shim.
-An optional `signal` cancels waiting for the Figure module and prevents attachment with the exact abort reason;
-module fetching itself may continue. The default is no signal.
-Pass `axes: false` explicitly. Axes, scatter, lines, volumes, slices and integrated CPU isosurfaces are
-still pending, and their Figure calls reject with a help-linked `unsupported` error before publishing a layer.
-The three real-data demos still need those paths. This is a committed piece of job 1, not its completion.
+On a browser without WebGPU, `createFallbackFigure` (above) draws every figure the WebGPU path draws: axes with tick
+labels, scatter, lines, surfaces, bars, heatmaps, slices, volumes, CPU isosurfaces and the optional entries. It runs the
+same sciviz code on the complete WebGL2 compatibility layer, so there is no second drawing driver to keep in step.
+The layer needs `highp` fragment precision; `@margoengine/webgl2-compat/tiers` also permits half-float and 8-bit
+colour targets. Axes, scatter, lines and label volumes match native WebGPU on the layer and on both lower tiers
+(mean difference at most 0.00004/255, no pixel over 8/255, same tick text;
+`packages/sciviz/tests/fallback-browser.mjs`). Import the layer only where WebGPU is missing:
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { webglRenderer } from '@margoengine/webgl2-compat/preview';
-import { webglRestore } from '@margoengine/webgl2-compat/restore';
-import { attachWebGL2 } from '@margoengine/sciviz/webgl2';
+import { createFallbackFigure } from '@margoengine/sciviz/fallback';
 
 const canvas = document.querySelector('canvas')!;
-const engine = await Engine.create(canvas, { backend: 'webgl2', fallback: webglRenderer });
-engine.use(webglRestore());
-const fig = await attachWebGL2(engine, { axes: false, mode: '2d' });
-await fig.heatmap([0, 1, 2, 3, 4, 5], { nx: 3, ny: 2 });
+const fig = await createFallbackFigure(canvas, { compat: await import('@margoengine/webgl2-compat') });
+const x = Float32Array.from({ length: 200 }, (_, i) => i / 20);
+await fig.line({ x, y: x.map(Math.sin), z: x.map(Math.cos) });
 await fig.ready();
-fig.render();
-// Dispose fig and engine separately when finished. Call engine.start() for a running view.
+// fig.dispose() when the page is done with it.
 ```
 
-Surface heights must be CPU arrays (read a `GpuArray` first). They use an R32F 2D texture and integer vertex
-fetches, retaining every grid cell, central-difference normals, contours, grid styling, opacity and
-`setHeights` updates. No float render-target extension is needed. Each grid dimension must fit
-`MAX_TEXTURE_SIZE`. Rectangles use one instanced draw with packed colours. The optional driver preserves
-the caller's GL state, uses the engine view's viewport/scissor and shares its depth buffer with core meshes.
-`webglRestore()` rebuilds layer resources from retained data, including the latest height update.
-The preview renderer releases its own current program before live rebuild/disposal, allowing a layer's
-GL state scope to restore a valid binding. CPU and real-context regressions cover this. Missing samples reject their whole triangles; normals beside them use available one-sided differences.
-Root `Figure.create` continues to select WebGPU. Importing the root or CPU extractor never loads this driver.
-
-`npm run test:webgl2 --workspace @margoengine/sciviz` checks the two real engine backends, restoration,
-updates, NaN holes and caller GL state. Its fixed parity bound counts every pixel: at most 0.1% with any
-RGB channel difference above 2/255, mean per-pixel maximum-channel difference at most 0.25/255.
-Run it under the shared GPU lock. The strict eight-image gate now passes on both backends, including actual
-context loss and restoration. The first-view canvas clear includes pixels outside its scissor.
-No speed or other-browser/hardware claim is made.
-The corrected driver measures 4,476 B min+gzip (previously 4,288 B; ceiling 4,442 to 4,476 B); the shared root
-measures 36,916 B (previously 36,802 B; ceiling 36,802 to 36,916 B). These optional ceilings follow Scott's
-2026-11-10 ruling. The bytes retain complete missing-triangle rejection, finite boundary normals and safe GL
-resource disposal. Another split would add an artificial shader loader and divide resource ownership. The
-existing optional driver boundary stays intact; the CPU extractor does not load it. Core + stage is 24,808 B
-under its unchanged 25,000 B limit. Pixel bounds and timeouts are unchanged.
+The earlier `@margoengine/sciviz/webgl2` entry, which attached surfaces, bars, histograms and heatmaps to the small
+WebGL2 preview renderer, was retired (KB1405): it could not draw axes, points, lines or volumes, so it was a partial
+copy of the figure. A `Figure` on an engine without a WebGPU device now rejects with a coded `unsupported` error that
+names `createFallbackFigure`.
 
 ## A first WebGPU figure
 

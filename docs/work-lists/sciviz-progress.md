@@ -11,9 +11,9 @@ Lane X, after batch 118. Data drawing only; physics remains on hold.
 | 5. Climate and solver formats | Done | CDF-1/2 lazy bounded hyperslabs, shared-owner VTK XML datasets and legacy 5.1. Six hash-pinned NOAA writer files; 734 affected CPU cases, both-backend rendering and 57 README runtime examples pass. Single full verify completed with three metadata failures; all 27 affected checks pass after repair. [Receipt](../whitepaper/results/batch-171-formats-validation.json). |
 | 6. Atmosphere on globe | Done | Optional sky-owned Hillaire ECEF transport, UTC solar globe, per-fragment aerial perspective, GPU geographic wind, scalar/point layers and density clouds. Real NOAA demo and exact device replay on both GPU backends; 1095 CPU tests, 36 metadata tests and the fast gate pass. Atmosphere 32092 B, sky/planet 4687 B, flow 9118 B; core/stage unchanged at 23950 B. [Receipt](../whitepaper/results/batch-171-atmosphere-validation.json). |
 
-Native WebGL2 batch 181 job 1 has surface/rectangle drawing and strict real-backend parity on main through
-`6a09f480f`. Its axes, points/lines, volumes/slices, integrated CPU isosurfaces and real-data demos remain
-unfinished. Compatibility-backed WebGL2 coverage does not establish those native paths.
+The native sciviz WebGL2 driver (batch 181 job 1) was retired as KB1405 on 2026-11-11 with Scott's yes. WebGL2 sciviz is
+createFallbackFigure on the complete compatibility layer: axes, scatter, line, label volumes, surfaces, bars, heatmaps,
+slices, volumes and CPU isosurfaces match native WebGPU (`fallback-browser.mjs`, limits.md).
 
 
 

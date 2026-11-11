@@ -1277,6 +1277,9 @@ with owned, foreign and null initial bindings. The ordinary unit-test chain in `
 
 ## Batch 181 job 1: native sciviz surface and rectangle drawing (2026-11-10)
 
+Retired 2026-11-11 (KB1405, Scott's yes): the driver this section researched was removed, so its shaders and sources no longer
+ship. The record below stays as the history of what was consulted.
+
 Research-first survey, before implementation, compared these primary papers and standards:
 
 - Frank Losasso and Hugues Hoppe, [Geometry Clipmaps: Terrain Rendering Using Nested Regular Grids](https://hhoppe.com/geomclipmap.pdf), SIGGRAPH 2004, abstract and introduction: regular height grids and retained GPU geometry.

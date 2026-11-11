@@ -89,3 +89,23 @@ for (const host of ['notebook', 'standalone'])
       globalThis.document = previous;
     }
   });
+
+// KB1405: the native WebGL2 driver is retired; the complete layer (createFallbackFigure) draws every figure.
+test('the root never references a fallback driver and the webgl2 entry is gone', async () => {
+  const { readFileSync, readdirSync, existsSync } = await import('node:fs');
+  const dir = new URL('../src/', import.meta.url);
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal('./webgl2' in pkg.exports, false);
+  assert.equal(existsSync(new URL('webgl2.ts', dir)), false);
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.ts')))
+    assert.doesNotMatch(readFileSync(new URL(name, dir), 'utf8'), /attachWebGL2|FallbackBackend|FallbackDraw|drawGL/, name);
+});
+
+test('a preview engine rejects with the createFallbackFigure help', async () => {
+  const { SciRenderer } = await import('@margoengine/sciviz');
+  const engine = { gpu: undefined, use: (plugin) => plugin.setup(engine) };
+  assert.throws(
+    () => SciRenderer.attach(engine),
+    (e) => e.code === 'unsupported' && /createFallbackFigure/.test(e.message) && /@margoengine\/sciviz\/fallback/.test(e.message),
+  );
+});

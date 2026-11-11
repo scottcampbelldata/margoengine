@@ -182,8 +182,8 @@ export function streamTubeGeometry(path: StreamPath, options: StreamTubeOptions 
 
 /**
  * Converts an indexed stream mesh for the existing sciviz/grids meshLayer renderer, preserving smooth normals.
- * The returned arrays are independent. Output typed arrays are limited to 128 MiB. Native sciviz/webgl2 does
- * not draw this layer; WebGPU and real WebGL2 compatibility use the existing mesh renderer and restoration.
+ * The returned arrays are independent. Output typed arrays are limited to 128 MiB. WebGPU and the WebGL2
+ * compatibility layer use the existing mesh renderer and restoration.
  */
 export function streamMeshTriangles(mesh: StreamMesh, options: { readonly signal?: AbortSignal } = {}): TriangleSet {
   options.signal?.throwIfAborted();

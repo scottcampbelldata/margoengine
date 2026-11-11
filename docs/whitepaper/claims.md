@@ -522,7 +522,12 @@ WEBGL_lose_context restoration, hostile GL state, live reboots and disposal with
 missing-triangle rejection and finite one-sided normals preserve parity at NaN holes. The first-view frame
 clear also covers pixels outside its scissor. Evidence: resume-webgl-checkpoint-native.log and webgl2-pixels.json
 in test-results/sciviz-fixes. No full-job completion, speed or other-hardware claim is made.
-Axes, points/lines, volume/slice and CPU-isosurface integration and all three real-data demos are still owed.
+Retired 2026-11-11 (KB1405, Scott's yes): the native `sciviz/webgl2` driver and the claims above about it are withdrawn. Its
+successor claim is that `createFallbackFigure` draws axes, scatter, line and label volumes (with the existing surface,
+slice, volume, CPU isosurface, bars and heatmap cases) like native WebGPU on the WebGL2 layer and on its half-float and
+LDR tiers: mean difference at most 0.00004/255 and no pixel over 8/255 at 192 x 144 on Chromium/RTX A6000, identical tick
+text, proven by `packages/sciviz/tests/fallback-browser.mjs` (reproduce: `node scripts/gpu-lock.mjs run -- node
+packages/sciviz/tests/fallback-browser.mjs`, native and with MARGO_COMPAT=1). No speed or other-hardware claim is made.
 
 CPU isosurface foundation (2026-11-10): `@margoengine/sciviz/fallback` extracts without a GPU using the existing
 derived case table and a feature-local Rust/Wasm module. `packages/sciviz/tests/fallback.test.js` compares all

@@ -3443,10 +3443,6 @@
       "types": "./dist/sciviz/fallback.d.ts",
       "import": "./dist/sciviz/fallback.js"
     },
-    "./sciviz/webgl2": {
-      "types": "./dist/sciviz/webgl2.d.ts",
-      "import": "./dist/sciviz/webgl2.js"
-    },
     "./sciviz/flow": {
       "types": "./dist/sciviz/flow.d.ts",
       "import": "./dist/sciviz/flow.js"

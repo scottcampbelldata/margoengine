@@ -68,10 +68,6 @@
       "types": "./dist/fallback.d.ts",
       "import": "./dist/fallback.js"
     },
-    "./webgl2": {
-      "types": "./dist/webgl2.d.ts",
-      "import": "./dist/webgl2.js"
-    },
     "./flow": {
       "types": "./dist/flow.d.ts",
       "import": "./dist/flow.js"
@@ -389,13 +385,12 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",
     "test": "npm run build && node --experimental-test-module-mocks --test tests/*.test.js",
-    "test:browser": "npm run build && node scripts/browser-root.mjs tests/sciviz-browser.mjs && node scripts/browser-root.mjs tests/bricks-browser.mjs && node scripts/browser-root.mjs tests/entries-browser.mjs && node scripts/browser-root.mjs tests/restoration-browser.mjs && node scripts/browser-root.mjs tests/demos-browser.mjs && node scripts/browser-root.mjs tests/webgl2-browser.mjs && node scripts/browser-root.mjs tests/formats-browser.mjs && node scripts/browser-root.mjs tests/derive-browser.mjs && node scripts/browser-root.mjs tests/pipeline-browser.mjs && node scripts/browser-root.mjs tests/contour-browser.mjs && node scripts/browser-root.mjs tests/clip-browser.mjs && node scripts/browser-root.mjs tests/probe-browser.mjs && node scripts/browser-root.mjs tests/calc-browser.mjs && node scripts/browser-root.mjs tests/glyph-browser.mjs && node scripts/browser-root.mjs tests/transfer-browser.mjs && node scripts/browser-root.mjs tests/labels-browser.mjs && node scripts/browser-root.mjs tests/cinematic-browser.mjs && node scripts/browser-root.mjs tests/volume-depth-browser.mjs && node scripts/browser-root.mjs tests/volume-quality-browser.mjs && node scripts/browser-root.mjs tests/volume-physics-browser.mjs && node scripts/browser-root.mjs tests/scene-owner-browser.mjs && node scripts/browser-root.mjs tests/link-browser.mjs && node scripts/browser-root.mjs tests/datasets-browser.mjs && node scripts/browser-root.mjs tests/curvilinear-browser.mjs && node scripts/browser-root.mjs tests/geo-lod-browser.mjs && node scripts/browser-root.mjs tests/engineering-browser.mjs && node scripts/browser-root.mjs tests/tetvolume-browser.mjs && node scripts/browser-root.mjs tests/geo-vector-browser.mjs && node scripts/browser-root.mjs tests/spec-browser.mjs && node scripts/browser-root.mjs tests/spec-demos-browser.mjs && node scripts/browser-root.mjs tests/astronomy-browser.mjs",
+    "test:browser": "npm run build && node scripts/browser-root.mjs tests/sciviz-browser.mjs && node scripts/browser-root.mjs tests/bricks-browser.mjs && node scripts/browser-root.mjs tests/entries-browser.mjs && node scripts/browser-root.mjs tests/restoration-browser.mjs && node scripts/browser-root.mjs tests/demos-browser.mjs && node scripts/browser-root.mjs tests/formats-browser.mjs && node scripts/browser-root.mjs tests/derive-browser.mjs && node scripts/browser-root.mjs tests/pipeline-browser.mjs && node scripts/browser-root.mjs tests/contour-browser.mjs && node scripts/browser-root.mjs tests/clip-browser.mjs && node scripts/browser-root.mjs tests/probe-browser.mjs && node scripts/browser-root.mjs tests/calc-browser.mjs && node scripts/browser-root.mjs tests/glyph-browser.mjs && node scripts/browser-root.mjs tests/transfer-browser.mjs && node scripts/browser-root.mjs tests/labels-browser.mjs && node scripts/browser-root.mjs tests/cinematic-browser.mjs && node scripts/browser-root.mjs tests/volume-depth-browser.mjs && node scripts/browser-root.mjs tests/volume-quality-browser.mjs && node scripts/browser-root.mjs tests/volume-physics-browser.mjs && node scripts/browser-root.mjs tests/scene-owner-browser.mjs && node scripts/browser-root.mjs tests/link-browser.mjs && node scripts/browser-root.mjs tests/datasets-browser.mjs && node scripts/browser-root.mjs tests/curvilinear-browser.mjs && node scripts/browser-root.mjs tests/geo-lod-browser.mjs && node scripts/browser-root.mjs tests/engineering-browser.mjs && node scripts/browser-root.mjs tests/tetvolume-browser.mjs && node scripts/browser-root.mjs tests/geo-vector-browser.mjs && node scripts/browser-root.mjs tests/spec-browser.mjs && node scripts/browser-root.mjs tests/spec-demos-browser.mjs && node scripts/browser-root.mjs tests/astronomy-browser.mjs",
     "prepack": "npm run build",
     "build:fallback": "node scripts/build-fallback.mjs",
     "build:flow": "node scripts/build-flow.mjs",
     "test:flow-kernel": "node scripts/build-flow.mjs --test",
     "test:fallback-kernel": "node scripts/build-fallback.mjs --test",
-    "test:webgl2": "npm run build && node scripts/browser-root.mjs tests/webgl2-browser.mjs",
     "test:browser:atmosphere": "node scripts/browser-root.mjs tests/atmosphere-browser.mjs",
     "test:browser:contour2d": "node scripts/browser-root.mjs tests/contour2d-browser.mjs",
     "test:browser:export-vector": "node scripts/browser-root.mjs tests/export-vector-browser.mjs",

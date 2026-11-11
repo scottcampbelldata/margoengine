@@ -340,10 +340,11 @@ CPU isosurface extraction (batch 181 job 1 foundation): run
 `fallback.test.js` compares every derived case, SIMD tails and chunk boundaries with a scalar oracle, and loads
 `examples/assets/sciviz/head.nrrd` at intensity 300 to check 216,150 triangles and the pinned vertex hash in claims.md.
 The Wasm is a lazy asset outside the root entry; no WebGPU device or browser is needed. These checks establish
-extraction only. For the separate native surface/rectangle piece, build sciviz and webgl2-compat, then run
-`node scripts/gpu-lock.mjs run --owner=sciviz-native-proof --wait-max=60 --max=1 -- node packages/sciviz/tests/webgl2-browser.mjs`.
-This checks both real engine backends, strict all-pixel bounds, actual context loss, live reboots and GL state.
-It does not establish axes, points/lines, volume/slice or integrated CPU-isosurface support.
+extraction only. For WebGL2 drawing (the native driver was retired, KB1405), build sciviz and webgl2-compat, then run
+`node scripts/gpu-lock.mjs run --owner=sciviz-fallback-proof --wait-max=60 --max=1 -- node packages/sciviz/tests/fallback-browser.mjs`,
+natively and with `MARGO_COMPAT=1`. It compares surface, slice, volume, CPU isosurface, bars, heatmap, axes, scatter, line
+and label volumes on native WebGPU, the complete layer and the layer's half-float and LDR tiers, with restoration and
+cancellation, and prints each case's mean and share.
 
 Owned Chromium shutdown ordering: run `node --test --test-timeout=120000
 tests/browser-teardown.test.js tests/browser-selection.test.js

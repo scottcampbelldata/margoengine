@@ -4,8 +4,7 @@
 import { rangeError } from '../../shared/errors.js';
 import { rectAt } from './charts.js';
 import type { Bounds } from './layer.js';
-import { frameWGSL, type Drawable, type GlContext, type GpuContext, type SciRenderer } from './render.js';
-import type { FallbackDraw } from './fallback-types.js';
+import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -70,7 +69,6 @@ export class RectsLayer implements Drawable {
   #group: GPUBindGroup | undefined;
   #dirty = true;
   #disposed = false;
-  #fallback: FallbackDraw | undefined;
 
   /** @internal Use the figure's chart methods. */
   constructor(
@@ -94,12 +92,6 @@ export class RectsLayer implements Drawable {
   }
 
   #build(): void {
-    this.#dirty = true;
-    if (this.#renderer.fallback) {
-      this.#fallback?.dispose();
-      this.#fallback = this.#renderer.fallback.rects(this.rects, this.#colours);
-      return;
-    }
     const device = this.#renderer.device!;
     const buffer = (data: Float32Array | Uint32Array, usage: number) => {
       const b = device.createBuffer({ size: Math.max(16, Math.ceil(data.byteLength / 16) * 16), usage });
@@ -122,6 +114,7 @@ export class RectsLayer implements Drawable {
       layout: this.#layout,
       entries: this.#buffers.map((buffer, binding) => ({ binding, resource: { buffer } })),
     });
+    this.#dirty = true;
   }
 
   /** @internal The device was restored: rebuild from the CPU copies. */
@@ -168,8 +161,7 @@ export class RectsLayer implements Drawable {
     if (!this.#dirty) return;
     this.#uniform.set(this.#model, 0);
     this.#uniform[16] = -0.5;
-    if (this.#fallback) this.#fallback.update(this.#uniform);
-    else this.#renderer.device!.queue.writeBuffer(this.#buffers[0], 0, this.#uniform);
+    this.#renderer.device!.queue.writeBuffer(this.#buffers[0], 0, this.#uniform);
     this.#dirty = false;
   }
 
@@ -192,19 +184,12 @@ export class RectsLayer implements Drawable {
     pass.draw(6, this.values.length);
   }
 
-  /** @internal */
-  drawGL(context: GlContext): void {
-    this.prepare();
-    this.#fallback!.draw(context);
-  }
-
   /** Frees the GPU buffers. */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#renderer.remove(this);
     for (const b of this.#buffers) b.destroy();
-    this.#fallback?.dispose();
   }
 
   /** Same as `dispose()`, for `using`. */

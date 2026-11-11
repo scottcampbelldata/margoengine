@@ -395,8 +395,8 @@ or NaN; a nonzero node must retain a component >=8*2^-126 after common scaling, 
 interpolation does not rely on subnormals. Local scaled norms preserve parallel tangents across 24 orders
 without a nonzero speed cutoff. Slice coordinates/mappings within +/-1e15, sin(angle)^2 > 1e-8. Missing/outside texels mask rather than
 bridge. Readback temporarily adds one image-sized buffer and a luminance array. No arbitrary-triangle surface
-LIC, volume LIC or physical unsteady advection claim. Native sciviz/webgl2 is unsupported; the intended
-backends are WebGPU and compatibility-backed WebGL2. Independent analytical box error: 1.4725853414443435e-7;
+LIC, volume LIC or physical unsteady advection claim. The backends are WebGPU and the
+compatibility-layer WebGL2 (the native sciviz/webgl2 driver was retired, KB1405). Independent analytical box error: 1.4725853414443435e-7;
 exact circular-arc error: 1.1380660922433172e-5. Both have zero backend pixel differences and exact restoration.
 The NOAA demo passes both layouts/backends. The normalized pre-integration entry was 10,429 B gzip.
 After main restored full published colormap precision, LIC is 23,461 B gzip, ceiling 24,165 B (was 10,517 B).
@@ -538,7 +538,7 @@ readback. Explicit readPositions has a 30000 ms default timeout. WebGPU and WebG
 numeric/pixel/lifecycle tests; native WebGL2 flow remains pending with batch 181. NOAA daily means do not
 establish observed tracks or forecast accuracy. The official Moving wind example preserves these limitations.
 The `/flow` JavaScript entry is 8,665 B gzip (raised optional ceiling 8,854 B);
-the previous CPU-only size was 2,130 B (ceiling 2,386 B). Root remains 36,916 B, driver 4,476 B, Wasm 7,916 raw /
+the previous CPU-only size was 2,130 B (ceiling 2,386 B). Root was 36,916 B, driver 4,476 B (retired since), Wasm 7,916 raw /
 3,585 gzip B; their ceilings are unchanged by flow. Keeping one coherent flow entry avoids an artificial loader
 between transport, seed semantics and owned replay state.
 No core/stage implementation change is part of this feature.
@@ -633,9 +633,8 @@ vertices together are capped at 2 GiB, excluding the returned copy and allocator
 least two per axis; the input length must match; the level must be finite in float32. Both passes yield every
 16,384 cells for cancellation. NaN samples follow the GPU's comparison/interpolation behaviour. All 256 cases,
 non-cubic row tails, chunk boundaries and the real MRI are checked in `packages/sciviz/tests/fallback.test.js`.
-Root Figure attachment still rejects the engine's WebGL2 preview backend; the optional `sciviz/webgl2`
-adapter adds surface and rectangle drawing below. CPU extraction is not integrated into that adapter yet.
-Strict surface/rectangle drawing parity passes on Chromium/RTX A6000; the other native layer paths remain pending.
+A Figure on an engine without a WebGPU device (the small WebGL2 preview renderer) rejects with a coded `unsupported`
+error naming `createFallbackFigure`; the figure draws on the complete WebGL2 layer instead.
 
 KB1405 evidence (2026-11-11): `Figure.create` axes (with scatter points), scatter, line and label volumes on the
 complete WebGL2 layer, on `/tiers` forced to half-float and on LDR, match native WebGPU at 192 x 144: mean(max RGB
@@ -643,25 +642,17 @@ channel difference) at most 0.00004/255 and share(d > 8/255) 0 in every case, wi
 bounds were fixed before the first run (mean <= 1, share <= 0.02) in `packages/sciviz/tests/fallback-browser.mjs`,
 which fails when a case does not draw on the layer. This is the evidence for retiring the native `sciviz/webgl2` driver.
 
-Sciviz native drawing piece (batch 181, 2026-11-10): `await attachWebGL2(engine, { axes: false, ... })`
-returns a Figure on a real `backend: 'webgl2'` engine. CPU-backed surfaces, bars, histograms and heatmaps only;
-`signal` defaults absent and cancels module waiting/attachment with its exact reason; the module fetch may continue.
-no shim, globals or WebGPU device. Root Figure.create remains WebGPU. R32F heights need nx and ny within
-MAX_TEXTURE_SIZE and six vertices per cell within a signed GL draw count. The colour map is 256 sRGB8 texels.
-Surface uploads use 4 bytes/sample plus 1,024 colour-map bytes; rectangle instance data uses 20 bytes/cell.
-No per-cell CPU mesh building is added. The driver shares core depth and respects view viewport/scissor,
-restoring GL state after drawing and uploads. Restoration uses retained data, including setHeights' owned copy.
-Axes, points/lines, volumes/slices, integrated CPU isosurfaces and the real-data demos are still pending;
-unsupported Figure calls reject with coded help before publishing. The browser test's preselected all-pixel
-bound is share(d > 2/255) <= 0.001 and mean(max RGB channel difference) <= 0.25/255, at 320 x 240,
-single-sampled on Chromium/RTX A6000. All eight images pass, including real context restoration; no
-cross-hardware or speed claim. The drawing entry is 4,476 B min+gzip with bare imports external (previously
-4,288 B; ceiling 4,442 to 4,476 B), plus the shared Figure root at 36,916 B (previously 36,802 B; ceiling
-36,802 to 36,916 B). Scott's optional-package ruling permits these 34 B and 114 B ceiling increases for matching
-missing-triangle/boundary-normal correctness and generation-safe GL disposal. Another split would introduce
-an artificial shader loader and divide one generation's resource ownership. Readable shaders, full errors and
-the existing optional boundary are retained. Core plus stage remains 23,924 B gzip, below the unchanged 25,000 B.
-The CPU extractor remains 2,002 B plus its lazy Wasm.
+KB1405, native sciviz WebGL2 driver retired (2026-11-11, Scott's yes): `@margoengine/sciviz/webgl2` and
+`attachWebGL2` are removed, with the root's type-only driver seam. The driver drew CPU-backed surfaces, bars,
+histograms and heatmaps on the small preview renderer and refused axes, points, lines, volumes, slices and isosurfaces,
+so it was a partial copy of the figure and about 45 optional entries would still have refused it. Every figure
+now draws through `createFallbackFigure` on the complete layer, which the evidence above matches to native WebGPU.
+A device class that only the native driver served does not exist: its shaders needed `highp` fragment precision like the
+layer's tiers, and `/tiers` covers half-float and LDR targets. Sizes: the 4,476 B entry and its 4,667 B ceiling are
+gone; the sciviz root measured 63,709 B min+gzip (bare imports external, rolldown) before and 63,559 B after; the
+CPU extractor entry stays 2,223 B; core + stage stays 24,812 B under 25,000 B. WebGPU steady-frame work counts do not
+change (the removed branches ran only on the preview backend). The regression tests are the new
+`createFallbackFigure` cases in `fallback-browser.mjs` and the isolation cases in `backend-isolation.test.js`.
 
 Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
 isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays
@@ -2747,9 +2738,8 @@ pipeline compiles; it does not promise a bound on driver compilation. The existi
 uses renderImage and its documented capture lifecycle. Transport and entry exports
 are unchanged, and no runtime speed claim is made.
 
-Native sciviz corrections: root 36,916 B gzip and /webgl2 4,476 B meet the explicitly revised optional ceilings
-above. Missing triangles are completely rejected, with finite one-sided boundary normals. Core + stage remains
-23,924 B under 25,000 B. The strict all-pixel bound and all timeouts are unchanged.
+Native sciviz corrections (2026-11-10; the native driver was retired on 2026-11-11, KB1405): missing triangles are
+completely rejected, with finite one-sided boundary normals. Core + stage remains 23,924 B under 25,000 B.
 
 Media README startup (Batch 99): module initialization starts the existing
 progressive viewport independently of full tracing compilation. An explicit button
@@ -4591,7 +4581,6 @@ All values below are gzip bytes. The optional table includes every ceiling chang
 | `@margoengine/post/lens` | 6862 | 6916 | 6887 | 7078 |
 | `@margoengine/scatter/tiles` | 3401 | 3479 | 3415 | 3606 |
 | `@margoengine/scenery/scenes` | 19197 | 19334 | 19213 | 19404 |
-| `@margoengine/sciviz/webgl2` | 4476 | 4527 | 4476 | 4667 |
 | `@margoengine/shader/effects` | 8300 | 8364 | 8306 | 8497 |
 | `@margoengine/taa/upscale` | 7112 | 7179 | 7112 | 7303 |
 | `@margoengine/terrain/stream` | 12050 | 12112 | 12100 | 12291 |
@@ -5682,7 +5671,7 @@ Gate defaults threshold -40 dBFS (-120..0), hysteresis 3 dB (0..40), hold 0.05 s
 Multiband crossovers default [250,2500] Hz, ordered 10..0.45*sampleRate; separate low/mid/high BandDynamics. Each split is two cascaded Butterworth biquads per low/high path (24 dB/octave). Low-band high-crossover phase compensation keeps the unity sum flat. Per-band detector is linked maximum absolute sample. Ratios 1 and makeup 0 retain the crossover's allpass response. Tests prove independent RBJ convolution, closed-form knees/gains and flat impulse-response magnitude across the spectrum; real renders beside both backends. Headroom, perceptual tuning, other browsers and performance remain unmeasured. No core/stage change.
 ## Batch 173: optional transfer classification
 `@margoengine/sciviz/transfer` adds joint value/gradient histograms, rectangle, triangle and Gaussian classifiers, 1D ordered preintegration, CT/MRI/PET display presets and an owned HTML editor. LUT resolution is 2..2048 per axis; default 256 for widgets, 128 for preintegration. Colours are linear light, opacity per reference voxel. Points and widget coordinates use physical scalar units and scalar units/data unit for gradients. Histograms require 2+ samples per axis, at most 64 million samples, x fastest; NaN/nonfinite centres or derivative neighbours are excluded. Histograms own two float64 scratch arrays (16 bytes/sample) and a 4-byte count per bin. Scalar values/gradients outside the selected histogram axes clamp to the edge bins.
-Volume textures retain signed normalized scalar values outside the display range so their gradients remain meaningful; binary16 limits normalized values to [-65504,65504] and rounds them. Histogram derivatives use original CPU values; render derivatives use the half-float, trilinearly sampled field. Native WebGPU and WebGL2 compatibility are supported. The separate native `sciviz/webgl2` fallback, bricked volumes and extracted isosurfaces do not consume this scalar VolumeLayer API. The editor can bind any existing scalar VolumeLayer without recreating its data; function points are resampled into the layer's existing range. Slice colours update with the same classifier. Slice opacity remains its independently specified opacity.
+Volume textures retain signed normalized scalar values outside the display range so their gradients remain meaningful; binary16 limits normalized values to [-65504,65504] and rounds them. Histogram derivatives use original CPU values; render derivatives use the half-float, trilinearly sampled field. Native WebGPU and WebGL2 compatibility are supported. Bricked volumes and extracted isosurfaces do not consume this scalar VolumeLayer API. The editor can bind any existing scalar VolumeLayer without recreating its data; function points are resampled into the layer's existing range. Slice colours update with the same classifier. Slice opacity remains its independently specified opacity.
 Preintegration uses 8..2048 midpoint samples (default 128), linear scalar variation over an ordered front/back segment and RGBA8 output. Generate for the layer's `step=1/quality` and density. Regenerate after changing quality/density for the most accurate colour integral. The marcher corrects opacity when step/density differ, but unpremultiplied integrated colour remains an approximation in that case, at clipped segment endpoints and in the existing 2048-sample cap. Gradient classification is evaluated at march samples, not preintegrated in 2D. MIP is scalar-maximum projection, not a 2D classification maximum.
 The HTML component has no import side effects, supports add/select/delete, pointer/key translation, colour/opacity, rectangle extents, Gaussian sigma and explicit triangle vertices. Disposing the editor removes DOM/listeners and restores the layer's original classifier. Preintegration and histograms accept AbortSignal and yield during work. No timing or superiority claim. Transfer entry: 5996 bytes min+gzip (new entry, formerly 0; ceiling 6252). Sciviz root: measured parent 50597 to 52045 bytes; its optional ceiling rises from 51813 to 53607 for physical classifier hooks and safe owned-buffer PNG capture. Core + stage: unchanged 24209 bytes. The combined editor, histogram and classification contract stays together; splitting would add import/ownership complexity without reducing full-feature bytes.
 
@@ -6254,7 +6243,7 @@ the layer as `compat: await import('@margoengine/webgl2-compat')` (sciviz never 
 without it the call rejects with a TypeError naming that option), and the call installs it with force for the page, even with native WebGPU.
 Importing it performs no installation or Wasm load. The full tier requires highp fragment
 precision and EXT_color_buffer_float; unsupported hardware rejects with coded unsupported.
-The smaller sciviz/webgl2 preview attacher is unchanged. All normal Figure layers use the full
+The smaller sciviz/webgl2 preview attacher was retired (KB1405). All normal Figure layers use the full
 shared route, including 3D volume textures, slices, axes, bars and bricked page tables. CPU
 isosurfaces share Margo's cases and vertex layout and use at most floor(maxStorageBufferBindingSize/96)
 triangles. They retain their source and rebuild on device restoration; caller-owned lost GPU

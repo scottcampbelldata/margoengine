@@ -47,7 +47,7 @@ current on that date.
 | Notebook | Jupyter widget through anywidget (`tests/notebook.test.js`, `python/`) | Plotly, Bokeh, pydeck, Altair widgets | Jupyter |
 | Sharing | versioned figure spec, URL state, standalone HTML, provenance (`tests/spec.test.js`, `tests/share.test.js`, `tests/provenance.test.js`) | Neuroglancer URL state; Glance standalone HTML | State files |
 | Geo and time | tile level of detail, vector tiles, time-dynamic layers, CF conventions, projections (README "Geographic layers", `tests/geo-lod.test.js`, `tests/geo-vector.test.js`, `tests/geo-time.test.js`, `tests/cf.test.js`, `tests/projections.test.js`) | deck.gl tile and geo layers; CesiumJS globe | GIS tools |
-| Platform | WebGPU first, native WebGL2 path, GPU picking, progressive rendering (README "A first WebGPU figure", "Native WebGL2 drawing", `tests/webgl2.test.js`, `tests/pick-gpu.test.js`, `tests/progressive.test.js`) | WebGL2 throughout; deck.gl documents partial WebGPU | Native GPU |
+| Platform | WebGPU first, complete WebGL2 path on the compatibility layer, GPU picking, progressive rendering (README "A first WebGPU figure", "WebGL2 without WebGPU", `tests/fallback-browser.mjs`, `tests/pick-gpu.test.js`, `tests/progressive.test.js`) | WebGL2 throughout; deck.gl documents partial WebGPU | Native GPU |
 
 ## Measured scenes
 

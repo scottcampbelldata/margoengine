@@ -47,8 +47,8 @@ DOM overlays and picking coordinates retain their original size. Intermediate im
 resolution, integration accuracy and antialiasing. No numerical error bound is claimed for these temporary images.
 At full refinement the existing renderer's output is used unchanged. Do not use temporary motion frames for analysis.
 
-Both native WebGPU and the full WebGL2 compatibility path are supported. The native WebGL2 preview, which does not
-provide the device/pass API, rejects with the existing `unsupported` code before attachment. Reduced targets use the
+Both native WebGPU and the full WebGL2 compatibility path are supported. A core WebGL2 preview engine, which does not
+provide the device/pass API, rejects with the existing `unsupported` code before attachment; use `createFallbackFigure`. Reduced targets use the
 device's ordinary texture limits and roughly width * height * (colour bytes + 4 depth bytes) per retained view.
 Each view retains at most one reduced target. Replacement, full refinement and disposal release it. Applications
 changing their view-ID set should recreate the controller to release removed views' state.

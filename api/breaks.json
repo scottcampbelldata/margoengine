@@ -180,24 +180,6 @@
     "approved": "Scott 2026-11-10"
   },
   {
-    "entry": "@margoengine/sciviz/webgl2",
-    "symbol": "VolumeLayer.mode",
-    "change": "signature",
-    "was": "36fa2966",
-    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
-    "date": "2026-11-10",
-    "approved": "Scott 2026-11-10"
-  },
-  {
-    "entry": "@margoengine/sciviz/webgl2",
-    "symbol": "VolumeLayerOptions.mode",
-    "change": "signature",
-    "was": "4e647cc5",
-    "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
-    "date": "2026-11-10",
-    "approved": "Scott 2026-11-10"
-  },
-  {
     "entry": "@margoengine/sciviz/flow",
     "symbol": "VolumeLayer.mode",
     "change": "signature",
@@ -1078,5 +1060,14 @@
     "reason": "MinIP volume mode: mode widens from 'composite' | 'mip' to the VolumeMode union 'composite' | 'mip' | 'minip'. Every old value keeps its meaning, so existing callers compile and render the same; only code that switches exhaustively on mode sees the new member.",
     "date": "2026-11-10",
     "approved": "Scott 2026-11-10"
+  },
+  {
+    "entry": "@margoengine/sciviz/webgl2",
+    "symbol": "attachWebGL2",
+    "change": "removed",
+    "was": "8bea2053",
+    "reason": "KB1405: the native WebGL2 sciviz driver is retired. It drew only surfaces, bars, histograms and heatmaps and refused axes, points, lines and volumes; createFallbackFigure from @margoengine/sciviz/fallback draws every figure on the complete WebGL2 layer, matching native WebGPU (packages/sciviz/tests/fallback-browser.mjs). The whole entry and its @internal root seam (FallbackBackend, FallbackDraw, drawGL, SciRenderer fallback option) are removed.",
+    "date": "2026-11-11",
+    "approved": "Scott 2026-11-11"
   }
 ]

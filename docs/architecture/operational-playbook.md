@@ -787,7 +787,7 @@ The native sciviz reboot diagnostic found a preview renderer ownership defect: d
 kept a flagged binding alive until a plugin switched programs, at which point its saved binding became invalid.
 Preview restore and disposal now unbind their own current program before deletion, preserving foreign programs.
 `packages/webgl2-compat/test/preview-webgl.test.js` fails before the repair and checks both paths and foreign
-state preservation. `packages/sciviz/tests/webgl2-browser.js` checks NO_ERROR immediately after every reboot,
+state preservation. The sciviz driver's own browser test (removed with the driver, KB1405) checked NO_ERROR immediately after every reboot,
 upload and draw. The real-context gate passes after main's teardown repair; the optional ceilings now follow
 Scott's ruling, and the native piece is on main through 6a09f480f.
 The CPU test models the specification's marked-object rebinding error and checks owned, foreign and null
@@ -3261,6 +3261,15 @@ eight-image parity pass and all 346 scoped CPU tests remain valid. Evidence: rul
 resume-webgl-checkpoint-native.log in test-results/sciviz-fixes. Only the failed size prerequisites are rerun;
 the earlier full verify, lint and hygiene results are retained as requested.
 Axes, points/lines, volumes/slices, integrated CPU isosurfaces and real native demos remain pending.
+
+KB1405, backend change (2026-11-11, Scott's yes): the optional `sciviz/webgl2` driver above is retired. Sciviz draws on
+exactly two paths now: native WebGPU, and the complete WebGL2 layer through `createFallbackFigure`
+(`sciviz/fallback`), which installs the layer for a page without WebGPU. A Figure on a core preview engine rejects
+with a coded `unsupported` error naming that function. Evidence (section 5): `packages/sciviz/tests/fallback-browser.mjs`
+compares axes, scatter, line and label volumes with native WebGPU on the layer and on `/tiers` forced to half-float
+and LDR (mean 0.00004/255 at most, no pixel over 8/255, identical tick text), beside the existing surface, slice,
+volume, CPU isosurface, bars and heatmap cases. No GPU maths, kernel or core/stage change; WebGPU steady-frame work
+counts are unchanged because the removed branches ran only on the preview backend. Core + stage stays 24,812 B.
 No exclusive lock, benchmark, paired wall-clock measurement or timing assertion is part of this piece.
 
 

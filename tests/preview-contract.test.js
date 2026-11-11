@@ -97,16 +97,14 @@ test('an object plugin has the same contract as a class', () => {
   assert.equal(fails(object), 1);
 });
 
-test('the native sciviz route is reviewed against its backend count and real rendering regressions', () => {
+test('the sciviz renderer refuses the preview in setup and keeps no reviewed preview route (KB1405)', () => {
   const file = 'packages/sciviz/src/render.ts';
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
-  assert.deepEqual(previewRoutes[file + ':SciRenderer'], [1, 'packages/sciviz/tests/webgl2.test.js']);
-  assert.equal(inspectPreviewContract(source, file, {}).failures.length, 1);
+  assert.equal(previewRoutes[file + ':SciRenderer'], undefined);
   assert.deepEqual(inspectPreviewContract(source, file).failures, []);
-  const extraGuard = source.replace('this.fallback!.render(context, visible);',
-    "if (context.backend === 'webgl2') this.fallback!.render(context, visible);");
-  assert.notEqual(extraGuard, source);
-  assert.equal(inspectPreviewContract(extraGuard, file).failures.length, 1, 'new guarded work needs another review');
+  const open = source.replace('if (!engine.gpu)', 'if (false)');
+  assert.notEqual(open, source);
+  assert.equal(inspectPreviewContract(open, file).failures.length, 1, 'a setup that no longer refuses fails the gate');
 });
 
 test('all package pass owners meet the preview contract, enforced by verify and therefore check:merge', {

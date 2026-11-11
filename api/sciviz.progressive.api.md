@@ -163,22 +163,6 @@ interface Drawable {
     center(): readonly [number, number, number];
     prepare?(context: GpuContext, renderer: SciRenderer): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
-    drawGL?(context: GlContext): void;
-    dispose(): void;
-}
-
-interface FallbackBackend {
-    setup(engine: Engine): void;
-    render(context: GlContext, drawables: readonly Drawable[]): void;
-    surface(data: ArrayLike<number>, nx: number, ny: number, colormap: Colormap): FallbackDraw & {
-        setHeights(data: Float32Array): void;
-    };
-    rects(rects: Float32Array, colours: Uint32Array): FallbackDraw;
-}
-
-interface FallbackDraw {
-    update(uniform: Float32Array): void;
-    draw(context: GlContext): void;
     dispose(): void;
 }
 
@@ -319,10 +303,6 @@ interface FigureOptions extends AxesOptions {
     readonly legend?: boolean | LegendPosition;
     readonly tooltips?: boolean | ((hit: PickResult) => string | null);
 }
-
-type GlContext = Extract<PassContext, {
-    backend: 'webgl2';
-}>;
 
 type GpuContext = Extract<PassContext, {
     backend: 'webgpu';
@@ -481,7 +461,6 @@ class RectsLayer implements Drawable {
     center(): readonly [number, number, number];
     prepare(): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
-    drawGL(context: GlContext): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }
@@ -545,7 +524,6 @@ class SciRenderer implements EnginePlugin {
     }>;
     readonly name: string;
     readonly order: number;
-    readonly fallback: FallbackBackend | undefined;
     device: GPUDevice | undefined;
     frameLayout: GPUBindGroupLayout | undefined;
     frameGroup: GPUBindGroup | undefined;
@@ -558,7 +536,6 @@ class SciRenderer implements EnginePlugin {
     }): SciRenderer;
     constructor(options?: {
         readonly order?: number;
-        readonly fallback?: FallbackBackend;
     });
     setup(engine: Engine): void;
     onDeviceRestored(engine: Engine): void;
@@ -644,7 +621,6 @@ class SurfaceLayer implements Drawable {
     } | null;
     prepare(): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
-    drawGL(context: GlContext): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }

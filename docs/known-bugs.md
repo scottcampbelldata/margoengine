@@ -1,5 +1,21 @@
 # Known bugs and unverified features
 
+### Corrected: KB1405, the native sciviz WebGL2 driver drew only part of a figure (2026-11-11, retired)
+
+- **Bug:** `@margoengine/sciviz/webgl2` (`attachWebGL2`) drew surfaces, bars, histograms and heatmaps on the small preview
+  renderer and refused axes (`axes: false` was required), points, lines, volumes, slices, isosurfaces and the demos; about
+  45 optional entries refuse it by construction. A partial package that would have needed 8 to 10 more pushes, about 20 KB
+  of GLSL and a third parity matrix to finish.
+- **Fix:** Scott approved retiring it (2026-11-11). The entry, its tests, the root's type-only driver seam and its eleven
+  error messages are removed; a Figure on an engine without a WebGPU device rejects with a coded `unsupported` error naming
+  `createFallbackFigure`. Every figure draws on the complete WebGL2 layer instead.
+- **Evidence:** `packages/sciviz/tests/fallback-browser.mjs` draws axes with scatter, scatter, line and label volumes on
+  native WebGPU, on the layer and on `/tiers` forced to half-float and LDR: mean(max RGB channel difference) at most
+  0.00004/255, share(d > 8/255) 0, identical tick-label text (bounds fixed before the first run: mean <= 1, share <= 0.02).
+  Existing cases cover surface, slice, volume, CPU isosurface, bars and heatmap. `docs/webgl2-compat-demos.md` records
+  sciviz-head, points, stars, surface, volume and wind running with the same pixels at 16.7 ms intervals.
+  `backend-isolation.test.js` pins the removal and the error help. Sizes and details: `docs/limits.md`.
+
 ### Firefox on Windows rejects a WGSL function named `dx` (browser defect, found 2026-11-11, open upstream)
 
 - **Repro:** in Playwright Firefox 157 on Windows (RTX A6000, headed, `dom.webgpu.enabled`), a render pipeline whose
@@ -1062,8 +1078,8 @@ their scientific navigation destinations against production targets, and fails a
 The new optional LIC entry's input/lifecycle tests and real-GPU analytical, animation, mask, slice, exact
 restoration and strict backend pixel checks pass. NOAA demo checks pass in all four layout/backend cases.
 The one full verify's four metadata/test-fixture failures are corrected and their affected checks pass;
-package CPU/GPU, README and quality gates pass. Native sciviz/webgl2 has no LIC implementation and
-rejects it explicitly; compatibility-backed WebGL2 is the supported fallback.
+package CPU/GPU, README and quality gates pass. The retired native sciviz/webgl2 driver had no LIC
+implementation; compatibility-backed WebGL2 (createFallbackFigure) is the supported fallback.
 There is no claim of physical unsteady advection, volume LIC or arbitrary triangle-surface support.
 
 ### Fixed during batch 234: unrendered edits in wave-query snapshots
@@ -1580,8 +1596,8 @@ Scott's optional-size ruling raises their ceilings from 36,802/4,442 B to those
 measured sizes. Another split would add an artificial shader loader and divide
 GL-generation ownership. Readable shaders and full errors are retained; only a
 local GL receiver alias survives the stopped size work. Pixel bounds and timeouts
-are unchanged. Native drawing remains an incomplete feature: axes,
-points/lines, volumes/slices, integrated CPU isosurfaces and real demos are pending.
+are unchanged. Native drawing was an incomplete feature (axes,
+points/lines, volumes/slices, isosurfaces and demos pending); it was retired as KB1405 on 2026-11-11, see above.
 
 The gate first stalled because its promise resumed inside webglcontextlost
 dispatch; restoration is forbidden until dispatch completes. A MessageChannel

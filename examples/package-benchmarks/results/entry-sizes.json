@@ -9015,10 +9015,6 @@
         "raw": 4881,
         "gzip": 2223
       },
-      "./webgl2": {
-        "raw": 12194,
-        "gzip": 4527
-      },
       "./flow": {
         "raw": 24483,
         "gzip": 9223
@@ -11872,10 +11868,6 @@
       "./sciviz/fallback": {
         "raw": 42,
         "gzip": 62
-      },
-      "./sciviz/webgl2": {
-        "raw": 40,
-        "gzip": 60
       },
       "./sciviz/flow": {
         "raw": 38,

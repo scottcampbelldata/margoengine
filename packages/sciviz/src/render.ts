@@ -9,15 +9,12 @@ import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { fault } from '../../shared/errors.js';
 import { VolumeDepthCapture, VolumeDepthSnapshot } from './volume-depth.js';
-import type { FallbackBackend } from './fallback-types.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; VERTEX: number; INDIRECT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number; COMPUTE: number };
 
 /** @internal The WebGPU frame context. */
 export type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
-/** @internal The native WebGL2 engine frame context. */
-export type GlContext = Extract<PassContext, { backend: 'webgl2' }>;
 
 /** @internal Refuses a GPU-only layer before allocation or publication. */
 export function requireGPU(renderer: SciRenderer): void {
@@ -40,8 +37,6 @@ export interface Drawable {
   prepare?(context: GpuContext, renderer: SciRenderer): void;
   /** Draws into the open pass (group 0 is the frame). */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
-  /** Draws through the optional native WebGL2 backend. */
-  drawGL?(context: GlContext): void;
   /** Frees GPU resources. */
   dispose(): void;
 }
@@ -83,8 +78,6 @@ export class SciRenderer implements EnginePlugin {
   readonly name = `sciviz:${serial++}`;
   /** Frame-graph order: after the scene (0), before points (10) and fat lines (20). */
   readonly order: number;
-  /** @internal Optional driver; the root does not import its implementation. */
-  readonly fallback: FallbackBackend | undefined;
   /** @internal */ device: GPUDevice | undefined;
   /** @internal */ frameLayout: GPUBindGroupLayout | undefined;
   /** @internal */ frameGroup: GPUBindGroup | undefined;
@@ -131,17 +124,20 @@ export class SciRenderer implements EnginePlugin {
   }
 
   /** @param options `order` in the frame graph (default 5). Attach with {@link SciRenderer.attach}. */
-  constructor(options: { readonly order?: number; readonly fallback?: FallbackBackend } = {}) {
+  constructor(options: { readonly order?: number } = {}) {
     this.order = options.order ?? 5;
-    this.fallback = options.fallback;
   }
 
   /** @internal EnginePlugin hook. */
   setup(engine: Engine): void {
-    if (!engine.gpu && !this.fallback) throw fault('unsupported', 'Use attachWebGL2 from sciviz/webgl2', 'sciviz');
+    if (!engine.gpu)
+      throw fault(
+        'unsupported',
+        "Figures need WebGPU or the WebGL2 compatibility layer; on a browser without WebGPU use createFallbackFigure from '@margoengine/sciviz/fallback'",
+        'sciviz',
+      );
     this.#engine = engine;
-    if (engine.gpu) this.#create(engine.gpu);
-    else this.fallback!.setup(engine);
+    this.#create(engine.gpu);
   }
 
   #create(device: GPUDevice): void {
@@ -241,10 +237,7 @@ export class SciRenderer implements EnginePlugin {
     if (this.#disposed || !this.#drawables.size) return;
     const visible = [...this.#drawables].filter((d) => d.visible);
     if (!visible.length) return;
-    if (context.backend === 'webgl2') {
-      this.fallback!.render(context, visible);
-      return;
-    }
+    if (context.backend !== 'webgpu') return;
     const camera = context.camera,
       f = this.#frame,
       clip = camera.matrix;
