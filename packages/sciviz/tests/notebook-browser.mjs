@@ -3,8 +3,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
+import { prepareNotebookFixtures } from './notebook-fixtures.mjs';
 
 await mkdir('test-results/sciviz-notebook', { recursive: true });
+// The pages read the shipped notebook's real comm payloads: make them now (CPU work, before any browser opens), as no
+// earlier run of python/tests/notebook-fixtures.py can be relied on (amd-gpu-hunt row 18).
+prepareNotebookFixtures();
 for (const compat of [false, true]) {
   const ctx = await openBrowser({ startPath: '/packages/sciviz/tests/sciviz.html', port: 'free', compat });
   ctx.page.setDefaultTimeout(60000);
