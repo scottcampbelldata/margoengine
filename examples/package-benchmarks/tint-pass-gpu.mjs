@@ -16,6 +16,7 @@ import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { acPower } from './parts/power.mjs';
 import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
+import { assertPatchedOnce, patchChunk } from './parts/bundle-patch.mjs';
 
 const ROUNDS = Number(process.env.TINT_ROUNDS ?? 5),
   FRAMES = 240,
@@ -25,7 +26,7 @@ const ROUNDS = Number(process.env.TINT_ROUNDS ?? 5),
     [1920, 1080],
   ],
   SCENES = ['factors', 'four', 'eight'].flatMap((material) => [1, 4, 16].map((layers) => ({ material, layers })));
-// Each pattern must match the built gltf-pro exactly once.
+// Each pattern must match the built gltf-pro exactly once per page load, in whichever dist chunk holds it.
 const patches = {
   surface: [],
   constant: [[/=([\w$]+)=>!!\1\.attenuation&&!\1\.shading/g, '=$1=>!1']],
@@ -61,14 +62,10 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 let arm = 'surface';
-await page.route('**/packages/gltf-pro/dist/src-*.js*', async (route) => {
+const matched = new Map();
+await page.route('**/packages/gltf-pro/dist/*.js*', async (route) => {
   const response = await route.fetch();
-  let body = await response.text();
-  for (const [pattern, replacement] of patches[arm]) {
-    assert.equal(body.match(pattern)?.length, 1, `${arm}: ${pattern} must match the build once`);
-    body = body.replace(pattern, replacement);
-  }
-  await route.fulfill({ response, body });
+  await route.fulfill({ response, body: patchChunk(await response.text(), patches[arm], matched) });
 });
 const key = (width, scene, name) => `${width}/${scene.material}/${scene.layers}/${name}`;
 try {
@@ -77,6 +74,7 @@ try {
       for (let turn = 0; turn < ARMS.length; turn++) {
         arm = ARMS[(turn + round) % ARMS.length];
         await page.setViewportSize({ width, height });
+        matched.clear();
         await page.goto(
           `http://127.0.0.1:5273/examples/package-benchmarks/tint-pass.html?width=${width}&height=${height}`,
           {
@@ -84,6 +82,7 @@ try {
           },
         );
         await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+        assertPatchedOnce(arm, patches[arm], matched);
         for (const scene of SCENES) {
           assert.deepEqual(await page.evaluate((s) => window.check.show(s), scene), [], key(width, scene, arm));
           const result = await page.evaluate((n) => window.check.measure(n), FRAMES);
