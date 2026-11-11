@@ -979,7 +979,27 @@ export class CompatBindGroup {
         this.invalid = `${where}: bytes ${bound.offset} to ${bound.offset + bound.size} are outside the ${bound.buffer.size}-byte buffer`;
       else if (bound.size < l.buffer.minBindingSize)
         this.invalid = `${where}: the binding is ${bound.size} bytes, below the layout's minimum binding size of ${l.buffer.minBindingSize}`;
+      else if ((l.buffer.type ?? 'uniform') !== 'uniform' && bound.size > device.limits.maxStorageBufferBindingSize)
+        // A storage binding is read through an RGBA32UI texture 2,048 texels wide: past the limit it would not fit.
+        this.invalid = `${where}: the storage binding is ${bound.size} bytes, over this device's maxStorageBufferBindingSize of ${device.limits.maxStorageBufferBindingSize}`;
       if (this.invalid) break;
+    }
+    // The group's storage bindings share one texture 2,048 texels wide and at most MAX_TEXTURE_SIZE high (storageTexture).
+    if (!this.invalid) {
+      let rows = 0;
+      for (const l of this.layout.entries) {
+        const bound = this.entries.get(l.binding);
+        if (
+          l.buffer &&
+          (l.buffer.type ?? 'uniform') !== 'uniform' &&
+          !l.buffer.hasDynamicOffset &&
+          bound?.kind === 'buffer'
+        )
+          rows += Math.max(1, Math.ceil(bound.size / 16));
+      }
+      const most = 2048 * device.limits.maxTextureDimension2D;
+      if (rows > most)
+        this.invalid = `createBindGroup${this.label ? ` '${this.label}'` : ''}: its storage bindings total ${rows * 16} bytes, over the ${most * 16} bytes one WebGL2 data texture holds on this context; split them across bind groups`;
     }
     if (this.invalid) device.validationError(this.invalid);
   }

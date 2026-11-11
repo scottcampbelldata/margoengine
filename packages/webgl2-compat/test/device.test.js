@@ -427,6 +427,41 @@ test('createBindGroup refuses a buffer range below the minimum binding size or p
   device.destroy();
 });
 
+// Bug (limits audit): on a 2048 context a storage binding is at most 64 MiB (2,048-wide RGBA32UI rows), but a larger
+// one, or several that together pass one data texture, reached GL unchecked and failed there. As in WebGPU, createBindGroup
+// now reports a validation error naming the limit, and the group binds nothing.
+test('createBindGroup refuses a storage binding over maxStorageBufferBindingSize and groups past one data texture', async () => {
+  const gl = new Proxy(fakeContext({ limits: { MAX_TEXTURE_SIZE: 2048 } }), {
+    get: (context, key) => (key in context ? context[key] : () => ({})),
+  });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  assert.equal(device.limits.maxStorageBufferBindingSize, 64 * 1024 * 1024);
+  const layout = (count) =>
+    device.createBindGroupLayout({
+      entries: Array.from({ length: count }, (_, binding) => ({ binding, visibility: 4, buffer: { type: 'read-only-storage' } })),
+    });
+  const buffer = device.createBuffer({ size: 64 * 1024 * 1024 + 16, usage: 0x80 | 0x8 });
+  const errorOf = (count, entries) => {
+    device.pushErrorScope('validation');
+    const group = device.createBindGroup({ layout: layout(count), entries });
+    return device.popErrorScope().then((error) => ({ error, group }));
+  };
+  const over = await errorOf(1, [{ binding: 0, resource: { buffer } }]);
+  assert.match(over.error?.message ?? '', /storage binding is 67108880 bytes, over this device's maxStorageBufferBindingSize of 67108864/);
+  assert.ok(over.group.invalid);
+  const half = 40 * 1024 * 1024,
+    two = await errorOf(2, [
+      { binding: 0, resource: { buffer, size: half } },
+      { binding: 1, resource: { buffer: device.createBuffer({ size: half, usage: 0x80 | 0x8 }) } },
+    ]);
+  assert.match(two.error?.message ?? '', /storage bindings total 83886080 bytes, over the 67108864 bytes one WebGL2 data texture/);
+  const fine = await errorOf(1, [{ binding: 0, resource: { buffer, size: 64 * 1024 * 1024 } }]);
+  assert.equal(fine.error, null);
+  assert.equal(fine.group.invalid, null);
+  device.destroy();
+});
+
 // Explicit installation on a native WebGPU browser must explain why the renderer did not change.
 test('install keeps native WebGPU with a coded warning and forcing installs the full layer', async () => {
   const { installCompat, uninstallCompat } = await import('../dist/device.js');
