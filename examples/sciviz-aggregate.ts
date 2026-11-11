@@ -8,8 +8,7 @@ const canvas = document.querySelector<HTMLCanvasElement>('#plot')!,
 export const figure = await Figure.create(canvas, {
   mode: '2d',
   theme: 'light',
-  xLabel: 'Longitude',
-  yLabel: 'Latitude',
+  titles: { x: 'Longitude', y: 'Latitude' },
 });
 export const gpu = await createCompute({ engine: figure.engine });
 const data = '/packages/sciviz/tests/fixtures/aggregate/';

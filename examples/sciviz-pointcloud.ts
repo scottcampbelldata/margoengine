@@ -57,9 +57,10 @@ export const selection = new SelectionStore([], { universe: 'open' });
 export const figure = await Figure.create(canvas, {
   axes: true,
   controls: true,
-  dragMode: 'box',
   titles: { x: 'Easting (m)', y: 'Northing (m)', z: 'Elevation (m)' },
 });
+// A box drag selects points (the figure's drag mode is a property, not a creation option).
+figure.dragMode = 'box';
 export const layer = await pointcloud(figure, source, {
   origin,
   name: 'USGS Iowa',

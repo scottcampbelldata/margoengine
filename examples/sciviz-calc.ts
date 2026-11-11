@@ -1,6 +1,6 @@
 import { Figure } from '@margoengine/sciviz/spec';
 import { calcGrid, calcGridGPU, type CalcOperation } from '@margoengine/sciviz/calc';
-import { meshLayer, type MeshLayer } from '@margoengine/sciviz/grids';
+import { meshLayer, type MeshLayer, type TriangleSet } from '@margoengine/sciviz/grids';
 import { simplices } from '../packages/sciviz/src/cell-complex.js';
 import { readBumpSlice } from './sciviz-contour-data.js';
 import { element, fail } from './sciviz-demo.js';
@@ -35,12 +35,12 @@ export async function show() {
   }
   const normals = new Float32Array(positions.length);
   for (let k = 2; k < normals.length; k += 3) normals[k] = 1;
-  const set = {
+  const set: TriangleSet = {
     positions: Float32Array.from(positions),
     normals,
     values: Float32Array.from(values),
     cells: Uint32Array.from(cells),
-    bounds: [-1, 1, 0, 1, 0, 0] as const,
+    bounds: [-1, 1, 0, 1, 0, 0],
   };
   if (layer) figure.remove(layer);
   layer = meshLayer(figure, set, { colormap: 'aurora', range: [0, 10] });

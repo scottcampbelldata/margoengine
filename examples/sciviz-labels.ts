@@ -32,15 +32,16 @@ for (const f of [figure, rgbFigure]) {
   f.engine.stop();
   f.engine.camera.position = [1.8, 1.2, 2];
 }
+const baseLabels: readonly VolumeLabel[] = [
+  { id: 1, name: meta.labels['1'], rgba: [1, 0.15, 0.04, 0.06] },
+  { id: 2, name: meta.labels['2'], rgba: [0.05, 0.3, 1, 0.035] },
+  { id: 3, name: meta.labels['3'], rgba: [0.2, 1, 0.1, 0.12] },
+];
 const palette = (outlines: boolean): VolumeLabel[] =>
-  [
-    { id: 1, name: meta.labels['1'], rgba: [1, 0.15, 0.04, 0.06] },
-    { id: 2, name: meta.labels['2'], rgba: [0.05, 0.3, 1, 0.035] },
-    { id: 3, name: meta.labels['3'], rgba: [0.2, 1, 0.1, 0.12] },
-  ].map((l) => ({
+  baseLabels.map((l) => ({
     ...l,
     outline: outlines ? { rgba: [l.rgba[0], l.rgba[1], l.rgba[2], 0.4], width: 1 } : undefined,
-  })) as VolumeLabel[];
+  }));
 let layer: FusionLayer, legend: ReturnType<typeof labelLegend>;
 function rebuild(): void {
   legend?.dispose();
