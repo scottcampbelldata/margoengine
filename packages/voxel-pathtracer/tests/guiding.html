@@ -23,20 +23,31 @@ window.run=async(compat=false)=>{
   materials:[{id:1,type:'glass',color:[1,1,1],ior:1.5,roughness:0},
    {id:2,type:'emit',color:[1,0.6,0.2],emission:100}],
   environment:{skyIntensity:0,sunIntensity:0,groundColor:[1,1,1]}};
- const render=async(Tracer,strength,samples,seed,size=16)=>{
+ // Each tracer is attached once and renders every seed it is asked for (renderImage starts each image afresh).
+ const batches=async(Tracer,strength,samples,seeds,size=16)=>{
   const tracer=Tracer.attach(engine,{scene,denoise:false,maxBounces:6,...(strength===undefined?{}:{guideStrength:strength})});
-  try{await tracer.ready;const image=await tracer.renderImage({width:size,height:size,samples,seed,jitter:false,signal:AbortSignal.timeout(120000)});console.log(`guiding render: ${Tracer.name}, ${samples} samples, seed ${seed}`);return image;}
+  try{await tracer.ready;const images=[];for(const seed of seeds){images.push(await tracer.renderImage({width:size,height:size,samples,seed,jitter:false,signal:AbortSignal.timeout(120000)}));console.log(`guiding render: ${Tracer.name}, ${samples} samples, seed ${seed}`);}return images;}
   finally{tracer.dispose();}
  };
+ const render=async(Tracer,strength,samples,seed,size=16)=>(await batches(Tracer,strength,samples,[seed],size))[0];
+ const seeds=(first,n)=>Array.from({length:n},(_,i)=>first+i*7919);
+ const average=images=>({color:images[0].color.map((_,i)=>images.reduce((sum,image)=>sum+image.color[i],0)/images.length)});
  const mean=image=>[0,1,2].map(c=>{let sum=0;for(let i=c;i<image.color.length;i+=3)sum+=image.color[i];return sum/(image.color.length/3);});
  const delta=(a,b)=>Math.max(...a.color.map((v,i)=>Math.abs(v-b.color[i])));
  const coverage=[];
+ // BATCHES independent batches of each estimator: the per-channel means and the standard error of each mean from the
+ // spread of its batch means, so a bound can follow the scene's own noise instead of one absolute number.
+ const BATCHES=16;
+ const estimate=images=>{const m=images.map(mean);return [0,1,2].map(c=>{const mu=m.reduce((s,v)=>s+v[c],0)/m.length;const variance=m.reduce((s,v)=>s+(v[c]-mu)**2,0)/(m.length-1);return {mean:mu,se:Math.sqrt(variance/m.length)};});};
  const compare=async(name,samples=4096,size=16)=>{
-  const reference=await render(VoxelPathTracer,undefined,samples,317,size),actual=await render(GuidedVoxelPathTracer,0.5,samples,419,size);
-  coverage.push({name,reference:mean(reference),actual:mean(actual),finite:actual.color.every(Number.isFinite)});
+  const r=estimate(await batches(VoxelPathTracer,undefined,samples/BATCHES,seeds(317,BATCHES),size)),a=estimate(await batches(GuidedVoxelPathTracer,0.5,samples/BATCHES,seeds(419,BATCHES),size));
+  const actual=a.map(v=>v.mean);
+  coverage.push({name,reference:r.map(v=>v.mean),actual,se:[0,1,2].map(c=>Math.hypot(r[c].se,a[c].se)),finite:actual.every(Number.isFinite)});
  };
  try{
-  const reference=await render(GuidedVoxelPathTracer,0.5,16384,987);
+  // The reference is the root tracer (no guide) at 65,536 samples in 8 seeds: independent of the estimator under test,
+ // with about 1/1000 of the variance of the 64-sample images compared against it.
+ const reference=average(await batches(VoxelPathTracer,undefined,8192,seeds(987,8)));
   const original=await render(VoxelPathTracer,undefined,64,17),zero=await render(GuidedVoxelPathTracer,0,64,17);
   const guided=await render(GuidedVoxelPathTracer,0.5,64,17);
   let baseError=0,guidedError=0;

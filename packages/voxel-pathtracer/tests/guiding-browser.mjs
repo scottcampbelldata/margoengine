@@ -31,12 +31,16 @@ for (const compat of [false, true]) {
     );
     for (const scene of result.coverage) {
       assert.equal(scene.finite, true, scene.name);
+      // Six standard errors of the difference (from 16 batch means of each estimator), and never wider than the
+      // former absolute 0.02: dim scenes, whose means are themselves near 0.02, are now held to their own noise.
       if (scene.reference)
-        for (let c = 0; c < 3; c++)
+        for (let c = 0; c < 3; c++) {
+          const d = Math.abs(scene.actual[c] - scene.reference[c]);
           assert.ok(
-            Math.abs(scene.actual[c] - scene.reference[c]) < 0.02,
-            `${scene.name} channel ${c}: ${scene.actual[c]} vs ${scene.reference[c]}`,
+            d < 0.02 && d <= 6 * scene.se[c],
+            `${scene.name} channel ${c}: ${scene.actual[c]} vs ${scene.reference[c]} (6 standard errors ${6 * scene.se[c]})`,
           );
+        }
       if (scene.expected !== undefined)
         for (const v of [...scene.reference, ...scene.actual])
           assert.ok(Math.abs(v - scene.expected) < 0.02, `${scene.name}: ${v} vs ${scene.expected}`);
