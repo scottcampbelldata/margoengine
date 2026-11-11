@@ -1,15 +1,15 @@
 {
  "proof": "deformed-shadows",
- "ref": "da12bd07e",
- "revision": "da12bd07e10e2f6a3eea55fb0e33f4522618edae",
- "capturedAt": "210ceff1f1d99eddb10d30c3f816fafbce5fa89c",
+ "ref": "f3af75778",
+ "revision": "f3af757782a2d6b65c6b96c4beb51417f0fb1a39",
+ "capturedAt": "ee4b980a3991e0a63b8f1a286adad37acca1f0c5",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
   "vat": "47eadb59ffcd325a81882080d4b6e277c4b00b306efa3e2a1081f2f200df8168",
-  "distance500": "34bb4777eaf3fe04de49878cb27dfa27d642cbe6dda5708291cd3120947915ea",
-  "distance40": "85461e7209ae011aeb51ca119ac82df96b33c946395fd5285bfd6427e9b697f8",
-  "customSource": "ab9c02ea7b5511bed3739d9b6d166679706a9f30c0ba2213b44ae643a94a93d5",
-  "fitted": "df832c86b8e0a400901e45e75662b37bbbafca1f805b0c34637d0d2bb847ec0d"
+  "distance500": "df37c4f9ac6431d8ddd5bcbeb580d9179f9374adb9f2a0b5d79db37b924f8274",
+  "distance40": "d2d1ad5f78db82e7378ead15e4ab9bd543b5ecfeee8b10f01b599035eea883f4",
+  "customSource": "5e02ab6d6f09432a9ce64bc15261fcaa1ce86bc73bad14f17d217732e9feaa0b",
+  "fitted": "c2a438aece0bd4c04ab62688f9a41cc71f45f60f52c937ef74bccf5ae99e9804"
  }
 }

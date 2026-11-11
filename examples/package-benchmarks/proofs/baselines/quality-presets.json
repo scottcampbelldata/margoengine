@@ -1,13 +1,13 @@
 {
  "proof": "quality-presets",
- "ref": "a738d815b",
- "revision": "a738d815bb8878d1acecc1f2da6c79b06265f0c5",
- "capturedAt": "a738d815bb8878d1acecc1f2da6c79b06265f0c5",
+ "ref": "f3af75778",
+ "revision": "f3af757782a2d6b65c6b96c4beb51417f0fb1a39",
+ "capturedAt": "ee4b980a3991e0a63b8f1a286adad37acca1f0c5",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "shadows 1x": "5d24998a082b7f248cbe3196033a2aa3425f3f0a78f0b002fc4f9d7b60160dc9",
-  "shadows 4x": "916aec9c0f50254719b2496bd8193139565f7daea27c4fb6918d7154b1c8e574",
+  "shadows 1x": "2dbdd62999b0d0bc198192d9db6dbb328caaa41421d7df31269020e744ce12a8",
+  "shadows 4x": "4cefbc353cf8241ad4aef9b52ef18790c55c7eee6d75f2a623ea5a4df5a842b3",
   "ssao 1x": "95c0b01be3dba8677653857d1aff827d0652b0869e0cf7f6b8a6ed9ad8656d38",
   "ssao 4x": "e2d20571009419e84d50bd164ccaa6c72fbffa126204c9e5f6094d1f642de35b",
   "ssr 1x": "36832a376e3e74af1ee3b44b5f69d89aba82fa58a2f0171a1a1e73df378f3332",
