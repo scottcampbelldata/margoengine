@@ -6044,6 +6044,17 @@ as unsupported by the light loader.
   (Bruneton 2017) gives absorption 0.444e-6 /m and extinction 4.44e-6 /m, so the table's 4.40 looks like the extinction
   with a typo and the code's 4.44 like the extinction taken as absorption: Mie extinction comes out 8.436e-6 /m, about
   1.9x. Changing it changes every Hillaire sky and aerial picture, and test/aerial.test.js:92 pins 0.00444.
+  Source re-read (lane N, batch 132b, 2026-11-11; Hillaire 2020 fetched again from sebh.github.io/publications/egsr2020.pdf
+  and read with pdftotext): the text settles what the citation says and leaves its intent open. Table 1's column is
+  headed "Absorption (x10^-6 m^-1)" and prints sigma_ma = 4.40; section 3 defines sigma_t = sigma_a + sigma_s; nothing
+  else in the paper gives a Mie extinction, albedo or 4.44. So the code's 0.00444 /km (4.44e-6 /m) matches neither the
+  cited table (0.00440 /km, 0.9% lower) nor the albedo-0.9 reading (0.000444 /km, 10x lower). The table cites Bruneton
+  2017 for the values, whose text was not re-read here. Choices for Scott, value unchanged: 0.00440 (the citation as
+  printed: Mie extinction 8.396e-6 /m against 8.436e-6 /m, 0.5% lower) or 0.000444 (Mie extinction 4.44e-6 /m, about half the current one);
+  either moves test/aerial.test.js:92 and the sky pictures.
+  The package already holds both readings: packages/sky/src/atmosphere.ts (the Bruneton model's tables) takes Mie
+  extinction as scattering / 0.9 = 4.44e-6 /m at turbidity 3, while atmosphere-luts.ts (Hillaire) adds 4.44e-6 /m of
+  absorption to 3.996e-6 /m of scattering, so the two sky models dim the sun by Mie haze differently for the same Earth.
 - Open (Mac bug, M6, MARGO_COMPAT=1): `node packages/sky/test/browser-check.mjs` fails at "meadow 4x frame 1 scene vs
   narrow: differing 2, max 0.0009765625" every run, also on the source before the dispose fix; native passes. The full
   `Sky` and the base entry with only meadow's features differ by one half-float ulp in two pixels.
@@ -6303,7 +6314,9 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-faul
   of level 0 by 106 times the half-float tolerance (0.002 + 0.2%). Fix: the chain uses shared/mipmaps.js's area
   filter (each source texel weighted by its overlap, as gltf-pro's mips since 65098f33f); worst error now 0.16 of the
   tolerance on Metal WebGPU and MARGO_COMPAT=1. Rough glass near an odd-sized frame's right and bottom edges now
-  blurs the last column and row in.
+  blurs the last column and row in. Size (scripts/quality/baselines/sizes.json, entry of 2026-11-11 for f2cd28c42):
+  the transmission entry grew 323 B gzip (8,350 to 8,673) and transmission-layers 271 B (5,193 to 5,464), the shared
+  filter's loop in place of the 2x2 box.
 - Test that passed whatever the code did: test/physical.test.js asserted "group 0 binds the volume" by finding any
   2-entry bind group whose second entry was binding 1; that matched the old reduce groups (source, sampler), not the
   frame group [0, 3, 1] that holds the volume. It now looks for a buffer at binding 1.
