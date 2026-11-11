@@ -5,10 +5,11 @@
 import { fault } from '../../../shared/errors.js';
 import { translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
 import type { TextureType } from '../wgsl/types.js';
-import { type FormatInfo, hasDepth, hasStencil, VERTEX_FORMATS } from './formats.js';
+import { type FormatInfo, glTexelBytes, hasDepth, hasStencil, VERTEX_FORMATS } from './formats.js';
 import type { CompatDevice } from './device.js';
 import { type BoundGroup, CompatComputePassEncoder, type CompatComputePipeline } from './compute.js';
 import {
+  type BlockWrite,
   type Bound,
   type CompatBindGroup,
   CompatBindGroupLayout,
@@ -1030,6 +1031,9 @@ interface Helper {
 }
 
 /** Replays recorded operations against the device's GL state. */
+/** The largest zero-filled unpack buffer Replayer.zero keeps for the next texture (larger ones go after use). */
+const ZERO_BYTES_KEPT = 4 << 20;
+
 export class Replayer {
   private pass: PassState | null = null;
   readonly gl: WebGL2RenderingContext;
@@ -1043,6 +1047,155 @@ export class Replayer {
     for (const op of ops) {
       if (this.device.destroyed) return;
       op(this);
+    }
+  }
+
+  // ------------------------------------------------ new textures
+
+  /** Uploads one block write (writeBlocks) into storage `s` of a block-compressed texture, in `s`'s own format. */
+  putBlocks(s: TextureStorage, write: BlockWrite): void {
+    const gl = this.gl,
+      { level, x, y, z, w, h, depth, bytes } = write,
+      internal = this.device.enum(s.info.internal),
+      image = bytes.length / depth;
+    this.device.state.scratch(s.target, s.gl);
+    if (s.target === gl.TEXTURE_2D) gl.compressedTexSubImage2D(gl.TEXTURE_2D, level, x, y, w, h, internal, bytes);
+    else if (s.target === gl.TEXTURE_CUBE_MAP)
+      for (let layer = 0; layer < depth; layer++)
+        gl.compressedTexSubImage2D(
+          gl.TEXTURE_CUBE_MAP_POSITIVE_X + z + layer,
+          level,
+          x,
+          y,
+          w,
+          h,
+          internal,
+          bytes.subarray(layer * image, (layer + 1) * image),
+        );
+    else gl.compressedTexSubImage3D(s.target, level, x, y, z, w, h, depth, internal, bytes);
+  }
+
+  /** The framebuffer zero() attaches each new subresource to, and detaches it from after its clear. */
+  private zeroFramebuffer: WebGLFramebuffer | null = null;
+  /** A zero-filled pixel unpack buffer for zero() uploads (WebGL zero-fills bufferData), kept while small. */
+  private zeroBytes: { buffer: WebGLBuffer; size: number } | null = null;
+
+  /**
+   * Writes zeros into every level and layer (or 3D slice) of `texture`, which GL has just allocated with texStorage.
+   * WebGL reads an unwritten level as zeros, but initialises it itself at the first partial upload or draw that touches
+   * it, and Firefox warns for each ("Tex image TEXTURE_2D level 1 is incurring lazy initialization", "Texture has not
+   * been initialized prior to a partial upload, forcing the browser to clear it"). Colour-renderable, depth and
+   * stencil formats are cleared through a framebuffer; other formats are uploaded whole, one call per level (a partial
+   * upload would start the browser's own initialisation), from a zero-filled pixel unpack buffer. Block-compressed
+   * formats are left to the browser: an all-zero block is not a zero texel (ASTC's is its error colour).
+   */
+  zero(texture: WebGLTexture, target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): void {
+    if (info.block) return;
+    const aspect = hasDepth(info) || hasStencil(info);
+    if ((aspect || this.clearable(info)) && this.clearLevels(texture, target, info, levels, w, h, d)) return;
+    if (!aspect) this.uploadZeros(texture, target, info, levels, w, h, d);
+  }
+
+  /** Whether a colour format can be a framebuffer attachment on this context. */
+  private clearable(info: FormatInfo): boolean {
+    return info.renderable && (info.kind !== 'float' || !info.name.includes('float') || this.device.ext.colorBufferFloat);
+  }
+
+  /** zero() by framebuffer clears; false (nothing cleared) when GL does not take the texture as an attachment. */
+  private clearLevels(
+    texture: WebGLTexture,
+    target: number,
+    info: FormatInfo,
+    levels: number,
+    w: number,
+    h: number,
+    d: number,
+  ): boolean {
+    const gl = this.gl,
+      s = this.device.state,
+      point = hasDepth(info) || hasStencil(info) ? this.depthPoint(info) : gl.COLOR_ATTACHMENT0;
+    const fbo = (this.zeroFramebuffer ??= gl.createFramebuffer() as WebGLFramebuffer);
+    this.openMasks();
+    s.enable(gl.SCISSOR_TEST, false);
+    s.bindDrawFramebuffer(fbo);
+    const attach = (level: number, layer: number, t: WebGLTexture | null) => {
+      if (target === gl.TEXTURE_2D) gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, t, level);
+      else if (target === gl.TEXTURE_CUBE_MAP)
+        gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_CUBE_MAP_POSITIVE_X + layer, t, level);
+      else gl.framebufferTextureLayer(gl.DRAW_FRAMEBUFFER, point, t, level, layer);
+    };
+    const layersAt = (level: number) =>
+      target === gl.TEXTURE_CUBE_MAP ? 6 : target === gl.TEXTURE_3D ? Math.max(1, d >> level) : d;
+    let complete = true;
+    for (let level = 0; level < levels && complete; level++)
+      for (let layer = 0, n = layersAt(level); layer < n; layer++) {
+        attach(level, layer, texture);
+        if (level === 0 && layer === 0)
+          complete = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+        if (!complete) break;
+        if (hasDepth(info) && hasStencil(info)) gl.clearBufferfi(gl.DEPTH_STENCIL, 0, 0, 0);
+        else if (hasDepth(info)) gl.clearBufferfv(gl.DEPTH, 0, [0]);
+        else if (hasStencil(info)) gl.clearBufferiv(gl.STENCIL, 0, [0]);
+        else if (info.kind === 'uint') gl.clearBufferuiv(gl.COLOR, 0, [0, 0, 0, 0]);
+        else if (info.kind === 'sint') gl.clearBufferiv(gl.COLOR, 0, [0, 0, 0, 0]);
+        else gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
+      }
+    // Detach (a texture attached to no framebuffer can be deleted at once), and give a pass in replay (a view copy made
+    // at a draw) its framebuffer and state back.
+    attach(0, 0, null);
+    this.rebind();
+    return complete;
+  }
+
+  /** zero() by whole-level uploads from a zero-filled pixel unpack buffer. */
+  private uploadZeros(
+    texture: WebGLTexture,
+    target: number,
+    info: FormatInfo,
+    levels: number,
+    w: number,
+    h: number,
+    d: number,
+  ): void {
+    const gl = this.gl,
+      texel = glTexelBytes(info),
+      faces = target === gl.TEXTURE_CUBE_MAP ? 6 : 1,
+      size = w * h * d * texel;
+    let zeros = this.zeroBytes;
+    if (!zeros || zeros.size < size) {
+      if (zeros) gl.deleteBuffer(zeros.buffer);
+      zeros = this.zeroBytes = { buffer: gl.createBuffer() as WebGLBuffer, size };
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, zeros.buffer);
+      gl.bufferData(gl.PIXEL_UNPACK_BUFFER, size, gl.STATIC_DRAW);
+    } else gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, zeros.buffer);
+    this.device.state.scratch(target, texture);
+    const format = this.device.enum(info.format),
+      type = this.device.enum(info.type);
+    for (let level = 0; level < levels; level++) {
+      const lw = Math.max(1, w >> level),
+        lh = Math.max(1, h >> level);
+      if (target === gl.TEXTURE_3D || target === gl.TEXTURE_2D_ARRAY) {
+        const ld = target === gl.TEXTURE_3D ? Math.max(1, d >> level) : d;
+        gl.texSubImage3D(target, level, 0, 0, 0, lw, lh, ld, format, type, 0);
+      } else
+        for (let face = 0; face < faces; face++)
+          gl.texSubImage2D(
+            faces === 6 ? gl.TEXTURE_CUBE_MAP_POSITIVE_X + face : gl.TEXTURE_2D,
+            level,
+            0,
+            0,
+            lw,
+            lh,
+            format,
+            type,
+            0,
+          );
+    }
+    gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+    // Keep a small buffer for the next texture; give a large one back at once.
+    if (size > ZERO_BYTES_KEPT) {
+      gl.deleteBuffer(zeros.buffer);
+      this.zeroBytes = null;
     }
   }
 
@@ -1318,21 +1471,27 @@ export class Replayer {
     pass.applied = null;
   }
 
-  /** Brings the resolved copy of a multisampled texture up to date before it is sampled. */
-  private resolveForSampling(t: CompatTexture): void {
-    if (!t.stale || !t.resolved) return;
-    const gl = this.gl,
-      resolved = t.resolved;
+  /**
+   * Brings the resolved copy of a multisampled texture that a binding of aspect `stencil` reads up to date, and returns
+   * it: a depth-stencil texture's stencil aspect has a copy of its own (CompatTexture.resolvedFor).
+   */
+  private resolveForSampling(t: CompatTexture, stencil: boolean): WebGLTexture | null {
+    const resolved = t.resolvedFor(stencil),
+      own = resolved !== t.resolved;
+    if (!resolved || !(own ? t.staleStencil : t.stale)) return resolved;
+    const gl = this.gl;
     const to: Sub = {
-      key: `q${t.id}`,
+      key: `q${own ? 's' : ''}${t.id}`,
       owner: t,
       info: t.storageInfo,
       level: 0,
       attach: (point) => gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, resolved, 0),
     };
     this.blit(this.viewSub(t.createView()), to);
-    t.stale = false;
+    if (own) t.staleStencil = false;
+    else t.stale = false;
     this.rebind();
+    return resolved;
   }
 
   // ------------------------------------------------ passes
@@ -1437,7 +1596,7 @@ export class Replayer {
       if (standIn && c.storeOp === 'store') this.blit(standIn[1], standIn[0]);
       t.initialized = true;
       wrote(c.view);
-      if (t.renderbuffer && t.resolved) t.stale = true;
+      if (t.renderbuffer && t.resolved) t.stale = t.staleStencil = true;
       if (c.resolveTarget) {
         this.blit(this.viewSub(c.view, c.depthSlice), this.viewSub(c.resolveTarget));
         c.resolveTarget.texture.initialized = true;
@@ -1454,7 +1613,7 @@ export class Replayer {
       const t = d.view.texture;
       t.initialized = true;
       if (!d.depthReadOnly || !d.stencilReadOnly) wrote(d.view);
-      if (t.renderbuffer && t.resolved) t.stale = true;
+      if (t.renderbuffer && t.resolved) t.stale = t.staleStencil = true;
       if (d.depthStoreOp === 'discard' && (!hasStencil(t.info) || d.stencilStoreOp === 'discard')) {
         discard.push(this.depthPoint(t.info));
         t.initialized = false;
@@ -1807,8 +1966,7 @@ export class Replayer {
         // Read for its size or level count only: nothing to bind.
       } else if (tex.renderbuffer) {
         levels = 1;
-        this.resolveForSampling(tex);
-        plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: tex.resolved, sampler });
+        plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: this.resolveForSampling(tex, stencil), sampler });
       } else {
         const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`,
           sampleState = `${range}:${stencil}`;
@@ -2290,27 +2448,23 @@ function writeBlocks(
       tight.set(data.subarray(from, from + rowBytes), (layer * down + row) * rowBytes);
     }
   beforeUpload(device, t, level, z, depth);
-  device.state.scratch(t.target, t.texture);
   // A copy of whole blocks may run past a mip level smaller than one block; GL takes the level's own size there.
-  const [lw, lh] = t.levelSize(level),
-    cw = Math.min(w, lw - x),
-    ch = Math.min(h, lh - y);
-  const internal = device.enum(t.info.internal),
-    image = rowBytes * down;
-  if (t.target === gl.TEXTURE_2D) gl.compressedTexSubImage2D(gl.TEXTURE_2D, level, x, y, cw, ch, internal, tight);
-  else if (t.target === gl.TEXTURE_CUBE_MAP)
-    for (let layer = 0; layer < depth; layer++)
-      gl.compressedTexSubImage2D(
-        gl.TEXTURE_CUBE_MAP_POSITIVE_X + z + layer,
-        level,
-        x,
-        y,
-        cw,
-        ch,
-        internal,
-        tight.subarray(layer * image, (layer + 1) * image),
-      );
-  else gl.compressedTexSubImage3D(t.target, level, x, y, z, cw, ch, depth, internal, tight);
+  const [lw, lh] = t.levelSize(level);
+  const write: BlockWrite = { level, x, y, z, w: Math.min(w, lw - x), h: Math.min(h, lh - y), depth, bytes: tight };
+  device.replayer.putBlocks(t.primary as TextureStorage, write);
+  if (t.blockTwin) device.replayer.putBlocks(t.blockTwin, write);
+  else if (t.blockWrites) {
+    const covers = (a: BlockWrite, b: BlockWrite) =>
+      a.level === b.level &&
+      a.x <= b.x &&
+      a.y <= b.y &&
+      a.z <= b.z &&
+      a.x + a.w >= b.x + b.w &&
+      a.y + a.h >= b.y + b.h &&
+      a.z + a.depth >= b.z + b.depth;
+    t.blockWrites = t.blockWrites.filter((earlier) => !covers(write, earlier));
+    t.blockWrites.push(write);
+  }
   afterUpload(t, level, z, depth);
 }
 

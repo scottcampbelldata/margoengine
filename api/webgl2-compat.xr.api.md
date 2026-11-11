@@ -79,6 +79,17 @@ interface Attribute {
     readonly instance: boolean;
 }
 
+interface BlockWrite {
+    readonly level: number;
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly w: number;
+    readonly h: number;
+    readonly depth: number;
+    readonly bytes: Uint8Array;
+}
+
 type Bound = {
     readonly kind: 'buffer';
     readonly buffer: CompatBuffer;
@@ -502,17 +513,21 @@ class CompatTexture {
     readonly renderbuffer: WebGLRenderbuffer | null;
     readonly resolved: WebGLTexture | null;
     stale: boolean;
+    staleStencil: boolean;
     initialized: boolean;
     released: boolean;
     destroyed: boolean;
     readonly framebuffers: Set<string>;
     readonly layers: number;
+    blockWrites: BlockWrite[] | null;
+    blockTwin: TextureStorage | null;
     constructor(device: CompatDevice, descriptor: GPUTextureDescriptor);
     sampled(v: CompatTextureView, alias?: number): TextureStorage;
     attached(v: CompatTextureView): TextureStorage;
     read(s: TextureStorage, level: number, levels: number, layer: number, layers: number, sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void): void;
     wrote(s: TextureStorage, level: number, levels: number, layer: number, layers: number): void;
     sliceStandIn(s: TextureStorage): WebGLTexture;
+    resolvedFor(stencil: boolean): WebGLTexture | null;
     levelSize(level: number): [number, number, number];
     createView(descriptor?: GPUTextureViewDescriptor): CompatTextureView;
     dispose(): void;
@@ -1051,6 +1066,8 @@ class Replayer {
     readonly gl: WebGL2RenderingContext;
     constructor(device: CompatDevice);
     run(ops: readonly Op[]): void;
+    putBlocks(s: TextureStorage, write: BlockWrite): void;
+    zero(texture: WebGLTexture, target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): void;
     sub(s: TextureStorage, level: number, layer: number): Sub;
     single(s: Sub): WebGLFramebuffer;
     presentTexture(t: CompatTexture, opaque: boolean): void;

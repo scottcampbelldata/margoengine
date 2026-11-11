@@ -409,6 +409,63 @@ const cases = {
     return { unorm, srgb, back, unormAgain };
   },
 
+  /**
+   * KB1042d: the sRGB view of a block-compressed texture whose viewFormats name it, sampled beside the texture's own
+   * view, before and after a later write of one block. BC1, every index 0 (colour 0) in each block.
+   */
+  async compressedSrgbView(device) {
+    if (!device.features.has('texture-compression-bc')) return { missing: 'texture-compression-bc' };
+    const t = device.createTexture({
+      size: [8, 4],
+      format: 'bc1-rgba-unorm',
+      viewFormats: ['bc1-rgba-unorm-srgb'],
+      usage: U.TEXTURE_BINDING | U.COPY_DST,
+    });
+    const block = (c0) => [c0 & 255, c0 >> 8, 0, 0, 0, 0, 0, 0];
+    device.queue.writeTexture({ texture: t }, Uint8Array.from([...block(0x8410), ...block(0x4208)]), { bytesPerRow: 16 }, [8, 4]);
+    const code = '@group(0) @binding(0) var t: texture_2d<f32>; @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { return textureLoad(t, vec2i(p.xy), 0); }';
+    const look = (format) => shade(device, { w: 8, h: 1, code, entries: [{ binding: 0, resource: t.createView(format ? { format } : {}) }] });
+    const unorm = await look();
+    const srgb = await look('bc1-rgba-unorm-srgb');
+    device.queue.writeTexture({ texture: t, origin: [4, 0, 0] }, Uint8Array.from(block(0xc618)), { bytesPerRow: 8 }, [4, 4]);
+    const srgbAfter = await look('bc1-rgba-unorm-srgb');
+    const unormAfter = await look();
+    t.destroy();
+    return { unorm, srgb, srgbAfter, unormAfter };
+  },
+
+  /**
+   * KB4990c: one draw samples the depth and the stencil aspect of one 4x depth24plus-stencil8 texture, samples 0 and 3
+   * of each: each binding reads its own aspect.
+   */
+  async msaaAspects(device) {
+    const t = device.createTexture({ size: [4, 1], format: 'depth24plus-stencil8', sampleCount: 4, usage: U.RENDER_ATTACHMENT | U.TEXTURE_BINDING });
+    const e = device.createCommandEncoder();
+    e.beginRenderPass({
+      colorAttachments: [],
+      depthStencilAttachment: {
+        view: t.createView(),
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+        depthClearValue: 0.5,
+        stencilLoadOp: 'clear',
+        stencilStoreOp: 'store',
+        stencilClearValue: 77,
+      },
+    }).end();
+    device.queue.submit([e.finish()]);
+    const out = await shade(device, {
+      prelude: '@group(0) @binding(0) var d: texture_depth_multisampled_2d; @group(0) @binding(1) var s: texture_multisampled_2d<u32>;',
+      code: '@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { let i = vec2i(p.xy); return vec4f(textureLoad(d, i, 0), f32(textureLoad(s, i, 0).r), f32(textureLoad(s, i, 3).r), textureLoad(d, i, 3)); }',
+      entries: [
+        { binding: 0, resource: t.createView({ aspect: 'depth-only' }) },
+        { binding: 1, resource: t.createView({ aspect: 'stencil-only' }) },
+      ],
+    });
+    t.destroy();
+    return out;
+  },
+
   /** A 2D view of one layer of a 3-layer array: sampled, then rendered into and sampled again. */
   async layerView(device) {
     const t = device.createTexture({ size: [2, 2, 3], format: 'rgba8unorm', usage: U.TEXTURE_BINDING | U.COPY_DST | U.RENDER_ATTACHMENT });

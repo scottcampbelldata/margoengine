@@ -213,6 +213,25 @@ export const COMPRESSION_EXTENSIONS: Readonly<Record<string, readonly string[]>>
   'texture-compression-astc': ['WEBGL_compressed_texture_astc'],
 };
 
+const TYPE_BYTES: Readonly<Record<string, number>> = {
+  BYTE: 1,
+  UNSIGNED_BYTE: 1,
+  SHORT: 2,
+  UNSIGNED_SHORT: 2,
+  HALF_FLOAT: 2,
+  INT: 4,
+  UNSIGNED_INT: 4,
+  FLOAT: 4,
+};
+
+/** Bytes per texel of a format's GL upload format and type (packed types hold a whole texel). */
+export function glTexelBytes(info: FormatInfo): number {
+  const per = TYPE_BYTES[info.type];
+  if (!per) return info.type === 'FLOAT_32_UNSIGNED_INT_24_8_REV' ? 8 : info.type.startsWith('UNSIGNED_SHORT_') ? 2 : 4;
+  const channels = info.format.startsWith('RGBA') ? 4 : info.format.startsWith('RGB') ? 3 : info.format.startsWith('RG') ? 2 : 1;
+  return per * channels;
+}
+
 /** True for formats with a depth part. */
 export const hasDepth = (f: FormatInfo): boolean => f.kind === 'depth' || f.kind === 'depth-stencil';
 /** True for formats with a stencil part. */

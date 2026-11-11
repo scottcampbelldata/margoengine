@@ -13,6 +13,7 @@
 import { fault } from '../../../shared/errors.js';
 import type { BoundGroup, CompatComputePipeline, ComputeBuilt, ComputeRuntime } from '../device/compute.js';
 import type { CompatDevice } from '../device/device.js';
+import { type FormatInfo, FORMATS } from '../device/formats.js';
 import { CompatRenderPipeline, type Replayer, writeTexture } from '../device/render.js';
 import {
   type Bound,
@@ -428,6 +429,7 @@ class Runtime implements ComputeRuntime {
         c.rows = this.device.objects.own(buffer, gl.createTexture() as WebGLTexture);
         state.scratch(gl.TEXTURE_2D, c.rows);
         gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w4, c.height);
+        r.zero(c.rows, gl.TEXTURE_2D, FORMATS.get('rgba32uint') as FormatInfo, 1, w4, c.height, 1);
         c.fbo = this.device.objects.own(buffer, gl.createFramebuffer() as WebGLFramebuffer);
         state.bindDrawFramebuffer(c.fbo);
         gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, c.rows, 0);
@@ -637,11 +639,13 @@ class Runtime implements ComputeRuntime {
     );
     const values = gl.createTexture() as WebGLTexture,
       mask = gl.createTexture() as WebGLTexture;
+    // Storage comes with the first layer the kernel wrote, which need not be layer 0.
+    let made = false;
     for (let z = 0; z < level.d; z++) {
       const plane = level.written.subarray(z * w * h, (z + 1) * w * h);
       if (!plane.some((x) => x)) continue;
       state.scratch(gl.TEXTURE_2D, values);
-      if (z === 0)
+      if (!made)
         gl.texStorage2D(gl.TEXTURE_2D, 1, kind === 'u' ? gl.RGBA32UI : kind === 'i' ? gl.RGBA32I : gl.RGBA32F, w, h);
       gl.texSubImage2D(
         gl.TEXTURE_2D,
@@ -655,7 +659,8 @@ class Runtime implements ComputeRuntime {
         level.data.subarray(z * w * h * 4, (z + 1) * w * h * 4),
       );
       state.scratch(gl.TEXTURE_2D, mask);
-      if (z === 0) gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, w, h);
+      if (!made) gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, w, h);
+      made = true;
       gl.texSubImage2D(
         gl.TEXTURE_2D,
         0,

@@ -30,6 +30,15 @@ export function nextGPUTask(): Promise<void> {
   });
 }
 
+/**
+ * Whether the GPU has passed `sync`, a fence: clientWaitSync with SYNC_FLUSH_COMMANDS_BIT and no timeout (WebGL allows
+ * none). GetSyncParameter(SYNC_STATUS) cannot ask for the flush, and Firefox warns once a fence has been polled 100
+ * times without the bit ("If you do not flush, this sync object is not guaranteed to ever complete").
+ */
+export function fenceDone(gl: WebGL2RenderingContext, sync: WebGLSync): boolean {
+  return gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0) !== gl.TIMEOUT_EXPIRED;
+}
+
 const probes = new WeakMap<WebGL2RenderingContext, readonly [WebGLBuffer, WebGLBuffer]>();
 
 /**

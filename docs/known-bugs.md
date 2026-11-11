@@ -29,6 +29,12 @@
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases).
 
+### Fixed 2026-11-11 (bug sweep L3a): three WebGL2 layer defects in views, multisampled aspects and CPU compute
+
+- **KB1042d, sRGB view of a compressed texture refused:** materials makes every KTX2 texture with its sRGB twin in `viewFormats`, and a twin view of a block-compressed texture threw `unsupported` on the layer: a view in another format reads a copy, made by rendering, and GL can neither render into nor reinterpret a compressed texture. Now such a texture keeps the blocks it was written with (a later write that covers an earlier one replaces it) until a twin view is first made; then a storage of the twin format is filled with them, every later write goes to both, and the kept blocks go. Regression: `packages/webgl2-compat/test/features.html` case `compressedSrgbView`, compared with native WebGPU by `features-browser.mjs`.
+- **KB4990c, depth and stencil views of one multisampled texture in one draw:** the layer resolves a multisampled texture into one single-sample copy before sampling, and GL keeps one sampling aspect (`DEPTH_STENCIL_TEXTURE_MODE`) per texture object, so the last binding's aspect won for both. A depth-stencil texture's stencil aspect now resolves into a copy of its own. Regression: `features.html` case `msaaAspects` (depth 0.5 and stencil 77 through one draw, equal to native).
+- **CPU compute storage into a later layer only:** a CPU-run kernel publishes its stores by a masked draw per written layer from two scratch textures, whose storage was made only while filling layer 0; a kernel that stored nothing in layer 0 uploaded into textures without storage, GL refused it and the stores were lost. Storage now comes with the first written layer. Regression: `packages/webgl2-compat/test/compute-planes.test.js`.
+
 ### Firefox prints WebGL advisory warnings that the lod and materials browser checks count as errors (found 2026-11-11, open)
 
 - **Repro:** `MARGO_BROWSER=firefox node packages/lod/test/browser-check.mjs --compat` and
@@ -69,12 +75,27 @@
 - **Done 2026-11-11, (2):** Firefox's "WebGL context was lost." from the layer probe's deliberate `loseContext()` is
   counted, and the lod and materials checks assert it exactly once on the layer (`watchConsole`,
   `expectedContextLosses`); any other loss fails. With both, the lod check passes in Firefox on the layer.
-- **Still open, lazy initialisation:** with the cap lifted the imposter and materials checks show what was hidden:
-  "Tex image TEXTURE_2D level N is incurring lazy initialization" (texSubImage and draws, levels 0 to 4), "Texture has
-  not been initialized prior to a partial upload", the imposter check's "getSyncParameter ... called 100 times without
-  SYNC_FLUSH_COMMANDS_BIT", and materials' "Depth texture comparison requests (e.g. `LINEAR`) Filtering". Next:
-  initialise texture levels at creation in the layer, flush before polling a sync, and look at the comparison
-  sampler's filter. Owner: webgl2-compat.
+- **Fixed 2026-11-11 (bug sweep L3a), lazy initialisation:** with the cap lifted the imposter and materials checks
+  showed "Tex image TEXTURE_2D level N is incurring lazy initialization" (texSubImage and draws, levels 0 to 4) and
+  "Texture has not been initialized prior to a partial upload". Cause: the layer left every new level for the browser,
+  which zeroes it at the first partial upload or draw that touches it, and Firefox warns each time. The layer now
+  writes zeros into every level and layer when it allocates a texture (`Replayer.zero`): a framebuffer clear for
+  colour-renderable, depth and stencil formats, a whole-level upload from a zero-filled pixel unpack buffer for the
+  rest, nothing for compressed formats (an all-zero block is not a zero texel). Data, storage and readback helper
+  textures too. Regression: `packages/webgl2-compat/test/zero-init.test.js`.
+- **Fixed 2026-11-11 (bug sweep L3a), fence polls:** the imposter check's "ClientWaitSync with timeout=0 (or
+  GetSyncParameter(SYNC_STATUS)) called 100 times without SYNC_FLUSH_COMMANDS_BIT". Cause: readbacks polled their fence
+  with `getSyncParameter`, which cannot ask for a flush, and `onSubmittedWorkDone` with `clientWaitSync(sync, 0, 0)`;
+  Firefox counts polls without the bit whatever `gl.flush()` calls came between. Every poll is now
+  `clientWaitSync(sync, SYNC_FLUSH_COMMANDS_BIT, 0)` (`fenceDone` in `device/tasks.ts`). Regression: the fence test in
+  `packages/webgl2-compat/test/zero-init.test.js`.
+- **Accepted 2026-11-11 (bug sweep L3a), depth comparison filter:** materials' "Depth texture comparison requests (e.g.
+  `LINEAR`) Filtering, but behavior is implementation-defined" comes from the shadow map's comparison sampler (compare
+  `less-equal`, linear filters, `packages/shadows`). The package is right: WebGPU defines such samplers and leaves the
+  filtering to the implementation, as GL does, and the layer maps them to GL's LINEAR comparison, the hardware
+  percentage-closer filter native WebGPU uses on the same GPU. Emulating it in the shader would take four taps for one
+  and could differ from native. The checks accept that exact line, once per context, on Firefox 157 only
+  (`FIREFOX_DEPTH_COMPARE_LINES` in `scripts/support/browser-advisories.mjs`). Regression: `tests/browser-advisories.test.js`.
 
 ### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
 
@@ -2645,6 +2666,12 @@ It is listed with the others as an LDR refusal, message still checked. Regressio
 - **Was:** `test:gpu:tiers` failed on "points surfels 4x half-float": 1.2% of pixels (share 0.01196 against the 0.001 bound, at most 15 of 255) differed from the layer's full tier. The `/tiers` entry stores every float target below its full tier as half floats, so the surfel front depth (`r32float`) became `r16float`. Its rounding (about 0.004 at a view depth of 4) moved the blend window, which is one disc radius deep (0.03 here), so discs near the front got other weights. The packed route was keyed on `compatibilityLevel()`, which is false on the layer. The LDR tier would also have stored the sums in 8 bits, clamping each weight sum at 1, and nothing refused it.
 - **Fix (`@margoengine/points`):** on the layer below its full tier the front depth goes out as the four bytes of its float in `rgba8unorm` at any sample count (exact, as at the native compatibility level), while the sums stay one `rgba16float` target, which that tier stores unchanged; `SurfelPlugin` refuses a tier below half-float with `unsupported`. The full tier and native WebGPU keep `r32float`, so their work is unchanged. The bound was not touched: the case is now 0 pixels apart.
 - **Regression:** `packages/points/tests/compat-level.test.js` (three tests fail on the old source: 1x and 4x half-float formats, the LDR refusal) and `packages/webgl2-compat/test/tier-packages-browser.mjs` case `points surfels 4x` (share 0.01196 before, 0 after).
+
+### Fixed 2026-11-11: eye-dome lighting on the WebGL2 layer below its full tier (KB-L3a-edl)
+
+- **Was:** points with `edl: true` write their view depth into an `r32float` target, which the layer's `/tiers` entry stores as `r16float` on its half-float tier and in 8 bits on its ldr tier. EDL shades by log2 depth steps between neighbours, so the half float's rounding (about 0.004 at a depth of 4) added or hid steps. As for surfels, the packed route was keyed on `compatibilityLevel()`, false on the layer. No tier case drew EDL.
+- **Fix (`@margoengine/points`):** below the layer's full tier the eye-dome depth goes out as the four bytes of its float in `rgba8unorm` (exact), in the same pass as the colour, and the lighting pass unpacks it, at 1x and 4x. The full tier and native WebGPU keep `r32float`. `roundsFloatTargets` moved to `packages/points/src/tier.ts`, shared with surfels.
+- **Regression:** `packages/webgl2-compat/test/tier-packages-browser.mjs` cases `points edl` and `points edl 4x` (in `adapter-browser.js`).
 
 ### Fixed 2026-11-11: sky and other packages drew HDR as display colour over PostStack's rg11b10ufloat capture
 

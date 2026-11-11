@@ -18,7 +18,7 @@ import {
 /** One task: the layer dispatches uncapturederror in a task of its own, as WebGPU does. */
 const task = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** A stand-in context: just what webgl2Capabilities reads. */
+/** A stand-in context: what webgl2Capabilities reads, and a framebuffer that is always complete. */
 function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = {}) {
   const enums = Object.fromEntries(COMPAT_LIMITS.map((name, i) => [name, 0x1000 + i]));
   const values = new Map(COMPAT_LIMITS.map((name, i) => [0x1000 + i, limits[name] ?? 4096]));
@@ -30,6 +30,9 @@ function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = 
     RENDERER: 0x1f01,
     VERSION: 0x1f02,
     SHADING_LANGUAGE_VERSION: 0x8b8c,
+    // New textures are zeroed at creation by a clear through a scratch framebuffer (Firefox lazy initialisation).
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    checkFramebufferStatus: () => 0x8cd5,
     lost: false,
     getExtension(name) {
       if (name === 'WEBGL_lose_context') return { loseContext: () => (this.lost = true) };

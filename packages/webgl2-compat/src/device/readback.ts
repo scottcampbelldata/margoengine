@@ -1,7 +1,8 @@
 // Reading textures back, a chunk apart from the layer's base: only a page that copies a texture to a buffer, or runs
 // compute, downloads it (queue.submit and device.loadReadback load it first). The format conversions are the larger part
 // of it: every WebGPU layout a texture can be read in, from WebGL2's few readPixels formats.
-import { type FormatInfo, toHalf } from './formats.js';
+import { type FormatInfo, FORMATS, toHalf } from './formats.js';
+import { fenceDone } from './tasks.js';
 import { origin, type Replayer, writeTexture } from './render.js';
 import type { CompatBuffer, CompatTexture, TextureStorage } from './resources.js';
 
@@ -67,6 +68,7 @@ export function fetchInto(
   const target = gl.createTexture() as WebGLTexture;
   state.scratch(gl.TEXTURE_2D, target);
   gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
+  r.zero(target, gl.TEXTURE_2D, FORMATS.get(outputKind === 'u' ? 'rgba32uint' : outputKind === 'i' ? 'rgba32sint' : 'rgba32float') as FormatInfo, 1, w, h, 1);
   const fbo = gl.createFramebuffer() as WebGLFramebuffer;
   state.bindDrawFramebuffer(fbo);
   gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
@@ -154,6 +156,7 @@ function stencilInto(r: Replayer, s: TextureStorage, level: number, layer: numbe
   const target = gl.createTexture() as WebGLTexture;
   state.scratch(gl.TEXTURE_2D, target);
   gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h);
+  r.zero(target, gl.TEXTURE_2D, FORMATS.get('rgba8unorm') as FormatInfo, 1, w, h, 1);
   const fbo = gl.createFramebuffer() as WebGLFramebuffer;
   state.bindDrawFramebuffer(fbo);
   gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
@@ -245,7 +248,7 @@ export function copyTextureToBuffer(
     const offset = base + slice * bytesPerRow * rowsPerImage;
     dst.readbacks.push({
       forcible: true,
-      ready: () => gl.getSyncParameter(sync, gl.SYNC_STATUS) === gl.SIGNALED,
+      ready: () => fenceDone(gl, sync),
       apply: () => {
         const data = new Uint8Array(total);
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);

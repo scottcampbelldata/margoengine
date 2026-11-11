@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15131954,
+  "total": 15142164,
   "history": [
     {
       "date": "2026-10-24",
@@ -8621,6 +8621,12 @@
       "commit": "d906060770",
       "reason": "KB5580a: TAAUpscale WebGL2 coverage-depth resolve route; the shared upscale chunk 12739 to 13204 B raw, 4676 to 4870 B gzip -9 measured, upscale-velocity entry 19145 B over its 19045 ceiling; a lazy chunk would add a request on every WebGL2 attach for one shader edit",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "df426c8e4b",
+      "reason": "webgl2-compat zeroes every new texture at creation (Firefox lazy-init), polls fences with SYNC_FLUSH_COMMANDS_BIT, keeps a resolved MSAA stencil copy and a compressed sRGB twin: device 111850 to 111898 B, xr 111667 to 111798 B, tiers 111581 to 111582 B measured",
+      "grew": 3
     }
   ],
   "items": {
@@ -9320,7 +9326,7 @@
     "@margoengine/points/octree": 10704,
     "@margoengine/points/pick": 6024,
     "@margoengine/points/potree": 17694,
-    "@margoengine/points/surfels": 17539,
+    "@margoengine/points/surfels": 17510,
     "@margoengine/post": 43641,
     "@margoengine/post/afterimage": 6079,
     "@margoengine/post/anamorphic": 6742,
@@ -9931,14 +9937,14 @@
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
-    "@margoengine/webgl2-compat/device": 111850,
+    "@margoengine/webgl2-compat/device": 115255,
     "@margoengine/webgl2-compat/glsl": 43584,
     "@margoengine/webgl2-compat/pick": 5054,
     "@margoengine/webgl2-compat/preview": 3699,
     "@margoengine/webgl2-compat/restore": 1106,
-    "@margoengine/webgl2-compat/tiers": 111581,
+    "@margoengine/webgl2-compat/tiers": 114930,
     "@margoengine/webgl2-compat/wgsl": 27240,
-    "@margoengine/webgl2-compat/xr": 111667,
+    "@margoengine/webgl2-compat/xr": 115152,
     "@margoengine/wfc": 2154,
     "@margoengine/wfc dist/workers/wfc.js": 3601,
     "@margoengine/wfc/assemble": 1721,

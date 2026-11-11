@@ -109,6 +109,16 @@ try {
         for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazyAnd', 'lazyOr', 'discard'])
           assert.deepEqual(r[`${filter}/${mode}`], [1, mode.startsWith('lazy') ? 0 : mode === 'implicit' ? 1 : mode === 'grad' ? 1101 : 11, 0, 1], `${filter}/${mode}: each argument evaluated once`);
     }
+    if (name === 'msaaAspects')
+      assert.deepEqual(
+        r.map((v, i) => (i % 4 === 1 || i % 4 === 2 ? v : Math.abs(v - 0.5) < 1e-6)),
+        Array(4).fill([true, 77, 77, true]).flat(),
+        'msaaAspects: depth and stencil, each through its own binding',
+      );
+    if (name === 'compressedSrgbView' && !r.missing) {
+      assert.notDeepEqual(r.srgb, r.unorm, 'compressedSrgbView: the sRGB view decodes');
+      assert.notDeepEqual(r.srgbAfter, r.srgb, 'compressedSrgbView: a later write reaches the sRGB view');
+    }
     if (name === 'volumeSliceDepth') {
       // Rows top first: the wedge covers one texel of the top row and two of the bottom; slice 1 is only cleared.
       const [G, Bl, Y] = [[0, 255, 0, 255], [0, 0, 255, 255], [255, 255, 0, 255]];

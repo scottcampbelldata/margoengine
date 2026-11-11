@@ -5,7 +5,7 @@
 // WebGL, so a buffer with both usages has two GL buffers kept equal).
 import { checkWGSL, WGSLError } from '../wgsl.js';
 import type { IRModule } from '../wgsl/ir.js';
-import { type FormatInfo, FORMATS } from './formats.js';
+import { type FormatInfo, FORMATS, hasDepth } from './formats.js';
 import type { CompatDevice } from './device.js';
 import { nextGPUTask } from './tasks.js';
 
@@ -265,6 +265,7 @@ export class CompatBuffer {
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w, h);
       this.device.allocated(`the data texture of buffer '${this.label}' (${w} x ${h})`);
+      this.device.replayer.zero(texture, gl.TEXTURE_2D, WORDS, 1, w, h, 1);
       this.data = { texture, shift, version: -1 };
     }
     const d = this.data;
@@ -435,6 +436,21 @@ function uploadRows(
   gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
 }
 
+/** One writeTexture into a block-compressed texture: whole blocks of a region of one level (tight rows). */
+export interface BlockWrite {
+  readonly level: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly w: number;
+  readonly h: number;
+  readonly depth: number;
+  readonly bytes: Uint8Array;
+}
+
+/** The RGBA32UI format of data and storage textures (four 32-bit words a texel). */
+const WORDS = FORMATS.get('rgba32uint') as FormatInfo;
+
 /** A GPUTexture on WebGL2: a texture, or a multisample renderbuffer (plus a resolved texture when it is sampled). */
 export class CompatTexture {
   readonly id = id();
@@ -459,6 +475,13 @@ export class CompatTexture {
   /** Single-sample copy of a multisampled texture that shaders read; `stale` until the next resolve. */
   readonly resolved: WebGLTexture | null;
   stale = false;
+  /**
+   * The stencil aspect's own resolved copy of a multisampled depth-stencil texture, made when a draw first samples its
+   * stencil: GL keeps one sampling aspect (DEPTH_STENCIL_TEXTURE_MODE) per texture object, so with one copy a draw that
+   * samples both aspects read the last-set aspect through both bindings (KB4990c). `staleStencil` as `stale`.
+   */
+  private stencilCopy: WebGLTexture | null = null;
+  staleStencil = false;
   /** False until written: a load of an unwritten texture reads zeros, as WebGPU requires. */
   initialized = false;
   /** destroy() was called (see Usable); `destroyed` follows once its GL objects are freed. */
@@ -475,6 +498,14 @@ export class CompatTexture {
   /** 2D stand-ins for slices of a 3D storage drawn beside depth or stencil, by storage id (Replayer.standIn). */
   private standIns: Map<number, WebGLTexture> | null = null;
   private owner: TextureStorage[] | null = null;
+  /**
+   * The sRGB twin view of a block-compressed texture (KB1042d): GL can neither reinterpret a compressed texture nor
+   * render into one to copy it, so a texture whose viewFormats name its twin keeps the blocks it was written with
+   * (`blockWrites`, a later write that covers an earlier one replaces it), and the first twin view gets a storage of
+   * the twin's format filled with them (`blockTwin`); from then on each write goes to both and nothing is kept.
+   */
+  blockWrites: BlockWrite[] | null = null;
+  blockTwin: TextureStorage | null = null;
 
   constructor(
     readonly device: CompatDevice,
@@ -555,6 +586,7 @@ export class CompatTexture {
     this.target = target;
     this.primary = this.storageOf(target, this.format, info, 0, this.layers);
     this.texture = this.primary.gl;
+    if (info.block && descriptor.viewFormats?.some((f) => f !== this.format)) this.blockWrites = [];
   }
 
   private allocate(target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): WebGLTexture {
@@ -565,6 +597,7 @@ export class CompatTexture {
     if (target === gl.TEXTURE_3D || target === gl.TEXTURE_2D_ARRAY) gl.texStorage3D(target, levels, internal, w, h, d);
     else gl.texStorage2D(target, levels, internal, w, h);
     this.device.allocated(`texture '${this.label}' (${w} x ${h} x ${d}, ${levels} levels)`);
+    this.device.replayer.zero(t, target, info, levels, w, h, d);
     return t;
   }
 
@@ -624,6 +657,14 @@ export class CompatTexture {
   private copy(format: GPUTextureFormat, target: number, layer: number, layers: number, alias = 0): TextureStorage {
     const p = this.primary as TextureStorage;
     if (!alias && format === this.format && target === p.target) return p;
+    if (this.info.block && !alias && format !== this.format && target === p.target && (this.blockTwin || this.blockWrites)) {
+      if (!this.blockTwin) {
+        this.blockTwin = this.storageOf(target, format, FORMATS.get(format) as FormatInfo, 0, this.layers);
+        for (const write of this.blockWrites as BlockWrite[]) this.device.replayer.putBlocks(this.blockTwin, write);
+        this.blockWrites = null;
+      }
+      return this.blockTwin;
+    }
     const key = `${format}:${target}:${layer}:${alias}`;
     let s = this.copies?.get(key);
     if (s) return s;
@@ -696,6 +737,12 @@ export class CompatTexture {
     return t;
   }
 
+  /** The resolved copy a binding of this multisampled texture reads: the stencil aspect's own, or `resolved`. */
+  resolvedFor(stencil: boolean): WebGLTexture | null {
+    if (!this.resolved || !stencil || !hasDepth(this.info)) return this.resolved;
+    return (this.stencilCopy ??= this.allocate(this.device.gl.TEXTURE_2D, this.storageInfo, 1, this.width, this.height, 1));
+  }
+
   /** Size of a mip level. */
   levelSize(level: number): [number, number, number] {
     const d = this.dimension === '3d' ? Math.max(1, this.depthOrArrayLayers >> level) : this.depthOrArrayLayers;
@@ -726,6 +773,8 @@ export class CompatTexture {
     for (const t of [
       this.texture,
       this.resolved,
+      this.stencilCopy,
+      this.blockTwin?.gl,
       ...[...(this.copies?.values() ?? [])].map((c) => c.gl),
       ...(this.standIns?.values() ?? []),
     ])
@@ -1105,6 +1154,7 @@ export class CompatBindGroup {
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
       this.device.allocated(`the storage texture of bind group '${this.label}'`);
+      this.device.replayer.zero(texture, gl.TEXTURE_2D, WORDS, 1, 1 << shift, Math.ceil(total / (1 << shift)), 1);
       this.shared = { texture, shift, rows, versions: new Map() };
     }
     const d = this.shared;

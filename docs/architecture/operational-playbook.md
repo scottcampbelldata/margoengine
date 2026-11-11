@@ -1,3 +1,13 @@
+### Section 5 evidence: WebGL2 layer resources in Firefox and in one draw (bug sweep L3a, 2026-11-11)
+
+The layer writes zeros into every new texture level and layer at allocation (clears for renderable formats, whole-level
+uploads from a zero-filled unpack buffer for the rest), so no browser initialises one lazily, and polls every fence
+with `clientWaitSync(sync, SYNC_FLUSH_COMMANDS_BIT, 0)`. Evidence: `packages/webgl2-compat/test/zero-init.test.js`
+(CPU, every level, layer, face and slice), and the Firefox 157 materials, lod and imposter checks on the layer with no
+lazy-initialisation or flush warnings. A multisampled depth-stencil texture resolves a copy per sampled aspect, and a
+block-compressed texture's sRGB twin view is filled from its kept blocks: `features.html` cases `msaaAspects` and
+`compressedSrgbView` equal native WebGPU. Still missing: a run of these on a real OpenGL ES device.
+
 ### Section 5 evidence: height-correlated Smith in core's direct light (2026-11-11)
 
 Core's WGSL direct light, its WebGL2 twin and gltf-pro (base, coat lobe, extended isotropic path) use the
@@ -1787,7 +1797,8 @@ sample index and a one-sample mask (`perSample` in `packages/shared/msaa.js`, 20
 two rg16float targets (r, g and b, weight: the full level's half floats), resolved by a masked draw per sample; the
 adapter check's surfel frame is within 4 of 255 of the full level's. On the WebGL2 layer below its full tier surfels pack
 the front depth the same way (that tier stores r32float as r16float) and refuse LDR; the tier check's half-float surfel
-frame equals the full tier's. A lone Bloom at 4x and the float-target test
+frame equals the full tier's. Eye-dome lighting packs its depth target the same way below the full tier (tier cases
+`points edl` and `points edl 4x`). A lone Bloom at 4x and the float-target test
 (`linearHdr`) were fixed the same day (known-bugs.md).
 
 `@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
