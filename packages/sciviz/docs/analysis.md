@@ -105,7 +105,7 @@ const image = { dims: [3, 2, 1] as [number, number, number], bounds: [0, 2, 0, 1
   cellArrays: { velocity: [3, 4, 1, -1] } };
 const fast = await thresholdGrid(image, [2, Infinity], { association: 'cell', array: 'velocity' });
 const leftward = await thresholdGrid(image, [-Infinity, 0], { association: 'cell', array: 'velocity', component: 1 });
-console.log([...fast.sourceCells!], [...leftward.sourceCells!]); // [0] [1]
+console.log(Array.from(fast.sourceCells!), Array.from(leftward.sourceCells!)); // [0] [1]
 ``` `extractSubset` uses
 inclusive logical ranges and positive strides, default full extent/unit strides;
 strided cell tuples come from the lower source cell, not an average. `imageGrid`
@@ -128,7 +128,7 @@ const pieces = { points: [0,0,0, 1,0,0, 2,0,0, 3,0,0, 4,0,0, 5,0,0, 6,0,0, 7,0,0
   connectivity: [0,1, 1,2, 3,4, 5,6, 6,7, 7,8], offsets: [2, 4, 6, 8, 10, 12], types: [3, 3, 3, 3, 3, 3] };
 const regions = await connectivityGrid(pieces);
 const largest = await connectivityGrid(pieces, { extract: 'largest' });
-console.log([...regions.regionCells], [...largest.sourceCells!]); // [3, 2, 1] [3, 4, 5]
+console.log(Array.from(regions.regionCells), Array.from(largest.sourceCells!)); // [3, 2, 1] [3, 4, 5]
 ```
 
 `/probe` owns locator snapshots; rebuild after input edits. Barycentric simplex and

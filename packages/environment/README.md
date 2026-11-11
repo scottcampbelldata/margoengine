@@ -853,7 +853,7 @@ import { Engine, box, PbrMaterial } from '@margoengine/core';
 import { Tonemap } from '@margoengine/tonemap';
 import { VolumetricFog } from '@margoengine/environment/volumetric';
 
-const engine = await Engine.create(document.querySelector('canvas'), {
+const engine = await Engine.create(document.querySelector('canvas')!, {
   camera: { position: [3, 2, 5], target: [0, 0, 0] },
 });
 engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#4090c0' }));
