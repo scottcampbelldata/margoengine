@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15129473,
+  "total": 15130868,
   "history": [
     {
       "date": "2026-10-24",
@@ -8603,6 +8603,12 @@
       "commit": "5409a42f82",
       "reason": "KB5289a: blended MToon queues order across models (arm pass 0.99 and queue pass 1.2; armed beauty draws hand blended queues to one PBRDrawRun drawn by queue then model order). rigging/mtoon 9871 to 10260 B measured; the two passes and the queue record are the fix itself, and a split entry would add a fetch for every blended avatar. The static gltf-pro/model import is the PBRDrawRun class: MToon.attach takes a PBRModel, so gltf-pro/model is already loaded wherever MToon runs and the import adds no bytes or loads to any app.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "bfb492583d",
+      "reason": "KB6434c CulledMeshes makes its frame, slot and occlusion buffers inside error scopes and uses each once the device confirms it: culling 14635 to 14797 B and culling/bounds 20401 to 20572 B gzip measured; it runs on the first frame, so a lazy import() would add a request there",
+      "grew": 2
     }
   ],
   "items": {
@@ -8817,8 +8823,8 @@
     "@margoengine/creative/targets": 4277,
     "@margoengine/creative/targets-depth": 3946,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 14635,
-    "@margoengine/culling/bounds": 20401,
+    "@margoengine/culling": 15241,
+    "@margoengine/culling/bounds": 21190,
     "@margoengine/culling/depth": 6320,
     "@margoengine/culling/dynamic": 7842,
     "@margoengine/culling/lod": 4625,
