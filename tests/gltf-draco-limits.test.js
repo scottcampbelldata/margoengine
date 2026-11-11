@@ -132,3 +132,35 @@ test('non-indexed Draco topology receives a bounded index limit', async () => {
     engine.dispose();
   }
 });
+
+// Bug: the per-primitive decoded-byte check used the default budget (4x 64 MiB) instead of the load's own
+// `maxDownloadBytes`, so a raised budget still refused a Draco primitive declaring more than 256 MiB of attributes.
+test('a Draco primitive over 256 MiB declared decodes within a raised maxDownloadBytes, and is refused within 64 MiB', async () => {
+  const doc = JSON.parse(await fixture('Box.gltf')),
+    source = await fixture('Box.bin'),
+    primitive = doc.meshes[0].primitives[0],
+    ext = primitive.extensions.KHR_draco_mesh_compression;
+  for (const id of Object.values(primitive.attributes)) doc.accessors[id].count = 1_000_000;
+  for (let i = 0; i < 18; i++) {
+    primitive.attributes[`_A${i}`] = doc.accessors.length;
+    ext.attributes[`_A${i}`] = 2 + i;
+    doc.accessors.push({ componentType: 5126, type: 'VEC4', count: 1_000_000 });
+  }
+  const reached = new Error('reached the decoder'),
+    draco = {
+      async decode() {
+        throw reached;
+      },
+    };
+  for (const [maxDownloadBytes, expected] of [
+    [128 * 1024 * 1024, /reached the decoder/],
+    [64 * 1024 * 1024, /Decoded glTF exceeds byte budget/],
+  ]) {
+    const { engine } = await scene();
+    try {
+      await assert.rejects(parseGLTFAsync(engine, structuredClone(doc), [source], [], { draco, maxDownloadBytes }), expected);
+    } finally {
+      engine.dispose();
+    }
+  }
+});

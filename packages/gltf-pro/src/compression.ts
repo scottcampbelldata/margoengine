@@ -1,6 +1,6 @@
 import { margoError } from '../../shared/errors.js';
 import type { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
-import { type GLTFAsset, decoderSource, entry, integer, assetLimit } from './asset.js';
+import { type GLTFAsset, decoderSource, entry, integer } from './asset.js';
 import { decoded } from './draco-state.js';
 
 /**
@@ -78,7 +78,7 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
             );
           bytes += count * 4;
         }
-        if (bytes > assetLimit * 4)
+        if (bytes > asset.maxBytes * 4)
           throw new RangeError(
             'Decoded glTF exceeds byte budget; load a smaller model, or reduce its textures and meshes',
           );
