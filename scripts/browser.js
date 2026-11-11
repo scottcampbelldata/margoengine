@@ -96,7 +96,15 @@ export async function startDevServer({
   // A plugin whose configureServer throws makes createServer reject after Vite opened its file system watches, and
   // the rejected call returns no server to close: the two watches kept the process alive after its last test. This
   // first plugin is handed the server before any other hook runs, so a failed start can still close it.
-  const own = { name: 'margo-start-owner', enforce: 'pre', configureServer: (started) => void (server = started) };
+  // It also turns the file watcher off for real: Vite's mergeConfig skips null values, so `watch: null` below lost to
+  // the root vite.config.mjs's `watch: { ignored }`, and a build in the same checkout that rewrote a module the page had
+  // loaded reloaded the page in the middle of a suite ("Execution context was destroyed", tests/dev-server-watch.test.js).
+  const own = {
+    name: 'margo-start-owner',
+    enforce: 'pre',
+    configResolved: (config) => void (config.server.watch = null),
+    configureServer: (started) => void (server = started),
+  };
   try {
     server = await createServer({
       root,

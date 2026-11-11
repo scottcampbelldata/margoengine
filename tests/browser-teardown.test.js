@@ -198,6 +198,20 @@ test('an owned browser is ended through its host: listed while connected, every 
   assert.ok(calls.findIndex(([what]) => what === 'listed') < calls.findIndex(([what]) => what === 'client'), 'listed before the client disconnects');
 });
 
+// KB1898: check:readme-run closed a hung example's browser at its deadline and again at the end of the run. The second
+// close asked the host the first had released to end again; a released host answers null, and the close threw
+// "browser host <pid> did not acknowledge the end: null", hiding the example report.
+test('closing a browser twice ends and releases its host once, and both calls share the outcome', async () => {
+  const calls = [];
+  const host = fakeHost();
+  const browser = withBoundedClose(listingBrowser(calls), { host });
+  const [first, second] = [browser.close(), browser.close()];
+  await Promise.all([first, second]);
+  await browser.close();
+  assert.deepEqual(host.calls, [['end', [11, 12]], ['finished'], ['release']]);
+  assert.equal(calls.filter(([what]) => what === 'client').length, 1, 'one client close');
+});
+
 // The SHUTDOWN_TIMEOUT "still open: Chromium process/stdio close (<pid>)" that blocked batches 160, 171 and 234 (2026-11-09):
 // the close waited for Node's 'close' of the browser process, which Windows signals only once the kernel has torn the
 // process down after TerminateProcess (its exit code is set within 60 ms; the signal took 65 ms to 1.2 s beside the

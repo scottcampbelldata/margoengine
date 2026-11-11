@@ -162,9 +162,18 @@ test('a checkout reached through a Windows short path serves its pages', () => {
       const port = dev.server.httpServer.address().port;
       const response = await fetch('http://127.0.0.1:' + port + '/${dir}/page.js');
       console.log(String(response.status));
-      await dev.close();`;
+      await dev.close();
+      setTimeout(() => {
+        console.log('still open: ' + process.getActiveResourcesInfo().join(', '));
+        process.exit(3);
+      }, 20_000).unref();`;
+  // Local CI 2026-11-11 03:00: this child never exited, and with no limit spawnSync held the runner's event loop until
+  // its hang watch ended the run (KB2215). Its dev server watched files then (tests/dev-server-watch.test.js); a child
+  // still alive now names what keeps it open and fails here, with the same bound as the failed-start test above.
   try {
-    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd, encoding: 'utf8' });
+    // wall-clock: a bound on a hang, far from the about 2 s a clean run takes.
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(run.status, 0, `the process did not exit by itself: ${run.stdout}${run.stderr}`);
     assert.equal(run.stdout.trim(), '200', `served from ${cwd}: ${run.stdout}${run.stderr}`);
   } finally {
     rmSync(dir, { recursive: true, force: true });

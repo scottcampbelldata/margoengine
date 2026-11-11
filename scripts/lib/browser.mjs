@@ -302,7 +302,12 @@ export function withBoundedClose(
 ) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
-  browser.close = (...args) => {
+  // One close per browser, as Playwright's own close: a second call gets the first one's outcome. A second call used to
+  // ask a host the first had already released to end again, and threw `did not acknowledge the end: null` (KB1898,
+  // check:readme-run after an example's deadline close and its shared browser's close at the end of the run).
+  let closing;
+  browser.close = (...args) => (closing ??= boundedClose(...args));
+  const boundedClose = (...args) => {
     const pending = new Set();
     browser[SHUTDOWN_STEPS] = pending;
     const step = async (name, run) => {
