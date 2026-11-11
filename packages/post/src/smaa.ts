@@ -11,6 +11,7 @@ import {
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import type { StackStage } from '../../shared/stack.js';
 import { margoError } from '../../shared/errors.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -385,15 +386,24 @@ export class SMAA implements EnginePlugin {
       this.pass(c, this.edgeView!, this.edgePipeline, this.edgeGroup!);
       this.pass(c, this.weightView!, this.weightPipeline, this.weightGroup);
     } else this.pass(c, this.weightView!);
-    this.pass(c, view, this.blendPipeline!, this.blendGroup);
+    this.pass(c, view, this.blendPipeline!, this.blendGroup, true);
   }
-  // One fullscreen draw into a cleared target; without a pipeline only the clear.
-  private pass(c: Context, view: GPUTextureView, pipeline?: GPURenderPipeline, bindings?: GPUBindGroup): void {
+  // One fullscreen draw into a cleared target; without a pipeline only the clear. The blend into the output (`output`)
+  // stays inside the current view's viewport and scissor and keeps the views drawn before it.
+  private pass(
+    c: Context,
+    view: GPUTextureView,
+    pipeline?: GPURenderPipeline,
+    bindings?: GPUBindGroup,
+    output = false,
+  ): void {
     this.attachment.view = view;
+    this.attachment.loadOp = output ? viewLoadOp(c, 'clear') : 'clear';
     const pass = c.encoder.beginRenderPass(this.descriptor);
     if (pipeline) {
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, bindings!);
+      if (output) applyView(pass, c);
       pass.draw(3);
     }
     pass.end();

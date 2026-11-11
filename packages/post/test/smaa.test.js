@@ -192,3 +192,27 @@ test('SMAA is an LDR effect of a PostStack and never runs next to FXAA', async (
   PostStack.attach(s.engine, [new SMAA()]);
   assert.throws(() => FXAA.attach(s.engine), { code: 'attached' });
 });
+
+test('SMAA blends into the output only inside the current view, keeping the views drawn before it', () => {
+  const h = harness(),
+    smaa = SMAA.attach(h.engine);
+  h.frame();
+  for (const [index, scissor] of [
+    [0, undefined],
+    [1, [40, 0, 16, 32]],
+  ]) {
+    const log = h.gpu.record(() => {
+      h.view.begin(index);
+      h.view.c.view = { id: 'v' + index, camera: h.view.camera, viewport: [32 * index, 0, 32, 32], scissor, index, count: 2 };
+      h.engine.frameGraph.execute(h.view.c);
+    });
+    const starts = log.flatMap((e, i) => (e[0] === 'beginRenderPass' ? [i] : [])),
+      last = log.slice(starts.at(-1));
+    assert.equal(last[0][1].colorAttachments[0].loadOp, index ? 'load' : 'clear', 'a later view keeps the earlier ones');
+    // The recorder keeps the first five arguments of a call.
+    const at = (name, n) => last.find((e) => e[0] === 'pass.' + name)?.slice(1, 1 + n);
+    assert.deepEqual(at('setViewport', 5), [32 * index, 0, 32, 32, 0]);
+    assert.deepEqual(at('setScissorRect', 4), scissor ?? [32 * index, 0, 32, 32]);
+  }
+  smaa.dispose();
+});
