@@ -47,7 +47,18 @@
 - **Repro:** `MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --owner=<lane> -- node packages/post/test/ssgi-bounce-browser.mjs`
   fails at `ssgi-bounce-browser.mjs:108` ("switching multiBounce off gives the one-bounce frame back exactly", 1 !== 0).
   It fails the same way on `main` before the clear-colour fix (53bbc39b42), so that fix did not cause it; native passes.
-- **Cause:** not yet found. Suspect a pixel that differs after the toggle only on the WebGL2 compatibility layer.
+  Same defect as "ANGLE D3D11 SSGI trace difference" further down; this entry holds the 2026-11-11 measurements.
+- **Cause, as far as it is located (RTX A6000, Chrome ANGLE D3D11, aaace8b22f):** below the GL calls Margo makes, not
+  state Margo keeps across the toggle. Measured on this PC: 48 one-bounce frames with no toggle are bit-identical;
+  switching recreates every SSGI target, and forcing that recreation six times without `multiBounce` changes nothing;
+  three short `multiBounce` round trips change nothing. After 43 multi-bounce frames, the first two one-bounce frames
+  are exact and the frame 30 later differs in 97 channels by one level, with nothing changed in between; with waits or
+  a recorder slowing the calls, a run can pass. In a failing run the full-payload GL stream of a one-bounce frame
+  before the round trip and one after it are identical (509 calls, uniforms and uploads included, object identities
+  checked, no deleted object used again). The same flow under `--use-angle=vulkan` is exact at every step. So the
+  GPU work Margo submits is unchanged and its result drifts with time on D3D11 only.
+- **Next idea:** a D3D11 repro outside Margo (the trace shader alone, identical draws timed apart) to report upstream;
+  the test and its exact assertion stay unchanged.
 
 ### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
 
