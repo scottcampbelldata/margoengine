@@ -132,3 +132,12 @@ test('gpu-lock run admits browser scripts without a reason and each one holds a 
     rmSync(folder, { recursive: true, force: true });
   }
 });
+
+// Regression (sweep L6b, 2026-11-11): `npm run test:mtoon:browser` was classed as a CPU command (its name starts with
+// `test:` but not `test:browser`), so `gpu-lock run` refused it outright and its MToon GPU suites could not take a slot.
+test('npm scripts with a GPU word in a later part of their name are GPU leaves', () => {
+  for (const leaf of ['test:mtoon:browser', 'test:constraints:browser', 'test:limits:gpu', 'test:gpu', 'test:browser', 'test:xr'])
+    assert.equal(gpuCommand(['npm', 'run', leaf, '--workspace', 'packages/rigging']), 'gpu', leaf);
+  for (const leaf of ['test', 'test:unit', 'test:browserless', 'lint', 'build'])
+    assert.equal(gpuCommand(['npm', 'run', leaf]), 'cpu', leaf);
+});

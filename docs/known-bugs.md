@@ -365,6 +365,14 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   setting it already overrides for the same reason. The root dev servers keep the root config. Regression:
   tests/dev-server-watch.test.js ("a suite dev server scans only its start page").
 
+### Fixed 2026-11-11: `gpu-lock run` refused package GPU suites named test:<name>:browser (bug sweep L6b)
+
+`scripts/support/gpu-command.mjs` classed an npm script as a GPU leaf only when its name began `test:gpu`,
+`test:browser` or `test:xr`; any other `test:` name was CPU, which `--gpu=<reason>` cannot override. So
+`gpu-lock run -- npm run test:mtoon:browser` (and test:constraints:browser, test:limits:gpu and the like) was refused
+with ERR_GPU_COMMAND_NOT_GPU and those suites could not take a slot. A GPU word in any part of a test script's name now
+makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a GPU word in a later part of their name").
+
 ### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
 
 - **Repro:** `node scripts/gpu-lock.mjs run --owner=lane-x -- node scripts/csp-check.mjs` exited 2 with

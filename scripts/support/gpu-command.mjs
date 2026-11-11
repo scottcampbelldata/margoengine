@@ -44,7 +44,8 @@ export function gpuCommand(words, { cwd = process.cwd(), opens = opensBrowser } 
   if (/^(npm|pnpm|yarn)$/.test(program)) {
     const at = words.findIndex((word) => /^(run|run-script)$/.test(word));
     leaf = at < 0 ? words[1] : words[at + 1];
-    if (/^(test:(gpu|browser|xr)(:|$)|check:readme-run$)/.test(leaf ?? '')) return 'gpu';
+    // A GPU word in any part of a test script's name: test:gpu, test:gpu:x and package suites such as test:mtoon:browser.
+    if (/^(test(:[\w-]+)*?:(gpu|browser|xr)(:|$)|check:readme-run$)/.test(leaf ?? '')) return 'gpu';
     if (/^(verify|lint|hygiene|build|typecheck|check|test)(:|$)/.test(leaf ?? '')) return 'cpu';
     return 'unknown';
   }
