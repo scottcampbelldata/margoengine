@@ -3700,6 +3700,16 @@ selection at a negative grazing boundary can repeatedly select the previous medi
 advance rounds away. The walk now selects the forward half-open interval for each direction. A
 one-pixel two-material emissive path produced about 0.997 instead of 3.5 without this correction.
 
+### KB3574: batch 160 environment native direct row 1 over its budget (open, awaiting Scott's ruling)
+
+`node scripts/reference-rendering/environment.mjs` (native) fails `absolute: 2294442 > measured 2294441` on main
+(d33be0d67c, RTX A6000). Cause: 40e6f183dc, the deliberate GGX importance-sampling fix (sinTheta from
+alpha sqrt(xi / d) instead of sqrt(1 - cos^2), Walter et al. 2007 eq. 35), which moves the split-sum LUT toward an
+f64 integration (worst cell error 1.17e-3 to 4.9e-4, pinned by `packages/environment/tests/environment-browser.js`).
+On current main, putting the two old lines back renders at 2,294,441 and passes; between the two renders 58 of
+262,144 pixels move by one 8-bit level (32 up, 27 down, 59 channels). The budget is not moved here; re-recording
+it at 2,294,442 needs Scott's yes. Compat rows are lower and pass.
+
 ### Batch 160 job 7: environment furnace picture loss (open)
 
 Repro: GPU-locked node scripts/reference-rendering/environment.mjs, then --compat, after fetching the pinned job 1 model and generating the Mitsuba references with --capture-reference. All 123 primitives, 528,291 vertices and 1,040,409 triangles are retained. Direct-only MAE is 2.9175326029459634 / 2.9175211588541665; full-transport MAE is 1.8851051330566406 / 1.8851038614908855 (WebGPU / compatibility). Every RGB pixel and silhouette counts.
