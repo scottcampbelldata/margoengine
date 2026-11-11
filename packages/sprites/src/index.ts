@@ -604,7 +604,7 @@ export class SpriteLayer implements EnginePlugin {
     device.queue.submit([encoder.finish()]);
     // Destroyed only once the copy is submitted: a texture destroyed before its submit fails validation.
     for (const source of sources) if (source.owned) source.texture.destroy();
-    generateMipmaps(device, texture, levels, this.mipCache, undefined, sources.length);
+    generateMipmaps(device, texture, levels, this.mipCache, sources.length);
     return { texture, owned: true };
   }
   private pipeline(device: GPUDevice, format: GPUTextureFormat, samples: number, normal?: GPUTextureFormat) {

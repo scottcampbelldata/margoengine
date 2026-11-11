@@ -1,12 +1,14 @@
 /**
- * Fills mip levels 1 to `levels - 1` of the first `layers` (default 1) layers of a texture from level 0, with one
- * pipeline per format kept in `cache` and `sampler` (default: a linear one kept as `cache.sampler`).
+ * Fills mip levels 1 to `levels - 1` of the first `layers` (default 1) layers of a texture from level 0 by an area
+ * filter (the exact box filter at every size).
+ * `alpha: 'weighted'` averages colour weighted by alpha, for straight-alpha base colour maps of blended materials.
+ * One pipeline per format and mode is kept in `cache`.
  */
 export function generateMipmaps(
   device: GPUDevice,
   texture: GPUTexture,
   levels: number,
-  cache: Map<unknown, unknown> & { sampler?: GPUSampler },
-  sampler?: GPUSampler,
+  cache: Map<unknown, unknown>,
   layers?: number,
+  alpha?: 'plain' | 'weighted',
 ): void;

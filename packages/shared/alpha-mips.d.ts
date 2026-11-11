@@ -8,8 +8,7 @@ export function generateMaskMipmaps(
   device: GPUDevice,
   texture: GPUTexture,
   levels: number,
-  cache: Map<unknown, unknown> & { sampler?: GPUSampler },
+  cache: Map<unknown, unknown>,
   cutoff: number,
   factor: number,
-  sampler?: GPUSampler,
 ): void;

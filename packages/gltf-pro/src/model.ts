@@ -1758,7 +1758,8 @@ const opticalDepthProperty: PropertyDescriptor = {
   configurable: true,
   enumerable: true,
   get(this: VolumeMaterial): number[] | undefined {
-    const state = this[volumeDepthKey], source = this.attenuation;
+    const state = this[volumeDepthKey],
+      source = this.attenuation;
     if (state.depth && source) {
       for (let c = 0; c < 3; c++) {
         if (source !== state.source || source[c] !== state.samples[c])
@@ -2507,7 +2508,6 @@ export class PBRModel implements EnginePlugin {
         'unsupported',
         'PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu',
       );
-    const mipSampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
     const upload = this.bufferUpload(device);
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
       const r: DrawResource = {
@@ -2530,9 +2530,9 @@ export class PBRModel implements EnginePlugin {
       r.index = upload(from.indices, GPUBufferUsage.INDEX);
       if (from.uvs) r.uvs = upload(from.uvs, GPUBufferUsage.VERTEX);
       p.buffers = { vertex: r.vertex, index: r.index };
-      this.bindMaterial(r, device, mipSampler);
+      this.bindMaterial(r, device);
     }
-    this.installBatches(device, mipSampler, upload);
+    this.installBatches(device, upload);
   }
   /**
    * Points `target` at `source`'s vertex and index GPU buffers and frees the pair `target` used, so identical shapes
@@ -2804,11 +2804,7 @@ export class PBRModel implements EnginePlugin {
     if (this.disposed || this.staticBatches !== undefined) return;
     const device = this.engine.gpu;
     if (!device) throw margoError('unsupported', 'PBRModel requires WebGPU; use a browser that supports it');
-    this.installBatches(
-      device,
-      device.createSampler({ minFilter: 'linear', magFilter: 'linear' }),
-      this.bufferUpload(device),
-    );
+    this.installBatches(device, this.bufferUpload(device));
   }
   private batchNode(): Mesh {
     const node = this.engine.createMesh(this.root);
@@ -2818,7 +2814,6 @@ export class PBRModel implements EnginePlugin {
   /** Bakes static same-material triangles once, after world matrices exist, and uploads that mesh on each device. */
   private installBatches(
     device: GPUDevice,
-    mipSampler: GPUSampler,
     upload: (data: Float32Array | Uint32Array, usage: number) => GPUBuffer,
   ): void {
     // Streaming setup runs on placeholder boxes, and each arrived chunk borrows this model as its prototype.
@@ -2849,7 +2844,7 @@ export class PBRModel implements EnginePlugin {
       r.vertex = upload(p.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
       r.index = upload(p.indices, GPUBufferUsage.INDEX);
       p.buffers = { vertex: r.vertex, index: r.index };
-      this.bindMaterial(r, device, mipSampler);
+      this.bindMaterial(r, device);
       for (const part of batch.parts) {
         const held = byPrimitive.get(part.primitive);
         if (held) held.mergedInto = r;
@@ -2914,7 +2909,7 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   // The material's uniform buffer (880 bytes, 1232 for extended materials), textures and samplers; again after a variant switch.
-  private bindMaterial(r: DrawResource, device: GPUDevice, mipSampler: GPUSampler): void {
+  private bindMaterial(r: DrawResource, device: GPUDevice): void {
     retire(device, r.packedBase);
     r.packedBase = undefined;
     const baseSources: BaseTextureSource[] = [];
@@ -2983,11 +2978,13 @@ export class PBRModel implements EnginePlugin {
           i === 0 && m.settings[0] === 1 && image && !compressed && ![9728, 9729].includes(s.minFilter!)
             ? maskKeepByte(m.settings[1], m.base[3])
             : 0,
-        mask = keep ? ':mask' + keep : '';
-      const key = image ? source + ':' + format + mask : 'default:' + i;
+        mask = keep ? ':mask' + keep : '',
+        // A BLEND base colour map averages colour weighted by alpha down its chain: no dark fringes at its edges.
+        blend = !keep && i === 0 && m.settings[0] === 2 && image && !compressed ? ':blend' : '';
+      const key = image ? source + ':' + format + mask + blend : 'default:' + i;
       let texture = live ? undefined : (cache.get(key) as GPUTexture | undefined);
       const shares = texture || live ? undefined : texturesOf(device, image ?? this.asset),
-        shareKey = image ? format + mask : key,
+        shareKey = image ? format + mask + blend : key,
         share = shares?.get(shareKey);
       if (share) {
         // Another model on this device holds the same image: count this one in (cloneModel copies upload nothing).
@@ -3036,9 +3033,9 @@ export class PBRModel implements EnginePlugin {
             { bytesPerRow: normalMaps.includes(i) ? 8 : 4 },
             [1, 1],
           );
-        if (keep)
-          generateMaskMipmaps(device, texture, levels, mipPipelines(device), m.settings[1], m.base[3], mipSampler);
-        else if (!compressed) generateMipmaps(device, texture, levels, mipPipelines(device), mipSampler);
+        if (keep) generateMaskMipmaps(device, texture, levels, mipPipelines(device), m.settings[1], m.base[3]);
+        else if (!compressed)
+          generateMipmaps(device, texture, levels, mipPipelines(device), 1, blend ? 'weighted' : 'plain');
       }
       let view = live ?? textureViews.get(texture!);
       if (!view) textureViews.set(texture!, (view = texture!.createView()));
@@ -3152,10 +3149,7 @@ export class PBRModel implements EnginePlugin {
     const device = this.engine.gpu;
     if (this.disposed) image.users.delete(this);
     if (this.disposed || !device) return;
-    let sampler: GPUSampler | undefined;
-    for (const r of this.resources)
-      if (r.streamed?.includes(image))
-        this.bindMaterial(r, device, (sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })));
+    for (const r of this.resources) if (r.streamed?.includes(image)) this.bindMaterial(r, device);
   }
   /** Lets go of one of this model's material textures and forgets its cache key. */
   private dropTexture(device: GPUDevice, key: string, texture: GPUTexture): void {
@@ -3382,17 +3376,11 @@ export class PBRModel implements EnginePlugin {
     }
     const device = this.engine.gpu,
       resources = new Map(this.resources.map((r) => [r.primitive, r]));
-    let mipSampler: GPUSampler | undefined;
     for (const [p, m] of changes) {
       if (!this.defaults.has(p)) this.defaults.set(p, p.material);
       p.material = m;
       const r = resources.get(p);
-      if (r && device)
-        this.bindMaterial(
-          r,
-          device,
-          (mipSampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
-        );
+      if (r && device) this.bindMaterial(r, device);
     }
     this.selectedVariant = variant === undefined ? undefined : index;
   }
@@ -3445,12 +3433,7 @@ export class PBRModel implements EnginePlugin {
           device.queue.writeBuffer(resource.uvs, 0, uvs);
         }
       }
-      if (resource && device)
-        this.bindMaterial(
-          resource,
-          device,
-          (sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
-        );
+      if (resource && device) this.bindMaterial(resource, device);
     }
   }
   /**
@@ -3831,7 +3814,16 @@ export class PBRModel implements EnginePlugin {
           );
         // Another primitive with this material record already derived the shader, pipeline and uniform rows for this
         // call or run: reuse them (draw-memo.ts). Material extensions keep per-resource state and derive their own.
-        let d = steadyDerivation(draws.derivations.get(m), frame, source, inst, topology, sign, m, !!inst && whiteDraw(r));
+        let d = steadyDerivation(
+          draws.derivations.get(m),
+          frame,
+          source,
+          inst,
+          topology,
+          sign,
+          m,
+          !!inst && whiteDraw(r),
+        );
         const hit = d !== undefined;
         const batching = !!run && mode === 'beauty';
         if (!d)
@@ -3876,7 +3868,7 @@ export class PBRModel implements EnginePlugin {
           d = this.derivation(draws, m, frame, source, topology, sign, c, mode, scratch, r, wireframe, external, inst);
         else if (hit) {
           if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
-            this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+            this.bindMaterial(r, c.device);
           r.coordinates = undefined;
           if (r.extension) {
             retire(r.device, r.extension.uniform);
@@ -4188,8 +4180,7 @@ export class PBRModel implements EnginePlugin {
         this.drawOwn(r, batch, run, scratch);
         return;
       }
-      if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
-        this.bindMaterial(r, device, device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+      if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures) this.bindMaterial(r, device);
       if (batch.rows) {
         this.drawRows(batch, run, scratch);
         return;
@@ -4581,7 +4572,7 @@ export class PBRModel implements EnginePlugin {
         undefined,
       );
     else if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
-      this.bindMaterial(r, device, device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+      this.bindMaterial(r, device);
     const v = r.values;
     v.set(d.block);
     this.nodeRows(r, a, v);
@@ -4659,8 +4650,7 @@ export class PBRModel implements EnginePlugin {
       !capture &&
       !(p.extension ?? m.extension)
     ) {
-      if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
-        this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+      if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures) this.bindMaterial(r, c.device);
       if (r.extension) {
         retire(r.device, r.extension.uniform);
         r.extension = undefined;
@@ -4678,7 +4668,7 @@ export class PBRModel implements EnginePlugin {
       // A third or fourth UV set, which a material of the primitive reads; loading progressively, a placeholder has none.
       laterUV = !!p.uvs;
     if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
-      this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+      this.bindMaterial(r, c.device);
     const v = r.values;
     this.nodeRows(r, node.matrix, v);
     v.set(m.base, 76);
@@ -4705,7 +4695,8 @@ export class PBRModel implements EnginePlugin {
     // Physical rows follow 26 UV rows (42 for extended materials); factor-only materials (five maps) use the same layout.
     // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
     if (!compact && m.tint) {
-      const volume = surfaceTint(m), lanes = volume ? m.attenuation! : m.tint,
+      const volume = surfaceTint(m),
+        lanes = volume ? m.attenuation! : m.tint,
         depths = volume ? m.opticalDepth : undefined;
       for (let c = 0; c < 3; c++) {
         const depth = volume ? (depths?.[c] ?? (lanes[c] === 1 ? 0 : -Math.log(lanes[c]))) : lanes[c];
@@ -5316,7 +5307,6 @@ export class PBRModel implements EnginePlugin {
       factory = this.createDeformationRenderer;
     const projections = new Map<PBRInstances, PBRInstances>(),
       used = new Set<PBRInstances>();
-    let mipSampler: GPUSampler | undefined;
     const synchronize = (sources: PBRPrimitive[], copies: PBRPrimitive[], offset: number) => {
       for (let i = 0; i < sources.length; i++) {
         const source = sources[i],
@@ -5334,12 +5324,7 @@ export class PBRModel implements EnginePlugin {
             resource = replica.resources[offset + i];
           copy.material = source.material;
           try {
-            if (resource)
-              replica.bindMaterial(
-                resource,
-                device,
-                (mipSampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
-              );
+            if (resource) replica.bindMaterial(resource, device);
           } catch (error) {
             copy.material = previous;
             throw error;

@@ -1018,7 +1018,6 @@ function mipmaps(device: GPUDevice, texture: GPUTexture): void {
     texture,
     texture.mipLevelCount,
     d.pipelines,
-    d.sampler,
     texture.dimension === '2d' ? (texture.depthOrArrayLayers ?? 1) : 1,
   );
 }

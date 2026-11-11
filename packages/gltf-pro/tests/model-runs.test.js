@@ -387,7 +387,7 @@ test('copies of one textured asset compile the mip pipelines once per device', a
     createPipeline = device.createRenderPipeline;
   device.createShaderModule = (d) => {
     const m = createModule.call(device, d);
-    created.push(['module', d.code.includes('var imageSampler:sampler') ? 'mip' : 'draw']);
+    created.push(['module', d.code.includes('sum+=w*t;sc+=') ? 'mip' : 'draw']);
     return m;
   };
   device.createRenderPipeline = (d) => {

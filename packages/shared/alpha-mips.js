@@ -132,8 +132,7 @@ function pipelines(device, cache) {
     }),
     module = device.createShaderModule({ code: shader }),
     pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-    make = (entryPoint) =>
-      device.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
+    make = (entryPoint) => device.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
   made = { layout };
   for (const name of ['targetCount', 'reduce', 'begin', 'count', 'update', 'write']) made[name] = make(name);
   cache.set(KEY, made);
@@ -148,7 +147,7 @@ function pipelines(device, cache) {
  * levels as `generateMipmaps` does. `cache` keeps the pipelines per device, as for `generateMipmaps`. The texture
  * needs TEXTURE_BINDING, COPY_DST and RENDER_ATTACHMENT usage.
  */
-export function generateMaskMipmaps(device, texture, levels, cache, cutoff, factor, sampler) {
+export function generateMaskMipmaps(device, texture, levels, cache, cutoff, factor) {
   if (levels < 2) return;
   const keep = maskKeepByte(cutoff, factor),
     { format, width, height } = texture,
@@ -161,7 +160,7 @@ export function generateMaskMipmaps(device, texture, levels, cache, cutoff, fact
     stateBytes > device.limits.maxStorageBufferBindingSize ||
     stateBytes > device.limits.maxBufferSize
   )
-    return generateMipmaps(device, texture, levels, cache, sampler);
+    return generateMipmaps(device, texture, levels, cache);
   const made = pipelines(device, cache),
     dims = [[width, height]];
   for (let k = 1; k < levels; k++) dims.push(dims[k - 1].map((n) => Math.max(1, n >> 1)));

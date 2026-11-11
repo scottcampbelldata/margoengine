@@ -35,6 +35,7 @@
     "test:gpu:spec-gloss": "cd ../.. && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs && node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs --compat",
     "test:gpu:dds": "cd ../.. && node packages/gltf-pro/scripts/test-dds-browser.mjs && node packages/gltf-pro/scripts/test-dds-browser.mjs --compat",
     "test:gpu:mask-mips": "cd ../.. && node packages/gltf-pro/scripts/test-mask-mips-browser.mjs && node packages/gltf-pro/scripts/test-mask-mips-browser.mjs --compat",
+    "test:gpu:mipmaps": "cd ../.. && node packages/gltf-pro/scripts/test-mipmaps-browser.mjs && node packages/gltf-pro/scripts/test-mipmaps-browser.mjs --compat",
     "test:gpu:mask-alpha": "cd ../.. && node packages/gltf-pro/scripts/test-mask-alpha-browser.mjs && node packages/gltf-pro/scripts/test-mask-alpha-browser.mjs --compat",
     "test:gpu:base-textures": "cd ../.. && node packages/gltf-pro/scripts/test-base-textures-browser.mjs && node packages/gltf-pro/scripts/test-base-textures-browser.mjs --compat",
     "test:browser:audio": "cd ../.. && node packages/gltf-pro/scripts/test-audio-browser.mjs",

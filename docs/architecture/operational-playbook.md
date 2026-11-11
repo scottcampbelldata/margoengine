@@ -16,6 +16,17 @@ constant 0 is. MASK colour pipelines in gltf-pro (`exactAlphaShader`) and the `v
 the cutoff keeps all 77,822 grid pixels (40,257 cut before), 64 of 64 picks (56 before) and the same 7,974 shadow
 texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still interpolates in the plain path.
 
+### Section 5 evidence: mip chains at odd sizes and for blended colour (2026-11-11)
+
+`packages/shared/mipmaps.js` (gltf-pro, gltf, materials, lines, points, rigging, sprites and ui mips) builds every level
+with an area filter (every source texel weighted by its overlap, as `alpha-mips.js`): the 2x2 box at even sizes, and at
+odd sizes, where the old single bilinear fetch at the centre of a 2.5-texel footprint skipped a texel, the full overlap.
+One texel-load path for both sizes needs no sampler and keeps the shader smaller than two paths. `alpha: 'weighted'`
+averages colour weighted by alpha and is used for gltf-pro `BLEND` base colour maps. Evidence:
+`packages/gltf-pro/scripts/test-mipmaps-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: every level of
+plain, sRGB, weighted and gltf-pro chains within 0.68 colour and 0.54 alpha codes of a float64 area filter of the level
+above (38 and 95 codes before on odd sizes; the red last column of a 5 x 5 image now keeps 102 of 255 at level 1).
+
 ### Section 5 evidence: non-finite HDR input stays local in Bloom and Tonemap (2026-11-10)
 
 Bloom's prefilter and composite, Tonemap's presentation shaders and LocalExposure's base read NaN and -Inf as 0 and

@@ -634,7 +634,7 @@ export class PointsPlugin implements EnginePlugin {
           width,
           height,
         ]);
-      generateMipmaps(device, texture, levels, this.mipCache, this.gpu!.linear);
+      generateMipmaps(device, texture, levels, this.mipCache);
       owned = {
         source,
         version: material.mapVersion,
