@@ -4866,3 +4866,13 @@ On the tested NVIDIA RTX A6000 / ANGLE D3D11, detaching the prior VAO element bi
 ### Weather lens drop accuracy (2026-11-10)
 
 Lens drop cell-relative reduction passes the unchanged 4400 ordinary and 2400 long-time CPU-oracle cases on both backends; the long-time worst absolute error falls from a failing 0.000135 to 0.000051 native and 0.000053 compatibility. No assertion changed; no timing or all-input claim. Evidence: packages/weather/tests/parity-browser.mjs lens, with --compat; reproduce.md, "Weather lens".
+
+### Compute distance fields by jump flooding
+
+`@margoengine/compute/distance` computes distance transforms, signed distances and Voronoi maps of 2D and 3D masks by jump
+flooding. Claim: with the default `jfa+1` pass list, at most 0.0024 percent of cells name a seed that is not a nearest one
+(1024^2 with 1, 10, 1,000 seeds and a thin curve; 128^3 with the same and a helix), the farthest excess distance is
+0.64 cells in 2D and 1.94 cells in 3D, and the nearest-seed buffer is identical on WebGPU, the WebGL2 layer and the CPU
+backend. Proof: `packages/compute/tests/distance.test.js` (exact transform equal to brute force on 200 masks, CPU backend
+error rates) and `packages/compute/tests/distance-browser.mjs` (both GPU backends against the exact transform). No speed
+claim is made; the timing case is deferred to the speed phase.

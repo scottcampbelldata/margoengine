@@ -2,6 +2,8 @@
 // P. F. Felzenszwalb and D. P. Huttenlocher, "Distance Transforms of Sampled Functions", Theory of Computing 8 (2012)
 // 415-428: section 2.1 for one dimension, section 3 for the separable 2D transform (columns, then rows).
 
+import { squaredDistanceTransformNd } from '../../shared/distance-exact.js';
+
 /** Signed distance field parameters shared by the rasterizer and the shader. */
 export interface SdfParams {
   /** Distance in glyph pixels that maps to the full 0..255 range. */
@@ -17,73 +19,9 @@ export const SDF_DEFAULTS = { size: 48, buffer: 8, radius: 10, cutoff: 0.25 } as
 // enough that its square root stays finite.
 const FAR = 1e20;
 
-// Reused scratch for one line of the transform, grown to the longest line seen so far.
-let lineIn = new Float64Array(0), // f along the line
-  lineOut = new Float64Array(0), // transformed line
-  lineArg = new Int32Array(0), // index along the line of the minimising sample
-  hull = new Int32Array(0), // positions of the parabolas on the lower envelope
-  bounds = new Float64Array(0); // bounds[k]..bounds[k + 1] is where parabola hull[k] is lowest
-
-function reserve(n: number): void {
-  if (lineIn.length >= n) return;
-  lineIn = new Float64Array(n);
-  lineOut = new Float64Array(n);
-  lineArg = new Int32Array(n);
-  hull = new Int32Array(n);
-  bounds = new Float64Array(n + 1);
-}
-
-// One-dimensional transform of lineIn[0..n): lineOut[q] = min over p of (q - p)^2 + lineIn[p], lineArg[q] = that p.
-function envelope(n: number): void {
-  let top = 0;
-  hull[0] = 0;
-  bounds[0] = -Infinity;
-  bounds[1] = Infinity;
-  for (let q = 1; q < n; q++) {
-    const fq = lineIn[q] + q * q;
-    // Where the parabola rooted at q crosses the topmost one; pop parabolas it hides completely.
-    let p = hull[top],
-      cross = (fq - (lineIn[p] + p * p)) / (2 * (q - p));
-    while (cross <= bounds[top]) {
-      top--;
-      p = hull[top];
-      cross = (fq - (lineIn[p] + p * p)) / (2 * (q - p));
-    }
-    top++;
-    hull[top] = q;
-    bounds[top] = cross;
-    bounds[top + 1] = Infinity;
-  }
-  for (let q = 0, k = 0; q < n; q++) {
-    while (bounds[k + 1] < q) k++;
-    const p = hull[k];
-    lineOut[q] = (q - p) * (q - p) + lineIn[p];
-    lineArg[q] = p;
-  }
-}
-
 // Exact 2D squared transform in place. With `nearest`, also stores per cell the row-major index of the minimising cell.
 function transform2d(grid: Float64Array, width: number, height: number, nearest?: Int32Array): void {
-  reserve(Math.max(width, height));
-  // Columns: afterwards grid holds the per-column minimum and nearest (if given) the minimising row.
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) lineIn[y] = grid[y * width + x];
-    envelope(height);
-    for (let y = 0; y < height; y++) {
-      grid[y * width + x] = lineOut[y];
-      if (nearest) nearest[y * width + x] = lineArg[y];
-    }
-  }
-  // Rows: the minimising column picks which column's minimising row is the 2D nearest cell.
-  for (let y = 0, row = 0; y < height; y++, row += width) {
-    for (let x = 0; x < width; x++) lineIn[x] = grid[row + x];
-    envelope(width);
-    for (let x = 0; x < width; x++) grid[row + x] = lineOut[x];
-    if (nearest) {
-      for (let x = 0; x < width; x++) lineIn[x] = nearest[row + lineArg[x]] * width + lineArg[x];
-      for (let x = 0; x < width; x++) nearest[row + x] = lineIn[x];
-    }
-  }
+  squaredDistanceTransformNd(grid, [width, height], nearest);
 }
 
 function checkSize(length: number, width: number, height: number): void {

@@ -99,6 +99,10 @@
     "./quant": {
       "types": "./dist/quant.d.ts",
       "import": "./dist/quant.js"
+    },
+    "./distance": {
+      "types": "./dist/distance.d.ts",
+      "import": "./dist/distance.js"
     }
   },
   "files": [
@@ -134,6 +138,7 @@
     "test:browser:nn-extra": "cd ../.. && node packages/compute/tests/nn-extra-browser.mjs",
     "build:onnx": "node scripts/build-onnx.mjs",
     "test:browser:onnx-wasm": "cd ../.. && node packages/compute/tests/onnx-browser.mjs",
-    "test:browser:quant": "cd ../.. && node packages/compute/tests/quant-browser.mjs"
+    "test:browser:quant": "cd ../.. && node packages/compute/tests/quant-browser.mjs",
+    "test:browser:distance": "cd ../.. && node packages/compute/tests/distance-browser.mjs"
   }
 }

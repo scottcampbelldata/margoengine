@@ -6919,3 +6919,24 @@ in JavaScript, so the default size cost 214 ms a frame there (0.5 ms native). Th
 workgroup memory or barrier (per-triangle weights, 512 chunk sums, the scale), which the layer runs on the GPU: 19 ms a
 frame at the default size, the same energy errors (relative error 4.76e-6 and 1.49e-4 on both backends). Regression:
 `packages/water/test/caustics-scale.browser.mjs` fails when any range kernel plans onto the `cpu` tier.
+## Compute distance fields (jump flooding)
+
+`@margoengine/compute/distance` floods the nearest seed over a 2D mask (2 to 4096 per side) or a 3D mask (2 to 512 per side)
+in log2(longest side) + 1 passes (+2 for `jfa+2`), two u32 buffers ping-ponging and no readback on the GPU. Each buffer
+holds one u32 per cell, so the device's storage binding limit also caps the field: native WebGPU here reports 2 GiB (a
+512^3 field runs), the WebGL2 layer 128 MiB (up to 4096^2 in 2D, 320^3 in 3D); a larger field throws a coded `rangeError` naming the
+limit. Steps start at the power of two over the longest side, so sizes need not be powers of two. Squared distances are
+exact u32 integers (at most 33.5 million in 2D, 786,432 in 3D) and ties go to the lower cell index, so WebGPU, the WebGL2
+layer and the CPU backend produce the same nearest-seed buffer; distances agree to the last bits of sqrt only. A cell no
+seed reaches (no seeds at all) holds `NO_SEED` and `NO_DISTANCE` (the largest f32).
+
+Measured error rates (cells whose flooded seed is not a nearest one, against the exact transform; 1024^2 in 2D with 1, 10,
+1,000 seeds and a thin sine curve, 128^3 in 3D with the same and a helix; identical on WebGPU and the WebGL2 layer):
+`jfa+1` (default) at most 0.0024 percent wrong cells (2.4e-5), farthest excess 0.64 cells in 2D and 1.94 cells in 3D
+(10 seeds); plain `jfa` at most 0.012 percent wrong, excess up to 1.30 cells in 2D and 2.40 cells in 3D. The plan's
+"at most 1 cell" holds for `jfa+1` in 2D only; the 3D excess is the known weakness of flooding with sparse seeds, so use
+`distanceTransformExact` or `jfa+2` where 2 cells matter. The 3D flood checks all 27 neighbours (no slice-by-slice
+variant). `signedDistance` runs two floods and puts the zero set half a cell from the cell centres (`edge` option).
+The CPU backend runs the same passes in JavaScript (about 0.5 s for 256^2 with four masks); use the exact transform there.
+Entry size 5187 B min+gzip (ceiling 5443 B); the plan's 3,500 B estimate left out the CPU-backend flood, the exact
+oracle shared with text and the signed and Voronoi code.

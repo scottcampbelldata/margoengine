@@ -7508,3 +7508,11 @@ match byte for byte under both names; hostile fallback references and dual names
 reject. The previous snapshot inventory remains historical, with current readiness
 checked separately. No backend, decoder arithmetic, core, stage or API changed.
 [Regression and standards](../whitepaper/parity-diagnoses.md#round-2-meshopt-fallback-parsing).
+
+### 5. Compute distance fields (jump flooding, 2026-11-10)
+
+The optional compute/distance entry adds one WGSL kernel (seed, flood, distance and site-id modes of one shader, 8 x 8
+workgroups, integer squared distances, ties to the lower index) with no core, stage or backend change. Evidence: error
+rates against the exact separable transform on WebGPU and the WebGL2 layer, nearest-seed buffers bit-identical to the CPU
+backend, 200 brute-force oracle masks (docs/limits.md, "Compute distance fields"). Missing: quiet-machine GPU timings
+(docs/work-lists/speed-phase.md) and the follow-up consumers (coast foam, outline widening).

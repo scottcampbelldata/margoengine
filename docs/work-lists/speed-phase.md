@@ -509,3 +509,9 @@ Targets on the RTX A6000: default and medium 60 fps (16.7 ms) natively and on th
 Mid laptop iGPU (Radeon 680M): default 60 fps natively, 30 fps on the WebGL2 layer. Busy-machine diagnostic: native GPU
 0.52, 3.3 and 21 ms; WebGL2 wall 19 to 23, 26 and 49 to 58 ms (default is 8 to 11 ms over water alone). The WebGL2 default
 was 214 ms before the range kernels left the JavaScript compute tier. The WebGL2 limit case misses 33 ms and is rerun on the quiet machine.
+- Compute distance (jump flooding) scale case: `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/distance-browser.mjs`
+  floods a 4096 x 4096 mask (16.7 million cells, 1,000 seeds) and a 256^3 mask (16.8 million cells) with GPU timestamp
+  queries on the native run. Work per field: 12 flood passes plus a seeding and a distance pass, 9 (2D) or 27 (3D)
+  neighbour reads per cell per pass, two 64 MiB buffers, no readback. Target: each field under 16 ms of GPU time on the
+  RTX A6000. Busy-machine diagnostic 2026-11-10: 11.9 ms for 4096^2 (16 timed passes), 20.6 ms for 256^3 (12 timed
+  passes); the WebGL2 layer has no timestamps, time it by wall clock on the quiet machine.

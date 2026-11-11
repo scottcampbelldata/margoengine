@@ -4153,3 +4153,7 @@ Build packages, then `node scripts/gpu-lock.mjs run --owner=weather-lens -- node
 ## Stage viewer readiness
 
 `node --test --test-timeout=30000 tests/viewer-fixture-ready.test.js`, then under the GPU lock `node scripts/stage-viewer-gpu-check.js` native and with `MARGO_COMPAT=1`.
+
+Compute distance fields: `npm run build:packages`, then `node --test packages/compute/tests/distance.test.js` (CPU) and
+`node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/distance-browser.mjs` (WebGPU, then the WebGL2
+layer); the second prints the error-rate table quoted in docs/limits.md.

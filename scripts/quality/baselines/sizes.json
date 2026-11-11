@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14988613,
+  "total": 14994055,
   "history": [
     {
       "date": "2026-10-24",
@@ -8351,6 +8351,12 @@
       "commit": "88472aadea",
       "reason": "physics2d bundles Rapier 2D 0.21.0: its JavaScript is the lazy rapier-solver chunk (36,005 B gzip, loaded by Physics2D.load()), its Wasm a file of its own; the base the app loads at start-up is 8,423 B (was 8,241 with the solver an app-installed peer)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "378d1f67c8",
+      "reason": "New optional compute/distance entry absent (0 B) to 5187 B min+gzip, ceiling 5443 B. Plan estimate was 3500 B; the extra is the CPU-backend flood (about 0.6 KB, so the CPU and GPU nearest-seed buffers can be compared bit for bit), the exact transform shared with text (about 0.9 KB, the oracle and distanceTransformExact) and signed, Voronoi and validation code. Splitting would add another entry and loader for the same API. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8518,6 +8524,7 @@
     "@margoengine/compute/autotune": 3791,
     "@margoengine/compute/cpu-wasm": 41443,
     "@margoengine/compute/decomp": 3835,
+    "@margoengine/compute/distance": 5443,
     "@margoengine/compute/fft": 6037,
     "@margoengine/compute/frame": 32440,
     "@margoengine/compute/graph": 7451,
@@ -8705,7 +8712,7 @@
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
     "@margoengine/fbx/export": 8525,
-    "@margoengine/fbx/large": 795,
+    "@margoengine/fbx/large": 794,
     "@margoengine/fbx/layers": 4780,
     "@margoengine/fbx/legacy": 6650,
     "@margoengine/fbx/pbr": 3843,

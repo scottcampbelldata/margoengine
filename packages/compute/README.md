@@ -220,6 +220,42 @@ and `maxSweeps` (default 100, 1 to 1000; a Jacobi method that has not converged 
 `8 m n + 2 m^2 + 2 n^2` (plus `2 n k` for a solve with k right-hand sides) at or under 16,777,216 elements, so square
 matrices go up to 1182 (1094 for `solve` with as many columns); larger problems belong to the sparse solvers below.
 
+## Distance fields
+
+`@margoengine/compute/distance` turns a mask into distances by jump flooding (Rong and Tan, I3D 2006; the 1+JFA, JFA+1
+and JFA+2 variants, ISVD 2007), in log2 of the longest side passes plus one:
+
+- `distanceTransform(mask)`: distance from every cell to the nearest seed (a nonzero mask value), in cells times `spacing`;
+- `signedDistance(mask)`: negative inside, positive outside, zero half a cell from the cell centres (`edge` moves it);
+- `jumpFlood(mask)`: the same with the nearest seed's row-major index per cell (`NO_SEED` when none);
+- `voronoiMap(gpu, sites, shape)`: each cell's nearest site index and distance;
+- `distanceTransformExact(mask, shape)`: the exact CPU transform (Felzenszwalb and Huttenlocher 2012) that the flooded
+  results are tested against, right for small inputs.
+
+Masks are 2D (2 to 4096 per side) or 3D (2 to 512 per side, and as many cells as the device's storage binding allows,
+128 MiB per buffer on the WebGL2 layer). A mask is a u32 or i32 array, or any array or expression compared with 0. The
+`variant` option picks the pass list: `'jfa+1'` (default) is wrong at under 0.01 percent of cells in the measured cases
+and never more than 1 cell too far in 2D (2 cells in 3D); plain `'jfa'` is wrong at under 0.02 percent with up to 2.4
+cells of excess. Squared distances are exact integers and ties go to the lower index, so the nearest-seed buffer is
+identical on WebGPU, the WebGL2 layer and the CPU backend. The functions return promises because the CPU backend reads
+its input; on the GPU nothing waits.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { distanceTransform, signedDistance } from '@margoengine/compute/distance';
+
+using gpu = await createCompute();
+const size = 256;
+const disc = gpu.array(Uint32Array.from({ length: size * size }, (_, i) =>
+  Math.hypot((i % size) - 128, Math.floor(i / size) - 128) < 40 ? 1 : 0), { shape: [size, size] });
+using distance = await distanceTransform(disc); // 0 inside the disc, cells to the disc outside
+using signed = await signedDistance(disc); // negative inside
+// Outline 3 cells wide, and a glow that fades over 24 cells.
+const outline = signed.abs().lt(1.5).astype('f32');
+const glow = distance.mul(-1 / 24).add(1).clip(0, 1);
+console.log(await outline.sum().item(), await glow.max().item(), await signed.min().item());
+```
+
 ## Sparse matrices and solvers
 
 `@margoengine/compute/sparse` holds sparse matrices in compressed sparse row (CSR) form on the GPU, as SciPy does:

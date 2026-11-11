@@ -8725,3 +8725,12 @@ Read in full for this fix: Unicode Standard Annex #9, *Unicode Bidirectional Alg
 ## Weather lens drop argument reduction (2026-11-10)
 
 Sources: Sylvie Boldo, Marc Daumas and Ren-Cang Li, *Formally Verified Argument Reduction with a Fused-Multiply-Add* (2007), https://arxiv.org/abs/0708.3722 ; W3C GPU for the Web Working Group, *WebGPU Shading Language* (2026), fma built-in, https://www.w3.org/TR/WGSL/#fma-builtin . The lens field reduces each sample to its own cell with one fma before forming the fractional drop centre, so the sub-cell bits survive large cell indices. No other implementation or companion code was read.
+
+## Compute distance fields (2026-11-10)
+
+Written from the papers only, no other engine's or library's code read: Rong and Tan, "Jump Flooding in GPU with
+Applications to Voronoi Diagram and Distance Transform", I3D 2006, pp. 109-116, https://www.comp.nus.edu.sg/~tants/jfa/i3d06.pdf ;
+Rong and Tan, "Variants of Jump Flooding Algorithm for Computing Discrete Voronoi Diagrams", ISVD 2007,
+https://www.comp.nus.edu.sg/~tants/jfa-variants/jfa-variants.pdf ; Felzenszwalb and Huttenlocher, "Distance Transforms of
+Sampled Functions", Theory of Computing 8 (2012) 415-428 (the exact transform, now in packages/shared/distance-exact.js
+and used by text and compute/distance). Parallel banding (Cao, Tang, Mohamed and Tan, 2010) was considered and not built.
