@@ -17,6 +17,7 @@ import { applyView, viewRect } from '../../shared/view-rect.js';
 import { sunlight } from './atmosphere.js';
 import { depthWGSL, sceneDepth } from './depth.js';
 import { CloudVolumes, cloudField, writeLayer, type VolumetricCloudOptions } from './volumetric-clouds.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -252,7 +253,7 @@ export class LightShafts implements EnginePlugin {
     v.set(s, 20);
     v[23] = fade;
     for (let i = 0; i < 3; i++) v[24 + i] = this.color[i] * scale;
-    v[27] = +(c.format !== 'rgba16float');
+    v[27] = +!linearHdr(c.format);
     v[28] = (x / w) * 0.5 + 0.5;
     v[29] = 0.5 - (y / w) * 0.5;
     v[30] = o.length ?? defaults.length;

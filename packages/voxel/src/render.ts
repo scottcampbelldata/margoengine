@@ -30,6 +30,7 @@ import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
 import { alphaBlend } from '../../shared/pass.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 export type { VoxelLightmap } from './lightmap.js';
 export { type BlockPixels, BlockTextures, type BlockTexturesOptions } from './textures.js';
@@ -1292,7 +1293,7 @@ export class VoxelRenderer implements EnginePlugin {
     f[53] = c.height;
     f[54] = 1 / c.width;
     f[55] = 1 / c.height;
-    f[59] = +(c.format === 'rgba16float');
+    f[59] = +linearHdr(c.format);
     device.queue.writeBuffer(gpu.frame, 0, f);
     this.#cull(c, gpu, eye);
     const ready = this.#pipelines(c, gpu);

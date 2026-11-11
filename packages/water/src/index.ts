@@ -21,6 +21,7 @@ import { ggxDenominator } from '../../shared/light-terms.js';
 import { queryStates, riverKernels, surfacePasses } from './query-state.js';
 import { surfaceEffects } from './surface-effects.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -997,7 +998,7 @@ export class Water implements EnginePlugin {
     this.values[28] = c.camera.near;
     this.values[29] = c.camera.far;
     this.values[30] = c.delta;
-    this.values[31] = +(c.format === 'rgba16float');
+    this.values[31] = +linearHdr(c.format);
     const lighting = this.engine!.lighting;
     this.values[19] = lighting?.radiance[3] ?? 0.15;
     if (lighting) {

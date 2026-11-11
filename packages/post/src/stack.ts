@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
-import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
+import { requireCompatTier } from '../../shared/compat.js';
+import { captureFormat } from './capture.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -18,12 +19,6 @@ const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
   rank = { hdr: 0, display: 1, ldr: 2 },
   single = { count: 1 };
 
-/**
- * The HDR capture's format. Linear half floats, except where the capture is multisampled at WebGPU's compatibility level,
- * which cannot multisample them: there rg11b10ufloat, with less precision and no alpha.
- */
-const captureFormat = (d: GPUDevice, samples: number): GPUTextureFormat =>
-  samples > 1 && compatibilityLevel(d) && d.features.has('rg11b10ufloat-renderable') ? 'rg11b10ufloat' : 'rgba16float';
 
 /** One HDR scene capture shared by several effects, applied in array order: HDR effects (SSAO, DOF, Bloom, Afterimage),
  * at most one display effect (Tonemap or creative PostProcessing), then LDR effects (SMAA or FXAA, Glitch). Without a

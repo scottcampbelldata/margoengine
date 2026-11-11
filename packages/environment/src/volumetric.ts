@@ -20,6 +20,7 @@ import { displayShader } from '../../shared/display.js';
 import { clusterCell, decayTerms, legacyTerms } from '../../shared/light-terms.js';
 import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
 import { alphaBlend, groupCode, overlayPass, type SurfaceTransparency } from '../../shared/pass.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
@@ -615,7 +616,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     }
     v[59] = o.noise ?? 0;
     v[63] = 1 / (o.noiseScale ?? 8);
-    v[67] = +(c.format === 'rgba16float' || c.format === 'rgba32float');
+    v[67] = +linearHdr(c.format);
     const frame = (this.frameIndex % 16) + 1;
     for (let i = 0; i < 3; i++) v[68 + i] = temporal > 0 ? halton(frame, jitterBases[i]) - 0.5 : 0;
     v[71] = +transparents;

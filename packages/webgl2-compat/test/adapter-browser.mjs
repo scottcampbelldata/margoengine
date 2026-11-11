@@ -47,8 +47,10 @@ try {
   assert.ok(result.levels.edlLit > 0, 'points reach the frame');
   assert.equal(result.levels.edl.count, 0, 'the eye-dome lit frame is the same at both levels');
   // Sky fog reads each of the four depth samples by a masked draw per sample (no sample_index at the level) and fogs the
-  // frame there as the sample_index draw does at the full level. The two frames are not compared byte for byte: the
-  // sky itself draws apart over PostStack's rg11b10ufloat capture at the level (docs/known-bugs.md, "rg11b10ufloat").
+  // frame there as the sample_index draw does at the full level. Over PostStack's rg11b10ufloat capture the sky drew
+  // as display colour and then was tonemapped again, up to 19 of 255 brighter, until every package took linear HDR
+  // from linearHdr (packages/shared/hdr-format.js, bug sweep L3). What is left is the capture's own precision: 6 and 5
+  // mantissa bits against rgba16float's 10, so a step of up to 1/32 of the light before the tonemap.
   console.log(
     'fog',
     JSON.stringify({
@@ -58,6 +60,8 @@ try {
       level: result.levels.fogDrawn,
     }),
   );
+  for (const name of ['sky', 'fog'])
+    assert.ok(result.levels[name].largest <= 4, `the ${name} frame stays within the capture's rounding, got ${JSON.stringify(result.levels[name])}`);
   assert.ok(result.levels.fogFullDrawn.count > 6000, 'the fog changes the full-level frame');
   assert.ok(result.levels.fogDrawn.count > 6000, 'the fog changes the frame at the level');
   // Each of these runs on the level.
@@ -69,6 +73,7 @@ try {
     'shadows',
     'culling',
     'post bloom and tonemap',
+    'post bloom alone 4x',
     'sky fog 4x',
     'environment volumetric 4x',
     'water spray 4x',

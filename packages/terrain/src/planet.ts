@@ -32,6 +32,7 @@ import { applyView, viewSize } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
 import type { TerrainLighting } from './index.js';
 import { lightingLayout } from './lighting-layout.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 /**
  * Ground height in metres above `radius` at a unit direction from the planet's centre (float64). `detail` is the
@@ -773,7 +774,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     u.set(
       [
         this.seaLevel === false ? 0 : this.seaLevel,
-        +(c.format === 'rgba16float'),
+        +linearHdr(c.format),
         this.relief,
         +(this.seaLevel !== false),
       ],

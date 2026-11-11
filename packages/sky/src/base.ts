@@ -19,6 +19,7 @@ import { sunDirection } from './clock.js';
 import { head, mid, transmittance, sunlight } from './atmosphere.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 export { sunlight } from './atmosphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
@@ -590,7 +591,7 @@ export class Sky implements EnginePlugin {
     this.values[36] = this.options.clouds ? (this.options.clouds.coverage ?? 0.45) : 0;
     this.values[37] = this.cloudTime;
     this.values[38] = this.options.clouds?.height ?? 1500;
-    this.values[27] = +(c.format === 'rgba16float');
+    this.values[27] = +linearHdr(c.format);
     // Uniform layout of SkyNightOptions: zenith+twinkle, horizon+haze, moon direction+cos(size), moon colour+sin(size), phase/glow/stars/time; then the sun colour (60-62, set before update) and the enabled flag (63).
     const n = this.options.night;
     this.values[63] = +!!n;

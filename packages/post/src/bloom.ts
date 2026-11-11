@@ -3,6 +3,7 @@ import { ditherShader } from '../../shared/dither.js';
 import { cleanShader } from '../../shared/finite.js';
 import { SceneTarget } from '../../shared/msaa.js';
 import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
+import { captureFormat } from './capture.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -360,7 +361,7 @@ export class Bloom implements EnginePlugin {
             ...c.descriptor,
             layout: 'auto',
             vertex: { ...c.descriptor.vertex, module },
-            fragment: { ...c.descriptor.fragment!, module, targets: [{ format: 'rgba16float' }] },
+            fragment: { ...c.descriptor.fragment!, module, targets: [{ format: this.textures[0]!.format }] },
           });
           this.scenePipelines.set(c.shader, pipeline);
         }
@@ -400,7 +401,8 @@ export class Bloom implements EnginePlugin {
     this.textures.push(
       device.createTexture({
         size: [c.width, c.height],
-        format: 'rgba16float',
+        // rg11b10ufloat where WebGPU's compatibility level cannot multisample rgba16float, as PostStack captures.
+        format: captureFormat(device, c.descriptor.multisample?.count ?? 4),
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
       }),
     );

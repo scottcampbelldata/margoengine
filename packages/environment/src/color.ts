@@ -11,6 +11,7 @@ import {
   SRGBToLinear as srgbToLinear,
 } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 export type { ColorInput } from '@margoengine/math/color';
 
@@ -223,7 +224,7 @@ export class ColorBackground {
         }),
       );
     }
-    const hdr = context.format === 'rgba16float' || context.format === 'rgba32float',
+    const hdr = linearHdr(context.format),
       v = this.values,
       bottom = this.under ?? this.top;
     for (let i = 0; i < 3; i++) {

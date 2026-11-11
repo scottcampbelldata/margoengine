@@ -7,6 +7,7 @@ import type { AtmosphereParameters } from '@margoengine/sky/planet';
 import { fault, rangeError } from '../../shared/errors.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -155,7 +156,7 @@ export class OrbitAtmosphere implements EnginePlugin {
         fragment: {
           module: this.#module!,
           entryPoint: 'fragment',
-          constants: { hdr: +(c.format === 'rgba16float') },
+          constants: { hdr: +linearHdr(c.format) },
           targets: [{ format: c.format }],
         },
         depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal' },

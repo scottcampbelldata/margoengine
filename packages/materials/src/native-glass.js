@@ -3,6 +3,7 @@ import { sceneTarget } from '../../shared/msaa.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { applyView } from '../../shared/view-rect.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 const captures = new WeakMap();
 const frames = new WeakMap();
 const shader = `@group(0) @binding(0) var source:texture_2d<f32>;
@@ -27,7 +28,7 @@ class NativeGlass {
     graph.add({ name: this.name + ':present', order: 29, execute: (c) => this.present(c) });
   }
   begin(c) {
-    if (c.backend !== 'webgpu' || c.format === 'rgba16float' || ![...this.users].some((active) => active())) return;
+    if (c.backend !== 'webgpu' || linearHdr(c.format) || ![...this.users].some((active) => active())) return;
     currentFrame(c.device, c.view ?? c);
     const samples = c.descriptor.multisample?.count ?? 1;
     const key = [c.width, c.height, c.format, samples, c.descriptor.depthStencil.format].join(':');

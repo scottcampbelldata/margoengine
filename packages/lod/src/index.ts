@@ -32,6 +32,7 @@ import { hiddenInTree } from '../../shared/visibility.js';
 import { worldRadius } from '../../shared/sphere.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -640,7 +641,7 @@ export class LODSystem implements EnginePlugin {
     f.set(c.camera.position, 16);
     unitLight(f, 20, e.lighting.direction);
     f.set(e.lighting.radiance, 24);
-    f[28] = +(c.format === 'rgba16float');
+    f[28] = +linearHdr(c.format);
     f[29] = +(samples > 1);
     device.queue.writeBuffer(this.uniform, 0, f);
     const depthFormat = c.descriptor.depthStencil!.format,

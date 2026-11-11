@@ -606,6 +606,8 @@ test('Planet builds only initial pipelines, retains exact geometry and caches ta
   assert.equal(pipelines().length, 10);
   assert.throws(() => run('r32float'), /Unsupported planet target/);
   assert.throws(() => run('bgra8unorm', 2), /Unsupported planet target/);
+  // PostStack's HDR capture at WebGPU's compatibility level (bug sweep L3): drawn into as linear HDR, not refused.
+  run('rg11b10ufloat', 1);
   const old = state.resources.filter((value) => ['buffer', 'texture'].includes(value.kind));
   engine.gpu = { ...device };
   planet.onDeviceRestored(engine);

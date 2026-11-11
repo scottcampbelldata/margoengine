@@ -170,6 +170,7 @@ export type {
 } from './asset.js';
 export { textureCoordinates } from './texture-coordinates.js';
 import type { TextureTransform } from './texture-coordinates.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 export type { TextureTransform } from './texture-coordinates.js';
 
 export type { MaterialExtension, MaterialExtensionTexture } from './material-extension.js';
@@ -3823,7 +3824,7 @@ export class PBRModel implements EnginePlugin {
       viewData[35] = 0;
       unitLight(viewData, 36, lighting.direction);
       viewData.set(lighting.radiance, 40);
-      viewData[44] = +(c.format === 'rgba16float');
+      viewData[44] = +linearHdr(c.format);
     }
     scratchDepth++;
     // Resources a callback releases during this draw stay valid until the frame is submitted.
@@ -5033,7 +5034,7 @@ export class PBRModel implements EnginePlugin {
     if (through && !transmission && this.transparency!.blends && m.tint) code = transparentTintPBR(code);
     const native =
       mode === 'beauty' &&
-      c.format !== 'rgba16float' &&
+      !linearHdr(c.format) &&
       transmits(m) &&
       m.renderState?.blend === undefined &&
       !!nativeGlass(c);

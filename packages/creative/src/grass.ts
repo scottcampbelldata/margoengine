@@ -18,6 +18,7 @@ import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -329,7 +330,7 @@ export class GrassField implements EnginePlugin {
     unitLight(f, 44, this.engine!.lighting.direction);
     f.set(this.engine!.lighting.radiance, 48);
     f[59] = this.time;
-    f[62] = +(c.format === 'rgba16float');
+    f[62] = +linearHdr(c.format);
     const dx = camera.target[0] - camera.position[0],
       dy = camera.target[1] - camera.position[1],
       dz = camera.target[2] - camera.position[2];
@@ -385,7 +386,7 @@ export class GrassField implements EnginePlugin {
       : 'depth32float',
   ): Variant {
     if (
-      (format !== this.canvasFormat && format !== 'rgba16float') ||
+      (format !== this.canvasFormat && format !== 'rgba16float' && format !== 'rg11b10ufloat') ||
       (count !== 1 && (count !== 4 || sceneSamples() === 1))
     )
       throw new MargoError(

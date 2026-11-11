@@ -5,6 +5,7 @@ import { sceneSamples } from '../../shared/quality.js';
 import surfaceSource from './shaders/planet_surface.wgsl?raw';
 import atmosphereSource from './shaders/planet_atmosphere.wgsl?raw';
 import { displayShader } from '../../shared/display.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; VERTEX: number; INDEX: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -182,7 +183,7 @@ export class PlanetPass {
   }
 
   private variant(target: GPUTextureFormat, count: number, depthFormat: GPUTextureFormat): Variant {
-    if ((target !== this.format && target !== 'rgba16float') || (count !== 1 && count !== this.samples))
+    if ((target !== this.format && target !== 'rgba16float' && target !== 'rg11b10ufloat') || (count !== 1 && count !== this.samples))
       throw new MargoError(
         'unsupported',
         'Unsupported planet target or device; draw into the canvas format or rgba16float on the attached device',
@@ -201,7 +202,7 @@ export class PlanetPass {
         fragment: {
           module,
           entryPoint: 'fs_main',
-          constants: { outputHdr: +(target === 'rgba16float') },
+          constants: { outputHdr: +linearHdr(target) },
           targets: [
             {
               format: target,

@@ -28,6 +28,7 @@ import {
 } from './capture.js';
 import { applyView, checkLayers } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -577,7 +578,7 @@ export abstract class PlanarSurface {
     v[58] = (this.normalScroll[0] * this.time) % 1;
     v[59] = (this.normalScroll[1] * this.time) % 1;
     v[60] = this.normalSource ? 1 : 0;
-    v[61] = c.format === 'rgba16float' ? 1 : 0;
+    v[61] = linearHdr(c.format) ? 1 : 0;
     v[62] = v[63] = 0;
     this.surfaceUniforms(c, v);
     c.device.queue.writeBuffer(state.uniform, 0, v);

@@ -81,6 +81,7 @@ import type {
   VoxelTraceRenderOptions,
   VoxelTraceScene,
 } from './types.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: {
   MAP_READ: number;
@@ -1832,7 +1833,7 @@ export class VoxelPathTracer implements EnginePlugin {
     v.set(inverse, 16);
     v.set([width, height, c.width, c.height], 32);
     const mode =
-      (c.format === 'rgba16float' ? 1 : 0) |
+      (linearHdr(c.format) ? 1 : 0) |
       (o.toneMapping === 'linear' ? 2 : 0) |
       (o.toneMapping === 'aces-narkowicz' ? 4 : 0) |
       (o.toneMapping === 'agx' ? 8 : 0);

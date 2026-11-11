@@ -15,6 +15,7 @@ import { resolveMSAA } from '../../shared/msaa.js';
 import { oceanCompute, oceanSurface } from './fft-shaders.js';
 import { queryStates, surfacePasses } from './query-state.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   COPY_DST: number;
@@ -368,7 +369,7 @@ export class FFTOcean implements EnginePlugin {
     const depthFormat = c.descriptor.depthStencil?.format ?? 'depth24plus';
     const key = `${c.format}/${samples}/${depthFormat}`;
     if (key !== this.drawKey) {
-      const hdr = c.format === 'rgba16float';
+      const hdr = linearHdr(c.format);
       const code =
         displayShader +
         `\nfn surfaceDisplay(value:vec3f)->vec3f { return ${hdr ? 'value' : 'toDisplay(value)'}; }\n` +

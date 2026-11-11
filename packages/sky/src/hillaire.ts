@@ -25,6 +25,7 @@ import {
 import { sunDirection } from './clock.js';
 import { night } from './night.js';
 import type { SkyNightOptions } from './base.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 export { EARTH_ATMOSPHERE, atmosphereParameters, type AtmosphereParameters } from './atmosphere-luts.js';
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
 declare const GPUBufferUsage: {
@@ -505,7 +506,7 @@ export class HillaireSky implements EnginePlugin {
     v[43] = perUnit / 1000;
     // The planet's centre lies under the camera: radius = ground + height (km), at least a metre up.
     v[45] = a.bottomRadius + Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? 0)) / 1000);
-    v[46] = +(c.format !== 'rgba16float');
+    v[46] = +!linearHdr(c.format);
     v[47] = +(o.sunDisc ?? true);
     sunThrough(a, v[45], this.sun[1], this.sunTransmittance);
   }

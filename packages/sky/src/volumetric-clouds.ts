@@ -16,6 +16,7 @@ import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
 import { sunlight } from './atmosphere.js';
 import { depthWGSL, sceneDepth } from './depth.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -476,7 +477,7 @@ export class VolumetricClouds implements EnginePlugin {
     v[34] = o.maxDistance ?? defaults.maxDistance;
     v[35] = o.steps ?? defaults.steps;
     v[39] = o.lightSteps ?? defaults.lightSteps;
-    v[40] = +(c.format !== 'rgba16float');
+    v[40] = +!linearHdr(c.format);
     const moon = sky?.lights?.[1];
     for (let i = 0; i < 4; i++) v[44 + i] = moon ? moon.direction[i] : 0;
     for (let i = 0; i < 3; i++) v[48 + i] = moon ? moon.radiance[i] : 0;

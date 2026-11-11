@@ -11,6 +11,7 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { applyView } from '../../shared/view-rect.js';
 import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -678,7 +679,7 @@ export class VATCrowd implements EnginePlugin {
     f[35] = this.metalness;
     f[36] = this.layout.rowSize;
     f[37] = this.vat.width;
-    f[38] = +(c.format === 'rgba16float');
+    f[38] = +linearHdr(c.format);
     f[39] = code === this.plain ? 0 : f[38];
     device.queue.writeBuffer(g.frame, 0, f);
     const key = c.format + samples + depth;

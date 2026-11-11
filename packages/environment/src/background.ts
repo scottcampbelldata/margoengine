@@ -10,6 +10,7 @@ import { backgroundShader, imageBackground as imageBackgroundShader } from './sh
 import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -307,7 +308,7 @@ export class EnvironmentBackground {
           module: state.module,
           entryPoint: 'fragmentMain',
           targets: [{ format }],
-          constants: { outputHdr: format === 'rgba16float' || format === 'rgba32float' ? 1 : 0 },
+          constants: { outputHdr: linearHdr(format) ? 1 : 0 },
         },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
         multisample: { count },
@@ -552,7 +553,7 @@ export class ImageBackground {
           module: state.module,
           entryPoint: 'fragmentMain',
           targets: [{ format: context.format }],
-          constants: { outputHdr: context.format === 'rgba16float' || context.format === 'rgba32float' ? 1 : 0 },
+          constants: { outputHdr: linearHdr(context.format) ? 1 : 0 },
         },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
         multisample: { count },

@@ -24,6 +24,7 @@ import {
 } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
 export { heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
@@ -572,7 +573,7 @@ export class Terrain implements EnginePlugin {
       heightOffset = this.options.heightOffset ?? 0,
       layers = this.options.layers.length,
       cell = this.options.cellSize ?? 1,
-      hdr = +(c.format === 'rgba16float'),
+      hdr = +linearHdr(c.format),
       normal = +!!this.textures!.normalmap,
       floating = this.options.floatingOrigin,
       s = this.shiftValues;

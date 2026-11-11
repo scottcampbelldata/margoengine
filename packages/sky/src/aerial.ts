@@ -22,6 +22,7 @@ import {
   type AtmosphereParameters,
 } from './atmosphere-luts.js';
 import { depthWGSL, sceneDepth } from './depth.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 export { EARTH_ATMOSPHERE, atmosphereParameters, type AtmosphereParameters } from './atmosphere-luts.js';
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -232,7 +233,7 @@ export class AerialPerspective implements EnginePlugin {
     v[45] =
       a.bottomRadius +
       Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
-    v[46] = +(c.format !== 'rgba16float');
+    v[46] = +!linearHdr(c.format);
   }
   private draw(c: Context): void {
     if (!this.tables) return;

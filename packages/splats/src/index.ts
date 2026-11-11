@@ -38,6 +38,7 @@ export {
   type SogFiles,
   type EncodeSpzOptions,
 } from './compressed.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 export { cropSplats, filterSplats, transformSplats, mergeSplats, decimateSplats, type SplatRegion } from './edit.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -439,7 +440,7 @@ export class Splats implements EnginePlugin {
     v[38] = v[39] = focal;
     v[40] = c.camera.near;
     v[41] = c.camera.far;
-    v[42] = +(c.format === 'rgba16float');
+    v[42] = +linearHdr(c.format);
     v[43] = 0;
     // Orthographic clip matrix (e.g. @margoengine/cameras): affine Jacobian in pixels per world unit, signed near/far.
     const o = orthographic(c.camera.matrix, c.camera.position);

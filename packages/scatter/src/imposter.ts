@@ -14,6 +14,7 @@ import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { fadeCode, poseShader } from './pose.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -122,7 +123,7 @@ export class ImposterScatter extends Scatter {
     f.set(c.camera.position, 16);
     unitLight(f, 20, lighting.direction);
     f.set(lighting.radiance, 24);
-    f[28] = +(c.format === 'rgba16float');
+    f[28] = +linearHdr(c.format);
     f[29] = +(samples > 1);
     f[30] = this.values[72]; // alignToGround
     d.queue.writeBuffer(this.#uniform, 0, f as Float32Array<ArrayBuffer>);

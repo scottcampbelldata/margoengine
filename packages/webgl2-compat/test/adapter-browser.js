@@ -100,12 +100,14 @@ const frames = async (build) => {
 const compare = (a, b) => {
   let count = 0,
     largest = 0;
+  const channels = [0, 0, 0, 0];
   for (let i = 0; i < a.length; i++) {
     const difference = Math.abs(a[i] - b[i]);
     count += +(difference > 0);
     largest = Math.max(largest, difference);
+    channels[i % 4] = Math.max(channels[i % 4], difference);
   }
-  return { count, largest };
+  return { count, largest, channels };
 };
 
 /** Four different depth samples in one pixel, copied by SceneTarget into a 4x texture, read back sample by sample. */
@@ -208,6 +210,12 @@ export const PACKAGES = {
   'post bloom and tonemap'(engine) {
     scene(engine);
     PostStack.attach(engine, [new Bloom({ strength: 0.6 }), new Tonemap()]);
+  },
+  // Bug (bug sweep L3): Bloom without PostStack made its 4x capture rgba16float, which the level cannot multisample,
+  // and threw; it now takes PostStack's capture format (rg11b10ufloat there).
+  'post bloom alone 4x'(engine) {
+    scene(engine);
+    Bloom.attach(engine, { strength: 0.6 });
   },
   // KB2272: these three read each sample of a 4x scene depth, by sample_index at the full level and by one masked draw
   // per sample at the compatibility level, which has no sample_index. PostStack's capture makes the scene 4x.

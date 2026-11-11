@@ -37,6 +37,7 @@ import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { OrderedCull, candidateShader } from './order.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -787,7 +788,7 @@ export class Scatter implements EnginePlugin {
         this.values.set(c.camera.matrix);
         this.values.set(c.camera.position, 16);
         this.values.set(c.camera.planes, 44);
-        this.values[43] = +(c.format === 'rgba16float');
+        this.values[43] = +linearHdr(c.format);
         c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
         this.cull(c, terrain);
       },

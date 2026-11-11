@@ -1857,6 +1857,10 @@ Mapping details:
   rows (1 GiB at 8,192); before that a group past 256 MiB in total was refused, a WebGPU rule the layer had added.
   Evidence: `device.test.js` (a 360 MB group on an 8,192 context gets a 4,096 x 5,494 texture) and the 3,000,000-splat
   case of `packages/splats/test/gpu/scale-check.mjs` with MARGO_COMPAT=1.
+- Linear HDR targets: a pass's colour target holds linear light when its format is any float format (`linearHdr`,
+  `packages/shared/hdr-format.js`), which covers PostStack's `rg11b10ufloat` capture at WebGPU's compatibility level as
+  well as `rgba16float`. Packages skip their display encoding and clamp only then; `tests/hdr-format.test.js` fails any
+  package source that compares a pass format with `rgba16float` alone (2026-11-11, it found 25).
 - Base vertex and base instance use uniforms because measured WebGL2 targets lacked the extension.
 - Without indexed draw-buffer state, outputs with matching blend state are grouped; depth/stencil-writing cases that
   cannot be preserved are refused.
