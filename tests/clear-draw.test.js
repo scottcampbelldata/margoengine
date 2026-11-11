@@ -13,12 +13,22 @@ function recorder() {
   const device = {
     createBindGroupLayout: make('bindGroupLayout'),
     createPipelineLayout: make('pipelineLayout'),
-    createBuffer: make('buffer'),
+    createBuffer: (descriptor) => {
+      const buffer = make('buffer')(descriptor);
+      buffer.destroyed = 0;
+      buffer.destroy = () => buffer.destroyed++;
+      return buffer;
+    },
     createBindGroup: make('bindGroup'),
     createShaderModule: make('module'),
     createRenderPipeline: make('pipeline'),
-    queue: { writeBuffer: (buffer, offset, data) => log.push({ kind: 'write', buffer, offset, data: [...data] }) },
-  };
+    queue: {
+      writeBuffer: (buffer, offset, data) => log.push({ kind: 'write', buffer, offset, data: [...data] }),
+      // Work finishes only when the test calls `finish()`.
+      onSubmittedWorkDone: () => new Promise((resolve) => waiting.push(resolve)),
+    },
+  },
+    waiting = [];
   const calls = [],
     pass = new Proxy(
       {},
@@ -29,7 +39,7 @@ function recorder() {
             calls.push([name, ...args]),
       },
     );
-  return { device, pass, log, calls, of: (kind) => log.filter((e) => e.kind === kind) };
+  return { device, pass, log, calls, finish: () => waiting.splice(0).forEach((f) => f()), pending: () => waiting.length, of: (kind) => log.filter((e) => e.kind === kind) };
 }
 
 const options = { formats: ['bgra8unorm'], depthFormat: 'depth32float-stencil8', writeDepth: true, samples: 4 };
@@ -103,4 +113,31 @@ test('clearDraw keeps the colour when writeColor is false, and keeps a bounded s
   assert.equal(r.of('buffer').length, before, 'a recent colour is still cached');
   clearDraw(r.device, cache, r.pass, { ...options, tint: [0, 0, 0, 1] });
   assert.equal(r.of('buffer').length, before + 1, 'an evicted colour is made again');
+});
+
+// Eviction at the 65th colour must free the 16-byte uniform buffer, but only once the submitted work (which may still
+// read it through a bind group recorded earlier in the same frame) is done.
+test('clearDraw destroys an evicted colour buffer after submitted work, never before', async () => {
+  const r = recorder(),
+    cache = new Map(),
+    tint = (i) => [i / 255, 0, 0, 1];
+  for (let i = 0; i < 64; i++) clearDraw(r.device, cache, r.pass, { ...options, tint: tint(i) });
+  const buffers = r.of('buffer');
+  assert.equal(buffers.length, 64);
+  clearDraw(r.device, cache, r.pass, { ...options, tint: tint(0) });
+  assert.equal(r.of('buffer').length, 64, 'a cached colour makes no buffer');
+  // Steady frames (the colour is cached) add no buffer, write, bind group or queue wait: the work counts are unchanged.
+  const counts = () => [r.of('buffer').length, r.of('write').length, r.of('bindGroup').length, r.pending()];
+  const steady = counts();
+  for (let i = 0; i < 10; i++) clearDraw(r.device, cache, r.pass, { ...options, tint: tint(63) });
+  assert.deepEqual(counts(), steady, 'steady frames do the same work as before');
+  assert.equal(r.pending(), 0, 'no wait is queued before an eviction');
+  clearDraw(r.device, cache, r.pass, { ...options, tint: tint(64) });
+  assert.equal(r.of('buffer').length, 65);
+  assert.deepEqual(buffers.map((b) => b.destroyed), new Array(64).fill(0), 'nothing is freed while work is pending');
+  r.finish();
+  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(buffers.map((b) => b.destroyed), [1, ...new Array(63).fill(0)], 'only the oldest is destroyed, once');
+  assert.equal(r.of('buffer')[64].destroyed, 0);
 });

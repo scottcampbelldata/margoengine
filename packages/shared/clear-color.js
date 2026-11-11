@@ -33,7 +33,13 @@ function colourGroup(device, tint) {
     const buffer = device.createBuffer({ size: 16, usage: 72 });
     device.queue.writeBuffer(buffer, 0, new Float32Array(tint));
     group = device.createBindGroup({ layout: state.group, entries: [{ binding: 0, resource: { buffer } }] });
-    if (state.groups.size > 63) state.groups.delete(state.groups.keys().next().value);
+    group.b = buffer;
+    if (state.groups.size > 63) {
+      // A pass recorded earlier in this frame may still read the oldest buffer: free it once submitted work is done.
+      const [old, spent] = state.groups.entries().next().value;
+      state.groups.delete(old);
+      device.queue.onSubmittedWorkDone().then(() => spent.b.destroy());
+    }
     state.groups.set(key, group);
   }
   return [state.layout, group];

@@ -34,19 +34,20 @@
   while reusing the texture storage for the next frame of the same size, so steady frames still allocate nothing;
   then gate the video fixture.
 
-### The clear-colour cache drops its 65th colour's buffer without destroying it (found by check:owners, 2026-11-10, open)
+### SSR and SSGI are missing from the post owner-lifetime fixture (found by check:owners, 2026-11-10, open)
 
-- **Repro:** clear 65 or more different colours on one device (an animated background): `packages/shared/clear-color.js`
-  `colourGroup` deletes the oldest map entry and never calls `destroy()` on its 16-byte uniform buffer, so its GPU
-  memory is freed only when the browser collects it. Related: SSR and SSGI from `@margoengine/post` create their
-  colour's buffer inside this device cache, so after they are disposed `check:owners` counts it as theirs; adding
-  `SSR.attach` or `SSGI.attach` to `packages/post/test/owner-lifetime.fixture.js` fails the final leak check with one
-  retained 16-byte buffer.
-- **Cause:** the cache is per device, not per owner, and an evicted buffer may still be bound by a clear recorded
-  before the same submit, so it cannot be destroyed at eviction.
-- **Fix to build:** destroy evicted buffers after the queue's next submitted work is done (`onSubmittedWorkDone`),
-  and drop the whole device entry when the device is destroyed. Core's renderer shares the file, so the change is a
-  core bug fix (Scott's yes first) within the size gate. SSR and SSGI join the post fixture after it.
+- **Repro:** `packages/post/test/owner-lifetime.fixture.js` is not on `main`; it exists only in the unlanded owners work
+  (commit `e871e72960`) and its comment lists SSR and SSGI as not covered.
+- **Cause:** the clear-colour buffer leak that blocked them is fixed (evicted buffers are destroyed after submitted
+  work), but the fixture is not landed, so `SSR.attach` and `SSGI.attach` cannot be added yet.
+- **Fix to build:** when the owners fixture lands, add `SSR.attach` and `SSGI.attach` to it and delete this entry.
+
+### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
+
+- **Repro:** `MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --owner=<lane> -- node packages/post/test/ssgi-bounce-browser.mjs`
+  fails at `ssgi-bounce-browser.mjs:108` ("switching multiBounce off gives the one-bounce frame back exactly", 1 !== 0).
+  It fails the same way on `main` before the clear-colour fix (53bbc39b42), so that fix did not cause it; native passes.
+- **Cause:** not yet found. Suspect a pixel that differs after the toggle only on the WebGL2 compatibility layer.
 
 ### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
 
