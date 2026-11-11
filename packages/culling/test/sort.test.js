@@ -48,6 +48,30 @@ test('invalid sort ranges reject before GPU allocation and zero capacity is supp
   assert.equal(empty.instances.size, 96);
   sorter.dispose();
 });
+test('a sort binds only the rows it reads, so a core instance buffer past the storage binding still sorts', () => {
+  const h = harness(),
+    sorter = new InstanceSorter(),
+    groups = [],
+    make = h.engine.gpu.createBindGroup;
+  h.engine.gpu.createBindGroup = (d) => (groups.push(d), make ? make.call(h.engine.gpu, d) : d);
+  // A doubled core instance buffer of 2,097,150 records (201 MB) over the 128 MiB binding; the list is 1,048,574.
+  const instances = { size: 2_097_150 * 96 };
+  sorter.encode(h.context, {}, { instances, capacity: 1_048_574, start: 13, count: 9, indexCount: 36 });
+  const source = groups.at(-1).entries.find((e) => e.binding === 1).resource;
+  // Bound from record 8 (768 B, the first offset at or before record 13 meeting the 256 B alignment) to 13 + capacity.
+  assert.equal(source.buffer, instances);
+  assert.equal(source.offset, 8 * 96);
+  assert.equal(source.size, (13 + 1_048_574 - 8) * 96);
+  assert.ok(source.size <= h.engine.gpu.limits.maxStorageBufferBindingSize);
+  // The list itself past one binding (1,398,101 records at 128 MiB) is refused, and FrontToBack would leave it unsorted.
+  assert.equal(InstanceSorter.fits(h.engine.gpu, 1_398_101), true);
+  assert.equal(InstanceSorter.fits(h.engine.gpu, 1_398_102), false);
+  assert.throws(
+    () => sorter.encode(h.context, {}, { instances, capacity: 1_398_102, count: 9, indexCount: 36 }),
+    /storage binding/,
+  );
+  sorter.dispose();
+});
 test('ordering is after culling, never changes transparent models, and restores redirected ownership', () => {
   const h = harness(),
     geometry = box(),

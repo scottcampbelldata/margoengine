@@ -28,6 +28,7 @@ export interface FrontToBackOptions {
 
 export class InstanceSorter {
     disposed: boolean;
+    static fits(device: GPUDevice, capacity: number, start?: number): boolean;
     encode(c: Context, owner: object, range: SortRange): {
         instances: GPUBuffer;
         args: GPUBuffer;

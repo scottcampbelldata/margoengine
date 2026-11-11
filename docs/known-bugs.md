@@ -1,16 +1,5 @@
 # Known bugs and unverified features
 
-### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
-
-- **Repro:** more than 1,048,574 core meshes of one geometry on a device with WebGPU's default 128 MiB
-  `maxStorageBufferBindingSize` (the WebGL2 layer, or an adapter offering no more), sorted by `FrontToBack` of `@margoengine/culling`
-  (`InstanceSorter`): core's instance buffer has doubled past 128 MiB and the pass's bind group names it whole, a validation
-  error each frame. Core's own draws are unaffected (they bind it as a vertex buffer).
-- **Cause:** `packages/culling/src/sort.ts` binds `range.instances` with no `offset` or `size`, the case
-  `CulledMeshes` fixed in c106034b1.
-- **Fix to build:** bind only rows `start` to `start + capacity` (offset aligned to `minStorageBufferOffsetAlignment`,
-  the shader index rebased), with a scale check like `packages/culling/test/gpu/meshes-scale-check.mjs`.
-
 ### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
 
 - **Repro:** an EXR whose `chromaticities` attribute names ACEScg (AP1) primaries and one pixel (1, 0, 0): `parseEXR`,

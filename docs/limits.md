@@ -5239,7 +5239,14 @@ different center depths can resolve in the new order, the usual draw-order
 consequence of sorting. Transparent geometry must never be passed to the raw
 sorter. Importing ordinary cullers does not load ordering code.
 InstanceSorter accepts capacity 0 through 4,194,304 within device storage limits;
-its key network rounds to a power of two. O(n log-squared n) key comparisons and
+its key network rounds to a power of two. It binds only the rows a range reads (from the last record at or before
+`start` meeting minStorageBufferOffsetAlignment to `start + capacity`), so a core instance buffer that has doubled past
+one storage binding still sorts (2026-11-11; before, it bound the whole buffer, a validation error every frame past
+about 1,048,574 meshes of one geometry on a 128 MiB device). A list past one binding itself (1,398,101 records at
+128 MiB) is refused by `encode` with RangeError; `InstanceSorter.fits(device, capacity, start)` tells, and
+FrontToBack leaves such a list in its original order (drawn the same, unsorted). Scale check
+`packages/culling/test/gpu/sort-scale-check.mjs`: 1,200,000 meshes, frames equal to core's natively and on the WebGL2
+layer. O(n log-squared n) key comparisons and
 one gather are encoded; no per-instance CPU work or GPU readback occurs. Each
 view and stage owns distinct parameter storage. Input instance buffers require
 STORAGE; supplied argument buffers require STORAGE and COPY_SRC. Software

@@ -513,6 +513,12 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   instance count (likely core's per-frame CPU walk of 1.2M entities with culling off): a speed bug to diagnose with
   GPU timestamps (Stats with timestamp-query) and a CPU profile before release.
 
+- FrontToBack at scale: 1,200,000 core meshes of one box, binding held to 128 MiB, 480 x 320
+  (`node packages/culling/test/gpu/sort-scale-check.mjs`, native and `MARGO_COMPAT=1`). Work per frame: one bitonic
+  network over 2,097,152 keys (231 dispatches of 32,768 workgroups plus seed and gather), one 59 KB uniform write.
+  Busy-machine diagnostic 2026-11-11 on the RTX A6000: 57.7 ms wall natively, 2,529 ms on the WebGL2 layer. SPEED BUG:
+  the sort costs more than the overdraw it saves at this count; to fix or cap (a smaller network per batch, or skip
+  ordering past a measured count) before release.
 - Loader meshes at scale: a 2,828 x 2,828 height field (7,997,584 vertices, 15,983,858 triangles, the parsers'
   default `maxVertices`) through `createMeshes`, one part since loaders follow core's 11,184,810-vertex cap
   (2026-11-11; 9 parts of 1,000,000 before) (`node packages/loaders/tests/split-scale-check.mjs`, native and

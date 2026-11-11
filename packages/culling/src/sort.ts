@@ -37,6 +37,21 @@ fn less(a:Key,b:Key)->bool {
  let i=g.x;if(i<args[u.dims.z]){let first=args[u.dims.z+3u];output[first+i]=source[u.dims.x+first+keys[i].index];}
 }
 `;
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+/**
+ * The bound window of a sort range: from the last record at or before `start` whose byte offset meets
+ * minStorageBufferOffsetAlignment (every 8th on a default device), to `start + capacity`; null when the window or the
+ * sorted copy (capacity records) is over maxStorageBufferBindingSize.
+ */
+function sortWindow(d: GPUDevice, start: number, capacity: number): { first: number; bytes: number } | null {
+  const align = d.limits.minStorageBufferOffsetAlignment ?? 256,
+    step = align / gcd(align, 96),
+    first = start - (start % step),
+    bytes = Math.max(96, (start + capacity - first) * 96),
+    limit = d.limits.maxStorageBufferBindingSize;
+  return bytes <= limit && capacity * 96 <= limit ? { first, bytes } : null;
+}
+
 /** One compacted list of 96-byte instance records to order. All records must draw opaque surfaces. */
 export interface SortRange {
   /** Original records, readable as storage. */
@@ -77,6 +92,14 @@ export class InstanceSorter {
   private slots = new Map<object, Map<string, Slot>>();
   private args = new Uint32Array(5);
   disposed = false;
+  /**
+   * Whether `capacity` records from `start` can be sorted on `device`: the rows read and the sorted copy must each fit
+   * one storage binding (1,398,101 records at WebGPU's default 128 MiB). `encode` throws RangeError for a range that
+   * does not; `FrontToBack` leaves such a list in its original order instead (drawn the same, just not sorted).
+   */
+  static fits(device: GPUDevice, capacity: number, start = 0): boolean {
+    return sortWindow(device, start, capacity) !== null;
+  }
   /** Encode a front-to-back sort for one stable owner and view. Output counts and complete records are unchanged. */
   encode(c: Context, owner: object, range: SortRange): { instances: GPUBuffer; args: GPUBuffer } {
     if (this.disposed) throw new MargoError('disposed', 'Sorter is disposed; create a new InstanceSorter');
@@ -96,6 +119,12 @@ export class InstanceSorter {
       );
     if ((start + capacity) * 96 > range.instances.size)
       throw new RangeError('Sort range exceeds instance storage; lower capacity or start');
+    const d = c.device,
+      window = sortWindow(d, start, capacity);
+    if (!window)
+      throw new RangeError(
+        `Sort range of ${capacity} records is over this device's ${d.limits.maxStorageBufferBindingSize}-byte storage binding; sort fewer instances (InstanceSorter.fits)`,
+      );
     if (
       !range.args &&
       (!Number.isInteger(range.count) ||
@@ -112,7 +141,6 @@ export class InstanceSorter {
       (range.node && (range.node.length !== 16 || !Array.from(range.node).every(Number.isFinite)))
     )
       throw new TypeError('Sort center and node must be finite; pass three center values and a 16-value affine matrix');
-    const d = c.device;
     if (this.device !== d) {
       this.release();
       this.device = d;
@@ -188,7 +216,7 @@ export class InstanceSorter {
         f[at + 16 + k] = center[k];
         f[at + 20 + k] = forward[k] / length;
       }
-      u.set([start, size, range.args ? argsOffset / 4 + 1 : 1, 0], at + 24);
+      u.set([start - window.first, size, range.args ? argsOffset / 4 + 1 : 1, 0], at + 24);
       u.set(i > 0 && i < total - 1 ? steps[i - 1] : [0, 0], at + 28);
     }
     d.queue.writeBuffer(slot.uniform, 0, slot.data);
@@ -196,10 +224,12 @@ export class InstanceSorter {
       layout: this.layout!,
       entries: [
         { binding: 0, resource: { buffer: slot.uniform, size: 128 } },
-        ...[capacity ? range.instances : slot.empty, sourceArgs, slot.keys, slot.instances].map((buffer, i) => ({
-          binding: i + 1,
-          resource: { buffer },
-        })),
+        // Only the rows this range reads: a core instance buffer doubles past the storage binding long before the list
+        // does (it bound whole, it failed validation past about 1,048,574 meshes of one geometry on a 128 MiB device).
+        capacity
+          ? { binding: 1, resource: { buffer: range.instances, offset: window.first * 96, size: window.bytes } }
+          : { binding: 1, resource: { buffer: slot.empty } },
+        ...[sourceArgs, slot.keys, slot.instances].map((buffer, i) => ({ binding: i + 2, resource: { buffer } })),
       ],
     });
     const pass = c.encoder.beginComputePass(),
@@ -317,6 +347,8 @@ export class FrontToBack implements EnginePlugin {
     });
   }
   private set(c: Context, target: Batch | CullablePrimitive, range: SortRange): void {
+    // A list past one storage binding keeps its order: sorting only saves overdraw, and the frame draws the same.
+    if (!InstanceSorter.fits(c.device, range.capacity, range.start)) return;
     this.allocated.add(target);
     this.live.add(target);
     const previous = target.redirect,

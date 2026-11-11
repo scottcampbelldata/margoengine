@@ -88,6 +88,6 @@
     "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs && node packages/culling/test/gpu/last-pass-check.mjs && node packages/culling/test/gpu/meshes-occlusion-check.mjs && node packages/culling/test/gpu/models-cull-check.mjs && node packages/culling/test/gpu/models-plain-check.mjs && node packages/culling/test/gpu/occluders-check.mjs && node packages/culling/test/gpu/bounds-check.mjs && node packages/culling/test/gpu/shadows-cull-check.mjs && node packages/culling/test/gpu/lod-check.mjs && node packages/culling/test/gpu/meshlets-check.mjs && node packages/culling/test/gpu/meshes-scale-check.mjs",
     "test:gpu:webgl2": "cd ../.. && node packages/culling/test/gpu/webgl2-check.mjs",
     "test:gpu:bounds": "cd ../.. && node packages/culling/test/gpu/bounds-extended-check.mjs",
-    "test:gpu:sort": "cd ../.. && node packages/culling/test/gpu/sort-check.mjs"
+    "test:gpu:sort": "cd ../.. && node packages/culling/test/gpu/sort-check.mjs && node packages/culling/test/gpu/sort-scale-check.mjs"
   }
 }
