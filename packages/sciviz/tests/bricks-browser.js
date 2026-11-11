@@ -566,6 +566,19 @@ window.runBrickTests = async () => {
     gone(figure);
   });
 
+  await check('opacity 1 is opaque at any density (KB5700a regression)', async () => {
+    // The log clamp left alpha 1 - 1e-6^(density step) per step: about 0.001 at density 1e-4.
+    const flat = new Float32Array(DIMS[0] * DIMS[1] * DIMS[2]).fill(0.5),
+      look = { colormap: ['#ff0000', '#ff0000'], opacity: () => 1, density: 1e-4, shading: false };
+    const { image } = await bricked(flat, look),
+      plain = await whole(flat, look),
+      at = ((HEIGHT / 2) * WIDTH + WIDTH / 2) * 4;
+    numbers.opaqueBricked = [...image.slice(at, at + 4)];
+    numbers.opaqueWhole = [...plain.slice(at, at + 4)];
+    assert(numbers.opaqueBricked.join() === '255,0,0,255', `bricked ${numbers.opaqueBricked}`);
+    assert(numbers.opaqueWhole.join() === '255,0,0,255', `whole ${numbers.opaqueWhole}`);
+  });
+
   return { checks, numbers };
 };
 

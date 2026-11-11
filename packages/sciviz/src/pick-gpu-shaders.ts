@@ -144,7 +144,9 @@ fn slab(o:f32,d:f32)->vec2f {
     var uv=vec2f(v,coordinate);
     if(p.range.z>0.5) {let n=vec2f(textureDimensions(transfer));uv=(uv*(n-1.0)+0.5)/n;}
     let alpha=textureSampleLevel(transfer,linearSampler,uv,0.0).a;
-    var opacity=1.0-pow(1.0-clamp(alpha*p.query.w,0.0,0.999),stride/voxel);
+    // Opacity 1 is opaque over any step, so a threshold of 1 still finds it (KB5700a).
+    let scaled=clamp(alpha*p.query.w,0.0,1.0);
+    var opacity=select(1.0-pow(1.0-min(scaled,0.999),stride/voxel),1.0,scaled>=1.0);
     if(p.range.z==2.0) {opacity=1.0-pow(max(1.0-alpha,0.0),stride/voxel/p.spacing.w*p.query.w/p.extra.y);}
     if(opacity<p.query.y) {continue;}
     let ijk=min(vec3u(at*vec3f(p.dims.xyz)),p.dims.xyz-1u);

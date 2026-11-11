@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15075283,
+  "total": 15076037,
   "history": [
     {
       "date": "2026-10-24",
@@ -8471,6 +8471,12 @@
       "commit": "430f8ba969",
       "reason": "Sweep L1 KB0507a-f: @margoengine/sciviz/volume-quality 8765 B ceiling (last measured 8509 B, batch 173) -> 9351 B gzip. The quality march now reads colour-scale tables through the shared colour-lookup chunk (the rgba32float table failed bind-group creation before) and steps in data units. A split would put the same lookup in a second entry and duplicate the quality pipeline state; only importers of volume-quality pay. Root sciviz, bricks and multivolume stay under their ceilings; core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "c3ac3d3672",
+      "reason": "KB5700a: opacity 1 is exactly opaque in the multi-volume march (and the shared volume shader it bundles); +28 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -9384,7 +9390,7 @@
     "@margoengine/sciviz/molecule": 5419,
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/mrc": 3427,
-    "@margoengine/sciviz/multivolume": 24158,
+    "@margoengine/sciviz/multivolume": 24912,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/notebook": 2064,
     "@margoengine/sciviz/nrrd": 1216,

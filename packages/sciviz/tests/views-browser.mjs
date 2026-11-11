@@ -62,17 +62,31 @@ for (const compat of [false, true]) {
         d.quad.layout.figures.slice(0, 3).every(isotropic),
         'orthographic slices retain equal physical scale on both screen axes',
       );
-      const resized = d.quad.layout.canvases[0];
+      const resized = d.quad.layout.canvases[0],
+        watched = d.quad.layout.figures[0],
+        render = watched.render;
+      // KB6438a: the view's observer (created before this one, so delivered first) must not render the canvases it
+      // observes inside the delivery; WebKit reports that as a ResizeObserver loop. It renders on the next frame.
+      let renders = 0,
+        rendersAtDelivery = -1;
+      watched.render = function (...args) {
+        renders++;
+        return render.apply(this, args);
+      };
       await new Promise((resolve) => {
         const observer = new ResizeObserver(() => {
           if (resized.clientHeight === 360) {
             observer.disconnect();
+            rendersAtDelivery = renders;
             requestAnimationFrame(resolve);
           }
         });
         observer.observe(resized);
         resized.style.height = '360px';
       });
+      watched.render = render;
+      check(rendersAtDelivery === 0, `the view rendered ${rendersAtDelivery} times inside its resize observer`);
+      check(renders > 0, 'the view renders on the frame after a resize');
       check(isotropic(d.quad.layout.figures[0]), 'resize retains isotropic physical scale');
       const aborted = new AbortController(),
         firstFigure = d.quad.layout.figures[0],

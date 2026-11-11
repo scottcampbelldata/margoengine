@@ -95,7 +95,8 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
   let q=inverseMap(p);if(q.w==0.0 || !kept(q.xyz)){continue;}let v=scalar(q.xyz);if(v.y==0.0){continue;}
   if(u.options.w>0.5){if(!found||select((v.x>peak),(v.x<peak),(u.options.w>1.5))){peak=v.x;found=true;peakPoint=p;peakQ=q.xyz;}continue;}
   let tf=classify(p,q.xyz,v.x,origin+d*min(t+step*0.5,exit));
-  var alpha=1.0-pow(1.0-clamp(tf.a*u.options.z,0.0,0.999999),ds*physicalSpeed/u.options.x);
+  let opacity=clamp(tf.a*u.options.z,0.0,1.0);let k=ds*physicalSpeed/u.options.x;
+  var alpha=select(1.0-pow(1.0-min(opacity,0.999999),k),1.0,opacity>=1.0 && k>0.0);
   if(u.classification.x==2.0){alpha=1.0-pow(max(1.0-tf.a,0.0),ds*physicalSpeed/u.options.x/u.classification.z*u.options.z/u.classification.w);}
   var rgb=tf.rgb;
   if(u.span.w>0.5){let g=gradient(p,v.x)*u.span.xyz;if(dot(g,g)>1e-14){let normal=vec3f(dot(u.inverse[0].xyz,g),dot(u.inverse[1].xyz,g),dot(u.inverse[2].xyz,g));rgb=shade(rgb,normalize(normal),-worldDir);}}

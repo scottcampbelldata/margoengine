@@ -250,6 +250,7 @@ export class VolumeQuad extends EventTarget {
   readonly #heatmaps: (Layer | undefined)[] = [];
   readonly #events = new AbortController();
   readonly #resize: ResizeObserver;
+  #resizeFrame = 0;
   readonly #sizes: ({ width: number; height: number } | undefined)[] = [];
   readonly #options: VolumeQuadOptions;
   #position: AnnotationPoint;
@@ -300,13 +301,19 @@ export class VolumeQuad extends EventTarget {
         { signal: this.#events.signal },
       );
     }
+    // Refit and draw on the next frame, never inside the delivery: drawing can resize the canvases this observes,
+    // which WebKit reports as a ResizeObserver loop (KB6438a). Deliveries before that frame share one redraw.
     this.#resize = new ResizeObserver(() => {
-      if (this.#dead || this.#heatmaps.filter(Boolean).length !== 3) return;
-      this.#fitSlices(true);
-      for (let i = 0; i < 3; i++) {
-        this.layout.figures[i].render();
-        this.#annotations[i].render();
-      }
+      if (this.#resizeFrame) return;
+      this.#resizeFrame = requestAnimationFrame(() => {
+        this.#resizeFrame = 0;
+        if (this.#dead || this.#heatmaps.filter(Boolean).length !== 3) return;
+        this.#fitSlices(true);
+        for (let i = 0; i < 3; i++) {
+          this.layout.figures[i].render();
+          this.#annotations[i].render();
+        }
+      });
     });
     for (const canvas of layout.canvases.slice(0, 3)) this.#resize.observe(canvas);
     options.signal?.addEventListener('abort', () => this.dispose(), { once: true, signal: this.#events.signal });
@@ -515,6 +522,7 @@ export class VolumeQuad extends EventTarget {
     this.#dead = true;
     this.#events.abort();
     this.#resize.disconnect();
+    cancelAnimationFrame(this.#resizeFrame);
     this.layout.dispose();
   }
   /** Enable explicit resource management. */

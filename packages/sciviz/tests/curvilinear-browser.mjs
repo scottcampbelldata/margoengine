@@ -132,6 +132,15 @@ for (const compat of [false, true]) {
         v = curvilinearVolume(f, { dims, points }, missing, opts);
         const mask = center(await pixels());
         v.dispose();
+        // Opacity 1 is opaque however long the reference distance (KB5700a): the old 0.999999 cap left
+        // 1 - 0.999999^(0.002) per step, black.
+        v = curvilinearVolume(f, { dims, points }, new Float32Array(125).fill(0.5), {
+          ...opts,
+          opacity: () => 1,
+          referenceStep: 1000,
+        });
+        const opaque = center(await pixels());
+        v.dispose();
         f.dispose();
         return {
           classified,
@@ -149,6 +158,7 @@ for (const compat of [false, true]) {
           warpedPixel,
           regularPixel,
           mask,
+          opaque,
           gpuErrors,
         };
       },
@@ -170,6 +180,7 @@ for (const compat of [false, true]) {
     assert.ok(report.outlinePixels > 100);
     assert.ok(Math.abs(report.warpedPixel[0] - report.regularPixel[0]) <= 1);
     assert.deepEqual(report.mask, [0, 0, 0]);
+    assert.deepEqual(report.opaque, [255, 0, 0], 'opacity 1 is opaque at referenceStep 1000');
     await browser.page.goto(new URL('/examples/sciviz-curvilinear.html', browser.page.url()).href);
     await browser.page.waitForFunction(
       () => document.querySelector('#status').textContent.startsWith('Ready.'),

@@ -323,6 +323,13 @@ for (const fallback of [false, true]) {
         volume.clip = [{ normal: [0, 0, 0], offset: -1 }];
         check((await picker.pick(128, 96)) === null, 'fully clipped volume');
         volume.clip = [];
+        // Opacity 1 is opaque over a step of any length, so the strictest threshold (1) still hits (KB5700a).
+        f.remove(volume);
+        const opaque = f.volume(ctData, { dims, range: [-1000, 1000], opacity: () => 1, quality: 2, shading: false });
+        await f.ready();
+        f.render();
+        check((await picker.pick(128, 96, { opacityThreshold: 1 }))?.kind === 'volume', 'opacity 1 meets threshold 1');
+        f.remove(opaque);
         picker.dispose();
         f.dispose();
         canvas2.remove();

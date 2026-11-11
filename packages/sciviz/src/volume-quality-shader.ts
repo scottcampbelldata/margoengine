@@ -128,7 +128,7 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
    let c=classify(sampleP,origin+d*(sampleT+ds));
    var sigma=-log(max(1.0-c.a,1e-6))*u.params.y/voxel;
    if(u.classification.x==2.0){sigma/=u.classification.z*u.classification.w;}
-   let alpha=1.0-exp(-sigma*ds);total+=vec4f(lit(c.rgb,sampleP,-direction)*alpha,alpha)*(1.0-total.a);
+   let alpha=select(1.0-exp(-sigma*ds),1.0,c.a>=1.0 && u.params.y*ds>0.0);total+=vec4f(lit(c.rgb,sampleP,-direction)*alpha,alpha)*(1.0-total.a);
    if(total.a>0.9999){break;}
   }
   t+=ds;

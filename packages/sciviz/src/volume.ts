@@ -257,7 +257,9 @@ fn kept(p: vec3f) -> bool {
     if (volume.classification.x == 1.0) { coordinate = length(gradient(texel(p), volume.dims.xyz, volume.spacing.xyz)) * volume.classification.y; }
     if (volume.classification.x == 2.0) { coordinate = sample(origin + dir * min(t, exit)); }
     let tf = classify(v, coordinate, volume.classification.x);
-    var a = 1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * volume.params.z * stride / voxel);
+    // Opacity 1 is infinite extinction: any positive path length is opaque (the log clamp alone left 1 - 1e-6^k).
+    let k = volume.params.z * stride / voxel;
+    var a = select(1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * k), 1.0, tf.a >= 1.0 && k > 0.0);
     if (volume.classification.x == 2.0) {
       a = 1.0 - pow(max(1.0 - tf.a, 0.0), stride / voxel / volume.classification.z * volume.params.z / volume.classification.w);
     }

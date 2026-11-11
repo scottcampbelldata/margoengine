@@ -29,6 +29,12 @@ for (const compat of [false, true]) {
       const brushed = await Promise.all([pixels(demo.parallel), pixels(demo.matrix)]);
       check(before.every((v, i) => v.hash !== brushed[i].hash), 'shared brushing changes both rendered plots');
       demo.selection.undo(); check(demo.selection.rowIds.length > expected.length, 'shared undo restores the prior brush');
+      // KB5700c: the undone radius range must not come back with the next period gesture.
+      demo.parallel.brush('period', [1, 25]);
+      const periodOnly = demo.parallel.data.rowIds.filter((_, i) => { const p = demo.table.value('period', i); return p >= 1 && p <= 25; });
+      check(JSON.stringify(demo.selection.rowIds) === JSON.stringify(periodOnly), 'undo restores the axis ranges with the rows');
+      demo.selection.undo(); demo.selection.redo();
+      check(JSON.stringify(demo.selection.rowIds) === JSON.stringify(periodOnly), 'redo keeps the period-only ranges');
       demo.matrix.brushCell('period', 'radius', [2, 10], [2, 5]);
       check(demo.selection.rowIds.every((key) => { const i = demo.parallel.data.rowIds.indexOf(key); return demo.table.value('period', i) >= 2 && demo.table.value('period', i) <= 10 && demo.table.value('radius', i) >= 2 && demo.table.value('radius', i) <= 5; }), 'matrix brush uses physical shared scales');
       demo.selection.clear();

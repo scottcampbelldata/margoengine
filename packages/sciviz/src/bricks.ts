@@ -181,7 +181,9 @@ fn kept(p: vec3f) -> bool {
     let v = sample(p);
     if (volume.params.y > 0.5) { peak = select(max(peak, v), min(peak, v), volume.params.y > 1.5); continue; }
     let tf = textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0);
-    let a = 1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * volume.params.z * stride * span / voxel);
+    // Opacity 1 is infinite extinction: opaque over any positive length.
+    let k = volume.params.z * stride * span / voxel;
+    let a = select(1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * k), 1.0, tf.a >= 1.0 && k > 0.0);
     if (a < 0.002) { continue; }
     var rgb = tf.rgb;
     if (volume.params.w > 0.5) {

@@ -43,12 +43,26 @@ export interface SelectionJSON {
   readonly version: 1;
   readonly rowIds: readonly RowKey[];
   readonly options: Required<SelectionOptions>;
-  readonly brushes: readonly { readonly source: string; readonly rows: readonly RowKey[] }[];
+  readonly brushes: readonly {
+    readonly source: string;
+    readonly rows: readonly RowKey[];
+    /** What produced the rows (for example axis ranges), when the brush was given one. */
+    readonly predicate?: unknown;
+  }[];
   readonly past: readonly SelectionJSON['brushes'][];
   readonly future: readonly SelectionJSON['brushes'][];
   readonly revision: number;
 }
-const copy = (brushes: Brushes): Brushes => new Map([...brushes].map(([key, rows]) => [key, new Set(rows)]));
+// Each brush's predicate lives beside its row set, keyed by the set: undo, redo and toJSON carry it with the rows.
+type Predicates = WeakMap<Set<RowKey>, unknown>;
+const copy = (brushes: Brushes, predicates: Predicates): Brushes =>
+  new Map(
+    [...brushes].map(([key, rows]) => {
+      const next = new Set(rows);
+      if (predicates.has(rows)) predicates.set(next, predicates.get(rows));
+      return [key, next];
+    }),
+  );
 
 /** Shared keyed selection. All mutations validate before publishing; no globals or import side effects. */
 export class SelectionStore extends EventTarget {
@@ -59,6 +73,7 @@ export class SelectionStore extends EventTarget {
   readonly #limit: number;
   readonly #open: boolean;
   #brushes: Brushes = new Map();
+  readonly #predicates: Predicates = new WeakMap();
   #selected = new Set<RowKey>();
   #past: Brushes[] = [];
   #future: Brushes[] = [];
@@ -90,7 +105,12 @@ export class SelectionStore extends EventTarget {
   /** Snapshot keys, resolution, brushes and history without materializing renderer masks. */
   toJSON(): SelectionJSON {
     this.#check();
-    const snapshot = (brushes: Brushes) => [...brushes].map(([source, rows]) => ({ source, rows: [...rows] }));
+    const snapshot = (brushes: Brushes) =>
+      [...brushes].map(([source, rows]) =>
+        this.#predicates.has(rows)
+          ? { source, rows: [...rows], predicate: structuredClone(this.#predicates.get(rows)) }
+          : { source, rows: [...rows] },
+      );
     return {
       version: 1,
       rowIds: [...this.#keys],
@@ -128,7 +148,9 @@ export class SelectionStore extends EventTarget {
           new Set(brush.rows).size !== brush.rows.length
         )
           throw typeError('Invalid brush keys; use unique sources and dataset row IDs', 'sciviz');
-        result.set(brush.source, new Set(brush.rows));
+        const rows = new Set<RowKey>(brush.rows);
+        if ('predicate' in brush && brush.predicate !== undefined) store.#predicates.set(rows, structuredClone(brush.predicate));
+        result.set(brush.source, rows);
       }
       return result;
     };
@@ -175,7 +197,7 @@ export class SelectionStore extends EventTarget {
   }
   #remember(): void {
     if (this.#limit) {
-      this.#past.push(copy(this.#brushes));
+      this.#past.push(copy(this.#brushes, this.#predicates));
       if (this.#past.length > this.#limit) this.#past.shift();
     }
     this.#future = [];
@@ -207,13 +229,23 @@ export class SelectionStore extends EventTarget {
     );
   }
 
+  /**
+   * Brush `rowIds` for `source`. `predicate` is an optional structured-cloneable description of what produced the
+   * rows (for example axis ranges); it is kept with this brush through undo, redo, toJSON and fromJSON and read back
+   * with {@link predicate}.
+   */
   select(
     rowIds: Iterable<RowKey>,
-    options: { readonly source?: string; readonly operation?: SelectionOperation } = {},
+    options: {
+      readonly source?: string;
+      readonly operation?: SelectionOperation;
+      readonly predicate?: unknown;
+    } = {},
   ): void {
     this.#check();
     const source = options.source ?? 'default',
-      operation = options.operation ?? 'replace';
+      operation = options.operation ?? 'replace',
+      predicate = options.predicate === undefined ? undefined : structuredClone(options.predicate);
     if (!['replace', 'union', 'intersect', 'toggle', 'subtract'].includes(operation))
       throw rangeError('Unknown selection operation', 'sciviz');
     const incoming = new Set(rowIds);
@@ -231,8 +263,16 @@ export class SelectionStore extends EventTarget {
       }
     this.#remember();
     if (this.#resolve === 'global') this.#brushes.clear();
+    // `next` is always a new set, so the predicate is this brush's alone.
+    if (predicate !== undefined) this.#predicates.set(next, predicate);
     this.#brushes.set(source, next);
     this.#publish(source);
+  }
+  /** The predicate given with `source`'s current brush (a copy), or undefined when it has none or no brush. */
+  predicate(source: string): unknown {
+    this.#check();
+    const rows = this.#brushes.get(source);
+    return rows && this.#predicates.has(rows) ? structuredClone(this.#predicates.get(rows)) : undefined;
   }
 
   clear(source?: string): void {

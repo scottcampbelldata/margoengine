@@ -110,7 +110,9 @@ fn channel(i: u32, p: vec3f) -> vec4f {
     var keep = 1.0; var weighted = vec3f(0.0); var total = 0.0;
     for (var i = 0u; i < channels; i++) {
       let tf = channel(i, p);
-      let a = 1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * u.info.w * stride / voxel);
+      // Opacity 1 is infinite extinction: opaque over any positive length (density 0 stays clear).
+      let k = u.info.w * stride / voxel;
+      let a = select(1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * k), 1.0, tf.a >= 1.0 && k > 0.0);
       keep *= 1.0 - a; weighted += a * tf.rgb; total += a;
     }
     let a = 1.0 - keep;

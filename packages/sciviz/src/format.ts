@@ -143,12 +143,18 @@ export function tooltipTemplate(template: string, values: Readonly<Record<string
     )(v);
   });
 }
-const visible = (l: Layer) =>
-  'cloud' in l ? l.cloud.visible : 'line' in l ? l.line.visible : !('visible' in l) || l.visible !== false;
+// Set by a selection binding or density replacement on the source it hides while it draws that layer itself.
+const LINKED_DRAW: unique symbol = Symbol.for('@margoengine/sciviz/linked-draw') as never;
+type Shown = { visible?: boolean; [LINKED_DRAW]?: { visible: boolean } };
+// What draws the layer: its replacement when bound (KB5736b), else its own source.
+const drawn = (l: Layer): Shown | undefined => {
+  const source = ('cloud' in l ? l.cloud : 'line' in l ? l.line : 'visible' in l ? l : undefined) as Shown | undefined;
+  return source?.[LINKED_DRAW] ?? source;
+};
+const visible = (l: Layer) => drawn(l)?.visible !== false;
 const visibility = (l: Layer, v: boolean) => {
-  if ('cloud' in l) l.cloud.visible = v;
-  else if ('line' in l) l.line.visible = v;
-  else if ('visible' in l) l.visible = v;
+  const shown = drawn(l);
+  if (shown) shown.visible = v;
 };
 /** Chart domains default to existing data. Optional secondaryY has its own domain/label/format. Minor ticks default 4, crosshair and unified hover true, tooltip text template below. */
 export interface ChartPolishOptions {

@@ -63,6 +63,22 @@ for (const compat of [false, true]) {
         'reversed depth unprojects to the same camera plane at one CSS pixel',
       );
       check(document.activeElement?.getAttribute('data-id') === 'ruler', 'keyboard focus retained after repaint');
+      // KB5765c: frame repaints keep the focused handle element itself; a real change refocuses the same handle.
+      const held = document.activeElement;
+      d.ctAnnotations.render();
+      d.ct.engine.render();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      d.ctAnnotations.render();
+      check(document.activeElement === held && held.isConnected, 'unchanged frames keep the focused handle element');
+      const moved = d.ctAnnotations.annotations[0].points[0];
+      d.ctAnnotations.moveHandle('ruler', 0, [moved[0] + 1, moved[1], moved[2]]);
+      d.ctAnnotations.render();
+      check(
+        document.activeElement !== held &&
+          document.activeElement?.getAttribute('data-id') === 'ruler' &&
+          document.activeElement?.getAttribute('data-handle') === '0',
+        'a changed repaint refocuses the same handle',
+      );
       d.ctAnnotations.restore(original);
       let rejected = false;
       try {

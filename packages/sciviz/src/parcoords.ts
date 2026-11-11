@@ -108,7 +108,9 @@ export class MultivariatePlot extends EventTarget {
     for (const key of data.rowIds) if (!this.selection.contains(key)) throw rangeError('Every multivariate row key must exist in the shared selection', 'sciviz');
     this.#layer = new MultivariateLayer(figure, data, this.selection, kind, options.size ?? 3);
     figure.addLayer(this.#layer);
-    this.#change = () => { if (!this.selection.active) this.#brushes.clear(); this.#layer.selectionChanged(); if (this.#density) this.#scheduleDensity(); this.dispatchEvent(new Event('change')); };
+    // The axis ranges travel with this plot's brush in the store, so undo, redo, restore and another source's global
+    // replace leave the controller on the ranges that made the current rows (KB5700c).
+    this.#change = () => { this.#restoreRanges(); this.#layer.selectionChanged(); if (this.#density) this.#scheduleDensity(); this.dispatchEvent(new Event('change')); };
     this.selection.addEventListener('change', this.#change);
     this.#offPointer = this.#pointer();
   }
@@ -137,6 +139,16 @@ export class MultivariatePlot extends EventTarget {
     this.data.order[position * 2 + 1] = flipped === undefined ? 1 - this.data.order[position * 2 + 1] : Number(flipped);
     this.#layer.orderChanged(); if (this.#density) this.#scheduleDensity(); this.dispatchEvent(new Event('axes'));
   }
+  #restoreRanges(): void {
+    this.#brushes.clear();
+    const ranges = this.selection.predicate(this.#source);
+    if (!Array.isArray(ranges)) return;
+    for (const entry of ranges as unknown[]) {
+      if (!Array.isArray(entry) || entry.length !== 3) continue;
+      const [axis, lo, hi] = entry as [number, number, number];
+      if (Number.isInteger(axis) && axis >= 0 && axis < this.data.axes.length) this.#brushes.set(axis, [lo, hi]);
+    }
+  }
   #axis(name: string): number { const k = this.data.axes.findIndex((a) => a.column === name); if (k < 0) throw rangeError(`Unknown plotted axis ${name}; use an axis column name`, 'sciviz'); return k; }
   /** Inclusive per-axis ranges intersect; undefined clears that axis. Modifiers apply to the resolved row keys. */
   brush(name: string, range?: readonly [number, number], operation: SelectionOperation = 'replace'): void {
@@ -149,7 +161,8 @@ export class MultivariatePlot extends EventTarget {
       let pass = true; for (const [k, [lo, hi]] of this.#brushes) { const v = this.data.raw(k, row); if (!(v >= lo && v <= hi)) { pass = false; break; } }
       if (pass) rows.push(this.data.rowIds[row]);
     }
-    this.selection.select(rows, { source: this.#source, operation });
+    const predicate = [...this.#brushes].map(([k, [lo, hi]]) => [k, lo, hi]);
+    this.selection.select(rows, { source: this.#source, operation, predicate });
   }
   /** A matrix cell's rectangle selects by its two physical coordinates, with shared row ids. */
   brushCell(x: string, y: string, xr: readonly [number, number], yr: readonly [number, number], operation: SelectionOperation = 'replace'): void {
@@ -157,7 +170,7 @@ export class MultivariatePlot extends EventTarget {
     if ([xr, yr].some((r) => r.length !== 2 || !r.every(Number.isFinite) || r[1] < r[0])) throw rangeError('Matrix brush ranges need ordered finite endpoints', 'sciviz');
     const rows: RowKey[] = [];
     for (let i = 0; i < this.data.table.length; i++) { const vx = this.data.raw(a, i), vy = this.data.raw(b, i); if (vx >= xr[0] && vx <= xr[1] && vy >= yr[0] && vy <= yr[1]) rows.push(this.data.rowIds[i]); }
-    this.selection.select(rows, { source: this.#source, operation });
+    this.selection.select(rows, { source: this.#source, operation, predicate: [[a, ...xr], [b, ...yr]] });
   }
   /** Exact integer counts per raster pixel column, displayed with log(1+count) colour. */
   async density(options: ParallelDensityOptions = {}): Promise<Uint32Array> {

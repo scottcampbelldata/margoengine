@@ -120,3 +120,32 @@ test('a change event keeps its rows after the store is disposed (KB5588d)', () =
     assert.deepEqual([...detail.rowIds].sort(), ['a', 'b'], open ? 'open store' : 'fixed store');
   }
 });
+
+test('a brush predicate travels with its rows through undo, redo and saved state (KB5700c)', () => {
+  using store = new SelectionStore(keys);
+  store.select(red, { source: 'plot', predicate: [[0, 1, 20]] });
+  store.select(bright, { source: 'plot', predicate: [[0, 1, 20], [1, 1, 3]] });
+  assert.deepEqual(store.predicate('plot'), [[0, 1, 20], [1, 1, 3]]);
+  store.undo();
+  assert.deepEqual(store.predicate('plot'), [[0, 1, 20]]);
+  store.redo();
+  assert.deepEqual(store.predicate('plot'), [[0, 1, 20], [1, 1, 3]]);
+  store.undo();
+  using restored = SelectionStore.fromJSON(JSON.parse(JSON.stringify(store.toJSON())));
+  assert.deepEqual(restored.predicate('plot'), [[0, 1, 20]]);
+  restored.redo();
+  assert.deepEqual(restored.predicate('plot'), [[0, 1, 20], [1, 1, 3]]);
+  // A brush without a predicate, another source's global replace and a clear all leave none.
+  store.select(red, { source: 'plot' });
+  assert.equal(store.predicate('plot'), undefined);
+  store.select(red, { source: 'plot', predicate: { mine: true } });
+  const given = store.predicate('plot');
+  given.mine = false;
+  assert.deepEqual(store.predicate('plot'), { mine: true }, 'callers get a copy');
+  store.select(bright, { source: 'other' });
+  assert.equal(store.predicate('plot'), undefined);
+  store.undo();
+  assert.deepEqual(store.predicate('plot'), { mine: true });
+  store.clear();
+  assert.equal(store.predicate('plot'), undefined);
+});

@@ -71,6 +71,15 @@ for (const compat of [false, true]) {
       const scaled = centre(await pixels(flat))[0],
         scaledErrors = gpuErrors.slice(before);
       q.dispose();
+      flat.remove(layer);
+      // 8. Opacity 1 is infinite extinction: opaque even when density makes each step a tiny fraction of a voxel
+      // (KB5700a). The log clamp used to leave alpha 1 - 1e-6^(density / quality), near 0 here.
+      layer = flat.volume(new Float32Array(n).fill(0.5), { ...box, opacity: () => 1, density: 1e-4 });
+      const opaque = centre(await pixels(flat));
+      q = qualityVolume(flat, layer, { emptySpaceSkipping: false, adaptive: false, jitter: false });
+      const opaqueQuality = centre(await pixels(flat));
+      q.dispose();
+      flat.remove(layer);
       flat.dispose();
       // 3. Bounds are voxel centres. The centre ray (along data y) passes data x = 1.125: 0.125 of the way from voxel
       // 1 (value 0) to voxel 2 (value 1), so MIP reads 0.125. Sampling the box coordinate as a texture coordinate read
@@ -126,12 +135,24 @@ for (const compat of [false, true]) {
       multi.engine.camera.target = [0, 0, -1];
       const inside = centre(await pixels(multi))[0];
       mv.dispose();
+      multi.engine.camera.position = [0, 0, 4];
+      multi.engine.camera.target = [0, 0, 0];
+      const opaqueMulti = multiVolume(multi, [{ ...cube, opacity: () => 1 }], { quality: 8, density: 1e-4 });
+      const multiOpaque = centre(await pixels(multi));
+      opaqueMulti.dispose();
+      const clearMulti = multiVolume(multi, [{ ...cube, opacity: () => 1 }], { quality: 8, density: 0 });
+      const multiClear = centre(await pixels(multi));
+      clearMulti.dispose();
       multi.dispose();
       return {
         shortAxis,
         shortAxisQuality,
         dense,
         denseQuality,
+        opaque,
+        opaqueQuality,
+        multiOpaque,
+        multiClear,
         scaled,
         scaledErrors,
         plainRamp,
@@ -152,6 +173,10 @@ for (const compat of [false, true]) {
     near(r.shortAxisQuality, expect(0.1, 7), 4, 'qualityVolume along the short axis absorbs over 7 voxels');
     near(r.dense, expect(0.3, 3.5), 4, 'figure.volume density 0.5 halves extinction');
     near(r.denseQuality, expect(0.3, 3.5), 4, 'qualityVolume density 0.5 halves extinction');
+    assert.deepEqual(r.opaque, [255, 0, 0, 255], 'figure.volume opacity 1 is opaque at density 1e-4');
+    assert.deepEqual(r.opaqueQuality, [255, 0, 0, 255], 'qualityVolume opacity 1 is opaque at density 1e-4');
+    assert.deepEqual(r.multiOpaque, [255, 0, 0, 255], 'multi-volume opacity 1 is opaque at density 1e-4');
+    assert.deepEqual(r.multiClear.slice(0, 3), [0, 0, 0], 'multi-volume density 0 stays clear at opacity 1');
     assert.deepEqual(r.scaledErrors, [], 'the quality wrapper binds a colour-scale table');
     near(r.scaled, expect(0.1, 7), 4, 'the quality wrapper reads row 0 of a colour-scale table');
     assert.ok(r.plainRamp > 15, `figure.volume samples voxel centres (red ${r.plainRamp} at 0.125 of a 0 to 1 step)`);

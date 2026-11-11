@@ -51,6 +51,7 @@ export interface SelectionJSON {
     readonly brushes: readonly {
         readonly source: string;
         readonly rows: readonly RowKey[];
+        readonly predicate?: unknown;
     }[];
     readonly past: readonly SelectionJSON['brushes'][];
     readonly future: readonly SelectionJSON['brushes'][];
@@ -83,7 +84,9 @@ export class SelectionStore extends EventTarget {
     select(rowIds: Iterable<RowKey>, options?: {
         readonly source?: string;
         readonly operation?: SelectionOperation;
+        readonly predicate?: unknown;
     }): void;
+    predicate(source: string): unknown;
     clear(source?: string): void;
     undo(): boolean;
     redo(): boolean;

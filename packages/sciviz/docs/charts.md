@@ -30,6 +30,21 @@ using restored = SelectionStore.fromJSON(selection.toJSON());
 console.log(restored.rowIds);
 ```
 
+A brush can carry a `predicate`, any structured-cloneable description of what produced its rows (axis ranges,
+a query string). The store keeps it with that brush through undo, redo, `toJSON` and `fromJSON`; read it back with
+`predicate(source)`, which returns a copy, or undefined once the brush is replaced, cleared or undone away. Controllers
+restore their own state from it on every change, so an undone range never comes back with the next gesture.
+
+```ts
+import { SelectionStore } from '@margoengine/sciviz/link';
+
+using store = new SelectionStore(['a', 'b', 'c']);
+store.select(['a', 'b'], { source: 'axes', predicate: { period: [1, 20] } });
+store.select(['a'], { source: 'axes', predicate: { period: [1, 20], radius: [1, 3] } });
+store.undo();
+console.log(store.predicate('axes')); // { period: [1, 20] }
+```
+
 Store notifications expose source, active, revision and lazy row IDs. Subscriptions
 accept AbortSignal/unsubscribe. Bindings own aligned f32 masks (one per mark, minimum
 16 bytes), rebuild on device restoration, and restore visibility on disposal. Default
@@ -63,7 +78,8 @@ abort removes its view/listeners, leaving the table/query alive.
 `/parcoords` creates parallel coordinates and scatter matrices using common row keys
 and shared scales. Reorder/flip axes and apply axis/cell brushes without changing key
 identity. Pixel-density rendering counts the actual pixel bins; CPU and compatibility
-paths implement the same rule. Its 2D CustomLayer declaration is deliberate. Dispose
+paths implement the same rule. Axis and cell brushes store their ranges as the brush predicate, so undo, redo and a
+restored selection put the controller's ranges back with the rows. Its 2D CustomLayer declaration is deliberate. Dispose
 the chart owner to remove listeners/layers, never the caller's table or selection.
 
 A scatterplot matrix (SPLOM) puts column `cx` against column `cy` in the cell at column `cx`, row `cy` from the top:

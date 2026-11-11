@@ -400,3 +400,28 @@ test('precomputed compressed segmentation expands bit-packed labels and constant
   v.setUint32(4, 3, true);
   assert.deepEqual([...(await (await openPrecomputed(store)).source.read(req([2, 2, 2])))], new Array(8).fill(17));
 });
+
+test('openCloudZarr reads rank-zero scalar arrays, v2 and v3 (KB5822b)', { timeout: 10000 }, async () => {
+  const v2 = {
+    '.zarray': JSON.stringify({ zarr_format: 2, shape: [], chunks: [], dtype: '<f8', compressor: null, fill_value: null, order: 'C', filters: null }),
+    0: new Uint8Array(Float64Array.of(2.5).buffer),
+  };
+  const v3 = {
+    'zarr.json': JSON.stringify({
+      zarr_format: 3,
+      node_type: 'array',
+      shape: [],
+      data_type: 'float32',
+      chunk_grid: { name: 'regular', configuration: { chunk_shape: [] } },
+      chunk_key_encoding: { name: 'default' },
+      fill_value: 0,
+      codecs: [{ name: 'bytes', configuration: { endian: 'little' } }],
+    }),
+    c: new Uint8Array(Float32Array.of(-4).buffer),
+  };
+  for (const [objects, value] of [[v2, 2.5], [v3, -4]]) {
+    const array = await openCloudZarr(objects);
+    assert.deepEqual(array.shape, []);
+    assert.deepEqual([...(await array.read({ start: [], stop: [] })).data], [value]);
+  }
+});

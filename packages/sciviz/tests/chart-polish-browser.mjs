@@ -38,6 +38,24 @@ for (const compat of [false, true]) {
       if ((await figure.toSVG()).includes('<polyline')) throw Error('Hidden lines still export');
       chart.setVisible(existing, true);
       chart.setVisible(secondary, true);
+      // KB5736b: a selection-bound line is drawn by its binding, so hiding the layer hides the binding.
+      const { SelectionStore, bindSelection } = await import('/packages/sciviz/dist/link.js'),
+        store = new SelectionStore(Array.from({ length: existing.positions.length / 3 }, (_, i) => i));
+      let binding = bindSelection(figure, existing, store);
+      chart.setVisible(existing, false);
+      if (binding.visible !== false) throw Error('Hidden bound layer still draws');
+      if (figure.pick(x, y, { radius: 3 }) !== null) throw Error('Hidden bound layer still picks');
+      chart.setVisible(existing, true);
+      if (binding.visible !== true || figure.pick(x, y, { radius: 3 })?.layer !== existing)
+        throw Error('Shown bound layer does not draw and pick');
+      chart.setVisible(existing, false);
+      binding.dispose();
+      if (existing.line.visible !== false) throw Error('Unbinding a hidden layer showed it');
+      binding = bindSelection(figure, existing, store);
+      if (binding.visible !== false) throw Error('Binding a hidden layer showed it');
+      binding.dispose();
+      chart.setVisible(existing, true);
+      store.dispose();
       const svg = await chart.toSVG(),
         doc = new DOMParser().parseFromString(svg, 'image/svg+xml'),
         ids = [...doc.querySelectorAll('[id]')].map((n) => n.id);

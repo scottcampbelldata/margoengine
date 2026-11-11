@@ -86,7 +86,6 @@ export class SelectionBinding implements Drawable {
   readonly #uniform = new Float32Array(20);
   readonly #geometry: Float32Array;
   readonly #colours: Uint32Array;
-  readonly #originalVisible: boolean;
   #buffers: GPUBuffer[] = [];
   #layout!: GPUBindGroupLayout;
   #group!: GPUBindGroup;
@@ -132,7 +131,8 @@ export class SelectionBinding implements Drawable {
       }
     } else if ('colours' in layer) this.#colours.set(layer.colours);
     const target = layer.kind === 'scatter' ? layer.cloud : layer.kind === 'line' ? layer.line : layer;
-    this.#originalVisible = target.visible;
+    // The binding draws in the source's place: it starts with the source's visibility and hands it back on dispose.
+    this.visible = target.visible;
     this.#rebuild();
     target.visible = false;
     (target as { [LINKED_DRAW]?: SelectionBinding })[LINKED_DRAW] = this;
@@ -290,7 +290,7 @@ export class SelectionBinding implements Drawable {
       [LINKED_DRAW]?: SelectionBinding;
     };
     if (target[LINKED_DRAW] === this) delete target[LINKED_DRAW];
-    target.visible = this.#originalVisible;
+    target.visible = this.visible;
   }
   [Symbol.dispose](): void {
     this.dispose();

@@ -7678,3 +7678,10 @@ both backends. Quality gate change: the one-brick check of `tests/bricks-browser
 test-only exact float trilinear filter (pipeline constant `filterMode`; the normal path builds the hardware branch
 only) at 1 of 255, and bounds each hardware march by an 8-bit filter-weight model (measured worst 6 within the model's
 8); docs/limits.md, "Sciviz volume filtering precision". Still missing: the same measurement on an AMD or Intel GPU.
+
+Opacity 1 (KB5700a, 2026-11-11): the per-step opacity correction of the scalar, bricked, multi-volume, quality and
+curvilinear marches, and of GPU volume picking, takes alpha exactly 1 when the classified opacity is 1 and the step is
+positive (opacity 1 is infinite extinction), instead of 1 - 1e-6^k or a 0.999999 clamp. Tetrahedral and AMR marches
+already did. The cinematic path tracer keeps its 0.9999 extinction clamp (a finite free-flight distance). Evidence:
+case 8 of `tests/volume-physics-browser.mjs`, `opaque` in `tests/curvilinear-browser.mjs`, the opacity check of
+`tests/bricks-browser.js` and `tests/pick-gpu-browser.mjs` (threshold 1), both backends on the A6000.

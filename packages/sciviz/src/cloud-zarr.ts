@@ -29,6 +29,10 @@ export function cloudCounts(value: unknown, rank?: number): number[] {
   return [...out];
 }
 
+// Zarr arrays may be rank zero (shape and chunks []): one scalar chunk keyed "c" (v3) or "0" (v2) (KB5822b).
+const zarrCounts = (value: unknown, rank?: number) =>
+  Array.isArray(value) && !value.length && !rank ? [] : cloudCounts(value, rank);
+
 /** Cloud codec/shard bounds plus the standard Zarr opening options. */
 export interface CloudZarrOptions extends CloudStoreOptions, ZarrOptions {
   /** Largest decoded chunk or index. Default 64 MiB. */
@@ -69,14 +73,14 @@ export async function cloudZarrStore(input: CloudInput, path = '', options: Clou
   let shardKey: (index: number[]) => string;
   if (v3) {
     const grid = meta.chunk_grid as { configuration: { chunk_shape: number[] } };
-    outer = cloudCounts(grid?.configuration?.chunk_shape);
+    outer = zarrCounts(grid?.configuration?.chunk_shape);
     const list = meta.codecs as Codec[];
     if (!Array.isArray(list)) throw bad('missing codec list');
     const sharding = list.find((c) => c.name === 'sharding_indexed');
     if (sharding) {
       if (list.length !== 1) throw bad('sharding must be the outer codec');
       shard = sharding.configuration;
-      chunks = cloudCounts(shard?.chunk_shape, outer.length);
+      chunks = zarrCounts(shard?.chunk_shape, outer.length);
       if (outer.some((n, i) => n % chunks[i])) throw bad('inner chunks do not divide shard shape');
       codecs = shard!.codecs as Codec[];
       grid.configuration.chunk_shape = chunks;
@@ -100,7 +104,7 @@ export async function cloudZarrStore(input: CloudInput, path = '', options: Clou
     shardKey = (index) => root + [...lead, ...index].join(separator);
     meta.codecs = codecs.filter((c) => ['bytes', 'transpose'].includes(c.name));
   } else {
-    chunks = outer = cloudCounts(meta.chunks);
+    chunks = outer = zarrCounts(meta.chunks);
     const compressor = meta.compressor as { id?: string } | null;
     codecs = compressor ? [{ name: String(compressor.id), configuration: compressor as ObjectValue }] : [];
     meta.compressor = null;

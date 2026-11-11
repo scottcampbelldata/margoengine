@@ -53,6 +53,7 @@ export class Annotations extends EventTarget {
   readonly #offFrame: () => void;
   readonly #offExport: () => void;
   readonly #editable: boolean;
+  #painted = '';
   #disposed = false;
   #drag?: { id: string; index: number; depth: number; pointer: number };
   constructor(figure: Figure, options: AnnotationOptions = {}) {
@@ -409,7 +410,19 @@ export class Annotations extends EventTarget {
     this.element.style.top = `${this.#canvas.offsetTop}px`;
     this.element.setAttribute('width', String(r.width));
     this.element.setAttribute('height', String(r.height));
-    renderMarkup(this.element, svgNS, [this.#markup(r.width, r.height, true)]);
+    // Frames repaint without rebuilding the SVG when nothing moved, so a focused handle keeps focus; a real change
+    // rebuilds it and moves focus to the same handle of the same record (KB5765c).
+    const markup = this.#markup(r.width, r.height, true),
+      text = markupText([markup]);
+    if (text === this.#painted) return;
+    this.#painted = text;
+    const active = this.element.ownerDocument.activeElement,
+      focused = active && this.element.contains(active) ? active : null,
+      handle = focused?.getAttribute('data-handle'),
+      record = focused?.getAttribute('data-record');
+    renderMarkup(this.element, svgNS, [markup]);
+    if (handle != null && record != null)
+      this.element.querySelector<SVGElement>(`[data-handle="${handle}"][data-record="${record}"]`)?.focus();
   }
   dispose(): void {
     if (this.#disposed) return;

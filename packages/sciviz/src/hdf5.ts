@@ -589,15 +589,32 @@ export async function openHDF5(input: FileInput, options: FileOptions = {}): Pro
           else if (l.index === 1)
             chunks.push({ origin: shape.map(() => 0), address: l.address, size: l.size || rawSize, mask: l.mask });
           else if (l.index === 2) {
-            const dims = shape.map((n, d) => Math.ceil(n / cs[d]));
-            for (let i = 0; i < product(dims); i++) {
-              let q = i;
-              const origin = dims.map(() => 0);
-              for (let d = rank - 1; d >= 0; d--) {
-                origin[d] = (q % dims[d]) * cs[d];
-                q = Math.floor(q / dims[d]);
-              }
-              if (intersects(origin)) chunks.push({ origin, address: l.address + i * rawSize, size: rawSize, mask: 0 });
+            // Implicit index: chunk i sits at address + i * rawSize. Visit only the chunks holding a selected value,
+            // per axis (at most count[d] of them), never every chunk of the shape (KB0535b).
+            const dims = shape.map((n, d) => Math.ceil(n / cs[d])),
+              signal = alive(selection.signal),
+              axes = cs.map((n, d) => {
+                const out: number[] = [];
+                if (!count[d]) return out;
+                const last = Math.floor((start[d] + (count[d] - 1) * stride[d]) / n);
+                for (let k = Math.floor(start[d] / n); k <= last; k++) {
+                  const j = Math.max(0, Math.ceil((k * n - start[d]) / stride[d]));
+                  if (j < count[d] && start[d] + j * stride[d] < (k + 1) * n) out.push(k);
+                }
+                return out;
+              });
+            const at = axes.map(() => 0);
+            for (let visited = 0; axes.every((a) => a.length); visited++) {
+              if (!(visited & 4095)) signal.throwIfAborted();
+              let i = 0;
+              const origin = at.map((p, d) => {
+                i = i * dims[d] + axes[d][p];
+                return axes[d][p] * cs[d];
+              });
+              chunks.push({ origin, address: l.address + i * rawSize, size: rawSize, mask: 0 });
+              let d = rank - 1;
+              while (d >= 0 && ++at[d] === axes[d].length) at[d--] = 0;
+              if (d < 0) break;
             }
           } else if (l.index === 3) {
             const h = new Cursor(await read(l.address, 12 + lw + ow, selection.signal));
