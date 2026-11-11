@@ -4,8 +4,10 @@
 `@margoengine/shadows` and `@margoengine/lod` attached; core restores each one and draws 120 frames before the next
 (its budget gives up after four losses within 120 frames). It counts live buffers and textures on the current device
 (created less destroyed) after the first and the hundredth restore and compares the two pictures. RTX A6000, Edge 157:
-native WebGPU 12 buffers and 4 textures both times, the same picture; the WebGL2 layer 12 and 6 in two runs of three,
-and 6 then 5 textures in the third (open in docs/known-bugs.md). Standalone, run by hand in a shared GPU slot; no check
+native WebGPU 12 buffers and 4 textures both times, the same picture; the WebGL2 layer 12 and 6, the extra two
+being the canvas texture and the shadows route's nearest-depth level. That level went missing in about one restore in
+seven until the route was kept once loaded (docs/known-bugs.md, fixed 2026-11-11); since then 400 restores kept 6.
+The soak names each live texture by format and size when counts differ. Standalone, run by hand in a shared GPU slot; no check
 runs it yet. Missing: gltf-pro models in the scene, other GPUs.
 
 ### Section 5 evidence: alpha-tested mip coverage (2026-11-10)

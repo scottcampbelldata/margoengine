@@ -18,12 +18,13 @@ const context = await openBrowser({ startPath: '/tests/modern-game.html', port: 
 await runSuite(
   async () => {
     const result = await page.evaluate(async (cycles) => {
-      // Live buffers and textures per device: created less destroyed, on every device requested from here on.
+      // Live buffers and textures per device: created less destroyed, on every device requested from here on. Each
+      // live texture's format and size are kept too, so a count that differs names the texture.
       const live = new WeakMap(),
         request = GPUAdapter.prototype.requestDevice;
       GPUAdapter.prototype.requestDevice = async function (...args) {
         const device = await request.apply(this, args),
-          count = { buffers: 0, textures: 0 };
+          count = { buffers: 0, textures: 0, kinds: new Map() };
         live.set(device, count);
         for (const [method, key] of [
           ['createBuffer', 'buffers'],
@@ -35,8 +36,13 @@ await runSuite(
               destroy = resource.destroy;
             let alive = true;
             count[key]++;
+            const kind = key === 'textures' && `${descriptor.format} ${[descriptor.size].flat().join('x')}`;
+            if (kind) count.kinds.set(kind, (count.kinds.get(kind) ?? 0) + 1);
             resource.destroy = function () {
-              if (alive) count[key]--;
+              if (alive) {
+                count[key]--;
+                if (kind) count.kinds.set(kind, count.kinds.get(kind) - 1);
+              }
               alive = false;
               return destroy.call(this);
             };
@@ -101,8 +107,10 @@ await runSuite(
         // draws 120 frames before the next loss, as a page would between real losses.
         for (let f = 0; f < 120; f++) engine.render({ delta: 1 / 60 });
         if (cycle === 1 || cycle === cycles) {
-          const image = await settle();
-          states.push({ cycle, ...live.get(engine.gpu), image: Array.from(image) });
+          const image = await settle(),
+            { buffers, textures, kinds } = live.get(engine.gpu);
+          const named = [...kinds].filter(([, n]) => n).map(([kind, n]) => `${n} ${kind}`).sort();
+          states.push({ cycle, buffers, textures, kinds: named, image: Array.from(image) });
         }
       }
       const [first, last] = states;
@@ -117,8 +125,8 @@ await runSuite(
       engine.dispose();
       return {
         errors,
-        first: { cycle: first.cycle, buffers: first.buffers, textures: first.textures },
-        last: { cycle: last.cycle, buffers: last.buffers, textures: last.textures },
+        first: { cycle: first.cycle, buffers: first.buffers, textures: first.textures, kinds: first.kinds },
+        last: { cycle: last.cycle, buffers: last.buffers, textures: last.textures, kinds: last.kinds },
         differ,
         lit,
         centre: first.image.slice(((size / 2) * size + size / 2) * 4, ((size / 2) * size + size / 2) * 4 + 3),
@@ -130,8 +138,8 @@ await runSuite(
     assert.deepEqual(result.errors, []);
     assert.ok(result.lit > 500, `the scene draws over the clear colour (${result.lit} px): ${JSON.stringify(result)}`);
     assert.deepEqual(
-      [result.last.buffers, result.last.textures],
-      [result.first.buffers, result.first.textures],
+      [result.last.buffers, result.last.textures, result.last.kinds],
+      [result.first.buffers, result.first.textures, result.first.kinds],
       `live GPU resources after restore ${result.first.cycle} and ${result.last.cycle}: ${JSON.stringify(result)}`,
     );
     assert.equal(result.differ, 0, `picture after restore ${result.last.cycle} differs on ${result.differ} pixels`);

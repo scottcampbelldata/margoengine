@@ -34,7 +34,7 @@ import {
   type ShadowFilterEffect,
 } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { compatibilityLevel, loadCompatRoute } from '../../shared/compat.js';
+import { compatibilityLevel, compatTier, loadCompatRoute } from '../../shared/compat.js';
 import { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';
 import {
   casterBuffers,
@@ -306,6 +306,8 @@ interface Batch {
 // Below this many casters sharing a geometry, each keeps its own draw: the instanced path pays a storage upload and
 // its own pipeline, which only pays off for many copies (a field of identical boxes, rocks, parts).
 const BATCH_MIN = 8;
+/** The WebGL2 layer's nearest-depth route once a Shadows has loaded it (import() only on that layer). */
+let compatRoute: typeof import('./compat.js') | undefined;
 // Depth-only, no fragment stage: core casters have no alpha. One world matrix per instance from a storage array.
 const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f;
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
@@ -790,9 +792,14 @@ export class Shadows implements EnginePlugin {
     this.engine = engine;
     this.device = engine.gpu;
     const device = this.device;
-    loadCompatRoute(device, () => import('./compat.js'))?.then(({ NearestRoute }) => {
-      if (this.device === device) this.nearestRoute = new NearestRoute(device);
-    });
+    // Once the route has loaded, every later setup (a device restore, another Shadows) takes it at once: waiting for
+    // import() again let the first frames on the new device run the WebGPU kernel on the layer's CPU tier.
+    if (compatRoute && compatTier(device) === 'webgl2') this.nearestRoute = new compatRoute.NearestRoute(device);
+    else
+      loadCompatRoute(device, () => import('./compat.js'))?.then((route) => {
+        compatRoute = route;
+        if (this.device === device && !this.nearestRoute) this.nearestRoute = new route.NearestRoute(device);
+      });
     this.validate();
     this.checkLimits();
     for (const r of this.sources)
@@ -1260,19 +1267,8 @@ export class Shadows implements EnginePlugin {
    */
   private nearest(c: ShadowPassContext): void {
     const device = c.device;
-    this.nearestPipeline ??= device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: device.createShaderModule({ code: nearestDepth }), entryPoint: 'main' },
-    });
-    this.nearestGroup ??= device.createBindGroup({
-      layout: this.nearestPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.combinedView! },
-        { binding: 1, resource: { buffer: this.nearestBuffer! } },
-      ],
-    });
-    device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
     if (this.nearestRoute) {
+      device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
       this.nearestRoute.encode(
         c.encoder,
         this.combinedView!,
@@ -1285,6 +1281,18 @@ export class Shadows implements EnginePlugin {
       this.nearestStale = false;
       return;
     }
+    this.nearestPipeline ??= device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code: nearestDepth }), entryPoint: 'main' },
+    });
+    this.nearestGroup ??= device.createBindGroup({
+      layout: this.nearestPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.combinedView! },
+        { binding: 1, resource: { buffer: this.nearestBuffer! } },
+      ],
+    });
+    device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
     const pass = c.encoder.beginComputePass();
     pass.setPipeline(this.nearestPipeline);
     pass.setBindGroup(0, this.nearestGroup);
