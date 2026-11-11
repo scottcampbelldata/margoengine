@@ -53,15 +53,16 @@ function assertDisposed(h) {
   h.cleanup();
 }
 
-// The baseline includes the retained orthographic camera path; optional shadow hooks remain absent.
+// The baseline includes the retained orthographic camera path; optional shadow hooks remain absent. Recorded again
+// for KB6016 (the height-correlated Smith G2 in the light loop), the one intended change to this text.
 test('unconfigured clustered lighting retains the exact baseline sampling source and bindings', () => {
   assert.equal(
     createHash('sha256').update(clusteredSampling(0)).digest('hex'),
-    '0d481b539f3b9bca7c25f25ac776fac8aca983258418b71e4ca9c7d4a2def4fa',
+    '4123a705969acd433f93157d49052424bdc44f56720d9481aee438c67a077368',
   );
   assert.equal(
     createHash('sha256').update(clusteredSampling(2)).digest('hex'),
-    '431160d2518756d721c1292f5fe41aa6c612d14d2eb3cd53a91bb76b3725a4a5',
+    'ff3311a00713be0a6cfcd9809be2305f23f0a41dcabc77483fc2c807b2f478e2',
   );
   const h = harness(),
     effect = new Clustered({ grid: [2, 2, 2] });

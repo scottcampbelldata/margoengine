@@ -15,9 +15,11 @@ height-correlated Smith-GGX G2 = 1 / (1 + Lambda(v) + Lambda(l)) (Heitz 2014, JC
 B.3.2, current revision) in place of the separable G1 G1 (KB5875a). Evidence: `packages/core/tests/smith.test.js`,
 `packages/gltf-pro/tests/smith.test.js` and `packages/webgl2-compat/test/smith.test.js` evaluate each shader's own
 text against Heitz's Lambda over 150 (nl, nv, roughness) points (1e-12); G2 is never below G1 G1 and gains over 25
-percent rough and grazing. gltf-pro's naming proof fixture follows the same line (re-recorded). Missing: clustered,
-materials and the other PBR shaders still write the separable `smithG` (docs/known-bugs.md, open); no
-multiple-scattering compensation in direct light.
+percent rough and grazing. gltf-pro's naming proof fixture follows the same line (re-recorded). Since KB6016 every
+other PBR direct light (clustered, materials, terrain, lod imposters, animation VAT, post material decals, voxel) takes
+the same `smithGCorrelated`, and the separable `smithG` export is gone; `tests/smith-shaders.test.js` evaluates each
+user and scans every package's source for a separable product. Missing: environment's split-sum DFG table still
+integrates the separable G (KB6016b, docs/known-bugs.md, open); no multiple-scattering compensation in direct light.
 
 ### Section 5 evidence: allocation-free changed-row uploads (2026-11-11)
 

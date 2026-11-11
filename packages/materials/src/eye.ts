@@ -4,7 +4,7 @@
 // light. The sizes are those of Gullstrand's schematic eye as usually quoted: cornea index 1.376, an eyeball 24 mm across,
 // an iris about 11.7 mm across and an anterior chamber about 3 mm deep. Outside the cornea the material is the sclera. The
 // reflection is GGX on the smooth cornea, F0 from the index, on the mesh's normal; a normal map shows on the sclera only.
-import { ggxD, smithG } from '../../shared/light-terms.js';
+import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
 import { direction, float, localShaded, shaded, vec3, vertexFields, within } from './character-light.js';
 import { whiteTexture } from '../../shared/white-texture.js';
 import type { Material, MaterialFeature, Texture } from './built-material.js';
@@ -85,7 +85,7 @@ fn margoEyeSurface(i:Out,n:vec3f,under:Surface)->Surface {
 fn margoEyeLight(n:vec3f,v:vec3f,l:vec3f,base:vec3f)->vec3f {
   let h=(v+l)/max(length(v+l),0.0001); let nl=clamp(dot(n,l),0.0,1.0); let nv=clamp(dot(n,v),0.0001,1.0);
   let nh=clamp(dot(n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0); let a=margoEyeRoughness*margoEyeRoughness; let a2=a*a;
-  let d=${ggxD}; let g=${smithG}; let f0=mix(0.04,${f0},margoEyeCornea); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
+  let d=${ggxD}; let g=${smithGCorrelated}; let f0=mix(0.04,${f0},margoEyeCornea); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
   let through=select(0.0,max(dot(-refract(-l,n,1.0/${ior}),margoEyeLook),0.0),nl>0.0);
   return (1-fresnel)*base/3.14159265*mix(nl,through,margoEyeCornea)+d*g*fresnel/max(4*nv,0.0001);
 }

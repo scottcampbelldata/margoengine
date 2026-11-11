@@ -9,6 +9,7 @@ import { transmissionQuads } from '../../../tests/support/transmission-fixture.j
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
+// gltf-pro's base shader since KB5875a (edcb6debb7, height-correlated Smith G2); the root tests took it then.
 const baselineShader = '4333079f4e7977e43594a1b377c701910a47c5474b10f65bbf963a9ddd5e1dcd';
 const transmission = (factor = 1, extra = {}) => ({
   KHR_materials_transmission: { transmissionFactor: factor },

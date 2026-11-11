@@ -4,23 +4,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { wgsl } from '../src/shaders.ts';
-import { smithG, smithGCorrelated, smithGCorrelatedFloat } from '../../shared/light-terms.js';
+import { smithGCorrelated, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { correlatedG2, separableG2, shaderExpression, smithGrid } from '../../../tests/support/smith-reference.js';
 
 const names = ['nl', 'nv', 'a2'];
+// The separable G1 G1 text the shaders wrote before KB5875a and KB6016 (Walter et al. 2007, eq. 34).
+const SEPARABLE = '2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001)';
 const coreG = shaderExpression(/let g=([^;]+);/.exec(wgsl)[1], names);
 
 test("core's direct light evaluates the height-correlated Smith G2 (Heitz 2014, eq. 99)", () => {
   for (const [nl, nv, a2] of smithGrid()) {
     const want = correlatedG2(nl, nv, a2);
-    assert.ok(Math.abs(coreG(nl, nv, a2) - want) < 1e-12, `G at nl ${nl}, nv ${nv}, a2 ${a2}: ${coreG(nl, nv, a2)} vs ${want}`);
+    assert.ok(
+      Math.abs(coreG(nl, nv, a2) - want) < 1e-12,
+      `G at nl ${nl}, nv ${nv}, a2 ${a2}: ${coreG(nl, nv, a2)} vs ${want}`,
+    );
   }
 });
 
 test('the shared height-correlated text is the same G2, and never below the separable form', () => {
   const shared = shaderExpression(smithGCorrelated, names),
     float = shaderExpression(smithGCorrelatedFloat, names),
-    separable = shaderExpression(smithG, names);
+    separable = shaderExpression(SEPARABLE, names);
   let gain = 0;
   for (const [nl, nv, a2] of smithGrid()) {
     const want = correlatedG2(nl, nv, a2);

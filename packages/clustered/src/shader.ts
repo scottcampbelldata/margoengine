@@ -1,4 +1,4 @@
-import { clusterBrdf, clusterCell, decayTerms, ggxD, legacyTerms, smithG } from '../../shared/light-terms.js';
+import { clusterBrdf, clusterCell, decayTerms, ggxD, legacyTerms, smithGCorrelated } from '../../shared/light-terms.js';
 const declarations = (group: number) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
 struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
@@ -49,7 +49,7 @@ const directionalLoop = (shadow: string) => /* wgsl */ `
     let light=clusterDirectional.lights[j];let l=light.toLight.xyz;let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=${ggxD};
-    let g=${smithG};
+    let g=${smithGCorrelated};
     let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
     result+=${clusterBrdf}*nl*light.color.rgb${shadow};
   }`;
@@ -78,7 +78,7 @@ export interface ClusteredSamplingHooks {
    */
   contact?: { declarations(group: number): string; readonly term: string };
 }
-// BRDF: GGX D and separable Smith-GGX G (Walter et al. 2007 eq. 33-34), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
+// BRDF: GGX D (Walter et al. 2007 eq. 33) and height-correlated Smith-GGX G2 (Heitz 2014, JCGT 3(2), eq. 99; KB6016), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
 // (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
 // published engine standard.
 /**
@@ -117,7 +117,7 @@ export function clusteredSampling(
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=${ggxD};
-    let g=${smithG};
+    let g=${smithGCorrelated};
     let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}`,
     start =

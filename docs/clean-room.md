@@ -2176,7 +2176,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| P2 | ggxD / smithG text snippets used by every PBR shader | shared/light-terms.js | glTF 2.0 Appendix B |
+| P2 | ggxD / smithGCorrelated text snippets used by every PBR shader | shared/light-terms.js | glTF 2.0 Appendix B (current revision, B.3.2); E. Heitz, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), 2014, eq. 99 (height-correlated G2, https://jcgt.org/published/0003/02/03/); Walter et al. 2007, eq. 33 (GGX D) |
 | P3 | Khronos PBR Neutral + sRGB encode | shared/display.js, core/src/shaders.ts, shader/src/raw.ts | Khronos PBR Neutral spec (2024); IEC 61966-2-1 |
 | P4 | Light distance window and spot cone | shared/light-terms.js | Karis 2013 eq. 9 (window); floor is Margo's (documented: ball of radius 1/64) |
 | P5 | clustered per-light BRDF text | shared/light-terms.js | glTF Appendix B |

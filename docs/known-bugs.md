@@ -6534,16 +6534,33 @@ Appendix B.3.2 gives (`smithGCorrelated` in `packages/shared/light-terms.js`). G
 grid the largest gain is over 25 percent (rough, grazing); at normal incidence both are 1. Core + stage 24,812 B to
 24,808 B gzip (the expression is shorter). Scott's 2026-11-11 core ruling. Regression: packages/core/tests/smith.test.js,
 packages/gltf-pro/tests/smith.test.js, packages/webgl2-compat/test/smith.test.js (each fails on the separable form).
-The other PBR shaders (clustered, materials, terrain, lod, animation, post decals, voxel) still write the separable
-`smithG` (next entry).
+The other PBR shaders (clustered, materials, terrain, lod, animation, post decals, voxel) followed in KB6016 (next
+entry).
 
-### Open: clustered, materials and the other PBR shaders still use the separable Smith G (2026-11-11)
+### Fixed 2026-11-11: clustered, materials and the other PBR shaders used the separable Smith G (KB6016)
 
-Repro: `packages/shared/light-terms.js` `smithG` (and `ggxNamed`), used by clustered/src/shader.ts, materials,
-terrain, lod imposters, animation VAT, post material decals and voxel render. A clustered light on a core or gltf-pro
-material uses the separable G while the sun uses the height-correlated one, so the two lights shade the same surface
-with different masking. Cause: KB5875a moved only core, its WebGL2 twin and gltf-pro (the approved core row). Fix to
-build: switch `smithG` to the height-correlated form and re-record each package's proofs.
+`packages/shared/light-terms.js` `smithG` (and `ggxNamed`), used by clustered's light loop, materials (the clearcoat
+lobe, eye, skin and the lobe extension's isotropic path), terrain, lod imposters, animation VAT, post material decals and
+voxel render, was the separable G1 G1, so a clustered light on a core or gltf-pro material used it while the sun used
+the height-correlated G2: two lights shaded one surface with different masking. Cause: KB5875a moved only core, its WebGL2
+twin and gltf-pro. Every one of them now takes `smithGCorrelated` (G2 = 1 / (1 + Lambda(v) + Lambda(l)), Heitz 2014,
+"Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), eq. 99), `ggxNamed` gives G2, the
+separable `smithG` and `smithGFloat` exports are gone, and the materials lobe extension's anisotropic path uses the
+anisotropic G2, 2 nl nv / (nl |(at tv, ab bv, nv)| + nv |(at tl, ab bl, nl)|), which meets the isotropic G2 at equal
+widths (KHR_materials_anisotropy's V). Only shader text changes: the same draws, buffer writes and bytes, bind groups and
+allocations. The proofs whose GPU call logs carry these shaders took the change at its commit (claims.md). Regression:
+tests/smith-shaders.test.js (fails on the separable text in every user, on `ggxNamed`, on the anisotropic G1 product,
+and on any separable product left in package source). The materials tests also pinned gltf-pro's base shader hash from
+before KB5875a; they take its current hash (the root tests already did).
+
+### Open: environment's split-sum table integrates the separable Smith G (KB6016b, 2026-11-11)
+
+Repro: `packages/environment/src/shaders.ts` `smithG1(nv, a2) * smithG1(l.z, a2)` in the DFG table (Karis 2013,
+split sum), the one separable product tests/smith-shaders.test.js still lists. Direct light everywhere uses the
+height-correlated G2 since KB5875a and KB6016, so image-based specular uses a different masking from direct specular.
+Cause: the table was left out of KB6016 because it moves every image-based-lighting picture, including the batch 160
+environment budget (already 1 over, KB3574), which needs a re-record ruling. Fix to build: integrate G2 in the table
+(Heitz 2014 eq. 99), recapture the environment proofs and re-record the IBL budget under a ruling.
 
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 

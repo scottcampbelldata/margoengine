@@ -32,7 +32,7 @@ export interface LobeShaderConfig {
 
 /** Optional lobes replace only the existing directional BRDF and hemisphere approximation. */
 // Sources: anisotropic GGX D and the mix(a, 1, s^2) width: KHR_materials_anisotropy "Implementation" (Burley 2012);
-// separable anisotropic Smith G1: Heitz 2014; specular-extension Fresnel mix and diffuse x (1 - max F):
+// height-correlated anisotropic Smith G2 = 1 / (1 + Lambda(v) + Lambda(l)): Heitz 2014, JCGT 3(2), eq. 99 (KB6016); specular-extension Fresnel mix and diffuse x (1 - max F):
 // KHR_materials_specular; sheen albedo scaling: KHR_materials_sheen "Albedo-scaling technique". The hemisphere ambient
 // (ground (0.35, 0.3, 0.25), specular weight 0.5) is a Margo design choice. Transmitted share: the transmitted light is
 // in fresnel_mix's base (KHR_materials_transmission), so 1 - specular x max(F) (KHR_materials_specular) applies, under
@@ -160,13 +160,12 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
       let materialDistribution=vec3f(materialAB*dot(material.tangent,materialH),materialAT*dot(material.bitangent,materialH),materialProduct*materialNH);
       let materialW=materialProduct/max(dot(materialDistribution,materialDistribution),0.000000000001);
       let materialAnisotropicD=materialProduct*materialW*materialW/3.14159265;
-      // Independent anisotropic Smith G1 terms retain the base shader's limit.
-      // https://www.pbr-book.org/4ed/Reflection_Models/Roughness_Using_Microfacet_Theory
+      // Height-correlated anisotropic Smith G2 = 2 nl nv / (nl |(at tv, ab bv, nv)| + nv |(at tl, ab bl, nl)|) keeps the
+      // isotropic G2 of the base shader at at = ab (Heitz 2014, JCGT 3(2), eq. 99; KHR_materials_anisotropy V).
       let materialViewLength=length(vec3f(materialAT*dot(material.tangent,materialV),materialAB*dot(material.bitangent,materialV),materialNV));
       let materialLightLength=length(vec3f(materialAT*dot(material.tangent,materialL),materialAB*dot(material.bitangent,materialL),materialNL));
-      let materialG1V=2*materialNV/(materialNV+materialViewLength);
-      let materialG1L=2*materialNL/max(materialNL+materialLightLength,0.0001);
-      materialSpecularBRDF=materialAnisotropicD*materialG1V*materialG1L/max(4*materialNL*materialNV,0.0001);
+      let materialG2=2*materialNL*materialNV/max(materialNL*materialViewLength+materialNV*materialLightLength,0.0001);
+      materialSpecularBRDF=materialAnisotropicD*materialG2/max(4*materialNL*materialNV,0.0001);
       }
     }
     let materialWeight=pow(1-materialVH,5.0);

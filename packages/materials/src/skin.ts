@@ -7,7 +7,7 @@
 // read per pixel with the curvature |dN| / |dP| from screen derivatives, in one pass, with nothing to blur. Fine detail
 // scatters too, so red reads a normal between the mesh's and the normal map's, green closer to the map, and blue the map.
 // The specular lobe is GGX with skin's index of 1.4 (F0 0.028, d'Eon and Luebke).
-import { ggxD, smithG } from '../../shared/light-terms.js';
+import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
 import { float, localShaded, shaded, within } from './character-light.js';
 import { mipTexture } from './mips.js';
 import type { MaterialFeature, Texture } from './built-material.js';
@@ -87,7 +87,7 @@ fn margoSkinRead(n:vec3f,l:vec3f)->vec3f {return textureSampleLevel(margoSkinMap
 fn margoSkinLight(n:vec3f,v:vec3f,l:vec3f,base:vec3f)->vec3f {
   let h=(v+l)/max(length(v+l),0.0001); let nl=clamp(dot(n,l),0.0,1.0); let nv=clamp(dot(n,v),0.0001,1.0);
   let nh=clamp(dot(n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0); let a=margoSkinRoughness*margoSkinRoughness; let a2=a*a;
-  let d=${ggxD}; let g=${smithG}; let fresnel=0.028+0.972*pow(1-vh,5.0);
+  let d=${ggxD}; let g=${smithGCorrelated}; let fresnel=0.028+0.972*pow(1-vh,5.0);
   let scattered=vec3f(margoSkinRead(normalize(mix(margoSkinMesh,n,0.25)),l).r,margoSkinRead(normalize(mix(margoSkinMesh,n,0.6)),l).g,margoSkinRead(n,l).b);
   return (1-fresnel)*base/3.14159265*scattered+d*g*fresnel/max(4*nv,0.0001);
 }

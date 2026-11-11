@@ -6,7 +6,7 @@ import { neutralShader } from '../../shared/display.js';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { fadeTest } from './fade-pattern.js';
-import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
+import { ggxDFloat, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { normalMatrix } from './attributes.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
 declare const GPUTextureUsage: {
@@ -749,7 +749,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  let nn=normalize(mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))));
  let v=normalize(frame.eye.xyz-world);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
- let a=rough*rough;let a2=a*a;let d=${ggxDFloat};let g=${smithGFloat};
+ let a=rough*rough;let a2=a*a;let d=${ggxDFloat};let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  var direct=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
  /*lod:direct*/

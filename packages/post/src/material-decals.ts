@@ -3,7 +3,7 @@
 // colour, and so how it takes light, instead of painting over the lit colour. Each covered pixel's surface comes from a
 // SceneTargets capture (albedo, world normal, roughness and metalness); the decals give a new surface; the pixel's
 // direct sunlight and ambient light are worked out for both with the shading model of core's lit shader (Lambert plus
-// GGX: Walter et al. 2007, Smith-GGX visibility, Schlick Fresnel) and the difference is added to the lit image. Shadow is
+// GGX: Walter et al. 2007, height-correlated Smith-GGX G2 of Heitz 2014, Schlick Fresnel) and the difference is added to the lit image. Shadow is
 // kept: how much sun reached the pixel is read back from the lit image (lit minus ambient, over the unshadowed direct
 // light) and the new direct light gets the same share. Tangent-space normals follow the decal's own right and up axes,
 // projected onto the surface (Gram-Schmidt), as a normal map follows its UV axes.
@@ -15,7 +15,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
-import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
+import { ggxDFloat, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
 import { unitLight } from '../../shared/unit-light.js';
@@ -101,7 +101,7 @@ fn shade(c:vec3f,r:f32,m:f32,n:vec3f,v:vec3f)->Light {
  let l=u.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=r*r;let a2=a*a;let d=${ggxDFloat};
- let g=${smithGFloat};
+ let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),c,m);let f=f0+(1.0-f0)*pow(1.0-vh,5.0);
  let direct=((1.0-f)*(1.0-m)*c/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;
  return Light(direct*u.radiance.xyz*u.light.w,c*(1.0-m)*u.radiance.w*u.ambient.rgb);

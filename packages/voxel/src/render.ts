@@ -16,7 +16,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { Frustum } from '@margoengine/math/frustum';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { displayShader } from '../../shared/display.js';
-import { clusterBrdf, ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
+import { clusterBrdf, ggxDFloat, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { lightPBR, type PBRHooks } from '../../shared/pbr-hooks.js';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -127,7 +127,7 @@ const SUN = 'fn voxelSun(p:vec3f,sky:f32)->f32 {return sky*sky;}',
 // The lit part of both beauty shaders (quads and bevel triangles): frame uniform, surface, sun, ambient and the PBR
 // direct term. `f.glow` is the block light colour and time, `f.ambient.w` the daylight. MODE: 0 opaque, 1 cutout (alpha
 // test), 2 cutout (alpha to coverage), 3 translucent (premultiplied).
-// direct_light: GGX D (Walter et al. 2007, eq. 33), Smith G (Heitz 2014), Schlick 1994 Fresnel, F0 0.04 from
+// direct_light: GGX D (Walter et al. 2007, eq. 33), height-correlated Smith G2 (Heitz 2014, eq. 99), Schlick 1994 Fresnel, F0 0.04 from
 // glTF 2.0 Appendix B. ambient: Margo design (the gltf-pro hemisphere ground tint and f0*0.5 specular share).
 const LIT = /* wgsl */ `${displayShader}
 struct Frame {camera:mat4x4f,inverse:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f,glow:vec4f,viewport:vec4f,settings:vec4f}
@@ -141,7 +141,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
  let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(s.n,l),0.0,1.0);let nv=clamp(dot(s.n,v),0.0001,1.0);let nh=clamp(dot(s.n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=s.roughness*s.roughness;let a2=a*a;let d=${ggxDFloat};
- let g=${smithGFloat};
+ let g=${smithGCorrelatedFloat};
  let base=s.base.rgb;let metal=s.metal;let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  return ${clusterBrdf}*nl*f.radiance.rgb*f.light.w;
 }

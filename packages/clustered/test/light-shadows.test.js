@@ -71,7 +71,7 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   // when areaIntegral gained its early returns and the owned edge-angle evaluation fixed backend cancellation.
   // The four shader-text hashes include that deliberate math change; binding and upload hashes stay unchanged.
   // Core's mesh shader hash recorded again at edcb6debb7 (KB5875a, height-correlated Smith G2 in core's direct light,
-  // Scott's approved core change); the three clustered declaration hashes did not change.
+  // Scott's approved core change), and all four recorded again for KB6016 (the same G2 in the clustered light loop).
   const h = harness(),
     lights = new Clustered({ grid: [2, 2, 2] });
   h.engine.use(lights);
@@ -90,15 +90,15 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   ]);
   h.frame();
   h.frame();
-  assert.equal(hash(h.context.shader), 'ad88a09b1c4d31f79c7d153c70fe4fdd2b42e353e5501c801528b8370924cae7');
-  assert.equal(hash(lights.pbr(2).declarations), 'e7aa5546f7ed9e390393a4a95920eaa54746dcec293801ecb9f80aa5f520edb6');
+  assert.equal(hash(h.context.shader), '7ccbd282ba920af2c4a63a6352b8194882249703fa3be811b16e5ca2f6c4b206');
+  assert.equal(hash(lights.pbr(2).declarations), '1c979b734099520fd7207677a133775c8ffa34cbcb4b88d083dda0a0e0c0fb04');
   assert.equal(
     hash(lights['unshadowed'].pbr(2).declarations),
-    '669bb2d58966f300232e1c182aca328890f013fea1c187319a4eccd68f15d83d',
+    'f89b58b1a10a885db8d9ce9f50fae08397c9f5f105c0411253d70554a2d63d43',
   );
   assert.equal(
     hash(clusteredSampling(0, local, area, false, false, true, { directional: sun })),
-    '43aaf08b782550199a89b1c9e2c6e05d603440ad3b290bdf96f343bffd39ffa8',
+    '39c113d0a0e50348a6ff760151a78d7a05636f38d607ce5edaf7943aa7d98d86',
   );
   assert.equal(hash(local.declarations(2)), '961f6b98277b21a35fb25375081db417e5364bb85c5b1ef39d54d879d1e76c6d');
   assert.deepEqual(
