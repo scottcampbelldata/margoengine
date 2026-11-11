@@ -50,6 +50,7 @@ export function unawaitedCalls(file, source, names) {
   for (const name of names) {
     const CALL = new RegExp(`(?<![\\w$.])${name.replace(/\$/g, '\\$')}\\s*\\(`, 'g');
     for (const match of source.matchAll(CALL)) {
+      if (inComment(source, match.index)) continue;
       const before = source.slice(Math.max(0, match.index - 400), match.index);
       if (DEFINITION.test(before) || SETTLED_BEFORE.test(before)) continue;
       if (SETTLED_AFTER.test(source.slice(closing(source, match.index + match[0].length)))) continue;
@@ -58,6 +59,20 @@ export function unawaitedCalls(file, source, names) {
     }
   }
   return found;
+}
+
+/**
+ * Whether `at` is inside a comment, where a helper's name followed by `(` is prose, not a call: after `//` outside a
+ * string on its line, or inside a block comment. scripts/check-dev-servers.mjs explains in a comment that "probe()
+ * fails a server", and the checker read that as a dropped promise.
+ */
+function inComment(source, at) {
+  const opened = source.lastIndexOf('/*', at),
+    shut = source.lastIndexOf('*/', at);
+  if (opened >= 0 && opened > shut && !/['"`]/.test(source.slice(source.lastIndexOf('\n', opened) + 1, opened)))
+    return true;
+  const line = source.slice(source.lastIndexOf('\n', at - 1) + 1, at);
+  return /\/\//.test(line.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, ''));
 }
 
 /**
@@ -173,6 +188,21 @@ test('the checker finds an unawaited decodePNG and accepts the awaited forms', (
   assert.deepEqual(importedAsync(file, source, helpers), ['decode']);
   assert.deepEqual(importedAsync('elsewhere/x.js', source, helpers), []);
   assert.deepEqual(unawaitedCalls(file, source, ['decode']), [`${file}:2 decode`, `${file}:11 decode`]);
+});
+
+// Regression (992f6fd6a1): a comment in scripts/check-dev-servers.mjs that says "probe() fails a server" failed this
+// gate as a dropped promise. Prose in comments is not a call; a real dropped call on a line with a URL string still is.
+test('a helper named in a comment is not a call, and a dropped call beside a URL string is still found', () => {
+  const source = [
+    "import { probe } from './support/dev-server.mjs';",
+    '// probe() fails a server that exits',
+    '/* every server goes through',
+    '   probe() first */',
+    "const page = 'http://127.0.0.1/'; probe(page);",
+    'run(); // then probe(page) once more',
+    'probe(page);',
+  ].join('\n');
+  assert.deepEqual(unawaitedCalls('scripts/x.mjs', source, ['probe']), ['scripts/x.mjs:5 probe', 'scripts/x.mjs:7 probe']);
 });
 
 test('the checker accepts a promise kept in a variable and awaited later in its function, and nothing looser', () => {
