@@ -515,6 +515,12 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   limit is one draw as before. Building the parts: 1.2 s on the CPU. Target: 60 fps on the RTX A6000 natively and on
   the WebGL2 layer; mid laptop iGPU 30 fps natively. Busy-machine diagnostic 2026-11-10: 4.1 ms wall natively,
   15.5 ms on the WebGL2 layer.
+- Splats at the cloud bounds: 3,000,000 splats without SH, and 699,050 with degree-3 SH (the default device's binding
+  bound), random in a cube filling a 640 x 400 view, sorted and drawn every frame (`node packages/splats/test/gpu/scale-check.mjs`,
+  native and `MARGO_COMPAT=1`). Work per frame: one GPU depth sort and one instanced draw of the cloud. Target: 60 fps
+  on the RTX A6000 natively and on the WebGL2 layer; mid laptop iGPU 30 fps natively at 3,000,000. Busy-machine
+  diagnostic 2026-11-10: native 15.2 ms and 7.8 ms wall; WebGL2 layer 401.6 ms and 123.6 ms, a speed bug (likely the
+  sort's compute passes on the emulated compute tier) to diagnose before release.
 ### Water caustics at scale (lague plan 5, 2026-11-10)
 
 `node packages/water/test/caustics-scale.browser.mjs`, native and `MARGO_COMPAT=1`. Cases: default (Water 128 segments, map
