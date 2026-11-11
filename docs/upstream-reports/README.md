@@ -21,5 +21,6 @@ the owner files them.
 | KB3508 | `KB3508` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (WebGPU and WebGL2 on ANGLE D3D11) |
 | KB5185b | `KB5185b` | ANGLE, NVIDIA | draft only, no standalone repro |
 | KB5247d | `KB5247d` | ANGLE, NVIDIA | draft only, no standalone repro |
+| KB5700f | `KB5700f` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (fold-blend-repeat.html, D3D12 and ANGLE D3D11); exact on AMD and Apple |
 | KB6171a | `KB6171a` | ANGLE, Apple | draft only, needs a Mac |
 | KBL3c | `KBL3c` | Mozilla (Firefox WebGL) | yes, Firefox 157 |
