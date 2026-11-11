@@ -1,22 +1,22 @@
 {
  "proof": "color-output",
- "ref": "049b4107ef",
- "revision": "049b4107ef102359f1bdaa214de687004350ade0",
- "capturedAt": "049b4107ef102359f1bdaa214de687004350ade0",
+ "ref": "379431fcb8",
+ "revision": "379431fcb8d0867558b694d282ca1272bf9996e9",
+ "capturedAt": "b0efe42d12657818cc319fe0782e0cf2a1f209fa",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "049b4107ef descends from eaddd64": false
+  "379431fcb8 descends from eaddd64": false
  },
  "outputs": {
-  "Tonemap alone 1x": "a19c07cbe31ebc663674c338f4f889d1d877d5651cf31f2b2eb49e7e1aad2099",
-  "Tonemap alone 4x": "836d560e452e52d3f2e834908a22c4ecc5c19572df95832d480c5272576a5d15",
-  "DOF -> Tonemap 1x": "2a53ab5d5ebd41a11a943fc4182fd6f5e9b90f50bbb298fad1d194aa240ef153",
-  "DOF -> Tonemap 4x": "3c1bcfe8b7b55578d17ea3990a54bbc53fb5820f5b96283ee187c4d78bebc923",
-  "PostStack Bloom + Tonemap + FXAA 1x": "ce626f7236d6b374c3dc89cdd76ffb0941e784bfebef17f48dbcc01b1ae6ba01",
-  "PostStack Bloom + Tonemap + FXAA 4x": "9ae9f46a2eb30bfad33948214a1d008c5a975e29edf55f82fb82b7a965151815",
-  "TransparentCanvas 1x": "a67ee84382ad7db4980334f8fcf39852046bc811de9a41f2846f2717c81bcdad",
-  "TransparentCanvas 4x": "75d460b0e28eef6f08cfe678666178723b00cd81be44cb9666f5657b6d840c79",
-  "ColorBackground gradient 1x": "b876c2275987a50d505deb512b4054c7a8b7d85db7bb21c7a6fe482d567bc650",
-  "ColorBackground gradient 4x": "cbcdf2a08ba33f0fda88fc3e64f793d5ff51dac866a6faf5679e46fae352f0a3"
+  "Tonemap alone 1x": "ff10bc85bd52874b37932566e6431c51db62c11a7a7a0ce1659ceb605387d8b0",
+  "Tonemap alone 4x": "3e304d1e0e2d2a2689641b75bcade8d4351a21dbd73e0194ff42ba76f3ba36e2",
+  "DOF -> Tonemap 1x": "2f6d3a48e07fd2d8cb56a47ce3998dd6500635c17527e08dc886cadeda9b5ecf",
+  "DOF -> Tonemap 4x": "7bc188229d758a135285b6ccb8a5c19201cb2a3719eb4c81fd85fecc5da12dbb",
+  "PostStack Bloom + Tonemap + FXAA 1x": "e1253aeac1be925d765657833354e196e6efa1a0dd04879f490f48789f773f77",
+  "PostStack Bloom + Tonemap + FXAA 4x": "e97d24129967a87bfc686ac9b4ecbb8bcd49c8c4995bfe2990456e8d6be2eeba",
+  "TransparentCanvas 1x": "cc3e59059ada9a24bbb3b07dac3856bfe56aa6e272654707cb1cc0621e6ff7a3",
+  "TransparentCanvas 4x": "7a57313f2a3d1e07ff656f99853e28e0c0f6d24844a51fd2a11ed192c266fd6c",
+  "ColorBackground gradient 1x": "39f79e2613a6a2efc8f8e4e26844afe7fe263d55f90ebf72cc2cc22bc3fcb699",
+  "ColorBackground gradient 4x": "9a3ac8fbd2f8d226fca25acc5794ff4a2b0134b8fa76a81d283c863c244c428c"
  }
 }

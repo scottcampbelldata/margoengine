@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, entryAt, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('7dcc958', '225b1d6', '049b4107ef'),
+const { ref, pin } = refs('7dcc958', '225b1d6', '379431fcb8'),
   { wgsl } = await coreAt(pin),
   { PostStack, FXAA, Bloom } = await entryAt('post', 'src/index.ts', pin); // the stack around the effects
 const tonemap = await versions('tonemap', ref, undefined, pin),
