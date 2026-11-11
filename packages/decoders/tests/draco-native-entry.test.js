@@ -24,6 +24,18 @@ test('optional Draco metadata strings preserve opaque conversion and require the
   }
 });
 
+test('optional Draco metadata strings never read past the value: missing group bytes are zero (E25)', () => {
+  // The opaque binding's result for these 22 streams changes with the value's length while every stream byte after
+  // the value stays the same, so the bytes it reads past the terminator come from its own memory, not the bitstream.
+  // Margo reads them as zero: the opaque decoder's own result for the same value carrying explicit zero bytes.
+  const rows = JSON.parse(new TextDecoder().decode(fixture('draco-metadata-past-value.json')));
+  assert.equal(rows.length, 22);
+  for (const { id, bytes, opaqueOriginal, opaqueZeroPadded } of rows) {
+    assert.notEqual(opaqueOriginal, opaqueZeroPadded, id);
+    assert.equal(decodeNativePoints(module, Uint8Array.from(bytes)).attributes[0].name, opaqueZeroPadded, id);
+  }
+});
+
 test('optional Draco entry has a registered transfer budget, a smaller Wasm, and no default-entry import', {
   timeout: 60_000,
 }, async () => {

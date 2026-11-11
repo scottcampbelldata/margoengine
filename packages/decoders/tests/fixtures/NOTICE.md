@@ -41,3 +41,9 @@ Both come from Khronos glTF-Sample-Assets revision
 
 These are standard test assets, never decoder implementation files or new encoder output.
 They prove the runnable examples with file-specific metadata, not arbitrary-model quality or speed.
+
+`draco-metadata-past-value.json` (SHA-256 `f3e919d173611d295fa98a5a51455d48c77017173a5669a7568442479ba5aa2a`) holds the
+22 Margo-crafted point-cloud streams whose last metadata group runs past the value (from
+docs/whitepaper/results/batch-133-metadata-strings.json), each with the opaque full build's public string for the
+stream itself and for the same value carrying three explicit zero bytes (E25 in docs/clean-room.md). Margo-authored
+syntax and oracle output; no decoder implementation or wrapper source was read.

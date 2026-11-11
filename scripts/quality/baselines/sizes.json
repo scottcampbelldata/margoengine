@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15092219,
+  "total": 15095128,
   "history": [
     {
       "date": "2026-10-24",
@@ -8519,6 +8519,12 @@
       "commit": "671c7f14f5",
       "reason": "materials/fur: KB5588b, fur casters keep the material displacementMap and patch TAA object velocity (3216 to 3857 B); caster() is synchronous, so a lazy import() split cannot serve it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "61dbadfab8",
+      "reason": "decoders/draco-native measured 68335 B gzip, over its 67462 B budget (new budget 70386 B): historical Draco predictor 3, bit-stream bounds and wrap-span rule (bug sweep L5b, KB4824b); one Wasm per feature, a split would add a second fetch for 873 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8762,7 +8768,7 @@
     "@margoengine/decoders/brotli": 69438,
     "@margoengine/decoders/bzip2": 2168,
     "@margoengine/decoders/dds": 3029,
-    "@margoengine/decoders/draco-native": 67462,
+    "@margoengine/decoders/draco-native": 70386,
     "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/image": 1068811,
     "@margoengine/decoders/jpeg": 4030,
@@ -8920,7 +8926,7 @@
     "@margoengine/gltf-pro/audio": 4956,
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/dds": 7076,
-    "@margoengine/gltf-pro/extended": 9006,
+    "@margoengine/gltf-pro/extended": 9000,
     "@margoengine/gltf-pro/instancing": 3350,
     "@margoengine/gltf-pro/interactivity": 16807,
     "@margoengine/gltf-pro/lights": 3470,
@@ -8931,7 +8937,7 @@
     "@margoengine/gltf-pro/prepare": 34132,
     "@margoengine/gltf-pro/progressive": 98789,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/spec-gloss": 10477,
+    "@margoengine/gltf-pro/spec-gloss": 10473,
     "@margoengine/gltf-pro/splats": 2100,
     "@margoengine/gltf-pro/worker": 90034,
     "@margoengine/gltf/auto": 17848,
@@ -9660,7 +9666,7 @@
     "@margoengine/tween/scroll-pin": 2361,
     "@margoengine/tween/stagger": 1435,
     "@margoengine/tween/timeline": 3440,
-    "@margoengine/ui": 33900,
+    "@margoengine/ui": 33896,
     "@margoengine/ui/curved": 1692,
     "@margoengine/ui/editor": 4906,
     "@margoengine/ui/forms": 3743,
@@ -9669,7 +9675,7 @@
     "@margoengine/ui/input": 4606,
     "@margoengine/ui/keyboard": 1770,
     "@margoengine/ui/markup": 10820,
-    "@margoengine/ui/react": 34011,
+    "@margoengine/ui/react": 34010,
     "@margoengine/ui/world": 10170,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 12918,

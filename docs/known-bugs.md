@@ -4907,11 +4907,14 @@ whitepaper/results/batch-133-paired-checkpoint.json: full 365 and glTF 288 total
 losses on the 1,937/1,003 accepted-input sets. Profiling Margo's own named Wasm
 localizes remaining cost to mapping, reconstruction and traversal; the proven
 mapping work reduction did not establish overall speed parity. Reproduce with
-the pinned paired manifest and private batch 133 driver. Cold/RSS/startup coverage
-is partial. Historical predictor 3 and full historical KD/type/transform coverage,
-and invalid UTF8 public metadata conversion are not established; the published
-spec omits rules and no new inference is authorized in this landing run. Both
-prebuilts stay default while these gaps remain; no replacement pass is claimed.
+the pinned paired manifest and private batch 133 driver. Speed work is deferred
+by scripts/speed-phase.json; the item is listed in docs/work-lists/speed-phase.md.
+Cold/RSS/startup coverage is partial (fresh-process RSS losses below).
+Historical predictor 3 and invalid UTF8 metadata conversion were closed on
+2026-11-11 (bug sweep L5b, see the two entries below and above). Full
+historical KD/type/transform coverage beyond the crafted one-triangle layouts
+is not established. Both prebuilts stay default while the RSS and speed gaps
+remain; no replacement pass is claimed.
 
 ### Historical: batch 133 optional landing GPU acquisition (resume 9)
 
@@ -4925,22 +4928,20 @@ unrun. Reproduce/resume with the bounded resume9 GPU bundle after ownership
 changes; no lock bypass or blind retry was used. Nothing was pushed. The command
 results and log hashes are in whitepaper/results/batch-133-landing.json.
 
-### Open: batch 133 malformed metadata trailing groups
+### Fixed 2026-11-11: batch 133 malformed metadata trailing groups had no defined rule (bug sweep L5b, KB4798)
 
-The optional native decoder still differs from the full opaque prebuilt on 22
-of 1,613 crafted metadata strings. Its short public conversion can consume bytes
-beyond the value and terminal NUL. Repro held-8: value8a bf84 4456 d525 3cf2;
-opaque UTF16 ends d9c0 dc09, owned conversion ends d9c0 dc00. See the complete stream in
-[the 22 retained repros](whitepaper/results/batch-133-metadata-strings.json).
-The owned bridge zero-fills absent bytes and never reads another allocation.
-Root boundary: public-string conversion outside the bitstream, not metadata
-framing or raw preservation. All 1,445 in-bounds cases agree; 168 inputs exercise
-external padding, of which 146 happen to agree. No external-padding semantics
-have been proved, so default replacement and full UTF8 equivalence remain open.
-
-Lane G reran all 22 retained complete streams against the shipped native Wasm:
-all 22 still disagree with their frozen opaque string oracle. Raw metadata
-framing is unchanged; the public external-padding rule is still unproved.
+The optional native decoder differed from the full opaque prebuilt on 22 of
+1,613 crafted metadata strings whose last 2/3/4-byte group runs past the value
+and its terminal NUL. E25 ([clean-room.md](clean-room.md#bug-sweep-l5b-e23-to-e25-historical-predictor-3-bit-streams-and-past-value-strings-2026-11-11))
+settles the rule: with every stream byte after the value unchanged, the opaque
+binding's last code point changes with the value's length alone (held-8 at
+lengths 9 to 13 gives U+80009, U+8028B, U+80807, U+801C1, U+80040), so the
+bytes it reads come from its own memory, not the bitstream. No bitstream rule
+can reproduce them. Margo reads absent group bytes as zero, which equals the
+opaque decoder's own result for the same value carrying explicit zero bytes in
+all 22 cases. Regression: `packages/decoders/tests/draco-native-entry.test.js`
+("never read past the value"). The remaining difference is recorded in
+[limits.md](limits.md); no code change was needed.
 
 ### Fixed: glTF textured pass raw light alias
 
@@ -4969,6 +4970,17 @@ the full campaign or isolate physical pages/JIT/live allocations. An initial
 manifest used a missing relative input path and failed before sampling;
 the resolved-path run and setup failure are retained separately.
 
+Bug sweep L5b recheck, 2026-11-11 (Node 26.12, current Wasm, busy dev PC,
+diagnostic): with the same child harness (scripts/acceptance/draco-resource-child.mjs)
+the native decoder's peak RSS was below the full prebuilt on every local input
+tried: a 461-byte predictive mesh 76.2 against 77.9 MB (Liftoff-only 76.6
+against 78.3), ABeautifulGame first 88.0 against 89.2 MB and largest 102.3
+against 103.7 MB, two runs each. The recorded loss inputs (BrainStem glTF-Draco
+primitives, test-only grant) are not on this machine, so the loss is neither
+reproduced nor closed. Next: rerun scripts/acceptance/draco-resources.mjs on
+the pinned corpus; if the loss holds, compare per-stage RSS (after compile,
+instantiate, decode and result copy) to find the stage that grows.
+
 Fixed in the lane G sweep: the native descriptor rejected widths above 16,
 and quantization, KD minima and prediction scratch also assumed 16 components.
 The descriptor now accepts nonzero UI8 counts; budgeted component-sized vectors
@@ -4980,14 +4992,15 @@ all three parallelogram predictors beyond 16; draco-wide.test.js verifies the
 shipped Wasm and typed output. The old public binding's negative width255 count
 is still a separate parity difference, not reproduced by the owned UI8 API.
 
-Historical predictor3 is absent from integer.rs's supported-method set. The
-record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
-UV bytes and intact canaries; native returns code5. The old-format reconstruction
-rule remains to be established by further crafted public-API observations.
-
-Lane G reran all twelve embedded historical predictor3 streams on the shipped
-Wasm; every stream still returns code5. The width repair above does not close
-this independent reconstruction gap.
+Fixed 2026-11-11 (bug sweep L5b, KB4824b): historical texture-coordinate
+predictor 3 (versions 1.0 to 1.2) is now decoded. E23/E24 crafted black-box
+observations fix its float32 arithmetic, half-up rounding, orientation sense,
+coincident-neighbour and equal-value behaviour, the bit-stream state bound and
+exhausted refill, and the pre-2.0 wrap-span limit. The 12 retained streams and
+246 further crafted cases (237 accepted, 21 rejected) match the full opaque
+decoder byte for byte; 18,000 randomized comparisons on the final build agree
+on output and acceptance (12,437 accepted and 5,563 rejected by both). Regression: `packages/decoders/native/draco/tests/legacy_uv.rs`
+(fails before the fix with code 5 on the first retained stream).
 
 Fixed 2026-11-11: packageInputs in scripts/package-stamps.mjs now lists the Rust folders `native` and `kernel`, so an edit there changes the package's API freshness stamp (cargo `target` stays skipped). Regression: tests/package-stamps.test.js (changed Rust file test).
 

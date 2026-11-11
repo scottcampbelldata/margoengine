@@ -5229,6 +5229,37 @@ was opened or used. The block-layout formula was already present in Margo's
 own checked KTX parser and was revalidated against KTX2.0.4, not inferred from
 an implementation search result.
 
+### Bug sweep L5b: E23 to E25, historical predictor 3, bit streams and past-value strings (2026-11-11)
+
+Sources: Frank Galligan / Google, *Draco Bitstream Specification* (2017),
+[portable texture-coordinate prediction, RansRead and RabsDescRead](https://google.github.io/draco/spec/),
+read again in those sections; IEEE Computer Society, *IEEE Standard for
+Floating-Point Arithmetic*, IEEE 754-2019 (2019),
+[binary32 rounding of each operation](https://doi.org/10.1109/IEEESTD.2019.8766229);
+WebAssembly Community Group, *WebAssembly Core Specification* 2.0 (2025),
+[f32 arithmetic and float-to-integer conversion](https://webassembly.github.io/spec/core/exec/numerics.html).
+The specification describes only the portable predictor 5; predictor 3 and the
+rules below come from Margo-crafted inputs fed to the opaque full build
+(SHA-256 `c55a594e...74f2`) through its public decode, attribute and metadata
+calls, outside this repository. No codec or wrapper source, disassembly or
+remembered internals were used.
+
+| Experiment | Observation and inferred rule | Confirmation |
+| --- | --- | --- |
+| E23 layout | Single-byte changes to the retained historical stream map raw i32 positions (entries in decoded order, points 1, 2, 0), six raw zigzag corrections and the orientation blob. Entries 0 and 1 use zero and previous-entry prediction. | All 12 retained E22 streams. |
+| E23 arithmetic | 400 small, 1,500 tiny, 1,500 mid and 4,500 large random triangles against seven rounding and five operation-order candidates: only float32 throughout matches, with `s = dot(cn,pn)/dot(pn,pn)`, offset vector `cn - pn*s`, `t = sqrt(dot(offset,offset)/dot(pn,pn))`, value `nuv + s*duv -/+ t*perp(duv)`, rounded half up. The sense of the orientation bit is opposite to predictor 5. | Final build: 18,000 randomized comparisons across all classes below, 12,437 accepted and 5,563 rejected by both, no disagreement. |
+| E24 bit streams | Sweeping the orientation blob: a three-byte state header above `4096*256` is rejected; an exhausted bit stream keeps its state instead of failing (the published RansRead guard). | 9,000 blob sweeps on count-1 and count-3 streams; native and oracle acceptance identical. |
+| E24 degenerate | Coincident neighbour positions: NaN prediction (converted to i32::MIN, then clamped) in 1.0/1.1; zero projection and offset from 1.2. Equal neighbour values take the computed path, so values past 2^24 round through float32. Out-of-range results convert to i32::MIN. | 12,000 degenerate, equal-value and wide-bound cases. |
+| E24 wrap span | Before 2.0 a wrap whose `max - min` is not below i32::MAX is rejected, with predictor 3 and with difference prediction. A 2.2 probe found no accepted wide-bound stream, so 2.x keeps the old rule. | Three accepted and three rejected bound pairs at the limit. |
+| E25 strings | The 22 past-value metadata strings: with every stream byte after the value fixed, the oracle's last code point follows the value length (lengths 9 to 13). It reads its own memory, not the bitstream. Its result for the same value with explicit zero bytes equals Margo's zero fill. | All 22, fixture `draco-metadata-past-value.json`. |
+
+Unobserved, so not claimed: predictor 3 fed by quantized or integer-coded
+positions (Margo uses their stored integers), and orientation order across
+several triangles (Margo pops from the end like predictor 5). The fixture
+`legacy-uv.bin` (258 cases, 237 accepted) and the 21 rejections are checked by
+`packages/decoders/native/draco/tests/legacy_uv.rs`, with every strict prefix
+of an accepted stream rejected.
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

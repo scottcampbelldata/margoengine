@@ -16,6 +16,7 @@ pub(crate) struct Integer {
     crease: [Vec<bool>; 4],
     orientations: Vec<bool>,
     flips: Vec<bool>,
+    version: u16,
 }
 impl Integer {
     pub fn read(
@@ -36,16 +37,22 @@ impl Integer {
             method
         };
         let transform = if method != -2 { c.byte()? } else { 0 };
-        if ![-2, 0, 1, 2, 4, 5, 6].contains(&method) {
+        // E23: predictor 3 is the historical texture-coordinate predictor;
+        // the opaque decoder accepts it only in streams before version 2.0.
+        if ![-2, 0, 1, 2, 4, 5, 6].contains(&method) && !(method == 3 && c.version < 0x200) {
             return Err(Error::Unsupported);
         }
         if method != -2 && transform != 1 && transform != 2 && transform != 3 {
             return Err(Error::Unsupported);
         }
-        if (transform == 2 || transform == 3 || method == 5 || method == 6) && components != 2 {
+        if (transform == 2 || transform == 3 || method == 3 || method == 5 || method == 6)
+            && components != 2
+        {
             return Err(Error::Invalid);
         }
-        if (method == 1 || method == 2 || method == 4 || method == 5) && transform != 1 {
+        if (method == 1 || method == 2 || method == 3 || method == 4 || method == 5)
+            && transform != 1
+        {
             return Err(Error::Unsupported);
         }
         if method == 6 && transform != 3 {
@@ -87,6 +94,7 @@ impl Integer {
             crease: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             orientations: Vec::new(),
             flips: Vec::new(),
+            version: c.version,
         };
         if method == -2 {
             return Ok(out);
@@ -106,7 +114,7 @@ impl Integer {
                     }
                 }
             }
-        } else if method == 5 {
+        } else if method == 3 || method == 5 {
             let count = c.le(4)? as usize;
             if count > n / components {
                 return Err(Error::Invalid);
@@ -127,6 +135,12 @@ impl Integer {
                 let min = c.le(4)? as i32;
                 let max = c.le(4)? as i32;
                 if min > max {
+                    return Err(Error::Invalid);
+                }
+                // E24: before 2.0 the opaque decoder rejects a wrap whose
+                // max - min is not below i32::MAX (its span would not fit
+                // int32). Later versions are unobserved and keep the old rule.
+                if c.version < 0x200 && i64::from(max) - i64::from(min) >= i64::from(i32::MAX) {
                     return Err(Error::Invalid);
                 }
                 Transform::Wrap(min, max)
@@ -154,11 +168,16 @@ impl Integer {
         }
         Ok(out)
     }
+    /// Whether reconstruction needs float positions (historical predictor 3).
+    pub fn legacy_tex_coords(&self) -> bool {
+        self.method == 3
+    }
     pub fn reconstruct(
         &mut self,
         components: usize,
         mesh: Option<&Mesh>,
         parent: Option<&[i32]>,
+        legacy_parent: Option<&[f32]>,
         budget: &mut Budget,
     ) -> Result<()> {
         if self.method == -2 {
@@ -180,7 +199,16 @@ impl Integer {
         for row in 0..self.values.len() / components {
             budget.steps(1)?;
             prediction.fill(0);
-            if self.method == 5 {
+            if self.method == 3 {
+                let value = mesh.ok_or(Error::Invalid)?.legacy_tex_coords(
+                    row,
+                    &self.values,
+                    legacy_parent.ok_or(Error::Invalid)?,
+                    self.version >= 0x102,
+                    &mut self.orientations,
+                )?;
+                prediction[..2].copy_from_slice(&value);
+            } else if self.method == 5 {
                 let value = mesh.ok_or(Error::Invalid)?.tex_coords(
                     row,
                     &self.values,

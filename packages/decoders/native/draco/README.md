@@ -40,7 +40,14 @@ raw keys/values and child references, including 32,769-byte values and 129 child
 levels. Metadata parsing and destruction use a flat arena, without recursive
 calls or a fixed depth ceiling. The private Wasm result appends a `META` arena
 trailer when metadata exists. The optional bridge reads point names from the arena; the frozen real point
-records check native types, names and bytes. Invalid UTF8 equivalence is unproved.
+records check native types, names and bytes. Bytes a malformed last group
+would need past the value read as zero: the opaque binding reads its own memory
+there (E25), so those 22 strings are an accepted difference.
+
+Historical texture-coordinate predictor 3 (versions 1.0 to 1.2) decodes with
+the float32 rule, bit-stream bounds and wrap-span limit inferred in E23/E24;
+`tests/legacy_uv.rs` checks 258 crafted cases (237 accepted, 21 rejected)
+against the full opaque output.
 
 `node --test packages/decoders/tests/draco-native.test.js` runs native tests,
 builds this Wasm artifact and runs the KD, memory, prediction, metadata, flavor and predictive Wasm

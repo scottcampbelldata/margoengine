@@ -64,6 +64,56 @@ fn read_format(c: &mut Cursor, attr: &Attribute, budget: &mut Budget) -> Result<
         _ => return Err(Error::Invalid),
     })
 }
+/// Float positions per point for historical predictor 3: the first
+/// three-component position attribute, raw scalars converted to float32 or
+/// reconstructed integer values.
+fn float_positions(
+    attributes: &[Attribute],
+    groups: &[PortableGroup],
+    parent: Option<&[i32]>,
+    points: usize,
+    budget: &mut Budget,
+) -> Result<Option<Vec<f32>>> {
+    let n = points.checked_mul(3).ok_or(Error::Overflow)?;
+    for group in groups {
+        for attr in &attributes[group.first..group.last] {
+            if attr.semantic != 0 || attr.components != 3 {
+                continue;
+            }
+            let mut values = budget.vector(n, 0_f32)?;
+            if attr.encoding != 0 {
+                let parent = parent.ok_or(Error::Invalid)?;
+                for (dst, src) in values.iter_mut().zip(parent) {
+                    *dst = *src as f32;
+                }
+                return Ok(Some(values));
+            }
+            let width = scalar_bytes(attr.data_type)?;
+            for point in 0..points {
+                let entry = group
+                    .sequence
+                    .as_ref()
+                    .map_or(point, |s| s.point_entry[point]);
+                for c in 0..3 {
+                    let at = (entry * 3 + c) * width;
+                    let b = attr.data.get(at..at + width).ok_or(Error::Invalid)?;
+                    values[point * 3 + c] = match attr.data_type {
+                        1 => f32::from(b[0] as i8),
+                        2 | 11 => f32::from(b[0]),
+                        3 => f32::from(i16::from_le_bytes([b[0], b[1]])),
+                        4 => f32::from(u16::from_le_bytes([b[0], b[1]])),
+                        5 => i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f32,
+                        6 => u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f32,
+                        9 => f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+                        _ => return Err(Error::Unsupported),
+                    };
+                }
+            }
+            return Ok(Some(values));
+        }
+    }
+    Ok(None)
+}
 struct PortableGroup {
     first: usize,
     last: usize,
@@ -358,7 +408,20 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     // All framing is parsed before reconstruction. Parent position attributes
     // can therefore precede or follow their dependents, in any decoder group.
     let mut parent = None;
+    let mut legacy_parent: Option<Vec<f32>> = None;
+    let legacy = integers.iter().flatten().any(|i| i.legacy_tex_coords());
     for positions_first in [true, false] {
+        // E23: historical predictor 3 reads float positions. A raw position
+        // attribute gives its stored scalars; an integer one gives its values.
+        if !positions_first && legacy && legacy_parent.is_none() {
+            legacy_parent = float_positions(
+                &attributes,
+                &portable_groups,
+                parent.as_deref(),
+                points,
+                &mut budget,
+            )?;
+        }
         for (group_id, group) in portable_groups.iter().enumerate() {
             let predictor = if let (Some(topology), Some(mapping), Some(sequence)) =
                 (&topology, &mapping, &group.sequence)
@@ -389,6 +452,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                     components,
                     predictor.as_ref(),
                     parent.as_deref(),
+                    legacy_parent.as_deref(),
                     &mut budget,
                 )?;
                 if positions_first && components == 3 && parent.is_none() {
@@ -410,6 +474,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     // Prediction is finished. Release connectivity and the portable parent
     // before allocating the final attribute arrays and their point ordering.
     drop(parent);
+    drop(legacy_parent);
     drop(topology);
     drop(mapping);
     drop(group_info);

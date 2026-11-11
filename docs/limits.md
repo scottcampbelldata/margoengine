@@ -3655,8 +3655,26 @@ short-string conversion and exact raw name lookup. All 1,445 bounded crafted
 cases match the full oracle. Across all 1,613, 1,591 match and 22 trailing malformed
 groups differ; 168 can consume beyond the value plus terminal NUL in the oracle.
 The owned decoder zero-fills missing bytes rather than reading another
-allocation. This does not close malformed UTF8 equivalence or any replacement
-gate. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json).
+allocation. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json).
+
+Accepted difference (bug sweep L5b, 2026-11-11, E25): those 22 strings stay
+different on purpose. The oracle's last code point changes with the value's
+length while every stream byte after the value stays the same, so it reads its
+own memory past the string; no decoder can match it from the bitstream. Margo's
+result equals the oracle's own result for the same value with explicit zero
+bytes, in all 22 cases (draco-native-entry.test.js). Cost: a file whose
+metadata ends in a cut multibyte character gets a different last character
+than the prebuilt gave, which was never defined by the file.
+
+Historical predictor 3 (bug sweep L5b, 2026-11-11, E23/E24): versions 1.0 to
+1.2 texture-coordinate predictor 3 now decodes and matches the full oracle on
+258 crafted cases and 18,000 randomized comparisons, output and acceptance.
+Unobserved and therefore not claimed: quantized or integer-coded positions
+feeding predictor 3 (Margo uses their stored integer values) and orientation
+order across several triangles (Margo follows the portable predictor). The
+glTF flavor accepts these version 1 streams although the glTF prebuilt refuses
+every major version 1 file; this is a supported-feature superset. The Wasm grew
+from 122,842 to 127,592 bytes.
 
 Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
 for a destructured direction alias, matching core's unit-direction contract.

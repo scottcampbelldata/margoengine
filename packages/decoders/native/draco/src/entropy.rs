@@ -36,8 +36,23 @@ impl<'a> Ans<'a> {
         }
         Ok(())
     }
+    /// The initial state of a bit stream must lie below `base * 256`. E24: a
+    /// three- or four-byte state header above it is rejected by the opaque
+    /// decoder (the published RabsDescRead has no such bound).
+    pub fn bounded(&self) -> bool {
+        u64::from(self.state) < u64::from(self.base) * 256
+    }
+    /// Bit reads refill only while bytes remain, as the published RansRead
+    /// does for symbols; an exhausted bit stream keeps its small state (E24).
     pub fn binary(&mut self, p0: u8) -> Result<bool> {
-        self.refill()?;
+        while self.state < self.base && self.at > 0 {
+            self.at -= 1;
+            self.state = self
+                .state
+                .checked_mul(256)
+                .and_then(|v| v.checked_add(u32::from(self.data[self.at])))
+                .ok_or(Error::Overflow)?;
+        }
         let p = 256 - u32::from(p0);
         let q = self.state / 256;
         let r = self.state % 256;

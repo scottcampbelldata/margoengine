@@ -89,3 +89,12 @@ transmitted fallbacks, split merges and disconnected components. Input creation
 uses the published connectivity rules and the recorded crafted-input inference;
 no implementation source, wrapper text or disassembly was read or copied. These
 fixtures are Margo-authored syntax and oracle output, not outside source files.
+
+`legacy-uv.bin` (SHA-256 `c018980e01c9d3e1bd11055ffd3a91b07a69c0bdef45969129401658b747e058`)
+retains 258 Margo-crafted historical one-triangle streams (versions 1.0, 1.1
+and 1.2, texture-coordinate predictor 3): the 12 retained E22 inventory streams
+plus E23/E24 variants of their positions, corrections, orientation bit streams
+and wrap bounds, and six difference-predictor wrap-span probes. Each holds the
+opaque full build's public-API output bytes (237) or its rejection (21). These
+fixtures are Margo-authored syntax and oracle output, not outside source files;
+no implementation source, wrapper text or disassembly was read.

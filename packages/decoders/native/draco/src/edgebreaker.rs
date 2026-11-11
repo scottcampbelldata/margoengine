@@ -32,17 +32,18 @@ pub(crate) struct Binary<'a> {
 impl<'a> Binary<'a> {
     pub fn read(c: &mut Cursor<'a>) -> Result<Self> {
         let p0 = c.byte()?;
-        Ok(Self {
-            p0,
-            ans: Ans::new(
-                if c.version < 0x202 {
-                    c.fixed_blob(32)?
-                } else {
-                    c.blob(32)?
-                },
-                4096,
-            )?,
-        })
+        let ans = Ans::new(
+            if c.version < 0x202 {
+                c.fixed_blob(32)?
+            } else {
+                c.blob(32)?
+            },
+            4096,
+        )?;
+        if !ans.bounded() {
+            return Err(Error::Invalid);
+        }
+        Ok(Self { p0, ans })
     }
     pub fn bit(&mut self) -> Result<bool> {
         self.ans.binary(self.p0)
