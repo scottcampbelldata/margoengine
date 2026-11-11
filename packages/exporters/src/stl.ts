@@ -18,7 +18,7 @@ export interface STLOptions extends SceneOptions {
 const meshes = (source: ExportSource, options: STLOptions) => {
   const turn = turnsToZUp(options.upAxis, 'STL');
   return drawables(collect(source, options, undefined, 'shape'))
-    .map(toWorld)
+    .map((item) => toWorld(item, false))
     .map((mesh) => (turn ? { ...mesh, positions: standZUp(mesh.positions) } : mesh));
 };
 

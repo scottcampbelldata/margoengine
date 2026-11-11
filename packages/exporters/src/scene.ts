@@ -1612,27 +1612,29 @@ export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
 }
 
 /** @internal World-space vertices, unit normals and winding-corrected indices of one drawable. */
-export function toWorld({ geometry, world }: Drawable): {
+export function toWorld({ geometry, world }: Drawable, includeNormals = true): {
   positions: Float64Array;
   normals: Float64Array;
   indices: Uint32Array;
 } {
   const { count } = geometry,
     positions = new Float64Array(count * 3),
-    normals = new Float64Array(count * 3),
-    n = normalMatrix(world);
+    normals = new Float64Array(includeNormals ? count * 3 : 0),
+    n = includeNormals ? normalMatrix(world) : undefined;
   for (let i = 0; i < count; i++) {
     const x = geometry.positions[i * 3],
       y = geometry.positions[i * 3 + 1],
       z = geometry.positions[i * 3 + 2];
     for (let r = 0; r < 3; r++)
       positions[i * 3 + r] = world[r] * x + world[4 + r] * y + world[8 + r] * z + world[12 + r];
-    const nx = geometry.normals[i * 3],
-      ny = geometry.normals[i * 3 + 1],
-      nz = geometry.normals[i * 3 + 2];
-    const v = [n[0] * nx + n[3] * ny + n[6] * nz, n[1] * nx + n[4] * ny + n[7] * nz, n[2] * nx + n[5] * ny + n[8] * nz],
-      l = Math.hypot(v[0], v[1], v[2]) || 1;
-    for (let r = 0; r < 3; r++) normals[i * 3 + r] = v[r] / l;
+    if (n) {
+      const nx = geometry.normals[i * 3],
+        ny = geometry.normals[i * 3 + 1],
+        nz = geometry.normals[i * 3 + 2];
+      const v = [n[0] * nx + n[3] * ny + n[6] * nz, n[1] * nx + n[4] * ny + n[7] * nz, n[2] * nx + n[5] * ny + n[8] * nz],
+        l = Math.hypot(v[0], v[1], v[2]) || 1;
+      for (let r = 0; r < 3; r++) normals[i * 3 + r] = v[r] / l;
+    }
   }
   let indices = geometry.indices;
   if (determinant3(world) < 0) {

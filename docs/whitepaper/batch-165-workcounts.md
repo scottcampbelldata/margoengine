@@ -50,6 +50,31 @@ For tonight's permitted quiet run, retain the existing p-cube-lut workload and
 both rival backends; run the row command in perf-vs-threejs.md. It is not part
 of the current correctness gate.
 
+## Job 2: STL export skips unused world normals, row 11.2
+
+Fix commit: `perf(exporters): skip unused world vertex normals in STL export`.
+The 2026-11-10 `p-export-mesh` diagnosis named scene normalization and
+`toWorld` among the costs. STL writes one facet normal per triangle, computed
+from the transformed positions, so the per-vertex world normals `toWorld`
+built for it were never read. `toWorld` now takes an `includeNormals` flag;
+STL passes `false`, OBJ, PLY and the other writers keep the default.
+
+For a drawable with V vertices, STL export no longer allocates the 3V-element
+Float64 world-normal array, no longer builds the normal matrix (3 basis-length
+calls) and no longer normalizes V vertex normals. Input normals are still
+validated, so non-finite normals still reject. On the test mesh (4 vertices,
+2 triangles) three-component `Math.hypot` calls fall from 13 to 9 and
+12-element Float64 arrays from 2 to 1. Binary and ASCII STL bytes for both
+up axes, and OBJ and binary PLY bytes, keep their pre-change SHA-256 values.
+
+`packages/exporters/tests/stl-workcount.test.js` fails against the parent
+(13 length calls, not 9) and passes with the change. No benchmark was run;
+the historical row 11.2 loss stays recorded until the quiet rerun.
+
+```sh
+node --test --test-timeout=120000 packages/exporters/tests/stl-workcount.test.js
+```
+
 ## Clean-room sources
 
 ### Blocking compatibility correction

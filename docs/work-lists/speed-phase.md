@@ -1,6 +1,7 @@
 # Deferred speed phase
 
 - Batch 165 job 1, row 10.21 / p-cube-lut: Cube parsing work-count and byte-identity proof is built in packages/tonemap/tests/cube-workcount.test.js. Keep the existing scene, both rival backends and budgets for tonight's quiet rerun. See docs/whitepaper/batch-165-workcounts.md; the historical 2.61x loss is not replaced by a speed claim.
+- Batch 165 job 2, row 11.2 / p-export-mesh: STL export skips unused world vertex normals; work-count and byte-identity proof in packages/exporters/tests/stl-workcount.test.js. Keep the existing scene and rival backends for the quiet rerun. See docs/whitepaper/batch-165-workcounts.md.
 
 Scott's ruling, 2026-11-10: finish building before running speed work. The single
 checked-in default is `scripts/speed-phase.json` (`deferred`). Verify, check:merge,

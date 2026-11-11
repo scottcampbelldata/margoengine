@@ -89,6 +89,13 @@ ceiling 12,561 to 12,976 B. Keeping the synchronous root API avoids a separate
 entry that would retain the existing parser anyway. [Methods, regression and sources](batch-165-workcounts.md).
 The historical loss remains recorded; timing pending the quiet rerun. No timed run occurred.
 
+## Batch 165 job 2: STL export work counts (2026-11-10)
+
+STL export no longer builds per-vertex world normals that its facet writer
+never reads (row 11.2, `p-export-mesh`). Test mesh: 13 to 9 vector-length
+calls and 2 to 1 Float64 vertex arrays; STL, OBJ and PLY output bytes
+unchanged. No timed run occurred. [Methods and regression](batch-165-workcounts.md).
+
 ## Verify cache metadata work
 
 The post-build pause repeated a full synchronous archive stat/sort per newly
