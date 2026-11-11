@@ -224,8 +224,9 @@ export class CulledModels implements EnginePlugin {
       throw new RangeError('Invalid culled model options; set minRadius to a number from 0 up to 1e6');
   }
   /**
-   * Culls a model's primitives from the next frame on, with their bounds as of each frame's vertices. A model added twice
-   * takes the later `padding`.
+   * Culls a model's primitives from the next frame on. Each primitive's bounding sphere is measured from its `vertices`
+   * array, and measured again only when the primitive gets a new array: writes into the same array are not seen, so
+   * replace the array, or `remove` and `add` the model again. A model added twice takes the later `padding`.
    * @throws TypeError for something without `primitives`, RangeError for a negative `padding`.
    */
   add(model: CullableModel, { padding = 0 }: CulledModelOptions = {}): this {

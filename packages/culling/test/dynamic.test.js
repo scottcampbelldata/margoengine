@@ -334,7 +334,10 @@ test('a failed retain in setup releases nothing, and the error reaches the calle
   h.engine.retain = () => {
     throw new RangeError('GPU buffer limit');
   };
-  assert.throws(() => h.engine.use(new DynamicInstances({ geometry: box(), material: new PbrMaterial(), capacity: 8 })), /GPU buffer limit/);
+  assert.throws(
+    () => h.engine.use(new DynamicInstances({ geometry: box(), material: new PbrMaterial(), capacity: 8 })),
+    /GPU buffer limit/,
+  );
   assert.deepEqual(h.released, []);
 });
 
@@ -364,4 +367,15 @@ test('a frame culls and compacts in one dispatch, reading each row once (batch 1
   assert.doesNotMatch(code, /\blocal\b|\bgroups\b/, 'no per-row round trip through memory');
   assert.equal(h.pipelines.filter((p) => p.compute).length, 2, 'cull and fill pipelines only');
   crowd.dispose();
+});
+
+test('a refused addInstance matrix takes no row (batch 132b)', () => {
+  const crowd = new DynamicInstances({ geometry: box(), material: new PbrMaterial(), capacity: 2 });
+  const first = crowd.addInstance(translate(5, 0, 0));
+  crowd.deleteInstance(first);
+  assert.throws(() => crowd.addInstance([NaN, ...translate(0, 0, 0).slice(1)]), RangeError);
+  assert.throws(() => crowd.addInstance(translate(0, 0, 0, -1)), RangeError, 'mirrored without mirrored: true');
+  assert.equal(crowd.count, 0, 'no instance is left alive by a refused matrix');
+  assert.throws(() => crowd.getMatrixAt(first), RangeError, 'the freed row stays free, not drawn with its old matrix');
+  assert.equal(crowd.addInstance(), first, 'the freed row is still the next one handed out');
 });

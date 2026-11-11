@@ -310,6 +310,8 @@ export class DynamicInstances implements EnginePlugin {
       throw new RangeError(
         `No free instance: all ${this.capacity} are alive; delete one or create DynamicInstances with a larger capacity`,
       );
+    // Checked before a row is taken: a refused matrix must not leave a live instance drawing a freed row's old matrix.
+    if (matrix) this.validMatrix(matrix);
     const index = this.freeCount ? this.free[--this.freeCount] : this.high++;
     this.live++;
     const t = index * 4;
@@ -335,13 +337,8 @@ export class DynamicInstances implements EnginePlugin {
     this.mark(this.dirtyRows, index);
     return this;
   }
-  /**
-   * Sets an instance's world matrix: 16 floats, column-major, affine (last row 0, 0, 0, 1). Mirrored matrices need
-   * `mirrored: true`.
-   * @throws RangeError for an index not alive, or a matrix that is not finite, not affine or (without `mirrored`) mirrors.
-   */
-  setMatrixAt(index: number, matrix: ArrayLike<number>): this {
-    this.alive(index);
+  // Throws for a matrix setMatrixAt refuses: not 16 values, not finite, not affine, or mirrored without `mirrored`.
+  private validMatrix(matrix: ArrayLike<number>): void {
     if (!matrix || matrix.length !== 16) throw new TypeError('Invalid instance matrix; pass 16 numbers, column-major');
     for (let i = 0; i < 16; i++)
       if (matrix[i] - matrix[i] !== 0) throw new RangeError('Instance matrix is not finite; pass finite numbers');
@@ -355,6 +352,15 @@ export class DynamicInstances implements EnginePlugin {
         0
     )
       throw new RangeError('Instance matrix mirrors; create DynamicInstances with mirrored: true');
+  }
+  /**
+   * Sets an instance's world matrix: 16 floats, column-major, affine (last row 0, 0, 0, 1). Mirrored matrices need
+   * `mirrored: true`.
+   * @throws RangeError for an index not alive, or a matrix that is not finite, not affine or (without `mirrored`) mirrors.
+   */
+  setMatrixAt(index: number, matrix: ArrayLike<number>): this {
+    this.alive(index);
+    this.validMatrix(matrix);
     const m = this.matrices,
       at = index * ROW;
     m[at] = matrix[0];
@@ -625,9 +631,10 @@ export class DynamicInstances implements EnginePlugin {
         d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint, constants } });
     const group = d.createBindGroup({
       layout,
-      entries: [b.frame, b.part, b.matrices, b.rows, b.world, b.drawn, b.args].map(
-        (buffer, binding) => ({ binding, resource: { buffer } }),
-      ),
+      entries: [b.frame, b.part, b.matrices, b.rows, b.world, b.drawn, b.args].map((buffer, binding) => ({
+        binding,
+        resource: { buffer },
+      })),
     });
     return {
       cull: pipeline('cull', this.wait === undefined ? undefined : { wait: this.wait }),
