@@ -24,6 +24,11 @@ export function setMeshSource(mesh, source) {
 export function clearMeshSource(mesh) {
   sources.delete(mesh);
 }
+/** The gltf-pro record of `mesh` while its model lives, else undefined: meshTriangles without an object per call. */
+export function meshSource(mesh) {
+  const source = mesh && sources.get(mesh);
+  return source && !source.model.disposed ? source : undefined;
+}
 export function meshTriangles(mesh) {
   if (mesh?.geometry) return { kind: 'core', geometry: mesh.geometry };
   const source = mesh && sources.get(mesh);

@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: every model scale casts a shadow</title><style>body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style></head><body><canvas width="960" height="540"></canvas>
+<script type="module">
+// One sphere resting on a floor, the whole scene built at a chosen scale (1 mm to 1 km), with default Shadows
+// settings. scale-browser.mjs reads the canvas in three states (window.check.show) and compares the floor's shadow with
+// the sphere's geometric shadow. Known bug it guards (docs/known-bugs.md, fixed 2026-11-11): a model a few centimetres
+// across, the Khronos BoomBox among them, cast no visible shadow at the default settings.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {sphereGeometry} from '/packages/geometry/dist/index.js';
+import {PbrMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu'}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// The quickstart's sun, from the left and above.
+engine.lighting.direction.set([-4,4,2,3]);
+const radiance=Float32Array.from(engine.lighting.radiance);
+const d=engine.lighting.direction,l=Math.hypot(d[0],d[1],d[2]),sun=[d[0]/l,d[1]/l,d[2]/l];
+let scene,shadows,boombox;
+const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const clear=()=>{shadows?.dispose();shadows=undefined;scene?.floor.dispose();scene?.remove();scene=undefined;};
+window.check={
+  // `scale`: the sphere's diameter in metres; the floor is 20 diameters across. `camera`: 'scaled' keeps the camera's
+  // near and far in proportion (near = scale / 10), 'default' keeps core's defaults (near 0.1 m), as the loading-gltf
+  // guide does. `model`: 'sphere', or 'boombox' (the Khronos BoomBox at its own size, about 2 cm, scale ignored).
+  async setup({scale,camera,model='sphere'}){
+    clear();
+    const cam=engine.camera;
+    cam.near=camera==='scaled'?scale/10:0.1;cam.far=camera==='scaled'?scale*1000:1000;
+    cam.position=[0,2,5];cam.target=[0,0,0];
+    let source,remove,min,max,sphere;
+    if(model==='boombox'){
+      boombox??=await loadGLTF(engine,'/examples/assets/khronos/BoomBox/BoomBox.glb');
+      boombox.root.visible=true;boombox.root.setPosition([0,0,0]);
+      boombox.root.setPosition([0,-boombox.bounds[1],0]);
+      const c=boombox.bounds;min=[c[0],c[1],c[2]];max=[c[3],c[4],c[5]];
+      source=boombox;remove=()=>{boombox.root.visible=false;};
+    }else{
+      sphere={center:[0,scale/2,0],radius:scale/2};
+      const ball=createMesh(engine,sphereGeometry(sphere.radius,48,24),new PbrMaterial({color:'#c05050',roughness:0.8}));
+      ball.root.setPosition(sphere.center);
+      source=ball;remove=()=>ball.destroy();
+      // The sphere and its shadow, which falls away from the sun.
+      min=[-scale*0.5,0,-scale];max=[scale*1.8,scale,scale*0.5];
+    }
+    const size=model==='boombox'?Math.max(max[0]-min[0],max[1]-min[1],max[2]-min[2]):scale;
+    const floor=engine.createMesh().setGeometry(box(size*20,size/10,size*20)).setPosition([0,-size/20,0]);
+    scene={floor,source,remove};
+    // The guide's framing for the model (fitToBoundingBox of its bounds); the sphere's box at the canvas's aspect.
+    cam.fitToBoundingBox(min,max,model==='boombox'?{duration:0}:{aspect:canvas.width/canvas.height,duration:0});
+    await render(1);
+    return {position:[...cam.position],target:[...cam.target],fov:cam.fov,near:cam.near,width:canvas.width,height:canvas.height,sun,sphere,size,floor:size*10};
+  },
+  // 'soft': default Shadows. 'open': no shadows. 'dark': no shadows, no sun.
+  async show(state,options={}){
+    engine.lighting.radiance.set(state==='dark'?[0,0,0]:radiance.subarray(0,3));
+    shadows?.dispose();shadows=undefined;
+    if(state==='soft'){shadows=Shadows.attach(engine,options);shadows.add(scene.source);shadows.add(scene.floor,{castShadow:false});}
+    await render();
+    return errors.splice(0);
+  },
+};
+window.ready=true;
+</script></body></html>

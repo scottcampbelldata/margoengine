@@ -1,3 +1,18 @@
+### Section 5 evidence: directional shadows at any model scale (2026-11-11)
+
+`Shadows` no longer carries world-length defaults. Each receiver moves a quarter texel of its cascade along its normal
+and compares one texel nearer the light, with the texel's world size read in WGSL from the cascade matrix
+(`shadowPlace` in `packages/shadows/src/shader.ts`; normal offset after Holbert 2011, slope and texel scaled bias after
+Dou, Yan, Kerzner, Dai and Wyman 2014, JCGT 3(4)). The light depth range reaches the farthest known caster instead of
+100 m (Lauritzen, Salvi and Lefohn 2011, Sample Distribution Shadow Maps; Microsoft 2010, Common Techniques to Improve
+Shadow Depth Maps), still models fit the cascades as core meshes do, and the default `distance` is 500 or 20 times the
+camera's target distance. Evidence: `packages/shadows/test/scale-browser.mjs` renders one scene at 1 mm, 2 cm, 1 m,
+100 m and 1 km plus the Khronos BoomBox, native WebGPU and the WebGL2 layer, RTX A6000 Edge 157, with the same umbra
+and lit pixel counts at every scale (4,626 umbra, 335,079 lit, none darkened); every other shadows GPU test passes in
+both modes. Steady-frame GPU calls and written bytes are unchanged in the deformed-shadows, quality-presets and
+gltf-pro-lighting-hooks proofs; only uniform values and shader text differ. Missing: `VirtualShadows` keeps its world
+defaults (docs/known-bugs.md), other GPUs.
+
 ### Section 5 evidence: 100 device restores (2026-11-11)
 
 `scripts/device-recreation-soak.mjs` (Rust engine port R20) forces 100 device losses in one page with core meshes,

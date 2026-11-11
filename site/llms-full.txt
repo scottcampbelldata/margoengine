@@ -49,8 +49,8 @@ Open <http://127.0.0.1:5173/examples/quickstart/>. That page is the quickstart b
 [examples/quickstart/](examples/quickstart).
 
 **Route 2: use the packages in your own project from local tarballs.** `npm run pack:packages` builds every package and
-writes one `.tgz` file each to `test-results/`. Install them all, plus Vite, in a new folder (shown for a shell that
-expands `*.tgz`, such as Git Bash, macOS or Linux; in PowerShell list the files or use `Get-ChildItem`):
+writes one `.tgz` file each to `test-results/`. Install them all, plus Vite, in a new folder. In Git Bash, macOS or
+Linux:
 
 ```sh
 npm run pack:packages
@@ -58,6 +58,19 @@ mkdir ../my-scene && cd ../my-scene
 npm init -y
 npm install ../margoengine/test-results/*.tgz vite
 ```
+
+In PowerShell on Windows, which does not expand `*.tgz` for npm and (in version 5.1, the one Windows ships) does not
+accept `&&`:
+
+```powershell
+npm run pack:packages
+mkdir ../my-scene; cd ../my-scene
+npm init -y
+npm install (Get-ChildItem ../margoengine/test-results/*.tgz).FullName vite
+```
+
+If PowerShell says `npm.ps1 cannot be loaded because running scripts is disabled on this system`, type `npm.cmd` instead
+of `npm` and `npx.cmd` instead of `npx`; they run the same programs.
 
 On the machine used to write this page, `npm ci` took 15 seconds, packing 35 and the install 8; from the first command
 to a rendered, verified page took 76 seconds (`npm run check:quickstart` repeats the whole run and fails above 300).
@@ -187,6 +200,10 @@ The scene is about 60 lines. Three things to know about it:
 - `createMesh` (from `margoengine/materials`) draws a geometry with a `PbrMaterial`. That is how a mesh gets a
   texture. `stage.box()` and `stage.sphere()` make plain-colour meshes with no texture.
 - Shadows, picking and outlines are separate packages. You import them when you want them and pay nothing when you do not.
+
+To change it: the ball's size is the first number of `sphereGeometry` (its radius), so lift it by the same amount in
+`setPosition`. A new mesh, such as a second crate, casts a shadow once you pass it to `shadows.add`, and the click handler
+names it once you add it to `names`.
 
 **WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
 in. Without WebGPU the page shows a message and stops. The site's demos run on WebGL2 without WebGPU through the optional
@@ -890,6 +907,9 @@ collides against the same CPU triangle trees the `@margoengine/bvh` Raycaster us
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js. -->
 
+Put your level in the Vite project's `public/assets/` folder as `house.glb`, so the page loads it from
+`/assets/house.glb`. Any `.glb` with its floor at y = 0 works; the camera below starts at x 2.5, z -2, looking toward +z.
+
 ## The page
 
 ```html
@@ -1241,6 +1261,28 @@ import {createStage} from '@margoengine/web';
 
 const stage = await createStage('#viewport');
 stage.box({color: '#84d6bd'});
+```
+
+## A game in one import
+
+With a `<div id="viewport" style="height:400px"></div>` in the page, a crate falls onto a floor and casts a shadow:
+
+```ts
+import {createStage, Shadows} from '@margoengine/game';
+import {Physics} from '@margoengine/game/physics';
+
+await Physics.load(); // compiles the physics solver, once per page
+const stage = await createStage('#viewport', {camera: {position: [6, 4, 8], target: [0, 1, 0]}});
+const physics = new Physics(stage.engine); // steps itself every frame
+const shadows = Shadows.attach(stage.engine, {resolution: 2048});
+stage.engine.scene.lighting.direction.set([-4, 4, 2, 3]); // sun from the left and above, so the shadow is in view
+const floor = stage.box({size: [10, 1, 10], position: [0, -0.5, 0], color: '#d4d4cc'});
+const crate = stage.box({position: [0, 4, 0], color: '#c08040'});
+physics.addBody(floor, {type: 'fixed'});
+physics.addBody(crate, {colliders: {shape: 'box', restitution: 0.3}});
+shadows.add(floor);
+shadows.add(crate);
+window.addEventListener('pagehide', () => stage.dispose(), {once: true});
 ```
 
 For a complete app, `npm create margo@latest my-app -- --template web`, then `cd my-app`, `npm install` and
@@ -2898,20 +2940,17 @@ features add no core or stage functionality.
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (89 of 102 on 2026-11-10, many with no engine plugin at all, such as math or input). Core and the physics
+  pending (80 of 102 on 2026-11-11, many with no engine plugin at all, such as math or input). Core and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`.
-- The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`. It
-  lacks `createPipelineLayout`, `queue.writeTexture`, device limits, the `GPU*` enum globals, `OffscreenCanvas` and a
-  document, so the fixtures that need them add those
-  themselves; glyphs are not rasterised. The GPU leaf runs the same fixtures on a real device, native and WebGL2.
-- Written but not gated yet, because they pass the CPU model only: the culling, environment, post, shadows, sky,
-  splats, text, ui and video fixtures. Their Node shims (stub shaders, fake buffers, a document stand-in) break on a
-  real device, and video's WebGL2 case finds the external-texture retention in docs/known-bugs.md; they are gated once
-  each passes native WebGPU and the WebGL2 layer. The bugs those fixtures found are fixed with their own tests.
+- The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,
+  completed in `tests/support/owner-lifetime-node.js` (pipeline layouts, error scopes, texture writes, limits, the
+  `GPUShaderStage` and `GPUTextureUsage` globals, a canvas context and core's standard lit shader lines). Fixtures never
+  shim a device, so the GPU leaf runs the same fixtures with real resources on a real device, native and WebGL2. Glyphs
+  are not rasterised in the CPU model.
 - Not covered yet: stage feature entries (they take a Stage, not the engine the harness gives), terrain, `LabelRenderer`
   and `LabelGL` (DOM), `TransmissionLayers` and the `BatchedMesh`, `Fur` and node-material entries of materials, SSR and
-  SSGI (shared clear-colour cache, docs/known-bugs.md), and SceneFade, which disposes itself on device restore by
-  design, so the attached device-loss case cannot hold for it.
+  SSGI (a clear-colour buffer stays in the shared per-device cache, docs/known-bugs.md), and SceneFade, which disposes
+  itself on device restore by design, so the attached device-loss case cannot hold for it.
 - Work after an async factory settles (a stream that keeps loading) runs with no owner and is checked only through
   the plugin hooks it runs in.
 
@@ -3683,6 +3722,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Native glass tint draw | Enforced by method ([shader.ts](../packages/gltf-pro/src/shader.ts)): a loaded transmissive material draws twice, a multiply of the light behind and the lit surface, and both sample the material's maps. Cost measured (quiet-gated, RTX A6000, 1920 × 1080 4x, screen-filling glass, [tint-pass-gpu.json](../examples/package-benchmarks/results/tint-pass-gpu.json)): four maps, one layer 0.52 ms a frame against 0.33 ms with no tint draw and 0.39 ms with the older factors-only draw; 16 layers 4.46, 2.56 and 3.47 ms; eight maps, 16 layers 6.88, 3.41 and 4.65 ms. | Base colour, transmission, metal, sheen and clearcoat maps change how much light passes through, so the multiply has to read them. | The tint draw takes 17 to 57 percent of the GPU time of these glass-only frames at 1920 × 1080, 0.03 to 0.2 ms per million glass pixels. Glass with no maps pays as well: 3.41 ms against 2.69 ms for the factors-only draw at 16 layers, because the surface read also covers metal and thin film. | The `Transmission` pass from `@margoengine/materials`. |
 | Native glass on a display-encoded target | Package-owned scene capture and one snapshot before each native glass surface. | Decode the stored background and lit surface, multiply the linear transmitted share, add, then encode once. HDR targets retain their existing blend path. | A full scene capture and a copy pass per native glass primitive; 4x scenes also resolve before each snapshot. Native transmission remains a sightline tint, without screen-space refraction. | Use `Transmission` for refracted HDR scene copies. |
 | Materials surfaces outside the colour pass | Enforced ([cutout-passes-browser.mjs](../packages/materials/test/cutout-passes-browser.mjs), [cutout-casters-browser.mjs](../packages/shadows/test/cutout-casters-browser.mjs)): shadow maps, contact shadows, TAA velocity and picking follow `map` alpha, `alphaMap`, UV transforms, `alphaTest`, `vertexColors: false`, `displacementMap` and `clippingPlanes`. Three limits: `triplanar` keeps its whole surface in those passes; a `static` `ContactShadows` redraws every frame while it has an `alphaMap`, displaced or clipped caster, which change on the GPU alone; and TAA gives a displacement that changes between frames no velocity of its own. Cut-out shadow outlines are also held against Blender Cycles on real glTF models ([check.mjs](../packages/shadows/test/outside/check.mjs)). | Triplanar projects in world space, which a caster's UVs cannot follow; an `alphaMap`, displacement or clipping can change on the GPU alone, so the CPU cannot tell when a static caster is stale, and TAA has no velocity for a displacement that changes between frames. | A `triplanar` surface keeps its whole surface in those passes, a `static` `ContactShadows` redraws every frame in the cases named, and TAA has no velocity for a changing displacement. | Use a UV-mapped `map` instead of `triplanar` where the shape must cut in shadows, picking and TAA; give a `static` `ContactShadows` casters with no `alphaMap`, displacement or clipping so it does not redraw every frame. |
+| Shadows at any model scale (`Shadows` defaults, 2026-11-11) | Measured on an RTX A6000, WebGPU and the WebGL2 layer ([scale-browser.mjs](../packages/shadows/test/scale-browser.mjs)): a sphere on a floor built at 1 mm, 2 cm, 1 m, 100 m and 1 km, and the 2 cm Khronos BoomBox framed as the loading-gltf guide frames it, all cast their full shadow with no lit pixel darkened, untuned. By method: a skinned, morphed, instanced, displaced or custom-drawn (`drawShadow`) caster has no fixed bounds, so with it in the set the cascades span the camera's near plane to `distance` (500, or 20 times the camera's target distance) and their depth reaches `casterMargin` (100) towards the light. | Receiver offsets are fractions of the receiver's cascade texel (a quarter texel along the normal, one texel of depth), and the cascades fit the casters whenever their bounds are fixed. | Such a caster a few centimetres across, framed from centimetres away, lands in texels several centimetres wide and casts a blurred or no shadow. | Set `distance` near the scene's size. |
 | Shadows far from world zero (`ShadowOptions.floatingOrigin`, 2026-11-11) | Measured on the CPU fit ([floating-origin.test.js](../packages/shadows/test/floating-origin.test.js)): over 32 rebases about 1e5 m from zero, a world point keeps its texel phase within 0.01 texel in every cascade and in a `bounds` map; snapped in local space it moved by more than 0.1 texel (up to half a texel). Virtual shadow maps (`/virtual`) are not anchored: their page grid stays local. | Centres snap in float64 world units, then the matrix is written relative to the origin in float32, as every other local matrix. | Without the option, each rebase that is not a whole number of texels moves shadow edges by up to half a texel for one frame and for good after; `/virtual` re-renders its pages after a rebase. | Pass the `FloatingOrigin` as `floatingOrigin`. |
 | Ray traced shadows (`@margoengine/shadows/rt`, 2026-11-07) | Where a fragment shader cannot read four storage buffers the call answers a map filter. | No hardware path: WebGPU exposes no ray queries, as gpuweb's acceleration structure and ray query proposals are still open pull requests on 2026-11-07, so rays walk a BVH in the fragment shader and cost follows rays times lit pixels. | By method: only the tree casts, in the pose it was built; alpha masks are not in it, so a cutout casts whole triangles; shadows end at the map's reach; `Shadows` only. Against Cycles on the real plant: overlap 0.97 hard, and 0.97 under a soft sun with 64 rays, where PCSS gives 0.97. One GPU, an RTX A6000; no timing yet. | Call `bvh.refit()` then `filter.refit()` after moving what the tree holds; lower `rays` (default 16, 1 to 256) to cut cost; `fallback` picks the map filter used where storage buffers cannot be read. |
 | Shadow intensity and colour (`@margoengine/shadows/style`, 2026-11-07) | Enforced: `intensity` and each of `color` from 0 to 1, one style per shadows object. | By method: art direction, so light reaches where no light could, the same light a second sun that casts nothing would add, and that is what it matches in Cycles: deep in the real plant's shadow 0.283 against 0.287 in red and 0.684 against 0.684 in blue. three.js r186's `light.shadow.intensity`, read from its pixels outside this repository, leaves 1 - intensity, the black case here; it has no colour. One GPU, an RTX A6000; no timing yet. | Speculars and everything else the light drives are scaled alike. | Leave the style off, or keep `intensity` 1 with the default black `color`, for the plain physical shadow; both options are live on `style.options`. |
@@ -3717,7 +3757,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Projected decals | Enforced ([decals.ts](../packages/post/src/decals.ts)): 4,096 decals per `setDecals`, culled each frame on the CPU by view (bounding sphere against the six clip planes) and screen size (`minPixels`, default 1 px, a conservative span bound), so only the visible ones are uploaded and drawn (LIM-442); colour only (`MaterialDecals` changes normal, roughness and metalness). Cost measured (diagnostic: other jobs running; [decals-gpu.json](../examples/package-benchmarks/results/decals-gpu.json)): 1280 × 720 4x, 1.64 ms without, 1.64 / 1.97 / 6.36 ms with 1 / 16 / 256 one-metre decals. | Screen-space decals need no change to any material shader: one pass reads the scene depth a post capture already provides. | `Decals need scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first`; at 4x MSAA decal edges along silhouettes are per pixel; gltf-pro BLEND primitives are tinted with the surface behind them; `multiply` cannot lighten; decals under `minPixels` across are dropped. | `@margoengine/post/decals` (5,243 B gzip) is itself the opt-in; `mode: 'over'` for light-on-dark marks; `minPixels: 0` keeps every decal in view; `@margoengine/post/material-decals` for normal and roughness. |
 | VFX repeatable particle order (accepted difference in work, Scott 2026-10-30) | Measured (RTX A6000, Edge 156, 2026-10-30, 8 alternating rounds of `examples/package-benchmarks/vfx-gpu.mjs` against the atomic build): simulate compute 0.094 to 0.184 ms at 1,000,000 particles and 0.010 to 0.031 ms at 100,000; draw unchanged. On the WebGL2 layer's CPU tier, simulate wall time 290 to 58 ms at 20,000 and 370 to 250 ms at 100,000 (the package-route row under Platform was measured before this change). | Births take the lowest dead slots and the draw list is in slot order, instead of atomic counters whose order changed from run to run (two runs of one still frame differed on up to 5,965 of 65,536 pixels). The extra work is four small compute passes (workgroup prefix sums) around the simulation; the output is the same particles in a repeatable order. | The same frames draw the same pixels on every run (`packages/vfx/test/browser-check.mjs`, order case). Size: `@margoengine/vfx/base` 7,339 to 7,978 B gzip, the root 12,376 to 12,999 B; the growth of their limits in `scripts/quality/baselines/sizes.json` was approved by Scott on 2026-10-30. | None needed below about 1,000,000 particles; fewer particles (`capacity`) cost proportionally less. |
 | VFX capacity (`@margoengine/vfx`, raised 2026-11-10) | Enforced: `capacity` 1 to 16,776,960 at construction (65,535 workgroups of 256); at attach 64 x capacity must fit one storage binding and one buffer, so a default WebGPU device holds 2,097,152 (was a fixed 1,000,000), else `RangeError` naming the device's figure. Default 1,000,000 (light and phone presets 100,000) is unchanged: capacity is allocated whether or not slots are live. Measured (RTX A6000, 2026-11-10, busy machine, diagnostic only): 2,097,152 live particles, all on screen at 1280 x 720, GPU 1.77 ms a frame from timestamp queries natively; on the WebGL2 layer 107 ms wall a frame (no timestamps there). | The device's storage binding: 128 MiB / 64 B. Margo's device asks for no larger binding (core), so more slots need an adapter-raised device. | On the WebGL2 layer 2,097,152 particles run far below 60 fps (speed phase item). | Keep `capacity` to what the effect needs; on the WebGL2 layer use the presets' 100,000. `packages/vfx/test/browser-check.mjs` scale case reproduces it, native and `MARGO_COMPAT=1`. |
-| Loader meshes past the core vertex limit (`@margoengine/loaders`, 2026-11-10, cap followed 2026-11-11) | Enforced by core: one `Geometry` holds at most 11,184,810 vertices (`CORE_MAX_VERTICES`), and a part at most 67,108,864 indices. `toGeometries` and `createMeshes` split a larger mesh or group into consecutive triangle ranges within those (`maxPartVertices` lowers the vertex count); `createPBRMeshes` splits at 1,000,000 vertices, gltf-pro's primitive limit. Measured: a 7,997,584-vertex, 15,983,858-triangle field is one part, built in 1.3 s, drawn at 8.6 ms a frame natively and 15.6 ms on the WebGL2 layer (busy machine, diagnostic; `node packages/loaders/tests/split-scale-check.mjs`). `pointsToGeometry` keeps 166,666 points by default (`maxPoints` up to 1,864,135). `createPBRMeshes` still refuses more than 4096 parts and packed data over `maxBytes` (default 256 MiB, about 3.3 million vertices at 80 B each). `toGeometry` keeps its one-Geometry contract and refuses past the limit. | Core's vertex limit is frozen; splitting in the package costs one draw per part and nothing per frame otherwise. Smooth normals are computed over the whole mesh first, so parts meet without seams. | A vertex on a cut is stored in each part that uses it (8,020,208 stored for 7,997,584 when that field was cut at 1,000,000). Parsers stop first at `maxVertices` (default 8,000,000); binary STL output has three vertices per triangle before welding, so the default admits 2,666,666 triangles. | Raise `maxVertices` and `maxTriangles` on the parser, and `maxBytes` on `createPBRMeshes`, for larger files. |
+| Loader meshes past the core vertex limit (`@margoengine/loaders`, 2026-11-10, cap followed 2026-11-11) | Enforced by core: one `Geometry` holds at most 11,184,810 vertices (`CORE_MAX_VERTICES`), and a part at most 67,108,864 indices. `toGeometries` and `createMeshes` split a larger mesh or group into consecutive triangle ranges within those (`maxPartVertices` lowers the vertex count); `createPBRMeshes` splits at 262,144 vertices, gltf-pro's default part size, so gltf-pro does not split its parts again ([split.test.js](../packages/loaders/tests/split.test.js)). Measured: a 7,997,584-vertex, 15,983,858-triangle field is one part, built in 1.3 s, drawn at 8.6 ms a frame natively and 15.6 ms on the WebGL2 layer (busy machine, diagnostic; `node packages/loaders/tests/split-scale-check.mjs`). `pointsToGeometry` keeps 166,666 points by default (`maxPoints` up to 1,864,135). `createPBRMeshes` still refuses more than 4096 parts and packed data over `maxBytes` (default 256 MiB, about 3.3 million vertices at 80 B each). `toGeometry` keeps its one-Geometry contract and refuses past the limit. | Core's vertex limit is frozen; splitting in the package costs one draw per part and nothing per frame otherwise. Smooth normals are computed over the whole mesh first, so parts meet without seams. | A vertex on a cut is stored in each part that uses it (8,020,208 stored for 7,997,584 when that field was cut at 1,000,000). Parsers stop first at `maxVertices` (default 8,000,000); binary STL output has three vertices per triangle before welding, so the default admits 2,666,666 triangles. | Raise `maxVertices` and `maxTriangles` on the parser, and `maxBytes` on `createPBRMeshes`, for larger files. |
 | Scatter cull in candidate order (accepted difference in work, 2026-11-05) | Measured (8 alternating rounds of [scatter-cull-gpu.mjs](../examples/package-benchmarks/scatter-cull-gpu.mjs) against the atomic build, 1463 x 768 at 4x MSAA, [A6000 result](../examples/package-benchmarks/results/scatter-cull-gpu-a6000.json), [M6 result](../examples/package-benchmarks/results/scatter-cull-gpu-m6.json)): the distribute pass at 10,000 / 110,000 / 1,000,000 candidates takes 0.012 / 0.044 / 0.049 ms atomic and 0.046 / 0.091 / 0.222 ms ordered on the RTX A6000 (Edge 156, D3D12), 0.011 / 0.111 / 0.485 ms and 0.043 / 0.231 / 1.050 ms on an Apple M6 Mac mini (Chrome for Testing 156, Metal); the LOD draw is unchanged (ratio 0.94 to 1.03). | The atomic cull put each frame's instances in the rings in whichever order the GPU's threads ran, and an Apple M6 at 4x MSAA draws an instance's edge pixels by that order: a still biome view changed about 420 of 76,800 pixels every frame. The extra work: each candidate stores its ring flags (and, when kept, its instance) at its own index, a prefix count over the three rings (`packages/shared/prefix.js`, the WebGL2 route's) gives each its slot, and each ring is compacted (`packages/scatter/src/order.ts`). The output is the same instances in every ring (the benchmark compares them), in candidate order every frame. | Still frames draw the same bits at 4x MSAA (`packages/scatter/test/repeat.browser.mjs`: exact on the A6000 and the M6). GPU memory: about 58 B more per candidate (`ScatterTiles`: per record slot; `gpuBytes` counts it), 32 B of it the culled instance: the zero-config biome world's stored objects went from 5.9 to 12.0 MB; `ScatterTiles` holds at most `maxStorageBufferBindingSize / 32` record slots (4,194,304 at the WebGPU default of 128 MiB, 16,777,216 before). Shadow lists keep their atomic append: a depth-only pass gives the same depth in any order. | Fewer candidates (`count`) cost proportionally less; a candidate past every ring costs its flags and its share of the prefix count only. |
 | Picking scattered instances (`@margoengine/scatter/pick`, 2026-11-08) | Enforced: transforms are 16 floats an instance; the grid is at most 1,024 cells a side, so cells grow past 1/1,024 of the spread. By method: a uniform XZ grid of world boxes walked front to back; a box test, then the triangles when a mesh is given. | Instances are spread over the ground, so a flat grid holds about one per cell and a ray visits only the cells it crosses; the triangle test per instance is linear in the mesh's triangles. | A click picks the nearest instance; the picker holds 64 bytes of transform and about 125 bytes of box, inverse and flags an instance, plus 4 bytes a grid entry. Any `remove`, `restore` or `setTransform` rebuilds the whole grid on the next pick, in time linear in the instances. The GPU `Scatter` and `ScatterTiles` make their instances on the GPU, so they are not picked. | Pick the transforms you placed (`instanceTransforms`, `groundTransforms`, a `ScatterBatch`); pass `cell` to size the grid by hand; for a tree, pass its `mesh` so the gaps between branches miss. |
 | Grass trampling (`@margoengine/scatter/interact`, 2026-11-08) | Enforced: 4,096 interactors a frame; 8 to 1,024 cells a side; a bend of at most pi / 2. By method: a flat push field around the camera that moves in whole cells; every instance turns about its root. | One push vector a cell is enough to bend a meadow; a rotation about the root keeps each vertex's distance from it, so the cull radii still hold. | 8 bytes a cell twice (128 KB each at the default 128 cells) and one compute thread a cell that loops over every interactor, so many interactors cost cells times interactors. The field reads no height: an interactor in the air presses the grass under it. Grass more than half the field's size from the camera is not pushed, and a push is lost once its cell leaves the field. | Pass only the interactors on the ground; raise `size` for a wider field and `resolution` for finer footprints. |
@@ -3860,9 +3900,9 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| glTF download budget | Enforced: gltf-pro reads at most `maxDownloadBytes` (default 64 MiB, 67,108,864 B: `assetLimit`) of JSON, buffers and images per load, and decoded accessors, packed geometry and decoded images may each use 4x that (256 MiB by default); `@margoengine/gltf` reads at most 64 MiB ([asset.ts](../packages/gltf-pro/src/asset.ts), [loading.js](../packages/shared/loading.js); [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Khronos ABeautifulGame (a 43 MB GLB whose 33 2048x2048 textures decode to 528 MiB) is over the default image budget. | Bounds memory for any URL an app is handed. | gltf-pro names the option for the download and packed-geometry budgets, e.g. `RangeError: glTF exceeds download budget (67108864 bytes; raise the maxDownloadBytes option)`; decoded accessors and images over 4x throw `RangeError: Decoded glTF exceeds byte budget` or `RangeError: glTF images exceed decoded size limit`; the light loader throws `glTF download byte budget exceeded` or `glTF buffers exceed 64 MiB`. | gltf-pro's `maxDownloadBytes` option (ABeautifulGame loads with 160 MiB, [khronos-gallery.js](../examples/khronos-gallery.js)); for the light loader, use gltf-pro. |
+| glTF download budget | Enforced: gltf-pro reads at most `maxDownloadBytes` (default 512 MiB, 536,870,912 B: `assetLimit`, 64 MiB before 2026-11-11) of JSON, buffers and images per load, and decoded accessors, packed geometry and decoded images may each use 4x that (2 GiB by default); a Draco primitive takes up to 16,777,216 vertices and 50,331,648 indices (1,000,000 each before), and `@margoengine/decoders` outputs at most 256 MiB per Draco decode; the stage's `addGLTF` reads up to 512 MiB and sends a file over 64 MiB to gltf-pro; `@margoengine/gltf` reads at most 64 MiB ([asset.ts](../packages/gltf-pro/src/asset.ts), [loading.js](../packages/shared/loading.js); [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js), [gltf-draco-limits.test.js](../tests/gltf-draco-limits.test.js), [gltf-routing.test.js](../packages/stage/tests/gltf-routing.test.js)). Khronos ABeautifulGame (a 43 MB GLB whose 33 2048x2048 textures decode to 528 MiB) fits the default image budget. | Bounds memory for any URL an app is handed, at a size where a 10M-triangle scan (about 300 MB raw, or about 800 MB decoded from a 40 MB Draco file) loads with no options; the decoded budget does not shrink with compression. | gltf-pro names the option for the download and packed-geometry budgets, e.g. `RangeError: glTF exceeds download budget (536870912 bytes; raise the maxDownloadBytes option)`; decoded accessors and images over 4x throw `RangeError: Decoded glTF exceeds byte budget` or `RangeError: glTF images exceed decoded size limit`; the light loader throws `glTF download byte budget exceeded` or `glTF buffers exceed 64 MiB`. | gltf-pro's `maxDownloadBytes` option, which also lowers the budget for apps that load untrusted URLs on small devices; for the light loader, use gltf-pro. |
 | Malformed and hostile files | Enforced at each parser's trust boundary (glTF, gltf-pro with its parse worker and progressive stream, `.margo`, Draco, KTX2, meshopt, HDR, EXR, UltraHDR, FBX), checked by seeded fuzzers (`npm run fuzz`, [targets-formats.js](../scripts/fuzz/targets-formats.js); regressions in [fuzz-formats-regressions.test.js](../tests/fuzz-formats-regressions.test.js)): every input ends in a result or the package's own error. Limits added with them: a gltf-pro document nested deeper than 256 levels ([asset.ts](../packages/gltf-pro/src/asset.ts)); an EXR chunk that decodes to more than 256 MiB, or chunks too small to hold the image ([exr.ts](../packages/environment/src/exr.ts)); a Draco or KTX2 decode running longer than 10 s plus 4 s per MiB of input ([pool.ts](../packages/decoders/src/pool.ts)). How long large valid Draco and KTX2 files take to decode: not measured. | Files from a URL are untrusted: a malformed one must fail with an error the app can show, not crash, hang, read outside its bytes or claim memory its size cannot justify. | `TypeError: Invalid glTF JSON: nested deeper than 256 levels`, `RangeError: Unsupported EXR: a chunk decodes to more than 256 MiB`, `RangeError: Invalid EXR: chunks are too small for the image size`, `MargoError: Draco decode timed out after <limit> ms (corrupt data?); the decoder worker was restarted`. | The decoders' `timeout` option (`Infinity` turns the limit off). No real glTF comes near 256 levels; EXR: fewer channels per file. |
-| Vertices per primitive | Enforced: gltf-pro takes up to 16,777,216 vertices per primitive (2^24), loaded as parts of at most `maxPartVertices` (default 262,144, 1,024 to 1,000,000) each; skinned and morphed primitives must fit one part; `loadGLTFProgressive` streams primitives of up to 1,000,000 vertices; the light `@margoengine/gltf` loader takes up to 1,000,000 vertices in total ([parts.test.js](../packages/gltf-pro/tests/parts.test.js), [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Packed geometry is still bounded by the decoded budget (4x `maxDownloadBytes`; 80 B a vertex, 4 B an index). Measured (Node 26, busy machine, diagnostic): a 1,001,000-vertex grid loads as 4 parts with 0.37% of its vertices copied onto the cuts, packed in about 240 ms. | Each part's vertex buffer is also bound as a storage buffer, so 262,144 vertices (20 MiB) stays inside the WebGPU default binding (128 MiB) and the WebGL2 layer's 2048-context one (64 MiB); indices pass through float32, exact up to 2^24. Parts follow Hoppe 1999, Sander et al. 2007, Yoon et al. 2005, Isenburg and Lindstrom 2005, Cignoni et al. 2005, Kerbl et al. 2018 and Karis et al. 2021 (cited in [parts.ts](../packages/gltf-pro/src/parts.ts)). | Over 2^24: `MargoError` code `unsupported` naming 16777216; a skinned or morphed primitive over the part size: `unsupported` naming `maxPartVertices`; a part over a device's binding: `RangeError` naming its bytes and `maxPartVertices`; progressive over 1,000,000: `unsupported`; the light loader: `RangeError: glTF exceeds one million vertices`. | Split a primitive over 2^24 vertices (or a rigged one over the part size) at export; use `loadGLTF` rather than the progressive loader for primitives over 1,000,000 vertices; lower `maxPartVertices` for a device with a small storage binding. |
+| Vertices per primitive | Enforced: gltf-pro takes up to 16,777,216 vertices per primitive (2^24), loaded as parts of at most `maxPartVertices` (default 262,144, 1,024 to 1,000,000) each; skinned and morphed primitives must fit one part; `loadGLTFProgressive` streams them part by part, each part drawn as it arrives ([progressive.test.js](../packages/gltf-pro/tests/progressive.test.js)); the light `@margoengine/gltf` loader takes up to 1,000,000 vertices in total ([parts.test.js](../packages/gltf-pro/tests/parts.test.js), [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Packed geometry is still bounded by the decoded budget (4x `maxDownloadBytes`; 80 B a vertex, 4 B an index). Measured (Node 26, busy machine, diagnostic): a 1,001,000-vertex grid loads as 4 parts with 0.37% of its vertices copied onto the cuts, packed in about 240 ms. | Each part's vertex buffer is also bound as a storage buffer, so 262,144 vertices (20 MiB) stays inside the WebGPU default binding (128 MiB) and the WebGL2 layer's 2048-context one (64 MiB); indices pass through float32, exact up to 2^24. Parts follow Hoppe 1999, Sander et al. 2007, Yoon et al. 2005, Isenburg and Lindstrom 2005, Cignoni et al. 2005, Kerbl et al. 2018 and Karis et al. 2021 (cited in [parts.ts](../packages/gltf-pro/src/parts.ts)). | Over 2^24: `MargoError` code `unsupported` naming 16777216; a skinned or morphed primitive over the part size: `unsupported` naming `maxPartVertices`; a part over a device's binding: `RangeError` naming its bytes and `maxPartVertices`; the light loader: `RangeError: glTF exceeds one million vertices`. | Split a primitive over 2^24 vertices (or a rigged one over the part size) at export; lower `maxPartVertices` for a device with a small storage binding. |
 | Dash caps (`dashCap` on `LineMaterial`) | By method: a cap reaches half the line width past its dash in pixels while dashes stay in world units, so a gap narrower than the width closes up. A cap stops at the line's own ends, and picks count gaps as line. | Ends are drawn in the fragment, with no extra geometry per dash. | Dotted lines keep the dot width on screen while their spacing follows perspective. | Widen `gapSize`, or use `worldUnits` widths. |
 | Adaptive point size (`adaptiveSize` on `OctreeCloud` in `@margoengine/points/octree`) | By method: density is per node and assumes a surface (points per cube face), so a volume of points gets smaller points than its gaps need. Sizes are written on the CPU, at most 500,000 points a selection, when the nodes drawn under a node change. A random sample still leaves gaps: 98 percent of the pixels covered at the default `scale` of 1.5 in the browser check. | Point sizes already have a channel, so this needs no second shader. | Far parts look solid, with larger and softer points. A big camera jump takes a few frames to settle sizes. | Raise `scale`; set `maxPixelSize` to cap the growth. |
 | Surfels (`SurfelPlugin` in `@margoengine/points/surfels`) | Enforced by method: opaque, always tests and writes depth, no textures, no `PointsPlugin.pick`; WebGPU only. Scene depth holds each disc pushed back by up to `blendDepth` radii. Each point draws twice, plus one full-screen pass. Extra targets take 12 bytes a sample: about 100 MB at 1920 x 1080 with 4x MSAA. Speed is not measured. | Weighted colour needs a sum and a divide, so it cannot be one blended draw; pushing the scene's own depth keeps meshes in the same test. | About twice the point cost of `PointsPlugin`. Something drawn later that lies within the push of a surface can show through it. | `PointsPlugin` where speed matters more; a smaller `blendDepth` for thin layers close together. |
@@ -9900,6 +9940,24 @@ ParticleLiquid draws 0 to 4,194,304 particles, all of one radius (0.001 to 100 w
 # Known bugs and unverified features
 
 
+### A 10M-triangle Draco scan decodes past @margoengine/decoders' 256 MiB output cap (found 2026-11-11, open)
+
+- **Repro:** a Draco glTF primitive of 5,000,000 vertices (position, normal, uv) and 10,000,000 triangles decodes to
+  about 280 MB; gltf-pro passes its 2 GiB decoded budget, but `validatedDracoLimits` in `packages/decoders/src/protocol.ts`
+  caps `maxDecodedBytes` at 256 MiB and the native crate's workspace at 256 MiB, so the decode is refused.
+- **Cause:** the decoders' ceiling predates parts; gltf-pro took at most 1,000,000 Draco vertices until 2026-11-11.
+- **Fix to build:** raise the decoders' output and workspace ceilings to what wasm32 memory allows for one decode
+  (measured), with a test at 10M triangles; gltf-pro already passes the right limits.
+
+### gltf-pro extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
+
+- **Repro:** `MARGO_COMPAT=1 node packages/gltf-pro/scripts/test-extensions-browser.js` on the dev PC while 30 package
+  test suites ran beside it: "lights: the real EnvironmentTest" failed with `page.evaluate: Execution context was
+  destroyed`. Run alone, and the full check run again on the same build and on origin/main 519906bcf6, it passed.
+- **Cause:** not found. The page was replaced or its renderer exited after about 40 earlier checks on one page, under
+  heavy memory load; nothing in the failing check navigates. Next: record the renderer's exit reason and memory when
+  the context goes, so a repeat names the cause.
+
 ### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
 
 - **Repro:** more than 1,048,574 core meshes of one geometry on a device with WebGPU's default 128 MiB
@@ -9920,26 +9978,18 @@ ParticleLiquid draws 0 to 4,194,304 particles, all of one radius (0.001 to 100 w
 - **Fix to build:** decide in loaders whether to follow the new core cap (and keep the point-cloud default at 166,666
   points so frame cost does not change), or keep 1,000,000 as the loaders' own limit and say so in the message.
 
-### WebGL2 layer: an imported external texture outlives the Video that imported it (found by check:owners, 2026-11-10, open)
+### SSR and SSGI keep a clear-colour buffer after disposal (found by check:owners, 2026-11-11, open)
 
-- **Repro:** `MARGO_COMPAT=1 node scripts/check-owner-lifetime-browser.mjs --packages=video` with
-  `packages/video/test/owner-lifetime.fixture.js` on disk: all 11 cases fail 'no leaked GPU buffers, textures or query
-  sets'; the same fixture passes on native WebGPU.
-- **Cause:** `packages/webgl2-compat/src/device/device.ts` `importExternalTexture` keeps one texture per source in
-  `externals` and destroys it only when the size changes, so after `Video.dispose()` (and after its VideoFrame is
-  closed) the texture stays until the source object is collected. WebGPU expires an external texture at the end of
-  the task, or when its VideoFrame closes.
-- **Fix to build:** expire the layer's external texture as WebGPU does (a closed VideoFrame, the end of the task)
-  while reusing the texture storage for the next frame of the same size, so steady frames still allocate nothing;
-  then gate the video fixture.
-
-### SSR and SSGI are missing from the post owner-lifetime fixture (found by check:owners, 2026-11-10, open)
-
-- **Repro:** `packages/post/test/owner-lifetime.fixture.js` is not on `main`; it exists only in the unlanded owners work
-  (commit `e871e72960`) and its comment lists SSR and SSGI as not covered.
-- **Cause:** the clear-colour buffer leak that blocked them is fixed (evicted buffers are destroyed after submitted
-  work), but the fixture is not landed, so `SSR.attach` and `SSGI.attach` cannot be added yet.
-- **Fix to build:** when the owners fixture lands, add `SSR.attach` and `SSGI.attach` to it and delete this entry.
+- **Repro:** add `ssr: ['SSR'], ssgi: ['SSGI']` to the `entries` of `packages/post/test/owner-lifetime.fixture.js` and run
+  `node scripts/check-owner-lifetime.mjs --packages=post`: all 22 `SSR.attach` and `SSGI.attach` cases fail 'no leaked
+  GPU buffers, textures or query sets'.
+- **Cause:** `packages/shared/clear-color.js` keeps one 16 byte uniform buffer per colour in a per-device cache of 64
+  (core's eviction fix, aaace8b22f, bounds it). SSR and SSGI clear with a colour of their own, so the first clear makes
+  that buffer under the plugin, and it stays in the cache after the plugin is disposed, until 64 newer colours evict it
+  or the device goes.
+- **Fix to build:** count the users of each cached colour and destroy its buffer when the last user is disposed (or
+  give SSR and SSGI their clear values through a buffer they own), then add both to the post fixture. Core change:
+  needs Scott's yes unless it is zero bytes.
 
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
@@ -10071,6 +10121,22 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   before that, the preview-contract baker comparison failed on the A6000 (layer 134, native 133 at texel (3, 0)).
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
+
+### Fixed 2026-11-11: a model a few centimetres across cast no visible directional shadow
+
+- **Repro:** the loading-gltf guide with the Khronos BoomBox (about 2 cm) at its own size: the floor showed no shadow.
+- **Cause:** three `Shadows` defaults were fixed world lengths, right for a model of about a metre and wrong at other
+  scales. A model (`loadGLTF`, materials' `createMesh`) never fitted the cascades, which fit only core meshes, so they
+  spanned 0.1 to 500 m and the first cascade's texels were 6 cm wide; the depth bias was 0.0005 of a depth range of at
+  least 200 m (0.1 m) and the normal offset 0.02 m, both larger than the model; and the 500 m `distance` left a model
+  framed from kilometres outside the shadowed range.
+- **Fix:** still models fit the cascades as core meshes do (their local boxes cached, not recomputed each frame); the
+  depth range reaches the farthest caster instead of 100 m; below one unit the cascade radius rounds to 1/16 of its
+  octave; every receiver's normal offset and depth bias are fractions of its cascade's texel (`normalBias` and `bias`
+  now add to them, default 0); and the default `distance` is 500 or 20 times the camera's target distance, whichever
+  is farther. Steady-frame GPU calls and uploaded bytes are unchanged (deformed-shadows, quality-presets and
+  gltf-pro-lighting-hooks proofs). Regression: `packages/shadows/test/scale-browser.mjs` (1 mm, 2 cm, 1 m, 100 m, 1 km,
+  the default camera and the BoomBox, WebGPU and the WebGL2 layer) and `packages/shadows/test/scale.test.js`.
 
 ### Fixed 2026-11-10: weather machine stopped its schedule on a refused call and dropped time after 256 steps
 
@@ -11921,6 +11987,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   run, and the results recorded here.
 
 ## Open defects
+
+### VirtualShadows keeps world-length bias defaults, so a model a few centimetres across may lose its shadow
+
+- **What:** `VirtualShadows` (`@margoengine/shadows/virtual`) still offsets each receiver by `bias` 0.002 and `normalBias` 0.02 in world units, the same class of fixed world lengths that hid a centimetre model's shadow under `Shadows` (fixed 2026-11-11, above). Not yet measured: no test renders a virtual-shadowed model below 10 cm.
+- **Repro:** `packages/shadows/test/scale.html` with `VirtualShadows` in place of `Shadows` at the 2 cm case; expected an umbra under the cube, likely none, as the 2 cm normal offset is the model's whole size.
+- **Cause (expected):** `packages/shadows/src/virtual.ts` uniforms 29 and 30 take those world defaults; its page texels are not used to size the offsets as the root's `shadowPlace` now does.
+- **Needed to close:** size both offsets from the page's texel at the receiver, as `shadowPlace` does per cascade, and add the virtual case to `scale-browser.mjs` at every scale.
 
 ### A chain laid out level under a 1000:1 end mass stretches once it is taut
 
@@ -20750,6 +20823,9 @@ animation.destroy();
 model.destroy();
 stage.dispose();
 ```
+
+`playing`, `time` and `clip` are plain fields. `time` is the seconds into the current clip; while the clip loops (the
+default `loop: true`) it wraps at the clip's end, so a scrub bar can show it as is.
 
 Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LINEAR (quaternion slerp), and CUBICSPLINE tracks. Animation advances in seconds before the engine updates world matrices. A compute pass blends position/normal/tangent morphs before skinning and writes the vertex draw buffer. Bone matrices use read-only storage buffers, bounded by the GPU's storage limits rather than a fixed bone count.
 

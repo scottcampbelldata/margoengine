@@ -88,9 +88,8 @@ The basic path has no `model.pbr`; advanced models expose it. See [loader select
 ## Common mistakes
 
 - **The model is tiny or huge.** glTF units are metres. Frame it with `fitToBoundingBox`, or scale `model.root`. A
-  model only a few centimetres across (the Khronos BoomBox is 2 cm) is framed from the camera's 10 cm near plane and
-  casts no visible shadow at the default settings; scale it to a real size before step 3, for example
-  `model.root.setScale([50, 50, 50])`.
+  model only a few centimetres across (the Khronos BoomBox is 2 cm) is framed from the camera's 10 cm near plane; it
+  still casts its shadow, at any scale. To see a tiny model larger, lower `engine.camera.near` before framing it.
 - **The model is dark.** Without an environment, glTF materials get a simple sky and ground fill plus the sun. Add
   image-based lighting from the [environment](../../packages/environment/README.md) package for glossy models.
 - **A 404 or "Unexpected token <".** The URL is wrong and the server sent an HTML page. Files in Vite's `public/`

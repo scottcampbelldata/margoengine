@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15068664,
+  "total": 15069491,
   "history": [
     {
       "date": "2026-10-24",
@@ -8447,6 +8447,12 @@
       "commit": "f2cd28c42",
       "reason": "materials transmission mip chain uses the shared area filter (batch 132b)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "1ff2caa670",
+      "reason": "shadows fix 2026-11-11: shadows at any model scale (texel-sized bias in WGSL, still models fit the cascades, cached local boxes); 19333 to 19572 B gzip; a separate lazy chunk would add a request on every shadowed page for 239 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -9418,7 +9424,7 @@
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/texture-array": 3442,
     "@margoengine/shader/utils": 7295,
-    "@margoengine/shadows": 19333,
+    "@margoengine/shadows": 20160,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/light-function": 1921,
     "@margoengine/shadows/rt": 6486,

@@ -11,7 +11,7 @@ const contract = [
   'fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {',
   'let depth=-(shadowFrame.view*vec4f(position,1)).z;',
   'let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);',
-  'var reference=projected.z-shadowFrame.settings.y;',
+  'let place=shadowPlace(layer,position,normal);let uv=place.xy;var reference=place.z;',
   'fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}',
 ];
 
@@ -238,13 +238,13 @@ test('the last tenth of each cascade dithers into the next; the last cascade and
     'let noise=shadowNoise(position);let split=shadowFrame.splits[cascade];',
     'let band=0.1*(split-select(0.0,shadowFrame.splits[max(cascade,1u)-1u],cascade>0u));',
     'let layer=cascade+u32(split<shadowFrame.splits.w&&depth>split-band*(1.0-noise.y));',
-    'let projected=shadowFrame.matrices[layer]*',
+    'let place=shadowPlace(layer,position,normal);',
     'let matrix=shadowFrame.matrices[layer];',
   ];
   for (const filter of ['soft', 'pcf', 'hard']) {
     const source = shadowSampling(0, filter);
     for (const line of dither) assert.ok(source.includes(line), `${filter}: ${line}`);
-    const body = source.slice(source.indexOf('let projected='));
+    const body = source.slice(source.indexOf('let place='));
     assert.doesNotMatch(body, /\[cascade\]|i32\(cascade\)/, `${filter}: every lookup after the dither uses layer`);
   }
   // The same rule on the CPU, over a ramp of noise values.

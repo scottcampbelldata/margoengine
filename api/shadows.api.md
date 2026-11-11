@@ -170,7 +170,7 @@ export function cascadeSplits(near: number, far: number, lambda?: number, out?: 
 export function fitCascades(camera: Camera, aspect: number, direction: Vec3, resolution: number, splits: Float32Array, matrices?: Float32Array<ArrayBuffer>, ranges?: Float32Array<ArrayBuffer>, margin?: number, result?: {
     matrices: Float32Array;
     ranges: Float32Array;
-}, count?: number, anchor?: ArrayLike<number>): {
+}, count?: number, anchor?: ArrayLike<number>, scene?: ArrayLike<number>): {
     matrices: Float32Array;
     ranges: Float32Array;
 };

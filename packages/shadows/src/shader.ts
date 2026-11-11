@@ -102,6 +102,14 @@ const filters: Record<ShadowFilter, string> = {
   hard: /* wgsl */ `
   return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(layer),reference);`,
 };
+// The receiver's own offsets follow its cascade's texel, so every model scale gets the same shadow (a fixed world
+// length, 0.02 along the normal and 0.0005 of a depth range of 200 or more, hid a model a few centimetres across):
+// shadowPlace moves the receiver NORMAL_TEXELS texels along its normal (Holbert 2011, "Normal Offset Shadows": the offset
+// scales with the world size of a texel) and compares DEPTH_TEXELS texels nearer the light (Dou, Yan, Kerzner, Dai & Wyman
+// 2014, "Adaptive Depth Bias for Shadow Maps", JCGT 3(4): the bias that hides self-shadowing is a fraction of a texel's
+// world footprint). The `normalBias` and `bias` options add to them.
+const NORMAL_TEXELS = 0.25,
+  DEPTH_TEXELS = 1.0;
 // Compare on the receiver plane; cover comparison-sampler subtexel footprints.
 // Receiver-plane depth bias: Isidoro 2006, GDC "Shadow Mapping: GPU-based Tips and Techniques". Normal-offset
 // receiver position: Holbert 2011, "Normal Offset Shadows". shadowNoise is interleaved gradient noise (Jimenez 2014).
@@ -154,6 +162,12 @@ ${search ? `@group(${group}) @binding(30) var shadowDepth:texture_2d_array<f32>;
   let magic=vec2f(0.06711056,0.00583715);
   return fract(52.9829189*fract(vec2f(dot(pixel,magic),dot(pixel.yx,magic))));
 }
+fn shadowPlace(layer:u32,position:vec3f,normal:vec3f)->vec3f {
+  let matrix=shadowFrame.matrices[layer];let size=2.0/vec2f(textureDimensions(shadowMap));
+  let world=max(size.x/length(vec3f(matrix[0].x,matrix[1].x,matrix[2].x)),size.y/length(vec3f(matrix[0].y,matrix[1].y,matrix[2].y)));
+  let projected=matrix*vec4f(position+normalize(normal)*(shadowFrame.settings.z+${NORMAL_TEXELS}*world),1);
+  return vec3f(projected.xy*vec2f(0.5,-0.5)+0.5,projected.z-shadowFrame.settings.y-${DEPTH_TEXELS}*world*length(vec3f(matrix[0].z,matrix[1].z,matrix[2].z)));
+}
 fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   let depth=-(shadowFrame.view*vec4f(position,1)).z;
   if(depth>shadowFrame.splits.w){return 1;}
@@ -161,8 +175,7 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   let noise=shadowNoise(position);let split=shadowFrame.splits[cascade];
   let band=0.1*(split-select(0.0,shadowFrame.splits[max(cascade,1u)-1u],cascade>0u));
   let layer=cascade+u32(split<shadowFrame.splits.w&&depth>split-band*(1.0-noise.y));
-  let projected=shadowFrame.matrices[layer]*vec4f(position+normalize(normal)*shadowFrame.settings.z,1);
-  let uv=projected.xy*vec2f(0.5,-0.5)+0.5;var reference=projected.z-shadowFrame.settings.y;
+  let place=shadowPlace(layer,position,normal);let uv=place.xy;var reference=place.z;
   if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0||reference>=1){return 1;}
   let dimensions=vec2f(textureDimensions(shadowMap));let texel=1.0/dimensions;
   let matrix=shadowFrame.matrices[layer];let rowX=vec3f(matrix[0].x,matrix[1].x,matrix[2].x);let rowY=vec3f(matrix[0].y,matrix[1].y,matrix[2].y);let rowZ=vec3f(matrix[0].z,matrix[1].z,matrix[2].z);
@@ -182,8 +195,7 @@ fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
   let split=shadowFrame.splits[cascade];
   let band=0.1*(split-select(0.0,shadowFrame.splits[max(cascade,1u)-1u],cascade>0u));
   let layer=cascade+u32(split<shadowFrame.splits.w&&depth>split-band*(1.0-shadowNoise(position).y));
-  let projected=shadowFrame.matrices[layer]*vec4f(position+normalize(normal)*shadowFrame.settings.z,1);
-  let uv=projected.xy*vec2f(0.5,-0.5)+0.5;let reference=projected.z-shadowFrame.settings.y;
+  let place=shadowPlace(layer,position,normal);let uv=place.xy;let reference=place.z;
   if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0||reference>=1){return vec3f(1);}
   ${spread ? `let through=textureSampleLevel(shadowTintMap,shadowTintSampler,uv,i32(layer),0).rgb;let gap=max(reference-textureLoad(shadowTintDepth,vec2i(uv*vec2f(textureDimensions(shadowTintDepth))),i32(layer),0),0.0)*shadowFrame.ranges[layer];\n  return mix(${spread},vec3f(1),textureSampleCompareLevel(shadowTintDepth,shadowSampler,uv,i32(layer),reference));` : 'return mix(textureSampleLevel(shadowTintMap,shadowTintSampler,uv,i32(layer),0).rgb,vec3f(1),textureSampleCompareLevel(shadowTintDepth,shadowSampler,uv,i32(layer),reference));'}
 }

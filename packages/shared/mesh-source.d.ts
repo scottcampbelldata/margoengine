@@ -72,6 +72,8 @@ export interface MeshSource {
 }
 export function setMeshSource(mesh: PublicMesh, source: MeshSource): void;
 export function clearMeshSource(mesh: PublicMesh): void;
+/** The gltf-pro record of `mesh` while its model lives, else undefined: meshTriangles without an object per call. */
+export function meshSource(mesh: PublicMesh | null | undefined): MeshSource | undefined;
 export function meshTriangles(
   mesh: PublicMesh | null | undefined,
 ): { kind: 'core'; geometry: Geometry } | { kind: 'pbr'; source: MeshSource } | null;

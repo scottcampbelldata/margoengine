@@ -16,7 +16,7 @@ import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
-import { geometrySurface, meshTriangles, type MeshSource } from '../../shared/mesh-source.js';
+import { geometrySurface, meshSource, meshTriangles, type MeshSource } from '../../shared/mesh-source.js';
 import { sectionState } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
@@ -78,19 +78,29 @@ export interface ShadowOptions {
    */
   resolution?: number | readonly [number, number];
   /**
-   * Farthest shadowed distance from the camera, world units, > 0. Default 500; when unset and every caster is a core
-   * mesh, a static non-instanced PBR mesh, or a node that draws nothing, cascades tighten to the casters' bounds.
+   * Farthest shadowed distance from the camera, world units, > 0. Default 500, or 20 times the camera's distance to its
+   * target when that is farther. When unset and every caster is a core mesh, a model or mesh with no skin, morph
+   * targets, instances or displacement, or a node that draws nothing, cascades tighten to the casters' bounds.
    */
   distance?: number;
   /** Cascade split blend, 0 (uniform) to 1 (logarithmic). Default 0.5. */
   lambda?: number;
   /** Light size for the `'soft'` filter's penumbra width, 0 or more. Default 0.02. */
   lightSize?: number;
-  /** Constant depth bias, 0 or more. Default 0.0005. */
+  /**
+   * Extra constant depth bias, as a fraction of the map's depth range, 0 or more. Default 0. Every receiver already
+   * compares one texel nearer the light, with the texel's world size, so any model scale works without it.
+   */
   bias?: number;
-  /** Receiver offset along its normal, world units, 0 or more. Default 0.02. */
+  /**
+   * Extra receiver offset along its normal, world units, 0 or more. Default 0. Every receiver already moves a quarter
+   * texel along its normal, with the texel's world size, so any model scale works without it.
+   */
   normalBias?: number;
-  /** World units each cascade extends towards the light for off-screen casters, 0 or more. Default 100. */
+  /**
+   * World units each cascade extends towards the light for off-screen casters, 0 or more. Unset: as far as the
+   * farthest caster when every caster's bounds are known (see `distance`), else 100.
+   */
   casterMargin?: number;
   /** Fixed world-space caster and receiver bounds, rendered in one camera-independent map. */
   bounds?: { min: Vec3; max: Vec3; points?: readonly Vec3[] };
@@ -313,9 +323,35 @@ const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
 @vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
-/** A primitive whose bounds hold still: range() made once, not a closure per caster per frame. */
+/**
+ * A primitive whose bounds hold still: range() made once, not a closure per caster per frame. A material's `shading`
+ * (materials' createMesh gives every mesh one) changes colour only: the depth pass draws the vertices as they are, and
+ * a shading that moves them names its `displacement`.
+ */
 const staticPrimitive = (p: MeshSource['primitives'][number]): boolean =>
-  !p.deformed && !('instances' in p && p.instances) && !p.material.displacement && !p.material.shading;
+  !p.deformed && !('instances' in p && p.instances) && !p.material.displacement;
+/**
+ * A node whose bounds hold still: a core mesh, a node that draws nothing (a glTF group), or a gltf-pro node with no
+ * skin, morph targets, instances or displacement.
+ */
+const stillNode = (node: Mesh): boolean => {
+  if (node.geometry) return true;
+  const source = meshSource(node);
+  return !source || (!source.skinned && !source.morphed && source.primitives.every(staticPrimitive));
+};
+/** Each still gltf-pro node's local box, kept while its primitives keep their vertex arrays: read twice a frame. */
+const boundsCache = new WeakMap<MeshSource, { vertices: Float32Array[]; bounds: Float32Array }>();
+const localBounds = (source: MeshSource | undefined): Float32Array | undefined => {
+  if (!source) return undefined;
+  const primitives = source.primitives,
+    cached = boundsCache.get(source);
+  let same = !!cached && cached.vertices.length === primitives.length;
+  for (let i = 0; same && i < primitives.length; i++) same = cached!.vertices[i] === primitives[i].vertices;
+  if (same) return cached!.bounds;
+  const bounds = source.bounds;
+  boundsCache.set(source, { vertices: primitives.map((p) => p.vertices), bounds });
+  return bounds;
+};
 const validTint = (tint: unknown): tint is readonly number[] =>
   Array.isArray(tint) && tint.length === 3 && tint.every((v) => v >= 0 && v <= 1);
 /** A shader cache key: filter, bind group and anisotropy as one number (bit 1 is left for the receive patch). */
@@ -417,6 +453,8 @@ export class Shadows implements EnginePlugin {
   private readonly rangeBox = new Float64Array(6);
   private readonly sphere = new Float64Array(4);
   private readonly rangeCenter = new Float64Array(4);
+  /** range() found every caster's bounds this frame: `rangeCenter` holds a sphere around them. */
+  private sceneKnown = false;
   private cascadeCount = 1;
   /** The layers the maps were allocated with. */
   private mapCascades = 0;
@@ -621,9 +659,9 @@ export class Shadows implements EnginePlugin {
         i === 0
           ? (o.lightSize ?? 0.02)
           : i === 1
-            ? (o.bias ?? 0.0005)
+            ? (o.bias ?? 0)
             : i === 2
-              ? (o.normalBias ?? 0.02)
+              ? (o.normalBias ?? 0)
               : (o.casterMargin ?? 100);
       // Runs every frame, so compares and no call: V8's middle tier (Maglev) boxes a fractional number it passes to
       // Number.isFinite or Math.fround. Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103.
@@ -942,22 +980,32 @@ export class Shadows implements EnginePlugin {
     fit.near = camera.near;
     // Both are finite and positive (Camera.update and validate check them): a compare gives Math.min's number
     // without the call, which V8 13 (Node 24) Maglev makes with boxed numbers. So below, for Math.max and Math.min.
-    const distance = this.options.distance ?? 500;
+    // Unset: 500, or 20 times the camera's distance to its target when that is farther, so a model framed from
+    // kilometres away is inside the shadowed range as a model framed from metres away is.
+    let distance = this.options.distance;
+    if (distance === undefined) {
+      const h = hypotTerms;
+      h[0] = camera.target[0] - camera.position[0];
+      h[1] = camera.target[1] - camera.position[1];
+      h[2] = camera.target[2] - camera.position[2];
+      hypotOf(3);
+      distance = h[4] * 20 > 500 ? h[4] * 20 : 500;
+    }
     fit.far = camera.far < distance ? camera.far : distance;
     let core = this.options.distance === undefined && this.sources.length > 0;
+    this.sceneKnown = false;
     for (let i = 0; core && i < this.sources.length; i++) {
-      const source = this.sources[i].source;
-      // A node with no geometry and no model behind it (a glTF group) draws nothing, so it changes no bounds.
-      if (!('id' in source)) core = false;
-      else if (!source.geometry) {
-        // A core mesh is read directly: meshTriangles builds an object on every call, and this runs every frame.
-        const triangles = meshTriangles(source);
-        core =
-          !triangles ||
-          (triangles.kind === 'pbr' &&
-            !triangles.source.skinned &&
-            !triangles.source.morphed &&
-            triangles.source.primitives.every(staticPrimitive));
+      const record = this.sources[i],
+        source = record.source;
+      if ('id' in source) core = stillNode(source);
+      else if ('drawShadow' in source && source.drawShadow) core = false;
+      else {
+        // A model (gltf-pro, materials' createMesh): still when every caster is a still node, as `add(model.root)` is.
+        const primitives = this.casters(record, this.primitiveDepth);
+        for (let j = 0; core && j < primitives.length; j++) {
+          const primitive = primitives[j];
+          core = !primitive.instances && !primitive.displacement && stillNode(primitive.node);
+        }
       }
     }
     if (!core) return fit;
@@ -983,6 +1031,8 @@ export class Shadows implements EnginePlugin {
       near = d > radius ? 2 ** (Math.floor(Math.log2(d - radius) * 4) / 4) : 0;
     if (far < fit.far && far > camera.near) fit.far = far;
     if (near > fit.near && near < fit.far) fit.near = near;
+    // Finite (every sphere is): the cascades' depth then reaches the casters and no farther.
+    this.sceneKnown = radius - radius === 0 && cx - cx === 0 && cy - cy === 0 && cz - cz === 0;
     return fit;
   }
   /** The world bounding sphere of core mesh `id` (centre, radius) into `this.sphere`, from its local one. */
@@ -995,8 +1045,7 @@ export class Shadows implements EnginePlugin {
       b = id * 4,
       mesh = this.engine!.meshes.get(id),
       // A core mesh reads core's bounds directly: meshTriangles builds an object on every call (twice a caster a frame).
-      triangles = mesh?.geometry ? undefined : meshTriangles(mesh),
-      bounds = triangles?.kind === 'pbr' ? triangles.source.bounds : undefined;
+      bounds = mesh?.geometry ? undefined : localBounds(meshSource(mesh));
     const x = bounds ? (bounds[0] + bounds[3]) / 2 : s[b],
       y = bounds ? (bounds[1] + bounds[4]) / 2 : s[b + 1],
       z = bounds ? (bounds[2] + bounds[5]) / 2 : s[b + 2],
@@ -1012,7 +1061,7 @@ export class Shadows implements EnginePlugin {
   }
   // range()'s two passes over the engine's meshes, made once (Map.forEach callbacks).
   private readonly extendBox = (mesh: Mesh, id: number): void => {
-    if (!mesh.geometry && meshTriangles(mesh)?.kind !== 'pbr') return;
+    if (!mesh.geometry && !meshSource(mesh)) return;
     const w = this.worldSphere(id),
       box = this.rangeBox;
     // Math.min and Math.max exactly, NaN and the sign of zero included.
@@ -1026,7 +1075,7 @@ export class Shadows implements EnginePlugin {
     }
   };
   private readonly extendRadius = (mesh: Mesh, id: number): void => {
-    if (!mesh.geometry && meshTriangles(mesh)?.kind !== 'pbr') return;
+    if (!mesh.geometry && !meshSource(mesh)) return;
     const w = this.worldSphere(id),
       c = this.rangeCenter;
     const h = hypotTerms;
@@ -1079,6 +1128,7 @@ export class Shadows implements EnginePlugin {
         this.fitted,
         this.cascadeCount,
         this.anchor,
+        this.sceneKnown && this.options.casterMargin === undefined ? this.rangeCenter : undefined,
       );
     }
     if (cadence && !this.dirty) {
@@ -1134,8 +1184,8 @@ export class Shadows implements EnginePlugin {
     viewMatrix(this.view, c.camera);
     this.values.set(this.splits, 80);
     this.values[88] = this.options.lightSize ?? 0.02;
-    this.values[89] = this.options.bias ?? 0.0005;
-    this.values[90] = this.options.normalBias ?? 0.02;
+    this.values[89] = this.options.bias ?? 0;
+    this.values[90] = this.options.normalBias ?? 0;
     // Pixels per unit at view depth 1: the sampler rebuilds each fragment's screen pixel for its per-pixel noise.
     this.values[91] = c.height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);

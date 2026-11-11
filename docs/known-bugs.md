@@ -26,18 +26,6 @@
   heavy memory load; nothing in the failing check navigates. Next: record the renderer's exit reason and memory when
   the context goes, so a repeat names the cause.
 
-### A model a few centimetres across casts no visible directional shadow (found in the school pilot, 2026-11-11, open)
-
-- **Repro:** the docs/guides/loading-gltf.md program with the Khronos BoomBox (`examples/assets/khronos/BoomBox/BoomBox.glb`,
-  about 2 cm across, loaded at its own scale) instead of the Flight Helmet: the model draws, framed at the camera's
-  near-plane limit, and the floor under it shows no shadow (WebGPU, Chrome 157, RTX A6000). Scaling `model.root` by 50
-  before step 3 gives the expected shadow, and so does the Flight Helmet at its own size.
-- **Cause:** not found yet. Ruled out on their own: `normalBias` (0.02 m default; 0.001 still shows nothing) and
-  `casterMargin` (100 m default, which makes the 0.0005 normalized `bias` about 0.1 m of depth; 1 still shows
-  nothing). Next suspects: the PCSS blocker search and filter width against a caster smaller than a few texels, and the
-  cascade near distance at a camera 13 cm from its target.
-- **Workaround in the guide:** scale a tiny model to a real size (loading-gltf.md, "The model is tiny or huge").
-
 ### Per-object `device.lost` reactions keep disposed objects alive in several packages (found with the path tracer stall, 2026-11-11, open)
 
 - **Repro:** make and dispose an object below many times on one live device, then collect garbage: the disposed objects
@@ -257,6 +245,22 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   one traversal; the same image hashes on WebGPU, and `transparent` passes in 89.4 s. Regression:
   `packages/voxel-pathtracer/tests/compat-staged.test.js` ("layer-compiled kernels ... hold no constant-bound loop around
   a traversal").
+
+### Fixed 2026-11-11: a model a few centimetres across cast no visible directional shadow
+
+- **Repro:** the loading-gltf guide with the Khronos BoomBox (about 2 cm) at its own size: the floor showed no shadow.
+- **Cause:** three `Shadows` defaults were fixed world lengths, right for a model of about a metre and wrong at other
+  scales. A model (`loadGLTF`, materials' `createMesh`) never fitted the cascades, which fit only core meshes, so they
+  spanned 0.1 to 500 m and the first cascade's texels were 6 cm wide; the depth bias was 0.0005 of a depth range of at
+  least 200 m (0.1 m) and the normal offset 0.02 m, both larger than the model; and the 500 m `distance` left a model
+  framed from kilometres outside the shadowed range.
+- **Fix:** still models fit the cascades as core meshes do (their local boxes cached, not recomputed each frame); the
+  depth range reaches the farthest caster instead of 100 m; below one unit the cascade radius rounds to 1/16 of its
+  octave; every receiver's normal offset and depth bias are fractions of its cascade's texel (`normalBias` and `bias`
+  now add to them, default 0); and the default `distance` is 500 or 20 times the camera's target distance, whichever
+  is farther. Steady-frame GPU calls and uploaded bytes are unchanged (deformed-shadows, quality-presets and
+  gltf-pro-lighting-hooks proofs). Regression: `packages/shadows/test/scale-browser.mjs` (1 mm, 2 cm, 1 m, 100 m, 1 km,
+  the default camera and the BoomBox, WebGPU and the WebGL2 layer) and `packages/shadows/test/scale.test.js`.
 
 ### Fixed 2026-11-10: weather machine stopped its schedule on a refused call and dropped time after 256 steps
 
@@ -2107,6 +2111,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   run, and the results recorded here.
 
 ## Open defects
+
+### VirtualShadows keeps world-length bias defaults, so a model a few centimetres across may lose its shadow
+
+- **What:** `VirtualShadows` (`@margoengine/shadows/virtual`) still offsets each receiver by `bias` 0.002 and `normalBias` 0.02 in world units, the same class of fixed world lengths that hid a centimetre model's shadow under `Shadows` (fixed 2026-11-11, above). Not yet measured: no test renders a virtual-shadowed model below 10 cm.
+- **Repro:** `packages/shadows/test/scale.html` with `VirtualShadows` in place of `Shadows` at the 2 cm case; expected an umbra under the cube, likely none, as the 2 cm normal offset is the model's whole size.
+- **Cause (expected):** `packages/shadows/src/virtual.ts` uniforms 29 and 30 take those world defaults; its page texels are not used to size the offsets as the root's `shadowPlace` now does.
+- **Needed to close:** size both offsets from the page's texel at the receiver, as `shadowPlace` does per cascade, and add the virtual case to `scale-browser.mjs` at every scale.
 
 ### A chain laid out level under a 1000:1 end mass stretches once it is taut
 
