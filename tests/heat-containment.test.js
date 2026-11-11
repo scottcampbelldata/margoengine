@@ -368,6 +368,8 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'halftone-browser.mjs',
       'stylize-browser.mjs',
       'curvature-browser.mjs',
+      'bloom-finite-browser.mjs',
+      'fxaa-gate-browser.mjs',
     ],
   );
   // TAA's browser checks, one step each.
