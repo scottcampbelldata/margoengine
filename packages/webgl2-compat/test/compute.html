@@ -54,6 +54,20 @@ function half(h) {
 }
 const f16 = (u8) => [...new Uint16Array(u8.buffer, u8.byteOffset, u8.byteLength / 2)].map(half);
 const tierOf = (pipeline) => pipeline.built?.tier ?? null;
+/**
+ * The f32 values the UnormRound cases store, texel by texel (mirrored in x for the scatter case), times 255: the exact
+ * position between the two nearest 8-bit steps, computed as the shader does (k + c, then / 255, each rounded to f32),
+ * clamped to 1 as the store clamps.
+ */
+function unormSteps(mirror) {
+  const out = [];
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
+      const k = (mirror ? 15 - x : x) + y * 16;
+      for (const c of [0.52, 0.48, 0.505, 0.5625]) out.push(Math.min(1, Math.fround(Math.fround(k + Math.fround(c)) / 255)) * 255);
+    }
+  return out;
+}
 
 function compute(device, code, entryPoint = 'main', constants) {
   return device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint, constants } });
@@ -121,9 +135,12 @@ const cases = {
     run(device, p, [group(device, p, [src, samp, dst, { buffer: k }])], 2, 2);
     return { values: f16(await readTexture(device, dst, { bytes: 8 })), tier: tierOf(p), tolerance: 2e-3 };
   },
-  // An rgba8unorm store of values just past a half step, (k + 0.52) / 255 and the like: WebGPU rounds each to k + 1.
-  // The layer draws into a colour attachment, whose export the Radeon 680M's D3D11 driver narrows to binary16 by
-  // truncation first (k + 0.52 became k + 0.477, so k), unless the layer rounds to the 255 steps in the shader.
+  // An rgba8unorm store of values near a half step, (k + 0.52) / 255 and the like. WGSL's inverse channel transfer
+  // function only clamps; which of the two nearest steps a GPU stores is its own (an RTX A6000 stores k for k + 0.52
+  // when k % 16 < 11, a Radeon 680M's storage store k + 1). So the layer must store exactly the nearest step, as the CPU
+  // tier's quantize does, and native one of the two nearest (compute-browser.mjs checks both against `steps`). Without
+  // rounding in the shader the layer stores what its colour attachment's export makes of it: the 680M's D3D11 driver
+  // narrows it to binary16 by truncation (k + 0.52 became k + 0.477, so k), the A6000 rounds as it does natively.
   async fragmentUnormRound(device) {
     const p = compute(device, `
       @group(0) @binding(0) var dst: texture_storage_2d<rgba8unorm, write>;
@@ -133,7 +150,7 @@ const cases = {
       }`);
     const dst = texture(device, { size: [16, 16], usage: U.STORAGE_BINDING | U.COPY_SRC });
     run(device, p, [group(device, p, [dst])], 2, 2);
-    return { values: [...(await readTexture(device, dst, { bytes: 4 }))], tier: tierOf(p) };
+    return { values: [...(await readTexture(device, dst, { bytes: 4 }))], tier: tierOf(p), steps: unormSteps(false) };
   },
   // The same values on the scatter tier: each invocation stores the texel mirrored from its own.
   async scatterUnormRound(device) {
@@ -145,7 +162,7 @@ const cases = {
       }`);
     const dst = texture(device, { size: [16, 16], usage: U.STORAGE_BINDING | U.COPY_SRC });
     run(device, p, [group(device, p, [dst])], 2, 2);
-    return { values: [...(await readTexture(device, dst, { bytes: 4 }))], tier: tierOf(p) };
+    return { values: [...(await readTexture(device, dst, { bytes: 4 }))], tier: tierOf(p), steps: unormSteps(true) };
   },
   async fragmentLayers(device) {
     const p = compute(device, `

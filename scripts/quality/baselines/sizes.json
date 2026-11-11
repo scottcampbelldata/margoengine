@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14774960,
+  "total": 14775227,
   "history": [
     {
       "date": "2026-10-24",
@@ -8303,6 +8303,12 @@
       "commit": "b13c463990",
       "reason": "post and tonemap read non-finite HDR as finite light (Rust port R3): bit-tested clean() in Bloom prefilter, composite and up chain, Tonemap and LocalExposure. Measured gzip before -> after: post 42151 -> 42369, post/bloom 7066 -> 7307, post/image 12233 -> 12462, post/selective-bloom 9453 -> 9690, tonemap 12606 -> 12708, tonemap/local 2130 -> 2234, scenery/scenes (bundles Bloom) to 19665; the WGSL lives in the shaders that read HDR, so no split is possible",
       "grew": 7
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "89c9113c6f",
+      "reason": "procedural/textures rounds each baked channel to the 255 steps in WGSL and GLSL (+11 B gzip, 5264 to 5275) so the GPU's own UNORM rounding, which differs between an RTX A6000 and a Radeon 680M, cannot change a bake",
+      "grew": 1
     }
   ],
   "items": {
@@ -9038,7 +9044,7 @@
     "@margoengine/procedural/poisson": 1525,
     "@margoengine/procedural/sdf": 2112,
     "@margoengine/procedural/standin": 673,
-    "@margoengine/procedural/textures": 5264,
+    "@margoengine/procedural/textures": 5531,
     "@margoengine/procedural/textures-pbr": 5202,
     "@margoengine/procedural/tree": 3400,
     "@margoengine/procedural/tree-mesh": 4676,

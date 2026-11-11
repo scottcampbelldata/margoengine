@@ -1,7 +1,9 @@
 // Milestone M5 compute check (run by `npm run test:gpu`, part of check:merge): each case of compute.html runs on the
 // browser's own WebGPU and on the WebGL2 layer in the same page, on the same GPU, and the two must return the same
 // numbers: integers equal, floats within the case's tolerance (1e-6 unless it samples or stores half floats, where the
-// two paths' filtering and rounding may differ in the last bits). Neither side may report a validation error, throw,
+// two paths' filtering and rounding may differ in the last bits). The two UnormRound cases store values near a half
+// step into 8-bit UNORM, whose rounding WGSL leaves to the GPU: there the layer must store the nearest step exactly and
+// native one of the two nearest. Neither side may report a validation error, throw,
 // or (the layer) a GL error, and each case must run on the tier it was written for. A refusal is checked to be coded.
 // All of it runs twice: as the page comes, and under a Content-Security-Policy without 'unsafe-eval', where the CPU tier
 // runs on its interpreter.
@@ -97,6 +99,23 @@ async function suite() {
       assert.equal(r.gl, 0, `${name} (${side}) GL error`);
     }
     assert.equal(compat.result.tier, TIERS[name], `${name} runs on the ${TIERS[name]} tier`);
+    if (compat.result.steps) {
+      // An 8-bit UNORM store near a half step: WGSL leaves the rounding to the GPU, so native may store either of the
+      // two nearest steps (and does: the RTX A6000 and the Radeon 680M differ), while the layer rounds in the shader
+      // and must store the nearest one exactly, as the CPU tier does. Equal to native is not defined here.
+      const { steps } = compat.result;
+      const nearest = steps.map((s) => Math.floor(s + 0.5));
+      const wrong = compat.result.values.flatMap((v, i) => (v === nearest[i] ? [] : [`[${i}]: compat ${v}, nearest ${nearest[i]}`]));
+      assert.deepEqual(wrong.slice(0, 8), [], `${name}: compat stores the nearest step`);
+      assert.equal(compat.result.values.length, steps.length, `${name}: compat texel count`);
+      const outside = native.result.values.flatMap((v, i) =>
+        v === Math.floor(steps[i]) || v === Math.ceil(steps[i]) ? [] : [`[${i}]: native ${v} for ${steps[i]}`],
+      );
+      assert.deepEqual(outside.slice(0, 8), [], `${name}: native stores one of the two nearest steps`);
+      assert.equal(native.result.values.length, steps.length, `${name}: native texel count`);
+      lines.push(`${name} (${TIERS[name]}): compat the nearest step, native one of the two nearest`);
+      continue;
+    }
     const diff = differences(native.result.values, compat.result.values, compat.result.tolerance ?? 1e-6);
     assert.deepEqual(diff, [], `${name}: compat differs from native`);
     // Each case must test something: all-zero results on both sides fail.

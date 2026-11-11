@@ -44,6 +44,9 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   } else if p.kind == 4u {
     value = smoothstep(0.35-p.detail*0.2,0.65+p.detail*0.2,n);
   }
-  textureStore(outputImage,vec2i(id.xy),vec4f(mix(p.secondary.rgb,p.color.rgb,value),1.0));
+  // Rounded to the 255 steps here: WebGPU leaves a float's rounding to an 8-bit UNORM store to the GPU (an RTX A6000
+  // stores 133.52 / 255 as 133, a Radeon 680M as 134), and a value already on a step is stored exactly everywhere.
+  let rgb = floor(clamp(mix(p.secondary.rgb,p.color.rgb,value),vec3f(0.0),vec3f(1.0))*255.0+0.5)/255.0;
+  textureStore(outputImage,vec2i(id.xy),vec4f(rgb,1.0));
 }
 `;

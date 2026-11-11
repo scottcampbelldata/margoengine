@@ -570,7 +570,9 @@ are stylized patterns, without wood anatomy, corrosion simulation or PBR maps.
 `repeat` controls brick/tile cells and wood bands; noise/rust use fixed octave
 periods. Bake enough pixels per cell to avoid aliasing. No mipmaps are generated.
 The format is linear `rgba8unorm`, alpha 1, with TEXTURE_BINDING, STORAGE_BINDING and
-COPY_SRC. Use a sampler with repeat addressing on both axes. Pixel centres on
+COPY_SRC. Each channel is rounded to the nearest of the 255 steps in the shader: WebGPU leaves
+that rounding to the GPU, and GPUs differ near a half step (an RTX A6000 stored 133 where
+a Radeon 680M stored 134). Use a sampler with repeat addressing on both axes. Pixel centres on
 opposite edges need not match: the underlying function repeats continuously, and
 the adjacent pixel across a repeat boundary is the next sample of that function.
 

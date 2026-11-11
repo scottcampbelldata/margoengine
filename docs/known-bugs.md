@@ -117,12 +117,22 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   (the first at texel 8, blue 8.505 / 255) where native WebGPU stores k + 1.
 - **Cause:** below Margo. The layer runs a compute store into rgba8unorm as a draw into a colour attachment, and the
   680M's driver exports the fragment output to an 8-bit target as binary16, truncating, before the UNORM conversion
-  (the same truncation as R6 row 7's half targets). The conversion rounding of a colour write is implementation
-  chosen, so this is allowed; NVIDIA exports f32 and matches.
+  (the same truncation as R6 row 7's half targets). WGSL's inverse channel transfer function for 8unorm only clamps
+  (WGSL, "Texel Formats"), so which of the two nearest steps a GPU stores is its own choice, and GPUs differ: the
+  dev PC's RTX A6000 (Chrome, D3D12 and ANGLE D3D11 alike) stores k for (k + 0.52) / 255 when k % 16 is 0 to 10 and
+  k + 1 otherwise, and only from k + 0.57 up on every k (probe of 256 x 21 values, storage store, render target and
+  raw WebGL2 all equal), where the 680M's storage store rounds to the nearest.
 - **Workaround (`packages/webgl2-compat/src/compute/glsl.ts`):** the fragment and scatter tiers round a float texel to
   the 255 steps in the shader before an 8-bit UNORM target stores it, as the CPU tier's quantize already did. A value
-  on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores k.
-  `fragmentUnormRound` and `scatterUnormRound` pass, and so does the baker comparison.
+  on the k / 255 grid survives any narrowing to 11 or more bits (under 0.13 of a step), so every GPU stores exactly
+  the nearest step. Because native WebGPU's own rounding differs by GPU, `fragmentUnormRound` and
+  `scatterUnormRound` check the layer against the nearest step computed in f32 and native against the two nearest
+  steps; comparing the layer to native byte for byte failed on the A6000 (layer 1, native 0 for 0.52 / 255) after the
+  first version of this fix. The procedural texture baker (`texture-shader.ts`, `textures-webgl.ts`) rounds to the
+  255 steps itself, as its PBR baker already did, so the store's rounding no longer depends on the GPU or tier;
+  before that, the preview-contract baker comparison failed on the A6000 (layer 134, native 133 at texel (3, 0)).
+  Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
+  its native store rounds to the nearest and the layer's grid values survive its truncation.
 
 ### Fixed 2026-11-10: weather machine stopped its schedule on a refused call and dropped time after 256 steps
 

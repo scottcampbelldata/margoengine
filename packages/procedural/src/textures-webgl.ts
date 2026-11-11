@@ -37,7 +37,8 @@ void main(){
  }else if(kind==3){
   float ring=0.5+0.5*cos(6.28318530718*(uv.x*repeats.x+detail*n));value=0.2+0.8*ring;
  }else if(kind==4){value=smoothstep(0.35-detail*0.2,0.65+detail*0.2,n);}
- result=vec4(mix(secondary,color,value),1);
+ // Rounded to the 255 steps, as texture-shader.ts: the GPU's own rounding into RGBA8 differs between drivers.
+ result=vec4(floor(clamp(mix(secondary,color,value),0.0,1.0)*255.0+0.5)/255.0,1);
 }`;
 const failed = (text: string) => fault('failed', text, 'procedural');
 
