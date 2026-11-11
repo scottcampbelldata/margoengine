@@ -1,4 +1,4 @@
-// Kept apart from rapier-wasm.js: an entry imports this at start-up, the lazy solver chunk imports that.
+// Kept apart from bindgen-wasm.js: an entry imports this at start-up, the lazy solver chunk imports that.
 import { wasmError } from './errors.js';
 
 const noop = () => {};

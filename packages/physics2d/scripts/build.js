@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
-import { interfaceHash } from '../../shared/rapier-wasm.js';
+import { interfaceHash } from '../../shared/bindgen-wasm.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');

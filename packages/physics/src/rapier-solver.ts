@@ -3,10 +3,11 @@
 // stays a file that bundlers emit as an asset and browsers compile while it downloads (WebAssembly.instantiateStreaming).
 import * as RAPIER from '@dimforge/rapier3d';
 import * as glue from '@dimforge/rapier3d/rapier_wasm3d_bg.js';
-import { instantiateRapier, type RapierWasmSource } from '../../shared/rapier-wasm.js';
+import { instantiateBundledWasm } from '../../shared/bindgen-wasm.js';
 import type { RapierModule } from './rapier-types.js';
 
-export type { RapierWasmSource };
+/** Where Rapier's Wasm comes from: a URL, a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. */
+export type RapierWasmSource = string | URL | Response | ArrayBuffer | ArrayBufferView | WebAssembly.Module;
 
 /**
  * The Wasm this package ships, beside this chunk in dist. The literal reaches the app's bundler unchanged, which emits
@@ -24,7 +25,8 @@ declare const __RAPIER_INTERFACE__: number;
  * @throws MargoError (`failed`) when the Wasm cannot be fetched or is not Rapier's.
  */
 export async function startRapier(source: RapierWasmSource, signal: AbortSignal): Promise<RapierModule> {
-  const exports = await instantiateRapier(source, signal, {
+  const exports = await instantiateBundledWasm(source, signal, {
+    name: 'Rapier',
     // What the Wasm imports: the glue module, under the name wasm-bindgen gave it.
     imports: { './rapier_wasm3d_bg.js': glue as unknown as WebAssembly.ModuleImports },
     file: 'rapier3d.wasm',
