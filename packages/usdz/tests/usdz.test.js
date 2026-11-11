@@ -1,66 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { deflateRawSync, deflateSync } from 'node:zlib';
-import { crc32 } from '@margoengine/loaders';
+import { readFile } from 'node:fs/promises';
 import { parseUSDA, parseUSDC, parseUSDZ } from '../dist/index.js';
-const source = (await readFile(new URL('./fixtures/triangle.usda', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
-function png(r, g, b) {
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(1, 0);
-  header.writeUInt32BE(1, 4);
-  header[8] = 8;
-  header[9] = 6;
-  const chunk = (type, data) => {
-    const name = Buffer.from(type),
-      size = Buffer.alloc(4),
-      crc = Buffer.alloc(4);
-    size.writeUInt32BE(data.length);
-    crc.writeUInt32BE(crc32(Buffer.concat([name, data])));
-    return Buffer.concat([size, name, data, crc]);
-  };
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.from([0, r, g, b, 255]))),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
-function zip(files, method = 0) {
-  let offset = 0;
-  const locals = [],
-    directory = [];
-  for (const [name, data] of files) {
-    const filename = Buffer.from(name),
-      compressed = method === 8 ? deflateRawSync(data) : data,
-      header = Buffer.alloc(30),
-      central = Buffer.alloc(46);
-    header.writeUInt32LE(0x04034b50);
-    header.writeUInt16LE(method, 8);
-    header.writeUInt32LE(crc32(data), 14);
-    header.writeUInt32LE(compressed.length, 18);
-    header.writeUInt32LE(data.length, 22);
-    header.writeUInt16LE(filename.length, 26);
-    central.writeUInt32LE(0x02014b50);
-    central.writeUInt16LE(method, 10);
-    central.writeUInt32LE(crc32(data), 16);
-    central.writeUInt32LE(compressed.length, 20);
-    central.writeUInt32LE(data.length, 24);
-    central.writeUInt16LE(filename.length, 28);
-    central.writeUInt32LE(offset, 42);
-    locals.push(header, filename, compressed);
-    directory.push(central, filename);
-    offset += header.length + filename.length + compressed.length;
-  }
-  const cd = Buffer.concat(directory),
-    end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50);
-  end.writeUInt16LE(files.length, 8);
-  end.writeUInt16LE(files.length, 10);
-  end.writeUInt32LE(cd.length, 12);
-  end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, cd, end]);
-}
+import { png, texturedFixture, texturedTriangleSource, triangleSource, zip } from './preview-fixture.js';
+const source = triangleSource();
 test('USDA produces typed geometry, hierarchy and PreviewSurface PBR factors', () => {
   const asset = parseUSDA(source),
     mesh = asset.meshes[0];
@@ -108,33 +51,8 @@ test('stored and Deflate archives share geometry, validate CRC and enforce budge
   await assert.rejects(parseUSDZ(archive, { signal: AbortSignal.abort() }), /abort/i);
 });
 test('PreviewSurface texture channels map to glTF and missing assets fail', async () => {
-  const shader = (name, file) =>
-    `        def Shader "${name}"\n        {\n            uniform token info:id = "UsdUVTexture"\n            asset inputs:file = @${file}@\n        }\n`;
-  const textured = source
-    .replace(
-      'color3f inputs:diffuseColor = (0.2, 0.4, 0.6)',
-      'color3f inputs:diffuseColor.connect = </Root/Material/Diffuse.outputs:rgb>\n            normal3f inputs:normal.connect = </Root/Material/Normal.outputs:rgb>',
-    )
-    .replace('float inputs:roughness = 0.3', 'float inputs:roughness.connect = </Root/Material/Roughness.outputs:r>')
-    .replace('float inputs:metallic = 0.7', 'float inputs:metallic.connect = </Root/Material/Metallic.outputs:b>')
-    .replace(
-      '    def Material "Material"\n    {\n',
-      '    def Material "Material"\n    {\n' +
-        shader('Diffuse', 'color.png') +
-        shader('Normal', 'normal.png') +
-        shader('Roughness', 'rough.png') +
-        shader('Metallic', 'metal.png'),
-    );
-  const archive = zip(
-      [
-        ['scene.usda', Buffer.from(textured)],
-        ['color.png', png(0, 255, 0)],
-        ['normal.png', png(128, 128, 255)],
-        ['rough.png', png(128, 0, 0)],
-        ['metal.png', png(0, 0, 192)],
-      ],
-      8,
-    ),
+  const textured = texturedTriangleSource();
+  const archive = texturedFixture(),
     asset = await parseUSDZ(archive),
     material = asset.document.materials[0],
     pbr = material.pbrMetallicRoughness;
@@ -145,8 +63,6 @@ test('PreviewSurface texture channels map to glTF and missing assets fail', asyn
   assert.equal(pbr.roughnessFactor, 1);
   assert.equal(pbr.metallicFactor, 1);
   await assert.rejects(parseUSDZ(zip([['scene.usda', Buffer.from(textured)]])), /missing texture/);
-  await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/usdz-textured.usdz', archive);
 });
 // Regression: the glTF document took st as uvs unflipped (textures drew upside down) and ignored UsdTransform2d and
 // wrap modes. st (0, 0) is the image's bottom left; glTF uv (0, 0) its top left.
@@ -332,7 +248,13 @@ test('vertex opacity blends, indexed primvars resolve and a mesh without the pri
   assert.equal(asset.document.materials[0].alphaMode, 'BLEND');
   assert.deepEqual(colorsOf(parseUSDA(painted(toColor))).slice(0, 4), [0.5, 0.25, 1, 1]);
   assert.throws(
-    () => parseUSDA(painted(toColor, 'int[] primvars:displayColor:indices = [0,0,9]\n  color3f[] primvars:displayColor = [(1,0,0)]')),
+    () =>
+      parseUSDA(
+        painted(
+          toColor,
+          'int[] primvars:displayColor:indices = [0,0,9]\n  color3f[] primvars:displayColor = [(1,0,0)]',
+        ),
+      ),
     /index outside stream/,
   );
 });
@@ -345,7 +267,8 @@ test('a reader of any other primvar stays refused', () => {
 });
 
 test('opacity from the base colour map and a threshold keep the alpha mode', async () => {
-  const map = 'color3f inputs:diffuseColor.connect = </Paint/Map.outputs:rgb>\n float inputs:opacity.connect = </Paint/Map.outputs:a>',
+  const map =
+      'color3f inputs:diffuseColor.connect = </Paint/Map.outputs:rgb>\n float inputs:opacity.connect = </Paint/Map.outputs:a>',
     packed = (layer) =>
       zip([
         ['scene.usda', Buffer.from(layer)],
@@ -354,7 +277,8 @@ test('opacity from the base colour map and a threshold keep the alpha mode', asy
       ]),
     blend = (await parseUSDZ(packed(painted(map)))).document.materials[0],
     mask = (await parseUSDZ(packed(painted(`${map}\n float inputs:opacityThreshold = 0.25`)))).document.materials[0],
-    constant = parseUSDA(painted('float inputs:opacity = 0.5\n float inputs:opacityThreshold = 0.75')).document.materials[0];
+    constant = parseUSDA(painted('float inputs:opacity = 0.5\n float inputs:opacityThreshold = 0.75')).document
+      .materials[0];
   assert.equal(blend.alphaMode, 'BLEND');
   assert.equal(mask.alphaMode, 'MASK');
   assert.equal(mask.alphaCutoff, 0.25);
@@ -363,4 +287,14 @@ test('opacity from the base colour map and a threshold keep the alpha mode', asy
     parseUSDZ(packed(painted(`${map.split('\n')[0]}\n float inputs:opacity.connect = </Paint/Second.outputs:a>`))),
     /unsupported opacity texture/,
   );
+});
+// Regression (KB4915-fixture): scripts/modern-usdz-tests.js read test-results/usdz-textured.usdz, which only a
+// repo-root run of this file wrote, so the browser check failed with ENOENT on its own. Both build it in memory now.
+test('the browser check builds its textured archive in memory and reads nothing from test-results', async () => {
+  const script = await readFile(new URL('../../../scripts/modern-usdz-tests.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(script, /(readFile|setInputFiles)\(\s*['"`]test-results\//);
+  assert.match(script, /texturedFixture\(\)/);
+  const first = texturedFixture();
+  assert.deepEqual(texturedFixture(), first);
+  assert.equal((await parseUSDZ(first)).document.textures.length, 3);
 });

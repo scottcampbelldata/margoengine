@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { deflateSync, deflateRawSync } from 'node:zlib';
 import { crc32 } from '@margoengine/loaders';
-function png(r, g, b) {
+export function png(r, g, b) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(1, 0);
   header.writeUInt32BE(1, 4);
@@ -21,7 +22,7 @@ function png(r, g, b) {
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
-function zip(files, method = 0) {
+export function zip(files, method = 0) {
   let offset = 0;
   const locals = [],
     directory = [];
@@ -101,4 +102,41 @@ export function previewReaderFixture() {
     )
     .join('\n');
   return `#usda 1.0\n(metersPerUnit=1 upAxis="Y")\ndef Mesh "M" {uniform token subdivisionScheme="none" rel material:binding=</Mat> int[] faceVertexCounts=[3] int[] faceVertexIndices=[0,1,2] point3f[] points=[(-1,-1,0),(1,-1,0),(0,1,0)] ${attrs}}\ndef Material "Mat" {token outputs:surface.connect=</Mat/S.outputs:surface> def Shader "S" {uniform token info:id="UsdPreviewSurface" ${connections}} ${readers}}`;
+}
+// The triangle fixture, and the same triangle with four PreviewSurface textures (green colour, flat normal, roughness
+// in r, metallic in b) in a Deflate archive. Built in memory, so scripts/modern-usdz-tests.js runs on its own (KB4915:
+// it once read an archive that only a repo-root run of usdz.test.js wrote).
+export function triangleSource() {
+  return readFileSync(new URL('./fixtures/triangle.usda', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+}
+export function texturedTriangleSource() {
+  const shader = (name, file) =>
+    `        def Shader "${name}"\n        {\n            uniform token info:id = "UsdUVTexture"\n            asset inputs:file = @${file}@\n        }\n`;
+  return triangleSource()
+    .replace(
+      'color3f inputs:diffuseColor = (0.2, 0.4, 0.6)',
+      'color3f inputs:diffuseColor.connect = </Root/Material/Diffuse.outputs:rgb>\n            normal3f inputs:normal.connect = </Root/Material/Normal.outputs:rgb>',
+    )
+    .replace('float inputs:roughness = 0.3', 'float inputs:roughness.connect = </Root/Material/Roughness.outputs:r>')
+    .replace('float inputs:metallic = 0.7', 'float inputs:metallic.connect = </Root/Material/Metallic.outputs:b>')
+    .replace(
+      '    def Material "Material"\n    {\n',
+      '    def Material "Material"\n    {\n' +
+        shader('Diffuse', 'color.png') +
+        shader('Normal', 'normal.png') +
+        shader('Roughness', 'rough.png') +
+        shader('Metallic', 'metal.png'),
+    );
+}
+export function texturedFixture() {
+  return zip(
+    [
+      ['scene.usda', Buffer.from(texturedTriangleSource())],
+      ['color.png', png(0, 255, 0)],
+      ['normal.png', png(128, 128, 255)],
+      ['rough.png', png(128, 0, 0)],
+      ['metal.png', png(0, 0, 192)],
+    ],
+    8,
+  );
 }

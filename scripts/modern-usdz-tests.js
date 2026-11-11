@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { texturedFixture } from '../packages/usdz/tests/preview-fixture.js';
 import { openBrowser } from './browser.js';
 
-const data = Array.from(await readFile('test-results/usdz-textured.usdz'));
+// Built in memory, so this check runs on its own (KB4915-fixture).
+const textured = texturedFixture();
+const data = Array.from(textured);
 const browser = await openBrowser({ startPath: '/examples/usdz-loader/', port: 'free' });
 try {
   const page = browser.page,
@@ -414,7 +417,9 @@ def PointInstancer "Scatter" {
   assert.deepEqual(result.gpuErrors, []);
   assert.deepEqual(errors, []);
   // Exercise the example's actual file-selection path with the same synthetic archive.
-  await page.locator('input[type=file]').setInputFiles('test-results/usdz-textured.usdz');
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'usdz-textured.usdz', mimeType: 'model/vnd.usdz+zip', buffer: textured });
   await page.waitForFunction(() => document.querySelector('#status').textContent === 'Loaded 1 meshes');
   // A real rigged file: its clip plays on the GPU, so two moments of it draw differently.
   const rigged = await page.evaluate(
@@ -796,6 +801,7 @@ def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
   assert.deepEqual(networks.unchanged, []);
   assert.ok(networks.changed > 0);
   assert.deepEqual(errors, []);
+  await mkdir('test-results', { recursive: true });
   await writeFile('test-results/modern-usdz.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log('USDZ texture packing, real WebGPU pixels, bitmap teardown and file-picker demo passed');
 } finally {
