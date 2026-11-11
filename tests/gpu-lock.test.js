@@ -229,18 +229,19 @@ for (const capacity of [1, 3, 5]) {
   );
 }
 
-test('shared holders share: up to the slot count at once, the next waits for a free slot', () =>
+test('shared holders share: up to the slot count at once (3 by default), the next waits for a free slot', () =>
   withLock(async (gpu) => {
+    assert.equal(gpu.slots(), 3);
     const held = [];
-    for (const owner of ['a', 'b', 'c', 'd', 'e']) held.push(await take(gpu, owner));
-    assert.equal(gpu.status().holders.length, 5);
-    const sixth = take(gpu, 'f');
-    assert.equal(await settled(sixth), 'waiting');
+    for (let i = 0; i < gpu.slots(); i++) held.push(await take(gpu, 'holder-' + i));
+    assert.equal(gpu.status().holders.length, gpu.slots());
+    const next = take(gpu, 'f');
+    assert.equal(await settled(next), 'waiting');
     held[1]();
-    assert.equal(await settled(sixth), 'got');
-    assert.equal(gpu.status().holders.length, 5);
-    (await sixth)();
-    for (const i of [0, 2, 3, 4]) held[i]();
+    assert.equal(await settled(next), 'got');
+    assert.equal(gpu.status().holders.length, gpu.slots());
+    (await next)();
+    for (const i of [0, 2]) held[i]();
     assert.equal(gpu.status().mode, 'idle');
   }));
 

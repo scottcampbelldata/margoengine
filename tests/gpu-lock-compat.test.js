@@ -69,7 +69,7 @@ test('an ambient MARGO_GPU_* setting does not reach the locks under test, and is
     restore = isolateGpuEnv(ambient);
   try {
     await withBoth(async ({ now }) => {
-      assert.equal(now.slots(), 5);
+      assert.equal(now.slots(), 3);
       for (const key of Object.keys(ambient)) assert.equal(process.env[key], undefined, key);
     });
     for (const [key, value] of Object.entries(ambient)) assert.equal(process.env[key], value, key);

@@ -6898,3 +6898,8 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-comp
 - Test that passed whatever the code did: test/physical.test.js asserted "group 0 binds the volume" by finding any
   2-entry bind group whose second entry was binding 1; that matched the old reduce groups (source, sampler), not the
   frame group [0, 3, 1] that holds the volume. It now looks for a buffer at binding 1.
+
+### Changed 2026-11-11: default shared GPU slots back to 3 (driver resets)
+
+- **Repro:** with the default of 5 slots (b7d02c892), the RTX A6000 driver reset 6 times in 12 hours (Windows System log, nvlddmkm event 153, at 00:09, 00:12, 00:24, 08:04, 08:12 and 09:23).
+- **Cause so far:** not isolated; AGENTS.md says to go back to 3 when the driver resets. `slots()` in `scripts/gpu-lock.mjs` now defaults to 3; MARGO_GPU_SLOTS still overrides. Pinned by `tests/gpu-lock-compat.test.js` (default is 3 with an ambient override cleared).

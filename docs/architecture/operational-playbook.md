@@ -1228,7 +1228,7 @@ commands must give `--timing=<reason>` (API `timing`), logged in
 `test-results/gpu-lock-refusals.log` before any lock wait or nested admission.
 Exclusive holds default to and cannot exceed 20 minutes; oversize requests fail
 with `ERR_GPU_EXCLUSIVE_LIMIT`. Other explicitly named locks retain their
-30-minute default. Correctness requests use the three shared GPU slots.
+30-minute default. Correctness requests use the three shared GPU slots (the default of `slots()`; it was five from 2026-11-10 until six NVIDIA driver resets, nvlddmkm event 153, between 00:09 and 09:23 on 2026-11-11 put it back to three, as AGENTS.md requires; MARGO_GPU_SLOTS still overrides).
 
 Cap evidence is existing run history, not a new loaded-machine measurement:
 the three JSON records under `benchmarks/records/` took 88.4, 113.3 and 184.4

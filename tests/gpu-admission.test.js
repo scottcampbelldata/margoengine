@@ -118,7 +118,7 @@ test('one slot per worktree or lane leaves the other two slots usable and retain
   for (const key of Object.keys(process.env)) if (key.startsWith('MARGO_GPU_')) delete process.env[key];
   process.env.MARGO_GPU_LOCK = join(folder, 'gpu.lock');
   process.env.MARGO_GPU_FRESH_MS = '0';
-  // Three slots, set here rather than read from the default (five since b7d02c892): the case fills every slot with
+  // Three slots, set here rather than read from the default (five from b7d02c892 to 2026-11-11, three again since): the case fills every slot with
   // three lanes, so its counts must not move when the machine default does.
   process.env.MARGO_GPU_SLOTS = '3';
   for (const root of [folder, ...['different-tree', 'h', 'i'].map((name) => join(folder, name))])
