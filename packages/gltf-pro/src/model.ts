@@ -5538,7 +5538,7 @@ export class PBRModel implements EnginePlugin {
           // each surface; only the caller can end and reopen its pass for that (PBRDeviceRenderer.draw, `snapshot`).
           const snapshot = options?.snapshot;
           const glass =
-            snapshot && context.format !== 'rgba16float' ? (externalGlass ??= externalNativeGlass(device)) : undefined;
+            snapshot && !linearHdr(context.format) ? (externalGlass ??= externalNativeGlass(device)) : undefined;
           glass?.install(context, snapshot!);
           try {
             replica.draw(context, 'beauty', context.color, context.depth, 'all', external);
