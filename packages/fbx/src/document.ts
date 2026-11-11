@@ -50,6 +50,13 @@ export class ParseBudget {
       );
     this.bytes += bytes;
   }
+  /** Checks `bytes` that live only while one step runs (an inflated array before its typed copy) on top of the held total. */
+  transient(bytes: number): void {
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.decodedBytes - this.bytes)
+      throw new RangeError(
+        'FBX decoded byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
+  }
   array(bytes: number): void {
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.arrayBytes - this.arrays)
       throw new RangeError(

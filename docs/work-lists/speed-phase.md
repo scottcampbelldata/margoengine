@@ -26,6 +26,13 @@ never a replacement passing number, and never a raised budget.
 
 ## Retained cases and budgets
 
+FBX default-scale mesh (2026-11-11): `node packages/fbx/test/default-scale-browser.mjs`, native and `MARGO_COMPAT=1`,
+the 996,004-vertex default-limit mesh. Targets for the quiet run: steady frame at 60 fps or better on the RTX A6000
+(GPU time under 16.7 ms by timestamp-query, wall time per frame under 16.7 ms on both backends) and load (parseFBX
+from bytes to model) under 2,000 ms on the A6000 dev PC. Busy-machine diagnostics only, 2026-11-11: load 1,107 ms
+native and 1,239 ms compat, steady 3.9 ms wall and 0.39 ms GPU native, 16.9 ms wall compat (no GPU timer there).
+The work counts (one 81.7 MiB geometry upload, one draw, no buffer and 128 B per steady frame) are asserted now.
+
 Batch 21 job 5: the integrated-GPU `visual:compat:budget` record remains owed,
 explicitly deferred on 2026-11-10. Use the AMD Radeon 680M, all existing demos
 and native/compat pairs, in chunks of 8. Preserve the existing failure predicate

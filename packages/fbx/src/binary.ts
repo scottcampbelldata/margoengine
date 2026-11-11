@@ -141,8 +141,9 @@ export async function parseBinary(
           : type === 'i'
             ? new Int32Array(count)
             : new BigInt64Array(count);
-    // Inflated bytes and typed output coexist until this conversion completes.
-    if (encoding === 1) budget.reserve(decodedLength);
+    // Inflated bytes and typed output coexist until this conversion completes; the inflated copy is then dropped, so
+    // it counts against the cap while it lives and is not added to the held total (each array is converted alone).
+    if (encoding === 1) budget.transient(decodedLength);
     for (let index = 0; index < count; index++) {
       if ((index & 4095) === 0) budget.check();
       const offset = index * elementWidth;

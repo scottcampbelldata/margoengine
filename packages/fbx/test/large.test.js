@@ -130,3 +130,26 @@ test('binary with 2,500,002 distinct expanded vertices retains every index and p
     );
   });
 });
+test('the default limits hold 996,004 vertices: every corner its own vertex, with normals, a UV set and tangents', {
+  timeout: 120000,
+}, async () => {
+  const { defaultScaleMesh } = await import('./default-scale.js');
+  const { bytes, positions, index, corners } = defaultScaleMesh();
+  // Before the lean geometry build, 640,000 corners already passed the 128 MiB scene cap (about 267 B a corner).
+  const { doc, accessor } = readGLB(await convertFBX(bytes));
+  const primitives = doc.meshes.flatMap((mesh) => mesh.primitives);
+  assert.equal(primitives.length, 1);
+  const [primitive] = primitives,
+    out = accessor(primitive.attributes.POSITION),
+    indices = accessor(primitive.indices);
+  assert.equal(doc.accessors[primitive.attributes.POSITION].count, corners);
+  assert.equal(indices.length, (corners / 4) * 6);
+  // Corner k of the file is vertex k: its control point's position, in the file's order.
+  for (const k of [0, 1, 2, 3, 4, 123_457, corners - 1]) {
+    const control = index[k] < 0 ? ~index[k] : index[k];
+    for (let axis = 0; axis < 3; axis++)
+      assert.equal(out[k * 3 + axis], Math.fround(positions[control * 3 + axis]), `corner ${k}`);
+  }
+  assert.deepEqual([...indices.subarray(0, 6)], [0, 1, 2, 0, 2, 3]);
+  assert.ok(doc.accessors[primitive.attributes.TANGENT].count === corners);
+});

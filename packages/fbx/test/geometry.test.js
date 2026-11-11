@@ -18,6 +18,7 @@ const api = await import(
 );
 const {
   buildGeometry,
+  geometryBytes,
   identity,
   multiply,
   inverse,
@@ -353,4 +354,14 @@ test('one node evaluated at many keys: each result is its own matrix, equal to t
     assert.deepEqual([...matrix], [...expected], 'bit for bit, and untouched by later calls');
   }
   assert.notEqual(results[0][1], results[1][1]);
+});
+
+test('the geometry build reserves 94 B a corner for a 640,000-corner grid of unique vertices (was about 267 B)', () => {
+  // 400 x 400 quads: 160,801 control points, 640,000 corners, 960,000 triangle corners, every corner its own vertex
+  // with normals and one UV set (8 floats). Each term is a typed array the build allocates at exactly this size.
+  const bytes = geometryBytes(160_801, 640_000, 960_000, 640_000, 8);
+  assert.equal(bytes, 160_801 * 24 + 640_000 * 8 + 960_000 * 12 + 320_000 * 4 + 640_000 * (28 + 8 * 4));
+  assert.equal(Math.round(bytes / 640_000), 94);
+  // The documented cap fits the 128 MiB scene default: 1,000,000 vertices of that layout from 1,000,000 corners.
+  assert.ok(geometryBytes(251_001, 1_000_000, 1_500_000, 1_000_000, 12) < 128 * 1024 * 1024);
 });

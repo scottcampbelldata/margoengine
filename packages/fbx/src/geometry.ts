@@ -94,7 +94,7 @@ const cross = (a: Point, b: Point, c: Point): number => (b[0] - a[0]) * (c[1] - 
  */
 function triangulate(
   given: number[],
-  controlPoints: number[],
+  controlPoints: ArrayLike<number>,
   positions: ArrayLike<number>,
   charge: (amount?: number) => void,
 ): number[] {
@@ -224,16 +224,6 @@ function triangulate(
   return out;
 }
 
-interface Builder {
-  positions: number[];
-  normals: number[];
-  uvs: number[][];
-  tangents: number[];
-  colors: number[][];
-  indices: number[];
-  controlPoints: number[];
-  vertices: Map<string, number>;
-}
 export interface BuiltGeometry {
   primitives: { geometry: GeometryData; materialIndex: number }[];
   controlPoints: Uint32Array[];
@@ -244,6 +234,28 @@ export interface BuiltGeometry {
 
 const UV_KEYS = ['uvs', 'uvs1', 'uvs2', 'uvs3'] as const,
   COLOR_KEYS = ['colors', 'colors1'] as const;
+
+/** glTF's PBR storage binding holds at most one million 80-byte vertices: a primitive starts anew past this many. */
+const CHUNK_VERTICES = 999_997;
+
+/**
+ * Bytes `buildGeometry` holds at its peak beyond the file's own arrays, for `controlPoints` control points, `corners`
+ * polygon corners, `triangleCorners` triangulated corners and up to `vertices` expanded vertices of `width` floats each.
+ * Every buffer is a typed array of a size known before it is filled: Float64 generated normals (24 B per control
+ * point); per corner its control point and polygon (8 B); per triangulated corner the triangle list, its vertex and its
+ * output index (12 B) and its triangle's primitive (4 B per triangle); per expanded vertex its first corner, its key
+ * hash and up to four hash slots (24 B), its output control point (4 B) and its attributes (4 B per float).
+ * `test/geometry.test.js` pins it for a 640,000-corner grid; `test/large.test.js` loads the default-scale mesh.
+ */
+export function geometryBytes(
+  controlPoints: number,
+  corners: number,
+  triangleCorners: number,
+  vertices: number,
+  width: number,
+): number {
+  return controlPoints * 24 + corners * 8 + triangleCorners * 12 + Math.ceil(triangleCorners / 3) * 4 + vertices * (28 + width * 4);
+}
 
 /** Converts the first normal and tangent layer, and the first UV and color layer, or as many as glTF here holds with `all`. */
 export function buildGeometry(
@@ -276,38 +288,49 @@ export function buildGeometry(
         `FBX unsupported material reference ${reference}; bake or remove it in your 3D tool before export`,
       );
   }
-  const cp: number[] = [],
-    cornerPolygon: number[] = [],
-    triangles: number[] = [];
+  const corners = polygonIndices.length;
+  // A polygon of n corners gives at most n - 2 triangles, so the triangle list's size is known before triangulating.
+  let bound = 0,
+    run = 0;
+  for (let i = 0; i < corners; i++) {
+    run++;
+    if (polygonIndices[i] < 0) {
+      bound += Math.max(0, run - 2) * 3;
+      run = 0;
+    }
+  }
+  const cp = new Uint32Array(corners),
+    cornerPolygon = new Uint32Array(corners),
+    triangles = new Uint32Array(Math.min(bound, limits.corners));
   let polygon: number[] = [],
     polygonCount = 0,
+    triangleCount = 0,
     work = 0;
   const charge = (amount = 1) => {
     if ((work += amount) > limits.geometryWork) budget();
   };
-  for (let i = 0; i < polygonIndices.length; i++) {
+  for (let i = 0; i < corners; i++) {
     const index = polygonIndices[i];
     if (!Number.isSafeInteger(index)) throw new RangeError('FBX polygon index must be an integer');
-    cp.push(integer(index < 0 ? -index - 1 : index, count, 'control point'));
-    cornerPolygon.push(polygonCount);
+    cp[i] = integer(index < 0 ? -index - 1 : index, count, 'control point');
+    cornerPolygon[i] = polygonCount;
     polygon.push(i);
     if (polygon.length > MAX_POLYGON) budget();
     if (index < 0) {
       const tri = triangulate(polygon, cp, positions, charge);
-      if (triangles.length + tri.length > limits.corners) budget();
-      // Avoid argument-spread limits on large but valid polygons.
-      for (const corner of tri) triangles.push(corner);
+      if (triangleCount + tri.length > limits.corners) budget();
+      for (const corner of tri) triangles[triangleCount++] = corner;
       polygon = [];
       polygonCount++;
     }
   }
   if (polygon.length)
     throw new RangeError('FBX polygon is missing its terminator; re-export the file, it looks damaged');
-  if (!triangles.length)
+  if (!triangleCount)
     throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
   const generated = new Float64Array(count * 3);
   let kept = 0;
-  for (let i = 0; i < triangles.length; i += 3) {
+  for (let i = 0; i < triangleCount; i += 3) {
     const a = cp[triangles[i]] * 3,
       b = cp[triangles[i + 1]] * 3,
       c = cp[triangles[i + 2]] * 3;
@@ -330,59 +353,43 @@ export function buildGeometry(
     triangles[kept++] = triangles[i + 1];
     triangles[kept++] = triangles[i + 2];
   }
-  triangles.length = kept;
   if (!kept)
     throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
-  const builders = new Map<number, Builder[]>();
-  let vertexCount = 0;
-  for (let at = 0; at < triangles.length; at++) {
+
+  // A corner's vertex key: its control point and the value each kept layer gives it (-1 for none).
+  const keyWidth = 4 + uvs.length + colors.length,
+    key = new Int32Array(keyWidth),
+    other = new Int32Array(keyWidth);
+  const keyOf = (at: number, out: Int32Array): void => {
     const corner = triangles[at],
       control = cp[corner],
       poly = cornerPolygon[corner];
-    let materialIndex = materialMapping === 'NoMappingInformation' ? -1 : 0;
-    if (materials) {
-      const index = materialMapping === 'AllSame' ? 0 : poly;
-      if (index >= materials.length)
-        throw new RangeError('FBX material index array too short; re-export the file, it looks damaged');
-      // The FBX SDK uses -1 for an unassigned polygon, even when the node has other materials.
-      materialIndex = materials[index] === -1 ? -1 : integer(materials[index], 65536, 'material index');
-    }
-    const chunks = builders.get(materialIndex) ?? [];
-    let builder = chunks[chunks.length - 1];
-    // glTF's PBR storage binding holds at most one million 80-byte vertices. Start only at
-    // triangle boundaries and retain every corner, layer and control-point mapping.
-    if (!builder || (at % 3 === 0 && builder.controlPoints.length > 999_997)) {
-      builder = {
-        positions: [],
-        normals: [],
-        uvs: uvs.map(() => []),
-        tangents: [],
-        colors: colors.map(() => []),
-        indices: [],
-        controlPoints: [],
-        vertices: new Map(),
-      };
-      chunks.push(builder);
-      builders.set(materialIndex, chunks);
-    }
-    const ni = normal ? layerIndex(normal, control, corner, poly) : -1,
-      // Index -1 is a corner the UV set leaves out: it sits at the origin, as in the tool that wrote it.
-      ui = uvs.map(({ layer: uv }) => (unmapped(uv, corner) ? -1 : layerIndex(uv, control, corner, poly)));
-    const ci = colors.map(({ layer: color }) => layerIndex(color, control, corner, poly)),
-      ti = tangent ? layerIndex(tangent, control, corner, poly) : -1,
-      bi = binormal ? layerIndex(binormal, control, corner, poly) : -1;
-    const key = `${control}/${ni}/${ui}/${ci}/${ti}/${bi}`;
-    let vertex = builder.vertices.get(key);
-    if (vertex !== undefined) {
-      builder.indices.push(vertex);
-      continue;
-    }
-    if (++vertexCount > limits.vertices) budget();
-    vertex = builder.controlPoints.length;
-    builder.vertices.set(key, vertex);
-    builder.controlPoints.push(control);
-    builder.indices.push(vertex);
-    builder.positions.push(positions[control * 3], positions[control * 3 + 1], positions[control * 3 + 2]);
+    out[0] = control;
+    out[1] = normal ? layerIndex(normal, control, corner, poly) : -1;
+    let k = 2;
+    // Index -1 is a corner the UV set leaves out: it sits at the origin, as in the tool that wrote it.
+    for (const { layer: uv } of uvs) out[k++] = unmapped(uv, corner) ? -1 : layerIndex(uv, control, corner, poly);
+    for (const { layer: color } of colors) out[k++] = layerIndex(color, control, corner, poly);
+    out[k++] = tangent ? layerIndex(tangent, control, corner, poly) : -1;
+    out[k] = binormal ? layerIndex(binormal, control, corner, poly) : -1;
+  };
+
+  // Writes the vertex first met at triangle corner `at` into the attribute arrays at `v`, checking every value read.
+  const scratch = {
+    positions: new Float32Array(3),
+    normals: new Float32Array(3),
+    uvs: uvs.map(() => new Float32Array(2)),
+    colors: colors.map(() => new Float32Array(4)),
+    tangents: new Float32Array(4),
+  };
+  type Target = typeof scratch;
+  const writeVertex = (at: number, out: Target, v: number): void => {
+    keyOf(at, key);
+    const control = key[0],
+      ni = key[1];
+    out.positions[v * 3] = positions[control * 3];
+    out.positions[v * 3 + 1] = positions[control * 3 + 1];
+    out.positions[v * 3 + 2] = positions[control * 3 + 2];
     let nx = normal ? finite(normal.values[ni * 3], 'normals') : 0,
       ny = normal ? finite(normal.values[ni * 3 + 1], 'normals') : 0,
       nz = normal ? finite(normal.values[ni * 3 + 2], 'normals') : 0;
@@ -411,20 +418,26 @@ export function buildGeometry(
     nx /= length;
     ny /= length;
     nz /= length;
-    builder.normals.push(nx, ny, nz);
-    uvs.forEach(({ layer: uv }, set) =>
-      ui[set] < 0
-        ? builder.uvs[set].push(0, 1)
-        : builder.uvs[set].push(finite(uv.values[ui[set] * 2], 'UVs'), 1 - finite(uv.values[ui[set] * 2 + 1], 'UVs')),
-    );
+    out.normals[v * 3] = nx;
+    out.normals[v * 3 + 1] = ny;
+    out.normals[v * 3 + 2] = nz;
+    uvs.forEach(({ layer: uv }, set) => {
+      const ui = key[2 + set],
+        target = out.uvs[set];
+      target[v * 2] = ui < 0 ? 0 : finite(uv.values[ui * 2], 'UVs');
+      target[v * 2 + 1] = ui < 0 ? 1 : 1 - finite(uv.values[ui * 2 + 1], 'UVs');
+    });
     colors.forEach(({ layer: color }, set) => {
+      const ci = key[2 + uvs.length + set];
       for (let k = 0; k < 4; k++) {
-        const value = finite(color.values[ci[set] * 4 + k], 'colors');
+        const value = finite(color.values[ci * 4 + k], 'colors');
         if (value < 0 || value > 1) throw new RangeError('FBX colors must be in [0, 1]');
-        builder.colors[set].push(value);
+        out.colors[set][v * 4 + k] = value;
       }
     });
     if (tangent) {
+      const ti = key[2 + uvs.length + colors.length],
+        bi = key[3 + uvs.length + colors.length];
       let tx = finite(tangent.values[ti * 3], 'tangents'),
         ty = finite(tangent.values[ti * 3 + 1], 'tangents'),
         tz = finite(tangent.values[ti * 3 + 2], 'tangents');
@@ -454,23 +467,115 @@ export function buildGeometry(
           bz = finite(binormal.values[bi * 3 + 2], 'binormals');
         sign = (ny * tz - nz * ty) * bx + (nz * tx - nx * tz) * by + (nx * ty - ny * tx) * bz < 0 ? 1 : -1;
       }
-      builder.tangents.push(tx, ty, tz, sign);
+      out.tangents[v * 4] = tx;
+      out.tangents[v * 4 + 1] = ty;
+      out.tangents[v * 4 + 2] = tz;
+      out.tangents[v * 4 + 3] = sign;
     }
+  };
+
+  // First pass: each triangle's primitive and each corner's vertex, deduplicated in an open-addressing table of
+  // vertex keys (the vertex's first corner and the key's hash are kept; its key is rebuilt from that corner).
+  // A corner gives one vertex per primitive, and only a polygon split across a primitive boundary repeats corners.
+  const capacity = Math.min(limits.vertices, corners + Math.ceil(corners / CHUNK_VERTICES) * MAX_POLYGON);
+  let slots = 1;
+  while (slots < capacity * 2) slots *= 2;
+  const table = new Int32Array(slots).fill(-1),
+    firstCorner = new Uint32Array(capacity),
+    hashes = new Uint32Array(capacity),
+    local = new Uint32Array(kept),
+    primitiveOf = new Uint32Array(kept / 3);
+  const chunks: { materialIndex: number; vertices: number; indices: number }[] = [],
+    order = new Map<number, number[]>();
+  let vertexCount = 0,
+    current = -1;
+  for (let at = 0; at < kept; at++) {
+    const corner = triangles[at],
+      poly = cornerPolygon[corner];
+    let materialIndex = materialMapping === 'NoMappingInformation' ? -1 : 0;
+    if (materials) {
+      const index = materialMapping === 'AllSame' ? 0 : poly;
+      if (index >= materials.length)
+        throw new RangeError('FBX material index array too short; re-export the file, it looks damaged');
+      // The FBX SDK uses -1 for an unassigned polygon, even when the node has other materials.
+      materialIndex = materials[index] === -1 ? -1 : integer(materials[index], 65536, 'material index');
+    }
+    const list = order.get(materialIndex) ?? [];
+    current = list[list.length - 1] ?? -1;
+    // Start only at triangle boundaries and retain every corner, layer and control-point mapping.
+    if (current < 0 || (at % 3 === 0 && chunks[current].vertices > CHUNK_VERTICES)) {
+      current = chunks.length;
+      chunks.push({ materialIndex, vertices: 0, indices: 0 });
+      list.push(current);
+      order.set(materialIndex, list);
+    }
+    if (at % 3 === 0) primitiveOf[at / 3] = current;
+    const chunk = chunks[current];
+    keyOf(at, key);
+    let hash = Math.imul(current + 1, 0x9e3779b1);
+    for (let k = 0; k < keyWidth; k++) {
+      hash = Math.imul(hash ^ key[k], 0x85ebca6b);
+      hash ^= hash >>> 13;
+    }
+    hash >>>= 0;
+    let slot = hash & (slots - 1),
+      found = -1;
+    for (let g = table[slot]; g >= 0; slot = (slot + 1) & (slots - 1), g = table[slot]) {
+      if (hashes[g] !== hash || primitiveOf[(firstCorner[g] / 3) | 0] !== current) continue;
+      keyOf(firstCorner[g], other);
+      let same = true;
+      for (let k = 0; k < keyWidth && same; k++) same = other[k] === key[k];
+      if (same) {
+        found = g;
+        break;
+      }
+    }
+    chunk.indices++;
+    if (found >= 0) {
+      local[at] = local[firstCorner[found]];
+      continue;
+    }
+    if (++vertexCount > limits.vertices) budget();
+    table[slot] = vertexCount - 1;
+    firstCorner[vertexCount - 1] = at;
+    hashes[vertexCount - 1] = hash;
+    local[at] = chunk.vertices++;
+    // Checks the vertex's values now, in corner order, as the second pass writes them without a check left to fail.
+    writeVertex(at, scratch, 0);
+  }
+
+  // Second pass: each primitive's arrays at their final size, filled in place.
+  const outputs = chunks.map(({ vertices, indices }) => ({
+    positions: new Float32Array(vertices * 3),
+    normals: new Float32Array(vertices * 3),
+    uvs: uvs.map(() => new Float32Array(vertices * 2)),
+    colors: colors.map(() => new Float32Array(vertices * 4)),
+    tangents: new Float32Array(tangent ? vertices * 4 : 0),
+    indices: new Uint32Array(indices),
+    controlPoints: new Uint32Array(vertices),
+    filled: 0,
+  }));
+  for (let g = 0; g < vertexCount; g++) {
+    const at = firstCorner[g],
+      out = outputs[primitiveOf[(at / 3) | 0]];
+    writeVertex(at, out, local[at]);
+    out.controlPoints[local[at]] = cp[triangles[at]];
+  }
+  for (let at = 0; at < kept; at++) {
+    const out = outputs[primitiveOf[(at / 3) | 0]];
+    out.indices[out.filled++] = local[at];
   }
   const primitives: BuiltGeometry['primitives'] = [],
     controlPoints: Uint32Array[] = [];
-  for (const [materialIndex, chunks] of builders)
-    for (const builder of chunks) {
-      const geometry: GeometryData = {
-        positions: Float32Array.from(builder.positions),
-        normals: Float32Array.from(builder.normals),
-        indices: Uint32Array.from(builder.indices),
-      };
-      uvs.forEach((_, set) => (geometry[UV_KEYS[set]] = Float32Array.from(builder.uvs[set])));
-      if (tangent) geometry.tangents = Float32Array.from(builder.tangents);
-      colors.forEach((_, set) => (geometry[COLOR_KEYS[set]] = Float32Array.from(builder.colors[set])));
+  for (const [materialIndex, list] of order)
+    for (const id of list) {
+      const out = outputs[id];
+      const geometry: GeometryData = { positions: out.positions, normals: out.normals, indices: out.indices };
+      uvs.forEach((_, set) => (geometry[UV_KEYS[set]] = out.uvs[set]));
+      if (tangent) geometry.tangents = out.tangents;
+      colors.forEach((_, set) => (geometry[COLOR_KEYS[set]] = out.colors[set]));
       primitives.push({ materialIndex, geometry });
-      controlPoints.push(Uint32Array.from(builder.controlPoints));
+      controlPoints.push(out.controlPoints);
     }
   return { primitives, controlPoints, vertexCount, uvNames: uvs.map((uv) => uv.name) };
 }

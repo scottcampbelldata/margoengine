@@ -18,7 +18,7 @@ import {
   fbxGeometricTransform,
   determinant3,
 } from './math.js';
-import { buildGeometry, type BuiltGeometry } from './geometry.js';
+import { buildGeometry, geometryBytes, type BuiltGeometry } from './geometry.js';
 import { applyInheritance, type InheritBinding } from './inherit.js';
 import type { ExtensionHooks } from './extension.js';
 
@@ -291,10 +291,9 @@ function preflight(ctx: SceneContext, source: FBXNode): void {
   const uv = Math.min(count('LayerElementUV'), 4) * 2,
     tangent = findChild(source, 'LayerElementTangent') ? 4 : 0,
     color = Math.min(count('LayerElementColor'), 2) * 4;
-  const vertices = Math.min(indices.length, ctx.budget.limits.vertices),
-    width = 7 + uv + tangent + color;
-  // Numeric JS builders and vertex-key maps coexist with the final typed arrays.
-  ctx.budget.reserve(positions.length * 8 + indices.length * 32 + triangles * 12 + vertices * (128 + width * 12));
+  const vertices = Math.min(indices.length, ctx.budget.limits.vertices);
+  // The build's peak: its typed working arrays and the final attribute arrays (geometryBytes says what each holds).
+  ctx.budget.reserve(geometryBytes(positions.length / 3, indices.length, triangles, vertices, 6 + uv + tangent + color));
   ctx.budget.work(triangles * 32);
 }
 

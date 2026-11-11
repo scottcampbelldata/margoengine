@@ -280,20 +280,28 @@ test('cumulative decoded allocation limits apply across compressed arrays', asyn
   const raw = Buffer.alloc(8_000_000),
     compressed = deflateSync(raw),
     data = values('d', [], { count: 1_000_000, compressed: true, payload: compressed });
-  const nodes = roots([geometry(Array.from({ length: 9 }, (_, index) => [`Unknown${index}`, [data], []])), model(2)]);
-  await assert.rejects(parseDocument(binary(nodes)), /decoded.*byte budget/);
-  // Byte arrays reuse the inflated allocation, so this isolates the 64 MiB
-  // cumulative array limit from the separate 128 MiB allocation limit.
+  const arrays = (count, value) =>
+    binary(roots([geometry(Array.from({ length: count }, (_, index) => [`Unknown${index}`, [value], []])), model(2)]));
+  // Nine 8 MB arrays hold 72 MB. Each inflated copy lives only until its typed array is made, so it is checked on top
+  // of the held total but not added to it: counting it twice once rejected this at 144 MB of a 128 MiB cap.
+  await parseDocument(arrays(9, data));
+  // Sixteen hold 128 MB; the sixteenth's inflated copy on top passes the 128 MiB decoded cap before its array cap does.
+  await assert.rejects(parseDocument(arrays(16, data)), /FBX decoded byte budget/);
+  // Byte arrays reuse the inflated allocation, so this isolates the 128 MiB cumulative array limit (with the work cap,
+  // one step per byte, lifted out of its way).
   const byteData = values('b', [], { count: raw.length, compressed: true, payload: compressed });
   await assert.rejects(
-    parseDocument(
-      binary(roots([geometry(Array.from({ length: 9 }, (_, index) => [`Raw${index}`, [byteData], []])), model(2)])),
-    ),
+    parseDocument(arrays(17, byteData), undefined, { ...new ParseBudget().limits, parseWork: 1_000_000_000 }),
     /decoded array byte budget/,
   );
   const budget = new ParseBudget();
-  budget.array(64 * 1024 * 1024);
+  budget.array(128 * 1024 * 1024);
   assert.throws(() => budget.array(1), /decoded array byte budget/);
+  const transient = new ParseBudget();
+  transient.array(100 * 1024 * 1024);
+  transient.transient(28 * 1024 * 1024);
+  transient.transient(28 * 1024 * 1024);
+  assert.throws(() => transient.transient(28 * 1024 * 1024 + 1), /decoded byte budget/);
 });
 
 test('supported version endpoints and malformed compressed payloads are explicit', async () => {

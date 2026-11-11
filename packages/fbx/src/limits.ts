@@ -19,7 +19,7 @@ export interface FBXImportLimits {
 export const defaultLimits: Readonly<FBXImportLimits> = Object.freeze({
   inputBytes: 64 * 1024 * 1024,
   decodedBytes: 128 * 1024 * 1024,
-  arrayBytes: 64 * 1024 * 1024,
+  arrayBytes: 128 * 1024 * 1024,
   nodes: 100_000,
   properties: 2_000_000,
   parseWork: 128_000_000,

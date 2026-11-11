@@ -5038,7 +5038,7 @@ Ordinary imports keep every existing default. All figures below are caps, never 
 | --- | ---: | ---: |
 | inputBytes | 64 MiB | 512 MiB |
 | decodedBytes | 128 MiB | 2 GiB |
-| arrayBytes | 64 MiB | 512 MiB |
+| arrayBytes | 128 MiB | 512 MiB |
 | nodes | 100,000 | 1,000,000 |
 | properties | 2,000,000 | 16,000,000 |
 | parseWork | 128,000,000 | 2,000,000,000 |
@@ -5058,6 +5058,19 @@ polygon corners and triangulated indices. Allocation/work accounting remains con
 so dense seams/instances may need higher caps. Raising a cap cannot create available memory.
 The 4,096-corner polygon, hierarchy depth, animation/key/sample limits and GLB uint32 format
 limits are unchanged. Imported meshes are never decimated or truncated to meet these caps.
+
+Measured default ceiling (2026-11-11, RTX A6000 dev PC): the defaults hold a 996,004-vertex mesh with every corner
+its own vertex (normals, one UV set, tangents; binary FBX with compressed arrays, 6.7 MiB): it converts, attaches with
+`parseFBX` and renders as one primitive in one draw, uploading its 81.7 MiB of GPU geometry once, on WebGPU and on
+the WebGL2 layer (`packages/fbx/test/large.test.js`, `test/default-scale-browser.mjs`). What bounds it: the
+1,000,000 expanded-vertex cap (a second primitive starts past 999,997 vertices and repeats the corners of a polygon
+split across it). The memory caps sit just above it for this layout: the geometry build reserves 94 B per corner for
+a mesh of unique vertices with normals and one UV set (each term a typed array of exactly that size; it was about
+267 B, which stopped such a mesh at about 480,000 corners under the 128 MiB scene cap), decoded arrays are about 75 MiB
+of the 128 MiB array cap (an inflated array is counted while it lives, not added to the total after its typed copy is
+made), and an uncompressed file reaches the 64 MiB input cap first, at about 860,000 such vertices. WebGPU's default
+device limits do not bind: a primitive holds at most 1,000,000 vertices of 80 B (under the 128 MiB storage binding)
+and its index buffer is far under the 256 MiB buffer size. Past the default ceiling `largeFBX` raises every cap.
 
 Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker finished at 98,163 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage is 24,209 B; 16,769 B was the separately reported particlesOnly build.
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14902778,
+  "total": 14904000,
   "history": [
     {
       "date": "2026-10-24",
@@ -8321,6 +8321,12 @@
       "commit": "f8b119693",
       "reason": "WebGL2 staged path tracer route and GL object ownership in the compat layer (fl-pathtracer). @margoengine/voxel-pathtracer 81115 B on origin/main to 88589 B: the staged wavefront route (one traversal per fragment program, CPU window loop with mapAsync census) lives in the lazy compat chunk only the WebGL2 layer loads (base 79628 B, lazy 9086 B); it replaces a single program that never compiled on ANGLE Direct3D 11. @margoengine/webgl2-compat 107674 to 108630 B, /device 107647 to 108592, /xr 107475 to 108414, /tiers 107394 to 108331: the device now owns and deletes every GL object and shares programs by GLSL text, which fixed 13 of 78 wrong renders on ANGLE Vulkan. A split would put the ownership wrapper in a second chunk every compat device loads at creation anyway, adding a request and duplicating the device's resource tracking for no saving.",
       "grew": 5
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "178763cbb0",
+      "reason": "fbx lean geometry build (typed working arrays, vertex-key hash table, two-pass fill) and the parser's transient inflate check: entry measured 22,685 B gzip against a 22,144 B budget; the bytes buy importing the documented 1,000,000-vertex cap inside the default memory caps (94 B a corner instead of about 267 B), and the build is one function on the conversion path, so a split would only add a module load",
+      "grew": 1
     }
   ],
   "items": {
@@ -8670,7 +8676,7 @@
     "@margoengine/exporters/usdz": 17778,
     "@margoengine/exporters/usdz-anim": 20969,
     "@margoengine/exporters/webp": 3661,
-    "@margoengine/fbx": 22144,
+    "@margoengine/fbx": 23366,
     "@margoengine/fbx dist/workers/fbx.js": 114006,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
