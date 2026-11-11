@@ -3,13 +3,11 @@ const entries = {
   'contact-shadows': ['ContactShadows'], curvature: ['Curvature'], decals: ['Decals'], depth: ['DepthTexture'],
   fxaa: ['FXAA'], glitch: ['Glitch'], gtao: ['GTAO'], halftone: ['Halftone', 'DotScreen'], image: ['ImagePost'],
   'lens-flare': ['LensFlare'], lens: ['Lens'], 'material-decals': ['MaterialDecals'], outline: ['Outline'],
-  pixelate: ['Pixelate'], smaa: ['SMAA'], ssao: ['SSAO'],
+  pixelate: ['Pixelate'], smaa: ['SMAA'], ssao: ['SSAO'], ssgi: ['SSGI'], ssr: ['SSR'],
   sss: ['SSS'], stylize: ['Stylize'],
   'motion-blur': ['MotionBlur'], mrt: ['SceneTargets'], 'selective-bloom': ['SelectiveBloom'],
 };
-// Not covered here: SceneFade ends itself on device restore by design (a captured transition cannot survive it), and
-// SSR and SSGI, whose clear colour buffers stay in shared/clear-color.js's per device cache after disposal
-// (docs/known-bugs.md).
+// Not covered here: SceneFade ends itself on device restore by design (a captured transition cannot survive it).
 // Classes whose options have required members.
 const required = {
   MotionBlur: { velocity: () => undefined },

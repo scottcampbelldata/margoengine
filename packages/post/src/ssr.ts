@@ -710,6 +710,7 @@ export class SSR implements EnginePlugin {
     this.depthView = this.ownDepth = this.hiz = this.blur = undefined;
     this.compositeGroups = undefined;
     this.clearPass = undefined;
+    this.materialClear?.dispose();
     this.materialClear = undefined;
     this.compositeAttachment.view = undefined!;
   }

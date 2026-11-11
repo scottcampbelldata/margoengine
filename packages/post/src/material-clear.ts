@@ -1,5 +1,6 @@
 import type { PassContext } from '@margoengine/core/extension';
-import { clearColorValue, clearDraw } from '../../shared/clear-color.js';
+import { clearColorValue, clearDraw, releaseClears } from '../../shared/clear-color.js';
+import { retire } from '../../shared/frame-resources.js';
 import { applyView, partialRect, viewRect } from '../../shared/view-rect.js';
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -21,12 +22,14 @@ function components(color: GPUColor | undefined): number[] {
 /**
  * Clears a material pass's targets inside a partial view (core's attachment clear would cover the whole target):
  * target 0 to the view's clear colour when it owns the depth, else to zero, the extra targets to their clear values.
+ * `dispose()` frees the colour buffers post's copy of the clear cache made on the device (KB0106).
  */
 export class MaterialClear {
   readonly extra: GPURenderPassColorAttachment[];
   private readonly values: number[][];
   private readonly attachments: GPURenderPassColorAttachment[];
   private readonly pipelines = new Map<string, GPURenderPipeline>();
+  private device?: GPUDevice;
   constructor(
     private readonly formats: readonly GPUTextureFormat[],
     extra: GPURenderPassColorAttachment[],
@@ -38,6 +41,7 @@ export class MaterialClear {
   draw(c: Context, ownedDepth: boolean): void {
     const clearDepth = ownedDepth && (c.view?.clear?.depth ?? true);
     this.attachments[0].view = c.color;
+    this.device = c.device;
     const pass = c.encoder.beginRenderPass({
       colorAttachments: this.attachments,
       ...(clearDepth
@@ -56,5 +60,15 @@ export class MaterialClear {
     } finally {
       pass.end();
     }
+  }
+  /**
+   * Frees the cached clear colours of the device this clear drew on. Post's bundle keeps its own copy of the cache, used
+   * only by material clears: another live clear on the device (SSR beside SSGI) makes its colour again on its next
+   * partial view. `retire` defers the destroy to the end of the task while a frame that may use it is still open.
+   */
+  dispose(): void {
+    const device = this.device;
+    this.device = undefined;
+    if (device) for (const buffer of releaseClears(device)) retire(device, buffer);
   }
 }

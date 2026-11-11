@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15076637,
+  "total": 15077526,
   "history": [
     {
       "date": "2026-10-24",
@@ -8483,6 +8483,12 @@
       "commit": "893910c96f",
       "reason": "video/record checks for an encoded frame before resolving (KB5116): 1396 to 1740 B gzip; a lazy chunk would add a request at stop() for a 60-line walk",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "51d4422c1d",
+      "reason": "KB0106: SSR and SSGI release their partial-view clear colour buffers (MaterialClear.dispose and releaseClears); ssr 13,257 to 13,319 B, ssgi 13,052 to 13,090 B gzip",
+      "grew": 2
     }
   ],
   "items": {
@@ -9209,8 +9215,8 @@
     "@margoengine/post/selective-bloom": 9706,
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10083,
-    "@margoengine/post/ssgi": 13052,
-    "@margoengine/post/ssr": 13257,
+    "@margoengine/post/ssgi": 13483,
+    "@margoengine/post/ssr": 13719,
     "@margoengine/post/sss": 7461,
     "@margoengine/post/stack": 4479,
     "@margoengine/post/stylize": 7202,
@@ -9348,7 +9354,7 @@
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 64619,
-    "@margoengine/sciviz dist/workers/readers.js": 49474,
+    "@margoengine/sciviz dist/workers/readers.js": 49470,
     "@margoengine/sciviz/a11y": 6480,
     "@margoengine/sciviz/aggregate": 29019,
     "@margoengine/sciviz/amr": 30374,

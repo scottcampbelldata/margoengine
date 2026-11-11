@@ -16,3 +16,5 @@ export declare function clearDraw(
     tint?: readonly number[];
   },
 ): void;
+/** Drops every colour bind group cached for `device` in this copy of the module; returns their buffers to destroy. */
+export declare function releaseClears(device: GPUDevice): GPUBuffer[];

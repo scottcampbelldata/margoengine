@@ -46,6 +46,20 @@ function colourGroup(device, tint) {
 }
 
 /**
+ * Drops every colour bind group this copy of the module caches for `device` and returns their buffers, which the
+ * caller destroys (with `retire`, so a pass recorded earlier in the frame still submits). Optional packages bundle a
+ * copy of their own: post's material clears call this when an SSR or SSGI pass is released, and any other material
+ * clear on the device makes its colour again on its next partial view. Core never calls it (its renderer lives as
+ * long as the device), so core's bundle drops it.
+ */
+export function releaseClears(device) {
+  const groups = devices.get(device)?.groups,
+    buffers = groups ? [...groups.values()].map((group) => group.b) : [];
+  groups?.clear();
+  return buffers;
+}
+
+/**
  * Clears inside the pass's viewport and scissor by drawing a triangle (an attachment clear always covers the whole
  * target): colour target 0 to `tint` (unless `writeColor` is false), further colour targets to their `values`, and
  * depth to 0 when `writeDepth`. The fragment shader writes `tint` from a uniform at full float precision with blending

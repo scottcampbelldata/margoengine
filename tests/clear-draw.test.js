@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clearColorValue, clearDraw, defaultClear } from '../packages/shared/clear-color.js';
+import { clearColorValue, clearDraw, defaultClear, releaseClears } from '../packages/shared/clear-color.js';
 
 // A recording device and pass: enough of WebGPU for clearDraw.
 function recorder() {
@@ -140,4 +140,24 @@ test('clearDraw destroys an evicted colour buffer after submitted work, never be
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(buffers.map((b) => b.destroyed), [1, ...new Array(63).fill(0)], 'only the oldest is destroyed, once');
   assert.equal(r.of('buffer')[64].destroyed, 0);
+});
+
+// KB0106: an owner that bundles its own copy of the cache (post's material clears) frees its colours with
+// releaseClears; the next clear of a colour makes it again, and the pipelines stay.
+test('releaseClears hands back every cached colour buffer of the device and forgets them', () => {
+  const r = recorder(),
+    cache = new Map(),
+    red = clearColorValue('#440000');
+  clearDraw(r.device, cache, r.pass, { ...options, tint: red });
+  clearDraw(r.device, cache, r.pass, { ...options, tint: defaultClear });
+  const made = r.of('buffer');
+  assert.deepEqual(releaseClears(r.device), made, 'both colour buffers are returned');
+  assert.deepEqual(made.map((b) => b.destroyed), [0, 0], 'the caller destroys them (with retire)');
+  assert.deepEqual(releaseClears(r.device), [], 'nothing is returned twice');
+  assert.deepEqual(releaseClears(recorder().device), [], 'a device with no clears has none');
+  const pipelines = r.of('pipeline').length;
+  clearDraw(r.device, cache, r.pass, { ...options, tint: red });
+  assert.equal(r.of('buffer').length, 3, 'a released colour is made again on its next clear');
+  assert.equal(r.of('pipeline').length, pipelines, 'the pipelines are kept');
+  assert.equal(r.of('bindGroupLayout').length, 1, 'the layout is kept');
 });

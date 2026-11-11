@@ -83,19 +83,6 @@
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
   results kept, watching for an `out-of-memory` error.
 
-### SSR and SSGI keep a clear-colour buffer after disposal (found by check:owners, 2026-11-11, open)
-
-- **Repro:** add `ssr: ['SSR'], ssgi: ['SSGI']` to the `entries` of `packages/post/test/owner-lifetime.fixture.js` and run
-  `node scripts/check-owner-lifetime.mjs --packages=post`: all 22 `SSR.attach` and `SSGI.attach` cases fail 'no leaked
-  GPU buffers, textures or query sets'.
-- **Cause:** `packages/shared/clear-color.js` keeps one 16 byte uniform buffer per colour in a per-device cache of 64
-  (core's eviction fix, aaace8b22f, bounds it). SSR and SSGI clear with a colour of their own, so the first clear makes
-  that buffer under the plugin, and it stays in the cache after the plugin is disposed, until 64 newer colours evict it
-  or the device goes.
-- **Fix to build:** count the users of each cached colour and destroy its buffer when the last user is disposed (or
-  give SSR and SSGI their clear values through a buffer they own), then add both to the post fixture. Core change:
-  needs Scott's yes unless it is zero bytes.
-
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
 - **Repro:** `MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --owner=<lane> -- node packages/post/test/ssgi-bounce-browser.mjs`
@@ -248,6 +235,21 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Chromium (`chromiumExecutablePath`) by their real paths. Headless Chromium, Edge, Chrome, WebKit and an executable named
   by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
   headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
+
+### Fixed 2026-11-11: SSR and SSGI kept a clear-colour buffer after disposal
+
+- **Repro:** SSR or SSGI in a partial view (a viewport smaller than the canvas), then dispose it: the 16 byte uniform
+  buffer behind its material clear stayed alive until 64 newer colours evicted it or the device went. With
+  `ssr: ['SSR'], ssgi: ['SSGI']` in `packages/post/test/owner-lifetime.fixture.js`, all 22 `SSR.attach` and
+  `SSGI.attach` cases of `check:owners` failed 'no leaked GPU buffers, textures or query sets'.
+- **Cause:** `packages/shared/clear-color.js` caches one buffer per colour per device, and nothing released post's
+  entries when the pass that made them went away.
+- **Fix (0 B in core + stage):** post bundles its own copy of the cache, used only by its material clears. The new
+  `releaseClears(device)` export (core never imports it, so core's bundle drops it) hands back the device's cached
+  colour buffers; `MaterialClear.dispose()` retires them, and SSR and SSGI call it whenever they release their targets
+  (resize, device restore, dispose). Another live clear on the device makes its colour again on its next partial view.
+  Tests: `packages/post/test/material-clear.test.js` (fails on the old build: dispose and restore left the buffer),
+  `tests/clear-draw.test.js`, and SSR and SSGI in the post owner fixture.
 
 ### Fixed 2026-11-11: per-object `device.lost` reactions kept disposed objects alive as long as their device
 

@@ -714,6 +714,7 @@ export class SSGI implements EnginePlugin {
     this.depthView = this.ownDepth = this.hiz = this.chain = undefined;
     this.viewGroups = undefined;
     this.clearPass = undefined;
+    this.materialClear?.dispose();
     this.materialClear = undefined;
     this.compositeAttachment.view = undefined!;
   }
