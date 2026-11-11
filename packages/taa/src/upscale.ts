@@ -17,6 +17,7 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { SceneTarget } from '../../shared/msaa.js';
+import { requireCompatTier } from '../../shared/compat.js';
 import { halton } from './jitter.js';
 import { color, fullscreen } from './shader.js';
 import { sharpenCode } from './cas.js';
@@ -204,6 +205,8 @@ export class TAAUpscale implements EnginePlugin {
         'TAAUpscale requires WebGPU; it does not run on the WebGL2 fallback; see https://margoengine.com/errors#webgpu',
       );
     if (engine.hasPlugin('taa')) throw new MargoError('unsupported', 'TAAUpscale replaces TAA; remove TAA first');
+    // 8-bit history: 92% of pixels off by more than 2 levels on the ldr tier (KB4278c).
+    requireCompatTier(engine.gpu, 'TAA history', 'half-float');
     this.engine = engine;
     const usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST;
     this.uniform = engine.gpu.createBuffer({ size: 224, usage });
@@ -442,8 +445,15 @@ export class TAAUpscale implements EnginePlugin {
   }
 
   onDeviceRestored(engine: Engine): void {
+    if (this.disposed) return;
     this.release();
-    this.setup(engine);
+    try {
+      this.setup(engine);
+    } catch (error) {
+      // A restored device can land on a lower tier (KB4278c); the effect leaves the engine instead of failing every frame.
+      this.dispose();
+      throw error;
+    }
   }
 
   /** Removes the effect and releases its GPU resources. Safe to call twice. */

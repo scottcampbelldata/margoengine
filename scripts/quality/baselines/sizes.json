@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15118061,
+  "total": 15118348,
   "history": [
     {
       "date": "2026-10-24",
@@ -8561,6 +8561,12 @@
       "commit": "321af581ca",
       "reason": "KB2281-xr: xr eye passes lend gltf-pro the glass snapshot hook (resolve-only pass, reopened eye pass, shared nativeGlassMaterial rule): 9,332 -> 9,469 B gzip; the fix itself, nothing to split",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "21221691ae",
+      "reason": "taa/upscale: TAA and TAAUpscale refuse the WebGL2 ldr tier (KB4278c) through the shared requireCompatTier and its linked coded error, as Bloom, SSAO, DOF and PostStack do; upscale 7384 -> 7624 B, root 14686 -> 14927 B (within its budget). A local copy of the tier rule would save about half and fork the rule the other HDR effects share",
+      "grew": 1
     }
   ],
   "items": {
@@ -9626,7 +9632,7 @@
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 15106,
     "@margoengine/taa/sharpen": 1023,
-    "@margoengine/taa/upscale": 7593,
+    "@margoengine/taa/upscale": 7880,
     "@margoengine/taa/upscale-velocity": 19045,
     "@margoengine/terrain": 14424,
     "@margoengine/terrain/blend": 3676,

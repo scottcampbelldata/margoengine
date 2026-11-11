@@ -3148,8 +3148,16 @@ after releasing old resources, including SSAO's GTAO subclass. Repaired refusal
 receipts and original failing images' metrics are retained under
 whitepaper/results/batch-273-tier-packages-standalone*.json.
 
+Standalone TAA and TAAUpscale (`@margoengine/taa`, 2026-11-11, KB4278c) require at
+least half-float too, at attach and on device restore, before allocation. Their
+8-bit history put 90.4 and 92.1 percent of pixels more than 2 levels off on LDR;
+half-float measured at most 0.024 percent in two runs (`taa alone` and `taa upscale` in
+packages/webgl2-compat/test/tier-packages-browser.mjs). The shared tier check took
+`@margoengine/taa/upscale` from 7,384 to 7,624 B gzip and the root from 14,686 to
+14,927 B.
+
 Tracked follow-up **T273-COVERAGE** (batch 273, after the 26 full-tier compat
-failures): remaining post effects and standalone Tonemap, TAA, DOF, transitions,
+failures): remaining post effects and standalone Tonemap, DOF, transitions,
 animation, BVH, cameras, clustered, compute, creative, environment, geometry,
 glTF/glTF-pro, headless, HTML, inspector, lighting2d, lines, points, text, pixel,
 procedural, quality, React, scatter, sciviz, selection, shader, sky, splats,

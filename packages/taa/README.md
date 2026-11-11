@@ -191,6 +191,11 @@ Measured on `packages/taa/test/upscale-browser.mjs` (640x480, scale 0.5, 4x MSAA
 
 ## Preview tier contract
 
+On the WebGL2 compatibility layer, `TAA` and `TAAUpscale` need the half-float tier or better: their history accumulates
+below one 8-bit level, and on the LDR tier 90 percent of pixels came out more than 2 levels off. They refuse LDR at
+attach and after a device restore with `MargoError` code `unsupported` (`TAA history`) before allocating anything; a
+restore that refuses also removes the effect from its scene.
+
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
 
 TAA and TAAUpscale keep the source camera on their transient raster-camera wrappers. The optional

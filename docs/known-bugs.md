@@ -4617,6 +4617,12 @@ allocation and after releasing resources on restore. Six CPU cases fail on
 the parent and cover default/temporal setup and replacement lifetimes; the
 package's new tier GPU entry retains the unchanged parity rule and expects
 the coded LDR refusal. See [DOF requirement](dof-tier-requirement.md).
+Standalone TAA and TAAUpscale (KB4278c, 2026-11-11): their LDR images put 90.4 and 92.1 percent of pixels more
+than 2 levels off (half-float at most 0.024 percent in two runs), so both now refuse LDR (`TAA history`) before allocation and
+after releasing resources on restore, leaving the scene. Regression: packages/taa/test/lower-tiers.test.js (4 cases
+fail on the parent) and the `taa alone` / `taa upscale` scenes of
+packages/webgl2-compat/test/tier-packages-browser.mjs. That check had failed on main since 0525c34e14 added the
+`post bloom alone 4x` scene without listing it among the LDR refusals (Bloom refuses LDR by design); it is listed now.
 Other standalone HDR effects and other
 package entries still need their measured requirement checks.
 The DOF landing also repairs sciviz notebook/share dependency ownership: host

@@ -40,8 +40,11 @@ try {
   const ldrRefusals = [
     'post bloom and tonemap',
     'post bloom alone',
+    'post bloom alone 4x',
     'post ssao alone',
     'dof HDR',
+    'taa alone',
+    'taa upscale',
     'sky fog 4x',
     'environment volumetric 4x',
     'water spray 4x',
@@ -63,7 +66,7 @@ try {
         assert.equal(result.refusal?.code, 'unsupported');
         assert.match(
           result.refusal.message,
-          /(?:PostStack HDR\/display effects|Bloom HDR processing|SSAO geometry\/HDR processing|DOF HDR processing).*half-float.*ldr.*https:\/\//,
+          /(?:PostStack HDR\/display effects|Bloom HDR processing|SSAO geometry\/HDR processing|DOF HDR processing|TAA history).*half-float.*ldr.*https:\/\//,
         );
         report.rows.push({ name, tier, refusal: result.refusal });
         save();

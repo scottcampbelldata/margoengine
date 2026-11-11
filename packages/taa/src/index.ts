@@ -29,6 +29,7 @@ import { displacementGroup, opacityEntries, type CasterCutout } from '../../shar
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { requireCompatTier } from '../../shared/compat.js';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUTextureUsage: {
@@ -422,6 +423,9 @@ export class TAA implements EnginePlugin {
         this.disposed ? 'disposed' : 'unsupported',
         'TAA requires WebGPU and a live effect; attach a new TAA to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
+    // 8-bit history loses the sub-level accumulation TAA exists for: 90% of pixels off by more than 2 levels on
+    // the ldr tier (KB4278c, packages/webgl2-compat/test/tier-packages-browser.mjs).
+    requireCompatTier(engine.gpu, 'TAA history', 'half-float');
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -1257,8 +1261,15 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.reset();
   }
   onDeviceRestored(engine: Engine): void {
+    if (this.disposed) return;
     this.release();
-    this.setup(engine);
+    try {
+      this.setup(engine);
+    } catch (error) {
+      // A restored device can land on a lower tier (KB4278c); the effect leaves the engine instead of failing every frame.
+      this.dispose();
+      throw error;
+    }
   }
   dispose(): void {
     if (this.disposed) return;

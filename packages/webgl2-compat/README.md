@@ -292,12 +292,14 @@ stack is pixel-identical at half-float; its HDR capture fails the existing image
 rule on LDR, so PostStack refuses HDR/display stages at setup on that tier.
 LDR-only stacks stay available. Standalone Bloom and SSAO also refuse LDR before
 allocation; both pass half-float (SSAO maximum channel difference 1). Standalone
-FXAA is identical on both lower tiers. These ten scenes are the proven scope.
+FXAA is identical on both lower tiers. Standalone TAA and TAAUpscale refuse LDR too (`TAA history`): their 8-bit
+history put 90.4 and 92.1 percent of pixels more than 2 levels off, against at most 0.024 percent at half-float.
+These twelve scenes are the proven scope.
 The three 4x MSAA scenes (sky fog, VolumetricFog, water spray) take their 4x scene from PostStack's capture, the
 only 4x route, so on LDR they refuse with PostStack's coded `unsupported`; at half-float they render.
 
 Tracked follow-up **T273-COVERAGE**: remaining post effects and standalone Tonemap,
-TAA, DOF, transitions, animation, BVH, cameras, clustered, compute, creative,
+DOF, transitions, animation, BVH, cameras, clustered, compute, creative,
 environment, geometry, glTF/glTF-pro, headless, HTML, inspector, lighting2d,
 lines, points, text, pixel, procedural, quality, React, scatter, sciviz,
 selection, shader, sky, splats, sprites, staging, stats, terrain, tilemap, toon,
