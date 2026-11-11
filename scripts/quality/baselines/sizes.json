@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14772350,
+  "total": 14774960,
   "history": [
     {
       "date": "2026-10-24",
@@ -8297,6 +8297,12 @@
       "commit": "1d9d2297bb",
       "reason": "gltf-pro/asset +7 B: KHR_meshopt_compression fallback and both-names rejection (bug fix 1d9d2297bb)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "b13c463990",
+      "reason": "post and tonemap read non-finite HDR as finite light (Rust port R3): bit-tested clean() in Bloom prefilter, composite and up chain, Tonemap and LocalExposure. Measured gzip before -> after: post 42151 -> 42369, post/bloom 7066 -> 7307, post/image 12233 -> 12462, post/selective-bloom 9453 -> 9690, tonemap 12606 -> 12708, tonemap/local 2130 -> 2234, scenery/scenes (bundles Bloom) to 19665; the WGSL lives in the shaders that read HDR, so no split is possible",
+      "grew": 7
     }
   ],
   "items": {
@@ -8991,10 +8997,10 @@
     "@margoengine/points/pick": 6015,
     "@margoengine/points/potree": 17694,
     "@margoengine/points/surfels": 15381,
-    "@margoengine/post": 42249,
+    "@margoengine/post": 43641,
     "@margoengine/post/afterimage": 6079,
     "@margoengine/post/anamorphic": 6742,
-    "@margoengine/post/bloom": 7196,
+    "@margoengine/post/bloom": 7563,
     "@margoengine/post/blur": 6394,
     "@margoengine/post/contact-shadows": 6852,
     "@margoengine/post/curvature": 9209,
@@ -9152,7 +9158,7 @@
     "@margoengine/scenery/aurora": 5866,
     "@margoengine/scenery/moon": 4231,
     "@margoengine/scenery/presets": 1233,
-    "@margoengine/scenery/scenes": 19404,
+    "@margoengine/scenery/scenes": 20255,
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 64619,

@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { ditherShader } from '../../shared/dither.js';
+import { cleanShader } from '../../shared/finite.js';
 import { SceneTarget } from '../../shared/msaa.js';
 import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
@@ -56,24 +57,43 @@ fn tent(t:texture_2d<f32>,s:sampler,uv:vec2f)->vec3f{
  * 2x2-texel boxes: the centre box weighs 0.5, the four corner boxes 0.125 each. The top level reads the full-resolution
  * scene, keeps only the light above the threshold in every tap and weights each box by 1/(1+luma) (Karis average), so
  * one very bright pixel (a water glint, an ember) cannot switch the glow on and off as it crosses pixels. Coming back
- * up, each level adds a tent upsample of the summed levels below it.
+ * up, each level adds a tent upsample of the summed levels below it, kept within the half-float range.
+ *
+ * Non-finite input (an Inf from an overflowing emissive, a NaN from a shader) would spread through every tap that
+ * touches it, then down and up the chain. `clean` maps NaN and -Inf to 0 and +Inf to 65504 (the largest binary16, IEEE
+ * 754-2008), so it is tested on the bits: WGSL lets compilers assume finite floats (WGSL spec, floating-point
+ * evaluation), so `x != x` may be folded away. A prefilter tap whose bilinear result is not finite is refetched as four
+ * cleaned texels; finite taps keep the hardware filter, so a finite image filters exactly as before.
  */
 const chain =
   tent +
+  cleanShader +
   `
 @group(0) @binding(0) var source:texture_2d<f32>;
 @group(0) @binding(1) var bilinear:sampler;
 @group(0) @binding(2) var output:texture_storage_2d<rgba16float,write>;
 @group(0) @binding(3) var detail:texture_2d<f32>;
 @group(0) @binding(4) var<uniform> settings:vec4f;
+fn cleanTap(uv:vec2f)->vec3f{
+ let size=vec2i(textureDimensions(source));let x=uv*vec2f(size)-0.5;let i=vec2i(floor(x));let f=x-floor(x);
+ let a=clean(textureLoad(source,clamp(i,vec2i(0),size-1),0).rgb);
+ let b=clean(textureLoad(source,clamp(i+vec2i(1,0),vec2i(0),size-1),0).rgb);
+ let c=clean(textureLoad(source,clamp(i+vec2i(0,1),vec2i(0),size-1),0).rgb);
+ let d=clean(textureLoad(source,clamp(i+vec2i(1,1),vec2i(0),size-1),0).rgb);
+ return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
 fn downsample(id:vec2u,top:bool){
  let size=textureDimensions(output);if(any(id>=size)){return;}
  let uv=(vec2f(id)+0.5)/vec2f(size);let t=1.0/vec2f(textureDimensions(source));
  let o=array<vec2f,13>(vec2f(-2,-2),vec2f(0,-2),vec2f(2,-2),vec2f(-1,-1),vec2f(1,-1),vec2f(-2,0),vec2f(0,0),vec2f(2,0),vec2f(-1,1),vec2f(1,1),vec2f(-2,2),vec2f(0,2),vec2f(2,2));
  var s:array<vec3f,13>;
  for(var i=0;i<13;i++){
-  var c=textureSampleLevel(source,bilinear,uv+o[i]*t,0.0).rgb;let m=max(c.r,max(c.g,c.b));
-  if(top){c*=max(0.0,m-settings.w)/max(0.0001,m);}s[i]=c;
+  var c=textureSampleLevel(source,bilinear,uv+o[i]*t,0.0).rgb;
+  if(top){
+   if(any(bad(c))){c=cleanTap(uv+o[i]*t);}
+   c=min(c,vec3f(65504.0));let m=max(c.r,max(c.g,c.b));c*=max(0.0,m-settings.w)/max(0.0001,m);
+  }
+  s[i]=c;
  }
  let b=array<vec3f,5>(s[3]+s[4]+s[8]+s[9],s[0]+s[1]+s[5]+s[6],s[1]+s[2]+s[6]+s[7],s[5]+s[6]+s[10]+s[11],s[6]+s[7]+s[11]+s[12]);
  var color=vec3f(0);var total=0.0;
@@ -88,7 +108,7 @@ fn downsample(id:vec2u,top:bool){
 @compute @workgroup_size(8,8) fn up(@builtin(global_invocation_id) id:vec3u){
  let size=textureDimensions(output);if(any(id.xy>=size)){return;}
  let uv=(vec2f(id.xy)+0.5)/vec2f(size);
- textureStore(output,vec2i(id.xy),vec4f(textureLoad(detail,vec2i(id.xy),0).rgb+tent(source,bilinear,uv),1));
+ textureStore(output,vec2i(id.xy),vec4f(min(textureLoad(detail,vec2i(id.xy),0).rgb+tent(source,bilinear,uv),vec3f(65504.0)),1));
 }`;
 // With a radius other than 0.5, each up step weighs its own level by settings.x and the sum below by settings.y (the
 // smallest level's weight on the first step, 1 after it), read from that step's slice of the weights buffer.
@@ -113,6 +133,7 @@ export function bloomWeights(radius: number, levels: number): number[] {
 const composite =
   displayShader +
   tent +
+  cleanShader +
   `
 @group(0) @binding(0) var scene:texture_2d<f32>;
 @group(0) @binding(1) var bloom:texture_2d<f32>;
@@ -123,7 +144,7 @@ const composite =
 }
 ${ditherShader}
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{
- let s=textureLoad(scene,vec2i(p.xy),0);let hdr=s.rgb+tent(bloom,bilinear,p.xy/vec2f(textureDimensions(scene)))*settings.x;
+ let s=textureLoad(scene,vec2i(p.xy),0);let hdr=clean(s.rgb)+tent(bloom,bilinear,p.xy/vec2f(textureDimensions(scene)))*settings.x;
  let o=toDisplay(hdr*exp2(settings.y));let a=max(s.a,max(o.r,max(o.g,o.b)));return vec4f(min(o+dither(p.xy)*min(vec3f(settings.z),min(o,1-o)),vec3f(a)),a);
 }`;
 // Alpha: scene coverage (premultiplied), raised to the glow's brightest channel so glow over a transparent canvas stays valid.

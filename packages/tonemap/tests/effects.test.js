@@ -5,7 +5,7 @@ import { Tonemap, whiteBalanceGain } from '../dist/index.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 
 const hash = (code) => createHash('sha256').update(code).digest('hex');
-const defaultShader = '64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448';
+const defaultShader = '672546811be6922e47f3faa5531e004859899ab5f333c9869f73295de3c49159';
 
 function frame(options) {
   const h = gpuHarness(),

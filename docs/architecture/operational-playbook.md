@@ -16,6 +16,17 @@ constant 0 is. MASK colour pipelines in gltf-pro (`exactAlphaShader`) and the `v
 the cutoff keeps all 77,822 grid pixels (40,257 cut before), 64 of 64 picks (56 before) and the same 7,974 shadow
 texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still interpolates in the plain path.
 
+### Section 5 evidence: non-finite HDR input stays local in Bloom and Tonemap (2026-11-10)
+
+Bloom's prefilter and composite, Tonemap's presentation shaders and LocalExposure's base read NaN and -Inf as 0 and
++Inf as 65504 (largest IEEE 754-2008 binary16). The test is on the bits (`bitcast<vec3u>`, exponent all ones), since
+WGSL lets compilers assume finite floats; a prefilter tap whose bilinear result is non-finite is refetched as four
+cleaned texels, finite taps keep the hardware filter, and the up chain is kept within 65504. Evidence on the RTX A6000,
+WebGPU and WebGL2 compat: `packages/post/test/bloom-finite-browser.mjs` (64 x 64, +Inf, -Inf, NaN texels) gives every
+texel 8 px from a bad one equal to the clean image (largest difference 10.2 before), and
+`packages/tonemap/tests/finite-browser.mjs` gives frames identical to the clean source with and without
+LocalExposure (3 bytes differed before). Missing: other GPU vendors. Core's lit shader is not clamped (core freeze).
+
 ### Section 5 evidence: bright environments fit half floats by a stored scale (2026-11-10)
 
 `Environment` divides every RGB texel by `radianceScale` = peak / 60000 when the brightest finite texel is above

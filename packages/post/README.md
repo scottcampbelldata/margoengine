@@ -35,6 +35,9 @@ disposal ends an active export. Dispose `ImagePost` before its engine, and detac
 
 `Bloom.encodeImage(context, input, output)` runs the same HDR bloom kernel for other packages: use a separate
 unattached `Bloom`, `rgba16float` views of the image size, and submit before disposing it.
+Bloom reads non-finite HDR input as finite light: NaN and -Inf as 0, +Inf as 65504 (the largest half float), so one
+bad texel from an overflowing emissive or a broken shader stays where it is instead of spreading through the glow
+chain; finite images filter exactly as before.
 
 ## Combining effects: `PostStack`
 

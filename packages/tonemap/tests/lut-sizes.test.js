@@ -5,8 +5,8 @@ import { Tonemap } from '../dist/index.js';
 import { PostStack } from '../../post/dist/index.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 
-const defaultShader = '64c85cad2e74730f98492367c5ccf62f77a3f5d7ae8a991b5e60e2d8340e1448',
-  defaultOutputShader = 'bc97844614d054f4cac82bda4b43530ab6941cd4c277f7ecd05c5e4fabdef24a';
+const defaultShader = '672546811be6922e47f3faa5531e004859899ab5f333c9869f73295de3c49159',
+  defaultOutputShader = 'f5a493659603156fc4d55c92af83d5b67016cf1c71be1750348ebb717bd3c344';
 const hash = (code) => createHash('sha256').update(code).digest('hex');
 
 function lut(size = 33, explicit = true) {

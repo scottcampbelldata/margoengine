@@ -75,6 +75,7 @@
     "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs",
     "test:gpu:local": "cd ../.. && node packages/tonemap/tests/local-browser.mjs",
     "test:gpu:hue": "cd ../.. && node packages/tonemap/tests/hue-browser.mjs",
-    "test:gpu:export-cube": "cd ../.. && node packages/tonemap/tests/export-cube-browser.mjs"
+    "test:gpu:export-cube": "cd ../.. && node packages/tonemap/tests/export-cube-browser.mjs",
+    "test:gpu:finite": "cd ../.. && node packages/tonemap/tests/finite-browser.mjs"
   }
 }

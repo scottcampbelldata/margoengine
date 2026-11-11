@@ -5,6 +5,7 @@
 // 1998), run as two separable passes (an approximation of the full 2D filter), and each pixel's exposure moves by
 // -strength * (base + exposure - log2(0.18)) stops, clamped to +-maxStops. Only the smooth base is compressed; the
 // detail on top of it (texture, edges inside a region) keeps its full contrast.
+import { cleanShader } from '../../shared/finite.js';
 import type { TonemapExtension, TonemapPassContext } from './index.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -30,15 +31,17 @@ const quad = `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position
 }
 `;
 // Quarter resolution: the mean log2 luminance of each 4 by 4 block inside the image.
+// clean(): NaN and -Inf count as black, +Inf as 65504, so one bad texel cannot spread through the base and its blur.
 const downShader =
   quad +
+  cleanShader +
   `@group(0) @binding(0) var scene:texture_2d<f32>;
 @fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
   let size=vec2i(textureDimensions(scene));let o=vec2i(pos.xy)*${SCALE};var sum=0.0;var n=0.0;
   for(var y=0;y<${SCALE};y++){for(var x=0;x<${SCALE};x++){
     let q=o+vec2i(x,y);
     if(q.x<size.x&&q.y<size.y){
-      let c=textureLoad(scene,q,0).rgb;let l=dot(max(c,vec3f(0)),vec3f(0.2126,0.7152,0.0722));
+      let l=dot(max(clean(textureLoad(scene,q,0).rgb),vec3f(0)),vec3f(0.2126,0.7152,0.0722));
       sum+=clamp(log2(max(l,0.0001)),-14.0,14.0);n+=1.0;
     }
   }}

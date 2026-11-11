@@ -6,6 +6,7 @@
 import { agxShader } from '../../shared/agx.js';
 import { acesShader } from '../../shared/aces.js';
 import { neutralShader } from '../../shared/display.js';
+import { cleanShader } from '../../shared/finite.js';
 const common = `
 struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;
@@ -16,7 +17,7 @@ fn acescgToSRGB(v:vec3f)->vec3f {
 }
 ${acesShader}
 ${agxShader}
-${neutralShader}fn sampleLUT(color:vec3f)->vec3f {
+${neutralShader}${cleanShader}fn sampleLUT(color:vec3f)->vec3f {
   let uv=clamp((color-p.domainMin.xyz)/(p.domainMax.xyz-p.domainMin.xyz),vec3f(0),vec3f(1))*32.0;
   let lo=vec3i(floor(uv));let hi=min(lo+1,vec3i(32));let t=fract(uv);
   let z0=mix(mix(textureLoad(lut,lo,0).rgb,textureLoad(lut,vec3i(hi.x,lo.y,lo.z),0).rgb,t.x),
@@ -32,7 +33,7 @@ ${neutralShader}fn sampleLUT(color:vec3f)->vec3f {
 export const tonemapShader =
   common +
   `@fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
-  let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=source.rgb;
+  let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=clean(source.rgb);
   if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
   hdr=max(hdr,vec3f(0))*exp2(p.grade.x);
   var color:vec3f;if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=pbrNeutral(hdr);}else{color=agx(hdr);}
@@ -54,7 +55,7 @@ export const outputShader =
   `
 fn rolloff(x:f32,white:f32)->f32 {if(x<0.76){return x;}return white-(white-0.76)*(white-0.76)/(x+white-1.52);}
 fn linearOutput(pos:vec4f)->vec4f {
-  let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=source.rgb;
+  let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=clean(source.rgb);
   if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
   hdr*=exp2(p.grade.x);
   // P3 canvas: clip to the P3 gamut instead of sRGB; what lies outside sRGB rides along as the negative part.
