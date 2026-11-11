@@ -1,12 +1,12 @@
 {
  "proof": "clustered-light-hooks",
- "ref": "376d1021c",
- "revision": "376d1021c822b8290f76e28ce304fb78ee72a418",
- "capturedAt": "38ac115756e74eec02daec3a2e52d207aab1ecc7",
+ "ref": "65098f33f",
+ "revision": "65098f33fe3ed7f87f1ee014bf0745bb4cbcd334",
+ "capturedAt": "47b04230b8c6565cf284cea64f4d6f13c4c2102e",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "1x": "6d6cb748c0e367f3df6308c9cc4cf88c357995711749305619a06a68c78249d3",
-  "4x": "e53e7aed8dd2c90af9df0777f44c0252acafa57610affc878ca5031e87555eee"
+  "1x": "743eaf88e5cb6bba2d4857840639896050dfc7a65280393ba3f57191380a4e23",
+  "4x": "2a563ea12c6581b9f56e77ebfedf6bd1a7282e9eff524b4c76a91faca3bc8c67"
  }
 }
