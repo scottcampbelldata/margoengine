@@ -148,3 +148,35 @@ test('area light shadows read no slot for a light past the first 64 (regression:
     lights.dispose();
   }
 });
+
+test('setup makes its GPU objects in the order the clustered proofs pin, the light page second', () => {
+  // e68bbe3ce made the light buffer after the cluster lists and the pipeline, and set local shadows up before the
+  // culling group: every later GPU call of a default scene changed identity (proofs clustered-*, 2026-11-10).
+  for (const shadows of [undefined, { maxLights: 2, resolution: 64 }]) {
+    const h = optionalGPU(),
+      gpu = h.engine.gpu,
+      log = [];
+    for (const name of ['createBuffer', 'createTexture', 'createBindGroup', 'createComputePipeline']) {
+      const make = gpu[name].bind(gpu);
+      gpu[name] = (descriptor) => {
+        log.push(name === 'createBuffer' ? `buffer ${descriptor.size}` : name);
+        return make(descriptor);
+      };
+    }
+    const lights = new Clustered({ grid: [2, 2, 2], ...(shadows ? { shadows } : {}) });
+    try {
+      lights.setup(h.engine);
+      assert.deepEqual(log.slice(0, 6), [
+        'buffer 128',
+        `buffer ${1024 * 64}`,
+        `buffer ${8 * 4}`,
+        `buffer ${8 * 1024 * 4}`,
+        'createComputePipeline',
+        'createBindGroup',
+      ]);
+      assert.equal(log.length > 6, !!shadows, 'local shadows make theirs after the culling group');
+    } finally {
+      lights.dispose();
+    }
+  }
+});

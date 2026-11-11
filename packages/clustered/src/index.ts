@@ -626,30 +626,44 @@ export class Clustered implements EnginePlugin {
       throw new RangeError('Cluster index list exceeds device limit; use a smaller cluster grid');
     const buffer = (size: number, usage: number) =>
       this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
+    // Creation order is part of the GPU call sequence the clustered proofs pin (uniform, lights, counts, indices,
+    // pipeline, bindings, then local shadows): a default scene's calls stay exactly those of a fixed 64 KiB light list.
     this.uniform = buffer(128, GPUBufferUsage.UNIFORM);
+    this.lights = this.lightBuffer();
     this.counts = buffer(count * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indices = buffer(bytes, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.pipeline = this.device.createComputePipeline({
       layout: 'auto',
       compute: { module: this.device.createShaderModule({ code: cullingShader }), entryPoint: 'main' },
     });
+    this.bind();
     this.dirty = true;
-    if (this.localShadows) this.localShadows.setup(engine);
-    this.page();
+    if (this.localShadows) {
+      this.localShadows.setup(engine);
+      this.entries = [...this.entries, ...this.localShadows.bindings()];
+    }
   }
-  /** (Re)creates the light buffer at the CPU copy's page count, then the bindings that name it. */
-  private page(): void {
+  /** The light buffer at the CPU copy's page count. */
+  private lightBuffer(): GPUBuffer {
     const size = this.data.byteLength,
       limits = this.device!.limits;
     if (size > limits.maxStorageBufferBindingSize || size > limits.maxBufferSize)
       throw new RangeError('The light list exceeds the device storage buffer limit; use fewer lights');
-    this.lights?.destroy();
-    this.lights = this.device!.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.entries = this.lightEntries = [this.uniform!, this.lights, this.counts!, this.indices!].map((buffer, i) => ({
+    return this.device!.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  }
+  /** The culling bind group and the bindings that name the current light buffer. */
+  private bind(): void {
+    this.entries = this.lightEntries = [this.uniform!, this.lights!, this.counts!, this.indices!].map((buffer, i) => ({
       binding: i + 4,
       resource: { buffer },
     }));
     this.group = this.device!.createBindGroup({ layout: this.pipeline!.getBindGroupLayout(0), entries: this.entries });
+  }
+  /** Grows the light buffer to the CPU copy's page count, then rebinds. */
+  private page(): void {
+    this.lights?.destroy();
+    this.lights = this.lightBuffer();
+    this.bind();
     if (this.localShadows) this.entries = [...this.entries, ...this.localShadows.bindings()];
     this.dirty = true;
   }
