@@ -6,7 +6,7 @@ import { directVisibility } from '../../shared/pbr-hooks.js';
 import { neutralShader } from '../../shared/display.js';
 import { transmittedDiffuse } from '../../shared/pbr-transmission.js';
 import { cotangentFrameShader } from '../../shared/tangent-frame.js';
-import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
+import { ggxD, ggxDOf, smithGCorrelated } from '../../shared/light-terms.js';
 import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { bumpGradientWgsl } from '../../shared/bump.js';
@@ -27,7 +27,7 @@ fn ambient(s:Surface)->vec3f {
 fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
-  let a=s.roughness*s.roughness; let a2=a*a; let d=${ggxD};
+  let a=s.roughness*s.roughness; let a2=a*a; let d=${/* @__PURE__ */ ggxDOf('s.n', 'h')};
   let g=${smithGCorrelated};
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
   return ((1-fresnel)*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
@@ -747,7 +747,7 @@ export const directWgsl = (
       ? `let t=s.at.xyz; let b=cross(s.n,t); let alt=mix(a,1.0,s.at.w*s.at.w); let a2=alt*a;
   let q=vec3f(a*dot(t,h),alt*dot(b,h),a2*nh); let w2=a2/max(dot(q,q),1e-12);
   let spec=a2*w2*w2/3.14159265*clamp(0.5/max(nl*length(vec3f(alt*dot(t,v),a*dot(b,v),nv))+nv*length(vec3f(alt*dot(t,l),a*dot(b,l),nl)),1e-6),0.0,1.0);`
-      : `let a2=a*a; let spec=${ggxD}*0.5/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),0.00005);`
+      : `let a2=a*a; let spec=${/* @__PURE__ */ ggxDOf('s.n', 'h')}*0.5/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),0.00005);`
   }
   let diffuse=kd*(1-s.metal)*((1-s.tr)*(s.base.rgb*(1-s.dt.w)*nl+s.dt.rgb*s.dt.w*clamp(-dot(s.n,l),0.0,1.0))${scatter ? '+s.sc*nl' : ''})/3.14159265;
   return diffuse+spec*fr*nl;

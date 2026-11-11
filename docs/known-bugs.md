@@ -174,6 +174,30 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
 - Source: W3C WebGPU Shading Language, section "Behavior Analysis" (function return rules),
   https://www.w3.org/TR/WGSL/#behaviors.
 
+### Fixed 2026-11-11: float32 GGX D lost tens of percent on smooth surfaces (KB6016c)
+
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/core/tests/ggx-precision.browser.mjs` on the
+  old core: at roughness 0.03 core's D was 125,995 against an f64 98,243 for the same float32 vectors (+28 %), 3.2 % at
+  0.05 and 0.28 % at 0.1; WebGL2 layer the same.
+- **Cause:** every GGX D in the engine wrote its denominator `nh^2 (a2 - 1) + 1`. Near the peak of a narrow lobe
+  `1 - nh^2` is a few float32 steps while `a2` is about 8e-7 at roughness 0.03, so the rounding of `nh` alone moved D
+  by tens of percent (and gave 0/0 at roughness 0, nh 1). Found while fixing KB6016b: the same form in a reference
+  script biased smooth spheres by -13 %.
+- **Fix:** the denominator is `|n x h|^2 + a2 nh^2`, equal for unit vectors by the Lagrange identity
+  (|n x h|^2 = 1 - nh^2); the cross product keeps its relative precision. Core's mesh shader (Scott's ruling "fix C the
+  core"; core 22,207 B -> 22,225 B, core + stage 24,808 B -> 24,825 B) and the shared `ggxD` / new `ggxDOf(n, h)` in
+  packages/shared/light-terms.js, used by animation (VAT), clustered, gltf-pro, lod imposters, materials (base, coat,
+  eye, skin), post material decals, terrain, voxel and the WebGL2 preview. After the fix the worst error is 6e-5. Where the half vector faces away (dot(n, h) < 0, nh clamped to 0) the identity holds for the raw dot only: |n x h|^2 fell below 1 and reached 0 as h turned to -n, so D was unbounded on back-facing shading normals lit from the front (found by terrain's crest check on the WebGL2 layer, "weightedUncapped: 9 specks uncapped"); the term is max(|n x h|^2, step(nh, 0)), so D is a2 / pi there as before (+10 B, core 22,225 B).
+- **Still open (KB6016d):** the scalar `ggxDenominator(nh)` callers (environment prefilter and probes, water glints,
+  voxel-pathtracer) and materials' `ggxNamed` lobes keep the old form; they need the vectors passed in.
+- **Regression:** packages/core/tests/ggx-precision.browser.mjs (core's own D statements on the GPU against f64, bound
+  0.2 %, in core's test:gpu, native and WebGL2 layer, back-facing half vectors included); packages/core/tests/smith.test.js and
+  tests/smith-shaders.test.js (D = a2 / pi where dot(n, h) < 0, for core and the shared ggxD, ggxDFloat, ggxDOf).
+- Sources: Walter, Marschner, Li and Torrance 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR,
+  eq. 33; Guy and Agopian, "Physically Based Rendering in Filament", section 4.4.1 (the same cross-product form),
+  https://google.github.io/filament/Filament.html; Goldberg 1991, "What Every Computer Scientist Should Know About
+  Floating-Point Arithmetic", ACM Computing Surveys 23(1) (cancellation).
+
 ### Fixed 2026-11-11: no gate held the Firefox return-path rule outside water (KB-FF1b)
 
 - **Repro:** before this change, a WGSL function in any package other than water could end in a `loop` left only by
@@ -6617,6 +6641,7 @@ Platform defect below the compatibility layer, proven at the WebGL call level (b
 - Probes (git-excluded, in the main checkout): `handoffs/compat-determinism-probes/` in the git-excluded work folder holds `disp-probe.js` (the grid with recorder, extra frames, direct reads, attachment map and `PROBE_NOINVALIDATE`), `gl-recorder.js`, `diffstreams.cjs`, the raw pages and one failing stream capture.
 - Batch 164 SSAO resolve control (2026-11-10): `node packages/post/test/ssao-resolve-browser.mjs` with `MARGO_COMPAT=1` fails default ANGLE D3D11 exact pixels after odd-size 4x resize (59 channels, max two display levels). Its three unchanged historical-control frames also vary by the same 59 channels and two levels; native and ANGLE Vulkan (`BROWSER_ARGS=["--use-angle=vulkan"]`) pass all 12 pairs. This is consistent with the recorded D3D resolve defect above, but this fixture still needs a raw GL command replay to isolate the cause. Control evidence: `test-results/bp164-compat-diagnostic.log`; native `bp164-ssao-pixels.log` and actual Vulkan `bp164-compat-vulkan-real.log` (the earlier `bp164-compat-vulkan.log` did not forward the backend argument and is not Vulkan evidence). Under Scott's 2026-11-10 control-variance ruling, D3D11 cannot prove or disprove this change's identical output; the exact native and Vulkan checks supply that proof. The original exact test and assertion remain unchanged. This is a landing exception, not a repaired driver claim.
 
+- KB6016c lane (2026-11-11, sweep-l4): the compat leg of `materials/test:gpu:dispersion` at the KB6016c tree failed 4 exact 4x checks (loaded glTF vs constructed; groups, instances and mirror device restoration) with the same max 0.000244140625 signature; the native leg passed. Same open defect: the shader text the compared draws use is identical within each comparison, and nothing was rerun to green.
 - Next step: report to ANGLE/NVIDIA with a self-contained replay of the recorded session (full payloads, not hashes). Until then this stays a release blocker for exact compat captures on Windows D3D11. Never raise the bound for it.
 
 

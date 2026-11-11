@@ -3,9 +3,11 @@ export const decayTerms: string;
 export const clusterBrdf: string;
 /** WGSL cluster lookup for world point `p` (a WGSL name): declares `cell`, `count` and `result`. */
 export function clusterCell(p: string): string;
-/** GGX normal distribution as shader source over a2 and nh. */
+/** GGX normal distribution as shader source over the unit vectors named `n` and `h`, and a2 and nh (KB6016c form). */
+export function ggxDOf(n: string, h: string): string;
+/** GGX normal distribution as shader source over n, h, a2 and nh. */
 export const ggxD: string;
-/** {@link ggxD} with float literals. */
+/** {@link ggxD} (float literals). */
 export const ggxDFloat: string;
 /** Height-correlated Smith-GGX G2 (Heitz 2014, eq. 99) over a2, nv and nl. */
 export const smithGCorrelated: string;

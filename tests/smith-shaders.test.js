@@ -87,3 +87,28 @@ test('no package source writes the separable Smith product outside the listed ex
   }
   assert.deepEqual(hits, exceptions);
 });
+
+// Regression (KB6016c, 2026-11-11): the shared GGX D wrote |n x h|^2 + a2 nh^2, which equals the textbook
+// nh^2 (a2 - 1) + 1 only where dot(n, h) >= 0; with nh clamped to 0 and h facing away it fell below 1 and reached 0 as
+// h turned to -n, so D was unbounded on back-facing shading normals (terrain crest specks on the WebGL2 layer). Every
+// shader that takes ggxD or ggxDOf gets a2 / pi there, and the textbook value where h faces the normal.
+test('the shared GGX D is a2 / pi where the half vector faces away, and the textbook D elsewhere', () => {
+  const forms = {
+      ggxD: shaderExpression(terms.ggxD, ['n', 'h', 'nh', 'a2']),
+      ggxDFloat: shaderExpression(terms.ggxDFloat, ['n', 'h', 'nh', 'a2']),
+      ggxDOf: shaderExpression(terms.ggxDOf('s.n', 'q'), ['s', 'q', 'nh', 'a2']),
+    },
+    n = [0, 0, 1];
+  assert.equal(terms.ggxD, terms.ggxDOf('n', 'h'), 'ggxD is ggxDOf over n and h, written as a literal so bundles drop it unused');
+  for (const [name, d] of Object.entries(forms)) {
+    const call = (h, nh, a2) => (name === 'ggxDOf' ? d({ n }, h, nh, a2) : d(n, h, nh, a2));
+    for (const c of [-0.999, -0.9, -0.5, -0.1, -1e-6, 0.3, 0.9, 0.999])
+      for (const roughness of [0.03, 0.2, 0.5, 1]) {
+        const a2 = roughness ** 4,
+          h = [Math.sqrt(1 - c * c), 0, c],
+          nh = Math.max(0, c),
+          want = a2 / (3.14159265 * (nh * nh * (a2 - 1) + 1) ** 2);
+        assert.ok(Math.abs(call(h, nh, a2) / want - 1) < 1e-6, `${name} at dot(n, h) ${c}, roughness ${roughness}`);
+      }
+  }
+});

@@ -58,11 +58,11 @@ function assertDisposed(h) {
 test('unconfigured clustered lighting retains the exact baseline sampling source and bindings', () => {
   assert.equal(
     createHash('sha256').update(clusteredSampling(0)).digest('hex'),
-    '4123a705969acd433f93157d49052424bdc44f56720d9481aee438c67a077368',
+    '6c0ac45b73e90c7d0c0f8bcd7ec799f446e523d66b3fa24b55c23a58be99411b',
   );
   assert.equal(
     createHash('sha256').update(clusteredSampling(2)).digest('hex'),
-    'ff3311a00713be0a6cfcd9809be2305f23f0a41dcabc77483fc2c807b2f478e2',
+    'c54b24418ce09f3621921ced30530e9ae36d5adfda3fa607edd10b686ce6429d',
   );
   const h = harness(),
     effect = new Clustered({ grid: [2, 2, 2] });

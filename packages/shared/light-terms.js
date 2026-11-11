@@ -31,10 +31,26 @@ export const clusterCell = (
 // The GGX (Trowbridge-Reitz) microfacet terms every PBR shader in the engine writes, as source text over the names a2
 // (roughness^4), nh, nv and nl. The Float forms spell 1.0 and 2.0 (as GLSL needs and some shaders write), so each
 // shader's text stays as it was.
-/** GGX normal distribution `a2 / (pi (nh^2 (a2 - 1) + 1)^2)` (Walter et al. 2007, eq. 33; glTF 2.0 Appendix B.3.2). */
-export const ggxD = 'a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0))';
-/** {@link ggxD} with float literals. */
-export const ggxDFloat = 'a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0))';
+/**
+ * GGX normal distribution `a2 / (pi (nh^2 (a2 - 1) + 1)^2)` (Walter et al. 2007, eq. 33; glTF 2.0 Appendix B.3.2),
+ * over the unit normal `n` and half vector `h` (WGSL or GLSL names) and the shader's `a2` and `nh`. The denominator is
+ * written `|n x h|^2 + a2 nh^2`, equal to `nh^2 (a2 - 1) + 1` for unit vectors by the Lagrange identity
+ * (|n x h|^2 = 1 - nh^2), because in float32 `1 - nh^2` cancels near the peak of a narrow lobe: at roughness 0.03 a2
+ * is about 8e-7, a few float steps of nh^2, and the old form moved D by tens of percent (KB6016c). The cross product
+ * keeps its relative precision there (Filament writes the same form: Guy and Agopian, "Physically Based Rendering in
+ * Filament", section 4.4.1 "Normal distribution function").
+ * `nh` must be the shader's `clamp(dot(n, h), 0, 1)`, as every caller writes it. Where the half vector faces away
+ * (dot(n, h) <= 0, so nh is 0) the identity holds for the raw dot, not the clamped nh: |n x h|^2 is below 1 there and
+ * reaches 0 as h turns to -n, which made D unbounded on back-facing shading normals lit from the front (terrain's
+ * edge-on bump slivers turned bright). `max(|n x h|^2, step(nh, 0))` keeps the old denominator 1 (D = a2 / pi) there
+ * and is exactly |n x h|^2 everywhere else.
+ */
+export const ggxDOf = (n, h) =>
+  `a2/(3.14159265*pow(max(dot(cross(${n},${h}),cross(${n},${h})),step(nh,0.0))+a2*nh*nh,2.0))`;
+/** {@link ggxDOf} over the names `n` and `h`. */
+export const ggxD = 'a2/(3.14159265*pow(max(dot(cross(n,h),cross(n,h)),step(nh,0.0))+a2*nh*nh,2.0))';
+/** {@link ggxD}; its literals are already float (kept for the shaders and the GLSL text that import this name). */
+export const ggxDFloat = ggxD;
 /**
  * Height-correlated Smith-GGX masking-shadowing, G2 = 1 / (1 + Lambda(v) + Lambda(l)) with the GGX Lambda, written
  * `2 nl nv / (nl sqrt(a2 + (1 - a2) nv^2) + nv sqrt(a2 + (1 - a2) nl^2))`: Heitz 2014, "Understanding the

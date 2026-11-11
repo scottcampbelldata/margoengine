@@ -1,6 +1,6 @@
 import type { MaterialExtension } from '@margoengine/gltf-pro';
 import { coordinateExpression, coordinateWGSL } from './coordinates.js';
-import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
+import { ggxDOf, smithGCorrelated } from '../../shared/light-terms.js';
 
 /** Resource index in the extension slot, and the existing vertex UV set. */
 export interface ClearcoatTextureSlot {
@@ -89,7 +89,7 @@ ${normalShader}
   let nl=clamp(dot(coatNormal,l),0.0,1.0); let nv=clamp(dot(coatNormal,v),0.0001,1.0);
   let nh=clamp(dot(coatNormal,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=roughness*roughness; let a2=a*a;
-  let d=${ggxD};
+  let d=${/* @__PURE__ */ ggxDOf('coatNormal', 'h')};
   let g=${smithGCorrelated};
   let fresnel=0.04+(1-0.04)*pow(1-vh,5.0);
   materialCoatKeep=1.0-factor*(0.04+0.96*pow(1.0-clamp(dot(coatNormal,v),0.0,1.0),5.0));

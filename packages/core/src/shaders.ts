@@ -22,7 +22,7 @@ o.color=i.color.rgb;o.material=vec4f(i.factors.xyz,sign(dot(i.m0.xyz,cross(i.m1.
 let facing=front==(i.material.w>0.0);if(!C&&!facing&&i.material.z<0.5){discard;}
 let n=normalize(i.normal)*select(-1.0,1.0,facing);let v=normalize(frame.eye.xyz-i.position);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
 let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
-let a=i.material.x*i.material.x;let a2=a*a;let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
+let a=i.material.x*i.material.x;let a2=a*a;let k=cross(n,h);let q=max(dot(k,k),step(nh,0.0))+a2*nh*nh;let d=a2/(3.14159265*q*q);
 let g=2.0*nl*nv/max(nl*sqrt(a2+(1.0-a2)*nv*nv)+nv*sqrt(a2+(1.0-a2)*nl*nl),0.0001);
 let f0=mix(vec3f(0.04),i.color,i.material.y);let f=f0+(1.0-f0)*pow(1.0-vh,5.0);
 let direct=((1.0-f)*(1.0-i.material.y)*i.color/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;

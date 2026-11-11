@@ -68,10 +68,12 @@ const builtins = {
   pow: (a, b) => zip(a, b, (x, y) => x ** y),
   min: (a, b) => zip(a, b, Math.min),
   max: (a, b) => zip(a, b, Math.max),
+  step: (edge, x) => zip(edge, x, (e, v) => (v < e ? 0 : 1)),
   clamp: (v, lo, hi) => zip(zip(v, lo, Math.max), hi, Math.min),
   mix: (a, b, t) => binary['+'](a, binary['*'](binary['-'](b, a), t)),
   select: (f, t, c) => (isVector(c) ? c.map((k, i) => (k ? t : f)[i] ?? (k ? t : f)) : c ? t : f),
   dot: (a, b) => a.reduce((s, v, i) => s + v * b[i], 0),
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
   length: (a) => Math.sqrt(a.reduce((s, v) => s + v * v, 0)),
   normalize: (a) => {
     const l = Math.sqrt(a.reduce((s, v) => s + v * v, 0));

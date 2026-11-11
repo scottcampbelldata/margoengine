@@ -209,7 +209,7 @@ test('unextended models retain the baseline shader and allocation path after ins
     assert.deepEqual([...s.draws[0].groups.keys()], [0, 1]);
     assert.equal(
       digest(s.draws[0].pipeline.vertex.module.code),
-      '4333079f4e7977e43594a1b377c701910a47c5474b10f65bbf963a9ddd5e1dcd',
+      'bdf7de1e862e4f56fe0db5ad6a0213d66d78d88afe29f9546fe52a1101834390',
     );
     assert.equal(s.counts.textures, before.textures);
     assert.equal(s.counts.buffers, before.buffers);

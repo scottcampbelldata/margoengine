@@ -35,6 +35,7 @@ const builtins = {
   inverseSqrt: (a) => map1(a, (x) => f32(1 / Math.sqrt(x))),
   min: (a, b) => map2(a, b, Math.min),
   max: (a, b) => map2(a, b, Math.max),
+  step: (edge, x) => map2(edge, x, (e, v) => (v < e ? 0 : 1)),
   clamp: (a, lo, hi) => map2(map2(a, lo, Math.max), hi, Math.min),
   pow: (a, b) => map2(a, b, (x, y) => f32(x ** y)),
   mix: (a, b, t) =>

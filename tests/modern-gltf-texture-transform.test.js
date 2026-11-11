@@ -10,7 +10,7 @@ import { optionalGPU } from './support/optional-gpu.js';
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // GPU-verified derivative frame correction changes shader text while retaining the frame and group ABI.
 // 2026-11-11: the base shader's Smith term is the height-correlated G2 (KB5875a); was 20ea22e3...ca4297.
-const baselineShader = '4333079f4e7977e43594a1b377c701910a47c5474b10f65bbf963a9ddd5e1dcd';
+const baselineShader = 'bdf7de1e862e4f56fe0db5ad6a0213d66d78d88afe29f9546fe52a1101834390';
 async function scene(fixture = materialQuad(), image = true) {
   const harness = optionalGPU(),
     store = await TransformStore.create(16),

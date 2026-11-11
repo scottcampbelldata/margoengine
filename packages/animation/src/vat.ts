@@ -9,7 +9,7 @@ import { neutralShader } from '../../shared/display.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { applyView } from '../../shared/view-rect.js';
-import { ggxDFloat, smithGCorrelatedFloat } from '../../shared/light-terms.js';
+import { ggxDOf, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
@@ -312,7 +312,7 @@ const unlitShader = (
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=f.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
- let a=rough*rough;let a2=a*a;let d=${ggxDFloat};let g=${smithGCorrelatedFloat};
+ let a=rough*rough;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('nn', 'h')};let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  var color=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w
   +(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*f.radiance.w;
@@ -332,7 +332,7 @@ fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return 
  var s:Surface;s.base=f.base*textureSample(map,mapSampler,i.uv);s.n=normalize(i.normal)*select(-1.0,1.0,front);s.roughness=f.options.z;s.metal=f.options.w;s.occlusion=1.0;
  let v=normalize(f.eye.xyz-i.position);let l=f.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(s.n,l),0.0,1.0);let nv=clamp(dot(s.n,v),0.0001,1.0);let nh=clamp(dot(s.n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
- let a=s.roughness*s.roughness;let a2=a*a;let d=${ggxDFloat};let g=${smithGCorrelatedFloat};
+ let a=s.roughness*s.roughness;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('s.n', 'h')};let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),s.base.rgb,s.metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  let direct=((1.0-fresnel)*(1.0-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
  var color=direct+ambient(s)+s.emissive;
