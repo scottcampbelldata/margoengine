@@ -365,22 +365,64 @@ async function modelFrom(
     levelled = bakedDocument(doc, source.shareImages(), records, baked, level);
   let made: PBRModel;
   try {
-    made = new Model(
-      source.root.engine,
-      new GLTFAsset(levelled.doc, asset.buffers, undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
-      levelled.images,
-      prepared,
+    const levelAsset = new GLTFAsset(
+      levelled.doc,
+      asset.buffers,
+      undefined,
+      asset.hooks,
+      asset.maxBytes,
+      asset.maxNodes,
     );
+    // A level over the source's part size splits as the source did.
+    levelAsset.partVertices = asset.partVertices;
+    made = new Model(source.root.engine, levelAsset, levelled.images, prepared);
   } catch (error) {
     closeImages(levelled.images);
     throw error;
   }
-  made.primitives.forEach((p, i) => {
+  levelRecords(made).forEach((i, k) => {
+    const p = made.primitives[k];
     p.material = levelled.materials[i];
     p.extension = records[i].extension;
   });
   source.root.engine.use(made);
   return made;
+}
+/**
+ * The record (source primitive, its first part for a split one) of each primitive of a level, by index: a level
+ * primitive over `maxPartVertices` loads as parts too, and every part takes its first part's record.
+ */
+function levelRecords(made: PBRModel): number[] {
+  let i = -1;
+  return made.primitives.map((p) => (p.part?.index ? i : ++i));
+}
+/**
+ * A primitive whole again: the parts of a split primitive on its node merged back into the definition's vertices,
+ * shared vertices welded through `part.vertexMap` (only vertices some part holds), so a level simplifies the whole
+ * surface with no seam at the cuts. An unsplit primitive comes back as it is.
+ */
+function whole(model: PBRModel, p: PBRPrimitive): PBRPrimitive {
+  if (!p.part) return p;
+  const parts = model.primitives.filter((q) => q.node === p.node && q.definition === p.definition && q.part),
+    ids = new Map<number, number>();
+  for (const q of parts) for (const v of q.part!.vertexMap) if (!ids.has(v)) ids.set(v, ids.size);
+  const vertices = new Float32Array(ids.size * 20),
+    uvs = p.uvs ? new Float32Array(ids.size * 4) : undefined,
+    indices = new Uint32Array(parts.reduce((n, q) => n + q.indices.length, 0));
+  let o = 0;
+  for (const q of parts) {
+    const map = q.part!.vertexMap;
+    for (let k = 0; k < map.length; k++) {
+      const to = ids.get(map[k])!;
+      vertices.set(q.vertices.subarray(k * 20, k * 20 + 20), to * 20);
+      if (uvs && q.uvs) uvs.set(q.uvs.subarray(k * 4, k * 4 + 4), to * 4);
+    }
+    for (const i of q.indices) indices[o++] = ids.get(map[i])!;
+  }
+  const merged: PBRPrimitive = { ...p, vertices, indices };
+  delete merged.part;
+  if (uvs) merged.uvs = uvs;
+  return merged;
 }
 /** One level of a loaded model: its node tree and transforms, its triangle primitives simplified, nothing else. */
 async function gltfLevel(
@@ -401,7 +443,7 @@ async function gltfLevel(
     nodes = doc.nodes?.map((node) =>
       node.mesh !== undefined && !meshes[node.mesh]?.primitives.length ? { ...node, mesh: undefined } : node,
     ),
-    records = model.primitives.filter((p) => simplified.has(p.definition)),
+    records = model.primitives.filter((p) => simplified.has(p.definition) && !p.part?.index),
     made = await modelFrom(model, { ...doc, nodes, meshes }, prepared, records, baked, level, signal);
   placeNodes(model, made);
   return made;
@@ -552,7 +594,7 @@ async function riggedLevel(
       bufferViews: out.bufferViews,
       buffers: [...out.buffers, { byteLength: bytes.byteLength }],
     },
-    records = model.primitives.filter((p) => simplified.has(p.definition)),
+    records = model.primitives.filter((p) => simplified.has(p.definition) && !p.part?.index),
     levelled = bakedDocument(levelDoc, model.shareImages(), records, baked, level);
   let made: PBRModel;
   try {
@@ -565,7 +607,8 @@ async function riggedLevel(
     closeImages(levelled.images);
     throw error;
   }
-  made.primitives.forEach((p, i) => {
+  levelRecords(made).forEach((i, k) => {
+    const p = made.primitives[k];
     p.material = levelled.materials[i];
     p.extension = records[i].extension;
     p.weights = records[i].weights;
@@ -725,9 +768,17 @@ async function autoModelLOD(
     if (!p.topology && !simplified.has(p.definition))
       simplified.set(
         p.definition,
-        simplifyPacked(simplify, p, ratios, signal, rigged(model, p) ? deformation(model, p) : undefined),
+        simplifyPacked(simplify, whole(model, p), ratios, signal, rigged(model, p) ? deformation(model, p) : undefined),
       );
-  const baked = bake ? await bakeLevels(model.primitives, simplified, bakeWants(model), bake, signal) : undefined,
+  const baked = bake
+      ? await bakeLevels(
+          model.primitives.filter((p) => !p.part?.index).map((p) => whole(model, p)),
+          simplified,
+          bakeWants(model),
+          bake,
+          signal,
+        )
+      : undefined,
     made = await modelLevels(model, simplified, ratios.length, baked, signal),
     levels: LODLevel[] = [{ object: ownNodes(model) }];
   made.forEach((object, i) => levels.push({ object, screen: screens[i] }));

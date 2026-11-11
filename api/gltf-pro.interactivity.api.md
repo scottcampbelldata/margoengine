@@ -153,6 +153,7 @@ class GLTFAsset {
     baseURL?: string;
     get remainingDecodedBytes(): number;
     reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
+    partVertices: number;
     reserveDecodedBytes(byteLength: number): void;
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;

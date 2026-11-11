@@ -98,19 +98,19 @@ test('an index accessor with more than 1,000,000 uint32 elements decodes exactly
     assertSameBytes(model.asset.accessor(1), Float32Array.from(indices));
   }));
 
-test('more than 1,000,000 vertices in one primitive is still refused, naming the mesh and primitive, on both paths', () =>
+test('more than 1,000,000 vertices in one primitive (refused before parts) load as the same parts on both paths', () =>
   headlessModels(async () => {
-    const bytes = glb({
+    const model = await both(
+      glb({
         POSITION: { data: new Float32Array(1_000_002 * 3).map((_, i) => i % 7), type: 'VEC3', componentType: 5126 },
       }),
-      error = /^RangeError: glTF mesh 0 "part" primitive 0: Expected bounded triangle geometry$/;
-    await assert.rejects(parseGLTFAsync(await headless(), bytes.slice()), (e) => error.test(String(e)));
-    const prepared = await runParseWorker(worker, { url: 'https://example.test/', input: bytes.slice().buffer });
-    const engine = await headless();
-    assert.throws(
-      () => modelFromPrepared(engine, prepared),
-      (e) => error.test(String(e)),
     );
+    assert.ok(model.primitives.length >= 4);
+    assert.equal(
+      model.primitives.reduce((n, p) => n + p.indices.length, 0),
+      1_000_002 - (1_000_002 % 3),
+    );
+    for (const p of model.primitives) assert.ok(p.vertices.length / 20 <= 262_144 && p.part.count === model.primitives.length);
   }));
 
 test('an accessor gltf-pro cannot decode names mesh, primitive, attribute and accessor', () =>

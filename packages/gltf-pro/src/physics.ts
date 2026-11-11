@@ -519,15 +519,17 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     if (!list) {
       const mesh = doc.meshes?.[index];
       if (!mesh) throw invalid('KHR_physics_rigid_bodies geometry mesh');
+      // A primitive split into parts gives one piece per part, each with its own indices.
       list = mesh.primitives
         .filter((p: GLTFPrimitive) => (p.mode ?? 4) >= 4)
-        .map((p: GLTFPrimitive) => {
-          const { vertices, indices } = packPrimitive(model.asset, p),
-            positions = new Float32Array((vertices.length / 20) * 3);
-          // The 80-byte vertex of gltf-pro begins with its position.
-          for (let v = 0, o = 0; o < vertices.length; v += 3, o += 20) positions.set(vertices.subarray(o, o + 3), v);
-          return { positions, indices };
-        });
+        .flatMap((p: GLTFPrimitive) =>
+          packPrimitive(model.asset, p).map(({ vertices, indices }) => {
+            const positions = new Float32Array((vertices.length / 20) * 3);
+            // The 80-byte vertex of gltf-pro begins with its position.
+            for (let v = 0, o = 0; o < vertices.length; v += 3, o += 20) positions.set(vertices.subarray(o, o + 3), v);
+            return { positions, indices };
+          }),
+        );
       meshes.set(index, list);
     }
     return list;

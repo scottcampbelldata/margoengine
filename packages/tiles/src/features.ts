@@ -147,7 +147,11 @@ export class TileFeatures implements EnginePlugin, Disposable {
                 index: 0,
                 ids:
                   attribute === undefined
-                    ? new Uint32Array(primitive.vertices.length / 20)
+                    ? new Uint32Array(
+                        primitive.part
+                          ? primitive.part.vertexMap.reduce((a, b) => Math.max(a, b), 0) + 1
+                          : primitive.vertices.length / 20,
+                      )
                     : this.rawIds(model, attribute),
               },
             ];
@@ -282,7 +286,12 @@ export class TileFeatures implements EnginePlugin, Disposable {
     const indices = entry.primitive.indices,
       triangle = Array.from(indices.subarray(hit.faceIndex * 3, hit.faceIndex * 3 + 3));
     if (triangle.length !== 3) return undefined;
-    const source = triangle.map((v) => entry.owners?.[v] ?? v);
+    // Ids and UVs are per vertex of the file's primitive: a part of a split one names its vertices through vertexMap.
+    const map = entry.primitive.part?.vertexMap,
+      source = triangle.map((v) => {
+        const local = entry.owners?.[v] ?? v;
+        return map ? map[local] : local;
+      });
     if (set.texture) {
       // Highlight tessellation is only used for attributes; texture coordinates remain the authored coordinates.
       const texture = entry.model.asset.doc.textures?.[set.texture.index],
@@ -434,8 +443,11 @@ export class TileFeatures implements EnginePlugin, Disposable {
         throw new TypeError('Feature texture UV accessor is missing; add the referenced TEXCOORD attribute');
       const values = entry.model.asset.accessor(accessor, 'VEC2'),
         uvs = entry.saved.uvs?.slice() ?? new Float32Array(entry.primitive.vertices.length / 5);
-      for (let i = 0; i < values.length / 2; i++)
-        uvs.set(values.subarray(i * 2, i * 2 + 2), i * 4 + (coordinate - 2) * 2);
+      const map = entry.primitive.part?.vertexMap;
+      for (let i = 0, n = map ? map.length : values.length / 2; i < n; i++) {
+        const s = map ? map[i] : i;
+        uvs.set(values.subarray(s * 2, s * 2 + 2), i * 4 + (coordinate - 2) * 2);
+      }
       entry.model.writeGeometry(
         entry.model.primitives.map((p) =>
           p === entry.primitive
@@ -494,12 +506,14 @@ export class TileFeatures implements EnginePlugin, Disposable {
     const { vertices, indices, uvs } = entry.saved,
       output: number[] = [],
       later: number[] = [],
-      owners: number[] = [];
+      owners: number[] = [],
+      map = entry.primitive.part?.vertexMap,
+      idOf = (v: number) => set.ids?.[map ? map[v] : v];
     const tint = color.map((v, c) => (c < 3 ? SRGBToLinear(v) : v));
     const emit = (weights: readonly number[], triangle: readonly number[], owner: number) => {
       for (let k = 0; k < 20; k++) {
         let value = weights.reduce((sum, w, i) => sum + w * vertices[triangle[i] * 20 + k], 0);
-        if (k >= 16 && set.ids?.[triangle[owner]] === id) value *= tint[k - 16];
+        if (k >= 16 && idOf(triangle[owner]) === id) value *= tint[k - 16];
         output.push(value);
       }
       // Keep convex direction interpolants: normalization belongs after raster interpolation.
@@ -514,7 +528,7 @@ export class TileFeatures implements EnginePlugin, Disposable {
     };
     for (let face = 0; face < indices.length; face += 3) {
       const triangle = Array.from(indices.subarray(face, face + 3));
-      const ids = triangle.map((v) => set.ids?.[v]);
+      const ids = triangle.map(idOf);
       if (ids.every((value) => value === ids[0])) {
         for (let i = 0; i < 3; i++) emit([Number(i === 0), Number(i === 1), Number(i === 2)], triangle, i);
         continue;

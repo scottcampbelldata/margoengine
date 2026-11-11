@@ -11,13 +11,15 @@ export interface PreparedGLTF {
   buffers: Uint8Array[];
   images: GLTFImage[];
   /** Packed geometry per mesh and primitive; null where packing failed (the main thread repeats it and reports the error). */
-  geometry: (PreparedGeometry | null)[][];
+  geometry: (PreparedGeometry | readonly PreparedGeometry[] | null)[][];
   /** Decoded accessors by index (geometry, skins, morph targets, animation samplers, GPU instancing), as GLTFAsset caches them. */
   accessors: [number, Float32Array][];
   /** The load's `maxDownloadBytes`, so the main thread's asset keeps the same budgets (absent: the default). */
   maxDownloadBytes?: number;
   /** The load's `maxNodes` (absent: the default). */
   maxNodes?: number;
+  /** The load's `maxPartVertices` (absent: the default). */
+  maxPartVertices?: number;
 }
 /** Decode what PBRModel and @margoengine/animation read from an asset: packed primitives and their accessors. */
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF {
@@ -35,10 +37,12 @@ export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLT
   const geometry = (doc.meshes ?? []).map((mesh) =>
     (Array.isArray(mesh?.primitives) ? mesh.primitives : []).map((p) => {
       const packed = attempt(() => packPrimitive(asset, p));
-      geometryBytes += packed ? packed.vertices.byteLength + packed.indices.byteLength + (packed.uvs?.byteLength ?? 0) : 0;
+      for (const g of packed ?? [])
+        geometryBytes += g.vertices.byteLength + g.indices.byteLength + (g.uvs?.byteLength ?? 0);
       if (geometryBytes > asset.maxBytes * 4)
         throw overBudget('Decoded glTF geometry exceeds byte budget', asset.maxBytes * 4);
-      return packed;
+      // One element for a primitive that fits one part, the parts otherwise.
+      return packed && packed.length === 1 ? packed[0] : packed;
     }),
   );
   decodeExtras(asset);
@@ -51,6 +55,7 @@ export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLT
     accessors: [...asset['cache']],
     maxDownloadBytes: asset.maxBytes,
     maxNodes: asset.maxNodes,
+    maxPartVertices: asset.partVertices,
   };
 }
 /** Fetch (url) or parse (input) and prepare a glTF; no decoders (Draco, meshopt, KTX2 need the main-thread path). */
@@ -62,10 +67,11 @@ export async function prepareGLTF(
   maxNodes?: number,
   allowedURLs?: readonly string[],
   optimize?: boolean,
+  maxPartVertices?: number,
 ): Promise<PreparedGLTF> {
   const { asset, images, deferred, baseURL, downloadedBytes } = await loadAsset(
     url,
-    { buffers, maxDownloadBytes, maxNodes, allowedURLs, optimize },
+    { buffers, maxDownloadBytes, maxNodes, allowedURLs, optimize, maxPartVertices },
     input,
     {},
     true,
@@ -79,6 +85,7 @@ export async function prepareGLTF(
       accessors: [],
       maxDownloadBytes: asset.maxBytes,
       maxNodes: asset.maxNodes,
+      maxPartVertices: asset.partVertices,
       deferred,
       baseURL,
       downloadedBytes,

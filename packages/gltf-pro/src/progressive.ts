@@ -454,7 +454,7 @@ export function loadGLTFProgressive(
     defs.forEach((p, k) => {
       const b = box(doc, p);
       local[k] = [b.lo, b.hi];
-      if (p && typeof p === 'object') packed.set(p, b);
+      if (p && typeof p === 'object') packed.set(p, [b]);
     });
     if (decoders.instancing) hooks.instancing = { read: () => undefined };
     if (decoders.materials) hooks.materials = decoders.materials;

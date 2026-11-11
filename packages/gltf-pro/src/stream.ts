@@ -22,6 +22,7 @@ import {
   unusedBasisuFallbacks,
 } from './asset.js';
 import { decodeExtras, packPrimitive, primitiveDefs, usesLaterUV } from './pack.js';
+import { MAX_PART_VERTICES } from './parts.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import type { GLTFDocument, GLTFStreamSource } from './asset.js';
@@ -387,6 +388,8 @@ export class GLTFStream {
     });
     // Same validation (and the same errors) as a plain load: required extensions, buffer sizes, the byte budget.
     this.asset = new GLTFAsset(doc, views, undefined, {}, this.limit, this.maxNodes);
+    // ponytail: the fill-in swaps one placeholder per primitive, so the stream packs a primitive as one part (up to 1M vertices).
+    this.asset.partVertices = MAX_PART_VERTICES;
     this.needs = primitiveDefs(doc).map((p) => {
       const out: Range[] = [],
         a = p?.attributes ?? {};
@@ -485,7 +488,12 @@ export class GLTFStream {
         if (this.ready(key)) {
           this.posted.add(key);
           try {
-            const { vertices, indices, uvs } = packPrimitive(this.asset!, defs[key]);
+            const [{ vertices, indices, uvs }, ...more] = packPrimitive(this.asset!, defs[key]);
+            if (more.length)
+              throw margoError(
+                'unsupported',
+                `Progressive glTF loads primitives of up to ${MAX_PART_VERTICES} vertices; use loadGLTF for larger ones`,
+              );
             this.post({ type: 'geometry', key, vertices, indices, uvs });
           } catch (e) {
             this.post({ type: 'geometry', key, error: error(e) });

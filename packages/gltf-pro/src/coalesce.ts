@@ -61,7 +61,8 @@ function determinant(m: ArrayLike<number>): number {
 /** True for a primitive a static batch can hold, whatever it shares a material with. */
 export function eligible(p: PBRPrimitive): boolean {
   const m = p.material;
-  if (p.topology || p.instances || p.deformed) return false;
+  // A part of a split primitive keeps its own buffers: merged, the parts would pass the storage binding they were cut for.
+  if (p.topology || p.instances || p.deformed || p.part) return false;
   // A height in the node's space reads the node's scale in the shader, and a batch has one node. A later UV set sits in a
   // second vertex buffer, which a batch does not bake.
   if (m.extended?.bump || p.uvs) return false;

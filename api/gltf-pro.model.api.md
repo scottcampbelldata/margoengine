@@ -28,6 +28,7 @@ export class GLTFAsset {
     baseURL?: string;
     get remainingDecodedBytes(): number;
     reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
+    partVertices: number;
     reserveDecodedBytes(byteLength: number): void;
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
@@ -376,7 +377,7 @@ export class PBRModel implements EnginePlugin {
         nodeIndex: number;
     }[];
     splats: readonly GLTFSplatCloud[];
-    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
+    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedPrimitive[])[]);
     get bounds(): Float32Array;
     attachSplats(signal?: AbortSignal): Promise<void>;
     get raw(): {
@@ -515,6 +516,7 @@ export interface PBRPrimitive {
         index: GPUBuffer;
     };
     topology?: 'point-list' | 'line-list';
+    part?: PrimitivePart;
 }
 
 export interface PBRRenderState {
@@ -556,6 +558,15 @@ export interface PreparedGeometry {
     indices: Uint32Array;
     uvs?: Float32Array;
     topology?: 'point-list' | 'line-list';
+    part?: PrimitivePart;
+}
+
+export type PreparedPrimitive = PreparedGeometry | readonly PreparedGeometry[];
+
+export interface PrimitivePart {
+    index: number;
+    count: number;
+    vertexMap: Uint32Array;
 }
 
 export interface TextureTransform {
@@ -574,11 +585,11 @@ export function closeImages(images: readonly GLTFImage[]): void;
 
 export function loadGLTF(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly GLTFImage[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'>, { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly GLTFImage[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'>, { maxNodes, maxPartVertices }?: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'>): PBRModel;
 
 export function parseGLTFAsync(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffersOrOptions?: Array<ArrayBuffer | ArrayBufferView> | (AssetOptions & CompressionOptions), images?: readonly GLTFImage[], options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parsePreparedPBR(instance: EngineKernel, doc: GLTFAsset['doc'], geometry: readonly (readonly PreparedGeometry[])[], images?: readonly GLTFImage[], { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
+export function parsePreparedPBR(instance: EngineKernel, doc: GLTFAsset['doc'], geometry: readonly (readonly PreparedPrimitive[])[], images?: readonly GLTFImage[], { maxNodes, maxPartVertices }?: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'>): PBRModel;
 
 export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'extensions'>): {
     texCoord: UVSet;
@@ -618,6 +629,7 @@ interface AssetOptions {
     maxDownloadBytes?: number;
     maxNodes?: number;
     optimize?: boolean;
+    maxPartVertices?: number;
 }
 
 interface BaseTextureSource {

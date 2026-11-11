@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15047576,
+  "total": 15056607,
   "history": [
     {
       "date": "2026-10-24",
@@ -8417,6 +8417,12 @@
       "commit": "6d0836c488",
       "reason": "new optional entry text/vector (lague plan 2): exact GPU glyph coverage from font curves. About 12 KB of it is the OpenType outline parser shared with text/extrude (moved out of extrude.ts into font-outlines.ts so vector does not pull in the triangulator); the plan's 9,000 B estimate left the parser out. Splitting the parser again would only move bytes, and a lighter parser would drop CFF2 and variations.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "2ae51098ac",
+      "reason": "gltf-pro parts: primitives of any size load as parts (pack.ts + parts.ts bundled where packing is: about 0.1 to 1 KB gzip per entry); a lazy split would add a chunk and a round trip to every load that packs geometry for under 1 KB",
+      "grew": 7
     }
   ],
   "items": {
@@ -8511,7 +8517,7 @@
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4596,
     "@margoengine/blender/anim": 5097,
-    "@margoengine/blender/components": 15503,
+    "@margoengine/blender/components": 16677,
     "@margoengine/blender/curves": 6746,
     "@margoengine/blender/ktx2": 5429,
     "@margoengine/blender/lightmap": 4892,
@@ -8812,8 +8818,8 @@
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7560,
     "@margoengine/gltf-pro": 86524,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 36850,
-    "@margoengine/gltf-pro dist/workers/progressive.js": 17249,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 38562,
+    "@margoengine/gltf-pro dist/workers/progressive.js": 18330,
     "@margoengine/gltf-pro/asset": 6017,
     "@margoengine/gltf-pro/audio": 4956,
     "@margoengine/gltf-pro/coordinates": 755,
@@ -8824,9 +8830,9 @@
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/material-draw": 683,
     "@margoengine/gltf-pro/metadata": 2432,
-    "@margoengine/gltf-pro/model": 66635,
-    "@margoengine/gltf-pro/physics": 8977,
-    "@margoengine/gltf-pro/prepare": 32692,
+    "@margoengine/gltf-pro/model": 68727,
+    "@margoengine/gltf-pro/physics": 10136,
+    "@margoengine/gltf-pro/prepare": 34134,
     "@margoengine/gltf-pro/progressive": 95582,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/spec-gloss": 10477,
@@ -8957,7 +8963,7 @@
     "@margoengine/loaders/worker": 8571,
     "@margoengine/loaders/xml": 1561,
     "@margoengine/lod": 14974,
-    "@margoengine/lod/auto": 9492,
+    "@margoengine/lod/auto": 9863,
     "@margoengine/lod/clusters": 3680,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/msft": 2266,

@@ -123,6 +123,7 @@ class Writer extends Bin {
   // Separate array identities keep a shared source accessor's front and back variants distinct in memo().
   private readonly negated = new Map<ArrayLike<number>, Float32Array>();
   private readonly reversed = new Map<Uint32Array, Uint32Array>();
+  private readonly gathered = new WeakMap<Uint32Array, Map<number, Float32Array>>();
   private readonly backMeshes = new Map<GLTFMesh, PBRMaterial[][]>();
   constructor(
     private readonly embedImages: boolean,
@@ -139,10 +140,10 @@ class Writer extends Bin {
   }
 
   /** A source accessor as gltf-pro decodes it: floats, JOINTS as unsigned ints, WEIGHTS normalized per vertex. */
-  private data(model: PBRModel, id: number, name: string, back = false): number {
-    const source = model.asset.accessor(id),
-      values = back && name === 'NORMAL' ? this.negate(source) : source,
-      type = model.asset.doc.accessors![id].type;
+  private data(model: PBRModel, id: number, name: string, back = false, vertexMap?: Uint32Array): number {
+    const type = model.asset.doc.accessors![id].type,
+      source = vertexMap ? this.gather(model, id, vertexMap) : model.asset.accessor(id),
+      values = back && name === 'NORMAL' ? this.negate(source) : source;
     return this.memo(values, () => {
       if (name.startsWith('JOINTS_')) {
         let max = 0;
@@ -160,6 +161,22 @@ class Writer extends Bin {
       }
       return this.accessor(values, type, FLOAT, ARRAY_BUFFER, name === 'POSITION');
     });
+  }
+
+  /** Accessor `id` at the source vertices a part of a split primitive holds (`PBRPrimitive.part.vertexMap`), once per part. */
+  private gather(model: PBRModel, id: number, vertexMap: Uint32Array): Float32Array {
+    let byId = this.gathered.get(vertexMap);
+    if (!byId) this.gathered.set(vertexMap, (byId = new Map()));
+    let values = byId.get(id);
+    if (!values) {
+      const source = model.asset.accessor(id),
+        width = source.length / model.asset.doc.accessors![id].count;
+      values = new Float32Array(vertexMap.length * width);
+      for (let k = 0; k < vertexMap.length; k++)
+        values.set(source.subarray(vertexMap[k] * width, vertexMap[k] * width + width), k * width);
+      byId.set(id, values);
+    }
+    return values;
   }
 
   private negate(source: ArrayLike<number>): Float32Array {
@@ -184,7 +201,9 @@ class Writer extends Bin {
         return o;
       };
     if (def.attributes) {
-      for (const name in def.attributes) attributes[name] = this.data(model, def.attributes[name], name, back);
+      // A part of a split primitive writes its own vertices of each attribute, and its own indices below.
+      for (const name in def.attributes)
+        attributes[name] = this.data(model, def.attributes[name], name, back, p.part?.vertexMap);
       // The packed normal is also the renderer's fallback when a loaded primitive omits NORMAL.
       if (back && def.attributes.NORMAL === undefined)
         attributes.NORMAL = this.accessor(this.negate(column(4, 3)), 'VEC3', FLOAT, ARRAY_BUFFER);
@@ -222,8 +241,8 @@ class Writer extends Bin {
       out.indices = this.memo(indices, () =>
         this.accessor(indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
       );
-    } else if (def.indices !== undefined || !def.attributes)
-      out.indices = this.memo(def.attributes ? model.asset.accessor(def.indices) : p.indices, () =>
+    } else if (def.indices !== undefined || !def.attributes || p.part)
+      out.indices = this.memo(def.attributes && !p.part ? model.asset.accessor(def.indices) : p.indices, () =>
         this.accessor(p.indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
       );
     if (def.material !== undefined) out.material = this.material(model, p.material, def.material);

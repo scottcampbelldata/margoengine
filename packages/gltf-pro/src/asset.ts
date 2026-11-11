@@ -5,6 +5,7 @@ import { readResponse } from '../../shared/loading.js';
 import type { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import type { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { partLimit, PART_VERTICES } from './parts.js';
 import type { PBRInstances } from './instancing.js';
 import type { Engine } from '@margoengine/core/extension';
 import type { Splats } from '@margoengine/splats';
@@ -264,7 +265,9 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
 // The built-in meshopt decoder is a dynamic import so a build that never loads a glTF does not bundle it.
 let meshoptSync: typeof meshoptDecodeGltfBuffer | undefined;
 const meshoptNames = ['EXT_meshopt_compression', 'KHR_meshopt_compression'];
-const meshopt = <T>(def: { extensions?: { EXT_meshopt_compression?: T; KHR_meshopt_compression?: T } }): T | undefined => {
+const meshopt = <T>(def: {
+  extensions?: { EXT_meshopt_compression?: T; KHR_meshopt_compression?: T };
+}): T | undefined => {
   const extensions = def?.extensions;
   if (extensions?.EXT_meshopt_compression !== undefined && extensions?.KHR_meshopt_compression !== undefined)
     throw new TypeError('Invalid glTF meshopt extensions; use only EXT or KHR on each buffer or bufferView');
@@ -447,6 +450,8 @@ export class GLTFAsset {
   }
   /** @internal The triangle order of the `optimize` option, for primitives packed from here on. */
   reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
+  /** @internal Most vertices a packed part holds (the `maxPartVertices` option); larger primitives split into parts. */
+  partVertices = PART_VERTICES;
   /** @internal Account for retained decoded data, including topology without an accessor. */
   reserveDecodedBytes(byteLength: number): void {
     integer(byteLength, 'decoded byte length');
@@ -639,7 +644,9 @@ export class GLTFAsset {
   async prepareMeshopt(): Promise<void> {
     if (meshoptSync || this.hooks.meshopt) return;
     if (
-      this.doc.bufferViews?.some((v) => v?.extensions?.EXT_meshopt_compression || v?.extensions?.KHR_meshopt_compression)
+      this.doc.bufferViews?.some(
+        (v) => v?.extensions?.EXT_meshopt_compression || v?.extensions?.KHR_meshopt_compression,
+      )
     )
       meshoptSync = (await import('@margoengine/decoders/meshopt')).meshoptDecodeGltfBuffer;
   }
@@ -1012,6 +1019,12 @@ export interface AssetOptions {
    * order their meshes, and `margo-convert` does it once, offline.
    */
   optimize?: boolean;
+  /**
+   * Most vertices one GPU part holds (default 262,144, from 1,024 to 1,000,000). A primitive with more vertices loads as
+   * several parts of its node, each drawn, culled and picked on its own (`PBRPrimitive.part`); shared vertices stay
+   * shared inside a part. Up to 16,777,216 vertices per primitive; skinned and morphed primitives must fit one part.
+   */
+  maxPartVertices?: number;
 }
 /** @internal The triangle order `optimize` asks for, loaded only then. */
 export async function triangleOrder(): Promise<NonNullable<GLTFAsset['reorder']>> {
@@ -1037,10 +1050,12 @@ export async function loadAsset(
     maxNodes,
     optimize,
     allowedURLs,
+    maxPartVertices,
   } = config;
   const prepare = typeof inputOrPrepare === 'function' ? inputOrPrepare : undefined;
   const input = typeof inputOrPrepare === 'function' ? undefined : inputOrPrepare;
-  const limit = downloadLimit(maxDownloadBytes);
+  const limit = downloadLimit(maxDownloadBytes),
+    partVertices = partLimit(maxPartVertices);
   signal?.throwIfAborted();
   let base = url === undefined ? undefined : new URL(url, globalThis.location?.href),
     total = downloadedBytes;
@@ -1095,6 +1110,7 @@ export async function loadAsset(
   const asset = new GLTFAsset(doc, buffers, binary, await withMaterials(doc, givenDecoders), limit, maxNodes);
   const decoders = asset.hooks;
   asset.baseURL = base?.href;
+  asset.partVertices = partVertices;
   if (optimize) asset.reorder = await triangleOrder();
   if (deferCompression && asyncCompression(doc))
     return { asset, images, deferred: true, baseURL: base?.href, downloadedBytes: total };

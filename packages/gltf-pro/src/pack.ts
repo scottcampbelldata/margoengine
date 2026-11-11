@@ -2,6 +2,8 @@ import type { GLTFDocument, GLTFPrimitive } from '../../shared/gltf.js';
 import { compressedIndices } from './draco-state.js';
 import { entry, type GLTFAsset } from './asset.js';
 import type { PreparedGeometry } from './index.js';
+import { margoError } from '../../shared/errors.js';
+import { partition, PRIMITIVE_VERTICES, type PartPlan } from './parts.js';
 /** True for an object holding a `texCoord` above 1 anywhere: the texture infos of a material, extensions included. */
 function readsLaterUV(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -31,9 +33,12 @@ export function usesLaterUV(doc: GLTFDocument, p: GLTFPrimitive): boolean {
   return false;
 }
 /** Geometry already packed by a parse worker, keyed by primitive definition; PBRModel then skips decoding it. */
-export const packed = new WeakMap<object, PreparedGeometry>();
-/** Decode one triangle primitive's accessors into gltf-pro's 80-byte vertices and uint32 indices (main thread or worker). */
-export function packPrimitive(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
+export const packed = new WeakMap<object, readonly PreparedGeometry[]>();
+/**
+ * Decode one primitive's accessors into gltf-pro's 80-byte vertices and uint32 indices (main thread or worker): one
+ * element, or one per part when the primitive has more vertices than `asset.partVertices` (see parts.ts).
+ */
+export function packPrimitive(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry[] {
   compressedIndices(asset, p);
   try {
     return pack(asset, p);
@@ -78,7 +83,7 @@ export function listIndices(v: Uint32Array, mode: number): Uint32Array {
   }
   return v;
 }
-function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
+function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry[] {
   const mode = p.mode ?? 4,
     per = mode === 0 ? 1 : mode < 4 ? 2 : 3;
   if (!Number.isInteger(mode) || mode < 0 || mode > 6)
@@ -94,11 +99,23 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
         throw error;
       }
     };
+  // Index accessors decode through Float32, exact to 2^24: refused from the declaration, before any decode.
+  if (entry(asset.doc.accessors, a.POSITION, 'POSITION').count > PRIMITIVE_VERTICES)
+    throw margoError(
+      'unsupported',
+      `glTF primitive has more than ${PRIMITIVE_VERTICES} vertices, the most one primitive may hold; split the mesh into several primitives`,
+    );
   const positions = read('POSITION', a.POSITION, 'VEC3'),
     count = positions.length / 3,
-    quantized = asset.doc.extensionsUsed?.includes('KHR_mesh_quantization');
-  // Vertex buffers are also bound as storage and indices pass through Float32: 1M vertices keeps both safe (same cap as validatePreparedGeometry).
-  if (count < per || count > 1_000_000) throw new RangeError('Expected bounded triangle geometry');
+    quantized = asset.doc.extensionsUsed?.includes('KHR_mesh_quantization'),
+    max = asset.partVertices;
+  if (count < per) throw new RangeError('Expected bounded triangle geometry');
+  // Each part's vertex buffer is also bound as storage: parts of at most `max` vertices keep every binding in range.
+  if (count > max && (a.JOINTS_0 !== undefined || (Array.isArray(p.targets) && p.targets.length > 0)))
+    throw margoError(
+      'unsupported',
+      `Skinned or morphed glTF primitive has ${count} vertices, over maxPartVertices (${max}); only static primitives split into parts`,
+    );
   for (const key of ['POSITION', 'NORMAL', 'TANGENT'])
     if (a[key] !== undefined && !quantized) {
       const def = entry(asset.doc.accessors, a[key], 'attribute');
@@ -161,8 +178,23 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       normals[z + 2] += nz;
     }
   // After the summed normals, whose rounding follows the file's order. Blended triangles layer in the file's order.
-  if (asset.reorder && per === 3 && asset.doc.materials?.[p.material as number]?.alphaMode !== 'BLEND')
-    indices = asset.reorder(indices, positions, count);
+  const blend = asset.doc.materials?.[p.material as number]?.alphaMode === 'BLEND',
+    plans: PartPlan[] | null = count > max ? partition(indices, per, count, max, blend ? null : positions) : null;
+  if (asset.reorder && per === 3 && !blend) {
+    if (!plans) indices = asset.reorder(indices, positions, count);
+    else
+      for (const plan of plans) {
+        const n = plan.vertexMap.length,
+          local = new Float32Array(n * 3);
+        for (let k = 0; k < n; k++) {
+          const v = plan.vertexMap[k] * 3;
+          local[k * 3] = positions[v];
+          local[k * 3 + 1] = positions[v + 1];
+          local[k * 3 + 2] = positions[v + 2];
+        }
+        plan.indices = asset.reorder(plan.indices, local, n);
+      }
+  }
   const uv0 = a.TEXCOORD_0 === undefined ? null : read('TEXCOORD_0', a.TEXCOORD_0, 'VEC2'),
     uv1 = a.TEXCOORD_1 === undefined ? null : read('TEXCOORD_1', a.TEXCOORD_1, 'VEC2'),
     later = usesLaterUV(asset.doc, p),
@@ -183,9 +215,8 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
     throw new RangeError(
       'Mismatched glTF attributes; the file holds invalid numbers, re-export it and check it with the glTF Validator',
     );
-  const vertices = new Float32Array(count * 20);
-  // Packed vertex: position+1, normal+0, tangent, uv0 uv1, color.
-  for (let i = 0, o = 0; i < count; i++, o += 20) {
+  // Packed vertex: position+1, normal+0, tangent, uv0 uv1, color; `i` is the source vertex, `o` its first float.
+  const fill = (vertices: Float32Array, i: number, o: number) => {
     const p = i * 3,
       nx = normals[p],
       ny = normals[p + 1],
@@ -241,19 +272,46 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       vertices[o + 18] = 1;
       vertices[o + 19] = 1;
     }
-  }
-  const uvs = uv2 || uv3 ? new Float32Array(count * 4) : undefined;
-  if (uvs)
-    for (let i = 0; i < count; i++) {
-      if (uv2) uvs.set(uv2.subarray(i * 2, i * 2 + 2), i * 4);
-      if (uv3) uvs.set(uv3.subarray(i * 2, i * 2 + 2), i * 4 + 2);
-    }
-  return {
-    vertices,
-    indices,
-    ...(per < 3 ? { topology: per === 1 ? ('point-list' as const) : ('line-list' as const) } : {}),
-    ...(uvs ? { uvs } : {}),
   };
+  const fillLater = (uvs: Float32Array, i: number, o: number) => {
+    if (uv2) uvs.set(uv2.subarray(i * 2, i * 2 + 2), o);
+    if (uv3) uvs.set(uv3.subarray(i * 2, i * 2 + 2), o + 2);
+  };
+  const topology = per < 3 ? { topology: per === 1 ? ('point-list' as const) : ('line-list' as const) } : {};
+  if (!plans) {
+    const vertices = new Float32Array(count * 20),
+      uvs = uv2 || uv3 ? new Float32Array(count * 4) : undefined;
+    for (let i = 0; i < count; i++) fill(vertices, i, i * 20);
+    if (uvs) for (let i = 0; i < count; i++) fillLater(uvs, i, i * 4);
+    return [{ vertices, indices, ...topology, ...(uvs ? { uvs } : {}) }];
+  }
+  return plans.map(({ indices, vertexMap }, index) => {
+    const n = vertexMap.length,
+      vertices = new Float32Array(n * 20),
+      uvs = uv2 || uv3 ? new Float32Array(n * 4) : undefined;
+    for (let k = 0; k < n; k++) fill(vertices, vertexMap[k], k * 20);
+    if (uvs) for (let k = 0; k < n; k++) fillLater(uvs, vertexMap[k], k * 4);
+    return { vertices, indices, ...topology, ...(uvs ? { uvs } : {}), part: { index, count: plans.length, vertexMap } };
+  });
+}
+/** TEXCOORD_2 then TEXCOORD_3 of the vertices `vertexMap` names, four floats a vertex (a part's later UVs for a new material). */
+export function laterUVs(asset: GLTFAsset, p: GLTFPrimitive, vertexMap: Uint32Array): Float32Array | undefined {
+  const a = p.attributes ?? {},
+    count = entry(asset.doc.accessors, a.POSITION, 'POSITION').count,
+    uv2 = a.TEXCOORD_2 === undefined ? null : asset.accessor(a.TEXCOORD_2, 'VEC2'),
+    uv3 = a.TEXCOORD_3 === undefined ? null : asset.accessor(a.TEXCOORD_3, 'VEC2');
+  if (!uv2 && !uv3) return undefined;
+  if ((uv2 && uv2.length !== count * 2) || (uv3 && uv3.length !== count * 2))
+    throw new RangeError(
+      'Mismatched glTF attributes; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+    );
+  const uvs = new Float32Array(vertexMap.length * 4);
+  for (let k = 0; k < vertexMap.length; k++) {
+    const i = vertexMap[k];
+    if (uv2) uvs.set(uv2.subarray(i * 2, i * 2 + 2), k * 4);
+    if (uv3) uvs.set(uv3.subarray(i * 2, i * 2 + 2), k * 4 + 2);
+  }
+  return uvs;
 }
 /** Decode the accessors read besides packed geometry (skins, morph targets, animation samplers, GPU instancing); failures are left for the reader. */
 export function decodeExtras(asset: GLTFAsset): [number, Float32Array][] {

@@ -5,8 +5,10 @@ import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import { GLTFAsset, loadAsset, closeImages, type AssetOptions, type GLTFDecoderHooks } from './asset.js';
 import { PBRModel, loadGLTF, parseGLTFAsync, type GLTFLoadOptions } from './index.js';
 import { packed } from './pack.js';
+import { partLimit } from './parts.js';
 import { withDecoders } from './decoder-default.js';
 import { prepareAsset, type PreparedGLTF } from './prepare.js';
+import type { PreparedGeometry } from './index.js';
 export type { PreparedGLTF } from './prepare.js';
 // Draco, meshopt and KTX2 decode on this thread; the instancing reader only composes the worker-decoded accessors. A custom
 // fetch cannot move to the worker, so it keeps the load on this thread too.
@@ -40,11 +42,12 @@ export function modelFromPrepared(
       prepared.maxNodes,
     );
     asset.baseURL = prepared.baseURL;
+    if (prepared.maxPartVertices !== undefined) asset.partVertices = partLimit(prepared.maxPartVertices);
     for (const [index, data] of prepared.accessors) asset['cache'].set(index, data);
     prepared.doc.meshes?.forEach((mesh, i) =>
       mesh?.primitives?.forEach((p, j) => {
         const g = prepared.geometry[i]?.[j];
-        if (g && p && typeof p === 'object') packed.set(p, g);
+        if (g && p && typeof p === 'object') packed.set(p, Array.isArray(g) ? g : [g as PreparedGeometry]);
       }),
     );
     model = new PBRModel(instance, asset, prepared.images);
@@ -111,6 +114,7 @@ export async function loadGLTFInWorker(
         maxDownloadBytes: options.maxDownloadBytes,
         maxNodes: options.maxNodes,
         allowedURLs: options.allowedURLs,
+        maxPartVertices: options.maxPartVertices,
       },
       options.signal,
     ),
@@ -137,6 +141,7 @@ export async function parseGLTFInWorker(
     maxDownloadBytes: options.maxDownloadBytes,
     maxNodes: options.maxNodes,
     allowedURLs: options.allowedURLs,
+    maxPartVertices: options.maxPartVertices,
   };
   return finishPrepared(instance, await runWorker<PreparedGLTF>(workerURL(), message, options.signal), options);
 }

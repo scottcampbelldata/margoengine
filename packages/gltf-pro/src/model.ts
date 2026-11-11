@@ -143,7 +143,8 @@ import {
 export type { PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type { PBRInstances } from './instancing.js';
-import { packed, packPrimitive } from './pack.js';
+import { laterUVs, packed, packPrimitive } from './pack.js';
+import { partLimit, splitPrepared } from './parts.js';
 import { buildStaticBatches, copyStaticBatches, eligible, type StaticBatch } from './coalesce.js';
 // Progressive sets this on the asset until real vertices and instances replace the placeholder boxes.
 const deferStaticBatches = Symbol.for('margoengine.gltf-pro.defer-static-batches');
@@ -1111,6 +1112,17 @@ export interface PBRPrimitive {
   buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   /** Set for glTF POINTS (`point-list`) and LINES, LINE_LOOP, LINE_STRIP (`line-list`, as index pairs); absent for triangles. */
   topology?: 'point-list' | 'line-list';
+  /**
+   * Set when the primitive's definition has more vertices than `maxPartVertices`: this is part `index` of `count`, all
+   * with the same node, material and definition. `vertexMap` holds the definition's vertex for each local vertex.
+   */
+  part?: PrimitivePart;
+}
+/** Where a part of a split primitive comes from (see `PBRPrimitive.part`). */
+export interface PrimitivePart {
+  index: number;
+  count: number;
+  vertexMap: Uint32Array;
 }
 /** Refuses a later UV array that does not have four floats for each vertex. */
 function checkLaterUVs({ vertices, uvs }: PreparedGeometry): void {
@@ -1126,7 +1138,11 @@ export interface PreparedGeometry {
   /** TEXCOORD_2 and 3, four floats a vertex, when a material of the primitive reads either. */
   uvs?: Float32Array;
   topology?: 'point-list' | 'line-list';
+  /** Set on each part of a primitive split into parts (`PBRPrimitive.part`). */
+  part?: PrimitivePart;
 }
+/** A prepared primitive: one geometry, or its parts. */
+export type PreparedPrimitive = PreparedGeometry | readonly PreparedGeometry[];
 /**
  * Optional beauty-pass pipeline overrides, set as `primitive.material.renderState` (shared by every primitive using
  * that material). Unset fields keep gltf-pro's defaults; `blend: null` turns blending off. The state is part of the
@@ -1158,19 +1174,38 @@ export { validatePreparedGeometry };
 function preparedPrimitive(
   asset: GLTFAsset,
   p: GLTFPrimitive,
-  data: PreparedGeometry,
+  given: PreparedGeometry | readonly PreparedGeometry[],
   node: Mesh,
   nodeIndex: number,
   materials: PBRMaterial[],
-  checked: Set<PreparedGeometry>,
-): PBRPrimitive {
-  if (!checked.has(data)) {
-    validatePreparedGeometry(data);
-    checked.add(data);
-  }
-  const { vertices, indices } = data;
+  checked: Map<PreparedGeometry, readonly PreparedGeometry[]>,
+): PBRPrimitive[] {
   if ((p.mode ?? 4) !== 4 || p.targets || p.extensions) throw new TypeError('Prepared PBR requires static triangles');
-  const m = p.material === undefined ? material() : materials[integer(p.material, 'material')];
+  const m = p.material === undefined ? material() : materials[integer(p.material, 'material')],
+    list = Array.isArray(given) ? (given as readonly PreparedGeometry[]) : [given as PreparedGeometry];
+  if (!list.length) throw new TypeError('Missing prepared PBR primitives; this is a loader bug, report it with the file');
+  return list.flatMap((data) => {
+    let parts = checked.get(data);
+    if (!parts) {
+      // Geometry over the part size (an autoLOD level of a scan, a large .margo) splits as a loaded primitive does.
+      parts = data?.vertices?.length / 20 > asset.partVertices
+        ? (splitPrepared(data, asset.partVertices, m?.alphaMode === 'BLEND') as PreparedGeometry[])
+        : [data];
+      for (const part of parts) validatePreparedGeometry(part);
+      checked.set(data, parts);
+    }
+    return parts.map((part) => preparedPart(asset, p, part, node, nodeIndex, m));
+  });
+}
+function preparedPart(
+  asset: GLTFAsset,
+  p: GLTFPrimitive,
+  data: PreparedGeometry,
+  node: Mesh,
+  nodeIndex: number,
+  m: PBRMaterial,
+): PBRPrimitive {
+  const { vertices, indices } = data;
   if (!m) throw new TypeError('Missing prepared PBR material; this is a loader bug, report it with the file');
   for (const map of m.maps)
     if (map) {
@@ -1185,6 +1220,7 @@ function preparedPrimitive(
     vertices,
     indices,
     ...(data.uvs ? { uvs: data.uvs } : {}),
+    ...(data.part ? { part: data.part } : {}),
     definition: p,
     material: m,
     weights: new Float32Array(0),
@@ -1904,7 +1940,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
   });
 }
 /** Main-thread packings per asset and primitive definition, kept as long as the asset is. */
-const assetPacks = new WeakMap<GLTFAsset, WeakMap<object, PreparedGeometry>>();
+const assetPacks = new WeakMap<GLTFAsset, WeakMap<object, readonly PreparedGeometry[]>>();
 /**
  * Vertex and index GPU buffers by device, asset and CPU array, counted by the models holding them: models of one asset
  * (cloneModel copies) share its packed arrays and baked static batches, so they upload each array once. A model writes
@@ -1981,24 +2017,23 @@ function primitive(
   nodeIndex: number,
   mesh: GLTFMesh,
   materials: PBRMaterial[],
-  packs: Map<object, PreparedGeometry>,
-): PBRPrimitive {
+  packs: Map<object, readonly PreparedGeometry[]>,
+): PBRPrimitive[] {
   // Packing depends only on the primitive definition, so nodes sharing a mesh share its arrays (and GPU buffers, keyed by array).
   // Models of one asset (cloneModel copies) share the arrays too: packing is a pure function of the definition.
   let shared = assetPacks.get(asset);
   if (!shared) assetPacks.set(asset, (shared = new WeakMap()));
-  let g = packed.get(p) ?? packs.get(p) ?? shared.get(p);
-  if (!g) {
-    g = packPrimitive(asset, p);
-    shared.set(p, g);
+  let list = packed.get(p) ?? packs.get(p) ?? shared.get(p);
+  if (!list) {
+    list = packPrimitive(asset, p);
+    shared.set(p, list);
   }
-  packs.set(p, g);
-  const { vertices, indices } = g;
+  packs.set(p, list);
   const m = fit(
     asset,
     p,
     p.material === undefined ? material() : materials[integer(p.material, 'material')],
-    !!g.topology,
+    !!list[0].topology,
   );
   const targets = p.targets ?? [];
   if (!Array.isArray(targets))
@@ -2010,11 +2045,12 @@ function primitive(
     targets.length,
     'morph weights',
   );
+  return list.map((g) => {
   const made: PBRPrimitive = {
     node,
     nodeIndex,
-    vertices,
-    indices,
+    vertices: g.vertices,
+    indices: g.indices,
     definition: p,
     material: m,
     weights: Float32Array.from(weights),
@@ -2025,7 +2061,9 @@ function primitive(
   };
   if (g.topology) made.topology = g.topology;
   if (g.uvs) made.uvs = g.uvs;
+  if (g.part) made.part = g.part;
   return made;
+  });
 }
 // Material `m` as primitive `p` draws it: every map must name a texture and a UV set the primitive has. glTF 2.0 3.9.2:
 // points and lines without NORMAL are rendered without lighting (here: the base colour, as KHR_materials_unlit).
@@ -2145,7 +2183,7 @@ export class PBRModel implements EnginePlugin {
     instance: EngineKernel,
     readonly asset: GLTFAsset,
     private readonly images: readonly GLTFImage[] = [],
-    prepared?: readonly (readonly PreparedGeometry[])[],
+    prepared?: readonly (readonly PreparedPrimitive[])[],
   ) {
     for (const image of images)
       if (
@@ -2298,8 +2336,8 @@ export class PBRModel implements EnginePlugin {
         }
       }
       let geometryBytes = 0;
-      const checked = new Set<PreparedGeometry>(),
-        packs = new Map<object, PreparedGeometry>(),
+      const checked = new Map<PreparedGeometry, readonly PreparedGeometry[]>(),
+        packs = new Map<object, readonly PreparedGeometry[]>(),
         counted = new Set<Float32Array | Uint32Array>(),
         reader = asset.hooks.instancing;
       // Like a missing draco/ktx2 decoder: a required extension without its reader fails, a used-only one falls back (each mesh once).
@@ -2326,19 +2364,21 @@ export class PBRModel implements EnginePlugin {
               continue;
             }
             // ponytail: progressive's placeholders are triangle boxes, so it leaves points and lines out; stream them if CAD edges need it.
-            if (!prepared && (p?.mode ?? 4) < 4 && packed.has(p) && !packed.get(p)!.topology) continue;
-            const made: PBRPrimitive = prepared
+            if (!prepared && (p?.mode ?? 4) < 4 && packed.has(p) && !packed.get(p)![0].topology) continue;
+            const parts: PBRPrimitive[] = prepared
               ? preparedPrimitive(asset, p, prepared[defs[i].mesh][j], this.nodes[i], i, materials, checked)
               : primitive(asset, p, this.nodes[i], i, mesh, materials, packs);
-            for (const data of [made.vertices, made.indices])
-              if (!counted.has(data)) {
-                geometryBytes += data.byteLength;
-                counted.add(data);
-              }
-            if (geometryBytes > asset.maxBytes * 4)
-              throw overBudget('Decoded glTF geometry exceeds byte budget', asset.maxBytes * 4);
-            if (instances) made.instances = instances;
-            (made.topology ? this.pointsAndLines : this.primitives).push(made);
+            for (const made of parts) {
+              for (const data of [made.vertices, made.indices])
+                if (!counted.has(data)) {
+                  geometryBytes += data.byteLength;
+                  counted.add(data);
+                }
+              if (geometryBytes > asset.maxBytes * 4)
+                throw overBudget('Decoded glTF geometry exceeds byte budget', asset.maxBytes * 4);
+              if (instances) made.instances = instances;
+              (made.topology ? this.pointsAndLines : this.primitives).push(made);
+            }
           }
         }
       const audioOnly = ['KHR_audio_emitter', 'MSFT_audio_emitter'].some(
@@ -2480,6 +2520,11 @@ export class PBRModel implements EnginePlugin {
       if (data.byteLength > device.limits.maxBufferSize)
         throw new RangeError(
           'PBR buffer exceeds device limit; load a smaller model, or reduce its textures and meshes',
+        );
+      // Vertex buffers are bound as storage too (picking, deformation): a part over the binding names the option to lower.
+      if (usage & GPUBufferUsage.STORAGE && data.byteLength > device.limits.maxStorageBufferBindingSize)
+        throw new RangeError(
+          `PBR vertex buffer of ${data.byteLength} bytes exceeds this device's ${device.limits.maxStorageBufferBindingSize}-byte storage binding; lower maxPartVertices`,
         );
       const b = device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
       try {
@@ -3411,7 +3456,9 @@ export class PBRModel implements EnginePlugin {
           : fit(this.asset, p.definition, this.materials[index], !!p.topology);
       const uvs =
         !p.uvs && m.maps.some((map) => map && (map.texCoord ?? 0) > 1)
-          ? packPrimitive(this.asset, { ...p.definition, material: index }).uvs
+          ? p.part
+            ? laterUVs(this.asset, p.definition, p.part.vertexMap)
+            : packPrimitive(this.asset, { ...p.definition, material: index })[0].uvs
           : undefined;
       return [p, m, uvs] as const;
     });
@@ -5537,17 +5584,20 @@ function capturePublicShadowGetter(model: typeof PBRModel): () => unknown {
   return Object.getOwnPropertyDescriptor(model.prototype, 'shadowPrimitives')!.get!;
 }
 const publicShadowGetter = /* @__PURE__ */ capturePublicShadowGetter(PBRModel);
-/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder and `materials` shaders; `maxNodes` as for loadGLTF. */
+/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder and `materials` shaders; `maxNodes` and `maxPartVertices` as for loadGLTF. */
 export function parseGLTF(
   instance: EngineKernel,
   input: string | object | ArrayBuffer | ArrayBufferView,
   buffers: Array<ArrayBuffer | ArrayBufferView> = [],
   images: readonly GLTFImage[] = [],
   decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'> = {},
-  { maxNodes }: Pick<AssetOptions, 'maxNodes'> = {},
+  { maxNodes, maxPartVertices }: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'> = {},
 ): PBRModel {
+  const partVertices = partLimit(maxPartVertices);
   const { doc, binary } = container(input),
-    model = new PBRModel(instance, new GLTFAsset(doc, buffers, binary, decoders, undefined, maxNodes), images);
+    asset = new GLTFAsset(doc, buffers, binary, decoders, undefined, maxNodes);
+  asset.partVertices = partVertices;
+  const model = new PBRModel(instance, asset, images);
   try {
     engineRuntime(instance).use(model);
     return model;
@@ -5556,14 +5606,15 @@ export function parseGLTF(
     throw error;
   }
 }
-/** A static scene whose geometry is already packed (as @margoengine/blender's .margo); `maxNodes` as for loadGLTF. */
+/** A static scene whose geometry is already packed (as @margoengine/blender's .margo); `maxNodes` and `maxPartVertices` as for loadGLTF. */
 export function parsePreparedPBR(
   instance: EngineKernel,
   doc: GLTFAsset['doc'],
-  geometry: readonly (readonly PreparedGeometry[])[],
+  geometry: readonly (readonly PreparedPrimitive[])[],
   images: readonly GLTFImage[] = [],
-  { maxNodes }: Pick<AssetOptions, 'maxNodes'> = {},
+  { maxNodes, maxPartVertices }: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'> = {},
 ): PBRModel {
+  const partVertices = partLimit(maxPartVertices);
   checkDocument(doc);
   if (
     doc.buffers?.length ||
@@ -5574,7 +5625,9 @@ export function parsePreparedPBR(
     geometry.length !== doc.meshes?.length
   )
     throw new TypeError('Prepared PBR requires a static scene');
-  const model = new PBRModel(instance, new GLTFAsset(doc, [], undefined, {}, undefined, maxNodes), images, geometry);
+  const asset = new GLTFAsset(doc, [], undefined, {}, undefined, maxNodes);
+  asset.partVertices = partVertices;
+  const model = new PBRModel(instance, asset, images, geometry);
   try {
     engineRuntime(instance).use(model);
     return model;
@@ -5652,6 +5705,7 @@ export async function parseGLTFAsync(
       options.maxDownloadBytes,
       options.maxNodes,
     );
+  asset.partVertices = partLimit(options.maxPartVertices);
   if (options.optimize) asset.reorder = await triangleOrder();
   await asset.prepareMeshopt();
   // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.

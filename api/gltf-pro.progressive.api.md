@@ -82,6 +82,7 @@ interface AssetOptions {
     maxDownloadBytes?: number;
     maxNodes?: number;
     optimize?: boolean;
+    maxPartVertices?: number;
 }
 
 interface BaseTextureSource {
@@ -346,6 +347,7 @@ class GLTFAsset {
     baseURL?: string;
     get remainingDecodedBytes(): number;
     reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
+    partVertices: number;
     reserveDecodedBytes(byteLength: number): void;
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
@@ -980,7 +982,7 @@ class PBRModel implements EnginePlugin {
         nodeIndex: number;
     }[];
     splats: readonly GLTFSplatCloud[];
-    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
+    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedPrimitive[])[]);
     get bounds(): Float32Array;
     attachSplats(signal?: AbortSignal): Promise<void>;
     get raw(): {
@@ -1119,6 +1121,7 @@ interface PBRPrimitive {
         index: GPUBuffer;
     };
     topology?: 'point-list' | 'line-list';
+    part?: PrimitivePart;
 }
 
 interface PBRRenderState {
@@ -1194,6 +1197,15 @@ interface PreparedGeometry {
     indices: Uint32Array;
     uvs?: Float32Array;
     topology?: 'point-list' | 'line-list';
+    part?: PrimitivePart;
+}
+
+type PreparedPrimitive = PreparedGeometry | readonly PreparedGeometry[];
+
+interface PrimitivePart {
+    index: number;
+    count: number;
+    vertexMap: Uint32Array;
 }
 
 interface QuickRun {

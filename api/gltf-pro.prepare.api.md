@@ -14,15 +14,16 @@ export interface PreparedGLTF {
     downloadedBytes?: number;
     buffers: Uint8Array[];
     images: GLTFImage[];
-    geometry: (PreparedGeometry | null)[][];
+    geometry: (PreparedGeometry | readonly PreparedGeometry[] | null)[][];
     accessors: [number, Float32Array][];
     maxDownloadBytes?: number;
     maxNodes?: number;
+    maxPartVertices?: number;
 }
 
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF;
 
-export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number, allowedURLs?: readonly string[], optimize?: boolean): Promise<PreparedGLTF>;
+export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number, allowedURLs?: readonly string[], optimize?: boolean, maxPartVertices?: number): Promise<PreparedGLTF>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -67,6 +68,7 @@ class GLTFAsset {
     baseURL?: string;
     get remainingDecodedBytes(): number;
     reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
+    partVertices: number;
     reserveDecodedBytes(byteLength: number): void;
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
@@ -478,6 +480,13 @@ interface PreparedGeometry {
     indices: Uint32Array;
     uvs?: Float32Array;
     topology?: 'point-list' | 'line-list';
+    part?: PrimitivePart;
+}
+
+interface PrimitivePart {
+    index: number;
+    count: number;
+    vertexMap: Uint32Array;
 }
 
 interface TextureTransform {

@@ -516,6 +516,48 @@ test('autoLOD levels a loaded model: its nodes, materials and transforms, points
   }
 });
 
+test('autoLOD simplifies a primitive split into parts as one surface, and its levels split and keep the material', async () => {
+  const engine = await headless();
+  try {
+    const { positions, normals, indices } = sphere(64),
+      data = [new Float32Array(positions), new Float32Array(normals), new Uint32Array(indices)],
+      doc = {
+        asset: { version: '2.0' },
+        scene: 0,
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0 }],
+        materials: [{ name: 'scan' }],
+        meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+        accessors: [
+          { bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3', min: [-1, -1, -1], max: [1, 1, 1] },
+          { bufferView: 1, componentType: 5126, count: normals.length / 3, type: 'VEC3' },
+          { bufferView: 2, componentType: 5125, count: indices.length, type: 'SCALAR' },
+        ],
+        bufferViews: data.map((d, i) => ({ buffer: i, byteLength: d.byteLength })),
+        buffers: data.map((d) => ({ byteLength: d.byteLength })),
+      },
+      asset = new GLTFAsset(doc, data);
+    asset.partVertices = 1024;
+    const model = new PBRModel(engine, asset);
+    engine.use(model);
+    assert.ok(model.primitives.length >= 5, `${model.primitives.length} parts`);
+    const system = LODSystem.attach(engine),
+      triangles = (m) => m.primitives.reduce((n, p) => n + p.indices.length / 3, 0),
+      lod = await autoLOD(system, model, { ratios: [0.5], screens: [0.5] }),
+      near = lod.levels[1].object;
+    // One surface: about half the triangles of the whole, not half of each part with its cut edges kept.
+    assert.ok(triangles(near) <= triangles(model) * 0.55 && triangles(near) >= triangles(model) * 0.4, `${triangles(near)}`);
+    assert.ok(near.primitives.length >= 2, 'the level, still over 1,024 vertices, splits too');
+    for (const p of near.primitives) {
+      assert.ok(p.vertices.length / 20 <= 1024);
+      assert.equal(p.material, model.primitives[0].material);
+    }
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
 /** A lumpy sphere with UVs in the unit square, as glTF: a detail a level loses, for `bake` to keep. */
 const lumpy = (segments) => {
   const positions = [],

@@ -2698,6 +2698,19 @@ and a kernel world sphere at translation 2^24, scale 3; both fail on the old cod
 one centre rounding larger, so a mesh exactly at a plane may draw when it would not have; nothing in view is culled.
 Missing: no GPU test draws a mesh at 2^24 yet.
 
+### 5. glTF primitives of any size as parts (2026-11-10)
+
+gltf-pro packs a primitive with more vertices than `maxPartVertices` (default 262,144, 20 MiB of 80-byte vertices) as
+parts (`packages/gltf-pro/src/parts.ts`): Morton order of element centroids (30-bit keys, three 10-bit radix passes),
+then a greedy cut with a per-part vertex remap, so every part's vertex buffer fits the storage binding of a default
+WebGPU device (128 MiB) and of the WebGL2 layer on a 2048 context (64 MiB). Up to 2^24 vertices a primitive, as index
+accessors decode through float32. Each part is its own PBRPrimitive, uploaded, culled and picked on its own and kept out
+of static batches; an upload over the device binding throws naming `maxPartVertices`. Evidence: [parts.test.js](../../packages/gltf-pro/tests/parts.test.js)
+(1,001,000 vertices: 4 parts, identical triangle multiset, 0.37% copied, BLEND order, points and lines, worker and prepared
+paths, refusals), exporters [split-primitive.test.js](../../packages/exporters/tests/split-primitive.test.js) and the lod
+autoLOD part test. Missing: GPU pixel equality against a pre-split reference and the 10M-triangle frame time on the
+A6000 and an iGPU (docs/work-lists/speed-phase.md); progressive streaming of parts over 1,000,000 vertices.
+
 ### 5. Stage GPU inventory registration (2026-11-10)
 
 Stage declares `test:gpu:viewer-extras`, so the global browser inventory and selected GPU plans agree. The leaf exercises native WebGPU and WebGL2 compatibility, exact viewer pixels, animation, variants, picking, hotspots and element lifecycle. `tests/modern-extension-suite.test.js` now checks every package `test/gpu/*-check.mjs` against that package's declared GPU scripts; the added assertion fails on the unregistered stage leaf before the fix. Existing check:merge inventory coverage remains active. No rendering code or public API changes.

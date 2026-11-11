@@ -366,6 +366,52 @@ nothing.
 
 `model.selectVariant(index)` picks a `KHR_materials_variants` look, and `model.selectedVariant` reads it back (`undefined` for the file's default). `model.ownedMeshes` is every mesh the model built, with its root and nodes; a mesh you parented to a node is yours and is not in it.
 
+### Primitives of any size (scans)
+
+A primitive with more vertices than `maxPartVertices` (default 262,144: 20 MiB of 80-byte vertices, inside every
+device's storage binding, the WebGL2 layer's included) loads as several parts of its node, up to 16,777,216 vertices a
+primitive. Triangles go in Morton order of their centres, so each part is a compact piece of the surface with tight
+bounds, and are cut greedily: shared vertices stay shared inside a part, and only those on a cut are copied (0.37% on
+a 1,001,000-vertex grid). Blended primitives keep the file's triangle order. Each part is an ordinary `PBRPrimitive`
+with the same node, material and `definition`, and `part` says which it is; drawing, culling, picking,
+`@margoengine/exporters` (one primitive per part, same material) and `@margoengine/lod` levels (simplified as one
+surface, then split again) work part by part. Skinned and morphed primitives must fit one part;
+`loadGLTFProgressive` streams primitives of up to 1,000,000 vertices. Packed geometry still counts toward the decoded
+budget, 4x `maxDownloadBytes`.
+
+```ts
+import {parseGLTFAsync} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 100 x 100 vertex grid, two triangles a cell, as one glTF primitive.
+const positions = new Float32Array(100 * 100 * 3), indices = new Uint32Array(99 * 99 * 6);
+for (let i = 0; i < 100 * 100; i++) positions.set([(i % 100) / 50 - 1, Math.floor(i / 100) / 50 - 1, 0], i * 3);
+for (let y = 0, o = 0; y < 99; y++)
+  for (let x = 0; x < 99; x++, o += 6) {
+    const i = y * 100 + x;
+    indices.set([i, i + 1, i + 100, i + 1, i + 101, i + 100], o);
+  }
+const bin = new Uint8Array(positions.byteLength + indices.byteLength);
+bin.set(new Uint8Array(positions.buffer));
+bin.set(new Uint8Array(indices.buffer), positions.byteLength);
+const doc = {
+  asset: {version: '2.0'}, scene: 0, scenes: [{nodes: [0]}], nodes: [{mesh: 0}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, indices: 1}]}],
+  buffers: [{byteLength: bin.byteLength}],
+  bufferViews: [
+    {buffer: 0, byteLength: positions.byteLength},
+    {buffer: 0, byteOffset: positions.byteLength, byteLength: indices.byteLength},
+  ],
+  accessors: [
+    {bufferView: 0, componentType: 5126, type: 'VEC3', count: 10000, min: [-1, -1, 0], max: [0.98, 0.98, 0]},
+    {bufferView: 1, componentType: 5125, type: 'SCALAR', count: indices.length},
+  ],
+};
+// 10,000 vertices in parts of at most 4,096 (the default 262,144 keeps this one whole).
+const model = await parseGLTFAsync(engine, doc, [bin.buffer], [], {maxPartVertices: 4096});
+for (const p of model.primitives) console.log(p.part?.index, p.part?.count, p.vertices.length / 20);
+```
+
 ### More than two UV sets
 
 A texture may read `TEXCOORD_0` to `TEXCOORD_3`, as Blender writes them for a material on its third or fourth UV map. Only a primitive whose material (or a `KHR_materials_variants` mapping) reads set 2 or 3 pays: it gets a second vertex buffer, `primitive.uvs`, four floats a vertex, and its own shader. A file that merely carries those attributes loads as before. The 80-byte vertex stays as it is.
