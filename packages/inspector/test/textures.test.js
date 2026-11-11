@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
+import { setImmediate } from 'node:timers/promises';
 import { TextureCapture, TextureViewer } from '../dist/textures.js';
 function device() {
   const textures = [],
@@ -281,4 +284,37 @@ test('layered captures never publish another capture preview allocation', async 
   first.dispose();
   second.dispose();
   texture.destroy();
+});
+
+// A reaction on device.lost cannot be removed: one made per capture kept every disposed capture (and its records) alive as
+// long as the device (docs/known-bugs.md). The device now has one reaction over the captures still watching it.
+test('a disposed capture is collected while its device lives; a live capture still forgets a lost device', async () => {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc');
+  try {
+    let lose;
+    const d = Object.assign(device(), { lost: new Promise((resolve) => (lose = resolve)) });
+    const reference = (() => {
+      const capture = new TextureCapture();
+      capture.watchDevice(d);
+      d.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: 4 });
+      capture.dispose();
+      return new WeakRef(capture);
+    })();
+    for (let i = 0; i < 5 && reference.deref(); i++) {
+      await setImmediate();
+      gc();
+    }
+    assert.ok(reference.deref() === undefined, 'the disposed capture is still reachable from its live device');
+    const live = new TextureCapture();
+    live.watchDevice(d);
+    d.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: 4 });
+    assert.equal(live.list().length, 1);
+    lose({ reason: 'unknown', message: 'test' });
+    await setImmediate();
+    assert.equal(live.list().length, 0, 'a lost device leaves the list');
+    live.dispose();
+  } finally {
+    setFlagsFromString('--no-expose-gc');
+  }
 });

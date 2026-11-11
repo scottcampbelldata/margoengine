@@ -51,6 +51,21 @@ type RecordTexture = { texture: WeakRef<GPUTexture>; device: WeakRef<GPUDevice> 
 // All capture layers exclude the module's temporary preview allocations.
 let previewDepth = 0;
 
+// The captures watching each device, told once when it is lost. Made outside any capture's scope, so the reaction holds
+// only the device and this set, which a capture leaves on dispose.
+const lostWatch = new WeakMap<GPUDevice, Set<TextureCapture>>();
+function watchLost(device: GPUDevice): Set<TextureCapture> {
+  let captures = lostWatch.get(device);
+  if (!captures) {
+    const set = (captures = new Set());
+    lostWatch.set(device, set);
+    void device.lost.then(() => {
+      for (const capture of [...set]) capture['lostDevice'](device);
+    });
+  }
+  return captures;
+}
+
 /** Tracks textures from device creation, so a panel opened later still sees textures created before it. */
 export class TextureCapture {
   private readonly records = new Map<number, RecordTexture>();
@@ -157,10 +172,16 @@ export class TextureCapture {
           }
         },
     );
-    // A lost native device's resources are no longer previewable. Device restore is observed through watchGPU.
-    void device.lost.then(() => {
-      if (!self.disposed) self.forgetDevice(device);
-    });
+    // A lost native device's resources are no longer previewable. Device restore is observed through watchGPU. One
+    // reaction per device (watchLost): a reaction cannot be removed, so one made per capture kept every disposed capture
+    // and its records alive as long as the device (docs/known-bugs.md).
+    const captures = watchLost(device);
+    captures.add(this);
+    this.cleanup.push(() => captures.delete(this));
+  }
+  /** The device was lost: its textures are no longer previewable (called by `watchLost`). */
+  private lostDevice(device: GPUDevice): void {
+    if (!this.disposed) this.forgetDevice(device);
   }
   private forgetDevice(device: GPUDevice): void {
     for (const [id, entry] of this.records) if (entry.device.deref() === device) this.records.delete(id);
