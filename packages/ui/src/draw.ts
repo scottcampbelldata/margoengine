@@ -77,6 +77,13 @@ export interface RectStyle {
 
 const CLEAR: Rgba = [0, 0, 0, 0];
 
+/** Throws a RangeError unless every value is finite: NaN passes every size test and would reach the GPU. */
+function finite(what: string, ...values: (number | undefined)[]): void {
+  for (const value of values)
+    if (value !== undefined && !Number.isFinite(value))
+      throw new RangeError(`DrawList ${what} must be finite; pass finite UI units, not ${value}`);
+}
+
 /**
  * What a {@link Ui} draws, as plain data in back-to-front order: rounded rectangles, text blocks and clip regions in
  * device pixels. A renderer ({@link UiRenderer}) turns it into GPU draws; tests can read `commands` directly. The
@@ -95,6 +102,8 @@ export class DrawList {
 
   /** Empty the list and start a new version at `scale` pixels per UI unit. */
   clear(scale: number): void {
+    if (!(scale > 0) || !Number.isFinite(scale))
+      throw new RangeError(`DrawList scale must be finite and above 0; pass device pixels per UI unit, not ${scale}`);
     this.commands.length = 0;
     this.clips.length = 0;
     this.alpha = 1;
@@ -108,6 +117,7 @@ export class DrawList {
 
   /** A rounded rectangle with its edges snapped to whole pixels. */
   rect(x: number, y: number, width: number, height: number, style: RectStyle): void {
+    finite('rect', x, y, width, height, style.borderWidth, style.radius, style.blur);
     const s = this.scale,
       x0 = Math.round(x * s),
       y0 = Math.round(y * s),
@@ -142,6 +152,7 @@ export class DrawList {
     color: Rgba,
     outline?: { width: number; color: Rgba },
   ): void {
+    finite('text position', x, y);
     if (!layout.glyphs.length || color[3] * this.alpha <= 0) return;
     this.commands.push({
       type: 'text',
@@ -158,6 +169,7 @@ export class DrawList {
 
   /** Clip what follows to a rectangle in UI units until the matching {@link DrawList.popClip}. */
   pushClip(x: number, y: number, width: number, height: number): void {
+    finite('clip', x, y, width, height);
     const s = this.scale,
       outer = this.clips.at(-1),
       x0 = Math.max(Math.round(x * s), outer?.x0 ?? -Infinity),
@@ -169,9 +181,12 @@ export class DrawList {
     this.commands.push({ type: 'clip', x: clip.x0, y: clip.y0, width: clip.x1 - clip.x0, height: clip.y1 - clip.y0 });
   }
 
-  /** End the innermost clip. */
+  /**
+   * End the innermost clip.
+   * @throws RangeError when no clip is open: a stray popClip would end a clip its caller did not make.
+   */
   popClip(): void {
-    if (!this.clips.pop()) return;
+    if (!this.clips.pop()) throw new RangeError('DrawList popClip has no open clip; pass each pushClip one popClip');
     this.commands.push({ type: 'unclip' });
   }
 }

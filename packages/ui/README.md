@@ -563,6 +563,8 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
 
 - **A draw list, not a scene.** `ui.draw()` returns rounded rectangles, text blocks and clip regions in device pixels,
   back to front. It is rebuilt only when something changed, and `UiRenderer` uploads it only when it was rebuilt.
+  A `DrawList` checks each command before adding it: a non-finite position, size, border, radius or blur, a scale
+  that is not finite and above 0, and a `popClip` with no clip open throw a `RangeError` and leave the list as it was.
 - **Two instanced draws.** Rectangles are signed distance rounded boxes (crisp edges, outlines, soft shadows); glyphs are
   quads sampling the text package's atlases. Both read storage buffers by instance index, in the engine's own render pass
   after post-processing, with premultiplied alpha blending and one scissor per clip region.
