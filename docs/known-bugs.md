@@ -5909,7 +5909,7 @@ Batch 201 job 1: spec/gloss is built with CPU and both-backend GPU coverage. Fix
 
 
 
-- Voxel-net /rooms: reconnecting with a consumed room URL gets 1008, because its single-use admission nonce is removed when the player joins. The parked player retains capacity until the server resume timeout; obtain a new lobby reservation after it expires. Follow-up is resume-aware room authorization and separate account identity from seat identity.
+- Fixed 2026-11-11 (KB5499a, sweep L6): a used room URL is let on again while its seat's player is in the room, for a resuming hello only (rooms.ts; the signed ticket is checked past its reservation life for this). Regression: packages/voxel-net/tests/rooms.test.js ('a used room URL takes back its own parked player'); doc: docs/limits.md. Separating account identity from seat identity stays a design note, not a defect. Original: Voxel-net /rooms: reconnecting with a consumed room URL got 1008, because its single-use admission nonce is removed when the player joins. The parked player retains capacity until the server resume timeout; obtain a new lobby reservation after it expires. Follow-up is resume-aware room authorization and separate account identity from seat identity.
 
 Batch 214 job 2: no new defect found in legal-pose rejection; static-only scope and undefined twist at antipodal swing are documented in limits.md.
 
@@ -5953,7 +5953,7 @@ Fixed 2026-11-10: Batch 194 job 3 reobserved physical compatibility sampler plan
 
 
 
-- Voxel-net native Deno host: native WebSocket has no ping/pong observation hook. After clientTimeout without application input, the existing authoritative server can close an otherwise reachable idle client. Repro: join via serveVoxelDeno then stop client.update longer than clientTimeout. Cause: Deno handles control pongs internally and exposes only application message activity. Follow-up: native-provider liveness integration without inventing byte counters. Keep client.update running meanwhile.
+- Fixed 2026-11-11 (KB5545a, sweep L6, the upstream workaround Scott approved): Deno connections use Deno's own idle ping (`idleTimeout`, floor(clientTimeout / 2000) s) and report `livenessByRuntime`, so the server's byte-silence close no longer closes a live idle Deno client. Regression: packages/voxel-net/tests/server-runtimes.test.js ('a connection whose runtime checks liveness'); doc: docs/limits.md. Original: Voxel-net native Deno host: native WebSocket has no ping/pong observation hook. After clientTimeout without application input, the existing authoritative server can close an otherwise reachable idle client. Repro: join via serveVoxelDeno then stop client.update longer than clientTimeout. Cause: Deno handles control pongs internally and exposes only application message activity. Follow-up: native-provider liveness integration without inventing byte counters. Keep client.update running meanwhile.
 
 
 Fixed 2026-11-11 (KB5545b): Batch 198 compass spin at the Top pole under a CameraProjection kept projection.up, so the image did not turn. A drag on the cube or its compass now turns the projection's vertical up to the heading it reached (rolled as the view is); clicks, named views and quarter rolls still leave it alone. Regression: packages/viewcube/test/compass.test.js (KB5545b case).

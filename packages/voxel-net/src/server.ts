@@ -186,18 +186,23 @@ export interface VoxelServerConnection {
   uncork(): void;
   /** A keep-alive the client answers without the app seeing it. */
   ping(): void;
+  /**
+   * True when the runtime itself pings and closes a client that stops answering (Deno's `idleTimeout`), and hides the
+   * pongs from the app: the server's byte-silence close (`clientTimeout`) then does not apply. Default false.
+   */
+  readonly livenessByRuntime?: boolean;
   /** True when messages may be lost or reordered. */
   readonly datagrams?: boolean;
 }
 
 /**
  * The login check of {@link VoxelServerOptions.authenticate}: `hello` is undefined on the upgrade request and holds
- * the player's chosen name on the hello. Return (or resolve) `true`, or a non-empty string that becomes the player's
+ * the player's chosen name on the hello, and `resume: true` when the hello takes back a parked player. Return (or resolve) `true`, or a non-empty string that becomes the player's
  * `identity`, to let the client on; anything else refuses it.
  */
 export type VoxelAuthenticate = (
   req: IncomingMessage,
-  hello: { name: string } | undefined,
+  hello: { name: string; resume?: boolean } | undefined,
 ) => boolean | string | Promise<boolean | string>;
 
 /**
@@ -1335,7 +1340,7 @@ export class VoxelServer {
     for (const key of [...c.sim]) this.#unref(c, key);
   }
   // Runs authenticate once, within authTimeout; true when it let the client on. Otherwise the client is closed.
-  async #authorize(c: Client, hello: { name: string } | undefined): Promise<boolean> {
+  async #authorize(c: Client, hello: Parameters<VoxelAuthenticate>[1]): Promise<boolean> {
     const hook = this.#authenticate as VoxelAuthenticate,
       ms = this.#authTimeout,
       when = hello ? 'hello' : 'upgrade request';
@@ -1479,7 +1484,7 @@ export class VoxelServer {
     c.phase = 'auth';
     void (async () => {
       if (!(await c.upgradeAuth) || c.phase !== 'auth') return;
-      if ((await this.#authorize(c, { name: c.name })) && c.phase === 'auth') this.#admit(c, m);
+      if ((await this.#authorize(c, { name: c.name, resume: !!m.resume })) && c.phase === 'auth') this.#admit(c, m);
     })();
   }
   #admit(c: Client, m: Extract<ClientMessage, { type: 'hello' }>): void {
@@ -2003,7 +2008,7 @@ export class VoxelServer {
       if (c.conn.bytesIn !== c.heardBytes) {
         c.heardBytes = c.conn.bytesIn;
         c.silentTicks = 0;
-      } else if (joined && ++c.silentTicks >= this.#clientTimeoutTicks) {
+      } else if (joined && !c.conn.livenessByRuntime && ++c.silentTicks >= this.#clientTimeoutTicks) {
         c.conn.close(1008, 'client-silent'); // parks a player who is playing; the close handler decides
         continue;
       }

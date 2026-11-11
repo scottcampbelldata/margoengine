@@ -59,6 +59,8 @@ interface Seat {
   nonce: string;
   expires: number;
   claimed: boolean;
+  /** Admitted again on a used ticket to take back its parked player: only a resuming hello may follow (KB5499a). */
+  resume?: boolean;
 }
 interface Room {
   code: string;
@@ -127,6 +129,12 @@ export class VoxelLobby implements AsyncDisposable {
         authenticate: async (request, hello) => {
           if (hello) {
             const seat = admitted.get(request);
+            if (seat?.resume) {
+              // A used room URL takes back its own player only: a new join on it would be a second player in one seat.
+              if (!hello.resume) return false;
+              const result = authenticate ? await authenticate(request, hello) : true;
+              return result === true || (typeof result === 'string' && result !== '') ? `room:${seat.nonce}` : false;
+            }
             if (!seat || seat.expires <= Date.now()) return false;
             const result = authenticate ? await authenticate(request, hello) : true;
             return seat.expires > Date.now() && (result === true || (typeof result === 'string' && result !== ''))
@@ -137,6 +145,20 @@ export class VoxelLobby implements AsyncDisposable {
           if (!token) return false;
           const ticket = await verifyShardTicket(this.#secret, token);
           const seat = ticket && seats.get(ticket.nonce);
+          // Signed but past its reservation life still names the seat, for coming back only.
+          const signed = ticket ?? (await verifyShardTicket(this.#secret, token, 0));
+          if (signed && signed.to === index && (!seat || seat.claimed)) {
+            // The seat was used: its player is in the world, or parked after a drop until resumeTimeout. The signed
+            // ticket proves this client held that seat, so it may come back for that player (KB5499a); the hello's
+            // resume token is then checked by the server as for any resume.
+            const nonce = signed.nonce;
+            if (server!.players.some((p) => p.identity === `room:${nonce}`)) {
+              const back: Seat = { nonce, expires: Number.POSITIVE_INFINITY, claimed: true, resume: true };
+              admitted.set(request, back);
+              const result = authenticate ? await authenticate(request, undefined) : true;
+              return result === true || (typeof result === 'string' && result !== '') ? `room:${nonce}` : false;
+            }
+          }
           if (!ticket || ticket.to !== index || !seat || seat.claimed || seat.expires <= Date.now()) return false;
           // Claim before any caller authentication awaits. Concurrent consumption cannot take the same seat.
           seat.claimed = true;

@@ -85,6 +85,8 @@ class NativeConnection implements VoxelServerConnection {
   onmessage: ((data: Uint8Array) => void) | null = null;
   onclose: ((code: number, reason: string) => void) | null = null;
   bytesIn = 0;
+  /** Set for Deno, whose runtime pings and closes an unanswering client and shows no pong (KB5545a). */
+  livenessByRuntime = false;
   #closed = false;
   #held: Uint8Array[] | undefined;
   #heldBytes = 0;
@@ -327,7 +329,11 @@ export async function serveVoxelDeno(
         if (pending instanceof Response) return pending;
         let upgraded: ReturnType<DenoRuntime['upgradeWebSocket']>;
         try {
-          upgraded = native.upgradeWebSocket(request, { idleTimeout: 0 });
+          // Deno answers pongs inside the runtime, so the server never sees them (KB5545a): Deno pings after this many
+          // idle seconds and closes a client that does not answer within as many again, inside clientTimeout.
+          upgraded = native.upgradeWebSocket(request, {
+            idleTimeout: Math.max(1, Math.floor((options.clientTimeout ?? 20_000) / 2000)),
+          });
         } catch (error) {
           pending.release();
           ctx.server.onError(error);
@@ -336,7 +342,7 @@ export async function serveVoxelDeno(
         const socket = upgraded.socket;
         socket.binaryType = 'arraybuffer';
         socket.addEventListener('open', () => {
-          ctx.open(socket as NativeSocket, pending);
+          ctx.open(socket as NativeSocket, pending).livenessByRuntime = true;
         });
         socket.addEventListener('message', (event) => pending.connection?.receive(event.data));
         socket.addEventListener('close', (event) => {
