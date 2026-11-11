@@ -87,11 +87,12 @@ test('startup hardware probing waits through a confirmed Vite dependency reload'
   assert.equal(state.probes, 2);
   assert.equal(state.waits, 1);
   assert.equal(session.page, state.page);
-  // The WGSL compile guard, the device-loss guard (scripts/support/device-loss.js) and the pipeline counter
-  // (scripts/support/gpu-ready.js) are installed before the first navigation.
+  // The stale-document hold (scripts/support/stale-document.js, KB-L4-W1) first, so every GPU wrapper after it sees
+  // held promises; then the WGSL compile guard, the device-loss guard (scripts/support/device-loss.js) and the pipeline
+  // counter (scripts/support/gpu-ready.js), all installed before the first navigation.
   assert.deepEqual(
     state.initScripts.map((f) => f.name),
-    ['wgslGuard', 'deviceLossGuard', 'trackPipelines'],
+    ['holdStaleDocumentGpu', 'wgslGuard', 'deviceLossGuard', 'trackPipelines'],
   );
   await session.close();
   assert.equal(state.browserCloses, 1);
