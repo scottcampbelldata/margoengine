@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15086003,
+  "total": 15086408,
   "history": [
     {
       "date": "2026-10-24",
@@ -8495,6 +8495,12 @@
       "commit": "6bae2b47e5",
       "reason": "gltf-pro: per-primitive CPU frustum test in the PBR draw loop (KB0027, parts cull without CulledModels) and the MSFT_texture_dds diagnostic (KB5663b): about 400 B min; a lazy split would cost a dynamic import on the draw path",
       "grew": 3
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "9310112ebe",
+      "reason": "KB3454: Hillaire multiple scattering table kept in log-sum-exp scaled sums so nearly closed atmospheres stay finite; sky/aerial 6713 to 6868 B gzip (hillaire +150, planet +154 within their budgets)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9476,7 +9482,7 @@
     "@margoengine/shadows/virtual": 16664,
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 18225,
-    "@margoengine/sky/aerial": 6719,
+    "@margoengine/sky/aerial": 7124,
     "@margoengine/sky/astro": 9780,
     "@margoengine/sky/base": 7356,
     "@margoengine/sky/bruneton": 3258,

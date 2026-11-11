@@ -3529,24 +3529,26 @@ using the existing sky model. Its generated native/compatibility value and lifec
 parity or moving-camera denoising defects. Stylized night, isotropic higher orders and the fixed-altitude distant
 map are documented limits, not claims of astronomical or spectral reference accuracy.
 
-### Open: nearly closed conservative Hillaire atmospheres
+### Fixed: nearly closed conservative Hillaire atmospheres (KB3454, 2026-11-11)
 
-The existing raster Hillaire model accepts atmospheres whose geometric-series transfer rounds to one.
+The raster Hillaire model gave nonfinite radiance for atmospheres whose geometric-series transfer rounds to one.
 Repro: HillaireSky with atmosphere `{rayleigh:[1,1,1],mie:1,mieAbsorption:0,rayleighHeight:100000,
-mieHeight:100000,groundAlbedo:[1,1,1]}` on Earth radii. A native GPU probe returns nonfinite radiance.
-Cause: `packages/sky/src/atmosphere-luts.ts` computes `L2 / (1 - fms)`; in this opaque conservative domain
-`fms` rounds to one and L2 underflows to zero. The model needs a numerically stable treatment beyond its
-large-mean-free-path approximation; no epsilon clamp or scattering-order truncation was added. The new
-environment bake rejects vertical scattering depth above 6 before allocating, keeping an upward-quarter
-escape bound exp(-6 / 0.625) / 4 above Float32 subtraction error. This is an explicit bake domain limit,
-not a repair of the pre-existing raster model. Regression: sky-environment.test.js checks the domain refusal.
-
-Lane G current-main readback isolates the same defect inside the 32x32
-multiple-scattering table: 1600 of 4096 components are nonfinite on both
-native and compatibility devices, while the default control is finite.
-The later HDR scene capture instead saturates to finite 65504, so a finite
-display/readback does not establish finite internal transport. No clamp,
-scattering-order truncation or broader raster-domain refusal was substituted.
+mieHeight:100000,groundAlbedo:[1,1,1],ozone:[0,0,0]}` on Earth radii: 2688 of the 3072 RGB components of the
+32x32 multiple scattering table were nonfinite on native and compatibility devices.
+Cause: `packages/sky/src/atmosphere-luts.ts` computed `L2 / (1 - fms)` with `fms` a sum that rounds to one, and
+both L2 and the throughput underflow f32 deep in such a medium (a vertical optical depth near 200).
+Fix: 1 - f_ms of each direction is now summed as what leaves it (final throughput plus what the medium absorbs,
+an exact telescoping of the step integrals), and both that sum and L2 are kept as v x exp(-e), e an optical depth,
+added log-sum-exp style so every rescale factor is at most one (Blanchard, Higham and Higham 2021, "Accurately
+computing the log-sum-exp and softmax functions", IMA J. Numer. Anal. 41(4), https://doi.org/10.1093/imanum/draa038;
+Milakov and Gimelshein 2018, "Online normalizer calculation for softmax", https://arxiv.org/abs/1805.02867). No
+clamp, epsilon or order truncation. Earth's tables are unchanged (noon, sunset, twilight and the table-against-march
+check give the same values). The closed table now holds finite values up to 455 (native) and 444 (compatibility
+level): Hillaire's one-transfer-for-every-order approximation is far outside its domain there, which is a model
+limit, not a numeric failure. The environment bake's refusal above vertical scattering depth 6 stays as its own
+domain limit (sky-environment.test.js).
+Regression: `packages/sky/test/features-check.mjs` hillaire, case "closed" (nonfinite table count 0, finite sky),
+both backends.
 
 ### Fixed while building batch 76 job 2: mask addressing and bitmap usage
 

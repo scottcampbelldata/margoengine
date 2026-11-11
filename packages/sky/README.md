@@ -244,7 +244,9 @@ The air is Earth's by default (`EARTH_ATMOSPHERE`, Hillaire 2020 Table 1): Rayle
 absorption (Mie absorption 0.000444 /km, the 0.9 single-scattering albedo reading of Table 1, whose printed 4.40e-6 /m
 is the extinction; changed 2026-11-11, see docs/known-bugs.md), an ozone layer and the ground's albedo; `atmosphere` changes any of them (`atmosphereParameters` checks a
 set and fills the rest). Two tables are worked out once per atmosphere, the transmittance to the top (256 × 64) and
-multiple scattering (32 × 32, Hillaire 2020's second order over 64 directions summed as a geometric series). Each
+multiple scattering (32 × 32, Hillaire 2020's second order over 64 directions summed as a geometric series; the
+sums are kept as a value times exp(-optical depth), so an air thick enough to trap nearly all light still gives a
+finite table, see docs/known-bugs.md). Each
 frame a compute pass marches 32 × 32 view columns through 32 slices, reaching `maxDistance` (64 km) on a square-root
 spacing, so slices are dense near the camera; the pixel reads its slice by its distance. With a `sky`, the sun, the
 sky's turbidity (which scales Mie scattering as the sky does) and its exposure carry over; `sunIlluminance` defaults

@@ -302,6 +302,10 @@ const checks = {
         ratio(r.twilight, c) > ratio(r.twilightNoOzone, c),
         `ozone: ${show(r.twilight)} against ${show(r.twilightNoOzone)}`,
       );
+    // A nearly closed conservative atmosphere: its multiple scattering table (32 x 32 RGB) and its sky are finite.
+    console.log(`  hillaire ${samples}x closed: sky ${show(r.closed.sky)}; table nonfinite ${r.closed.nonfinite}, largest ${r.closed.largest}; red by altitude row ${r.closed.rows.map((v) => v.toPrecision(3)).join(' ')}`);
+    assert.equal(r.closed.nonfinite, 0, 'nonfinite multiple scattering in a nearly closed atmosphere');
+    assert.ok(r.closed.sky.every(Number.isFinite), `closed sky ${show(r.closed.sky)}`);
     // From 1,000 km: the sunlit ground shows, the limb is blue, and space beyond the air is black.
     assert.ok(
       r.ground.every((v) => v > 0.1),

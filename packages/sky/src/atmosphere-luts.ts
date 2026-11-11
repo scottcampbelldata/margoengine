@@ -163,7 +163,15 @@ fn integrateScattering(a:Atmosphere,o:vec3f,d:vec3f,t:f32,n:u32,throughputIn:vec
 `;
 // Multiple scattering (Hillaire 2020 sec. 5.5.2): from each altitude and sun angle, 64 directions on the sphere, 20
 // steps each, give the second order L2 and the transfer f_ms; Psi = L2 / (1 - f_ms) sums the geometric series of
-// higher orders. The ground reflects with its albedo (Lambert). One workgroup of 64 per texel.
+// higher orders. The ground reflects with its albedo (Lambert). One workgroup of 64 per texel. Since each step's
+// integral * extinction is throughput * (1 - step), which telescopes, 1 - f_ms of a direction is exactly its final
+// throughput plus what the medium absorbed along it; summing that avoids 1 minus a sum that rounds to one (KB3454).
+// Both sums are kept as v * exp(-e), e an optical depth, and added log-sum-exp style (every rescale factor is
+// exp(-x) with x >= 0, so nothing overflows; Blanchard, Higham and Higham 2021; Milakov and Gimelshein 2018), so in a
+// nearly closed medium, where throughput itself leaves f32's range, the ratio is still exact.
+// Scaled(v, e) is v * exp(-e); an empty sum (v = 0) takes the other's depth. depth is the optical depth from o to the
+// step, so throughput exp(-depth) is never formed; Psi = (vL / vg) exp(eg - eL), the escape sum is never empty and an
+// empty L2 gives zero.
 // Direction k of an 8 x 8 grid, uniform over the sphere in (phi, cos theta).
 const multiple = /* wgsl */ `${atmosphereCommon}
 @group(0) @binding(0) var<uniform> atmosphere:Atmosphere;
@@ -171,25 +179,32 @@ const multiple = /* wgsl */ `${atmosphereCommon}
 @group(0) @binding(2) var lutSampler:sampler;
 @group(0) @binding(3) var table:texture_storage_2d<rgba16float,write>;
 fn transmittanceToTop(a:Atmosphere,r:f32,mu:f32)->vec3f {return textureSampleLevel(transmittanceTable,lutSampler,transmittanceUV(a,r,mu),0.0).rgb;}
-var<workgroup> sums:array<vec3f,128>;
+struct Scaled {v:vec3f,e:vec3f}
+fn scaledAdd(x:Scaled,y:Scaled)->Scaled {
+ let ex=select(x.e,y.e,x.v==vec3f(0));let ey=select(y.e,x.e,y.v==vec3f(0));let e=min(ex,ey);
+ return Scaled(x.v*exp(e-ex)+y.v*exp(e-ey),e);
+}
+var<workgroup> sums:array<Scaled,128>;
 @compute @workgroup_size(64) fn main(@builtin(workgroup_id) texel:vec3u,@builtin(local_invocation_index) k:u32){
  let a=atmosphere;let mus=(f32(texel.x)+0.5)/32.0*2.0-1.0;let r=a.radii.x+(f32(texel.y)+0.5)/32.0*(a.radii.y-a.radii.x);
  let sun=vec3f(sqrt(max(1.0-mus*mus,0.0)),mus,0);let o=vec3f(0,r,0);
  let cosTheta=1.0-2.0*(f32(k/8u)+0.5)/8.0;let phi=2.0*PI*(f32(k%8u)+0.5)/8.0;let s=sqrt(max(1.0-cosTheta*cosTheta,0.0));
  let d=vec3f(s*cos(phi),cosTheta,s*sin(phi));
  let ground=sphereHit(o,d,a.radii.x);let t=select(sphereHit(o,d,a.radii.y),ground,ground>=0.0);let dt=max(t,0.0)/20.0;
- var throughput=vec3f(1);var l2=vec3f(0);var fms=vec3f(0);
+ var depth=vec3f(0);var l2=Scaled(vec3f(0),vec3f(0));var escape=Scaled(vec3f(0),vec3f(0));
  for(var i=0;i<20;i++){
   let p=o+d*((f32(i)+0.5)*dt);let pr=length(p);let h=pr-a.radii.x;
   let scatter=atmosphereRayleigh(a,h)+atmosphereMie(a,h);let ext=atmosphereExtinction(a,h);
   let shadow=select(1.0,0.0,sphereHit(p,sun,a.radii.x*0.99999)>=0.0&&dot(p,sun)<0.0);
-  let step=exp(-ext*dt);let integral=throughput*(1.0-step)/max(ext,vec3f(1e-7));
-  l2+=integral*scatter*transmittanceToTop(a,pr,dot(p/pr,sun))*shadow/(4.0*PI);fms+=integral*scatter;throughput*=step;
+  let span=(1.0-exp(-ext*dt))/max(ext,vec3f(1e-7));
+  l2=scaledAdd(l2,Scaled(span*scatter*transmittanceToTop(a,pr,dot(p/pr,sun))*shadow/(4.0*PI),depth));
+  escape=scaledAdd(escape,Scaled(span*max(ext-scatter,vec3f(0)),depth));depth+=ext*dt;
  }
- if(ground>=0.0){let p=o+d*ground;let n=normalize(p);l2+=throughput*transmittanceToTop(a,length(p),dot(n,sun))*max(dot(n,sun),0.0)*a.ground.rgb/PI;}
- sums[k]=l2;sums[64u+k]=fms;workgroupBarrier();
- for(var w=32u;w>0u;w=w>>1u){if(k<w){sums[k]+=sums[k+w];sums[64u+k]+=sums[64u+k+w];}workgroupBarrier();}
- if(k==0u){let L=sums[0]/64.0;let f=sums[64]/64.0;textureStore(table,vec2i(texel.xy),vec4f(L/(1.0-f),1));}
+ if(ground>=0.0){let p=o+d*ground;let n=normalize(p);l2=scaledAdd(l2,Scaled(transmittanceToTop(a,length(p),dot(n,sun))*max(dot(n,sun),0.0)*a.ground.rgb/PI,depth));}
+ escape=scaledAdd(escape,Scaled(vec3f(1),depth));
+ sums[k]=l2;sums[64u+k]=escape;workgroupBarrier();
+ for(var w=32u;w>0u;w=w>>1u){if(k<w){sums[k]=scaledAdd(sums[k],sums[k+w]);sums[64u+k]=scaledAdd(sums[64u+k],sums[64u+k+w]);}workgroupBarrier();}
+ if(k==0u){let L=sums[0];let g=sums[64];textureStore(table,vec2i(texel.xy),vec4f(select(vec3f(0),L.v/g.v*exp(g.e-L.e),L.v>vec3f(0)),1));}
 }
 `;
 /**

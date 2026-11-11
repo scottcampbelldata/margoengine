@@ -2149,10 +2149,15 @@ scattering tables, plus a 192 x 108 sky-view table each frame (azimuth from the 
 squeezed toward the horizon) that every sky pixel reads. With the camera above the top radius the table is not made and
 each pixel marches its own chord through the air, entry and exit from the top sphere's two roots. The draw is the root
 Sky's: a fullscreen triangle at reversed-Z 0 with `greater-equal`, so only clear depth takes it. The disc's radiance is
-held at 65,504 so an rgba16float capture never takes an infinity. Evidence: `features-check.mjs` hillaire on a Radeon 680M
+held at 65,504 so an rgba16float capture never takes an infinity. The multiple scattering table forms 1 - f_ms as
+what leaves each direction (final throughput plus what the medium absorbs, an exact telescoping of the step
+integrals) rather than 1 minus a sum, and keeps both that sum and L2 as v x exp(-e), e an optical depth, added
+log-sum-exp style (Blanchard, Higham and Higham 2021; Milakov and Gimelshein 2018), so a nearly closed medium whose
+throughput leaves f32's range still gives the exact ratio (KB3454). Evidence: `features-check.mjs` hillaire on a Radeon 680M
 at 4x and 1x: blue noon, orange sunset, ozone's bluer twilight zenith, the ground, limb and black space from 1,000 km, and
 the table and the march within 0.05% on one ray across the top; the CPU sun transmittance against the closed-form vertical
-optical depth to 1e-4. Missing: other GPUs, a reference image or radiance from another renderer, timing (4 to 6 ms per
+optical depth to 1e-4; a nearly closed conservative atmosphere (2 /km extinction under a 100,000 km scale height,
+white ground) gives a finite table on native and the compatibility level. Missing: other GPUs, a reference image or radiance from another renderer, timing (4 to 6 ms per
 frame at 128 x 96 with Bloom, diagnostic).
 
 The Bruneton `Sky`'s `groundAlbedo` (`@margoengine/sky/bruneton`) adds the ground as a boundary to the four-order
