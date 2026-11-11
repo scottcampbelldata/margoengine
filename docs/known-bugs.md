@@ -6272,3 +6272,13 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-faul
 ### Open: an allocation failure in core, shadows or culling stops the engine until the next device restore (2026-11-11)
 
 Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-fault-sweep.mjs` (and with `MARGO_COMPAT=1`), RTX A6000, Edge 157. Each of the 40 (native) or 42 (WebGL2 layer) allocations a restore makes fails once in turn. Every failure is reported and a clean restore after it gives the same buffers, textures and picture. But a failed allocation of core (10 native, 8 layer), `@margoengine/shadows` (5) or `@margoengine/culling` (13 native, reported at the next frame) stops the engine: the out-of-memory error reaches core's `uncapturederror` listener, and every frame throws the coded `gpu-lost` fault (`engine.start()` stops its loop) until the next device restore. `@margoengine/environment` scopes its allocations, rejects its restore and the frames go on. Cause: those allocations run outside an `out-of-memory` error scope, and WebGPU only reports the failure later, after frames have used the object. Fix needed: scope the allocations of each package's setup and restore, skip the package's passes until the scope resolves, and on failure release, report a coded error and retry at the next restore, with `scripts/restore-fault-sweep.mjs` asserting that the frame after any one failure renders.
+
+### sciviz views: ResizeObserver callback renders and resizes the canvases it observes (WebKit, 2026-11-11)
+
+- **What:** `sciviz test:browser:views` in Playwright WebKit fails on some runs with the page error "ResizeObserver loop
+  completed with undelivered notifications." (3 of 3 runs at 90f7f7dd0, 1 of 2 at 8ac516006); it passes in Chromium.
+- **Repro:** `MARGO_BROWSER=webkit npm run test:browser:views --workspace @margoengine/sciviz`.
+- **Cause:** the observer in `packages/sciviz/src/views.ts` (the `#resize` callback of the three-slice view) fits the
+  slices and calls `figure.render()`, which can change the size of the canvases it observes in the same frame. Not yet
+  fixed; the fix is to schedule the re-render from the callback with `requestAnimationFrame` and add a test that counts
+  observer errors.
