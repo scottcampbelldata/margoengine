@@ -7,6 +7,14 @@ export const transmittedDiffuse = [
   ['(1-s.metal)*s.base.rgb/', '(1-s.metal)*(1-s.tr)*s.base.rgb/'],
 ];
 
+/**
+ * A material gltf-pro draws as native glass (a tint pass over the light behind it): it transmits, has no explicit
+ * render state and no extension that replaces the physical surface. gltf-pro and @margoengine/xr read the same rule.
+ */
+export function nativeGlassMaterial(m) {
+  return !!m.tint && !m.renderState && !m.extension?.replacesPhysical;
+}
+
 /** `code` with the transmission weight `s.tr` (zero until set) and its energy split, unless it already has them. */
 export function transmissionWeight(code) {
   if (code.includes(' tr:f32')) return code;

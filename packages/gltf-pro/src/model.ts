@@ -171,6 +171,7 @@ export type {
 export { textureCoordinates } from './texture-coordinates.js';
 import type { TextureTransform } from './texture-coordinates.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { nativeGlassMaterial } from '../../shared/pbr-transmission.js';
 export type { TextureTransform } from './texture-coordinates.js';
 
 export type { MaterialExtension, MaterialExtensionTexture } from './material-extension.js';
@@ -308,7 +309,7 @@ const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.rende
     }
     return kind;
   },
-  transmits = (m: PBRMaterial) => !!m.tint && !m.renderState && !m.extension?.replacesPhysical,
+  transmits = (m: PBRMaterial) => nativeGlassMaterial(m),
   /** A loaded material's tint draw reads the surface; a shading hook's material has its own tint. */
   surfaceTint = (m: PBRMaterial) => !!m.attenuation && !m.shading;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or

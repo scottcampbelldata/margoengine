@@ -4,13 +4,21 @@ import { MargoError } from '@margoengine/math/errors';
 import type { XRBinding, XRProjectionLayer, XRViewerPose } from './types.js';
 import { meshTriangles, type MeshSourceOwner } from '../../shared/mesh-source.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { linearHdr } from '../../shared/hdr-format.js';
+import { nativeGlassMaterial } from '../../shared/pbr-transmission.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 
 type Resource = { vertex: GPUBuffer; index: GPUBuffer; instance: GPUBuffer; data: Float32Array; count: number };
 type DeviceRenderer = {
   prepare(context: Pick<Extract<PassContext, { backend: 'webgpu' }>, 'backend' | 'device' | 'encoder'>): void;
-  draw(context: Extract<PassContext, { backend: 'webgpu' }>, pass: GPURenderPassEncoder, view: ArrayLike<number>): void;
+  /** Returns the pass open afterwards: `pass`, or the one `options.snapshot` reopened (gltf-pro KB2281). */
+  draw(
+    context: Extract<PassContext, { backend: 'webgpu' }>,
+    pass: GPURenderPassEncoder,
+    view: ArrayLike<number>,
+    options?: { snapshot(pass: GPURenderPassEncoder, target: GPUTexture): GPURenderPassEncoder },
+  ): GPURenderPassEncoder | void;
   dispose(): void;
 };
 
@@ -254,25 +262,33 @@ export class StereoRenderer {
         }
         renderer.prepare(context);
       }
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [
-          {
-            view: frame.colorView!,
-            resolveTarget: image.colorTexture.createView(descriptor),
-            loadOp: 'clear',
-            storeOp: 'discard',
-            clearValue: { r: 0, g: 0, b: 0, a: transparent ? 0 : 1 },
+      // Native glass on a display-encoded layer adds its light to a snapshot of what is behind it in linear values
+      // (KB2281-xr): the renderer ends the eye pass for that, so the samples must be stored to be loaded again.
+      const glass = !linearHdr(image.colorTexture.format) && this.glass(),
+        resolveView = image.colorTexture.createView(descriptor),
+        viewport = image.viewport;
+      const open = (first: boolean) => {
+        const next = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: frame.colorView!,
+              resolveTarget: resolveView,
+              loadOp: first ? 'clear' : 'load',
+              storeOp: glass ? 'store' : 'discard',
+              clearValue: { r: 0, g: 0, b: 0, a: transparent ? 0 : 1 },
+            },
+          ],
+          depthStencilAttachment: {
+            view: frame.depthView!,
+            depthLoadOp: first ? 'clear' : 'load',
+            depthStoreOp: 'store',
+            depthClearValue: 1,
           },
-        ],
-        depthStencilAttachment: {
-          view: frame.depthView!,
-          depthLoadOp: 'clear',
-          depthStoreOp: 'store',
-          depthClearValue: 1,
-        },
-      });
-      const viewport = image.viewport;
-      pass.setViewport(viewport.x, viewport.y, viewport.width, viewport.height, 0, 1);
+        });
+        next.setViewport(viewport.x, viewport.y, viewport.width, viewport.height, 0, 1);
+        return next;
+      };
+      let pass = open(true);
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, frame.group);
       for (const [geometry, resource] of this.resources)
@@ -282,7 +298,24 @@ export class StereoRenderer {
           pass.setIndexBuffer(resource.index, 'uint32');
           pass.drawIndexed(geometry.indices.length, resource.count);
         }
-      for (const renderers of this.pbr.values()) renderers[eye].draw(context, pass, view.transform.inverse.matrix);
+      // The layer texture may not allow COPY_SRC: a resolve-only pass writes the eye's samples into the snapshot.
+      const options = glass
+        ? {
+            snapshot(current: GPURenderPassEncoder, target: GPUTexture) {
+              current.end();
+              encoder
+                .beginRenderPass({
+                  colorAttachments: [
+                    { view: frame.colorView!, resolveTarget: target.createView(), loadOp: 'load', storeOp: 'store' },
+                  ],
+                })
+                .end();
+              return open(false);
+            },
+          }
+        : undefined;
+      for (const renderers of this.pbr.values())
+        pass = renderers[eye].draw(context, pass, view.transform.inverse.matrix, options) ?? pass;
       pass.end();
       if (!image.depthStencilTexture) continue;
       // XR projection matrices use forward Z; populate the compositor's 1x depth layer.
@@ -311,6 +344,12 @@ export class StereoRenderer {
       if (onEye({ index, device, encoder, image: binding.getViewSubImage(layer, view), view }) === false) return;
     device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
+  }
+  /** True when a drawn gltf-pro model has a material drawn as native glass. */
+  private glass(): boolean {
+    for (const model of this.pbr.keys())
+      for (const primitive of model.primitives) if (nativeGlassMaterial(primitive.material)) return true;
+    return false;
   }
   dispose(): void {
     for (const renderers of this.pbr.values()) for (const renderer of renderers) renderer.dispose();

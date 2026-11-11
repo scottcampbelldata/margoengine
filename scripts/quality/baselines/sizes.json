@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15117639,
+  "total": 15118061,
   "history": [
     {
       "date": "2026-10-24",
@@ -8555,6 +8555,12 @@
       "commit": "sweep-l5b KB4824a",
       "reason": "decoders/draco-native measured 76289 B gzip, over its 70386 B ceiling: hot loops in small functions so V8 TurboFan compiles only what a stream uses, optimizing peak 7683216 to 3241160 B on the CarConcept fixture (about 4.4 MB less) with output bytes unchanged, fresh-process RSS losses 84 to 1 (bug sweep L5b, KB4824a); one Wasm per feature, a split per predictor or traversal would add a fetch and a compile per stream kind",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "321af581ca",
+      "reason": "KB2281-xr: xr eye passes lend gltf-pro the glass snapshot hook (resolve-only pass, reopened eye pass, shared nativeGlassMaterial rule): 9,332 -> 9,469 B gzip; the fix itself, nothing to split",
+      "grew": 1
     }
   ],
   "items": {
@@ -9889,7 +9895,7 @@
     "@margoengine/worker/auto": 4176,
     "@margoengine/worker/canvas": 2049,
     "@margoengine/worker/rpc": 2408,
-    "@margoengine/xr": 9332,
+    "@margoengine/xr": 9754,
     "@margoengine/xr/ar": 2828,
     "@margoengine/xr/ar-extra": 3289,
     "@margoengine/xr/device-check": 2344,

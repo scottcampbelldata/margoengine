@@ -6,6 +6,7 @@ import { setImmediate } from 'node:timers/promises';
 import { Engine, TransformStore, box, FrameGraph } from '@margoengine/core/extension';
 import { wgsl } from '../../core/dist/shaders.js';
 import { XR, XRManager, XRController, useXRSession, createXREngine } from '../dist/index.js';
+import { setMeshSource } from '../../shared/mesh-source.js';
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const pose = (x) => ({
   transform: {
@@ -142,7 +143,9 @@ async function fixture(t) {
         draw() {
           this.draws++;
         },
-        end() {},
+        end() {
+          this.ended = (this.ended ?? 0) + 1;
+        },
       };
       passes.push(pass);
       return pass;
@@ -326,6 +329,72 @@ test('manual XR frame rendering keeps both tracked eyes and suppresses only the 
   assert.deepEqual(f.errors, []);
   await xr.end();
 });
+// Bug KB2281-xr (bug sweep L4): the eye passes drew gltf-pro models through createRenderer with no snapshot hook, so
+// native glass on the display-encoded layer texture fell back to the tint/add blend on encoded values (too bright over
+// a bright background). With glass in the scene the eye's samples are kept (storeOp 'store'), and the hook resolves them
+// into the renderer's snapshot target with a resolve-only pass (the layer texture need not allow COPY_SRC), then
+// reopens the eye pass on the same attachments with 'load' and the eye's viewport. Without glass nothing changes.
+for (const glass of [true, false])
+  test(`XR eye passes lend gltf-pro a glass snapshot hook ${glass ? 'when the scene holds glass' : 'only when needed'}`, async (t) => {
+    const f = await fixture(t),
+      xr = await XR.create(f.engine),
+      calls = [],
+      target = { createView: () => ({ snapshot: true }) };
+    const model = {
+      disposed: false,
+      primitives: [{ material: glass ? { tint: [1, 1, 1] } : { base: [1, 1, 1, 1] } }],
+      createRenderer() {
+        return {
+          prepare() {},
+          draw(context, pass, view, options) {
+            calls.push({ pass, options });
+            if (!options?.snapshot) return pass;
+            pass.drawn = true;
+            return options.snapshot(pass, target);
+          },
+          dispose() {},
+        };
+      },
+    };
+    setMeshSource(f.engine.createMesh(), { model });
+    await xr.requestSession('immersive-vr');
+    const viewer = { ...pose(0), views: [
+      { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
+      { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
+    ] };
+    f.passes.length = 0;
+    f.session.tick(100, viewer);
+    assert.equal(calls.length, 2, 'one PBR draw per eye');
+    if (!glass) {
+      assert.equal(calls[0].options, undefined, 'no hook without glass');
+      assert.equal(f.passes.length, 6);
+      assert.equal(f.passes[0].descriptor.colorAttachments[0].storeOp, 'discard');
+      await xr.end();
+      return;
+    }
+    // Per eye: eye pass, resolve-only pass, reopened eye pass, depth copy, depth discard.
+    assert.equal(f.passes.length, 10);
+    const [eye, resolve, reopened] = f.passes;
+    assert.equal(calls[0].pass, eye);
+    assert.equal(eye.descriptor.colorAttachments[0].storeOp, 'store', 'the samples survive the snapshot');
+    assert.equal(eye.ended, 1, 'the hook ends the eye pass');
+    assert.equal(resolve.descriptor.colorAttachments[0].view, eye.descriptor.colorAttachments[0].view);
+    assert.deepEqual(resolve.descriptor.colorAttachments[0].resolveTarget, { snapshot: true });
+    assert.equal(resolve.descriptor.colorAttachments[0].loadOp, 'load');
+    assert.equal(resolve.descriptor.depthStencilAttachment, undefined);
+    assert.equal(resolve.ended, 1);
+    const [color] = reopened.descriptor.colorAttachments;
+    assert.equal(color.loadOp, 'load');
+    assert.equal(color.view, eye.descriptor.colorAttachments[0].view);
+    assert.equal(color.resolveTarget.descriptor.baseArrayLayer, 0);
+    assert.equal(reopened.descriptor.depthStencilAttachment.depthLoadOp, 'load');
+    assert.equal(reopened.descriptor.depthStencilAttachment.depthStoreOp, 'store');
+    assert.deepEqual(reopened.viewport, eye.viewport, 'the eye viewport is set again');
+    assert.equal(reopened.ended, 1, 'XR ends the pass the renderer handed back');
+    assert.equal(f.passes[5].descriptor.colorAttachments[0].storeOp, 'store', 'right eye too');
+    assert.deepEqual(f.errors, []);
+    await xr.end();
+  });
 test('XR negotiates webgpu and reference space, reads input poses, and renders distinct eye buffers', async (t) => {
   const f = await fixture(t);
   assert.equal(await XR.isSupported(), true);
