@@ -64,5 +64,9 @@ Terrain color patches share one mesh-ID varying and one per-pixel block; inside 
 the terrain's own values, so lighting patches applied before or after it (and the SSAO, SSR and HDR-capture rewrites of
 the fragment's tail) shade it unchanged. Wet ones allocate distinct bindings from 40 and name their functions per mesh.
 Scatter keeps TAA's camera reference when replacing the core vertex stage.
+Terrain's lit shader takes lighting effects in group 1. Its own entries hold fixed ranges there: layer materials
+90 to 92, the virtual texture 94 to 96, imagery on the lit path 98 to 107 (sampler, rules, one texture per layer up to
+8), displacement 108 and 109, footprints 110 and 111. `packages/terrain/test/bindings.test.js` composes all of them on
+one terrain and fails if two declare or bind the same slot.
 
 ModelHatching (@margoengine/toon/hatch-models) reserves group 2 binding 146, separate from the same pattern's core group 0 binding. It composes the original material shader and bindings, preserves the pattern uniform in surface for auxiliary layouts, and mixes linear ink before display processing. PBRDrawRun must encode any pending batches inside a material adapter call.draw before the adapter changes/restores borrowed records. Regression: packages/gltf-pro/tests/material-draw-run.test.js.

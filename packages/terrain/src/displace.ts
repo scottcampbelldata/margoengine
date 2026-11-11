@@ -42,8 +42,9 @@ export interface TerrainDisplacementOptions {
   shadows?: boolean;
 }
 
-// Terrain lighting group bindings 97 and 98, after layer materials (90 to 92) and the virtual texture (94 to 96).
-const BINDING = 97,
+// Terrain lighting group bindings 108 and 109. The terrain entries' ranges there: layer materials 90 to 92, the virtual
+// texture 94 to 96, imagery 98 to 107, displacement 108 and 109, deformation 110 and 111 (test/bindings.test.js).
+const BINDING = 108,
   // Most steps of one shadow ray through the maximum mipmap (one square passed over, descended into or tested); a ray
   // that has not left the relief by then counts the rest as lit.
   SHADOW_STEPS = 160,

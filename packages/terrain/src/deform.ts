@@ -25,7 +25,9 @@ import type { Terrain, TerrainLighting } from './index.js';
 type DeformPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /** The shift of a terrain without a floating origin. */
 const NO_SHIFT: readonly number[] = [0, 0, 0];
-const BINDING = 99,
+// Terrain lighting group bindings 110 and 111, past imagery's 98 to 107 and displacement's 108 and 109
+// (test/bindings.test.js).
+const BINDING = 110,
   /** Prints pressed in one frame at most; more wait for the next frame. */
   BATCH = 1024,
   /** Widest print box in texels (a longer track is split into pieces). */

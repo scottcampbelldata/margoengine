@@ -664,6 +664,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
       ? 'let direction=normalize(position-planet.center.xyz);let geographic=vec2f(atan2(direction.z,direction.x)*57.295779513,asin(clamp(direction.y,-1.0,1.0))*57.295779513);let pyramid=vec2f((geographic.x+180.0)/360.0,(90.0-geographic.y)/180.0);'
       : `let geographic=position.xz;let pyramid=(geographic-vec2f(${bounds[0]},${bounds[1]}))/vec2f(${span[0]},${span[1]});`;
     const stride = 2 + this.#options.maxTiles;
+    // Bindings 98 (sampler), 99 (rules) and 100 + layer (up to 107), clear of the other terrain entries (test/bindings.test.js).
     let code = `@group(${group}) @binding(98) var imagerySampler:sampler;\n@group(${group}) @binding(99) var<storage,read> imageryRules:array<vec4f>;\n`;
     this.#layers.forEach((_, i) => {
       code += `@group(${group}) @binding(${100 + i}) var imagery${i}:texture_2d_array<f32>;\n`;

@@ -9,16 +9,6 @@
 - **Fix to build:** read the attribute in the shared header parser and apply the RP 177 plus Bradford matrix `parseHDR`
   uses for Radiance PRIMARIES (`packages/environment/src/hdr.ts` `toSRGB`) in each decode path, with an AP1 test.
 
-### Terrain footprints and lit-path imagery claim the same bindings (2026-11-11, open)
-
-- **Repro:** on one `Terrain`, `TerrainDeformation.attach(engine, terrain)` and `TerrainImagery.attach(engine,
-  terrain, {automatic: false})` without a `virtualTexture`, one `imagery.add(...)`, then render: the lit shader fails to
-  compile with "entry point 'fragment' references multiple variables that use the same resource binding '@group(1)',
-  '@binding(99)'" (seen in `packages/terrain/test/origin.browser.mjs` while building its stacks).
-- **Cause:** `packages/terrain/src/deform.ts` takes group-1 bindings 99 and 100 (`BINDING = 99`) and
-  `packages/terrain/src/imagery.ts` takes 98, 99 and 100 + layer for its sampler, rules and layer textures.
-- **Fix to build:** move deform to a free pair (clear of shadows 1 to 31, effects from 40, clustered, layer materials
-  90 to 92, the virtual texture 94 to 96 and imagery 98 up) with a GPU test that attaches both.
 
 Batch 170 React harness (2026-11-10): when an external engine module fails to evaluate (seen with an R3F build whose React bundle read `process.env`), `bench/scenes/page.js` top-level `await import(...)` rejects without setting `window.result`, so `bench/lib/browser.mjs` waits its full 600 s before the case errors. Repro: an engines.json entry whose module throws on import, then `scripts/parity-smoke-browser.mjs --standard=react --engines=margo,<that engine>`. Cause: the engine import is outside the harness's error reporting. Fix in the fix phase: report the import error as the case result, with a test that loads a throwing module.
 

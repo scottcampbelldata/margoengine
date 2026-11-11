@@ -80,8 +80,8 @@ test('the lit shader is wrapped: the fragment shades the shifted ground, the lay
   );
   assert.match(code, /fn terrainDeformInner\(i:Output\)->vec4f \{/);
   assert.match(code, /return terrainColorUndeformed\(position,normal\)\*terrainDeformTint;/);
-  assert.match(code, /@group\(1\) @binding\(99\) var<uniform> terrainDeform:TerrainDeformFrame;/);
-  assert.match(code, /@group\(1\) @binding\(100\) var terrainDeformMap:texture_2d<f32>;/);
+  assert.match(code, /@group\(1\) @binding\(110\) var<uniform> terrainDeform:TerrainDeformFrame;/);
+  assert.match(code, /@group\(1\) @binding\(111\) var terrainDeformMap:texture_2d<f32>;/);
   assert.ok(!code.includes('terrainWeights0,terrainSampler,uv,0.0)'), 'no painted softness without weights');
   assert.equal(r.deformation.shader(r.lit, 1), code, 'cached');
   assert.throws(() => r.deformation.shader('fn nothing(){}', 1), /lit fragment shader/);
@@ -109,8 +109,8 @@ test('the frame uniform holds the settings, per-layer softness and which layers 
   assert.deepEqual([...frame.slice(12, 20)], [0, 0.5, 0.75, 0.75, 0.75, 0.75, 0, 0]);
   assert.deepEqual([...frame.slice(28, 36)], [1, 1, 1, 1, 1, 1, 0, 0], 'six layers exist');
   const [uniform, map] = deformation.bindings();
-  assert.equal(uniform.binding, 99);
-  assert.equal(map.binding, 100);
+  assert.equal(uniform.binding, 110);
+  assert.equal(map.binding, 111);
   deformation.dispose();
   assert.ok(uniform.resource.buffer.destroyed);
   assert.deepEqual(deformation.bindings(), []);

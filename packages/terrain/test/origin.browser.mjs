@@ -135,12 +135,14 @@ await runSuite(
     // materials with displacement; footprints; imagery on the lit path; a box placed in world coordinates and blended
     // into the ground; the ground streamed in tiles. The same numbers reach the GPU, so the same pictures (bar 1), and
     // each differs from the scene without it (the entry draws: the cache alone for overlays, the unblended box for
-    // blend, the bare terrain for the others; the stream's window has no hole and reaches past the heightmap). Blend
+    // blend, the bare terrain for the others; the stream's window has no hole and reaches past the heightmap). The
+    // combined stack puts layer materials, displacement, footprints and lit-path imagery on one terrain: it compiles
+    // only while their lighting-group bindings stay apart (test/bindings.test.js on the CPU). Blend
     // and stream also rebase in place onto the camera at 1e7 (bar 2: the box and the window follow the origin).
     out.stacks = {};
     const plain = await load(0, 'exact', 'plain'),
       mesh = await load(0, 'exact', 'mesh');
-    for (const stack of ['overlays', 'pbr', 'deform', 'imagery', 'blend', 'stream']) {
+    for (const stack of ['overlays', 'pbr', 'deform', 'imagery', 'blend', 'stream', 'combined']) {
       const a = await load(0, 'exact', stack),
         b = await load(OFFSETS[2], 'exact', stack),
         m = compare(b.image, a.image),

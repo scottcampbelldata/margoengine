@@ -70,15 +70,15 @@ test('displacement patches the materials shader: the hit point shades, gradients
     );
     assert.equal(code.split('if(terrainDisplaced){dx=terrainDisplaceDx;dy=terrainDisplaceDy;}').length, 2);
     assert.match(code, /let direct=terrainDisplaceShadow\*\(/);
-    assert.match(code, /@group\(1\) @binding\(97\) var<uniform> terrainDisplaceRules:array<vec4f,17>;/);
+    assert.match(code, /@group\(1\) @binding\(108\) var<uniform> terrainDisplaceRules:array<vec4f,17>;/);
     assert.equal(code.includes('textureSampleLevel(terrainWeights1'), weights, 'painted weights read when painted');
   }
   const quiet = rig(false, { shadows: false });
   const quietCode = quiet.displacement.shader(quiet.materials.shader(quiet.lit, 1), 1);
-  assert.ok(!quietCode.includes('terrainDisplaceSun') && !quietCode.includes('binding(98)'));
+  assert.ok(!quietCode.includes('terrainDisplaceSun') && !quietCode.includes('binding(109)'));
   const lit = rig(false),
     code = lit.displacement.shader(lit.materials.shader(lit.lit, 1), 1);
-  assert.match(code, /@group\(1\) @binding\(98\) var terrainDisplaceMax:texture_2d_array<f32>;/);
+  assert.match(code, /@group\(1\) @binding\(109\) var terrainDisplaceMax:texture_2d_array<f32>;/);
   assert.match(code, /terrainDisplaceShadow=terrainDisplaceSun\(p,normal,depth\);/);
 });
 
@@ -97,9 +97,9 @@ test('displacement needs layer materials first and owns its uniform and maximum 
   r.displacement.setup(r.engine);
   const [entry, maxima] = r.displacement.bindings(),
     [texture] = made;
-  assert.equal(entry.binding, 97);
+  assert.equal(entry.binding, 108);
   assert.equal(entry.resource.buffer.size, 272);
-  assert.equal(maxima.binding, 98);
+  assert.equal(maxima.binding, 109);
   assert.equal(made.length, 1);
   assert.equal(texture.format, 'r32float');
   assert.equal(texture.mipLevelCount, 3, 'a 4 texel map has levels of 4, 2 and 1');

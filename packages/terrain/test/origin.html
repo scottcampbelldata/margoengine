@@ -25,7 +25,8 @@ const offset = Number(q.get('offset') ?? 0),
   // rvt: the cache with a decal and a road; overlays: the cache with cached imagery and an overlay polygon; pbr: layer
   // materials with displacement; deform: footprints; imagery: imagery on the lit path; mesh: the cache and a box sunk
   // into the ground (placed in world coordinates); blend: the same with the box blended into the terrain; stream: the
-  // same ground streamed in 64 m tiles.
+  // same ground streamed in 64 m tiles; combined: layer materials with displacement, footprints and imagery on the lit
+  // path on one terrain (their lighting-group bindings must not overlap).
   stack = q.get('stack') ?? 'rvt';
 const errors = [];
 addEventListener('error', (e) => errors.push(String(e.message)));
@@ -177,19 +178,20 @@ async function main() {
       TerrainBlend.attach(engine, terrain, rvt, { height: 4, noise: 0.5 }).add(rock);
     }
   }
-  if (stack === 'overlays' || stack === 'imagery') {
+  const addImagery = async () => {
     const { TerrainImagery } = await import('/packages/terrain/dist/imagery.js');
     const imagery = TerrainImagery.attach(engine, terrain, { maxLayers: 2, automatic: false, ...(rvt ? { virtualTexture: rvt } : {}) }),
       photo = solid(engine.gpu, 16, 1, (x, y) => [x * 16, y * 16, 128, (x + y) % 3 ? 160 : 255]);
     imagery.add({ source: { texture: () => photo }, bounds: [-100 + d, -100 + d, 60 + d, 40 + d], alpha: 0.6 });
-  }
+  };
+  if (stack === 'overlays' || stack === 'imagery') await addImagery();
   if (stack === 'overlays') {
     const { TerrainOverlays } = await import('/packages/terrain/dist/overlays.js');
     TerrainOverlays.attach(engine, rvt).addPolygon([[world(-20, 0, -30), world(25, 0, -20), world(5, 0, 15)].map(([x, , z]) => [x, z])], {
       color: [0.9, 0.2, 0.1, 0.8],
     });
   }
-  if (stack === 'pbr') {
+  if (stack === 'pbr' || stack === 'combined') {
     const { TerrainMaterials } = await import('/packages/terrain/dist/layers-pbr.js'),
       { TerrainDisplacement } = await import('/packages/terrain/dist/displace.js');
     const materials = TerrainMaterials.attach(engine, terrain, {
@@ -200,13 +202,15 @@ async function main() {
     });
     TerrainDisplacement.attach(engine, terrain, materials, { depth: 0.3 });
   }
-  if (stack === 'deform') {
+  if (stack === 'deform' || stack === 'combined') {
     const { TerrainDeformation } = await import('/packages/terrain/dist/deform.js');
     // The map centres on a world point in view (follow gives world XZ), with prints around it.
     TerrainDeformation.attach(engine, terrain, { size: 512, texel: 0.03125, distance: 400, follow: () => [-30 + d, -45 + d] })
       .footprint(-31 + d, -46 + d, { depth: 0.1, angle: 0.4 })
       .track([-36 + d, -50 + d], [-24 + d, -40 + d], { width: 1.5, depth: 0.08 });
   }
+  // Imagery after the layer materials, whose shader it then patches.
+  if (stack === 'combined') await addImagery();
   const device = () => engine.gpu;
   let baked = 0,
     last = 0,
