@@ -379,7 +379,7 @@ class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
-    caster(_device: GPUDevice, _engine?: Engine): CasterDisplacement | undefined;
+    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement): CasterDisplacement | undefined;
     relight(code: string): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }

@@ -11,6 +11,7 @@ import {
 import type { CasterDisplacement } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import { retire } from '../../shared/frame-resources.js';
+import { displacementCode } from '../../shared/displacement.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
@@ -62,11 +63,14 @@ fn margoFurHash(cell:vec2f)->f32 {
   h=(h^(h>>16u))*2246822519u;h=(h^(h>>13u))*3266489917u;
   return f32((h^(h>>16u))>>8u)/16777216.0;
 }
-fn margoFurMove(n:vec3f,uv:vec2f)->vec3f {
-  let layer=margoFur.shape.x;let length=margoFur.shape.y;
-  let phase=6.2831853*(margoFur.clock.x*margoFur.clock.z+dot(uv,vec2f(0.73,0.37)));
-  let force=margoFur.gravity.xyz+margoFur.wind.xyz*sin(phase);
+fn margoFurMoveWith(shape:vec4f,gravity:vec4f,wind:vec4f,clock:vec4f,n:vec3f,uv:vec2f)->vec3f {
+  let layer=shape.x;let length=shape.y;
+  let phase=6.2831853*(clock.x*clock.z+dot(uv,vec2f(0.73,0.37)));
+  let force=gravity.xyz+wind.xyz*sin(phase);
   return n*(length*layer)+force*(length*layer*layer);
+}
+fn margoFurMove(n:vec3f,uv:vec2f)->vec3f {
+  return margoFurMoveWith(margoFur.shape,margoFur.gravity,margoFur.wind,margoFur.clock,n,uv);
 }
 fn margoFurCoverage(uv:vec2f)->f32 {
   let layer=margoFur.shape.x;if(layer<=0.0){return 1.0;}
@@ -105,8 +109,19 @@ export class FurMaterial extends Material {
   readonly fur: Required<FurOptions>;
   private readonly buffers = new Map<
     GPUDevice,
-    { buffer: GPUBuffer; last: Float32Array; layout?: GPUBindGroupLayout }
+    {
+      buffer: GPUBuffer;
+      last: Float32Array;
+      bytes: Uint8Array;
+      layouts: Map<string, GPUBindGroupLayout>;
+      records: Map<string, { map: CasterDisplacement | undefined; record: CasterDisplacement }>;
+    }
   >();
+  /** TAA's program contract: last frame's bytes of the fur block (`bytes`) are bound beside it at `next`. */
+  private readonly program = {
+    next: 181,
+    buffers: new WeakMap<GPUDevice, { bytes: Uint8Array }>(),
+  };
   private readonly rows = new Float32Array(16);
   private readonly key = 'fur:' + serial++;
   constructor({ fur = {}, ...options }: FurMaterialOptions = {}) {
@@ -159,11 +174,16 @@ export class FurMaterial extends Material {
     this.pack();
     let held = this.buffers.get(device);
     if (!held) {
+      const last = new Float32Array(16).fill(NaN);
       held = {
         buffer: device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-        last: new Float32Array(16).fill(NaN),
+        last,
+        bytes: new Uint8Array(last.buffer),
+        layouts: new Map(),
+        records: new Map(),
       };
       this.buffers.set(device, held);
+      this.program.buffers.set(device, held);
     }
     if (this.rows.some((n, k) => held!.last[k] !== n)) {
       device.queue.writeBuffer(held.buffer, 0, this.rows);
@@ -192,7 +212,16 @@ export class FurMaterial extends Material {
   override bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     return [...super.bindings(device, engine), this.entry(device)];
   }
-  private depth(code: string, group: number): string {
+  /** The vertex move of the beauty shader, as WGSL added to the mesh-space position: map displacement, then fur. */
+  private static move(mapped: boolean, block = 'margoFur'): string {
+    return (
+      (mapped ? 'i.normal.xyz*margoDisplacement(i.uv)+' : '') +
+      (block === 'margoFur'
+        ? 'margoFurMove(i.normal.xyz,i.uv.xy)'
+        : `margoFurMoveWith(${block}.shape,${block}.gravity,${block}.wind,${block}.clock,i.normal.xyz,i.uv.xy)`)
+    );
+  }
+  private depth(code: string, group: number, mapped = false): string {
     const out = /var o:(\w+);/.exec(code)?.[1];
     if (!out) throw new MargoError('unsupported', 'Fur needs a standard caster output; use matching effect packages');
     const moved = code
@@ -202,7 +231,7 @@ export class FurMaterial extends Material {
           body.trimEnd() + (body.trimEnd().endsWith(',') ? '' : ',') + '@location(7) margoFurUV:vec2f,}',
       )
       .replace('var o:' + out + ';', 'var o:' + out + ';o.margoFurUV=i.uv.xy;')
-      .replace('vec4f(i.position.xyz,1)', 'vec4f(i.position.xyz+margoFurMove(i.normal.xyz,i.uv.xy),1)')
+      .replace('vec4f(i.position.xyz,1)', `vec4f(i.position.xyz+${FurMaterial.move(mapped)},1)`)
       .replace(
         /@fragment fn fragment\((i:\w+)\)([^{]*)\{/,
         (_s, input: string, out: string) =>
@@ -210,22 +239,75 @@ export class FurMaterial extends Material {
       );
     if (!moved.includes('+margoFurMove(') || !moved.includes('if(margoFurCoverage('))
       throw new MargoError('unsupported', 'Fur needs a standard PBR caster shader; use matching effect packages');
-    return declarations(group) + moved;
+    return (mapped ? displacementCode(group) : '') + declarations(group) + moved;
   }
-  override caster(device: GPUDevice): CasterDisplacement {
-    return {
-      key: this.key,
+  /** TAA's object velocity shader (taa objectVelocity, graph form): the same move and strand cut as `depth`. */
+  private velocity(code: string, group: number, mapped: boolean): string {
+    const start = '{var o:Out;';
+    const fragment = /@fragment fn fragment\(i:Out\)->Motion \{/;
+    if (!code.includes(start) || !fragment.test(code) || !code.includes('@location(3) normal:vec4f'))
+      throw new MargoError('unsupported', 'Fur needs the standard TAA velocity shader; use matching taa and materials');
+    return (
+      (mapped ? displacementCode(group) : '') +
+      declarations(group) +
+      'alias NdUniforms=MargoFur;\n' +
+      code
+        .replace(start, `${start}var margoPosition=i.position.xyz+${FurMaterial.move(mapped)};`)
+        .replace(fragment, (found) => `${found}if(margoFurCoverage(i.uv.xy)<0.5){discard;}`)
+    );
+  }
+  /**
+   * The caster record, kept while the device and `map` (the material's own displacementMap record) stay the same: the
+   * fur move on top of the map, the strand cut, and TAA's velocity patch, whose move runs again on last frame's block.
+   */
+  override caster(device: GPUDevice, _engine?: Engine, map?: CasterDisplacement): CasterDisplacement {
+    this.entry(device);
+    const held = this.buffers.get(device)!;
+    const own = map && map.key === undefined ? map : undefined;
+    const key = own ? 'map' : 'fur';
+    const kept = held.records.get(key);
+    if (kept && kept.map === own) return kept.record;
+    const mapped = !!own;
+    const record: CasterDisplacement = {
+      key: this.key + (mapped ? ':map' : ''),
       cuts: true,
-      depth: (code, group) => this.depth(code, group),
-      entries: () => [this.entry(device)],
+      depth: (code, group) => this.depth(code, group, mapped),
+      velocity: (code, group) => this.velocity(code, group, mapped),
+      move: [`margoPosition+=${FurMaterial.move(mapped, 'ndu')};`],
+      program: this.program,
+      entries: () => [
+        ...(own
+          ? [
+              { binding: 0, resource: { buffer: own.buffer } },
+              { binding: 1, resource: own.view },
+              { binding: 2, resource: own.sampler },
+            ]
+          : []),
+        this.entry(device),
+      ],
       layout: () => {
-        this.entry(device);
-        const held = this.buffers.get(device)!;
-        return (held.layout ??= device.createBindGroupLayout({
-          entries: [{ binding: 180, visibility: 3, buffer: {} }],
-        }));
+        let layout = held.layouts.get(key);
+        if (!layout)
+          held.layouts.set(
+            key,
+            (layout = device.createBindGroupLayout({
+              entries: [
+                ...(own
+                  ? [
+                      { binding: 0, visibility: 3, buffer: {} },
+                      { binding: 1, visibility: 3, texture: {} },
+                      { binding: 2, visibility: 3, sampler: {} },
+                    ]
+                  : []),
+                { binding: 180, visibility: 3, buffer: {} },
+              ],
+            })),
+          );
+        return layout;
       },
     };
+    held.records.set(key, { map: own, record });
+    return record;
   }
   override clone(): this {
     const copy = new FurMaterial({

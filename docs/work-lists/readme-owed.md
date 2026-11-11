@@ -985,7 +985,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 
 - @margoengine/environment (batch 188 job 2): document /prefiltered save/load, KTX2 metadata, upload-only restore, cancellation, cube background mode and paused dynamic capture; correct the stale multiple-scattering limit when README work resumes.
-- materials: document fur/FurMaterial/createFur controls and defaults, shared textures, explicit setTime, atomic setOptions, shell-root parenting, caster support, two-shell sampling and integration limits.
+- materials: document fur/FurMaterial/createFur controls and defaults, shared textures, explicit setTime, atomic setOptions, shell-root parenting, caster support, two-shell sampling and integration limits. DONE (sweep L2): README "Shell fur" section with a Shadows and TAA example.
 - margoengine: document the generated materials/fur alias and post/mask mapping repair.
 - @margoengine/post: document Halftone and DotScreen, four shapes, degree angles, pixel origin, frequency, RGB/grayscale, scatter/blend/intensity and LDR ordering.
 

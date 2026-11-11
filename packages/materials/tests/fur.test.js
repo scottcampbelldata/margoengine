@@ -141,3 +141,57 @@ test('createFur owns a complete parented shell stack, updates controls atomicall
   assert.equal(engine.meshes.size, 0);
   engine.dispose();
 });
+
+// KB5588b: an inherited displacementMap moved the beauty shells but not their shadow casters (the fur caster replaced
+// the map's record), and TAA had no velocity patch for fur, so it took the fur record for a texture displacement.
+test('fur casters move on top of an inherited displacementMap and give TAA a velocity patch', async () => {
+  const { Texture } = await import('../dist/index.js');
+  const { objectVelocity } = await import('../../taa/src/shader.ts');
+  const { displacedDepth } = await import('../../shared/displacement.js');
+  const gpu = mockGPU(),
+    store = await TransformStore.create(64);
+  const engine = new Engine(
+    { width: 64, height: 64, clientWidth: 64, clientHeight: 64 },
+    store,
+    { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {} },
+    { position: [0, 0, 5], target: [0, 0, 0] },
+    null,
+  );
+  const map = new Texture({ data: new Uint8Array(16).fill(255), width: 2, height: 2 }, { mipmaps: false });
+  const fur = createFur(engine, geometry, { shells: 2, displacementMap: map, displacementScale: 0.2 });
+  try {
+    const record = fur.shells[1].primitives[0].material.displacement;
+    assert.ok(record?.depth, 'the shell casts through the fur record');
+    assert.equal(record, fur.shells[1].primitives[0].material.displacement, 'the record is kept while unchanged');
+    const depth = displacedDepth(shadowDepth(true), 2, record);
+    assert.match(depth, /vec4f\(i\.position\.xyz\+i\.normal\.xyz\*margoDisplacement\(i\.uv\)\+margoFurMove\(/);
+    assert.match(depth, /var margoDisplacementMap:texture_2d<f32>/);
+    assert.deepEqual(
+      record.entries().map((e) => e.binding),
+      [0, 1, 2, 180],
+    );
+    assert.ok(record.key.endsWith(':map'), 'a mapped caster has its own pipeline key');
+    // TAA builds the graph form with the move run again on last frame's fur block.
+    const velocity = objectVelocity(true, false, false, false, true, false, record.velocity, {
+      move: record.move,
+      binding: record.program.next,
+    });
+    assert.match(velocity, /var margoPosition=i\.position\.xyz\+i\.normal\.xyz\*margoDisplacement\(i\.uv\)\+margoFurMove\(/);
+    assert.match(velocity, /margoFurMoveWith\(nduBefore\.shape,nduBefore\.gravity,nduBefore\.wind,nduBefore\.clock,/);
+    assert.match(velocity, /@group\(1\) @binding\(181\) var<uniform> nduBefore:NdUniforms;/);
+    assert.match(velocity, /alias NdUniforms=MargoFur;/);
+    assert.match(velocity, /->Motion \{if\(margoFurCoverage\(i\.uv\.xy\)<0\.5\)\{discard;\}/);
+    assert.ok(record.program.buffers.get(gpu.device)?.bytes.byteLength === 64, 'TAA reads the 64-byte fur block');
+    // Without a map the record keeps the plain fur move, and TAA's patch too.
+    const plain = fur.shells[0].material.caster(gpu.device);
+    assert.doesNotMatch(plain.depth(shadowDepth(true), 2), /margoDisplacement/);
+    assert.deepEqual(
+      plain.entries().map((e) => e.binding),
+      [180],
+    );
+  } finally {
+    fur.dispose();
+    map.dispose();
+    engine.dispose();
+  }
+});

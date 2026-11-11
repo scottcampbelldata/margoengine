@@ -24,7 +24,7 @@ export class FurMaterial extends Material {
     constructor({ fur, ...options }?: FurMaterialOptions);
     shader(source: string, group: number): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
-    caster(device: GPUDevice): CasterDisplacement;
+    caster(device: GPUDevice, _engine?: Engine, map?: CasterDisplacement): CasterDisplacement;
     clone(): this;
     dispose(): void;
 }
@@ -387,7 +387,7 @@ class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
-    caster(_device: GPUDevice, _engine?: Engine): CasterDisplacement | undefined;
+    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement): CasterDisplacement | undefined;
     relight(code: string): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }

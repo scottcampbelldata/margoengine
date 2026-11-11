@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15091322,
+  "total": 15092219,
   "history": [
     {
       "date": "2026-10-24",
@@ -8513,6 +8513,12 @@
       "commit": "5179414773",
       "reason": "compute/decomp 3579 to 3602 B gzip (budget 3835 to 3858): KB5588a coded MargoError with cause for a missing or corrupt decomp-kernel.wasm (c859962c92); the error path is the whole growth, a split would add a request for 23 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "671c7f14f5",
+      "reason": "materials/fur: KB5588b, fur casters keep the material displacementMap and patch TAA object velocity (3216 to 3857 B); caster() is synchronous, so a lazy import() split cannot serve it",
+      "grew": 1
     }
   ],
   "items": {
@@ -9063,7 +9069,7 @@
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 38771,
     "@margoengine/materials/eye": 3629,
-    "@margoengine/materials/fur": 3216,
+    "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 2011,
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 11525,

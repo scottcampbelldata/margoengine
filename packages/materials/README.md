@@ -932,6 +932,46 @@ The map follows rigid transforms only: a skinned or morphed mesh, or a `BatchedM
 keeps the bind pose's normals, and `triplanar` has no meaningful projection of it. Clearcoat keeps its own tangent-space
 `clearcoatNormalMap`.
 
+### Shell fur (`@margoengine/materials/fur`)
+
+`createFur(engine, geometry, options)` draws `shells` copies of a mesh (default 24, 2 to 128), each pushed out along its
+normal and cut into strands, parented to `fur.root`. The shells share the geometry and textures and keep every PBR
+option of `PbrMaterial`. Controls, all live on each shell's `material.fur`: `length` 0.1 mesh units, `density` 64 strand
+cells per UV unit, `coverage` 0.65 of a cell at the root, `gravity` [0, -0.3, 0] and `wind` [0, 0, 0] (bends relative
+to `length`), `windFrequency` 1 cycle a second, `time` 0, `seed` 1, `rootShade` 0.35. `setTime(seconds)` moves the wind
+(identical time and transforms give identical pictures) and `setOptions` checks every value before changing any shell.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { createMesh, Material } from 'margoengine/materials';
+import { createFur } from 'margoengine/materials/fur';
+import { sphereGeometry } from 'margoengine/geometry';
+import { Shadows } from 'margoengine/shadows';
+import { TAA } from 'margoengine/taa';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [2, 1.2, 4], target: [0, 0, 0] },
+});
+const fur = createFur(engine, sphereGeometry(1, 24, 16), {
+  shells: 16, color: [0.7, 0.4, 0.1], roughness: 0.8,
+  fur: { length: 0.3, wind: [0.5, 0, 0], windFrequency: 0.5 },
+});
+const wall = createMesh(engine, {
+  positions: [-4, -4, -2, 4, -4, -2, 4, 4, -2, -4, 4, -2], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+  uvs: [0, 0, 1, 0, 1, 1, 0, 1], indices: [0, 1, 2, 0, 2, 3],
+}, new Material({ roughness: 1 }));
+const shadows = Shadows.attach(engine, { bounds: { min: [-4, -4, -3], max: [4, 4, 3] } });
+shadows.add(wall);
+for (const shell of fur.shells) shadows.add(shell);
+TAA.attach(engine);
+let seconds = 0;
+engine.onFrame((_, delta) => fur.setTime((seconds += delta)));
+```
+
+Shadows, contact shadows, selection and depth passes cut the same strands, and TAA draws their motion, wind included
+(last frame's fur block runs the move again). A `displacementMap` on the shells moves them first and the fur on top of
+it, in the colour pass and in the casters alike. `fur.dispose()` releases every shell and material.
+
 ### Layered materials and detail maps
 
 `@margoengine/materials/layered` blends full material layers over a material, for rock under moss under snow or paint

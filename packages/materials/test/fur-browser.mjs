@@ -91,7 +91,14 @@ for (const compat of [false, true]) {
       const mapped = await render({ length: 0.3, mapped: true }, 'real-texture');
       assert.ok(difference(mapped, full).changed > 500, 'real CC0 colour map reaches every shell');
       assert.deepEqual(await page.evaluate(() => window.furDraft.shadow()), []);
-      await image('caster-shadow');
+      const plainShadow = await image('caster-shadow');
+      // KB5588b: shells with an inherited displacementMap cast through the fur record with the map applied, and TAA
+      // draws their velocity with the fur patch (both used to fail pipeline creation or ignore the map).
+      assert.deepEqual(await page.evaluate(() => window.furDraft.displaced()), []);
+      const displaced = await image('displaced-shadow');
+      assert.ok(difference(displaced, plainShadow).changed > 500, 'the displaced stack draws and casts');
+      assert.deepEqual(await page.evaluate(() => window.furDraft.taa()), []);
+      await image('taa-wind');
       assert.deepEqual(await page.evaluate(() => window.furDraft.errors), []);
       records.push({
         compat,
