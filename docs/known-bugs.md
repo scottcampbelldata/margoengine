@@ -3517,6 +3517,14 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   PSNR 61.305 dB and max 1. Source: `packages/oit/src/index.ts` averages weighted colours with aggregate
   revealage; this does not retain the full ordered layer sequence. Rerun under the exclusive GPU lock:
   `node packages/oit/scripts/rival-bench.mjs`. Publishing the loss does not close it.
+  Closed 2026-11-11 (bug sweep L3b, KB3148a), accepted difference: weighted blended OIT (McGuire and Bavoil, JCGT
+  2013) is by definition a depth-weighted average, not the over operator, so its error is the method, not a defect.
+  The like-for-like route is Margo's depth peeling: `PeelOIT` on the same scene, reference and readback measures
+  MAE 0.048151, PSNR 61.305 dB, max 1, the same as Babylon's dual depth peeling to every digit, and `ExactOIT` and
+  the core per-mesh sort do too (RTX A6000; on the WebGL2 layer the same, ExactOIT refusing it by design). The
+  weighted default measures MAE 1.567519 again. Pinned by
+  `packages/oit/test/gpu/reference-check.mjs` (exact routes below MAE 0.133 and max 4; weighted within 25% of 1.568,
+  background exact); docs/limits.md (Transparency row) and docs/whitepaper/perf-vs-rivals.md carry the row.
 - **Transparent material colour is blended in the display domain** (`packages/materials/src/built-material.ts`,
   `packages/oit/src/index.ts`): the material encodes each source before the transparency hook. For a single
   50%-coverage basic red with linear source 0.5 over black, the pipeline computes 0.5*sRGB(0.5) rather than

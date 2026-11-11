@@ -28,7 +28,8 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/points` | 10,000,000 points, one settled frame | 9.000 ms | potree-core 2.0.17, 5.400 ms | loss |
 | `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels, one indirect bounce both sides | MAE 0.024863, relative 0.087125 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error (ray noise; 8 seeds: 0.012063) |
 | `@margoengine/oit` | five panes, 1280 x 720, frame plus completion | 2.000 ms | Babylon.js 8.33.0 dual depth peeling, 7.100 ms | win, busy machine |
-| `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss |
+| `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss, accepted difference (weighted default) |
+| `@margoengine/oit/peel` (`PeelOIT`, like for like with depth peeling) | same picture, same reference | MAE 0.048151, PSNR 61.305 dB, max 1 (`ExactOIT` and the core per-mesh sort the same) | Babylon MAE 0.048151, PSNR 61.305 dB, max 1 | match |
 | `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | accepted difference (different model; Margo tuning share MAE 0.012108) |
 | `@margoengine/staging` | default ContactShadows, sphere on ground, ray-traced hemispherical occlusion | MAE 0.048174, RMSE 0.074416 | 4096 cosine rays/pixel; projected-solid-angle oracle | loss |
 
@@ -160,7 +161,7 @@ full-image MAE includes the 738,416 background pixels. All per-layer counts/erro
 Seven alternating rounds: Margo 2.000 to 5.000 ms, Babylon 7.100 to 9.300 ms, per-round minimum.
 Completion is queue.onSubmittedWorkDone on Margo, one-pixel readPixels on Babylon, including that transfer.
 Busy machine, diagnostic, not isolated GPU pass costs. Weighted OIT approximates depth-ordered transport,
-while depth peeling resolves these five layers; the quality loss stays open. Nonbinary colours introduce an
+while depth peeling resolves these five layers. Like for like (2026-11-11, KB3148a): Margo's own depth peeling, `PeelOIT`, draws the same picture as Babylon's, MAE 0.048151, PSNR 61.305 dB, max 1, and so do `ExactOIT` and the core's per-mesh sort (RTX A6000, `packages/oit/test/gpu/reference-check.mjs`, no rival code). The weighted default's loss is the accepted difference of the method it is (one pass, no layer limit, order-free for interpenetrating parts), recorded in docs/limits.md. Nonbinary colours introduce an
 additional display-domain blending limitation, which this binary-palette algorithm comparison does not cover.
 Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
 
