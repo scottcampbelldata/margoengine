@@ -37,6 +37,15 @@ try {
     (name) => !selection || selection.includes(name),
   );
   assert.ok(names.length, 'select an existing package scene with --only=<URI-encoded name>');
+  const ldrRefusals = [
+    'post bloom and tonemap',
+    'post bloom alone',
+    'post ssao alone',
+    'dof HDR',
+    'sky fog 4x',
+    'environment volumetric 4x',
+    'water spray 4x',
+  ];
   for (const name of names) {
     const full = await context.page.evaluate((name) => window.check.capture('full', name), name);
     assert.equal(full.refusal, undefined, `${name}: full tier accepts the package`);
@@ -47,7 +56,9 @@ try {
       assert.equal(result.tier, tier);
       assert.deepEqual(result.errors, [], `${name} ${tier}: errors`);
       assert.equal(result.gl, 0);
-      if (['post bloom and tonemap', 'post bloom alone', 'post ssao alone', 'dof HDR'].includes(name) && tier === 'ldr') {
+      // PostStack is the only 4x scene capture, and its HDR stack needs half floats: the KB2272 4x cases (sky fog,
+      // volumetric, spray) have no 4x scene on the ldr tier, so they refuse there like the post cases.
+      if (ldrRefusals.includes(name) && tier === 'ldr') {
         assert.equal(result.refusal?.name, 'MargoError');
         assert.equal(result.refusal?.code, 'unsupported');
         assert.match(

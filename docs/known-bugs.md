@@ -2345,6 +2345,13 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 
 ### Fixed 2026-11-11: three routes broke WebGPU compatibility-level rules (KB2272); surfels at 4x still refuse
 
+Follow-up (KBnew-skyfog-ldr, L4, 2026-11-11): the three 4x cases KB2272 added to the shared adapter scenes made
+`webgl2-compat test:gpu:tiers` fail at "sky fog 4x ldr: the package accepts this tier". Cause: the cases get their
+4x scene from PostStack's capture (the only 4x route), and PostStack refuses HDR stages on the LDR tier by design,
+so the tier check met the documented refusal it did not list. Sky, VolumetricFog and spray have no fault there.
+`tier-packages-browser.mjs` now lists the three 4x scenes as LDR refusals and still checks their message; they
+render at half-float. Regression: that check (failed on 16fbe3c86c, passes now). Docs: webgl2-compat README.
+
 - **Was:** with `allowCompatibilityAdapters`, `FogPass` in `@margoengine/sky`, the `VolumetricFog` composite in `@margoengine/environment` and the spray in `@margoengine/water` failed pipeline creation at 4x ("sample_index is not supported in compatibility mode").
 - **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.
 - **Still open, surfels:** `SurfelPlugin` at 4x refuses with `unsupported`: its sums need a multisampled float target to add into and the level multisamples neither `r32float` nor `rgba16float`. A 1x pass needs a sampleable copy of the scene depth, which core's own 4x attachments do not have. Next idea: two `rg11b10ufloat` sum targets where the adapter has `rg11b10ufloat-renderable` (6-bit mantissa sums, to be measured), front depth packed into `rgba8unorm` as eye-dome lighting packs it, resolve by masked draws per sample.

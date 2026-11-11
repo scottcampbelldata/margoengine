@@ -293,6 +293,8 @@ rule on LDR, so PostStack refuses HDR/display stages at setup on that tier.
 LDR-only stacks stay available. Standalone Bloom and SSAO also refuse LDR before
 allocation; both pass half-float (SSAO maximum channel difference 1). Standalone
 FXAA is identical on both lower tiers. These ten scenes are the proven scope.
+The three 4x MSAA scenes (sky fog, VolumetricFog, water spray) take their 4x scene from PostStack's capture, the
+only 4x route, so on LDR they refuse with PostStack's coded `unsupported`; at half-float they render.
 
 Tracked follow-up **T273-COVERAGE**: remaining post effects and standalone Tonemap,
 TAA, DOF, transitions, animation, BVH, cameras, clustered, compute, creative,
