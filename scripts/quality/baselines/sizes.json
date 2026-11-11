@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15126455,
+  "total": 15126779,
   "history": [
     {
       "date": "2026-10-24",
@@ -8573,6 +8573,12 @@
       "commit": "097cf04ab4",
       "reason": "KB2604b navmesh corridor search over portals with shortest crossing points and position tie-break, erosion from the drop, seam-consistent edge splits: root 7637 to 8077 B gzip; a split would make every path call async",
       "grew": 10
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "ce781b6670",
+      "reason": "post/ssao: SSAO and GTAO read an r32float view depth target, and the extractor edge rule takes a side that exists (KB1900); @margoengine/post/ssao 9,904 -> 10,103 B. The bytes are the new binding, the target and the derivative rule; a split would add a second module load for one shader input.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9298,7 +9304,7 @@
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 9706,
     "@margoengine/post/smaa": 6435,
-    "@margoengine/post/ssao": 10083,
+    "@margoengine/post/ssao": 10407,
     "@margoengine/post/ssgi": 13483,
     "@margoengine/post/ssr": 13717,
     "@margoengine/post/sss": 7461,

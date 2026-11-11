@@ -111,10 +111,7 @@ export const NOT_IN_CHECKS = {
  * `scripts/*-gpu-check.js` files that no check runs, each with its reason (unrunCheckFiles fails the plan for any other).
  * Twenty-one such files were once written for one job and run by hand: nothing ran them, and five had rotted.
  */
-export const LOOSE_CHECKS = {
-  'scripts/ssao-gpu-check.js':
-    'fails on main: one edge pixel moves 17 levels against a limit of 16 when the eye moves, from the half-float view depth in post (docs/known-bugs.md); it joins post when that is fixed',
-};
+export const LOOSE_CHECKS = {};
 /** Commands a root suite needs first (it reads their output), run once before it. */
 export const PREPARE = {
   'modern:test:browser': [

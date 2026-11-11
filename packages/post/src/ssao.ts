@@ -216,7 +216,7 @@ export class SSAO implements EnginePlugin {
     )
       throw new RangeError('Invalid SSAO options; radius must be in (0, 100], bias 0 up to radius, samples 1-32.');
   }
-  /** The occlusion kernel (compute, bindings: frame, depth, gbuffer, 4x4 noise, the `kernel()` buffer, r32float output). */
+  /** The occlusion kernel (compute, bindings: frame, depth, gbuffer, 4x4 noise, the `kernel()` buffer, r32float output, r32float view depth with 0 for no surface). */
   protected occlusionShader(): string {
     return ssaoShader;
   }
@@ -442,8 +442,10 @@ export class SSAO implements EnginePlugin {
     }
     this.depth = depth.createView();
     const depthOnly = depth.createView({ aspect: 'depth-only' });
-    // shortcut: linear depth fits 65,504 scene units, use a separate r32float target for larger scenes.
+    // Normals plus a half-float view depth (what sources write); the kernels read view depth at full precision from
+    // viewDepth, so orthographic eye moves and scenes past 65,504 units keep their occlusion (KB1900).
     this.gbuffer = texture('rgba16float', storage | GPUTextureUsage.RENDER_ATTACHMENT).createView();
+    const viewDepth = texture('r32float', storage).createView();
     this.ambient = texture('rgba16float', render).createView();
     const raw = texture('r32float', storage).createView(),
       x = texture('r32float', storage).createView(),
@@ -494,7 +496,7 @@ export class SSAO implements EnginePlugin {
     }
     let noise: GPUTextureView | undefined;
     this.viewGroups = uniformGroups(this.uniform!, (uniform) => [
-      group(this.extract!, [uniform, depthOnly, this.gbuffer!]),
+      group(this.extract!, [uniform, depthOnly, this.gbuffer!, viewDepth]),
       group(this.occlusion!, [
         uniform,
         depthOnly,
@@ -502,12 +504,13 @@ export class SSAO implements EnginePlugin {
         (noise ??= this.noise!.createView()),
         { buffer: this.samples! },
         raw,
+        viewDepth,
       ]),
     ]);
     this.groups = [
       ...this.viewGroups.get(),
-      group(this.blur!, [raw, this.gbuffer, x, { buffer: this.directions[0] }]),
-      group(this.blur!, [x, this.gbuffer, y, { buffer: this.directions[1] }]),
+      group(this.blur!, [raw, this.gbuffer, x, { buffer: this.directions[0] }, viewDepth]),
+      group(this.blur!, [x, this.gbuffer, y, { buffer: this.directions[1] }, viewDepth]),
     ];
     if (!host) this.groups.push(group(this.composite!, [this.scene!, this.ambient, y]));
     this.ao = y;

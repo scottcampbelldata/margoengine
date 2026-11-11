@@ -162,6 +162,11 @@ is needed. Sampling, ambient-only darkening, blur and display transforms are
 unchanged. The work-count and exact-pixel checks are documented in
 [the reproduction guide](../../docs/whitepaper/reproduce.md#batch-164-ssao-resolve-work).
 
+SSAO and GTAO read view depth from an `r32float` target of their own (4 B a pixel), so an orthographic picture does
+not change when the eye moves along its view, and scenes past 65,504 units keep their occlusion. The G-buffer that
+sources draw into keeps normals and a half-float depth. `npm run test:gpu:ssao` in this package checks orthographic
+cameras, an eye inside the part and image-based light.
+
 ## Screen-space reflections: `SSR`
 
 `@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal) and in glTF-pro

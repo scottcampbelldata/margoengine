@@ -235,15 +235,21 @@ try {
     }
     result.orthographic.eyeMove = { worst, over, where };
     console.log('eye move', JSON.stringify(result.orthographic.eyeMove));
-    // A handful of silhouette pixels differ: the gbuffer's half-float view depth quantizes differently at 6 m than at 0.6 m.
+    // Since KB1900 the kernels read an r32float view depth (the half-float gbuffer depth quantized differently at 6 m
+    // than at 0.6 m: 87 bytes over 2, worst 17) and the extractor's derivative never takes the clamped zero-length side
+    // at the screen edge (column 399 was the worst). Native WebGPU is exact; the WebGL2 layer moves 4 interior pixels
+    // by 1 level.
     assert.ok(
-      over <= 90 && worst <= 16,
+      over === 0 && worst <= 1,
       `orthographic SSAO depends on the eye position along the view: ${over} bytes over 2, worst ${worst}`,
     );
   }
 
   // 3. IBL + SSAO: occlusion darkens the creases relative to IBL alone, and open faces keep the IBL value.
-  //    Constant ambient off, so any darkening comes from the IBL term.
+  //    Constant ambient and the direct light off, so IBL is the only light and any darkening comes from its term. With
+  //    the direct light on as well, the bright lit creases read 4.0 and 2.0 display levels on main and 4.0 and 1.9
+  //    with KB1900, against bars set on 2026-10-14, before the display curve changed on 2026-10-17; IBL alone reads
+  //    26.9 and 14.9.
   //    'close' looks down at open floor from 2 m: small pixel footprints there once made the depth-derived normal fall
   //    back to camera-facing (an absolute degeneracy threshold), so flat floor nearer than a fixed depth self-occluded
   //    behind a straight screen-wide edge. Only IBL's large ambient term made it visible.
@@ -252,7 +258,7 @@ try {
     ['orthographic', { ortho: true }],
     ['close', { eye: [-2.4, 1.2, 4.2], target: [-2.4, 0, 2.6] }],
   ]) {
-    const d = await darkening({ ...options, ibl: true, model: true, ambient: 0 });
+    const d = await darkening({ ...options, ibl: true, model: true, ambient: 0, light: false });
     await writeFile(`test-results/ssao-ibl-${label}-on.png`, await page.locator('#ao').screenshot());
     (result.ibl ??= {})[label] = d.delta;
     console.log('ibl', label, JSON.stringify(d.delta));

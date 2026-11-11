@@ -2117,17 +2117,30 @@ Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinish
 
 - Fixed 2026-11-11: check:readme-run: after an example hits its 20 s limit, closing the owned browser threw `browser host <pid> did not acknowledge the end: null` from scripts/lib/browser.mjs (2026-11-10, lane U). Repro: before the companion fix, `npm run check:readme-run -- --packages=worker` on unchanged main. Cause (traced 2026-11-11): the browser was closed twice, once by the example's deadline handler and once more for the shared browser at the end of the run (349243b3d3). The first bounded close released its host; the second asked the released host to end again, and a released host answers `null`. Fix: `withBoundedClose` closes a browser once, as Playwright's own `close()` does, and a second call shares the first one's outcome (since 242e8a7542 each example also owns its browser and one close). Regression: `tests/browser-teardown.test.js` ("closing a browser twice").
 
-### SSAO's orthographic picture moves with the eye
+### Fixed 2026-11-11: SSAO's orthographic picture moved with the eye (KB1900)
 
-- **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the
-  picture at silhouettes, 87 bytes past 2 levels (limit 90) and one edge pixel by 17 (limit 16). An orthographic picture has no
-  reason to change at all. It is the one `*-gpu-check.js` file no check runs, stated in `LOOSE_CHECKS`; the plan refuses any other.
-- **Repro:** `npm run build:packages`, then `node scripts/ssao-gpu-check.js`.
-- **Cause:** `SSAO` keeps linear view depth in the half-float G-buffer (`packages/post/src/ssao.ts`, the note beside `gbuffer`),
-  which holds about 0.004 m at 6 m and 0.125 m at 200 m. The limit of 16 was set before the display curve changed on 2026-10-17.
-- **Needed to close:** view depth in an `r32float` target of its own, which also serves scenes past 65,504 units; then the check
-  joins `post` as `test:gpu:ssao` and leaves `LOOSE_CHECKS`. The limit stays.
-- **Lane C recheck (2026-11-10, two rounds):** current main reproduces 87 channel bytes over 2 and worst 17. A separate r32float view-depth target reduces that to 27, worst 17; all remaining differences are at x=399. The normal extractor chooses a clamped zero-length forward derivative at the screen edge. Selecting the available one-sided derivative plus full-precision depth makes the eye-movement comparison exact (0 bytes, worst 0). The check then reaches a separate IBL bar: perspective crease 4.0 and step 1.9 against strict >4 and >2. No assertion changed. The draft is parked in lane C's private handoff at the two-round cap, not shipped. Next: reproduce the IBL bar independently, then finish both changes with their regression tests before adding this check to post's plan.
+- **Was:** `scripts/ssao-gpu-check.js` failed on main and was the one `*-gpu-check.js` file no check ran (`LOOSE_CHECKS`):
+  moving an orthographic eye along its view from 6 m to 0.6 m changed the picture, 87 bytes past 2 levels and one
+  pixel at the right screen edge (x = 399) by 17.
+- **Cause, two parts:** the kernels read view depth from the gbuffer's half-float `w` (about 0.004 m at 6 m, so the range
+  check and the blur's depth weights quantized differently at each eye distance), and the extractor chose the neighbour
+  with the smaller depth step even at the screen edge, where the clamped neighbour is the pixel itself, a zero-length
+  difference that always read as smaller.
+- **Fix (`@margoengine/post`):** the extractor also writes view depth to an `r32float` target that the SSAO and GTAO
+  kernels and both blur passes read (a full-precision camera-space depth, as in McGuire, Mara and Luebke, "Scalable
+  Ambient Obscurance", HPG 2012, https://research.nvidia.com/publication/2012-06_scalable-ambient-obscurance), and the
+  derivative takes only a neighbour that exists. The gbuffer keeps its half-float `w` for sources that write it.
+  Native WebGPU is now exact (0 bytes); the WebGL2 layer moves 4 interior pixels by 1 level (0 past 2).
+- **The check's IBL bar:** with the direct light on, IBL creases read 4.0 and 2.0 display levels on main (bars: more
+  than 4 and 2, set 2026-10-14, before the display curve change of 2026-10-17); the IBL cases now turn the direct light
+  off so IBL is the only light, and read 26.9 and 14.9 (perspective) and 23.1 and 15.4 (orthographic) natively. The
+  bars are unchanged.
+- **Regression:** `packages/post/test/ssao.test.js` (the view depth target and the edge rule; fails on the parent) and
+  `scripts/ssao-gpu-check.js`, now post's `test:gpu:ssao` (eye move over 0 past 2 and worst at most 1; fails on the
+  parent with 87 and 17). `LOOSE_CHECKS` is empty.
+- **Work:** one more `r32float` target (4 B a pixel, 3.7 MB at 1080p) written once a frame; the occlusion kernel's samples
+  read 4 B of it in place of 8 B of the gbuffer, and each blur tap reads it beside the gbuffer. Perspective SSAO pictures move by at most 5 levels (5,340 bytes of 480,000 in the
+  check's frame) from the precision change.
 
 ## Boulder demo
 

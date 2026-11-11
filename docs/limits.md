@@ -6,6 +6,12 @@
   The change key adds 50 B gzip to the stats root entry (4,934 to 4,984 B, quality baseline updated with the reason).
   [Counts](whitepaper/batch-170-stats.md). Timing pending the quiet rerun.
 
+- SSAO/GTAO view depth (2026-11-11, KB1900): one more `r32float` target, 4 B a pixel (3.7 MB at 1920 x 1080), written
+  once a frame by the extractor; the occlusion and blur passes read depth from it at full precision, so an orthographic
+  picture does not move with the eye and depth past 65,504 units keeps its occlusion. The G-buffer's own depth stays
+  half float. Perspective pictures move by at most 5 display levels from the precision change. Timing pending the
+  quiet rerun.
+
 - Batch 164 SSAO/GTAO: 4x removes one early colour resolve; 1x is unchanged.
   The 40 B/pixel reduction counts logical rgba16float resolve source reads and
   destination writes, not physical bandwidth. No shader, quality, target-size,

@@ -219,3 +219,34 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
   await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
+
+test('SSAO kernels read view depth from one r32float target the extractor writes, not the half-float gbuffer (KB1900)', () => {
+  const s = recorded(),
+    log = s.frame(0),
+    formats = new Map();
+  let texture;
+  for (const entry of log) {
+    if (entry[0] === 'texture') texture = entry[2].format;
+    else if (entry[0] === 'view' && texture) formats.set(entry[1], texture);
+  }
+  const groups = log.filter((entry) => entry[0] === 'group').map((entry) => entry[2].entries),
+    at = (entries, binding) => entries.find((e) => e.binding === binding)?.resource,
+    extract = groups.find((g) => g.length === 4 && at(g, 0)?.buffer),
+    occlusion = groups.find((g) => g.length === 7),
+    blurs = groups.filter((g) => g.length === 5);
+  const depth = at(extract, 3);
+  assert.equal(formats.get(depth), 'r32float', 'the extractor writes an r32float view depth');
+  assert.notEqual(depth, at(extract, 2), 'apart from the rgba16float gbuffer');
+  assert.equal(at(occlusion, 6), depth, 'the occlusion kernel reads it');
+  assert.equal(blurs.length, 2);
+  for (const blur of blurs) assert.equal(at(blur, 4), depth, 'both blur passes weigh by it');
+  s.ssao.dispose();
+  // At the screen edge the clamped neighbour is the pixel itself; the extractor takes the side that exists.
+  const gpu = mockGPU(),
+    setup = gpu.record(() =>
+      new SSAO().setup({ gpu: gpu.device, hasPlugin: () => false, sceneOf: () => undefined, removePlugin() {} }),
+    ),
+    code = setup.filter((entry) => entry[0] === 'module').map((entry) => entry[2].code);
+  assert.ok(code.some((c) => c.includes('let forwardX=p.x<limit.x&&(p.x==0||')));
+  assert.ok(code.some((c) => c.includes('let forwardY=p.y<limit.y&&(p.y==0||')));
+});

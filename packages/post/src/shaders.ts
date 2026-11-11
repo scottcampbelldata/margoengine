@@ -1,4 +1,7 @@
-// The gbuffer's w is the signed view depth -z (negative behind an orthographic eye); exactly 0 marks no surface.
+// The gbuffer's w is the signed view depth -z (negative behind an orthographic eye); exactly 0 marks no surface. The
+// kernels read that depth from viewDepth, an r32float copy written by the extractor: the gbuffer's half float holds
+// 0.004 m at 6 m, so an orthographic picture moved with the eye along its view (KB1900). A full-precision camera-space
+// depth buffer is the choice of McGuire, Mara and Luebke, "Scalable Ambient Obscurance", HPG 2012.
 import { displayShader } from '../../shared/display.js';
 export const frame = /* wgsl */ `
 struct Frame {inverse:mat4x4f,view:mat4x4f,projection:mat4x4f,params:vec4f,size:vec4f}
@@ -13,19 +16,24 @@ export const extractShader =
   `
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var output:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(3) var viewDepth:texture_storage_2d<r32float,write>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
   let p=vec2i(id.xy);let d=textureLoad(depth,p,0);
-  if(d==0){textureStore(output,p,vec4f(0));return;}
+  if(d==0){textureStore(output,p,vec4f(0));textureStore(viewDepth,p,vec4f(0));return;}
   let c=viewPosition(p,d);let limit=vec2i(size)-1;
   let right=min(p+vec2i(1,0),limit);let left=max(p-vec2i(1,0),vec2i(0));
   let down=min(p+vec2i(0,1),limit);let up=max(p-vec2i(0,1),vec2i(0));
   let r=viewPosition(right,textureLoad(depth,right,0));let l=viewPosition(left,textureLoad(depth,left,0));
   let b=viewPosition(down,textureLoad(depth,down,0));let t=viewPosition(up,textureLoad(depth,up,0));
-  let dx=select(c-l,r-c,abs(r.z-c.z)<abs(c.z-l.z));let dy=select(c-t,b-c,abs(b.z-c.z)<abs(c.z-t.z));
+  // The neighbour with the smaller depth step, among neighbours that exist: at the screen edge the clamped one is the
+  // pixel itself, a zero-length difference that always read as the smaller step (KB1900).
+  let forwardX=p.x<limit.x&&(p.x==0||abs(r.z-c.z)<abs(c.z-l.z));
+  let forwardY=p.y<limit.y&&(p.y==0||abs(b.z-c.z)<abs(c.z-t.z));
+  let dx=select(c-l,r-c,forwardX);let dy=select(c-t,b-c,forwardY);
   // Degenerate only if dx and dy are (near) parallel or zero: |n|^2 scales with the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.
   let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));
-  textureStore(output,p,vec4f(normal,-c.z));
+  textureStore(output,p,vec4f(normal,-c.z));textureStore(viewDepth,p,vec4f(-c.z));
 }
 `;
 // SSAO: normal-oriented hemisphere kernel with a range check, after Mittring, "Finding Next Gen: CryEngine 2"
@@ -38,10 +46,11 @@ export const ssaoShader =
 @group(0) @binding(3) var noise:texture_2d<f32>;
 @group(0) @binding(4) var<storage,read> kernel:array<vec4f>;
 @group(0) @binding(5) var output:texture_storage_2d<r32float,write>;
+@group(0) @binding(6) var viewDepth:texture_2d<f32>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
-  let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);
-  if(data.w==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
+  let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);let centre=textureLoad(viewDepth,p,0).r;
+  if(centre==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
   let n=normalize(data.xyz);let position=viewPosition(p,textureLoad(depth,p,0));
   let random=textureLoad(noise,vec2i(id.xy%4u),0).xyz*2-1;
   var tangent=random-n*dot(random,n);
@@ -53,8 +62,8 @@ export const ssaoShader =
     let clip=f.projection*vec4f(samplePosition,1);
     if(clip.w<=0){continue;}
     let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;if(any(uv<vec2f(0))||any(uv>=vec2f(1))){continue;}
-    let neighbor=textureLoad(gbuffer,vec2i(uv*vec2f(size)),0).w;
-    if(neighbor!=0){let weight=smoothstep(0.0,1.0,f.params.x/max(abs(neighbor-data.w),0.0001));occlusion+=select(0.0,weight,neighbor<-samplePosition.z-f.params.y);}
+    let neighbor=textureLoad(viewDepth,vec2i(uv*vec2f(size)),0).r;
+    if(neighbor!=0){let weight=smoothstep(0.0,1.0,f.params.x/max(abs(neighbor-centre),0.0001));occlusion+=select(0.0,weight,neighbor<-samplePosition.z-f.params.y);}
   }
   textureStore(output,p,vec4f(clamp(1-occlusion/f32(samples),0.0,1.0)));
 }
@@ -65,14 +74,16 @@ export const blurShader = `
 @group(0) @binding(1) var gbuffer:texture_2d<f32>;
 @group(0) @binding(2) var output:texture_storage_2d<r32float,write>;
 @group(0) @binding(3) var<uniform> settings:vec4f;
+@group(0) @binding(4) var viewDepth:texture_2d<f32>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
-  let p=vec2i(id.xy);let center=textureLoad(gbuffer,p,0);var sum=0.0;var total=0.0;
+  let p=vec2i(id.xy);let center=textureLoad(gbuffer,p,0);let centre=textureLoad(viewDepth,p,0).r;
+  var sum=0.0;var total=0.0;
   for(var i=-4;i<=4;i++) {
     let q=clamp(p+vec2i(settings.xy)*i,vec2i(0),vec2i(size)-1);let neighbor=textureLoad(gbuffer,q,0);
-    let depthWeight=exp(-abs(center.w-neighbor.w)/max(settings.z*0.1,0.0001));
+    let depthWeight=exp(-abs(centre-textureLoad(viewDepth,q,0).r)/max(settings.z*0.1,0.0001));
     let normalWeight=pow(max(dot(center.xyz,neighbor.xyz),0.0),8.0);
-    let w=exp(-f32(i*i)/8)*depthWeight*select(normalWeight,1.0,center.w==0);
+    let w=exp(-f32(i*i)/8)*depthWeight*select(normalWeight,1.0,centre==0);
     sum+=textureLoad(input,q,0).r*w;total+=w;
   }
   textureStore(output,p,vec4f(sum/max(total,0.000001)));

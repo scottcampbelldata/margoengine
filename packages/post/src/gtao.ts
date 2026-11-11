@@ -33,12 +33,13 @@ const gtaoShader =
 @group(0) @binding(3) var noise:texture_2d<f32>;
 @group(0) @binding(4) var<storage,read> pattern:array<vec4f>;
 @group(0) @binding(5) var output:texture_storage_2d<r32float,write>;
+@group(0) @binding(6) var viewDepth:texture_2d<f32>;
 const PI=3.14159265;
 fn arc(h:f32,g:f32)->f32 {return 0.25*(cos(g)-cos(2.0*h-g)+2.0*h*sin(g));}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
   let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);_=textureLoad(noise,vec2i(0),0);
-  if(data.w==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
+  if(textureLoad(viewDepth,p,0).r==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
   let position=viewPosition(p,textureLoad(depth,p,0));let n=normalize(data.xyz);
   // Toward the eye: from the point for perspective, the constant view axis for orthographic (clip w constant).
   let v=select(vec3f(0,0,1),normalize(-position),f.projection[2][3]<-0.5);
