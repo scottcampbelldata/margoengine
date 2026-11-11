@@ -1024,7 +1024,7 @@ export interface AssetOptions {
    */
   optimize?: boolean;
   /**
-   * Most vertices one GPU part holds (default 262,144, from 1,024 to 1,000,000). A primitive with more vertices loads as
+   * Most vertices one GPU part holds (default 262,144, from 1,024 to 1,048,576). A primitive with more vertices loads as
    * several parts of its node, each drawn, culled and picked on its own (`PBRPrimitive.part`); shared vertices stay
    * shared inside a part. Up to 16,777,216 vertices per primitive; skinned and morphed primitives must fit one part.
    */

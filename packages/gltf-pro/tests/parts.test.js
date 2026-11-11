@@ -19,10 +19,12 @@ async function engineFor() {
   });
 }
 /** A w x h vertex grid in the xy plane as a glTF: two triangles a cell, `mode` 4, or the vertices as points (0) or a line strip (3). */
-function grid(w, h, { blend = false, mode = 4, indexType = 5125, indexed = true, skinned = false } = {}) {
+function grid(w, h, { blend = false, mode = 4, indexType = 5125, indexed = true, skinned = false, relief = 0 } = {}) {
   const count = w * h,
     positions = new Float32Array(count * 3);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) positions.set([x, y, 0], (y * w + x) * 3);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      positions.set([x, y, relief * Math.sin(x * 0.05) * Math.cos(y * 0.04)], (y * w + x) * 3);
   let indices;
   if (mode === 4) {
     indices = new (indexType === 5123 ? Uint16Array : Uint32Array)((w - 1) * (h - 1) * 6);
@@ -53,7 +55,7 @@ function grid(w, h, { blend = false, mode = 4, indexType = 5125, indexed = true,
     at += c.byteLength;
   }
   const accessors = [
-      { bufferView: 0, componentType: 5126, type: 'VEC3', count, min: [0, 0, 0], max: [w - 1, h - 1, 0] },
+      { bufferView: 0, componentType: 5126, type: 'VEC3', count, min: [0, 0, -relief], max: [w - 1, h - 1, relief] },
     ],
     attributes = { POSITION: 0 },
     primitive = { attributes, mode, material: 0 };
@@ -162,6 +164,48 @@ test('a 1,001,000-vertex primitive (over the old 1M refusal) loads as compact pa
   }
 });
 
+// A terrain's parts were spread over the whole field: the Morton key scaled each axis to its own extent, so the nearly
+// flat axis took all 10 bits and its top bit split the surface into height bands (CulledModels then culled almost none
+// of a 10M-triangle field close up). One scale for all axes keeps every part a compact piece.
+test('parts of a field with low relief are as compact as those of a flat one, not height bands', async () => {
+  const engine = await engineFor(),
+    boxes = async (relief) => {
+      const { doc, buffer } = grid(400, 400, { relief }),
+        model = await parseGLTFAsync(engine, doc, [buffer], [], { maxPartVertices: 4096 });
+      try {
+        assert.ok(model.primitives.length > 30, `${model.primitives.length} parts`);
+        return boxArea(model.primitives);
+      } finally {
+        model.dispose();
+      }
+    };
+  try {
+    const flat = await boxes(0),
+      relief = await boxes(2);
+    assert.ok(relief <= 1.05 * flat, `part boxes cover ${(relief / flat).toFixed(2)} times those of the flat field`);
+  } finally {
+    engine.dispose();
+  }
+});
+/** Summed xy box areas of the parts. */
+function boxArea(primitives) {
+  let area = 0;
+  for (const p of primitives) {
+    let x0 = Infinity,
+      y0 = Infinity,
+      x1 = -Infinity,
+      y1 = -Infinity;
+    for (let k = 0; k < p.vertices.length; k += 20) {
+      x0 = Math.min(x0, p.vertices[k]);
+      x1 = Math.max(x1, p.vertices[k]);
+      y0 = Math.min(y0, p.vertices[k + 1]);
+      y1 = Math.max(y1, p.vertices[k + 1]);
+    }
+    area += (x1 - x0) * (y1 - y0);
+  }
+  return area;
+}
+
 test('BLEND parts keep the file triangle order; uint16, unindexed, points and line strips split too', async () => {
   const engine = await engineFor();
   try {
@@ -249,7 +293,7 @@ test('refusals: over 2^24 vertices, skinned over the part size, an invalid maxPa
       parseGLTFAsync(engine, skinned.doc, [skinned.buffer], [], { maxPartVertices: 1024 }),
       (e) => e.code === 'unsupported' && /maxPartVertices \(1024\)/.test(e.message),
     );
-    for (const bad of [1023, 1_000_001, 2.5])
+    for (const bad of [1023, 1_048_577, 2.5])
       await assert.rejects(
         parseGLTFAsync(engine, huge.doc, [huge.buffer], [], { maxPartVertices: bad }),
         /maxPartVertices/,

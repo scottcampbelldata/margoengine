@@ -20,7 +20,7 @@
 export const PART_VERTICES = 262_144;
 /** Fewest and most vertices per part `maxPartVertices` accepts. */
 export const MIN_PART_VERTICES = 1024,
-  MAX_PART_VERTICES = 1_000_000;
+  MAX_PART_VERTICES = 1_048_576;
 /** Most vertices one primitive may have: index accessors decode through Float32, exact to 2^24. */
 export const PRIMITIVE_VERTICES = 16_777_216;
 /** One part of a split primitive: local indices and, for each local vertex, its vertex in the source primitive. */
@@ -62,9 +62,12 @@ function mortonOrder(
     if (z < z0) z0 = z;
     if (z > z1) z1 = z;
   }
-  const sx = 1023.999 / (x1 - x0 || 1),
-    sy = 1023.999 / (y1 - y0 || 1),
-    sz = 1023.999 / (z1 - z0 || 1),
+  // One scale for all three axes (the largest extent), so the key's cells are cubes: per-axis scales would give a
+  // nearly flat axis (a terrain's height) all 10 bits, and its top bit would split the surface into height bands
+  // spread across the whole field instead of compact pieces.
+  const sx = 1023.999 / (Math.max(x1 - x0, y1 - y0, z1 - z0) || 1),
+    sy = sx,
+    sz = sx,
     keys = new Uint32Array(n);
   // Spreads the 10 low bits of v to every third bit.
   const spread = (v: number) => {

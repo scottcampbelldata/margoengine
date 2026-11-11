@@ -1,6 +1,14 @@
 # Known bugs and unverified features
 
 
+### gltf-pro parts cull one by one only under CulledModels (found 2026-11-11, open)
+
+- **Repro:** `npm run test:gpu:parts` in packages/gltf-pro: without `CulledModels`, a 20-part 10M-triangle field draws
+  all 20 parts in a close view where 9 are in the frustum (`draws` in test-results/gltf-pro-parts.json).
+- **Cause:** the frame's own culling tests a gltf-pro node's bounds, not each primitive's; parts of one primitive share
+  a node.
+- **Fix to build:** test each primitive's sphere on the CPU in the PBR draw loop (work count: spheres tested per frame).
+
 ### compressDraco cannot encode a 10M-triangle mesh with normals and UVs (found 2026-11-11, open)
 
 - **Repro:** `encodeNativeMesh` in `packages/exporters/src/draco-native-encode.ts` with a 5,004,169-vertex,

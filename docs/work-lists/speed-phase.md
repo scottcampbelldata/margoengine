@@ -519,6 +519,13 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   Busy-machine diagnostic 2026-11-11 on the RTX A6000: 57.7 ms wall natively, 2,529 ms on the WebGL2 layer. SPEED BUG:
   the sort costs more than the overdraw it saves at this count; to fix or cap (a smaller network per batch, or skip
   ordering past a measured count) before release.
+- glTF primitives at scale: a 2,237 x 2,237 height field in one primitive (5,004,169 vertices, 9,999,392 triangles,
+  a 240 MB GLB) through gltf-pro `loadGLTF` and `loadGLTFProgressive`, 512 x 512 (`npm run test:gpu:parts` in
+  packages/gltf-pro, native and `--compat`). Work per frame at the default 262,144-vertex parts: 20 draws without
+  culling; with `CulledModels`, 20 parts and 9,999,392 triangles in the far view, 9 parts and 4,683,190 triangles close
+  up (65,536: 12 parts, 1,550,309; 1,048,576: 4 parts, 8,363,067). No per-frame buffer write or allocation added by
+  parts. Target: 60 fps on the RTX A6000 natively and on the WebGL2 layer; mid laptop iGPU 30 fps natively. Not timed
+  yet (speed phase).
 - Loader meshes at scale: a 2,828 x 2,828 height field (7,997,584 vertices, 15,983,858 triangles, the parsers'
   default `maxVertices`) through `createMeshes`, one part since loaders follow core's 11,184,810-vertex cap
   (2026-11-11; 9 parts of 1,000,000 before) (`node packages/loaders/tests/split-scale-check.mjs`, native and
