@@ -24,7 +24,9 @@ const quadratic = new Colormap('quadratic', 'sequential', (t) => [t * t, 0, 0]);
 const saved = await encodeFigureValue(quadratic);
 const restored = (await decodeFigureValue(saved, { colormaps: [quadratic] })) as Colormap;
 console.log(restored.sample(0.123)[0] === 0.123 * 0.123); // true
-``` Factories affect only that instance, never a global prototype.
+```
+
+Factories affect only that instance, never a global prototype.
 
 ```ts
 import { Figure } from '@margoengine/sciviz/provenance';
