@@ -84,9 +84,9 @@ watchQuality();
 Measured, not estimated (records in `examples/package-benchmarks/results/`):
 
 - **Bytes.** `walk-size.json`: WalkControls, including the OrbitControls it uses for the dollhouse, is about 12 kB
-  min+gzip, about 22 kB when the app does not already ship `@margoengine/bvh`. `@margoengine/physics` plus Rapier
-  (`@dimforge/rapier3d-compat` 0.21.0, Wasm inlined) is about 1.65 MB gzip (4.3 MB raw); Rapier's Wasm alone is 3.1 MB
-  raw. Rapier stays the upgrade path for rigid bodies, joints and vehicles.
+  min+gzip, about 22 kB when the app does not already ship `@margoengine/bvh`. Rapier as `@margoengine/physics`
+  ships it is about 1.22 MB gzip (3.35 MB raw): its Wasm, 1,176,707 bytes gzip, and its JavaScript chunk, 42,407
+  (`entry-sizes.json`); until 2026-11-10 the inlined `rapier3d-compat` module was about 1.65 MB gzip (4.3 MB raw). Rapier stays the upgrade path for rigid bodies, joints and vehicles.
 - **CPU.** `walk-cpu.json` (`node examples/package-benchmarks/walk-cpu.mjs`; Node, one thread, a laptop with other
   work running, so read it as an order of magnitude): `update()` takes a median of 0.01-0.03 ms and at most 0.9 ms a
   frame on the generated two-storey house, a block of 16 such houses (912 meshes) and the 2.45-million-triangle

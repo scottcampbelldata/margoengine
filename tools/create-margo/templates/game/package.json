@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.21.0",
     "@margoengine/game": "^1.0.0"
   },
   "devDependencies": {

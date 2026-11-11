@@ -34,3 +34,4 @@ stage.onTick((delta) => {
 ```
 
 Model loading is a separate import: `import {loadGLTF} from '@margoengine/game/gltf-pro'`.
+Physics is one too: `import {Physics} from '@margoengine/game/physics'`. A game without it ships no solver Wasm.

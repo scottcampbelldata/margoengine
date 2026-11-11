@@ -51,8 +51,8 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@dimforge/rapier3d-compat": ">=0.14.0 <1"
+    "@dimforge/rapier3d-compat": ">=0.14.0 <1",
+    "@margoengine/core": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@dimforge/rapier3d-compat": {
@@ -60,6 +60,7 @@
     }
   },
   "devDependencies": {
+    "@dimforge/rapier3d": "0.21.0",
     "@margoengine/math": "^1.0.0"
   }
 }

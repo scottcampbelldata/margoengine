@@ -214,6 +214,10 @@ except an export or member added without `npm run api:update`, which fails `api:
 coverage failures still fail. After one green local CI run and no lane report of trouble, the coordinator
 can promote watch packages to locked, recording their date and batch in `ticked`. Day 1 is separate work.
 
+Signatures are compared as types: a destructured parameter (`load({ signal }?: Options)`) counts as one parameter of
+its type, whatever names the pattern lists, so adding a property to an options object and reading it from the pattern
+is not a break (`scripts/api-lock.mjs`, `withoutBindings`; `tests/api-lock.test.js`).
+
 Removals, renames and changes to existing declarations, class/interface members, enum values, overloads,
 unexported types or global blocks break locks. So do added required parameters, optional-to-required changes
 and added `readonly`. New exports/members/overloads, trailing optional parameters, required-to-optional

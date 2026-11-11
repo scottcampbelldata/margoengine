@@ -1,7 +1,7 @@
 # Margo game
 
 A small third-person game: walk Prototype Pete around a sunny field, knock over a stack of crates and find the six
-glowing orbs. WASD or the arrow keys walk, Shift runs. Built with the `margoengine/game` kit: a physical sky with sun
+glowing orbs. WASD or the arrow keys walk, Shift runs. Built with the `@margoengine/game` kit: a physical sky with sun
 shadows, bloom, Rapier physics and an animated glTF character. Needs a browser with WebGPU.
 
 ```sh
@@ -10,8 +10,10 @@ npm run dev       # http://localhost:5173
 npm run build     # type-check, then a production build in dist/
 ```
 
-The game is `src/main.ts` (about 120 lines). `vite.config.ts` raises Vite's chunk-size warning limit for Rapier's 4.3 MB lazy chunk, so `npm run build` prints no warning. `margoengine` is the only engine dependency: every package is a subpath
-(`margoengine/shadows`, `margoengine/physics`), and the build keeps only what you import.
+The game is `src/main.ts` (about 120 lines). Rapier's WebAssembly comes with the physics package as a file of its own: Vite emits it as an asset and the browser compiles it while it downloads, so it is not in the start-up chunk. `vite.config.ts` sets Vite's chunk warning to 700 kB, just above the game's start-up
+code (about 675 kB minified), so a chunk that grows past it is still flagged.
+`@margoengine/game` is the only engine dependency: its root holds the common names, and every member package is a
+subpath (`@margoengine/game/shadows`, `@margoengine/game/physics`); the build keeps only what you import.
 
 ## Three things to try next
 

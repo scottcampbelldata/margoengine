@@ -39,7 +39,7 @@ const EXCEPTIONS = {};
 
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
-  '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional, the app installs and initializes it',
+  '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional: @margoengine/physics bundles Rapier, and an app may pass its own through the rapier option',
   '@dimforge/rapier2d-compat': 'Rapier 2D rigid-body solver; optional, the app installs and initializes it',
   react: 'React component bindings for the stage',
   'react-dom': 'React DOM root and portal rendering for scene and HTML components',
@@ -114,6 +114,16 @@ export const BUNDLED = [
       'https://github.com/BIDS/colormap/blob/master/colormaps.py (CC0); PLOS ONE 13(7): e0199239 supporting file S2, https://doi.org/10.1371/journal.pone.0199239.s002 (CC0)',
     modified: 'published decimal values preserved as plain numeric RGB rows',
     notices: ['NOTICE.md'],
+  },
+  {
+    package: '@margoengine/physics',
+    component: 'Rapier 3D rigid-body solver (Dimforge)',
+    licence: 'Apache-2.0',
+    files: 'dist/rapier3d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled)',
+    source:
+      'devDependency @dimforge/rapier3d 0.21.0 (exact) from npm, https://www.npmjs.com/package/@dimforge/rapier3d/v/0.21.0 (rapier_wasm3d_bg.wasm sha256 17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b); packages/physics/scripts/build.js bundles and copies it',
+    modified: 'the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself',
+    notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
 ];
 

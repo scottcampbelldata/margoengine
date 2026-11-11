@@ -38,13 +38,23 @@ and builds all five templates, and checks their exact engine dependency closures
 
 To add a capability outside a profile, install its package at the same release version, for example
 `npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
-Optional third-party peers, including React and Rapier, remain app choices and are never silently installed by a kit.
+Optional third-party peers, including React, remain app choices and are never silently installed by a kit. Rapier's
+3D solver comes with `@margoengine/physics`; its optional `@dimforge/rapier3d-compat` peer is only for passing your
+own Rapier through the `rapier` option.
 
 Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/web/gltf-pro'` (or
 `@margoengine/game/gltf-pro`). The loader is installed with the profile, but a page importing only the root emits
 no Draco or Basis files. Bundlers discover decoder assets before tree-shaking, so the root deliberately keeps the
 loader entry separate. A model app keeps the full glTF/compression support of the existing loader. No loader,
 core or stage implementation changed.
+
+Physics works the same way: `import {Physics, PhysicsBody, CharacterController} from '@margoengine/game/physics'`
+(or `margoengine/physics` in the full install). `@margoengine/physics` ships Rapier's WebAssembly as its own file,
+`rapier3d.wasm`, which Vite and Rollup copy into the build as soon as they read the module, before tree-shaking. So
+the game kit root no longer re-exports the physics names: a game that imports only the root ships no Wasm, and one
+that imports the physics entry ships exactly `rapier3d.wasm` (`packages/game/tests/physics-entry.test.js`). Before
+2026-11-10 the root re-exported `Physics`, `PhysicsBody` and `CharacterController`; change those imports to the
+physics subpath.
 
 ## Research and format choice
 
@@ -79,10 +89,11 @@ not claimed: the game profile already exposes the built sprites, tilemaps, pixel
 The unchanged legacy bundle profiles below are min+gzip startup JavaScript when every root name is used.
 They describe browser bundles, separately from npm install bytes. Lazy parts and decoder assets are extra.
 `tests/umbrella.test.js` checks these existing budgets within 3 percent.
+The game row fell from 377,168 B on 2026-11-10, when the physics names moved to `margoengine/physics`.
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games | 377,168 B |
+| `margoengine/game` | Games | 359,499 B |
 | `margoengine/viz` | Visualization | 266,957 B |
 | `margoengine/web` | Web scenes | 96,802 B |
 
@@ -155,7 +166,6 @@ Games: models, animation, light and shadow, sky, physics, audio, input, effects.
 | `margoengine/controls/orbit` | `OrbitControls` |
 | `margoengine/controls/walk` | `WalkControls` |
 | `margoengine/input` | `Input` |
-| `margoengine/physics` | `Physics`, `PhysicsBody`, `CharacterController` |
 | `margoengine/navmesh` | `NavMesh` |
 | `margoengine/audio` | `Audio`, `AudioListener`, `PositionalAudio` |
 | `margoengine/vfx` | `VFX` |

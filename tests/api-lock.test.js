@@ -51,6 +51,11 @@ test('removals, renames, parameter edits, aliases, consts and local types are br
     ['export interface X { x: number; }', 'export interface X { readonly x: number; }'],
     ['export interface X { x: number; }', 'interface X { x: number; }'],
     ['export enum E { A = 0, B = 1 }', 'export enum E { A = 0 }'],
+    // Type literals and tuples in parameter types are types, not binding patterns.
+    ['export function f(x: { a: number }): void;', 'export function f(x: { a: string }): void;'],
+    ['export function f(x: [number]): void;', 'export function f(x: [string]): void;'],
+    ['export function f(x: Map<{ a: number }, { b: number }>): void;', 'export function f(x: Map<{ a: number }, { b: string }>): void;'],
+    ['export function f({ a }: { a: number }): void;', 'export function f({ a }: { a: string }): void;'],
   ])
     assert.ok(compare(a, b).breaking.length, `${a} -> ${b}`);
 });
@@ -86,6 +91,9 @@ test('exports, members, enum values, overloads, optional relaxations and local t
     ],
     ['export function f(): void;', 'export function f(x?: number): void;'],
     ['type Local = number;', 'export type Local = number;'],
+    // A binding pattern names locals, not types: a property added to it changes nothing a caller sees.
+    ['export class C { static load({ signal }?: O): Promise<void>; }', 'export class C { static load({ signal, wasm }?: O): Promise<void>; }'],
+    ['export function f({ a }: O, [b]: T): void;', 'export function f({ a, b }: O, [c, d]: T): void;'],
     ['import { A } from "a"; export type T = A;', 'import { A } from "b"; export type T = A;'],
   ])
     assert.equal(compare(a, b).breaking.length, 0, `${a} -> ${b}`);

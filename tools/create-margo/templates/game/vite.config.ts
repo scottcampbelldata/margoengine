@@ -2,9 +2,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
-    // Rapier ships its WebAssembly inside its JavaScript (about 4.3 MB, 1.7 MB gzip). It is its own chunk, loaded only
-    // when the game creates a physics world, so Vite's 500 kB advice does not apply to it. Lower this limit if you
-    // drop physics, so a large chunk of your own code is flagged again.
-    chunkSizeWarningLimit: 4500,
+    // The game's start-up code (stage, materials and the glTF model they draw, animation, shadows, sky, physics) is
+    // about 675 kB minified, 1.35 times Vite's 500 kB advice; Rapier's solver and Wasm are separate files loaded by
+    // Physics.load(). The limit sits just above that, so a chunk that grows past it is still flagged.
+    chunkSizeWarningLimit: 700,
   },
 });

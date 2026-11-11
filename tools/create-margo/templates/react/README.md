@@ -15,4 +15,4 @@ only what you import.
 
 1. **A model.** `<Model src="/model.glb" />` from `margoengine/react/gltf-pro`; put the file in `public/`.
 2. **Studio light.** `<Environment src="/studio.hdr" background />` for image-based lighting.
-3. **Physics.** `<Physics>` and `<RigidBody>` from `margoengine/react/physics` with `npm i @dimforge/rapier3d-compat`.
+3. **Physics.** `<Physics>` and `<RigidBody>` from `margoengine/react/physics`; Rapier comes with the physics package, nothing to install.

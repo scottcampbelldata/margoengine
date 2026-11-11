@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { readTarball, startRegistry } from './publish-rehearsal.mjs';
 import { run, installedEnginePackages, requiredClosure } from './kit-install-check.mjs';
@@ -30,6 +30,26 @@ function serverCommand(app, script, port) {
   if (/^vite( preview)?$/.test(command))
     return { command: process.execPath, args: [vite, ...command.split(' ').slice(1), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], page };
   throw new Error(`template script ${script} runs \`${command}\`, which this check does not know how to start`);
+}
+/**
+ * What a Vite template's production build emitted: no JavaScript file over Vite's 500 kB warning size, or over the
+ * limit in WARN_LIMITS for a template whose own start-up code is larger (a Wasm inlined as base64 once needed 4,500 kB),
+ * and for the game, Rapier's Wasm as an asset of its own. Templates built by another tool (Next) have no `dist`.
+ */
+// The game's start-up engine code measured 675,315 B minified on 2026-11-10; its vite.config.ts says 700 kB.
+const WARN_LIMITS = { game: 700_000 };
+function viteOutputProblems(name, app) {
+  const dist = join(app, 'dist');
+  if (!existsSync(dist)) return [];
+  const problems = [],
+    files = readdirSync(dist, { recursive: true }).map(String);
+  for (const file of files.filter((f) => /\.m?js$/.test(f))) {
+    const size = statSync(join(dist, file)).size;
+    const limit = WARN_LIMITS[name] ?? 500_000;
+    if (size > limit) problems.push(`${name}: build emitted ${file} of ${size} bytes, over its ${limit / 1000} kB warning size`);
+  }
+  if (name === 'game' && !files.some((f) => f.endsWith('.wasm'))) problems.push('game: build emitted no .wasm asset (Rapier)');
+  return problems;
 }
 const root = resolve(import.meta.dirname, '..'),
   results = join(root, 'test-results/template-installs');
@@ -83,6 +103,7 @@ try {
     const built = await run('npm', ['run', 'build'], { cwd: app, env, seconds: 400 });
     writeFileSync(join(results, `${name}-build.log`), built);
     for (const line of built.split(/\r?\n/)) if (BAD_LINE.test(line)) serverProblems.push(`${name}: build output: ${line.trim().slice(0, 240)}`);
+    serverProblems.push(...viteOutputProblems(name, app));
     for (const script of serverScripts(manifest)) {
       const { problems } = await probe({ ...serverCommand(app, script, nextPort++), cwd: app, env: { ...humanEnv(env), NEXT_TELEMETRY_DISABLED: '1' }, limitMs: 150_000 });
       for (const problem of problems) serverProblems.push(`${name} npm run ${script}: ${problem}`);

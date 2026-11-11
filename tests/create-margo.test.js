@@ -150,9 +150,19 @@ function link(app, manifest) {
   }
 }
 
-test('the game template carries the Vite config that keeps its production build free of the chunk-size warning', () => {
-  // Rapier's WebAssembly is a 4.3 MB lazy chunk; without this limit a newcomer's first `npm run build` printed
-  // "(!) Some chunks are larger than 500 kB" (found by scripts/template-install-check.mjs, which fails on any warning).
-  const config = readFileSync(join(root, 'tools/create-margo/templates/game/vite.config.ts'), 'utf8');
-  assert.match(config, /chunkSizeWarningLimit:\s*4500/);
+test('the game template keeps a tight Vite chunk-size warning and installs no Rapier of its own', () => {
+  // Rapier's WebAssembly used to sit base64 inside a 4.3 MB lazy chunk, and the template raised Vite's 500 kB warning
+  // limit to 4,500 kB to hide it. The physics package now ships the Wasm as its own file, so the limit only covers the
+  // game's own start-up code (675 kB minified), and scripts/template-install-check.mjs checks the build: a .wasm asset
+  // and no JavaScript chunk over that limit.
+  const game = join(root, 'tools/create-margo/templates/game');
+  const limit = Number(/chunkSizeWarningLimit:\s*(\d+)/.exec(readFileSync(join(game, 'vite.config.ts'), 'utf8'))?.[1]);
+  assert.ok(limit >= 500 && limit <= 700, `chunkSizeWarningLimit ${limit} kB: keep it just above the start-up chunk`);
+  const manifest = JSON.parse(readFileSync(join(game, 'package.json'), 'utf8'));
+  assert.deepEqual(
+    Object.keys({ ...manifest.dependencies, ...manifest.devDependencies }).filter((name) => /rapier/i.test(name)),
+    [],
+    'Rapier comes with @margoengine/physics',
+  );
+  assert.doesNotMatch(readFileSync(join(game, 'README.md'), 'utf8'), /rapier3d-compat/);
 });

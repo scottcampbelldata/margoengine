@@ -388,6 +388,7 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
       '/text/',
       '/fbx/',
       'rapier3d',
+      'rapier-solver',
     ])
       assert.equal(
         modules.some((id) => id.includes(fragment)),
@@ -503,6 +504,7 @@ test('Vite optional entry includes requested bindings while keeping their native
       '/packages/text/',
       '/packages/gltf-pro/',
       'rapier3d',
+      'rapier-solver',
     ])
       assert.equal(
         modules.some((id) => id.includes(fragment)),
@@ -516,7 +518,7 @@ test('Vite optional entry includes requested bindings while keeping their native
       '/packages/xr/',
       '/packages/text/',
       '/packages/gltf-pro/',
-      'rapier3d',
+      'rapier-solver',
     ])
       assert.ok(
         all.some((id) => id.includes(fragment)),

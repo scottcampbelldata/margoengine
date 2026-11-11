@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -9,16 +8,7 @@ import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
-// Consumers keep Rapier optional; browser checks use the monorepo test dependency.
-const rapier = process.env.MARGOENGINE_RAPIER
-  ? resolve(process.env.MARGOENGINE_RAPIER)
-  : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/', import.meta.url));
-if (!rapier || !existsSync(resolve(rapier, 'dist/rapier.mjs'))) {
-  console.log(
-    'SKIP physics browser test: set MARGOENGINE_RAPIER to an installed @dimforge/rapier3d-compat package folder',
-  );
-  process.exit(0);
-}
+// Physics.load() in the page fetches dist/rapier3d.wasm through the dev server, the way an app's bundler serves it.
 await mkdir(results, { recursive: true });
 const server = await createServer({
   configFile: resolve(root, 'vite.config.js'),

@@ -262,7 +262,7 @@ export const LAZY_FILES = [
     label: '@margoengine/physics',
     kind: 'Chunk',
     measure: 'bundle',
-    external: [...core, /^@dimforge\/rapier3d-compat$/],
+    external: core,
     when: '`addPhysics(stage)` or `addBody(stage, mesh)` (`margoengine/stage/physics`), first call',
   },
   {
@@ -624,12 +624,11 @@ export const LAZY_FILES = [
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics',
-    file: 'node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs',
-    label: '@dimforge/rapier3d-compat',
-    kind: 'JS with inlined Wasm',
-    measure: 'bundle',
-    external: [],
-    when: '`await Physics.load()`, once per app (no separate .wasm request: the Wasm is base64 in the module)',
+    file: 'packages/physics/dist/rapier3d.wasm',
+    label: 'rapier3d.wasm',
+    kind: 'Rapier Wasm (@dimforge/rapier3d, bundled)',
+    measure: 'file',
+    when: '`await Physics.load()`, once per app, compiled while it downloads; its JavaScript is the lazy rapier-solver chunk of the entry',
   },
 ];
 
@@ -665,6 +664,17 @@ export const LAZY_SPLITS = [
     source: 'packages/points/src/laz.ts',
     baseLabel: 'everything a plain <code>.las</code> file loads',
     when: 'the first compressed file, unless the caller passes its own decoder (import() in las.ts)',
+  },
+  {
+    package: 'physics',
+    entry: '.',
+    specifier: '@margoengine/physics',
+    dist: 'packages/physics/dist/index.js',
+    chunk: /^rapier-solver-/,
+    lazyLabel: 'Rapier solver JavaScript',
+    source: 'packages/physics/src/rapier-solver.ts',
+    baseLabel: 'everything the entry loads before <code>Physics.load()</code>',
+    when: '`await Physics.load()`, once per app (import() in physics.ts); its Wasm, rapier3d.wasm, is a file of its own',
   },
 ];
 

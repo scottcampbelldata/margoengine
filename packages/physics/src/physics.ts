@@ -4,7 +4,8 @@ import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from '
 import { PhysicsCollider } from './collider.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
-import { LoadOnce } from '../../shared/load-once.js';
+import { wasmError } from '../../shared/errors.js';
+import type { RapierWasmSource } from './rapier-solver.js';
 import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
 import { PhysicsJoint, createJointData, type JointDof, type JointOptions } from './joints.js';
@@ -52,9 +53,20 @@ export interface PhysicsOptions {
 
 /** Options of {@link Physics.load}. */
 export interface PhysicsLoadOptions {
-  /** Stops waiting for the load; the load itself carries on and a later call reuses it. */
+  /**
+   * Stops this call's wait. When no other call is waiting on the same load, it also cancels the download, and the next
+   * call starts again.
+   */
   signal?: AbortSignal;
+  /**
+   * Where Rapier's Wasm comes from: a URL (a CDN or your own server), a fetched `Response`, its bytes or a compiled
+   * `WebAssembly.Module`. Default: `dist/rapier3d.wasm` beside this package, which bundlers emit as its own file. It must
+   * be the Rapier build this package bundles (`@dimforge/rapier3d` 0.21.0). Calls made while a load runs share that load.
+   */
+  wasm?: RapierWasmSource;
 }
+
+export type { RapierWasmSource };
 
 /** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
 export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
@@ -163,13 +175,52 @@ function callListener(this: never, listener: (event: never) => void): void {
 }
 const identityRotation: Quat = [0, 0, 0, 1];
 
-// The solver `Physics.load` loaded, shared by every world of the app.
-const solver = new LoadOnce<RapierModule>(async () => {
-  const module = await import('@dimforge/rapier3d-compat'),
-    api = module.default ?? module;
-  await api.init();
-  return api as unknown as RapierModule;
-});
+// The solver `Physics.load` loaded, shared by every world of the app, and the load in flight. A load is cancelled when
+// every call waiting on it has been aborted; one call without a signal keeps it going.
+let solver: RapierModule | null = null;
+let loading: { promise: Promise<RapierModule>; controller: AbortController; waiting: number } | null = null;
+
+function startLoad(wasm: RapierWasmSource | undefined): NonNullable<typeof loading> {
+  const controller = new AbortController(),
+    promise = import('./rapier-solver.js')
+      .then((chunk) => chunk.startRapier(wasm ?? chunk.defaultWasm(), controller.signal))
+      .then(
+        (module) => (solver = module),
+        (error: unknown) => {
+          throw wasmError(error);
+        },
+      )
+      .finally(() => {
+        if (loading?.promise === promise) loading = null;
+      });
+  promise.catch(noop); // a cancelled load nobody waits on must not surface as an unhandled rejection
+  return { promise, controller, waiting: 0 };
+}
+
+async function loadSolver(wasm: RapierWasmSource | undefined, signal: AbortSignal | undefined): Promise<RapierModule> {
+  signal?.throwIfAborted();
+  if (solver) return solver;
+  const load = (loading ??= startLoad(wasm));
+  if (!signal) {
+    load.waiting = Infinity;
+    return load.promise;
+  }
+  load.waiting++;
+  let stop!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    stop = () => {
+      if (--load.waiting === 0) load.controller.abort(signal.reason);
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', stop, { once: true });
+  });
+  try {
+    return await Promise.race([load.promise, aborted]);
+  } finally {
+    if (!signal.aborted) load.waiting--;
+    signal.removeEventListener('abort', stop);
+  }
+}
 
 /**
  * Rigid-body physics on Rapier as a Margo Engine engine plugin. Steps a fixed timestep with an accumulator and
@@ -234,12 +285,15 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.
    * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.
+   * Rapier's Wasm is a file of its own (`dist/rapier3d.wasm`), fetched and compiled while it downloads; `wasm` points
+   * at another copy.
    * @example await Physics.load();
    * const physics = new Physics(engine);
    * @throws AbortError (the signal's reason) when `signal` aborts first.
+   * @throws MargoError (`failed`) when the Wasm cannot be fetched or is not Rapier's.
    */
-  static async load({ signal }: PhysicsLoadOptions = {}): Promise<void> {
-    await solver.load(signal);
+  static async load({ signal, wasm }: PhysicsLoadOptions = {}): Promise<void> {
+    await loadSolver(wasm, signal);
   }
   /** Creates the Physics on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options: PhysicsOptions = {}): Physics {
@@ -247,7 +301,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /** @throws MargoError (`state`) before {@link Physics.load} has finished. */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
-    const R = options.rapier ?? solver.value;
+    const R = options.rapier ?? solver;
     if (!R) throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
     if (typeof R.World !== 'function' || !R.ColliderDesc)
       throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics.load().');

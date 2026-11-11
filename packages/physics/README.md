@@ -6,7 +6,7 @@ Rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step
 
 Build from source with `npm run build` in `packages/physics`.
 
-It exports `Physics` (the world: bodies, colliders, joints, queries and events), `PhysicsBody`, `PhysicsJoint`, `CharacterController`, `Vehicle` and `Rope`. The React components in `@margoengine/react/physics` are `<Physics>`, `<RigidBody>`, the collider components (`CuboidCollider`, `BallCollider` and others), `useJoint`, `usePhysics`, `useBeforePhysicsStep` and `useAfterPhysicsStep`. Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
+It exports `Physics` (the world: bodies, colliders, joints, queries and events), `PhysicsBody`, `PhysicsJoint`, `CharacterController`, `Vehicle` and `Rope`. The React components in `@margoengine/react/physics` are `<Physics>`, `<RigidBody>`, the collider components (`CuboidCollider`, `BallCollider` and others), `useJoint`, `usePhysics`, `useBeforePhysicsStep` and `useAfterPhysicsStep`. Rapier (`@dimforge/rapier3d` 0.21.0, Apache-2.0) comes with this package, nothing else to install: its JavaScript in a lazy chunk and its WebAssembly as a file of its own, `dist/rapier3d.wasm`.
 
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
@@ -122,7 +122,17 @@ Static meshes loaded by `@margoengine/gltf-pro` or `@margoengine/fbx` support fi
 
 A body on a part below the root is fitted at that part's world scale. A skinned or morphed primitive rejects geometry-derived fitting with `Skinned mesh needs an explicit collider`; pass explicit dimensions or a capsule for animated characters. A root with no usable triangles throws `No geometry` and keeps no body. Use `colliders: []` for an intentionally colliderless body. Explicit collider dimensions, offsets and ownership keep their existing behavior.
 
-- **One load per app.** Install the solver beside this package: `npm i @margoengine/physics @dimforge/rapier3d-compat`. It is an optional peer until Margo's own solver replaces it. `await Physics.load()` imports and compiles the solver, then `new Physics(engine)` stays synchronous. Wasm compiles asynchronously on the main thread, so that wait cannot live in a constructor. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait. A world made before the load throws a `MargoError` with code `state`. The solver stays a dynamic import, so its 1.6 MB (gzip) stays out of the first load of a page. It is a peer dependency that npm installs with this package (`rapier3d-compat` inlines its Wasm, so it works in any bundler without asset configuration); tested with `@dimforge/rapier3d-compat` 0.21.0. The `rapier` option still takes a module you initialized yourself, for another Rapier version.
+- **One load per app.** `await Physics.load()` compiles the solver, then `new Physics(engine)` stays synchronous. Wasm compiles asynchronously on the main thread, so that wait cannot live in a constructor. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. A world made before the load throws a `MargoError` with code `state`. The solver is a dynamic import and its Wasm a separate file (`dist/rapier3d.wasm`, 3,082,103 bytes, 1,176,707 gzip), so neither is in the first load of a page. Bundlers emit the Wasm as an asset through `new URL('./rapier3d.wasm', import.meta.url)`, with no plugin or config, and the browser compiles it while it downloads when the server sends `application/wasm`. `wasm` points `Physics.load` at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the build this package bundles; any other Wasm, another Rapier version included, rejects with a `MargoError` with code `failed` and loads nothing. The `rapier` option still takes a module you initialized yourself, for another Rapier version.
+
+  ```ts
+  import { Physics } from '@margoengine/physics';
+
+  // The package's own copy found through Node's resolver; in a page, pass the URL your server or CDN serves it from.
+  const wasm = new URL('rapier3d.wasm', import.meta.resolve('@margoengine/physics'));
+  await Physics.load({ wasm, signal: AbortSignal.timeout(30_000) });
+  const physics = new Physics(null, { gravity: [0, -9.81, 0] });
+  physics.dispose();
+  ```
 - **Fixed timestep with an accumulator.** `onPreUpdate(delta)` adds `delta * timeScale` to an accumulator and runs whole steps of `fixedTimestep` (default 1/60 s), at most `maxSubsteps` (default 4) per frame. Time beyond that is dropped so a long hitch cannot snowball. Each step is identical regardless of frame rate, so a given sequence of inputs replays bit for bit.
 - **Interpolation.** After each step the plugin stores the previous and current pose of every non-fixed body. Meshes get `lerp(previous, current, alpha)` for position and a shortest-arc slerp for rotation, where `alpha = accumulator / fixedTimestep`. Rendering therefore lags physics by less than one step and moves smoothly at any refresh rate. `interpolate: false` writes the latest step instead. Teleports (`body.setPosition`) reset both poses, so they do not streak.
 - **Mesh writes.** `sync()` reuses preallocated position and quaternion buffers. It writes them with core's `setPosition` and `setQuaternion`, which allocate nothing. Sleeping or motionless bodies are written once and then skipped. Fixed bodies are written only when moved through the body API. Scale is never touched. Rapier stepping, events and scene queries are not allocation-free.
@@ -727,12 +737,11 @@ physics.dispose();
 
 ## Tests
 
-Rapier 0.21.0 is installed as a root development dependency, so `npm test` and the root `npm run test:all` run the real simulation checks without skipped tests. `MARGOENGINE_RAPIER` can override the package folder for testing another installation.
+`npm test` runs the real simulation checks without skipped tests. The Wasm loading checks (`tests/wasm-*.test.js`) load the bundled `dist/rapier3d.wasm` from a file URL, a local server, a `Response`, bytes and a compiled module, and refuse foreign Wasm, error statuses and aborted downloads. The other checks pass Rapier through the `rapier` option, from `@dimforge/rapier3d-compat` 0.21.0, a root development dependency; `MARGOENGINE_RAPIER` can point them at another installation of it.
 
 ```sh
 npm install --prefix /tmp/rapier @dimforge/rapier3d-compat
 MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm test
-MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm run test:browser
 ```
 
 `npm run test:replay` runs the replay in real browsers, Chromium and Firefox by default (`REPLAY_BROWSERS`), with no WebGPU, and fails unless each gives the hashes in `tests/fixtures/replay-hash.json`. `npm run test:browser` runs it too, in the browser the other suites use, so the full check holds it on every machine. `node scripts/replay-golden.mjs` rewrites that file after a kernel change; the native test and every browser must then match it. `REPLAY_FIREFOX` names a Firefox to run in place of Playwright's own, for a machine where that one will not start.
@@ -741,7 +750,7 @@ MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm run te
 
 `npm run test:browser` uses a real WebGPU engine in Chromium (`BROWSER_CHANNEL`, `BROWSER_EXECUTABLE`, `BROWSER_ARGS` as in the other packages): a stack of five boxes falls and settles, rendered world matrices match the interpolated physics poses while falling with variable frame times, readback pixels at the projected box centers match each box's color, a raycast from the camera returns the middle box mesh, there are zero WebGPU validation errors, and `engine.dispose()` frees the world.
 
-Rapier is Apache-2.0 and is not redistributed by this package.
+Rapier is Apache-2.0. This package redistributes it: `dist/THIRD-PARTY-NOTICE.md` says what was taken and `dist/LICENSE-Apache-2.0.txt` holds its licence.
 
 Apache-2.0 licensed.
 

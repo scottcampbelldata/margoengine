@@ -18,7 +18,6 @@ export { Sky } from '@margoengine/sky';
 export { OrbitControls } from '@margoengine/controls/orbit';
 export { WalkControls } from '@margoengine/controls/walk';
 export { Input } from '@margoengine/input';
-export { Physics, PhysicsBody, CharacterController } from '@margoengine/physics';
 export { NavMesh } from '@margoengine/navmesh';
 export { Audio, AudioListener, PositionalAudio } from '@margoengine/audio';
 export { VFX } from '@margoengine/vfx';

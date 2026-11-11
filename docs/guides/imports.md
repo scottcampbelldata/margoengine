@@ -53,7 +53,7 @@ stage.onTick((delta) => {
 | Orbit, walk, fly or a transform gizmo | `margoengine/controls/orbit`, `/controls/walk`, `margoengine/controls`, `/controls/transform` |
 | CAD navigation (SolidWorks, Inventor, Fusion ... mouse) | `cadControls` from `margoengine/controls/orbit` |
 | Skeletal animation and morph targets | `Animation` from `margoengine/animation`, `Animator` from `margoengine/animator` |
-| Rigid-body physics | `Physics` from `margoengine/physics`, and `npm i @dimforge/rapier3d-compat` |
+| Rigid-body physics | `Physics` from `margoengine/physics` (Rapier comes inside it) |
 | Bloom, SSAO, depth of field, anti-aliasing | `PostStack` from `margoengine/post/stack`, effects from `margoengine/post/<effect>`, `margoengine/dof` |
 | Tone mapping | `Tonemap` from `margoengine/tonemap` |
 | Particles | `VFX` from `margoengine/vfx` |

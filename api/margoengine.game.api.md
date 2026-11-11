@@ -17,8 +17,6 @@ export { AudioListener } from "@margoengine/audio";
 
 export { Bloom } from "@margoengine/post";
 
-export { CharacterController } from "@margoengine/physics";
-
 export { Clustered } from "@margoengine/clustered";
 
 export { Environment } from "@margoengine/environment";
@@ -38,10 +36,6 @@ export { Material } from "@margoengine/materials";
 export { NavMesh } from "@margoengine/navmesh";
 
 export { OrbitControls } from "@margoengine/controls";
-
-export { Physics } from "@margoengine/physics";
-
-export { PhysicsBody } from "@margoengine/physics";
 
 export { PositionalAudio } from "@margoengine/audio";
 

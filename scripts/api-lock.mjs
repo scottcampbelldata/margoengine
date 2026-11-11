@@ -13,10 +13,35 @@ function tokens(text) {
     .map((match) => ({ value: match[0], start: match.index }));
 }
 
-const canonical = (text) =>
-  tokens(text)
-    .map((t) => t.value)
-    .join(' ');
+/**
+ * Token values with each destructured parameter (`{ signal }`, `[a, b]` where a parameter starts) reduced to `{}` or
+ * `[]`: a binding pattern names locals and carries no type, so `load({ signal }?: O)` and `load({ signal, wasm }?: O)`
+ * are one signature. Only a `{` or `[` opening a parameter counts, right after `(` or `,` of a parameter list; a type
+ * literal or tuple follows `:`, `<`, `|` or `=` and stays.
+ */
+function withoutBindings(values) {
+  const out = [],
+    open = [];
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if ((v === '{' || v === '[') && open.at(-1) === '(' && (values[i - 1] === '(' || values[i - 1] === ',')) {
+      const close = v === '{' ? '}' : ']';
+      let depth = 0;
+      for (; i < values.length; i++) {
+        if (values[i] === '{' || values[i] === '[') depth++;
+        else if ((values[i] === '}' || values[i] === ']') && --depth === 0) break;
+      }
+      out.push(v, close);
+      continue;
+    }
+    if (v === '(' || v === '[' || v === '{' || v === '<') open.push(v);
+    else if (v === ')' || v === ']' || v === '}' || (v === '>' && values[i - 1] !== '=')) open.pop();
+    out.push(v);
+  }
+  return out;
+}
+
+const canonical = (text) => withoutBindings(tokens(text).map((t) => t.value)).join(' ');
 export const declarationHash = (text) =>
   createHash('sha1').update(text.replaceAll('\r\n', '\n').trim()).digest('hex').slice(0, 8);
 

@@ -4,7 +4,6 @@ import {
   Bloom,
   Input,
   Material,
-  Physics,
   Shadows,
   Sky,
   createMesh,
@@ -12,6 +11,7 @@ import {
   sphereGeometry,
 } from '@margoengine/game';
 import {loadGLTF} from '@margoengine/game/gltf-pro';
+import {Physics} from '@margoengine/game/physics';
 
 // Find the six glowing orbs. WASD or the arrow keys walk, Shift runs; walk into the crates to knock them over.
 const hud = document.querySelector('#hud')!;

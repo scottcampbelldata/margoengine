@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14775227,
+  "total": 14878774,
   "history": [
     {
       "date": "2026-10-24",
@@ -8309,6 +8309,12 @@
       "commit": "89c9113c6f",
       "reason": "procedural/textures rounds each baked channel to the 255 steps in WGSL and GLSL (+11 B gzip, 5264 to 5275) so the GPU's own UNORM rounding, which differs between an RTX A6000 and a Radeon 680M, cannot change a bake",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "71eb890c0f",
+      "reason": "physics bundles Rapier 0.21.0: the root entry joins its lazy solver chunk (39,906 B gzip, was the external rapier3d-compat peer of 1.64 MB) and grows 286 B for the Wasm load (URL, Response, bytes or Module, abort, build check); the Wasm is its own 1,176,707 B gzip file",
+      "grew": 3
     }
   ],
   "items": {
@@ -8980,7 +8986,9 @@
     "@margoengine/oit/peel": 3293,
     "@margoengine/oit/precise": 4033,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 19679,
+    "@margoengine/physics": 61692,
+    "@margoengine/physics base (without Rapier solver JavaScript)": 20430,
+    "@margoengine/physics lazy Rapier solver JavaScript": 41104,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/next": 188444,
     "@margoengine/physics2d": 8390,

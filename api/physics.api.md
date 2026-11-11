@@ -233,7 +233,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     timeScale: number;
     paused: boolean;
     stepCount: number;
-    static load({ signal }?: PhysicsLoadOptions): Promise<void>;
+    static load({ signal, wasm }?: PhysicsLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: PhysicsOptions): Physics;
     constructor(engine: EngineKernel | null, options?: PhysicsOptions);
     get world(): World;
@@ -434,6 +434,7 @@ export class PhysicsJoint {
 
 export interface PhysicsLoadOptions {
     signal?: AbortSignal;
+    wasm?: RapierWasmSource;
 }
 
 export interface PhysicsOptions {
@@ -538,6 +539,8 @@ export interface RapierModule {
     };
     ActiveHooks: Record<'FILTER_CONTACT_PAIRS' | 'FILTER_INTERSECTION_PAIRS', number>;
 }
+
+export type RapierWasmSource = string | URL | Response | ArrayBuffer | ArrayBufferView | WebAssembly.Module;
 
 export interface RaycastHit extends Hit {
     distance: number;

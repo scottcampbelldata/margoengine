@@ -104,7 +104,6 @@ export const KITS = {
       ['@margoengine/controls/orbit', ['OrbitControls']],
       ['@margoengine/controls/walk', ['WalkControls']],
       ['@margoengine/input', ['Input']],
-      ['@margoengine/physics', ['Physics', 'PhysicsBody', 'CharacterController']],
       ['@margoengine/navmesh', ['NavMesh']],
       ['@margoengine/audio', ['Audio', 'AudioListener', 'PositionalAudio']],
       ['@margoengine/vfx', ['VFX']],
@@ -319,7 +318,7 @@ export function umbrellaFiles(root = repository) {
     }, null, 2)}\n`;
     files[`${directory}/tsconfig.json`] = readFileSync(join(root, 'packages/margoengine/tsconfig.json'), 'utf8').replace(/\r\n/g, '\n');
     // npm tarballs require a package description. Examples are deliberately owed until the README phase.
-    files[`${directory}/README.md`] = `# @margoengine/${kit}\n\n${kit === 'react-kit' ? 'The web install profile with React bindings and sky.' : KITS[kit].about + '.'}\n\nThis package installs only its declared domain members and forwards their original typed modules.\nThe root contains common exports; member subpaths expose the complete installed member APIs.\nAll packages release together at one version. Optional third-party peers remain app choices.\n\nSee the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,\nmodel-loading entries and measured package counts.\n\nWith a \`<div id="viewport" style="height:400px"></div>\` in the page${kit === 'react-kit' ? ' and a \`<div id="root"></div>\` for React' : ''}:\n\n\`\`\`${kit === 'react-kit' ? 'tsx' : 'ts'}\n${KIT_EXAMPLES[kit]}\n\`\`\`\n\nModel loading is a separate import: \`import {loadGLTF} from '@margoengine/${kit}/gltf-pro'\`.\n`;
+    files[`${directory}/README.md`] = `# @margoengine/${kit}\n\n${kit === 'react-kit' ? 'The web install profile with React bindings and sky.' : KITS[kit].about + '.'}\n\nThis package installs only its declared domain members and forwards their original typed modules.\nThe root contains common exports; member subpaths expose the complete installed member APIs.\nAll packages release together at one version. Optional third-party peers remain app choices.\n\nSee the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,\nmodel-loading entries and measured package counts.\n\nWith a \`<div id="viewport" style="height:400px"></div>\` in the page${kit === 'react-kit' ? ' and a \`<div id="root"></div>\` for React' : ''}:\n\n\`\`\`${kit === 'react-kit' ? 'tsx' : 'ts'}\n${KIT_EXAMPLES[kit]}\n\`\`\`\n\nModel loading is a separate import: \`import {loadGLTF} from '@margoengine/${kit}/gltf-pro'\`.\n${kit === 'game' ? "Physics is one too: \`import {Physics} from '@margoengine/game/physics'\`. A game without it ships no solver Wasm.\n" : ''}`;
   }
   // The kits' contents in docs/guides/kits.md, between its markers.
   const guide = 'docs/guides/kits.md',
