@@ -560,6 +560,7 @@ test('verify keeps its checks and adds the preview contract after hygiene, asset
       'node scripts/kit-install-check.mjs',
       'npm run api:check',
       'npm run quality',
+      'npm run check:dev-servers',
       'npm run check:parity',
       'npm run check:xr-runs',
       'npm run check:preview-contract',

@@ -101,6 +101,7 @@ export const PLAIN_STEPS = [
   'check:fresh-clone',
   'build:site',
   'check:quickstart',
+  'check:templates',
   'check:text-extrude',
 ];
 /** Package-level steps narrowed by packageScopes; check:readme-run is the one of them that uses the GPU. */
@@ -645,6 +646,7 @@ export const STEP_AFTER = {
   'check:examples-types': ['verify'],
   'check:fresh-clone': ['verify'],
   'check:quickstart': ['verify'],
+  'check:templates': ['verify'],
   // Reads verify's build; it must not run beside a build of dist.
   'check:readme-run': ['verify'],
   // cargo builds and tests the crates on its own; it reads nothing another step makes.

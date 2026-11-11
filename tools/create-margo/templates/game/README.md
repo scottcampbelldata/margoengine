@@ -10,7 +10,7 @@ npm run dev       # http://localhost:5173
 npm run build     # type-check, then a production build in dist/
 ```
 
-The game is `src/main.ts` (about 120 lines). `margoengine` is the only engine dependency: every package is a subpath
+The game is `src/main.ts` (about 120 lines). `vite.config.ts` raises Vite's chunk-size warning limit for Rapier's 4.3 MB lazy chunk, so `npm run build` prints no warning. `margoengine` is the only engine dependency: every package is a subpath
 (`margoengine/shadows`, `margoengine/physics`), and the build keeps only what you import.
 
 ## Three things to try next
