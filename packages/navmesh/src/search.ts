@@ -65,41 +65,82 @@ export function heuristicScale(links: Iterable<{ start: Vec3; end: Vec3; cost: n
   return scale;
 }
 
-/** A* state reused by every path call; the heap holds one entry per improved polygon cost. */
+/**
+ * Where on the portal from `a` to `b` (as a fraction from `a`) the walk from the entry (ex, ez) to the goal
+ * (gx, gz) through it is shortest, in XZ. That walk's length is convex along the portal, so the answer is its
+ * unconstrained minimum clamped to the portal: where the straight line to the goal crosses the portal's line, or, with
+ * both on one side, where the line to the goal mirrored in the portal crosses it (Heron's reflection).
+ */
+function crossing(ex: number, ez: number, a: Vec3, b: Vec3, gx: number, gz: number): number {
+  const dx = b[0] - a[0],
+    dz = b[2] - a[2],
+    length2 = dx * dx + dz * dz;
+  if (!(length2 > 0)) return 0;
+  // Signed distances (times the portal length) from the portal's line.
+  const se = dx * (ez - a[2]) - dz * (ex - a[0]);
+  let sg = dx * (gz - a[2]) - dz * (gx - a[0]),
+    tx = gx,
+    tz = gz;
+  if ((se > 0 && sg > 0) || (se < 0 && sg < 0)) {
+    // Mirror the goal in the portal's line: n = (-dz, dx), distance sg / |n|.
+    tx = gx + (2 * sg * dz) / length2;
+    tz = gz - (2 * sg * dx) / length2;
+    sg = -sg;
+  }
+  const u = se === sg ? 0 : se / (se - sg),
+    px = ex + u * (tx - ex),
+    pz = ez + u * (tz - ez),
+    t = ((px - a[0]) * dx + (pz - a[2]) * dz) / length2;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+
+/** A* state reused by every path call. The search runs over portals, not polygons: a node is one way into a polygon
+ * (a link, in the direction it is crossed), so a polygon entered by two portals keeps both ways in and the one that
+ * leads on more cheaply wins later. One node per polygon lost the other way in, and with it the straight corridor
+ * (KB2604b). Node `offset[p] + l` is link `l` of polygon `p`; the node after the last link is the start.
+ */
 export class CorridorSearch {
   private g = new Float64Array(0);
   private f = new Float64Array(0);
   private parent = new Int32Array(0);
-  private parentLink = new Int32Array(0);
+  /** The polygon whose link each node is. */
+  private source = new Int32Array(0);
+  private offset = new Int32Array(0);
   private state = new Uint8Array(0);
-  /** Where the search entered each polygon: x, y, z. */
+  /** Where each node crosses into its polygon: x, y, z. */
   private entry = new Float64Array(0);
   private heapKey = new Float64Array(1);
   private heapNode = new Int32Array(1);
   /** What the last corridor {@link CorridorSearch.find} returned costs, the walk to its end included. */
   cost = 0;
-  /** Makes room for `polygons` polygons and `links` links in all. */
+  /** Makes room for `polygons` polygons and `links` links in all; {@link CorridorSearch.find} grows it as needed. */
   reserve(polygons: number, links: number): void {
-    if (this.g.length < polygons) {
-      this.g = new Float64Array(polygons);
-      this.f = new Float64Array(polygons);
-      this.parent = new Int32Array(polygons);
-      this.parentLink = new Int32Array(polygons);
-      this.state = new Uint8Array(polygons);
-      this.entry = new Float64Array(polygons * 3);
+    if (this.offset.length < polygons + 1) this.offset = new Int32Array(polygons + 1);
+    const nodes = links + 1;
+    if (this.g.length < nodes) {
+      this.g = new Float64Array(nodes);
+      this.f = new Float64Array(nodes);
+      this.parent = new Int32Array(nodes);
+      this.source = new Int32Array(nodes);
+      this.state = new Uint8Array(nodes);
+      this.entry = new Float64Array(nodes * 3);
     }
-    if (this.heapKey.length < links + 1) {
-      this.heapKey = new Float64Array(links + 1);
-      this.heapNode = new Int32Array(links + 1);
+    if (this.heapKey.length < nodes) {
+      this.heapKey = new Float64Array(nodes);
+      this.heapNode = new Int32Array(nodes);
     }
   }
   /**
    * The links of the cheapest corridor from `start` in polygon `from` to `end` in polygon `to` over `adjacency`, or
-   * null. A polygon's cost is the walk from where the search entered it to the middle of the portal it leaves by,
-   * times `costs[p]` (Infinity blocks it); off-mesh links cost what they say. Measuring from the portals and not the
-   * polygon centres keeps routes straight when polygons differ in size, as they do at a tile line. `polygons` is the
-   * used length of `adjacency`. `scale` multiplies the straight-line estimate: {@link heuristicScale} of the links in
-   * `adjacency` (default 1, right when no link costs less than its length).
+   * null. Crossing a polygon costs the walk from where the search entered it to where it leaves, times `costs[p]`
+   * (Infinity blocks it); off-mesh links cost what they say. A portal is crossed where the line from the entry to the
+   * goal meets it, or at its end nearer that line: where a taut path crosses it, so a corridor costs about what the
+   * funnel pulls through it. Portal middles made straight corridors zigzag and lose to bent ones (KB2604b); Demyen and
+   * Buro (2006) and Cui, Harabor and Grastien (2017) measure corridors by the taut path for the same reason. A node
+   * keeps the entry with the lower cost so far plus straight line on: entries at different points of a portal are not
+   * comparable by cost so far alone. `polygons` is the used length of `adjacency`. `scale` multiplies the straight-line
+   * estimate: {@link heuristicScale} of the links in `adjacency` (default 1, right when no link costs less than its
+   * length).
    */
   find(
     from: number,
@@ -111,23 +152,57 @@ export class CorridorSearch {
     costs: ArrayLike<number>,
     scale = 1,
   ): Link[] | null {
-    const { g, f, parent, parentLink, state, entry, heapKey, heapNode } = this,
+    if (this.offset.length < polygons + 1) this.offset = new Int32Array(polygons + 1);
+    let total = 0;
+    for (let p = 0; p < polygons; p++) {
+      this.offset[p] = total;
+      total += adjacency[p].length;
+    }
+    this.reserve(polygons, total);
+    const { g, f, parent, source, offset, state, entry } = this,
       gx = end[0],
       gy = end[1],
-      gz = end[2];
-    g.fill(Infinity, 0, polygons);
-    state.fill(0, 0, polygons);
-    g[from] = 0;
-    f[from] = scale * distance(start, end);
-    state[from] = 1;
-    entry[from * 3] = start[0];
-    entry[from * 3 + 1] = start[1];
-    entry[from * 3 + 2] = start[2];
-    // Open set as a binary heap ordered by (f, polygon index): the same pick as a lowest-f, lowest-index scan.
-    let size = 1;
-    heapKey[0] = f[from];
-    heapNode[0] = from;
-    while (true) {
+      gz = end[2],
+      first = total;
+    for (let p = 0; p < polygons; p++) source.fill(p, offset[p], offset[p] + adjacency[p].length);
+    g.fill(Infinity, 0, total + 1);
+    f.fill(Infinity, 0, total + 1);
+    state.fill(0, 0, total + 1);
+    // The start node enters `from` at `start`.
+    source[first] = -1;
+    g[first] = 0;
+    f[first] = scale * distance(start, end);
+    state[first] = 1;
+    entry[first * 3] = start[0];
+    entry[first * 3 + 1] = start[1];
+    entry[first * 3 + 2] = start[2];
+    const linkOf = (node: number) => adjacency[source[node]][node - offset[source[node]]];
+    // Heap order: f, then where a node crosses and the middle of its portal, so equal costs fall the same way whatever
+    // order polygons and links are kept in (a mesh loaded from a file numbers and stitches its tiles in another
+    // order); the node index only splits what is left, parallel links.
+    const tie = (n: number, node: number) => {
+      for (let i = 0; i < 3; i++) {
+        const d = entry[n * 3 + i] - entry[node * 3 + i];
+        if (d) return d < 0;
+      }
+      if (n === first || node === first) return n === first;
+      const p = linkOf(n),
+        q = linkOf(node);
+      for (let i = 0; i < 3; i++) {
+        const d = p.left[i] + p.right[i] - q.left[i] - q.right[i];
+        if (d) return d < 0;
+      }
+      return n < node;
+    };
+    const before = (k: number, n: number, key: number, node: number) => k < key || (k === key && n !== node && tie(n, node));
+    // Open set as a binary heap in `before` order.
+    let size = 1,
+      heapKey = this.heapKey,
+      heapNode = this.heapNode,
+      goal = -1;
+    heapKey[0] = f[first];
+    heapNode[0] = first;
+    while (goal < 0) {
       let current = -1;
       while (size) {
         const key = heapKey[0],
@@ -138,73 +213,84 @@ export class CorridorSearch {
         for (let child = 1; child < size; child = i * 2 + 1) {
           if (
             child + 1 < size &&
-            (heapKey[child + 1] < heapKey[child] ||
-              (heapKey[child + 1] === heapKey[child] && heapNode[child + 1] < heapNode[child]))
+            before(heapKey[child + 1], heapNode[child + 1], heapKey[child], heapNode[child])
           )
             child++;
-          if (lastKey < heapKey[child] || (lastKey === heapKey[child] && lastNode < heapNode[child])) break;
+          if (before(lastKey, lastNode, heapKey[child], heapNode[child])) break;
           heapKey[i] = heapKey[child];
           heapNode[i] = heapNode[child];
           i = child;
         }
         heapKey[i] = lastKey;
         heapNode[i] = lastNode;
-        // Entries left behind by a later cost improvement or an already closed polygon are stale.
+        // Entries left behind by a later cost improvement or an already closed node are stale.
         if (state[node] === 1 && f[node] === key) {
           current = node;
           break;
         }
       }
       if (current < 0) return null;
-      if (current === to) break;
+      const polygon = current === first ? from : linkOf(current).to;
+      if (polygon === to) {
+        goal = current;
+        break;
+      }
       state[current] = 2;
-      const links = adjacency[current],
+      const links = adjacency[polygon],
         ex = entry[current * 3],
         ey = entry[current * 3 + 1],
         ez = entry[current * 3 + 2],
         // An agent standing in a blocked polygon may still walk out of it.
-        rate = costs[current] < Infinity ? costs[current] : 1;
+        rate = costs[polygon] < Infinity ? costs[polygon] : 1;
       for (let l = 0; l < links.length; l++) {
         const link = links[l],
-          next = link.to;
-        if (state[next] === 2 || !(costs[next] < Infinity)) continue;
+          next = offset[polygon] + l;
+        if (state[next] === 2 || !(costs[link.to] < Infinity)) continue;
         const a = link.start ?? link.left,
           b = link.start ?? link.right,
-          mx = (a[0] + b[0]) / 2,
-          my = (a[1] + b[1]) / 2,
-          mz = (a[2] + b[2]) / 2,
+          t = crossing(ex, ez, a, b, gx, gz),
+          mx = a[0] + t * (b[0] - a[0]),
+          my = a[1] + t * (b[1] - a[1]),
+          mz = a[2] + t * (b[2] - a[2]),
           landing = link.end ?? null,
           nx = landing ? landing[0] : mx,
           ny = landing ? landing[1] : my,
           nz = landing ? landing[2] : mz,
-          candidate = g[current] + Math.hypot(mx - ex, my - ey, mz - ez) * rate + (link.cost ?? 0);
-        if (candidate < g[next]) {
-          const key = candidate + scale * Math.hypot(nx - gx, ny - gy, nz - gz);
-          entry[next * 3] = nx;
-          entry[next * 3 + 1] = ny;
-          entry[next * 3 + 2] = nz;
-          parent[next] = current;
-          parentLink[next] = l;
-          g[next] = candidate;
-          f[next] = key;
-          state[next] = 1;
-          let i = size++;
-          for (
-            let up = (i - 1) >> 1;
-            i > 0 && (key < heapKey[up] || (key === heapKey[up] && next < heapNode[up]));
-            i = up, up = (i - 1) >> 1
-          ) {
-            heapKey[i] = heapKey[up];
-            heapNode[i] = heapNode[up];
-          }
-          heapKey[i] = key;
-          heapNode[i] = next;
+          candidate = g[current] + Math.hypot(mx - ex, my - ey, mz - ez) * rate + (link.cost ?? 0),
+          key = candidate + scale * Math.hypot(nx - gx, ny - gy, nz - gz);
+        if (!(key < f[next])) continue;
+        entry[next * 3] = nx;
+        entry[next * 3 + 1] = ny;
+        entry[next * 3 + 2] = nz;
+        parent[next] = current;
+        g[next] = candidate;
+        f[next] = key;
+        state[next] = 1;
+        if (size === heapKey.length) {
+          const keys = new Float64Array(size * 2),
+            nodes = new Int32Array(size * 2);
+          keys.set(heapKey);
+          nodes.set(heapNode);
+          this.heapKey = heapKey = keys;
+          this.heapNode = heapNode = nodes;
         }
+        let i = size++;
+        for (
+          let up = (i - 1) >> 1;
+          i > 0 && before(key, next, heapKey[up], heapNode[up]);
+          i = up, up = (i - 1) >> 1
+        ) {
+          heapKey[i] = heapKey[up];
+          heapNode[i] = heapNode[up];
+        }
+        heapKey[i] = key;
+        heapNode[i] = next;
       }
     }
-    this.cost = g[to] + Math.hypot(gx - entry[to * 3], gy - entry[to * 3 + 1], gz - entry[to * 3 + 2]) * costs[to];
+    this.cost =
+      g[goal] + Math.hypot(gx - entry[goal * 3], gy - entry[goal * 3 + 1], gz - entry[goal * 3 + 2]) * costs[to];
     const corridor: Link[] = [];
-    for (let node = to; node !== from; node = parent[node]) corridor.push(adjacency[parent[node]][parentLink[node]]);
+    for (let node = goal; node !== first; node = parent[node]) corridor.push(linkOf(node));
     return corridor.reverse();
   }
 }

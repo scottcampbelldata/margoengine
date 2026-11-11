@@ -78,7 +78,7 @@ test('a loaded tiled mesh gives the same routes; with its level it still rebuild
     const one = route(world, a, b),
       two = route(copy, a, b);
     assert.equal(two === undefined, one === undefined);
-    // Stitches are made in another order on load, so a tie between equal routes may fall the other way.
+    // Stitches and polygon numbers come in another order on load; the search breaks ties by position (KB2604b).
     if (one) assert.ok(Math.abs(length(one) - length(two)) < 1e-9);
   }
   // The ids a game kept work on the copy, and it answers a change the same way.

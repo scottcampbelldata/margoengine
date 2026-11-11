@@ -75,7 +75,10 @@ test('a gapped floor path stays out of the hole and beats the corner lower bound
     const lower = Math.hypot(7, 8) * 2 + 2;
     const length = lengthOf(path);
     assert.ok(length > lower);
-    assert.ok(length < 30);
+    // KB2604b: the agent (radius 0.25) may pass the hole's corners at its radius, not radius plus a ledge cell. A
+    // disc agent's shortest path is about 23.69; the cell grid puts the corners at (+-1.25, 8.25), measured 23.823.
+    // Erosion from the ledge ring put them at z = 8.5 (24.212, against Detour's 23.778).
+    assert.ok(length < 23.85, `gapped path ${length}`);
   } finally {
     nav.dispose();
   }

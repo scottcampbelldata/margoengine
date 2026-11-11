@@ -168,7 +168,8 @@ export class TiledNavMesh implements NavSurface {
     this.config = input.config;
     this.origin = origin ? [origin[0], origin[1], origin[2]] : [input.min[0], input.min[1], input.min[2]];
     this.span = tileSize * input.config.cs;
-    // The filters mark the grid's outer ring as a ledge, and erosion reaches walkableRadius + 1 cells in from it.
+    // The filters mark the grid's outer ring as a ledge, and erosion reaches walkableRadius + 1 cells in from it (at
+    // most: since KB2604b it measures from the drop beyond a ledge, one cell less).
     this.margin = Math.max(Math.ceil(input.config.borderSize), Math.ceil(input.config.walkableRadius) + 2);
     if ((tileSize + 2 * this.margin) ** 2 > VOXEL_BUDGET)
       throw new RangeError('Padded tile exceeds 16000000 cells; reduce tileSize, borderSize or walkableRadius.');

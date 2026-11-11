@@ -40,6 +40,55 @@ test('walks on blocks, on top of them, and round walls', () => {
   mesh.dispose();
 });
 
+test('every straight walk across an open floor stays straight over tile lines (KB2604b)', () => {
+  // The corridor search measured a polygon from the middle of the portal it entered by, and kept one way into each
+  // polygon: a zigzag through portal middles lost to a bent corridor, so (10, 55.5) -> (50, 55.5) turned at the tile
+  // row above. Now a portal is crossed where the taut path crosses it and every portal is its own search node.
+  const { voxels } = world(),
+    mesh = new VoxelNavMesh(voxels, options),
+    bent = [];
+  for (let z = 2; z <= 62; z += 0.5)
+    for (const [x0, x1] of [
+      [5, 60],
+      [3, 61],
+      [10, 50],
+    ]) {
+      const path = mesh.path([x0, 1, z], [x1, 1, z]);
+      if (path?.length !== 2) bent.push(`${x0} -> ${x1} at z ${z}: ${JSON.stringify(path)}`);
+    }
+  assert.deepEqual(bent, []);
+  mesh.dispose();
+});
+
+test('tiles split a shared edge at the same points on both sides (KB2604b)', () => {
+  // An odd stretch of a tile's outer edge has two middle points; each tile walks the shared line the other way, so a
+  // split taken by walk order put (4, 32) in one tile and (4.5, 32) in the next once the floor edge moved half a cell.
+  const { voxels } = world(),
+    mesh = new VoxelNavMesh(voxels, options),
+    span = mesh.tileSize * 0.5,
+    seams = new Map();
+  for (let p = 0; p < mesh.polygonCount; p++) {
+    const centre = mesh.polygonCenter(p);
+    for (const v of mesh.polygonPoints(p))
+      for (const [along, across, axis] of [
+        [v[0], v[2], 'x'],
+        [v[2], v[0], 'z'],
+      ]) {
+        const line = Math.round(along / span) * span;
+        if (Math.abs(along - line) > 1e-9 || line <= 0 || line >= 64) continue;
+        const side = (axis === 'x' ? centre[0] : centre[2]) < line ? 'low' : 'high',
+          key = `${axis} ${line}`,
+          sides = seams.get(key) ?? { low: new Set(), high: new Set() };
+        sides[side].add(across);
+        seams.set(key, sides);
+      }
+  }
+  assert.ok(seams.size >= 14);
+  for (const [key, { low, high }] of seams)
+    assert.deepEqual([...low].sort((a, b) => a - b), [...high].sort((a, b) => a - b), key);
+  mesh.dispose();
+});
+
 test('a change rebuilds only the tiles that see it', () => {
   const { voxels, stone } = world(128),
     mesh = new VoxelNavMesh(voxels, options),

@@ -10,7 +10,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/behavior` | 1,000 agents, one flock step (separation, alignment, cohesion, radius 2) | 3.098 ms | Yuka 0.7.8, 9.472 ms | win |
 | `@margoengine/navmesh` | gapped floor, build | 3.190 ms | recast-navigation 0.44.0, 1.130 ms | loss |
 | `@margoengine/navmesh` | gapped floor, one path query | 0.064 ms | recast-navigation 0.44.0, 0.082 ms | win |
-| `@margoengine/navmesh` | gapped floor, path length | 24.212 | recast-navigation 0.44.0, 23.778 | loss |
+| `@margoengine/navmesh` | gapped floor, path length | 23.823 (24.212 before KB2604b) | recast-navigation 0.44.0, 23.778 | accepted difference |
 | `@margoengine/navmesh` | open floor, path length | 22.627416997969522 | recast-navigation 0.44.0, same value, the Euclidean length | equal |
 | `@margoengine/ecs` | 100,000 entities, one `position += velocity` query | 1.249 ms | bitECS 0.4.0, 11.054 ms | win |
 | `@margoengine/fsm` | 10,000 transitions of a two-state toggle | 1.443 ms | XState 5.33.4, 27.935 ms | win |
@@ -39,9 +39,11 @@ after `npm run build --workspace @margoengine/behavior`. The Yuka install is `ba
 (`MARGO_ENGINE_BENCH` overrides the folder).
 
 The navmesh rows use one gapped floor (four quads, cell size 0.25) and one open floor. Build time and the path query are
-separate paired runs. Margo's gapped path takes the north hall (4 points, length 24.212). Detour takes the south hall
-(5 points, length 23.778). The straight line through the gap corners is about 23.26. Both open-floor paths equal
-`hypot(16, 16)`. The build loss and the length loss stay open in `docs/known-bugs.md`. The open floor and the rule that
+separate paired runs. Margo's gapped path was 24.212 (north hall, 4 points); since KB2604b (2026-11-11) erosion keeps
+the agent radius from the drop, not a radius plus a ledge cell, and the path is 23.823 (4 points, corner at
+(1.25, 8.25)). Detour takes the south hall (5 points, length 23.778). A disc agent of radius 0.25 cannot do better than
+about 23.69. The remaining 0.045 is an accepted difference (Margo's corner is a whole cell corner), recorded in
+`docs/limits.md`. Both open-floor paths equal `hypot(16, 16)`. The build loss stays open in `docs/known-bugs.md`. The open floor and the rule that
 the gapped path stays out of the hole are `packages/navmesh/test/path-length.test.js` (that test does not freeze
 Detour's length). Rerun: `node packages/navmesh/scripts/rival-bench.mjs`.
 

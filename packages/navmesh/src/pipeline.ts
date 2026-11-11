@@ -719,7 +719,9 @@ export function polygonise(
       belowRise = wasRise;
     }
   }
-  const open = new Uint8Array(total);
+  const open = new Uint8Array(total),
+    // Floor an agent could stand on but for a drop beside it: erosion measures the radius from that drop.
+    ledges = new Uint8Array(total);
   for (let z = 0; z < depth; z++)
     for (let x = 0; x < width; x++)
       for (let s = head[z * width + x]; s >= 0; s = next[s]) {
@@ -744,6 +746,7 @@ export function polygonise(
           }
         }
         if (!ledge) open[s] = 1;
+        else ledges[s] = 1;
       }
   // Carve obstacles: a floor cell whose centre is under a box (within a step below its bottom) is not walkable.
   for (const box of config.obstacles) {
@@ -815,18 +818,39 @@ export function polygonise(
   };
   relink();
 
-  // 3. Erosion: chamfer distance (3 per cell across, 4 diagonally) from the nearest cell an agent cannot stand on;
-  // a span stays when its centre is at least `walkableRadius` cells from that cell's edge.
+  // 3. Erosion: chamfer distance (3 per cell across, 4 diagonally; Borgefors 1986) from the nearest cell an agent cannot
+  // stand on; a span stays when its centre is at least `walkableRadius` cells from that cell's edge. At a drop the
+  // distance is taken from the drop itself, past the ledge cell (KB2604b): an agent of radius r stands anywhere at
+  // least r from the edge (its disc then overhangs nothing; Lozano-Perez 1983, the free space eroded by the agent).
   if (config.walkableRadius > 0) {
     const distance = new Uint16Array(total);
+    // What lies in the cell (x, z) beside floor height `floor` (rise `r`): 0 open floor, 1 a ledge (floor with a
+    // drop on its far side, so the drop is one cell further), 2 nothing an agent stands on (void, wall, low roof).
+    const beside = (x: number, z: number, floor: number, r: number) => {
+      if (x < 0 || z < 0 || x >= width || z >= depth) return 2;
+      let kind = 2;
+      for (let n = head[z * width + x]; n >= 0; n = next[n])
+        if (Math.abs(top[n] - floor) <= climb + Math.max(r, rise[n])) {
+          if (open[n]) return 0;
+          if (ledges[n]) kind = 1;
+        }
+      return kind;
+    };
     for (let s = 0; s < total; s++) {
       if (!open[s]) continue;
+      const x = spanX[s],
+        z = spanZ[s];
       let d = 0xffff;
+      // Orthogonal neighbours: 3 to a cell the agent cannot stand on, 6 past a ledge cell to its drop.
       for (let k = 0; k < 4; k++) {
-        if (link[4 * s + k] < 0) d = 3;
-        const along = link[4 * s + k],
-          side = (k + 1) & 3;
-        if (along >= 0 && link[4 * along + side] < 0) d = Math.min(d, 4);
+        if (link[4 * s + k] >= 0) continue;
+        d = Math.min(d, beside(x + DX[k], z + DZ[k], top[s], rise[s]) === 1 ? 6 : 3);
+      }
+      // Diagonal neighbours, looked up directly so a gap behind a ledge corner is found: 4, or 7 past a ledge.
+      for (let k = 0; k < 4; k++) {
+        const side = (k + 1) & 3,
+          kind = beside(x + DX[k] + DX[side], z + DZ[k] + DZ[side], top[s], rise[s]);
+        if (kind) d = Math.min(d, kind === 1 ? 7 : 4);
       }
       distance[s] = d;
     }
@@ -1205,7 +1229,10 @@ export function polygonise(
           const a = ids[i],
             b = ids[j];
           if (j - i > 1 && Math.hypot(vx[b] - vx[a], vz[b] - vz[a]) > longest) {
-            keep[(i + j) >> 1] = 1;
+            // An odd stretch has two middle points: take the one nearer the lower end (x, then z), so the tile or
+            // region on the other side, which walks this stretch the other way, splits it at the same point (KB2604b).
+            const lower = vx[a] < vx[b] || (vx[a] === vx[b] && vz[a] < vz[b]);
+            keep[lower ? (i + j) >> 1 : (i + j + 1) >> 1] = 1;
             changed = true;
           }
           i = j;

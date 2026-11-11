@@ -2546,6 +2546,10 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   24.212 (north hall, 4 points) against 23.778 (south hall, 5 points). The corner route is about 23.26. Open floor
   equal, both 22.627416997969522, which is `hypot(16, 16)`. Busy machine, diagnostic. Cause of the two losses is not
   yet found. They stay open in known-bugs.md.
+- **Update (KB2604b, 2026-11-11):** gapped length 23.823 (was 24.212): erosion keeps the radius from the drop, not a
+  radius plus a ledge cell, and the corridor search runs over portals. The 0.045 left against Detour is an accepted
+  difference (whole-cell corner; limits.md, navmesh routes). Length only, no timing rerun (speed phase deferred).
+  Proof: `packages/navmesh/test/path-length.test.js`.
 - **Rerun:** `node packages/navmesh/scripts/rival-bench.mjs`. Citation in clean-room.md.
 
 ### 95. 100,000 entities against bitECS (diagnostic, win)

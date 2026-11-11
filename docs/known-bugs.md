@@ -2868,17 +2868,18 @@ Measured but not fixed. Their history, sources and rerun commands are in
   entry 94): 3.190 ms against 1.130 ms, paired turns, per-round minimum, busy machine, diagnostic. Repro:
   `node packages/navmesh/scripts/rival-bench.mjs` after the navmesh build. The rival is installed outside the
   repository. Cause not yet found. Publishing the number does not close it.
-- **Navmesh path on that floor is longer than Detour's** (`@margoengine/navmesh`, perf history entry 94): Margo 24.212
-  (north hall, 4 points) against recast-navigation 0.44.0 at 23.778 (south hall, 5 points). The corner route through
-  either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Measured cause
-  (2026-11-11, lane L4): the path is the shortest one on Margo's mesh (either hall gives the same 12.217 halves), and the
-  mesh keeps the agent radius plus the dropped ledge cell from the hole, as `build.test.js`'s recorded queries require,
-  with the corner cell cut by the chamfer erosion; Douglas-Peucker then takes the corner at (1.25, 8.5). With
-  `walkableRadius` 0 Margo's path is 23.645, under Detour's. Measuring the radius from the drop instead of from the
-  ledge ring gives 23.823 but breaks those recorded queries, so it was not landed. Detour's side is a black box. Next:
-  compare the two meshes' boundary cells on this floor before changing the ledge rule.
-  `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the hole. It
-  does not freeze Detour's length. Publishing the number does not close it.
+- **Fixed (KB2604b, 2026-11-11): navmesh path on that floor was longer than Detour's** (`@margoengine/navmesh`, perf
+  history entry 94): Margo 24.212 against recast-navigation 0.44.0 at 23.778. Two causes. Erosion measured the agent
+  radius from the far side of a dropped ledge cell, so the walkable edge sat a radius plus one cell from a drop; it now
+  measures from the drop (an agent of radius r stands anywhere r from the edge), and the gapped path is 23.823 (corner
+  at (1.25, 8.25); a disc agent's bound is about 23.69). That moved the floor edge half a block on voxel meshes and
+  exposed the corridor search: it charged each polygon from the middle of the portal it entered by and kept one way
+  into each polygon, so straight walks over an open voxel floor bent at tile lines (192 of 363 rows, 1 of 363 before
+  the erosion change). The search now runs over portals, crosses each where the walk to the goal through it is
+  shortest, and breaks ties by position; tiles split a shared outer edge at the same point on both sides. Tests:
+  `packages/navmesh/test/path-length.test.js` (gapped path under 23.85), `packages/navmesh/test/voxel.test.js`
+  (straight walks, shared edge splits), `packages/navmesh/test/build.test.js` (radius 2 rows re-recorded with the
+  clearance proof). The remaining 0.045 against Detour is an accepted difference in `docs/limits.md` (navmesh routes).
 - **Volume-64 frame is slower than VTK.js 38.0.5** (`@margoengine/sciviz`, perf history entry 102): 1.500 ms against
   1.300 ms, one 256 x 256 frame plus the pixel read, paired turns, per-round minimum, busy machine, diagnostic. The
   rounds overlap (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). Mean absolute channel difference of the last pair is 1.801.

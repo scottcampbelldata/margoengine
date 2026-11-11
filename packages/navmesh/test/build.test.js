@@ -42,7 +42,10 @@ const length = (path) =>
   );
 
 // Recorded from the previous solver (scene, radius vx, start, end, point count, length, first, last). Binding:
-// null or not, first/last within one cell (and y within ch), length within 3%; corner choice is not binding.
+// null or not, first/last within one cell (and y within ch), length within 3%; corner choice is not binding. The
+// radius 2 rows were re-recorded for KB2604b: erosion now measures the radius from the drop, not from the far side of a
+// dropped ledge cell, so (-8.5, -8.5), where the clearance below is exactly the radius, is no longer pulled in to
+// (-8.25, -8.25); the test asserts that proof for every row.
 const RECORDED = [
   ['plane', 0, [-5, 0, -5], [5, 0, 5], 2, 14.1421, [-5, 0, -5], [5, 0, 5]],
   ['plane', 0, [-8, 0, 0], [8, 0, 0], 2, 16, [-8, 0, 0], [8, 0, 0]],
@@ -54,10 +57,10 @@ const RECORDED = [
   ['plane', 2, [-5, 0, -5], [5, 0, 5], 2, 14.1421, [-5, 0, -5], [5, 0, 5]],
   ['plane', 2, [-8, 0, 0], [8, 0, 0], 2, 16, [-8, 0, 0], [8, 0, 0]],
   ['plane', 2, [-8, 0, -8], [8, 0, 8], 2, 22.6274, [-8, 0, -8], [8, 0, 8]],
-  ['plane', 2, [-8.5, 0, -8.5], [-8.5, 0, -8.5], 1, 0, [-8.25, 0.1, -8.25], [-8.25, 0.1, -8.25]],
-  ['plane', 2, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 2, 23.3345, [-8.25, 0.1, -8.25], [8.25, 0.1, 8.25]],
+  ['plane', 2, [-8.5, 0, -8.5], [-8.5, 0, -8.5], 1, 0, [-8.5, 0, -8.5], [-8.5, 0, -8.5]],
+  ['plane', 2, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 2, 24.0416, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5]],
   ['plane', 2, [-20, 0, -20], [5, 0, 5], null, null, null, null],
-  ['plane', 2, [0, 0, 0], [8.5, 0, 8.5], 2, 11.6677, [0, 0, 0], [8.25, 0.1, 8.25]],
+  ['plane', 2, [0, 0, 0], [8.5, 0, 8.5], 2, 12.0208, [0, 0, 0], [8.5, 0, 8.5]],
   ['hole', 0, [-5, 0, -5], [5, 0, 5], 3, 16.6793, [-5, 0, -5], [5, 0, 5]],
   ['hole', 0, [-8, 0, 0], [8, 0, 0], 5, 17.8471, [-8, 0, 0], [8, 0, 0]],
   ['hole', 0, [-8, 0, -8], [8, 0, 8], 3, 24.2937, [-8, 0, -8], [8, 0, 8]],
@@ -65,11 +68,11 @@ const RECORDED = [
   ['hole', 0, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 3, 25.6277, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5]],
   ['hole', 0, [-20, 0, -20], [5, 0, 5], null, null, null, null],
   ['hole', 0, [0, 0, 0], [8.5, 0, 8.5], null, null, null, null],
-  ['hole', 2, [-5, 0, -5], [5, 0, 5], 4, 17.3966, [-5, 0, -5], [5, 0, 5]],
-  ['hole', 2, [-8, 0, 0], [8, 0, 0], 4, 18.6054, [-8, 0, 0], [8, 0, 0]],
-  ['hole', 2, [-8, 0, -8], [8, 0, 8], 4, 24.76, [-8, 0, -8], [8, 0, 8]],
-  ['hole', 2, [-8.5, 0, -8.5], [-8.5, 0, -8.5], 1, 0, [-8.25, 0.1, -8.25], [-8.25, 0.1, -8.25]],
-  ['hole', 2, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 4, 25.4053, [-8.25, 0.1, -8.25], [8.25, 0.1, 8.25]],
+  ['hole', 2, [-5, 0, -5], [5, 0, 5], 3, 17.0635, [-5, 0, -5], [5, 0, 5]],
+  ['hole', 2, [-8, 0, 0], [8, 0, 0], 4, 18.3004, [-8, 0, 0], [8, 0, 0]],
+  ['hole', 2, [-8, 0, -8], [8, 0, 8], 3, 24.559, [-8, 0, -8], [8, 0, 8]],
+  ['hole', 2, [-8.5, 0, -8.5], [-8.5, 0, -8.5], 1, 0, [-8.5, 0, -8.5], [-8.5, 0, -8.5]],
+  ['hole', 2, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 3, 25.8871, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5]],
   ['hole', 2, [-20, 0, -20], [5, 0, 5], null, null, null, null],
   ['hole', 2, [0, 0, 0], [8.5, 0, 8.5], null, null, null, null],
   ['corridorL', 0, [-5, 0, -5], [5, 0, 5], null, null, null, null],
@@ -81,9 +84,9 @@ const RECORDED = [
   ['corridorL', 0, [0, 0, 0], [8.5, 0, 8.5], null, null, null, null],
   ['corridorL', 2, [-5, 0, -5], [5, 0, 5], null, null, null, null],
   ['corridorL', 2, [-8, 0, 0], [8, 0, 0], null, null, null, null],
-  ['corridorL', 2, [-8, 0, -8], [8, 0, 8], 4, 31.2119, [-8, 0, -8], [8, 0, 8]],
-  ['corridorL', 2, [-8.5, 0, -8.5], [-8.5, 0, -8.5], 1, 0, [-8.25, 0.1, -8.25], [-8.25, 0.1, -8.25]],
-  ['corridorL', 2, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 4, 31.7232, [-8.25, 0.1, -8.25], [8.25, 0.1, 8.25]],
+  ['corridorL', 2, [-8, 0, -8], [8, 0, 8], 4, 30.785, [-8, 0, -8], [8, 0, 8]],
+  ['corridorL', 2, [-8.5, 0, -8.5], [-8.5, 0, -8.5], 1, 0, [-8.5, 0, -8.5], [-8.5, 0, -8.5]],
+  ['corridorL', 2, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5], 4, 31.8512, [-8.5, 0.5, -8.5], [8.5, 0.5, 8.5]],
   ['corridorL', 2, [-20, 0, -20], [5, 0, 5], null, null, null, null],
   ['corridorL', 2, [0, 0, 0], [8.5, 0, 8.5], null, null, null, null],
 ];
@@ -112,11 +115,20 @@ test('generated meshes match the recorded path queries on plane, hole and L-corr
       assert.ok(Math.hypot(point.x - expected[0], point.z - expected[2]) <= OPTIONS.cs, `${label}: end within a cell`);
       assert.ok(Math.abs(point.y - expected[1]) <= OPTIONS.ch + 1e-9, `${label}: end height within ch`);
     }
+    // KB2604b proof, with the test's own clearance: an agent of the radius fits wherever the clearance reaches it, so a
+    // query end there is kept, not pulled in. Clearance at (-8.5, -8.5) is 0.5 = 2 * cs, the radius 2 rows' radius:
+    // their former ends at (-8.25, -8.25) were eroded one cell too far.
+    for (const [point, query] of [
+      [path[0], s],
+      [path.at(-1), e],
+    ])
+      if (clearance(scene, query[0], query[2]) >= radius * OPTIONS.cs)
+        assert.ok(Math.hypot(point.x - query[0], point.z - query[2]) < 1e-9, `${label}: the agent fits at the query point`);
     const measured = length(path);
     assert.ok(Math.abs(measured - recorded) <= 0.03 * recorded + 1e-9, `${label}: length ${measured} vs ${recorded}`);
-    // Every segment stays on the floor, eroded by the radius plus the dropped ledge cell, less one cell of
-    // contour simplification slack.
-    const margin = Math.max(0, (radius + 1) * OPTIONS.cs - OPTIONS.cs) - 1e-9;
+    // Every segment stays on the floor, eroded by the radius (measured from the drop since KB2604b, no ledge cell
+    // added), less one cell of contour simplification slack.
+    const margin = Math.max(0, radius * OPTIONS.cs - OPTIONS.cs) - 1e-9;
     for (let i = 1; i < path.length; i++)
       for (let t = 0; t <= 1; t += 1 / 32) {
         const x = path[i - 1].x + t * (path[i].x - path[i - 1].x),

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15118348,
+  "total": 15126455,
   "history": [
     {
       "date": "2026-10-24",
@@ -8567,6 +8567,12 @@
       "commit": "21221691ae",
       "reason": "taa/upscale: TAA and TAAUpscale refuse the WebGL2 ldr tier (KB4278c) through the shared requireCompatTier and its linked coded error, as Bloom, SSAO, DOF and PostStack do; upscale 7384 -> 7624 B, root 14686 -> 14927 B (within its budget). A local copy of the tier rule would save about half and fork the rule the other HDR effects share",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "097cf04ab4",
+      "reason": "KB2604b navmesh corridor search over portals with shortest crossing points and position tie-break, erosion from the drop, seam-consistent edge splits: root 7637 to 8077 B gzip; a split would make every path call async",
+      "grew": 10
     }
   ],
   "items": {
@@ -9196,20 +9202,20 @@
     "@margoengine/mixer/snapshots": 1956,
     "@margoengine/mixer/stereo": 1071,
     "@margoengine/mixer/worklet": 2825,
-    "@margoengine/navmesh": 7694,
-    "@margoengine/navmesh dist/workers/navmesh-build.js": 17951,
-    "@margoengine/navmesh/agents": 15964,
-    "@margoengine/navmesh/build": 12727,
-    "@margoengine/navmesh/codec": 17103,
+    "@margoengine/navmesh": 8333,
+    "@margoengine/navmesh dist/workers/navmesh-build.js": 18911,
+    "@margoengine/navmesh/agents": 17055,
+    "@margoengine/navmesh/build": 13637,
+    "@margoengine/navmesh/codec": 18194,
     "@margoengine/navmesh/debug": 1755,
-    "@margoengine/navmesh/hierarchy": 4250,
+    "@margoengine/navmesh/hierarchy": 4737,
     "@margoengine/navmesh/links": 4288,
     "@margoengine/navmesh/obstacles": 1814,
-    "@margoengine/navmesh/queries": 4729,
-    "@margoengine/navmesh/tiles": 15595,
+    "@margoengine/navmesh/queries": 5268,
+    "@margoengine/navmesh/tiles": 16203,
     "@margoengine/navmesh/volume": 4975,
-    "@margoengine/navmesh/voxel": 16031,
-    "@margoengine/navmesh/wasm": 17808,
+    "@margoengine/navmesh/voxel": 16957,
+    "@margoengine/navmesh/wasm": 18664,
     "@margoengine/net": 1985,
     "@margoengine/net/delay": 1551,
     "@margoengine/net/fields": 2902,
