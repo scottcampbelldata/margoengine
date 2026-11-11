@@ -153,3 +153,30 @@ test('the default limits hold 996,004 vertices: every corner its own vertex, wit
   assert.deepEqual([...indices.subarray(0, 6)], [0, 1, 2, 0, 2, 3]);
   assert.ok(doc.accessors[primitive.attributes.TANGENT].count === corners);
 });
+test('gltf-pro draws the 996,004-vertex FBX mesh as default-size parts that cover it exactly', {
+  timeout: 120000,
+}, async () => {
+  // The converted file holds one primitive; gltf-pro packs it in parts of at most 262,144 vertices (its documented
+  // default maxPartVertices). The GPU check (test/default-scale-browser.mjs) asserted one primitive and went red when
+  // parts landed; this proves the 1,000,000-vertex promise on the parts: every vertex and every triangle, once.
+  const { defaultScaleMesh } = await import('./default-scale.js');
+  const { partCoverage } = await import('./part-coverage.js');
+  const { prepareGLTF } = await import('../../gltf-pro/dist/prepare.js');
+  const { corners } = defaultScaleMesh();
+  const prepared = await prepareGLTF(undefined, await convertFBX(defaultScaleMesh().bytes));
+  const parts = prepared.geometry.flat().flatMap((g) => (Array.isArray(g) ? g : [g]));
+  assert.ok(parts.every((p) => p.part?.count === parts.length));
+  const coverage = partCoverage(
+    parts.map((p) => ({ indices: p.indices, vertexMap: p.part.vertexMap })),
+    corners,
+  );
+  assert.ok(coverage.parts >= Math.ceil(corners / 262_144), `${coverage.parts} parts`);
+  assert.ok(coverage.largest <= 262_144, `largest part ${coverage.largest}`);
+  assert.equal(coverage.wrong, 0);
+  assert.equal(coverage.repeated, 0);
+  assert.equal(coverage.missingVertices, 0);
+  assert.equal(coverage.missingTriangles, 0);
+  // A vertex on a cut is stored in each part that uses it; the cuts stay short (under 1% extra).
+  assert.ok(coverage.stored < corners * 1.01, `${coverage.stored} stored for ${corners}`);
+  for (const p of parts) assert.equal(p.vertices.length, p.part.vertexMap.length * 20);
+});

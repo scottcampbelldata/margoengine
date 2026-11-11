@@ -1,6 +1,8 @@
 // The default-limit FBX mesh (996,004 vertices, test/default-scale.js) loads with default options and renders, on
-// native WebGPU and (MARGO_COMPAT=1) the WebGL2 layer. Work counts are the assertions: one primitive, one geometry
-// upload, a steady frame that creates no buffer and re-uploads no geometry, a fixed draw count. Load time and GPU frame
+// native WebGPU and (MARGO_COMPAT=1) the WebGL2 layer. gltf-pro draws its one glTF primitive as parts of at most
+// 262,144 vertices (its default maxPartVertices), so the assertions are: the parts cover the mesh exactly (every vertex,
+// every triangle once, test/part-coverage.js), one upload of the parts' geometry, one draw per part, a steady frame
+// that creates no buffer and re-uploads no geometry. Load time and GPU frame
 // time (timestamp-query, when the adapter has it) are printed as diagnostics; their targets live in
 // docs/work-lists/speed-phase.md for the quiet run.
 // node scripts/gpu-lock.mjs run --owner=<you> --max=10 -- node packages/fbx/test/default-scale-browser.mjs
@@ -13,12 +15,13 @@ const browser = await openBrowser({ startPath: '/packages/fbx/test/textures.html
 try {
   const errors = [];
   browser.page.on('pageerror', (e) => errors.push(e.message));
-  const result = await browser.page.evaluate(async (base64) => {
-    const [{ Engine }, { parseFBX }, { Stats }, { readPixels, createHeadlessCanvas }] = await Promise.all([
+  const result = await browser.page.evaluate(async ([base64, corners]) => {
+    const [{ Engine }, { parseFBX }, { Stats }, { readPixels, createHeadlessCanvas }, { partCoverage }] = await Promise.all([
       import('/packages/core/dist/index.js'),
       import('/packages/fbx/dist/index.js'),
       import('/packages/stats/dist/index.js'),
       import('/packages/headless/dist/index.js'),
+      import('/packages/fbx/test/part-coverage.js'),
     ]);
     const input = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     const engine = await Engine.create(createHeadlessCanvas({ width: 256, height: 256 }), {
@@ -78,7 +81,12 @@ try {
     for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 60) lit++;
     const error = await device.popErrorScope();
     const primitives = model.primitives.length,
-      vertices = model.primitives.reduce((n, p) => n + p.vertices.length / 20, 0);
+      vertices = model.primitives.reduce((n, p) => n + p.vertices.length / 20, 0),
+      indices = model.primitives.reduce((n, p) => n + p.indices.length, 0),
+      coverage = partCoverage(
+        model.primitives.map((p) => ({ indices: p.indices, vertexMap: p.part?.vertexMap })),
+        corners,
+      );
     stats.dispose();
     model.dispose();
     engine.dispose();
@@ -92,6 +100,8 @@ try {
       error: error?.message,
       primitives,
       vertices,
+      indices,
+      coverage,
       draws: [...new Set(draws)],
       load: afterLoad,
       first: { buffers: afterFirst.buffers - afterLoad.buffers, writeBytes: afterFirst.writeBytes - afterLoad.writeBytes },
@@ -101,21 +111,30 @@ try {
         writesPerFrame: (afterSteady.writes - afterFirst.writes) / frames,
       },
     };
-  }, Buffer.from(bytes).toString('base64'));
+  }, [Buffer.from(bytes).toString('base64'), corners]);
   console.log(JSON.stringify(result));
   assert.equal(result.error, undefined);
   assert.deepEqual(errors, []);
-  assert.equal(result.primitives, 1);
-  assert.equal(result.vertices, corners);
+  const { coverage } = result;
+  assert.equal(coverage.parts, result.primitives);
+  assert.ok(coverage.largest <= 262_144, `every part within the default 262,144 vertices: ${coverage.largest}`);
+  assert.deepEqual(
+    [coverage.wrong, coverage.repeated, coverage.missingVertices, coverage.missingTriangles],
+    [0, 0, 0, 0],
+    'every vertex and every triangle of the mesh is drawn, each triangle once',
+  );
+  assert.equal(result.vertices, coverage.stored);
+  assert.ok(result.vertices < corners * 1.01, `cut vertices stay under 1%: ${result.vertices} for ${corners}`);
+  assert.equal(result.indices, (corners / 4) * 6, 'no triangle is added or lost');
   assert.ok(result.lit > 256 * 256 * 0.2, `the grid covers the view: ${result.lit} lit pixels`);
-  // One upload of the geometry: 80 B per PBR vertex and 4 B per index (1.5 triangles' worth of 3 per quad corner).
-  assert.equal(result.load.writeBytes, corners * 80 + (corners / 4) * 6 * 4, 'the geometry is uploaded once, whole');
-  assert.deepEqual(result.draws, [1], 'one draw a frame for one primitive');
+  // One upload of the parts' geometry: 80 B per stored PBR vertex and 4 B per index.
+  assert.equal(result.load.writeBytes, result.vertices * 80 + result.indices * 4, 'the geometry is uploaded once');
+  assert.deepEqual(result.draws, [result.primitives], 'one draw a frame per part');
   assert.equal(result.steady.buffers, 0, 'a steady frame creates no buffer');
   assert.ok(result.steady.writeBytesPerFrame <= 256, `a steady frame uploads only uniforms: ${result.steady.writeBytesPerFrame} B`);
   console.log(
     `FBX default-scale mesh (${corners.toLocaleString('en-US')} vertices, ${result.compat ? 'WebGL2 layer' : 'WebGPU'}): ` +
-      `one ${(result.load.writeBytes / 1048576).toFixed(1)} MiB upload, ${result.draws[0]} draw, ` +
+      `${result.primitives} parts, one ${(result.load.writeBytes / 1048576).toFixed(1)} MiB upload, ${result.draws[0]} draws, ` +
       `${result.steady.writeBytesPerFrame} B per steady frame; diagnostic on a busy machine: load ${result.loadMs.toFixed(0)} ms, ` +
       `first frame ${result.firstFrameMs.toFixed(0)} ms, steady ${result.steadyMs.toFixed(1)} ms wall, GPU ${result.gpuMs?.toFixed(2) ?? 'n/a'} ms`,
   );
