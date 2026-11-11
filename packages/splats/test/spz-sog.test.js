@@ -252,3 +252,58 @@ for (const [name, count, slab] of [
     }
   });
 }
+
+// Decompression bombs: a few hundred kilobytes of gzip or deflate must not expand without bound before the decoder
+// sees the size. An SPZ version 3 header promising one splat, followed by zeros past the largest possible body
+// (3,000,000 degree-3 splats), was inflated in full and then accepted; a SOG entry was inflated in full before its
+// declared size was compared.
+const zeros = async (header, total, make) => {
+  const { createGzip, createDeflateRaw } = await import('node:zlib'),
+    z = make === 'gzip' ? createGzip() : createDeflateRaw(),
+    out = [];
+  z.on('data', (c) => out.push(c));
+  const done = new Promise((resolve) => z.on('end', resolve)),
+    chunk = Buffer.alloc(1 << 20);
+  z.write(header);
+  for (let left = total - header.length; left > 0; left -= chunk.length)
+    if (!z.write(left >= chunk.length ? chunk : chunk.subarray(0, left))) await new Promise((r) => z.once('drain', r));
+  z.end();
+  await done;
+  return new Uint8Array(Buffer.concat(out));
+};
+test('parseSpz stops a gzip bomb at the largest possible body instead of inflating it all', async () => {
+  const header = Buffer.alloc(16);
+  header.writeUInt32LE(0x5053474e, 0);
+  header.writeUInt32LE(3, 4);
+  header.writeUInt32LE(1, 8);
+  const max = 16 + 3_000_000 * (20 + 45),
+    bomb = await zeros(header, max + 1, 'gzip');
+  assert.ok(bomb.length < 1 << 20, `the bomb is small (${bomb.length} bytes)`);
+  await assert.rejects(parseSpz(bomb), /expands past 195000016 bytes/);
+});
+test('parseSog stops a deflated entry once it passes its declared size', async () => {
+  const name = new TextEncoder().encode('meta.json'),
+    data = await zeros(Buffer.alloc(0), 64 << 20, 'deflate'),
+    local = Buffer.alloc(30),
+    central = Buffer.alloc(46),
+    end = Buffer.alloc(22);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(8, 8);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(100, 22);
+  local.writeUInt16LE(name.length, 26);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(8, 10);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(100, 24);
+  central.writeUInt16LE(name.length, 28);
+  central.writeUInt32LE(0, 42);
+  const centralAt = 30 + name.length + data.length;
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(46 + name.length, 12);
+  end.writeUInt32LE(centralAt, 16);
+  const zip = Buffer.concat([local, name, data, central, name, end]);
+  await assert.rejects(parseSog(buffer(zip)), /expands past 100 bytes/);
+});

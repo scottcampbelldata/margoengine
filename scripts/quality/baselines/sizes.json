@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14905074,
+  "total": 14906011,
   "history": [
     {
       "date": "2026-10-24",
@@ -8339,6 +8339,12 @@
       "commit": "2040cc95f2",
       "reason": "lightmap/refracted 9015 B budget to 9452 B measured, budget 9736 B (+437 B measured): Smith microsurface random walk and anisotropic GGX for rough glass; it is the refracted entry's own feature, a separate entry would duplicate the bake loop",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "c58f6081ab",
+      "reason": "splats: bounded gzip and deflate output (decompression-bomb cap), /lod 30687 to 30702 B gzip (+15 B), budget 31624 B; the bound lives in the shared inflate, a split would duplicate it",
+      "grew": 1
     }
   ],
   "items": {
@@ -9343,7 +9349,7 @@
     "@margoengine/splats/edit": 3856,
     "@margoengine/splats/formats": 20847,
     "@margoengine/splats/lighting": 3606,
-    "@margoengine/splats/lod": 30687,
+    "@margoengine/splats/lod": 31624,
     "@margoengine/splats/lod-sog": 20981,
     "@margoengine/splats/modify": 20779,
     "@margoengine/splats/pick": 3573,

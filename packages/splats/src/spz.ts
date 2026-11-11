@@ -12,6 +12,8 @@ export interface ParseSpzOptions {
 
 /** SH coefficients per colour channel for SPZ degrees 0-3 (the degree-0 term lives in the colour). */
 const REST_PER_CHANNEL = [0, 3, 8, 15];
+/** The largest version 2 or 3 body: a 16-byte header and 3,000,000 splats of degree 3 (20 + 45 bytes each). */
+export const SPZ_BODY_MAX = 16 + 3_000_000 * (9 + 1 + 3 + 3 + 4 + 15 * 3);
 
 /**
  * Decodes an SPZ file (versions 2 and 3, the gzip-compressed layout, and version 4, a plain header, a table of
@@ -41,7 +43,7 @@ export async function parseSpz(
     throw new RangeError(
       'Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz.',
     );
-  return decodeSpzBody(await inflate(file, 'gzip', options.signal), 3);
+  return decodeSpzBody(await inflate(file, 'gzip', options.signal, SPZ_BODY_MAX), 3);
 }
 
 /**

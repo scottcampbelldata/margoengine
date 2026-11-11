@@ -3,11 +3,15 @@
 import { MargoError } from '@margoengine/math/errors';
 import { hasTrailingData } from '../../shared/trailing-data.js';
 
-/** Inflates `bytes` with the platform decompressor (`'gzip'` or raw `'deflate-raw'`). */
+/**
+ * Inflates `bytes` with the platform decompressor (`'gzip'` or raw `'deflate-raw'`), stopping with a RangeError as
+ * soon as the output passes `maxBytes`, so a small hostile stream cannot expand without bound.
+ */
 export async function inflate(
   bytes: Uint8Array,
   format: 'gzip' | 'deflate-raw',
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  maxBytes: number,
 ): Promise<Uint8Array<ArrayBuffer>> {
   signal?.throwIfAborted();
   if (typeof DecompressionStream === 'undefined')
@@ -23,11 +27,18 @@ export async function inflate(
       if (done) break;
       parts.push(value);
       total += value.length;
+      if (total > maxBytes) break;
     }
   } catch (cause) {
     if (signal?.aborted) throw signal.reason;
     throw new RangeError(
       `The compressed data is damaged (${(cause as Error).message}); check that the file is complete.`,
+    );
+  }
+  if (total > maxBytes) {
+    await reader.cancel().catch(() => {});
+    throw new RangeError(
+      `The compressed data expands past ${maxBytes} bytes, more than the file can hold; check that the file is complete and not damaged.`,
     );
   }
   if (await hasTrailingData(bytes, format))
@@ -79,7 +90,8 @@ export async function readZip(bytes: Uint8Array, signal?: AbortSignal): Promise<
     const raw = bytes.subarray(dataAt, dataAt + compressed);
     let data: Uint8Array;
     if (method === 0) data = raw;
-    else if (method === 8) data = await inflate(raw, 'deflate-raw', signal);
+    // An entry may not inflate past the size its directory record declares.
+    else if (method === 8) data = await inflate(raw, 'deflate-raw', signal, size);
     else
       throw new MargoError(
         'unsupported',
