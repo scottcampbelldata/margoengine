@@ -465,6 +465,7 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
   out.bundlers = filesOnly(steps['modern:test:bundlers']);
   out['examples-types'] = filesOnly(steps['check:examples-types']);
   out['readme-run'] = filesOnly(steps['check:readme-run']);
+  out.owners = filesOnly(steps['check:owners']);
   out['rust-kernels'] = filesOnly(steps['check:rust-kernels']);
   out.verify = filesOnly(steps.verify);
   out['fresh-clone'] = filesOnly(steps['check:fresh-clone']);

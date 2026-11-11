@@ -1,5 +1,53 @@
 # Known bugs and unverified features
 
+
+### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
+
+- **Repro:** more than 1,048,574 core meshes of one geometry on a device with WebGPU's default 128 MiB
+  `maxStorageBufferBindingSize` (the WebGL2 layer, or an adapter offering no more), sorted by `FrontToBack` of `@margoengine/culling`
+  (`InstanceSorter`): core's instance buffer has doubled past 128 MiB and the pass's bind group names it whole, a validation
+  error each frame. Core's own draws are unaffected (they bind it as a vertex buffer).
+- **Cause:** `packages/culling/src/sort.ts` binds `range.instances` with no `offset` or `size`, the case
+  `CulledMeshes` fixed in c106034b1.
+- **Fix to build:** bind only rows `start` to `start + capacity` (offset aligned to `minStorageBufferOffsetAlignment`,
+  the shader index rebased), with a scale check like `packages/culling/test/gpu/meshes-scale-check.mjs`.
+
+### Loaders still name 1,000,000 as the core vertex limit (found with the core scale change, 2026-11-10, open)
+
+- **Repro:** `toGeometry` of `@margoengine/loaders` on a 1,000,001-vertex mesh throws `1000001 vertices exceed the core
+  limit of 1000000`, while core's `Geometry` now takes up to 11,184,810 vertices.
+- **Cause:** `packages/loaders/src/geometry.ts` mirrors core's old cap in its exported `CORE_MAX_VERTICES`; the default
+  point-cloud `maxPoints` (`CORE_MAX_VERTICES / 6`) derives from it, so raising it changes how many points draw by default.
+- **Fix to build:** decide in loaders whether to follow the new core cap (and keep the point-cloud default at 166,666
+  points so frame cost does not change), or keep 1,000,000 as the loaders' own limit and say so in the message.
+
+### WebGL2 layer: an imported external texture outlives the Video that imported it (found by check:owners, 2026-11-10, open)
+
+- **Repro:** `MARGO_COMPAT=1 node scripts/check-owner-lifetime-browser.mjs --packages=video` with
+  `packages/video/test/owner-lifetime.fixture.js` on disk: all 11 cases fail 'no leaked GPU buffers, textures or query
+  sets'; the same fixture passes on native WebGPU.
+- **Cause:** `packages/webgl2-compat/src/device/device.ts` `importExternalTexture` keeps one texture per source in
+  `externals` and destroys it only when the size changes, so after `Video.dispose()` (and after its VideoFrame is
+  closed) the texture stays until the source object is collected. WebGPU expires an external texture at the end of
+  the task, or when its VideoFrame closes.
+- **Fix to build:** expire the layer's external texture as WebGPU does (a closed VideoFrame, the end of the task)
+  while reusing the texture storage for the next frame of the same size, so steady frames still allocate nothing;
+  then gate the video fixture.
+
+### The clear-colour cache drops its 65th colour's buffer without destroying it (found by check:owners, 2026-11-10, open)
+
+- **Repro:** clear 65 or more different colours on one device (an animated background): `packages/shared/clear-color.js`
+  `colourGroup` deletes the oldest map entry and never calls `destroy()` on its 16-byte uniform buffer, so its GPU
+  memory is freed only when the browser collects it. Related: SSR and SSGI from `@margoengine/post` create their
+  colour's buffer inside this device cache, so after they are disposed `check:owners` counts it as theirs; adding
+  `SSR.attach` or `SSGI.attach` to `packages/post/test/owner-lifetime.fixture.js` fails the final leak check with one
+  retained 16-byte buffer.
+- **Cause:** the cache is per device, not per owner, and an evicted buffer may still be bound by a clear recorded
+  before the same submit, so it cannot be destroyed at eviction.
+- **Fix to build:** destroy evicted buffers after the queue's next submitted work is done (`onSubmittedWorkDone`),
+  and drop the whole device entry when the device is destroyed. Core's renderer shares the file, so the change is a
+  core bug fix (Scott's yes first) within the size gate. SSR and SSGI join the post fixture after it.
+
 ### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
 
 - **Repro:** an EXR whose `chromaticities` attribute names ACEScg (AP1) primaries and one pixel (1, 0, 0): `parseEXR`,

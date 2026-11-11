@@ -433,6 +433,15 @@ test('a documents-only change skips every GPU step, the example types and the bu
   );
 });
 
+test('owner/lifetime runs affected packages and their dependents, and whole when its harness changes', () => {
+  const ownerStep = (files) => planFor(files).planned.find((p) => stepName(p.command) === 'check:owners');
+  assert.match(ownerStep(['packages/video/src/index.ts']).command, /--packages=.*\bvideo\b/);
+  assert.equal(planFor(['packages/animation/src/index.ts']).decision.mode, 'full', 'existing dependent threshold applies');
+  assert.deepEqual(ownerStep(['packages/animation/src/index.ts']), { command: 'npm run check:owners' });
+  assert.equal(ownerStep(['docs/known-bugs.md']).skip, 'no affected package uses it');
+  assert.deepEqual(ownerStep(['tests/support/owner-lifetime.js']), { command: 'npm run check:owners' });
+});
+
 test('a Python package change runs only the Python notebook suite, not the full GPU run', () => {
   const { decision, planned } = planFor(['python/margoengine/_figure.py', 'python/frontend/figure.ts']);
   assert.equal(decision.mode, 'affected', decision.reason);

@@ -8749,3 +8749,35 @@ vocoder time stretch and pitch shift were considered and not built.
 ## Lague plan 1: particle liquid surface (2026-11-10)
 
 water/liquid is written from W. J. van der Laan, S. Green and M. Sainz, Screen Space Fluid Rendering with Curvature Flow, I3D 2009, https://doi.org/10.1145/1507149.1507164 (sphere sprites to eye depth, additive thickness, normals from the smaller one-sided difference); N. Truong and C. Yuksel, A Narrow-Range Filter for Screen-Space Fluid Rendering, Proc. ACM Comput. Graph. Interact. Tech. 1(1) 2018, https://www.cemyuksel.com/research/papers/narrowrangefilter.pdf (equations 1 to 9 and the separable passes with a 5 x 5 clean-up); the Beer-Lambert law and the exact Fresnel equations for an unpolarised dielectric. Also read and compared: F. Oliveira and A. Paiva, Narrow-Band Screen-Space Fluid Rendering, Computer Graphics Forum 41(6) 2022, https://doi.org/10.1111/cgf.14510 (its narrow band is a particle-space voxel classification, planned next); M. Ihmsen, N. Akinci, G. Akinci and M. Teschner, Unified spray, foam and air bubbles for particle-based fluids, The Visual Computer 28(6-8) 2012 (whitewater, planned); S. Green, Screen Space Fluid Rendering for Games, GDC 2010 (parameter sanity). Ruled out for now: Yu and Turk's anisotropic kernels (TOG 2013, a solver-side neighbour PCA) and Muller's screen-space meshes (2007, per-frame triangulation). No engine or companion code was read; the float64 oracle (packages/water/test/liquid-reference.js) was written from the paper alone.
+
+
+## Shared owner/lifetime model (check:owners)
+
+Research compared ownership confinement, explicit behavioral test models,
+browser listener semantics and GPU device/resource lifetimes before writing the
+shared harness. Sources: Anindya Banerjee and David A. Naumann,
+"Ownership Confinement Ensures Representation Independence for Object-Oriented
+Programs" (2002), https://arxiv.org/abs/cs/0212003; Bernhard Rumpe,
+"Model-Based Testing of Object-Oriented Systems" (2003; arXiv deposit 2014),
+https://arxiv.org/abs/1409.6603; WHATWG contributors, "DOM Standard" (2026),
+https://dom.spec.whatwg.org/#concept-event-listener; W3C GPU for the Web Working
+Group, "WebGPU" (2026; editors Kai Ninomiya, Brandon Jones and Jim Blandy),
+https://www.w3.org/TR/2026/CRD-webgpu-20260915/.
+
+Confinement motivates instance identity and independent owner domains; it does
+not prescribe this test implementation. Rumpe's explicit test models motivate
+reusing the same transition sequences with package-specific construction. DOM
+defines listener identity by type, callback and capture, including once and
+AbortSignal removal. WebGPU requires same-device objects and defines explicit
+destruction, device loss and per-pass viewport/scissor defaults. The engineering
+combination is an external observer plus independent CPU and real-GPU adapters,
+not a formal proof of ownership. The observer's injected-defect tests verify
+that its assertions are effective; historical Margo sources verify that the
+check rejects defects which previously escaped the gate. Only papers and
+standards were read; no companion code or other repository source was used.
+
+2026-11-10 continuation: an async fixture factory now keeps its owner until its promise settles
+(`LifetimeObserver.hold`), so constructors, buffers and listeners it makes after its first await are attributed to it;
+before, they ran with no owner and a leak there passed (`tests/owner-lifetime.test.js`, "async factory work after an
+await is owned", fails on the old harness). This is the confinement reading above applied to asynchronous construction:
+the owner domain is the whole factory, not its first synchronous slice. No new source was read.

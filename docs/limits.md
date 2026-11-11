@@ -26,7 +26,27 @@
 - Batch 163 points frame reuse retains a 144-byte snapshot per PointsPlugin plus a typed view and flag. It removes unchanged camera uploads only; point culling, sorting, quads and draw counts remain as before. Timing pending the quiet rerun; historical slower rows are not reclassified. See [work-count proof](whitepaper/bp-163-workcounts.md).
 
 
-### Batch 163 light-helper circle retention
+### Owner/lifetime check (check:owners) limits
+
+- Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
+  pending (89 of 102 on 2026-11-10, many with no engine plugin at all, such as math or input). Core and the physics
+  packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`.
+- The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`. It
+  lacks `createPipelineLayout`, `queue.writeTexture`, device limits, the `GPU*` enum globals, `OffscreenCanvas` and a
+  document, so the fixtures that need them add those
+  themselves; glyphs are not rasterised. The GPU leaf runs the same fixtures on a real device, native and WebGL2.
+- Written but not gated yet, because they pass the CPU model only: the culling, environment, post, shadows, sky,
+  splats, text, ui and video fixtures. Their Node shims (stub shaders, fake buffers, a document stand-in) break on a
+  real device, and video's WebGL2 case finds the external-texture retention in docs/known-bugs.md; they are gated once
+  each passes native WebGPU and the WebGL2 layer. The bugs those fixtures found are fixed with their own tests.
+- Not covered yet: stage feature entries (they take a Stage, not the engine the harness gives), terrain, `LabelRenderer`
+  and `LabelGL` (DOM), `TransmissionLayers` and the `BatchedMesh`, `Fur` and node-material entries of materials, SSR and
+  SSGI (shared clear-colour cache, docs/known-bugs.md), and SceneFade, which disposes itself on device restore by
+  design, so the attached device-loss case cannot hold for it.
+- Work after an async factory settles (a stream that keeps loading) runs with no owner and is checked only through
+  the plugin hooks it runs in.
+
+## Batch 163 light-helper circle retention
 
 A light helper retains 528 bytes of Float64 circle samples and two three-number coordinate arrays only after it draws a circle. This removes repeated geometry preparation work; it changes no precision, edge count or raster work. Timing pending the quiet rerun. [Proof](whitepaper/bp-163-workcounts.md#job-2-live-light-helper-circles).
 

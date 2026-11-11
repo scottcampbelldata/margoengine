@@ -106,6 +106,7 @@ export const PLAIN_STEPS = [
 ];
 /** Package-level steps narrowed by packageScopes; check:readme-run is the one of them that uses the GPU. */
 export const SCOPED_STEPS = [
+  'check:owners',
   'check:examples-types',
   'modern:test:packages',
   'modern:test:bundlers',
@@ -211,6 +212,11 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope, k
       // The packages whose examples can change, as for the tarball test; every example when a file the step runs changed.
       case 'check:readme-run':
         if (!scope || scope.packages.full || hit.has('readme-run')) return [{ command }];
+        return scope.packages.dirs.length
+          ? [{ command: `${command} -- --packages=${scope.packages.dirs.join(',')}` }]
+          : skip(none);
+      case 'check:owners':
+        if (!scope || scope.packages.full || hit.has('owners')) return [{ command }];
         return scope.packages.dirs.length
           ? [{ command: `${command} -- --packages=${scope.packages.dirs.join(',')}` }]
           : skip(none);
@@ -639,6 +645,7 @@ export async function runSteps(
  * catalog pages, records), and the bundler matrix installs what the tarball test packed.
  */
 export const STEP_AFTER = {
+  'check:owners': ['verify'],
   'check:road-invariants': ['verify'],
   'check:testpage-contracts': ['verify'],
   'check:text-extrude': ['verify'],
