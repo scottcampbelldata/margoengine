@@ -16,7 +16,119 @@
  * Init script: wraps GPUDevice.prototype.createShaderModule to check each distinct source's compilation info, and
  * makes each module's getCompilationInfo() return the answer asked for at its creation.
  */
-export function wgslGuard() {
+export function wgslGuard(probe) {
+  // Value-returning functions that do not end in a return on every path (KB-FF1b). The WGSL behavior analysis accepts
+  // a function whose last statement is a `loop` left only by `return`, but Firefox's WGSL front end (naga) requires a
+  // function with a return type to end in `return` (or `discard`), in an `if` with an `else` whose branches all do, in
+  // a `switch` whose every clause does, or in a block that does; Chromium and the WebGL2 layer accept the rest, so it
+  // only showed in Firefox (coastal.ts `root`, KB-FF1). Kept inside this function so the page gets it with the guard;
+  // Node gets it as `wgslReturnGaps` below. Returns [{ name, line }]; a source it cannot follow yields no entry.
+  const returnGaps = (code) => {
+    const kept = [];
+    for (let i = 0, depth = 0; i < code.length; i++) {
+      if (!depth && code[i] === '/' && code[i + 1] === '/') {
+        while (i < code.length && code[i] !== '\n') i++;
+        kept.push('\n');
+      } else if (code[i] === '/' && code[i + 1] === '*') {
+        depth++;
+        i++;
+        kept.push('  ');
+      } else if (depth && code[i] === '*' && code[i + 1] === '/') {
+        depth--;
+        i++;
+        kept.push('  ');
+      } else kept.push(depth && code[i] !== '\n' ? ' ' : code[i]);
+    }
+    const text = kept.join(''),
+      tokens = [...text.matchAll(/[A-Za-z_][A-Za-z0-9_]*|->|\S/g)].map((m) => ({ t: m[0], at: m.index })),
+      n = tokens.length,
+      open = { '{': '}', '(': ')', '[': ']' };
+    // Index of the token closing the bracket opened at i, or n when it never closes.
+    const close = (i) => {
+      for (let d = 0, j = i; j < n; j++) {
+        if (open[tokens[j].t]) d++;
+        else if (tokens[j].t === '}' || tokens[j].t === ')' || tokens[j].t === ']') if (--d === 0) return j;
+      }
+      return n;
+    };
+    // Index of the next `stop` token at bracket depth 0 from i (bracket groups skipped), or n.
+    const skipTo = (i, stop, end) => {
+      for (let j = i; j < end; j++) {
+        if (tokens[j].t === stop) return j;
+        if (open[tokens[j].t]) j = close(j);
+      }
+      return end;
+    };
+    // A statement from i: [index after it, whether it returns on every path]; null when it cannot be followed.
+    const statement = (i, end) => {
+      while (tokens[i]?.t === '@') i = tokens[i + 2]?.t === '(' ? close(i + 2) + 1 : i + 2;
+      const t = tokens[i]?.t;
+      if (t === '{') {
+        const j = close(i);
+        return j < end ? [j + 1, block(i + 1, j)] : null;
+      }
+      if (t === 'return' || t === 'discard') {
+        const j = skipTo(i, ';', end);
+        return j < end ? [j + 1, true] : null;
+      }
+      if (t === 'if') {
+        const b = skipTo(i + 1, '{', end),
+          j = close(b);
+        if (j >= end) return null;
+        const then = block(b + 1, j);
+        if (tokens[j + 1]?.t !== 'else') return [j + 1, false];
+        const rest = statement(j + 2, end);
+        return rest && [rest[0], then && rest[1]];
+      }
+      if (t === 'switch') {
+        const b = skipTo(i + 1, '{', end),
+          j = close(b);
+        if (j >= end) return null;
+        let all = true;
+        for (let k = b + 1; k < j; ) {
+          const c = skipTo(k, '{', j),
+            e = close(c);
+          if (c >= j || e >= j) return null;
+          all = all && block(c + 1, e);
+          k = e + 1;
+        }
+        return [j + 1, all];
+      }
+      if (t === 'loop' || t === 'for' || t === 'while' || t === 'continuing') {
+        const j = close(skipTo(i + 1, '{', end));
+        return j < end ? [j + 1, false] : null;
+      }
+      const j = skipTo(i, ';', end);
+      return j < end ? [j + 1, false] : null;
+    };
+    // Whether the statements from i to end return on every path (their last one does); null when not followed.
+    const block = (i, end) => {
+      let last = false;
+      while (i < end) {
+        const s = statement(i, end);
+        if (!s || s[0] <= i) return null;
+        [i, last] = s;
+      }
+      return last;
+    };
+    const gaps = [];
+    for (let i = 0, depth = 0; i < n; i++) {
+      const t = tokens[i].t;
+      if (t === '{') depth++;
+      else if (t === '}') depth--;
+      if (depth || t !== 'fn' || !/^[A-Za-z_]/.test(tokens[i + 1]?.t ?? '') || tokens[i + 2]?.t !== '(') continue;
+      const p = close(i + 2);
+      if (tokens[p + 1]?.t !== '->') continue;
+      const b = skipTo(p + 2, '{', n),
+        e = close(b);
+      if (e >= n) continue;
+      if (block(b + 1, e) === false)
+        gaps.push({ name: tokens[i + 1].t, line: text.slice(0, tokens[i].at).split('\n').length });
+      i = e;
+    }
+    return gaps;
+  };
+  if (probe === 'returnGaps') return returnGaps;
   if (typeof GPUDevice === 'undefined' || GPUDevice.prototype.createShaderModule.margoWgslGuard) return;
   const create = GPUDevice.prototype.createShaderModule,
     seen = new Set(),
@@ -57,6 +169,10 @@ export function wgslGuard() {
           console.error(
             `[wgsl] error ${descriptor.label ?? key} ${m.lineNum}:${m.linePos} ${m.message} | ${(lines[m.lineNum - 1] ?? '').trim().slice(0, 160)}`,
           );
+        for (const gap of returnGaps(code))
+          console.error(
+            `[wgsl] error ${descriptor.label ?? key} ${gap.line}:1 function '${gap.name}' returns a value but does not end in a return on every path; Firefox rejects it (KB-FF1b) | ${(lines[gap.line - 1] ?? '').trim().slice(0, 160)}`,
+          );
       });
       (globalThis.__margoWgslReports ??= []).push(report.catch(() => {}).finally(() => pending.delete(id)));
     }
@@ -65,6 +181,13 @@ export function wgslGuard() {
   guarded.margoWgslGuard = true;
   GPUDevice.prototype.createShaderModule = guarded;
 }
+
+/**
+ * The value-returning WGSL functions in `code` that do not end in a return on every path, as Firefox requires
+ * (KB-FF1b): [{ name, line }]. The same check the guard runs on every module a browser check creates.
+ * @type {(code: string) => { name: string, line: number }[]}
+ */
+export const wgslReturnGaps = wgslGuard('returnGaps');
 
 /** How long `settleWgslReports` waits for a page's compilation reports before it throws. */
 export const WGSL_SETTLE_MS = 30_000;

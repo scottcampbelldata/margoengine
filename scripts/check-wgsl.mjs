@@ -19,6 +19,7 @@ import { join, relative, resolve, sep } from 'node:path';
 import { parseAst } from 'rolldown/parseAst';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
+import { wgslReturnGaps } from './support/wgsl-guard.js';
 
 const root = resolve(import.meta.dirname, '..'),
   ENTRY = /@(vertex|fragment|compute)\b/,
@@ -120,12 +121,13 @@ try {
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
         device = await adapter.requestDevice({ requiredFeatures: [...adapter.features] }),
         seen = new Map(),
-        out = { files: list.length, constants: 0, variants: 0, skipped: [], threw: [], fragments: 0, errors: [] },
+        out = { files: list.length, constants: 0, variants: 0, skipped: [], threw: [], fragments: 0, errors: [], sources: [] },
         UNRESOLVED = /unresolved (value|type|call target|function|identifier|attribute)|undeclared/i;
       const compile = async (code, where) => {
         if (typeof code !== 'string' || !/@(vertex|fragment|compute)\b/.test(code)) return;
         if (seen.has(code)) return;
         seen.set(code, where);
+        out.sources.push([where, code]);
         const info = await device.createShaderModule({ code, label: `check-wgsl:${where}` }).getCompilationInfo(),
           errors = info.messages.filter((m) => m.type === 'error'),
           end = code.trimEnd().length;
@@ -176,6 +178,15 @@ try {
       device.destroy();
       return out;
     }, paths);
+  // Every source a builder returned, fragments included, must end each value-returning function in a return on every
+  // path: Firefox rejects the rest although this browser compiles them (KB-FF1b, scripts/support/wgsl-returns.mjs).
+  for (const [where, code] of report.sources) {
+    const lines = code.split('\n');
+    for (const gap of wgslReturnGaps(code))
+      report.errors.push(
+        `${where} ${gap.line}:1 function '${gap.name}' returns a value but does not end in a return on every path (Firefox rejects it) | ${(lines[gap.line - 1] ?? '').trim().slice(0, 160)}`,
+      );
+  }
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
   console.log(
     `check:wgsl: ${report.files} files, ${report.constants} constants and ${report.variants} builder variants: ${report.modules} distinct sources compiled (${report.fragments} fragments joined elsewhere), ${report.skipped.length} builders skipped (arguments not flags), ${report.threw.length} calls threw, in ${seconds} s`,

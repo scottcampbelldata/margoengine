@@ -43,6 +43,7 @@ import { changedDeclarations, declarationStamps, missingDeclaration } from './su
 import { assertLockInSync } from './support/lock-sync.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
 import { countMissingHelp, countNoFix } from './support/throw-messages.js';
+import { assertWgslReturns } from './support/wgsl-returns.mjs';
 import { isUmbrellaAlias } from './umbrella.mjs';
 import { assertWasmBlueprintsCurrent } from './wasm-blueprints.mjs';
 
@@ -59,6 +60,8 @@ assertWasmBlueprintsCurrent(root);
 // because the fast gate runs hygiene on every push while a lane runs only its own package tests; an unlisted sciviz
 // message once reached main that way (KB-ERR1).
 assertErrorPageCurrent(root);
+// Every shipped value-returning WGSL function ends in a return on every path, as Firefox requires (KB-FF1b).
+assertWgslReturns(root);
 // Every browser test file must have a script check:gpu-packages runs; its plan throws otherwise. Checked here because
 // the fast gate runs hygiene on every push and the plan would only fail later, in local CI's full check.
 gpuPlan();

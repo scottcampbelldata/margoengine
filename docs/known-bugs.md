@@ -101,11 +101,40 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   and the WebGL2 layer compile it), but Firefox's front end requires a value-returning function to end in a statement
   that returns on every path.
 - **Fix:** the loop breaks when it reaches the root and the function returns after it; same result on every backend.
-- **Regression:** packages/water/test/wgsl-returns.test.js parses every value-returning WGSL function written out in
-  water's source and fails on one that does not end in `return`, an `if`/`else` that returns on both sides, or a
-  `switch` whose clauses all return (it named `coastal.ts root` before the fix).
+- **Regression:** tests/wgsl-returns.test.js (KB-FF1b made the rule repo-wide and replaced the water-only test) fails
+  on a value-returning WGSL function that does not end in `return`, an `if`/`else` that returns on both sides, or a
+  `switch` whose clauses all return (the `coastal.ts root` shape is its first case).
 - Source: W3C WebGPU Shading Language, section "Behavior Analysis" (function return rules),
   https://www.w3.org/TR/WGSL/#behaviors.
+
+### Fixed 2026-11-11: no gate held the Firefox return-path rule outside water (KB-FF1b)
+
+- **Repro:** before this change, a WGSL function in any package other than water could end in a `loop` left only by
+  `return` (the KB-FF1 shape) and pass lint, hygiene, check:wgsl and every Chromium and WebGL2 GPU suite; only a
+  Firefox run would catch it.
+- **Cause:** the KB-FF1 regression test read water's source alone, and check:wgsl compiles on Chromium, whose WGSL
+  front end follows the spec's behavior analysis and accepts that shape.
+- **Fix:** one rule, three layers. `npm run hygiene` scans every `.wgsl` file under packages/ and every WGSL function
+  written out whole in packages/*/src and packages/shared (scripts/support/wgsl-returns.mjs); check:wgsl runs the same
+  analyzer on every module the shader builders return, flags both ways; the WGSL guard every browser check installs
+  (scripts/support/wgsl-guard.js `wgslReturnGaps`) reports a gap in any module a page creates as a `[wgsl] error`, so
+  assembled shaders are checked as the GPU receives them. On landing the source scan read 1,719 functions and check:wgsl
+  every builder output, with no other gap.
+- **Regression:** tests/wgsl-returns.test.js (the analyzer cases, the source scan on a planted gap, and the guard
+  reporting a planted module).
+- Source: W3C WebGPU Shading Language, section "Behavior Analysis", https://www.w3.org/TR/WGSL/#behaviors.
+
+### Fixed 2026-11-11: check:wgsl failed on sciviz's flow trail template (found by KB-FF1b)
+
+- **Repro:** `npm run check:wgsl` on main: `/packages/sciviz/src/flow-shaders.ts flowDraw 23:1 unexpected token |
+  FLOW_PROJECT`, so the gate in check:merge was red for every run that reached sciviz.
+- **Cause:** `flowDraw` was exported as a WGSL constant that still held three text slots (FLOW_PROJECT,
+  FLOW_APPEARANCE, FLOW_COLOUR) which flow-particles.ts filled at draw time; check:wgsl compiles every exported
+  constant with an entry point as it is.
+- **Fix:** `flowDraw(globe, appearance)` is a builder that holds the template and fills every slot (the same text
+  flow-particles.ts wrote). check:wgsl now compiles it with `globe` both ways. Drawn output is unchanged.
+- **Regression:** packages/sciviz/tests/flow-draw-shader.test.js (no exported flow shader holds a slot; each filled form
+  is checked).
 
 ### Fixed 2026-11-11: gltf-pro parts culled one by one only under CulledModels (bug sweep L2, KB0027)
 
