@@ -2353,11 +2353,11 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Repro:** in `packages/webgl2-compat/test/adapter-browser.js` attach `Bloom` alone in a `PACKAGES` case.
 - **Needed:** the same capture-format choice as `PostStack` (`captureFormat` in `packages/post/src/stack.ts`), with a case in the adapter check.
 
-### External PBR display passes
+### Fixed 2026-11-11: external PBR display passes blend glass in encoded values (KB2281)
 
-- K2 external-pass follow-up: PBRModel.draw with a caller-owned already-open external pass on a display-encoded target still uses native tint/add blending; reproduce with bright glass over a bright background via createRenderer. Cause: the caller owns the open pass and the package cannot end it to snapshot its background. Graph-managed Engine scenes are fixed; use a linear HDR external target pending a caller-supplied snapshot hook.
-
-- **Lane C source audit (2026-11-10):** PBRDeviceRenderer.draw still receives an already-open caller-owned pass and view; its prepare method handles deformation, not a colour snapshot. The caller snapshot API and its bright-background regression remain open. No renderer or assertion was changed for this entry.
+- **Was:** `PBRModel.createRenderer(device).draw(context, pass, view)` into a caller-owned, already-open pass on a display-encoded target drew native glass with the tint/add blend in stored values: bright glass over a 128 grey read 197, 221, 239 of 255 against the linear 143, 154, 165. The package cannot end the caller's pass to snapshot the light behind a surface.
+- **Fix:** `draw` takes `options.snapshot(pass, target)`: before each glass surface the caller ends its pass, writes the colour into `target` and returns the reopened pass, and `draw` returns the open pass. The glass then composites in linear light as graph-managed scenes do. Without the hook the native blend stays (exact on `rgba16float`), as documented in the gltf-pro README. Regression: `packages/gltf-pro/tests/external-glass.test.js`, `packages/materials/test/native-glass-browser.mjs` (`externalGlass`, 143, 155, 165 with the hook).
+- **Still open elsewhere:** `@margoengine/xr` draws its eyes through `createRenderer` without a hook (bug-sweep row KB2281-xr).
 
 ### Findings of the outside audit (2026-10-28)
 

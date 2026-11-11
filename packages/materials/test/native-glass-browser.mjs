@@ -27,6 +27,21 @@ await runSuite(
         'native glass must add light in linear values',
       );
     }
+    // KB2281: a caller-owned pass through createRenderer composites the same way once it lends a snapshot hook.
+    const external = await browser.page.evaluate(() => window.externalGlass());
+    const lit = external.find((r) => r.grey === 0).texel;
+    const linear = lit.map((x) => Math.round(255 * encode(decode(128 / 255) + decode(x / 255))));
+    const withHook = external.find((r) => r.grey === 128 && r.hook).texel,
+      without = external.find((r) => r.grey === 128 && !r.hook).texel;
+    console.log({ external: true, withHook, without, expected: linear });
+    assert.ok(
+      withHook.every((x, k) => Math.abs(x - linear[k]) <= 1),
+      'external native glass with a snapshot hook must add light in linear values',
+    );
+    assert.ok(
+      without.some((x, k) => x - linear[k] > 1),
+      'without the hook the encoded tint/add blend stays brighter (the documented default)',
+    );
     assert.deepEqual(errors, []);
   },
   () => browser.close(),

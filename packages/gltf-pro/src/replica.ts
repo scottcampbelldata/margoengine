@@ -7,9 +7,29 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface PBRDeviceRenderer {
   /** Encode deformation on this renderer's device before opening the eye pass. */
   prepare(context: Pick<Context, 'backend' | 'device' | 'encoder'>): void;
-  /** Append the ordinary PBR shader to a caller-owned forward-Z eye pass. */
-  draw(context: Context, pass: GPURenderPassEncoder, view: ArrayLike<number>): void;
+  /**
+   * Append the ordinary PBR shader to a caller-owned forward-Z eye pass. Returns the pass that is open afterwards: `pass`
+   * itself, or the one `options.snapshot` reopened. Keep recording on the returned pass.
+   */
+  draw(
+    context: Context,
+    pass: GPURenderPassEncoder,
+    view: ArrayLike<number>,
+    options?: PBRDeviceDrawOptions,
+  ): GPURenderPassEncoder;
   dispose(): void;
+}
+/** Options of {@link PBRDeviceRenderer.draw}. */
+export interface PBRDeviceDrawOptions {
+  /**
+   * Lets glass (KHR_materials_transmission) on a display-encoded target (any format but `rgba16float`) add its light to
+   * the light behind it in linear values. Before each glass surface the renderer calls it with the open pass and a
+   * texture of the context's width, height and format: end `pass`, write the colour drawn so far into `target` (the
+   * resolved colour for a multisampled pass, for example with `copyTextureToTexture`), and return a pass reopened on the
+   * same attachments with `loadOp: 'load'`, viewport and scissor. Default: unset, and glass multiplies and adds in the
+   * target's stored values, exact only on a linear `rgba16float` target.
+   */
+  snapshot?(pass: GPURenderPassEncoder, target: GPUTexture): GPURenderPassEncoder;
 }
 /** Encodes only a model's skinning and morph deformation on another device; dispose() releases it. */
 export interface PBRDeformationRenderer {
@@ -34,11 +54,11 @@ export function deviceRenderer(
         throw margoError('attached', 'PBR renderer belongs to another GPU device; create one per device');
       prepare(context);
     },
-    draw(context, pass, view) {
+    draw(context, pass, view, options) {
       if (disposed) throw margoError('disposed', 'PBR device renderer is disposed; create a new one');
       if (context.device !== device)
         throw margoError('attached', 'PBR renderer belongs to another GPU device; create one per device');
-      draw(context, pass, view);
+      return draw(context, pass, view, options);
     },
     dispose() {
       if (disposed) return;

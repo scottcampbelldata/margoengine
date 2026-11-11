@@ -26,4 +26,56 @@ window.nativeGlass=async()=>{
  }
  return rows;
 };
+// KB2281: the same glass through createRenderer into a caller-owned, already-open pass on an rgba8unorm target.
+// background: the grey drawn first; hook: whether draw gets the snapshot hook. Returns the centre texel.
+window.externalGlass=async()=>{
+ const canvas=document.body.appendChild(document.createElement('canvas'));
+ const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:[8,8],camera:{position:[0,0,1],target:[0,0,0]}});
+ const out=[];
+ try{
+  engine.lighting.radiance.fill(0);
+  const input=instancedGLTF([{t:[0,0,0]}],{instanced:false,material:{
+   emissiveFactor:[0.1,0.15,0.2],extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_ior:{ior:1}},
+  }});
+  const model=parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
+  engine.render({culling:false});
+  const device=engine.gpu,renderer=model.createRenderer(device),format='rgba8unorm';
+  const color=device.createTexture({size:[8,8],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC|GPUTextureUsage.TEXTURE_BINDING});
+  const depth=device.createTexture({size:[8,8],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT});
+  const readback=device.createBuffer({size:256*8,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  // The view matrix of a camera at z = 1 looking at the origin (column-major).
+  const view=new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-1,1]);
+  const descriptor={layout:'auto',vertex:{entryPoint:'vertex',buffers:[]},fragment:{entryPoint:'fragment',targets:[{format}]},
+   depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less-equal'},multisample:{count:1}};
+  try{
+   for(const [grey,hook] of [[128,true],[0,true],[128,false]]){
+    let texel;
+    await waitForPipelines(async()=>{
+     const encoder=device.createCommandEncoder();
+     const c={backend:'webgpu',device,encoder,bindings:[],delta:1/60,width:8,height:8,camera:engine.camera,
+      color:color.createView(),depth:depth.createView(),format,descriptor,shader:'',draw(){}};
+     const open=(first)=>encoder.beginRenderPass({
+      colorAttachments:[{view:c.color,loadOp:first?'clear':'load',clearValue:[grey/255,grey/255,grey/255,1],storeOp:'store'}],
+      depthStencilAttachment:{view:c.depth,depthLoadOp:first?'clear':'load',depthClearValue:1,depthStoreOp:'store'}});
+     renderer.prepare(c);
+     let pass=open(true);
+     pass=renderer.draw(c,pass,view,hook?{snapshot(current,target){
+      current.end();
+      encoder.copyTextureToTexture({texture:color},{texture:target},[8,8]);
+      return open(false);
+     }}:undefined);
+     pass.end();
+     encoder.copyTextureToBuffer({texture:color},{buffer:readback,bytesPerRow:256},[8,8]);
+     device.queue.submit([encoder.finish()]);
+     await readback.mapAsync(GPUMapMode.READ);
+     const bytes=new Uint8Array(readback.getMappedRange());
+     texel=Array.from(bytes.slice(4*256+4*4,4*256+4*4+3));
+     readback.unmap();
+    });
+    out.push({grey,hook,texel});
+   }
+  }finally{renderer.dispose();color.destroy();depth.destroy();readback.destroy();}
+ }finally{engine.dispose();canvas.remove();}
+ return out;
+};
 </script></body></html>

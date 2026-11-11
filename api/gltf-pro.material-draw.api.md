@@ -266,6 +266,12 @@ interface ExtensionGroup {
     gap?: GPUBindGroup;
 }
 
+type ExternalPass = {
+    pass: GPURenderPassEncoder;
+    view: ArrayLike<number>;
+    depthCompare: GPUCompareFunction;
+};
+
 interface GLTFAccessor extends GLTFProperty {
   bufferView?: number;
   byteOffset?: number;
@@ -789,9 +795,13 @@ interface PBRDeformationRenderer {
     dispose(): void;
 }
 
+interface PBRDeviceDrawOptions {
+    snapshot?(pass: GPURenderPassEncoder, target: GPUTexture): GPURenderPassEncoder;
+}
+
 interface PBRDeviceRenderer {
     prepare(context: Pick<Context, 'backend' | 'device' | 'encoder'>): void;
-    draw(context: Context, pass: GPURenderPassEncoder, view: ArrayLike<number>): void;
+    draw(context: Context, pass: GPURenderPassEncoder, view: ArrayLike<number>, options?: PBRDeviceDrawOptions): GPURenderPassEncoder;
     dispose(): void;
 }
 
@@ -1003,11 +1013,7 @@ class PBRModel implements EnginePlugin {
         clip?: GPUBufferBinding | undefined;
     }[];
     readPickingGeometry(): Promise<readonly PBRPickingGeometry[]>;
-    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
-        pass: GPURenderPassEncoder;
-        view: ArrayLike<number>;
-        depthCompare: GPUCompareFunction;
-    }, carry?: PBRDrawRun): void;
+    draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: ExternalPass, carry?: PBRDrawRun): void;
     joinRun(c: Context, run: PBRDrawRun, phase: 'all' | 'opaque' | 'blend', quick: QuickRun, viewAt: GPUBufferBinding): boolean;
     drawBatch(batch: PendingBatch, run: PBRDrawRun): void;
     drawOwn(r: DrawResource, batch: PendingBatch, run: PBRDrawRun, scratch: DrawScratch): void;

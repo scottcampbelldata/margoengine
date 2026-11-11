@@ -164,6 +164,52 @@ export function nativeGlass(c) {
   return frames.get(c);
 }
 
+// A caller-owned, already-open render pass (gltf-pro `PBRDeviceRenderer.draw`) cannot be ended and reopened by the
+// package, so the caller lends a snapshot hook: before each native glass surface the hook ends its pass, writes the
+// colour drawn so far into `target` and returns the reopened pass. Without one the external draw keeps the native
+// tint/add blend, which is exact only on a linear target.
+class ExternalGlass {
+  constructor(device) {
+    this.device = device;
+  }
+  install(c, hook) {
+    const key = [c.width, c.height, c.format].join(':');
+    if (this.key !== key) {
+      this.release();
+      this.snapshot = c.device.createTexture({
+        label: 'native-glass:external-snapshot',
+        size: [c.width, c.height],
+        format: c.format,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.entries = [{ binding, resource: this.snapshot.createView() }];
+      this.key = key;
+    }
+    this.hook = hook;
+    frames.set(c, this);
+  }
+  reopen(pass) {
+    const next = this.hook(pass, this.snapshot);
+    if (!next || typeof next.setPipeline !== 'function')
+      throw new TypeError(
+        'PBR glass snapshot hook returned no render pass; end the pass, write the colour into target, then return the reopened pass',
+      );
+    return next;
+  }
+  finish(c) {
+    if (frames.get(c) === this) frames.delete(c);
+    this.hook = undefined;
+  }
+  release() {
+    retire(this.device, this.snapshot);
+    this.snapshot = this.entries = this.key = undefined;
+  }
+}
+/** A display-target snapshot source for one caller-owned device renderer (gltf-pro `createRenderer`). */
+export function externalNativeGlass(device) {
+  return new ExternalGlass(device);
+}
+
 // Keep the native tint's complete material and lighting interface. Its returned share is linear here.
 export function nativeGlassShader(code) {
   const faced = /@fragment fn margoTint\(i:Out,@builtin\(front_facing\) front:bool\)/.test(code);

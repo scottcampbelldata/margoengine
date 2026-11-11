@@ -49,7 +49,7 @@ A light helper retains 528 bytes of Float64 circle samples and two three-number 
 
 ## K2 rendering and test limits
 
-K2 native glass scope: automatic per-surface snapshots apply to graph-managed Engine scenes. A caller-owned already-open external render pass must use a linear HDR target for the exact sum; its display-target snapshot hook remains on the finish-later list. The native path keeps its existing tone mapping and sightline tint; there is no new HDR-equivalence or refraction claim.
+K2 native glass scope: automatic per-surface snapshots apply to graph-managed Engine scenes. A caller-owned already-open external render pass (`createRenderer`) gets the same linear sum on a display-encoded target when its `draw` call lends `options.snapshot` (KB2281, 2026-11-11): one caller pass end, one colour copy into a context-sized snapshot texture and one reopened pass per glass surface, the cost the graph path pays too. Without the hook it keeps the native tint/add blend, exact only on `rgba16float` (measured: 197, 221, 239 against the linear 143, 154, 165 of 255 over a 128 grey). The native path keeps its existing tone mapping and sightline tint; there is no new HDR-equivalence or refraction claim.
 
 K2 native glass measured gzip before/after: gltf-pro 78058/79666 B, model 58923/60402 B, progressive 86739/88346 B, worker 78581/80160 B. Core plus stage remains 24209 B. Three optional ceilings grow in the generated sizes baseline; model remains within its existing ceiling. The synchronous draw adapter, shared lifecycle and scene-copy shader stay together; splitting them would introduce a package cycle or an async gap during model draws. No speed claim.
 

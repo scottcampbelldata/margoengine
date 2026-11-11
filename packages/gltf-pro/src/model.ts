@@ -1,5 +1,10 @@
 import { packBaseTextures, type BaseTextureSource, type PackedBaseTextures } from './base-textures.js';
-import { acquireNativeGlass, nativeGlass, nativeGlassShader } from '../../materials/src/native-glass.js';
+import {
+  acquireNativeGlass,
+  externalNativeGlass,
+  nativeGlass,
+  nativeGlassShader,
+} from '../../materials/src/native-glass.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import { markedClipDistances } from '../../shared/section.js';
 import { currentMaterialDraw, runMaterialDraw, inheritMaterialDraw } from './material-draw-state.js';
@@ -140,7 +145,7 @@ import {
   applyStencilReference,
   asymmetricStencilFaces,
 } from './render-state.js';
-export type { PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
+export type { PBRDeviceDrawOptions, PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type { PBRInstances } from './instancing.js';
 import { laterUVs, packed, packPrimitive } from './pack.js';
@@ -331,6 +336,8 @@ export type {
 import { unitLight } from '../../shared/unit-light.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** A caller-owned, already-open eye pass (`createRenderer`); `pass` is the one open after the draw. */
+type ExternalPass = { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction };
 /** Narrow encoding hook for optional GPU deformation consumers. */
 export type PBRDeformationContext = Pick<Context, 'backend' | 'device' | 'encoder'>;
 /** The triangles of one node for picking: its vertices, indices, sidedness and world matrix. */
@@ -3760,7 +3767,7 @@ export class PBRModel implements EnginePlugin {
     color: GPUTextureView,
     depth: GPUTextureView,
     phase: 'all' | 'opaque' | 'blend' = 'all',
-    external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
+    external?: ExternalPass,
     carry?: PBRDrawRun,
   ): void {
     const materialAdapter = currentMaterialDraw(this);
@@ -4027,10 +4034,15 @@ export class PBRModel implements EnginePlugin {
           frameBindings = copyGroup(c.device, pipeline, r, transmission, section, uniform ?? r.uniform.binding, viewAt);
         let target: GPURenderPassEncoder;
         if (d.nativeGlass) {
-          pass?.end();
-          pass = undefined;
-          c.settle?.();
-          nativeGlass(c)!.copy(c);
+          const glass = nativeGlass(c)!;
+          // A caller-owned pass: the caller's snapshot hook ends it, writes the colour so far and reopens it.
+          if (external) pass = external.pass = glass.reopen!(pass!);
+          else {
+            pass?.end();
+            pass = undefined;
+            c.settle?.();
+            glass.copy!(c);
+          }
         }
         if (through || capture) target = shared ??= (through ? oit! : hook!).begin();
         else {
@@ -4134,6 +4146,8 @@ export class PBRModel implements EnginePlugin {
       if (carry) carry.pass = undefined;
       throw error;
     } finally {
+      // The caller's pass may have been reopened by its snapshot hook: hand back the one that is open.
+      if (external && pass) external.pass = pass;
       endDraw(c.device);
       scratchDepth--;
       scratch.context = undefined;
@@ -4165,7 +4179,7 @@ export class PBRModel implements EnginePlugin {
     scratch: DrawScratch,
     r: DrawResource,
     wireframe: DrawResource['wireframe'],
-    external: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction } | undefined,
+    external: ExternalPass | undefined,
     inst: PBRInstances | BatchKind | undefined,
     build = true,
   ): DrawDerivation {
@@ -4745,7 +4759,7 @@ export class PBRModel implements EnginePlugin {
     topology: GPUPrimitiveTopology | undefined,
     wireframe: DrawResource['wireframe'],
     sign: number,
-    external: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction } | undefined,
+    external: ExternalPass | undefined,
     inst: PBRInstances | BatchKind | undefined = r.primitive.instances,
     build = true,
   ): DrawDerivation {
@@ -5427,7 +5441,8 @@ export class PBRModel implements EnginePlugin {
       defaults: new Map(),
     });
     let deformation: PBRDeformationRenderer | undefined,
-      factory = this.createDeformationRenderer;
+      factory = this.createDeformationRenderer,
+      externalGlass: ReturnType<typeof externalNativeGlass> | undefined;
     const projections = new Map<PBRInstances, PBRInstances>(),
       used = new Set<PBRInstances>();
     const synchronize = (sources: PBRPrimitive[], copies: PBRPrimitive[], offset: number) => {
@@ -5478,6 +5493,7 @@ export class PBRModel implements EnginePlugin {
       const cleanup = new Cleanup();
       cleanup
         .run(() => deformation?.dispose())
+        .run(() => externalGlass?.release())
         .run(() => replica.releaseGPU())
         .run(() => {
           for (let i = replica.created.length - 1; i >= 0; i--) replica.created[i].dispose();
@@ -5514,13 +5530,21 @@ export class PBRModel implements EnginePlugin {
             );
           deformation?.prepare(context);
         },
-        (context, pass, view) => {
+        (context, pass, view, options) => {
           inheritMaterialDraw(this, replica);
-          replica.draw(context, 'beauty', context.color, context.depth, 'all', {
-            pass,
-            view,
-            depthCompare: 'less-equal',
-          });
+          const external: ExternalPass = { pass, view, depthCompare: 'less-equal' };
+          // Native glass on a display-encoded target composites in linear light from a snapshot of the light behind
+          // each surface; only the caller can end and reopen its pass for that (PBRDeviceRenderer.draw, `snapshot`).
+          const snapshot = options?.snapshot;
+          const glass =
+            snapshot && context.format !== 'rgba16float' ? (externalGlass ??= externalNativeGlass(device)) : undefined;
+          glass?.install(context, snapshot!);
+          try {
+            replica.draw(context, 'beauty', context.color, context.depth, 'all', external);
+          } finally {
+            glass?.finish(context);
+          }
+          return external.pass;
         },
         release,
         (callback) => this.onDispose(callback),

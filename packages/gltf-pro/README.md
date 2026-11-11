@@ -305,6 +305,74 @@ through `camera.fitToBoundingBox`; the frozen stage's `fit(meshes)` and internal
 raw adapter continue to support core geometry only. Active deformation requires
 the asynchronous pose snapshot for accurate CPU raycasts.
 
+### Drawing a model into your own render pass (`createRenderer`)
+
+`model.createRenderer(device)` returns a `PBRDeviceRenderer` that appends the model's PBR draws to a render pass you
+already opened (a stereo eye, another device, your own target). `draw(context, pass, view, options)` returns the pass
+that is open afterwards; keep recording on it. Glass (`KHR_materials_transmission`) on a display-encoded target (any
+format but `rgba16float`) needs the light behind each surface in linear values, and only you can end and reopen your
+pass, so lend it `options.snapshot`: end the pass, write the colour drawn so far into `target` (same size and format,
+single-sample; resolve a multisampled pass first) and return the pass reopened with `loadOp: 'load'`. Without it glass
+multiplies and adds in the stored values, exact only on an `rgba16float` target; a bright highlight over a bright
+background then comes out too bright (KB2281: 197 of 255 against 143). Default: unset.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parseGLTF, type GLTFDocument} from 'margoengine/gltf-pro';
+import {extendedMaterials} from 'margoengine/gltf-pro/extended';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 1], target: [0, 0, 0]},
+});
+const data = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
+const doc: GLTFDocument = {
+  asset: {version: '2.0'},
+  extensionsUsed: ['KHR_materials_transmission'],
+  buffers: [{byteLength: data.byteLength}],
+  bufferViews: [{buffer: 0, byteLength: 36}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3'}],
+  materials: [{emissiveFactor: [0.1, 0.15, 0.2], extensions: {KHR_materials_transmission: {transmissionFactor: 1}}}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, material: 0}]}],
+  nodes: [{mesh: 0}], scenes: [{nodes: [0]}], scene: 0,
+};
+const model = parseGLTF(engine, doc, [new Uint8Array(data.buffer)], [], {materials: extendedMaterials});
+engine.render();
+
+const device = engine.gpu!, format: GPUTextureFormat = 'rgba8unorm', size = [256, 256] as const;
+const color = device.createTexture({size, format,
+  usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING});
+const depth = device.createTexture({size, format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT});
+const renderer = model.createRenderer(device);
+const encoder = device.createCommandEncoder();
+const context = {
+  backend: 'webgpu' as const, device, encoder, format, width: size[0], height: size[1], camera: engine.camera,
+  color: color.createView(), depth: depth.createView(), bindings: [], shader: '', indirect: false, delta: 0,
+  descriptor: {layout: 'auto', vertex: {module: device.createShaderModule({code: ''})},
+    depthStencil: {format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal'},
+    multisample: {count: 1}} as GPURenderPipelineDescriptor,
+  draw() {},
+};
+const open = (first: boolean) => encoder.beginRenderPass({
+  colorAttachments: [{view: context.color, loadOp: first ? 'clear' : 'load', clearValue: [0.5, 0.5, 0.5, 1],
+    storeOp: 'store'}],
+  depthStencilAttachment: {view: context.depth, depthLoadOp: first ? 'clear' : 'load', depthClearValue: 1,
+    depthStoreOp: 'store'},
+});
+// The view matrix of a camera at z = 1 looking at the origin.
+const view = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -1, 1];
+renderer.prepare(context);
+const pass = renderer.draw(context, open(true), view, {
+  snapshot(current, target) {
+    current.end();
+    encoder.copyTextureToTexture({texture: color}, {texture: target}, size);
+    return open(false);
+  },
+});
+pass.end();
+device.queue.submit([encoder.finish()]);
+renderer.dispose();
+```
+
 ### Mixed core/PBR scene helpers
 
 Import the optional `@margoengine/gltf-pro/scene` entry for camera fitting and
