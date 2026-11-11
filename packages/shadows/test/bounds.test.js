@@ -52,7 +52,7 @@ test('support hulls fit empty box corners tightly while enclosing every point ac
     ],
     envelope = { min: [-1, -1, -1], max: [1, 1, 1] },
     gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {}, sceneOf() {} },
     box = new Shadows({ bounds: envelope, resolution: 512, casterMargin: 0.1 }),
     hull = new Shadows({ bounds: { ...envelope, points }, resolution: 512, casterMargin: 0.1 }),
     view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),
@@ -110,7 +110,7 @@ test('point-fitted static maps survive camera movement and refit when the suppor
       [0, 0, 1],
     ],
     gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {}, sceneOf() {} },
     shadows = new Shadows({ bounds: { ...bounds, points }, casterMargin: 0.1 }),
     view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),
     execute = passes(shadows);
@@ -147,7 +147,7 @@ test('point-fitted static maps survive camera movement and refit when the suppor
 
 test('degenerate support points fail before rendering an invalid shadow matrix', () => {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([0, 1, 0, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([0, 1, 0, 4]) }, removePlugin() {}, sceneOf() {} },
     shadows = new Shadows({
       bounds: { ...bounds, points: Array.from({ length: 4 }, () => [0, 0, 0]) },
       casterMargin: 0,
@@ -165,7 +165,7 @@ test('degenerate support points fail before rendering an invalid shadow matrix',
 
 test('a rejected bounds fit keeps the last good matrix and depth range', () => {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {}, sceneOf() {} },
     shadows = new Shadows({ bounds, casterMargin: 0 }),
     view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),
     execute = passes(shadows);
@@ -189,7 +189,7 @@ test('a rejected bounds fit keeps the last good matrix and depth range', () => {
 
 test('a bounded glTF/custom scene uses one depth layer and stays fitted across camera orbit and light movement', () => {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {}, sceneOf() {} },
     shadows = new Shadows({ bounds, resolution: 2048, casterMargin: 0.9 }),
     view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),
     execute = passes(shadows);

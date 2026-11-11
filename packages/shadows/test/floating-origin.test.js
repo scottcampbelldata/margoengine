@@ -82,7 +82,7 @@ test('Shadows floatingOrigin validates, follows rebases for bounds fits and unsu
     },
     local = (at) => ({ min: world.min.map((v, i) => v - at[i]), max: world.max.map((v, i) => v - at[i]) }),
     gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {}, sceneOf() {} },
     resolution = 512,
     shadows = new Shadows({ bounds: local(start), resolution, casterMargin: 0.1, floatingOrigin: origin }),
     view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),

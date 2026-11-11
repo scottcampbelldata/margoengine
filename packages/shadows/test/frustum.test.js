@@ -7,7 +7,7 @@ const shader = 'let linear=direct*vec3f(1);';
 const frustum = () => ({ position: [1, 5, 2], left: -2, right: 3, bottom: -1, top: 4, near: 0.5, far: 9 });
 function rig(options, direction = [1, 2, 0.5]) {
   const gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([...direction, 4]) }, removePlugin() {} },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([...direction, 4]) }, removePlugin() {}, sceneOf() {} },
     shadows = new Shadows(options),
     view = context(gpu, { shader }),
     run = passes(shadows);
@@ -55,7 +55,7 @@ test('resolution takes one integer or [width, height] powers of two; frustum tak
   const shadows = new Shadows({ frustum: frustum() });
   shadows.options.frustum = undefined;
   shadows.options.bounds = { min: [0, 0, 0], max: [1, 1, 1] };
-  assert.doesNotThrow(() => shadows.setup({ gpu: mockGPU().device, removePlugin() {} }));
+  assert.doesNotThrow(() => shadows.setup({ gpu: mockGPU().device, removePlugin() {}, sceneOf() {} }));
   shadows.dispose();
 });
 

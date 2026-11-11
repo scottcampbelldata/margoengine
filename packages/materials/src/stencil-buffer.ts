@@ -152,7 +152,7 @@ export class StencilBuffer implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     try {
-      this.engine?.removePlugin(this.name);
+      this.engine?.sceneOf(this)?.removePlugin(this.name);
     } finally {
       this.release();
       this.engine = undefined;

@@ -1835,7 +1835,7 @@ export class Shadows implements EnginePlugin {
     this.disposed = true;
     this.unfollow?.();
     this.unfollow = undefined;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
     this.frames.length = 0;

@@ -210,7 +210,7 @@ test('attach allocates the pool and one table layer per level; dispose destroys 
     return texture;
   };
   const shadows = new VirtualShadows({ levels: 6, poolSize: 2048 });
-  shadows.setup({ gpu: device, lighting: { direction: [0, 1, 0] }, removePlugin() {} });
+  shadows.setup({ gpu: device, lighting: { direction: [0, 1, 0] }, removePlugin() {}, sceneOf() {} });
   const pools = textures.filter((t) => t.descriptor.format === 'depth32float'),
     table = textures.find((t) => t.descriptor.format === 'r32uint');
   assert.deepEqual(pools[0].descriptor.size, [2048, 2048]);

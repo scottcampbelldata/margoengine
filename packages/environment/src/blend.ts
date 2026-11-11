@@ -144,6 +144,9 @@ interface State {
 const STRIDE = 256;
 const isPowerOfTwo = (n: number) => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
 
+/** Serial for the attach scope plugins; each attach gets a unique name. */
+let attachments = 0;
+
 /**
  * Fades between two environments (day to night, indoor to outdoor) with matching image-based lighting: `environment`
  * is an ordinary Environment holding `(1 - t) x from + t x to` in its source cube, prefiltered specular mips and SH,
@@ -230,9 +233,20 @@ export class EnvironmentBlend implements EnginePlugin {
     to: Environment,
     options?: EnvironmentBlendOptions,
   ): Promise<EnvironmentBlend> {
+    const runtime = engineRuntime(engine);
+    // The scene active now, kept across the await: the blend belongs to it, not to whichever scene is active later.
+    let scene!: NonNullable<ReturnType<typeof runtime.sceneOf>>;
+    const scope = {
+      name: 'environment-blend:attach:' + attachments++,
+      setup() {
+        scene = runtime.sceneOf(scope)!;
+      },
+    };
+    runtime.use(scope);
+    scene.removePlugin(scope.name);
     const blend = await EnvironmentBlend.create(engine, from, to, options);
     try {
-      engine.use(blend);
+      runtime.use(blend, scene);
       return blend;
     } catch (error) {
       blend.dispose();
@@ -356,6 +370,7 @@ export class EnvironmentBlend implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.engine) engineRuntime(this.engine).sceneOf(this)?.removePlugin(this.name);
     for (const off of this.unsubscribe) off();
     this.unsubscribe.length = 0;
     this.drop();

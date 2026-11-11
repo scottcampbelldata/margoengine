@@ -1314,7 +1314,7 @@ export class VirtualShadows implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
     this.casters.length = this.receivers.length = this.customReceivers.length = 0;

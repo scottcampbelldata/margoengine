@@ -636,6 +636,9 @@ function destroy(resources: Resources | undefined): void {
   resources.params.destroy();
 }
 
+/** Serial for the attach scope plugins; each attach gets a unique name. */
+let attachments = 0;
+
 /**
  * Processed image-based lighting for one environment: the source cube map with a box-filtered mip chain,
  * a GGX-prefiltered specular cube (roughness 0..1 across its mips), L2 spherical-harmonic irradiance and a
@@ -679,9 +682,20 @@ export class Environment implements EnginePlugin {
     source: EnvironmentSource,
     options?: EnvironmentOptions,
   ): Promise<Environment> {
+    const runtime = engineRuntime(engine);
+    // The scene active now, kept across the await: the environment belongs to it, not to whichever scene is active later.
+    let scene!: NonNullable<ReturnType<Engine['sceneOf']>>;
+    const scope = {
+      name: 'environment:attach:' + attachments++,
+      setup() {
+        scene = runtime.sceneOf(scope)!;
+      },
+    };
+    runtime.use(scope);
+    scene.removePlugin(scope.name);
     const environment = await Environment.create(engine, source, options);
     try {
-      engine.use(environment);
+      runtime.use(environment, scene);
       return environment;
     } catch (error) {
       environment.dispose();
