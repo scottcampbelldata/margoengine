@@ -27,12 +27,22 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { venvDir } from '../python/tests/venv.mjs';
+import { externalAssetRoot } from './support/external-test-assets.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
 /** Lines of proof-runner output that show a dependence on history a fresh clone lacks. */
 export const MISSING_HISTORY =
   /asked Git for|no stored baseline for|a commit only in the pre-rewrite history|Needed a single revision|unknown revision|bad revision|bad object|not a valid object name|does not exist at [0-9a-f]{7,}|fatal: /;
+
+/**
+ * The environment the clone's verify runs with. The clone sits in the temp folder, so the shared outside test inputs
+ * (scripts/support/external-test-assets.mjs, found beside the checkout by default) and the Python venv are named as
+ * this checkout's: verify failed in the clone with "Missing Required test fixture <temp>/engine-bench/..." (01047bfc5a).
+ */
+export function verifyEnv(env = process.env) {
+  return { MARGO_JUPYTER_VENV: venvDir(), MARGO_SPLAT_SAMPLES: externalAssetRoot(env) };
+}
 
 /**
  * Problems in a proof-runner run (`out` is its stdout + stderr). `--current` (the ongoing guarantees, in verify): any
@@ -185,8 +195,9 @@ async function main() {
     if (present.length) throw new Error(`fresh-clone: the clone holds baseline commits: ${present.join(', ')}`);
     linkModules(clone);
     // Everything every change must pass, as a fresh clone runs it (it builds the packages the proofs below read).
-    // The Python venv is this checkout's (making one is python-venv.test.js's subject, not this check's).
-    const verify = run('npm', ['run', 'verify'], { cwd: clone, minutes: 40, env: { MARGO_JUPYTER_VENV: venvDir() } });
+    // The Python venv and the outside test inputs are this checkout's (verifyEnv); making a venv is
+    // python-venv.test.js's subject and fetching the inputs is fetch-skip-assets.mjs's, not this check's.
+    const verify = run('npm', ['run', 'verify'], { cwd: clone, minutes: 40, env: verifyEnv() });
     if (verify.status !== 0)
       throw new Error(
         `fresh-clone: npm run verify failed in a clone without history (${verify.status}):

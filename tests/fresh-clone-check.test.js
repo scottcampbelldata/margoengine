@@ -62,3 +62,15 @@ test('missing-history messages count even when the runner exits 0', () => {
 test('no summary line (the runner crashed before its table) is a problem', () => {
   assert.deepEqual(problems('', 0), ['the proof runner printed no summary']);
 });
+
+// Regression (01047bfc5a): the clone lives in the temp folder, so its verify looked for the shared outside test inputs
+// in <temp>/engine-bench and failed with "Missing Required test fixture". It now reads this checkout's cache.
+test("the clone's verify reads this checkout's outside test inputs, wherever the clone sits", async () => {
+  const { verifyEnv } = await import('../scripts/fresh-clone-check.mjs');
+  const { externalAssetRoot } = await import('../scripts/support/external-test-assets.mjs');
+  const env = verifyEnv({});
+  assert.equal(externalAssetRoot(env), externalAssetRoot({}), 'the clone resolves the same folder as this checkout');
+  assert.ok(env.MARGO_JUPYTER_VENV);
+  const bench = { MARGO_ENGINE_BENCH: 'D:/bench' };
+  assert.equal(externalAssetRoot(verifyEnv(bench)), externalAssetRoot(bench), 'an override in this checkout carries over');
+});
