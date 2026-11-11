@@ -1248,21 +1248,30 @@ window.check={
   await tracer.ready;
   tracer.enabled=false;const disabled=await shot();
   tracer.enabled=true;
-  // Frames until `done` holds, at most 500 (a guard against a tracer that stops, not a time budget). Both images are
-  // waited for alike: on the WebGL2 layer's route a frame launches a batch of samples that lands tens of frames later
+  // Frames until `done` holds, within a hard limit of 120 s (KB-C34h: a cap of 500 frames ran out while a slow driver
+  // still compiled the display pipeline, and the case then compared the raster frame). Both images are waited for
+  // alike: on the WebGL2 layer's route a frame launches a batch of samples that lands tens of frames later
   // (docs/limits.md), so the image before the restore must not be read at a frame count the native route reaches first.
-  const until=async(done)=>{for(let i=0;!done()&&i<500;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}};
-  await until(()=>tracer.stats.converged);
+  const until=async(done,what)=>{const end=performance.now()+120000;while(!done()){if(performance.now()>end)throw new Error(`viewport: ${what} not reached in 120 s`);engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}};
+  // Where two images differ (KB-C34h, seen once under GPU load and not reproduced): the bounding box, the differing
+  // pixels per 8-row block and the mean luminance ratio over them (0.75 would be a missing batch of 4 of 16 samples).
+  const where=(a,b)=>{let x0=1e9,y0=1e9,x1=-1,y1=-1,ra=0,rb=0;const rows={};const w=canvas.width;
+   for(let i=0;i<a.length;i+=4){let d=0;for(let k=0;k<3;k++)d=Math.max(d,Math.abs(a[i+k]-b[i+k]));if(!d)continue;
+    const p=i/4,x=p%w,y=(p-x)/w;x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);rows[y>>3]=(rows[y>>3]??0)+1;
+    ra+=a[i]*0.2126+a[i+1]*0.7152+a[i+2]*0.0722;rb+=b[i]*0.2126+b[i+1]*0.7152+b[i+2]*0.0722;}
+   return x1<0?undefined:{box:[x0,y0,x1,y1],rows,ratio:rb>0?ra/rb:null};};
+  await until(()=>tracer.stats.converged,'convergence before the restore');
   engine.render({delta:0});const traced=readCanvas(),statsBefore=tracer.stats;
   const old=device();await engine.rebootDevice();watch(device());
-  for(let i=0;tracer.status!=='ready'&&i<500;i++)await new Promise((r)=>setTimeout(r,10));
-  await until(()=>tracer.stats.converged);
+  // The tracer on the new device: its pipelines first (however long the driver takes), then its accumulation.
+  await tracer.ready;
+  await until(()=>tracer.stats.converged,'convergence after the restore');
   engine.render({delta:0});const restored=readCanvas(),statsAfter=tracer.stats;
   // Resize: the traced size follows the canvas and accumulation restarts (its first batch counted, not one more).
-  canvas.style.width='400px';await frames(1);await until(()=>tracer.stats.samples>0);const resized=tracer.stats;canvas.style.width='320px';
+  canvas.style.width='400px';await frames(1);await until(()=>tracer.stats.samples>0,'the first batch after the resize');const resized=tracer.stats;canvas.style.width='320px';
   tracer.dispose();const after=await shot();
   mesh.dispose();
-  return {disabled:diff(disabled,raster),traced:diff(traced,raster),restored:diff(restored,traced),afterDispose:diff(after,raster),newDevice:device()!==old,statsBefore,statsAfter,resized,errors:errors.splice(0),messages:messages.splice(0)};
+  return {disabled:diff(disabled,raster),traced:diff(traced,raster),restored:{...diff(restored,traced),where:where(restored,traced)},afterDispose:diff(after,raster),newDevice:device()!==old,statsBefore,statsAfter,resized,errors:errors.splice(0),messages:messages.splice(0)};
  },
  // With @margoengine/post's Bloom the tracer draws linear HDR into Bloom's rgba16float scene target and Bloom tone maps:
  // a bright emitter gains a glow around it that the plain traced frame does not have.

@@ -96,6 +96,7 @@
     "test:gpu:d3d11": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --compat --angle=d3d11 --report=d3d11 traversal analytic determinism",
     "test:gpu:d3d11-dispose": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --compat --angle=d3d11 --report=d3d11-dispose disposecompile",
     "test:gpu:slow-compile": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs agx --pipeline-delay=500",
+    "test:gpu:slow-compile-viewport": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs viewport --pipeline-delay=6000",
     "test:gpu:spec-math": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs projections --spec-math-error=1",
     "test:gpu:stall": "cd ../.. && node packages/voxel-pathtracer/tests/stall-check.mjs",
     "test:gpu:guiding": "cd ../.. && node packages/voxel-pathtracer/tests/guiding-browser.mjs",

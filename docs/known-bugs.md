@@ -144,6 +144,29 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
   results kept, watching for an `out-of-memory` error.
 
+### Path tracer viewport: the converged image after a device restore differed once on the WebGL2 layer under GPU load (KB-C34h, 2026-11-11, open, not reproduced)
+
+- **Repro (not reproduced since):** `node packages/voxel-pathtracer/tests/browser-check.mjs --compat viewport`, inside
+  `webgl2-compat test:gpu` while six other GPU suites ran (2026-11-11 10:06 EST): both images converged at 16 samples,
+  yet 5,723 of 76,800 pixels differed, by at most 91 levels. The case took 16.9 s (3.2 s alone) and a traced batch
+  1,608 ms (286 ms alone). It is the same "paths look cut short under load" class as the furnace entry above (Lane L3a
+  saw "clear glass" 0.7623 against 1 once, also on the layer under load).
+- **Ruled out, by experiment (RTX A6000, ANGLE Vulkan and native WebGPU, every converged image hashed):** band sizing
+  (seven fixed band budgets from 400,000 to 201,326,592 path-iterations give one hash on each backend); readback and
+  queue timing (every `mapAsync` and `onSubmittedWorkDone` delayed by a seeded 0 to 40 ms); GPU load (three loaded pages
+  at once, 48 images, one hash); the suite's own order on one page (`traversal analytic textures shapes transparent
+  determinism viewport`, twice beside each other). The denoiser is not involved: the case traces with `denoise` off
+  (the default). The NVIDIA driver resets that day (event 153 at 08:04, 08:12 and 09:23) do not line up with the failure.
+- **Found and fixed on the way:** the case waited at most 500 frames for convergence and 5 s for the restored tracer,
+  so a driver that compiles slowly (`--pipeline-delay=6000`) made it compare the raster frame ("enabled: the traced
+  image replaces it" failed on WebGPU and on the layer). It now waits for `ready` and for convergence within a hard
+  limit of 120 s each, and `npm run test:gpu:slow-compile-viewport` keeps that path covered
+  (packages/voxel-pathtracer/tests/browser-check.html). This flaw cannot give the 5,723-pixel result, where both
+  images had converged.
+- **Next:** a repeat now prints where the images differ (`restored.where`: bounding box, differing pixels per 8-row
+  block and the mean luminance ratio; 0.75 in whole 48-row bands would be one missing 4-sample batch of a band, a
+  scattered ratio below 1 paths cut short). Keep that line of the log when it happens.
+
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
 - **Repro:** `MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --owner=<lane> -- node packages/post/test/ssgi-bounce-browser.mjs`
