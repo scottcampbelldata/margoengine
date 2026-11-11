@@ -416,3 +416,33 @@ test('hardware bundle exposes the literal complete proof graph', { timeout: 1500
     assert.equal(typeof proof[name], 'function', name);
   assert.equal(proof.placementCases(proof).length + proof.flowCases().length + 2, proof.PLACEMENT_FLOW_CASE_COUNT);
 });
+
+// A reaction on device.lost cannot be removed: one made per session kept every closed session's failure promise alive
+// as long as the device (docs/known-bugs.md). One reaction per device now fails the sessions still open.
+test('a closed GPU session is collected while its device lives; an open one still fails when it is lost', async () => {
+  const { setFlagsFromString } = await import('node:v8');
+  const { setImmediate } = await import('node:timers/promises');
+  const { ComputeSession } = await import('../src/gpu-placement-flow-transport.ts');
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc');
+  try {
+    const fake = fakeDevice(),
+      device = fake.device ?? fake;
+    const reference = (() => {
+      const session = new ComputeSession(device);
+      session.close();
+      return new WeakRef(session.failure);
+    })();
+    for (let i = 0; i < 5 && reference.deref(); i++) {
+      await setImmediate();
+      gc();
+    }
+    assert.ok(reference.deref() === undefined, 'the closed session is still reachable from its live device');
+    const open = new ComputeSession(device);
+    (fake.lose ?? device.lose)({ message: 'test device loss' });
+    await assert.rejects(open.failure, (e) => e.code === 'failed' && /device lost.*recreate/i.test(e.message));
+    open.close();
+  } finally {
+    setFlagsFromString('--no-expose-gc');
+  }
+});

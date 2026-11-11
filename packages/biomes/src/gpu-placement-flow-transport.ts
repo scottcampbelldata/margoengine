@@ -35,6 +35,28 @@ export function checkWords(device: GPUDevice, words: number): void {
     throw rangeError('GPU storage exceeds device limits; use a smaller input', 'biomes');
 }
 
+// The open sessions of each device, failed once when it is lost. A reaction on device.lost cannot be removed: one made per
+// session kept every closed session's failure promise (and what waited on it) alive as long as the device
+// (docs/known-bugs.md). The one reaction, made outside any session's scope, holds the device and this set.
+const lostWatch = new WeakMap<GPUDevice, Set<(reason: unknown) => void>>();
+function watchLost(device: GPUDevice): Set<(reason: unknown) => void> {
+  let set = lostWatch.get(device);
+  if (!set) {
+    const open = (set = new Set());
+    lostWatch.set(device, open);
+    void device.lost.then(
+      (loss) => {
+        const error = fault('failed', `GPU device lost: ${loss.message}; recreate the WebGPU device`, 'biomes');
+        for (const reject of [...open]) reject(error);
+      },
+      (error) => {
+        for (const reject of [...open]) reject(error);
+      },
+    );
+  }
+  return set;
+}
+
 /** One request owns all buffers and failure listeners, including across dependent submissions. */
 export class ComputeSession {
   readonly buffers: GPUBuffer[] = [];
@@ -62,10 +84,7 @@ export class ComputeSession {
     void this.failure.catch(() => {});
     device.addEventListener('uncapturederror', this.uncaptured);
     signal?.addEventListener('abort', this.abort, { once: true });
-    void device.lost.then(
-      (loss) => reject(fault('failed', `GPU device lost: ${loss.message}; recreate the WebGPU device`, 'biomes')),
-      reject,
-    );
+    watchLost(device).add(reject);
     signal?.throwIfAborted();
   }
   wait<T>(task: Promise<T>): Promise<T> {
@@ -157,6 +176,7 @@ export class ComputeSession {
     void Promise.allSettled(this.pending);
     this.signal?.removeEventListener('abort', this.abort);
     this.device.removeEventListener('uncapturederror', this.uncaptured);
+    lostWatch.get(this.device)?.delete(this.reject);
     for (const buffer of this.buffers) buffer.destroy();
   }
 }
