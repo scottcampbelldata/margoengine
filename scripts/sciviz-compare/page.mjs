@@ -2,6 +2,7 @@ import { pairedFrames, imageDifference } from '@margoengine/sciviz/bench';
 import { comparisonData } from './data.mjs';
 import { margoRenderer, SIZE } from './margo.mjs';
 import { rivalRenderer } from './rivals.mjs';
+import { linkPeak } from './appearance.mjs';
 import { installWorkCounters, countDelta } from '../../packages/sciviz/scripts/rival-contract.js';
 
 async function hash(bytes) {
@@ -104,6 +105,15 @@ window.runComparison = async ({ id, rival, scale, runs }) => {
           }
         : {}),
       firstFrames: { margoInk: nonempty(imageA), rivalInk: nonempty(imageB) },
+      // Same asked colour (#22cbee), width 1 and opacity 1 on both sides; the share is the peak link pixel's fraction of it.
+      ...(id === 'graph'
+        ? {
+            linkPeak: {
+              margo: linkPeak({ width: SIZE, height: SIZE, rgba: result.a.rgba }, [34, 203, 238], [15, 20, 28]),
+              rival: linkPeak({ width: SIZE, height: SIZE, rgba: result.b.rgba }, [34, 203, 238], [15, 20, 28]),
+            },
+          }
+        : {}),
     };
     // Hold the last copied images for screenshots until the host explicitly releases them.
     window.releaseComparison = () => {

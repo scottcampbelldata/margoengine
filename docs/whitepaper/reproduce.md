@@ -4172,3 +4172,5 @@ layer); the second prints the error-rate table quoted in docs/limits.md.
 Audio spectrograms: `npm run build:packages`, then `node --test packages/audio/tests/spectrogram.test.js` (CPU, includes the
 Griffin-Lim run, which prints the two SNR figures) and `node scripts/gpu-lock.mjs run --owner=<you> -- node
 packages/audio/tests/spectrogram-browser.mjs` (the GPU path on WebGPU, then the WebGL2 layer).
+
+Sciviz rival accuracy (KB2594a): with the batch 182 rivals installed in engine-bench, run `node scripts/sciviz-compare.mjs --accuracy`. It is CPU only (no GPU slot), runs the isosurface, streamline and isoline closed-form references through VTK.js public filters as a black box and writes `accuracy.json` under test-results/bp-182/compare; docs/whitepaper/sciviz-vs-rivals.md holds the table. `node --test tests/sciviz-compare.test.js` checks the measures.

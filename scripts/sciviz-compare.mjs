@@ -9,6 +9,7 @@ import { acquire } from './gpu-lock.mjs';
 import { benchRoot } from './rival-pair.mjs';
 import { deferSpeed } from './support/speed-phase.mjs';
 import { CASES, INSTALL, RIVALS, compareOptions } from './sciviz-compare/manifest.mjs';
+import { vtkAccuracy } from './sciviz-compare/accuracy.mjs';
 
 const options = compareOptions(process.argv.slice(2));
 if (options.list) {
@@ -43,6 +44,19 @@ const versions = Object.fromEntries(
 );
 const output = resolve(options.output);
 mkdirSync(output, { recursive: true });
+if (options.accuracy) {
+  // CPU only, no GPU slot: the closed-form references through VTK.js public filters (KB2594a).
+  const record = {
+    schema: 'margo-sciviz-accuracy/1',
+    commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', timeout: 10_000 }).trim(),
+    versions: { vtk: versions.vtk },
+    vtk: await vtkAccuracy(modules),
+    noExtractionApi: Object.keys(RIVALS).filter((name) => name !== 'vtk'),
+  };
+  writeFileSync(join(output, 'accuracy.json'), `${JSON.stringify(record, null, 2)}\n`);
+  console.log(JSON.stringify(record, null, 2));
+  process.exit(0);
+}
 const aliases = [
   ...Object.values(RIVALS),
   '@deck.gl/layers',

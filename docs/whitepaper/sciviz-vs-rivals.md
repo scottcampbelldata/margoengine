@@ -97,6 +97,14 @@ rasterization, interpolation and storage precision. They are not used to accept 
 has the largest difference: Cosmograph draws links dimmer than the shared colour at width 1 and adds an
 attribution overlay outside its canvas; the node layout matches.
 
+Accepted difference, measured (KB2594b): both sides are asked for links of #22cbee at width 1 and opacity 1 on
+#0f141c (Cosmograph also with `linkVisibilityMinTransparency: 1` and `scaleLinksOnZoom: false`). The brightest
+interior link pixel reaches the asked colour in Margo (34, 203, 238; share 1.00 over the background) and
+(32, 97, 118) in Cosmograph 2.5.1, a share of 0.42; Margo lights 13,514 interior link pixels, Cosmograph 9,814. With
+its documented link opacity options already at full opacity, the dimming happens inside the rival (black box, not
+read), and Margo keeps drawing the colour it is asked for. Like for like: the same graph, layout, colour, width and background;
+the report field `linkPeak` of `node scripts/sciviz-compare.mjs --cases=graph/cosmograph` records both peaks.
+
 ### Explicit differences in work
 
 - **Volume:** Margo captures scene depth and composes the volume with opaque geometry through its multisample frame
@@ -122,8 +130,19 @@ spacing squared.
 | ABC flow streamline (A = sqrt 3, B = sqrt 2, C = 1), against a float64 RK4 of the analytic field | end-point distance 0.0053 then 0.0013 after one time unit | `tests/analytic-references.test.js` |
 | Isoline of x^2 + y^2 = 0.25 | largest radial error 0.00094 then 0.00024, one closed line | `tests/analytic-references.test.js` |
 
-Rival accuracy rows are not measured: running these references through the rivals needs their own extraction APIs
-and is listed as open work.
+The same references through VTK.js 38.0.5 public filters (ImageMarchingCubes, ImageStreamline with integration step
+0.005 for 200 steps, ImageMarchingSquares), run as a black box where it is installed, at 33 and 65 samples per axis:
+
+| Reference | VTK.js result | Like for like |
+| --- | --- | --- |
+| Beer-Lambert pre-integration | not measurable: no public pre-integrated opacity table | none |
+| Sphere isosurface | relative error 0.25 % then 0.062 % (area), 0.47 % then 0.12 % (volume); 4808 and 18968 triangles | same field and grid; both are marching cubes with linear edge interpolation, so the errors agree to two digits |
+| ABC streamline end point | distance 0.0053 then 0.0013 after one time unit | same trilinear-sampled grid and RK4 step; the grid sampling error dominates both |
+| Isoline of x^2 + y^2 = 0.25 | largest radial error 0.00094 then 0.00024; 60 then 124 two-point line cells | same error; Margo joins the cells into one closed line, VTK.js returns separate segments |
+
+Plotly, deck.gl, ECharts GL, regl-scatterplot and Cosmograph expose no extraction output for these references, so
+their rows are not measurable. Reproduce: `node scripts/sciviz-compare.mjs --accuracy` (CPU only, writes
+`accuracy.json` beside the comparison results).
 
 ## Losses and pending timing
 
@@ -137,8 +156,8 @@ included.
 
 ## Not found in Margo today
 
-None of the batch 182 feature gaps remain; docs/known-bugs.md "Sciviz comparison gaps" keeps the unmeasured rival
-accuracy rows and the Cosmograph appearance note.
+None of the batch 182 feature gaps remain. The rival accuracy rows are measured above, and the Cosmograph link
+appearance is a measured accepted difference ("Image differences" above).
 
 ## Reproduce
 

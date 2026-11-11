@@ -40,10 +40,18 @@ export const CASES = [
 ];
 
 export function compareOptions(args) {
-  const options = { runs: 1, cases: [], output: 'test-results/bp-182/compare', install: false, list: false };
+  const options = {
+    runs: 1,
+    cases: [],
+    output: 'test-results/bp-182/compare',
+    install: false,
+    list: false,
+    accuracy: false,
+  };
   for (const arg of args) {
     if (arg === '--install') options.install = true;
     else if (arg === '--list') options.list = true;
+    else if (arg === '--accuracy') options.accuracy = true;
     else if (arg.startsWith('--runs=')) {
       if (!/^[1-9]\d*$/.test(arg.slice(7)) || Number(arg.slice(7)) > 100) throw new RangeError('runs must be 1..100');
       options.runs = Number(arg.slice(7));

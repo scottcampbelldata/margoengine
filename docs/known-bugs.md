@@ -2667,9 +2667,13 @@ Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-
 feature that a web rival or desktop tool documents, with no export, README section or test in `@margoengine/sciviz`.
 Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
 
-- **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
-- **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
-  for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.
+- **Fixed 2026-11-11 (KB2594a): rival accuracy rows were unmeasured.** `node scripts/sciviz-compare.mjs --accuracy` now runs the isosurface, streamline and isoline references through VTK.js 38.0.5 public filters (black box, in engine-bench) next to Margo; the results are in [sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md#accuracy-against-closed-form-answers). Beer-Lambert has no public VTK.js extraction API, and the other five rivals expose no isosurface, streamline or contour output, so those rows are recorded as not measurable. Regression: tests/sciviz-compare.test.js (accuracy references case).
+- **Closed 2026-11-11 (KB2594b) as a measured accepted difference: Cosmograph link appearance differs** at the shared
+  colour and width (graph smoke mean RGB difference 23). Measured: the brightest interior link pixel is the asked
+  colour in Margo and 0.42 of it over the background in Cosmograph 2.5.1, with linkOpacity 1 and
+  linkVisibilityMinTransparency 1 (its documented opacity options at full), so the cause is inside the rival. Recorded in
+  [sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md) and docs/limits.md. Regression: tests/sciviz-compare.test.js
+  (graph link peak case); the comparison report carries `linkPeak`.
 
 ## Performance losses still open
 
