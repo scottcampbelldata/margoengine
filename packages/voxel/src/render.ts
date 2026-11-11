@@ -292,7 +292,9 @@ export interface VoxelRendererOptions {
   mesher?: VoxelChunkMesher;
   /**
    * Most GPU bytes for quads (12 each, in pages of 64): the buffer starts at 4 MiB and doubles up to this. A mesh that
-   * does not fit waits until other chunks free pages. Default 96 MiB; at most the device's maxStorageBufferBindingSize.
+   * does not fit waits until other chunks free pages, with {@link VoxelRendererStats.poolFull} true meanwhile. Default
+   * the device's limit: the smaller of maxStorageBufferBindingSize and maxBufferSize, in whole pages (128 MiB, about
+   * 11.18 million quads, on a default WebGPU device); at most that limit.
    */
   maxQuadBytes?: number;
   /** Initial {@link VoxelRenderer.daylight}. Default 1. */
@@ -398,6 +400,12 @@ export interface VoxelRendererStats {
    * it rather than for a number of frames: how long meshing takes depends on the CPU.
    */
   readonly pending: number;
+  /**
+   * True while a meshed chunk waits because the quad pool is at `maxQuadBytes` and no run of free pages fits it: that
+   * chunk is not drawn and `pending` stays above 0 until chunks are removed (or the renderer is made again with a
+   * larger `maxQuadBytes`, up to the device limit). False otherwise.
+   */
+  readonly poolFull: boolean;
 }
 
 // First fit over runs of free pages: [start, length] pairs sorted by start, neighbours merged.
@@ -621,7 +629,8 @@ export class VoxelRenderer implements EnginePlugin {
   #engine?: Engine;
   #mesher: VoxelChunkMesher;
   #ownMesher: boolean;
-  #maxPages: number;
+  readonly #maxQuadBytes: number | undefined;
+  #maxPages = 0;
   #fancyLeaves: boolean;
   #bevel?: VoxelBevel;
   #lightmap?: VoxelLightmap;
@@ -655,7 +664,7 @@ export class VoxelRenderer implements EnginePlugin {
   #postView = new Float32Array(16);
   #frustum = new Frustum();
   #box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
-  #stats = { chunks: 0, visible: 0, quads: 0, triangles: 0, bytes: 0, draws: 0, compiling: false, pending: 0 };
+  #stats = { chunks: 0, visible: 0, quads: 0, triangles: 0, bytes: 0, draws: 0, compiling: false, pending: 0, poolFull: false };
   // Mesher jobs in flight: chunk key -> the job's number (a newer job for a key supersedes the older one).
   #meshing = new Map<string, number>();
   #jobs = 0;
@@ -693,7 +702,7 @@ export class VoxelRenderer implements EnginePlugin {
       textures,
       workers,
       mesher,
-      maxQuadBytes = 96 << 20,
+      maxQuadBytes,
       daylight = 1,
       fancyLeaves = true,
       bevel,
@@ -706,9 +715,12 @@ export class VoxelRenderer implements EnginePlugin {
       throw new TypeError(
         'VoxelRenderer textures must be BlockTextures; pass {textures: await BlockTextures.load(urls)}',
       );
-    isNumber(maxQuadBytes, 'maxQuadBytes', 'pass bytes, such as 96 << 20');
-    if (!Number.isInteger(maxQuadBytes) || maxQuadBytes < PAGE_BYTES)
-      throw new RangeError(`VoxelRenderer maxQuadBytes ${maxQuadBytes} is not a whole number of at least 768 bytes`);
+    this.#maxQuadBytes = maxQuadBytes;
+    if (maxQuadBytes !== undefined) {
+      isNumber(maxQuadBytes, 'maxQuadBytes', 'pass bytes, such as 96 << 20');
+      if (!Number.isInteger(maxQuadBytes) || maxQuadBytes < PAGE_BYTES)
+        throw new RangeError(`VoxelRenderer maxQuadBytes ${maxQuadBytes} is not a whole number of at least 768 bytes`);
+    }
     if (typeof fancyLeaves !== 'boolean') throw new TypeError('VoxelRenderer fancyLeaves must be true or false');
     isNumber(scale, 'scale', 'pass a power of two, such as 8');
     if (!Number.isInteger(scale) || scale < 1 || scale > 4096 || (scale & (scale - 1)) !== 0)
@@ -718,7 +730,6 @@ export class VoxelRenderer implements EnginePlugin {
     this.#scale = scale;
     this.world = world;
     this.textures = textures;
-    this.#maxPages = Math.floor(maxQuadBytes / PAGE_BYTES);
     this.#fancyLeaves = fancyLeaves;
     if (bevel !== undefined && typeof bevel?.mesh !== 'function')
       throw new TypeError('VoxelRenderer bevel must come from voxelBevel(amount) of @margoengine/voxel/bevel');
@@ -740,7 +751,7 @@ export class VoxelRenderer implements EnginePlugin {
    * Creates a renderer for `options.world` and adds it to `engine`.
    * @throws TypeError when `world` is not a VoxelWorld, `textures` not BlockTextures, `lightmap` not a `voxelLightmap`
    * result, `bevel` not a `voxelBevel` result, or an option has the wrong type.
-   * @throws RangeError for `maxQuadBytes` under 768 or over the device's maxStorageBufferBindingSize, `daylight` that is
+   * @throws RangeError for `maxQuadBytes` under 768 or over the device's maxStorageBufferBindingSize or maxBufferSize, `daylight` that is
    * negative or not finite, or `workers` that is not a whole number of 1 or more.
    * @throws MargoError `unsupported` without the WebGPU backend or Web Workers.
    */
@@ -1101,11 +1112,14 @@ export class VoxelRenderer implements EnginePlugin {
         'unsupported',
         'VoxelRenderer needs the WebGPU backend; create the engine with WebGPU; see https://margoengine.com/errors#webgpu',
       );
-    const limit = device.limits.maxStorageBufferBindingSize;
-    if (this.#maxPages * PAGE_BYTES > limit)
+    // The pool is one storage binding: the device's binding and buffer limits bound it.
+    const limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize ?? Infinity);
+    const maxQuadBytes = this.#maxQuadBytes;
+    if (maxQuadBytes !== undefined && maxQuadBytes > limit)
       throw new RangeError(
         `VoxelRenderer maxQuadBytes is over this device's ${limit}-byte storage binding limit; lower maxQuadBytes`,
       );
+    this.#maxPages = Math.floor((maxQuadBytes ?? limit) / PAGE_BYTES);
     this.#engine = engine;
   }
 
@@ -1774,6 +1788,7 @@ export class VoxelRenderer implements EnginePlugin {
     stats.bytes = this.#pages.used * PAGE_BYTES;
     stats.draws += list.length;
     stats.pending = this.world.dirty.size + this.#meshing.size + this.#finished.size;
+    stats.poolFull = this.#full && this.#finished.size > 0;
     if (this.#slotTop) gpu.device.queue.writeBuffer(gpu.args, 0, args, 0, this.#slotTop * 10);
     list.sort((a, b) => distance(b) - distance(a));
     // Quad (and triangle) order inside near chunks, from the camera's position, when it moved RESORT blocks since the

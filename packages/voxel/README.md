@@ -817,7 +817,9 @@ voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
   again on the CPU after the camera moves 4 blocks, and translucent chunks draw back to front.
 - **GPU memory.** One storage buffer holds every quad (12 bytes) in pages of 64; a chunk layer takes a run of pages
   (first fit, reused in place while it still fits). The buffer starts at 4 MiB and doubles up to `maxQuadBytes`
-  (default 96 MiB, at most the device's storage binding limit); a mesh that does not fit waits until chunks free pages.
+  (default and most: the device's storage binding limit, or its `maxBufferSize` when smaller, in whole pages: 128 MiB,
+  11,184,810 quads, on a default WebGPU device; it only grows as chunks need it). A mesh that does not fit waits until
+  chunks free pages; `renderer.stats.poolFull` is true while one waits, and `stats.pending` stays above 0 meanwhile.
   Vertices are pulled from it by vertex index (no vertex buffers, no extra GPU feature).
 - **Draws.** Pass order -6 prepares: frustum cull per chunk on the CPU (`@margoengine/math/frustum`) into the indirect
   arguments, uploads, the frame uniform. Order 1 draws opaque blocks (back faces culled) and cutout blocks (both sides,

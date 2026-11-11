@@ -119,6 +119,7 @@ export interface VoxelRendererStats {
     readonly draws: number;
     readonly compiling: boolean;
     readonly pending: number;
+    readonly poolFull: boolean;
 }
 
 export interface VoxelShadowContext {

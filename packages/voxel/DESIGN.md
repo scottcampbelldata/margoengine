@@ -153,7 +153,7 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 - Bindings: group 0 frame uniform (camera, eye, engine.lighting, HDR flag settings.w, time, daylight, light curve,
   block-light colour), quad pool, page and chunk-origin tables, material table, block texture, sampler; group 1 from
   lighting effects via pbr(1) (shadows 1-3, clustered 4-7, IBL 20-24, fog 25).
-- One quad pool storage buffer: 64 MiB default growing to maxQuadBytes (default 96 MiB). First-fit 64-quad pages,
+- One quad pool storage buffer: 64 MiB default growing to maxQuadBytes (default the device's storage binding limit; 96 MiB before 2026-11-11). First-fit 64-quad pages,
   in-place reuse. Shader gets quad = vertex_index>>2, corner = &3, chunk from pages[quad>>6], firstInstance 0. Static
   u32 index buffer 2.25 MiB (worst-case 98,304 quads per chunk layer). 20-byte drawIndexedIndirect args per chunk and
   layer; opaque and cutout recorded into GPURenderBundles re-recorded only when the resident set, pipeline or lighting

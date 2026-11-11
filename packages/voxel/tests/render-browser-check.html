@@ -326,6 +326,35 @@ window.check={
   look({position:[48,40,-40],target:[48,16,16]});await shot();const stats={...renderer.stats};renderer.dispose();
   return {expected:quadsOf(w,ks,'greedy'),stats,lit,pixels:canvas.width*canvas.height,errors:errors.splice(0)};
  },
+ // The quad pool at its default (the device's storage binding): worst-case chunks (196,608 quads each, half opaque, half
+ // cutout) until one no longer fits. stats.poolFull must be false while all fit and true once one waits; then GPU time
+ // of the voxel passes (timestamp queries) over the grid (stats.visible chunks in view) and the steady work counts.
+ async scale(){
+  const d=device(),limit=Math.min(d.limits.maxStorageBufferBindingSize,d.limits.maxBufferSize),fit=Math.floor(Math.floor(limit/768)/3072);
+  const w=new VoxelWorld({blocks}),chunks=[];
+  const one=()=>{const c=new VoxelChunk();c.fillLight(0xf0);for(let i=0;i<32768;i++){const x=i&31,y=i>>10,z=(i>>5)&31;c.set(x,y,z,((x+y+z)&1)?LEAVES:GREEN);}return c;};
+  const settle=async(n)=>{let stable=0,last=-1;for(let i=0;i<20000&&stable<30;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();stable=renderer.stats.quads===last&&!w.dirty.size&&renderer.stats.chunks>=Math.min(n,fit)?stable+1:0;last=renderer.stats.quads;await new Promise((r)=>setTimeout(r,0));}};
+  const side=Math.ceil(Math.sqrt(fit+1));look({position:[side*20,side*30,-side*10],target:[side*20,0,side*20]});engine.camera.far=side*200;
+  renderer=VoxelRenderer.attach(engine,{world:w,textures});
+  for(let i=0;i<fit;i++){w.addChunk((i%side)*2,0,Math.floor(i/side)*2,one());chunks.push(i);}
+  await settle(fit);const fitted={...renderer.stats};
+  w.addChunk((fit%side)*2,0,Math.floor(fit/side)*2,one());
+  for(let i=0;i<200;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,0));}
+  const over={...renderer.stats};
+  // Timestamps where the device has them (native); on the WebGL2 layer, wall time per frame until the GPU is done.
+  const gpu=[],cpu=[],wall=[];
+  if(d.features.has('timestamp-query')){
+   const query=d.createQuerySet({type:'timestamp',count:4}),resolve=d.createBuffer({size:32,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+   const stamp=(name,order,index)=>runtime().frameGraph.add({name,order,execute:(c)=>c.encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:index}}).end()});
+   const off=[stamp('t0',0.999,0),stamp('t1',1.001,1),stamp('t2',4.499,2),stamp('t3',4.501,3),runtime().frameGraph.add({name:'t-resolve',order:9.99,execute:(c)=>{c.encoder.resolveQuerySet(query,0,4,resolve,0);c.encoder.copyBufferToBuffer(resolve,0,read,0,32);}})];
+   for(let i=0;i<80;i++){const t=performance.now();engine.render({delta:1/60});cpu.push(performance.now()-t);await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();if(i>=20)gpu.push(Number(s[1]-s[0]+s[3]-s[2])/1e6);}
+   for(const f of off)f();
+  }else for(let i=0;i<80;i++){const t=performance.now();engine.render({delta:1/60});cpu.push(performance.now()-t);await d.queue.onSubmittedWorkDone();if(i>=20)wall.push(performance.now()-t);}
+  w.removeChunk(0,0,0);for(let i=0;i<20000&&renderer.stats.poolFull;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,0));}
+  const freed={...renderer.stats};renderer.dispose();engine.camera.far=400;
+  const median=(a)=>[...a].sort((x,y)=>x-y)[a.length>>1];
+  return {limit,fit,size:[canvas.width,canvas.height],fitted,over,freed,gpuMs:gpu.length?median(gpu):null,wallMs:wall.length?median(wall):null,cpuFrameMs:median(cpu),errors:errors.splice(0)};
+ },
  // A synthetic world of render distance 16 (33 x 33 x 2 chunks): stats, GPU time of the voxel passes, bundle cost.
  async timing(){
   const big=new VoxelWorld({blocks}),bigKeys=[];

@@ -493,6 +493,11 @@ Build-ready controls and external-install commands: [sciviz-rivals](../sciviz-ri
 Scott's ruling (2026-11-10): a raised limit counts only if it runs fast. Each case below is timed on a quiet machine
 with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no timestamps), with its work count.
 
+- Voxel quad pool at its default, the device's storage binding (128 MiB, 2026-11-11): 56 worst-case chunks, 11,010,048
+  cutout quads, 52 chunks in view, 320 x 240 (`node packages/voxel/tests/render-browser-check.mjs --scale`, native and
+  `MARGO_COMPAT=1`). Work per steady frame: 52 indirect draws from one render bundle, no buffer writes. Busy-machine
+  diagnostic 2026-11-11 on the RTX A6000: voxel passes 8.3 ms GPU (timestamps) natively; WebGL2 layer 15.7 ms wall per
+  frame. Target 60 fps at 1920 x 1080 on the A6000 and the mid laptop iGPU: still to time on a quiet machine.
 - VFX at the device capacity: 2,097,152 live particles, all on screen, 1280 x 720, simulate and draw
   (`node packages/vfx/test/browser-check.mjs`, scale case, native and `MARGO_COMPAT=1`). Work per frame: four compute
   dispatches over 8,192 workgroups, one indirect draw of 3 vertices per listed particle, one 224 B uniform write.

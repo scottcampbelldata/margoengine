@@ -96,8 +96,10 @@ function fakeDevice() {
 }
 
 // A minimal engine (plugin graph, lighting, stats) and a pass context that records its render passes.
-function setup(options = {}, { textures = new BlockTextures(), blocks = defaultBlocks() } = {}) {
-  const device = fakeDevice(),
+function setup(options = {}, { textures = new BlockTextures(), blocks = defaultBlocks(), limits } = {}) {
+  const device = fakeDevice();
+  Object.assign(device.limits, limits);
+  const
     graph = new FrameGraph(),
     plugins = new Map(),
     errors = [],
@@ -260,9 +262,14 @@ test('pages: first fit, freed holes reused, in-place remesh, data and page table
   }
 });
 
-test('pool grows to maxQuadBytes keeping its pages, then a mesh that does not fit waits for freed pages', async () => {
+for (const [name, options, limits] of [
+  ['maxQuadBytes', { maxQuadBytes: 8000 * 768 }, {}],
+  // No maxQuadBytes: the pool may grow to the device's storage binding (here 8,000 pages and a byte; maxBufferSize larger).
+  ['the default, the device binding limit', {}, { maxStorageBufferBindingSize: 8000 * 768 + 1, maxBufferSize: 1 << 30 }],
+])
+test(`pool grows to ${name} keeping its pages, then a mesh that does not fit waits for freed pages, poolFull says so`, async () => {
   const pages = 8000,
-    { world, renderer, frame, device, STONE } = setup({ maxQuadBytes: pages * 768 });
+    { world, renderer, frame, device, STONE } = setup(options, { limits });
   try {
     const checkerboard = () => {
       const chunk = new VoxelChunk();
@@ -296,9 +303,12 @@ test('pool grows to maxQuadBytes keeping its pages, then a mesh that does not fi
       await new Promise((resolve) => setTimeout(resolve, 2));
     }
     assert.equal(renderer.stats.chunks, 5, 'the sixth mesh waits');
+    assert.equal(renderer.stats.poolFull, true, 'and the stats say why');
+    assert.ok(renderer.stats.pending > 0);
     world.removeChunk(2, 0, 0);
     await settle(frame, () => residents(device).has('20,0,0'));
     assert.equal(renderer.stats.chunks, 5);
+    assert.equal(renderer.stats.poolFull, false);
   } finally {
     renderer.dispose();
   }
@@ -710,6 +720,10 @@ test('VoxelRenderer: argument errors, WebGPU required, dispose', () => {
   assert.throws(attach({ textures: {} }), TypeError);
   assert.throws(attach({ maxQuadBytes: 100 }), RangeError);
   assert.throws(attach({ maxQuadBytes: 256 << 20 }), RangeError);
+  // The pool is one buffer: maxBufferSize bounds it too, not only the binding size.
+  engine.gpu.limits.maxBufferSize = 64 << 20;
+  assert.throws(attach({ maxQuadBytes: 96 << 20 }), /storage binding limit/);
+  delete engine.gpu.limits.maxBufferSize;
   assert.throws(attach({ daylight: -1 }), RangeError);
   assert.throws(attach({ fancyLeaves: 1 }), TypeError);
   assert.throws(attach({ workers: 0 }), RangeError);

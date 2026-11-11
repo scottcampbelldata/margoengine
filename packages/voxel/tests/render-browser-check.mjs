@@ -15,6 +15,8 @@
 // - a block edit is drawn within two 60 Hz frames (best of five); engine.rebootDevice() draws the same image again;
 // - the worst case, 196,608 quads in one chunk layer (cutout and translucent), draws;
 // - no WebGPU validation errors; sane stats.
+// `--scale` runs only this: it fills the default quad pool (the device's storage binding) with worst-case chunks and checks stats.poolFull
+// once one more waits; it reports GPU time of the voxel passes with every quad in view.
 // `--timing` adds a 16-chunk-radius synthetic world: spawn time, GPU time of the voxel passes (timestamp queries,
 // rough unless run behind scripts/quiet-gate.mjs) and the render bundle record cost. `--repeat=<frames>` runs only
 // this: one still 4x view drawn frame after frame under CPU load, failing on any frame that differs from the first
@@ -37,7 +39,8 @@ const path = '/packages/voxel/tests/render-browser-check.html',
   pageErrors = [],
   report = { hardware, results: {} },
   repeat = Number(process.argv.find((a) => a.startsWith('--repeat='))?.slice(9) ?? 0),
-  replay = Number(process.argv.find((a) => a.startsWith('--replay='))?.slice(9) ?? 0);
+  replay = Number(process.argv.find((a) => a.startsWith('--replay='))?.slice(9) ?? 0),
+  scale = process.argv.includes('--scale');
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
@@ -49,7 +52,7 @@ const near = (actual, expected, label, tolerance = 2e-3) =>
   );
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
-  for (const samples of repeat || replay ? [] : [4, 1]) {
+  for (const samples of repeat || replay || scale ? [] : [4, 1]) {
     await page.goto(`http://127.0.0.1:${port}${path}${samples === 1 ? '?samples=1' : ''}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     assert.equal(await page.evaluate(() => window.check.samples()), samples);
@@ -239,6 +242,19 @@ try {
     );
     console.log(`ok replay: ${replay} frames drew the same samples`);
   }
+  if (scale) {
+    // The default quad pool filled to the device's storage binding (docs/work-lists/speed-phase.md, default size limits).
+    await page.goto(`http://127.0.0.1:${port}${path}`);
+    await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+    const t = await page.evaluate(() => window.check.scale());
+    report.results.scale = t;
+    assert.deepEqual(t.errors, []);
+    assert.equal(t.fitted.quads, t.fit * 196608, 'every chunk that fits the default pool is drawn');
+    assert.equal(t.fitted.poolFull, false);
+    assert.ok(t.over.poolFull && t.over.pending > 0 && t.over.chunks === t.fit, 'the chunk past the pool waits, flagged');
+    assert.ok(!t.freed.poolFull && t.freed.chunks === t.fit, 'and is drawn once a chunk frees its pages');
+    console.log(`ok scale: ${t.fitted.quads} quads in the default ${t.limit}-byte pool ${JSON.stringify(t)}`);
+  }
   if (process.argv.includes('--timing')) {
     await page.goto(`http://127.0.0.1:${port}${path}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -248,7 +264,7 @@ try {
     console.log(`timing (rough: no quiet gate) ${JSON.stringify(t)}`);
   }
   assert.deepEqual(pageErrors, []);
-  if (!repeat && !replay)
+  if (!repeat && !replay && !scale)
     await writeFile('test-results/voxel-render-browser-check.json', JSON.stringify(report, null, 1));
   console.log('voxel render browser check passed');
 } finally {
