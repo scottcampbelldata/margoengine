@@ -340,6 +340,7 @@ export class Animation implements EnginePlugin {
    */
   readonly warnings: readonly string[];
   playing = true;
+  /** Seconds into the current clip. Wraps at the clip's end while `loop` is on; jump with `seek`. */
   time = 0;
   clip = 0;
   private device?: GPUDevice;
@@ -881,6 +882,9 @@ export class Animation implements EnginePlugin {
       throw new RangeError('Invalid animation delta; pass a finite delta >= 0 seconds');
     if (this.playing) {
       this.time += delta * (this.options.speed ?? 1);
+      const duration = this.clips[this.clip]?.duration ?? 0;
+      // A looping clip keeps `time` inside the clip, as `loop` says, so a scrub bar or a save reads the shown frame.
+      if ((this.options.loop ?? true) && duration > 0) this.time %= duration;
       this.apply(this.time);
       if (this.options.loop === false && this.time >= (this.clips[this.clip]?.duration ?? Infinity))
         this.playing = false;

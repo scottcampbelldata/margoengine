@@ -78,9 +78,9 @@ test('animation retains inverse bind views through 120 moving frames and recreat
     assert.equal(writes.length, 120);
     let time = 0;
     for (let i = 0; i < 120; i++) {
-      time += 0.1;
+      time = (time + 0.1) % 1; // a looping clip keeps its time inside the clip (Animation.time)
       const expected = identity.slice();
-      expected[12] = (time % 1) * Math.fround(0.4);
+      expected[12] = time * Math.fround(0.4);
       assert.deepEqual(writes[i], expected);
     }
     assert.equal(transforms.sx[0], 1);

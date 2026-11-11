@@ -19,6 +19,9 @@ model.destroy();
 stage.dispose();
 ```
 
+`playing`, `time` and `clip` are plain fields. `time` is the seconds into the current clip; while the clip loops (the
+default `loop: true`) it wraps at the clip's end, so a scrub bar can show it as is.
+
 Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LINEAR (quaternion slerp), and CUBICSPLINE tracks. Animation advances in seconds before the engine updates world matrices. A compute pass blends position/normal/tangent morphs before skinning and writes the vertex draw buffer. Bone matrices use read-only storage buffers, bounded by the GPU's storage limits rather than a fixed bone count.
 
 Every skinned or morphed primitive of a device, across all its Animations, lives in a few shared storage buffers and deforms in one compute dispatch per buffer page and influence format (100 morphed models with two primitives each: one dispatch, not 200). Copies of one asset primitive (`cloneModel`) share one copy of its bind-pose vertices, morph deltas and skin influences; only the deformed output, weights and bones are per copy, and a copy's output starts as a GPU copy of the bind pose, so a hundred characters upload their vertices once. A primitive's deformed vertices start `primitive.deformedOffset` bytes (a multiple of 256) into `primitive.deformed`; gltf-pro, shadows, TAA, selection and picking read them there, and a custom reader binds or copies from that offset.
