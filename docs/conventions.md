@@ -183,7 +183,9 @@ a gate passes on what its baseline records and fails on anything new or worse, n
 Baselines only shrink. When you fix a violation the gate fails until you lock it in:
 `npm run quality -- --gate=<gate> --update`. Growing a baseline (a new entry's budget, an accepted dependency) needs
 `npm run quality -- --gate=<gate> --update --reason="why"`; the reason is appended to the file's `history`. Size budgets
-only suggest shrinking. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
+only suggest shrinking. `--update` leaves the size budgets of a package whose dist is stale (its build stamp no longer
+matches the checked-out sources, as after a rebase onto other lanes' work) as recorded, and says how many it kept;
+rebuild that package to update them. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
 `test-results/quality.json`.
 
 ## API lock

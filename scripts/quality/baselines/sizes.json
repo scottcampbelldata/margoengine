@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15086408,
+  "total": 15087169,
   "history": [
     {
       "date": "2026-10-24",
@@ -9227,8 +9227,8 @@
     "@margoengine/post/selective-bloom": 9706,
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10083,
-    "@margoengine/post/ssgi": 13401,
-    "@margoengine/post/ssr": 13650,
+    "@margoengine/post/ssgi": 13483,
+    "@margoengine/post/ssr": 13719,
     "@margoengine/post/sss": 7461,
     "@margoengine/post/stack": 4479,
     "@margoengine/post/stylize": 7202,
@@ -9414,7 +9414,7 @@
     "@margoengine/sciviz/molecule": 5419,
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/mrc": 3427,
-    "@margoengine/sciviz/multivolume": 24838,
+    "@margoengine/sciviz/multivolume": 24912,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/notebook": 2064,
     "@margoengine/sciviz/nrrd": 1216,
@@ -9701,7 +9701,7 @@
     "@margoengine/video/dome": 2026,
     "@margoengine/video/material": 1407,
     "@margoengine/video/playback": 1725,
-    "@margoengine/video/record": 1460,
+    "@margoengine/video/record": 1996,
     "@margoengine/viewcube": 5321,
     "@margoengine/viewcube/axes": 6029,
     "@margoengine/viewcube/compass": 7914,

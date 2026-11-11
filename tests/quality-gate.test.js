@@ -49,6 +49,46 @@ test('updateBaseline shrinks freely, grows only with a reason, and logs the reas
   }
 });
 
+// Bug (2026-11-11): after a rebase onto another lane's raised video/record budget (1,996 B), a lane whose video dist
+// was still the old build ran `--update` and wrote 1,460, so main's sizes gate failed at 1,740 for everyone.
+test('updateBaseline keeps the budgets of items measured from a stale build', () => {
+  const root = mkdtempSync(join(tmpdir(), 'quality-'));
+  try {
+    mkdirSync(join(root, BASELINES), { recursive: true });
+    updateBaseline(root, 'demo', 'test', { mine: 100, theirs: 1996 }, readBaseline(root, 'demo'), { reason: 'first' });
+    const frozen = (key) => key === 'theirs';
+    // A stale, smaller measurement of theirs leaves its budget alone while mine still shrinks.
+    updateBaseline(root, 'demo', 'test', { mine: 90, theirs: 1460 }, readBaseline(root, 'demo'), { frozen });
+    assert.deepEqual(readBaseline(root, 'demo').items, { mine: 90, theirs: 1996 });
+    // A stale, larger one is not growth to accept either.
+    updateBaseline(root, 'demo', 'test', { mine: 90, theirs: 3000 }, readBaseline(root, 'demo'), { frozen });
+    assert.equal(readBaseline(root, 'demo').items.theirs, 1996);
+    assert.equal(readBaseline(root, 'demo').total, 90 + 1996);
+    // A stale build cannot set a first budget.
+    assert.throws(
+      () =>
+        updateBaseline(root, 'demo', 'test', { mine: 90, theirs: 1996, newer: 5 }, readBaseline(root, 'demo'), {
+          reason: 'x',
+          frozen: (key) => key === 'newer',
+        }),
+      /stale build .*npm run build:packages/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the sizes gate names the package each item measures, so stale builds can be kept', async () => {
+  const { sizesGate } = await import('../scripts/quality/sizes.js');
+  const { packageList, repoFiles } = await import('../scripts/quality/packages.js');
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const packages = packageList(root, repoFiles(root));
+  const result = await sizesGate({ root, packages });
+  assert.equal(result.owner('@margoengine/video/record'), 'video');
+  assert.equal(result.owner('@margoengine/core'), 'core');
+  for (const key of Object.keys(result.items)) assert.ok(result.owner(key), `no owner for ${key}`);
+});
+
 test('a baseline total is the sum of its items, in the committed files too', () => {
   // A merge settled by hand once kept sizes.json's total by adding the growth: 22,126 B off the sum of its items.
   assert.equal(staleTotal({ total: 3, items: { a: 1, b: 2 } }), undefined);

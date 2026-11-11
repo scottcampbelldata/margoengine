@@ -131,8 +131,17 @@ export async function sizesGate({ root, packages }) {
           (leaks[entry.specifier] ??= []).push([target, items[target]]);
         }
     }
+  // The package directory an item measures, from the specifier or package name that starts its key (a leak item: the
+  // entry that loads), so --update can leave the budgets of packages whose dist is stale alone (quality-gate.mjs).
+  const dirOf = new Map(packages.map((pkg) => [pkg.name, pkg.dir]));
+  const owner = (key) => {
+    const first = key.replace(/^leak /, '').split(' ')[0];
+    const name = first.startsWith('@') ? first.split('/').slice(0, 2).join('/') : first.split('/')[0];
+    return dirOf.get(name);
+  };
   return {
     items,
+    owner,
     allowance: (value, key) => (key.startsWith('leak ') ? value : headroom(value)),
     details: { leaks },
     summary() {

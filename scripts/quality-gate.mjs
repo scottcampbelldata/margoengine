@@ -11,6 +11,7 @@
 // --summary (print the biggest offenders), --details (write test-results/quality.json with every item and block).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { stalePackages } from './package-stamps.mjs';
 import { apiGate } from './quality/api.js';
 import { cleanRoomGate } from './quality/clean-room.js';
 import { duplicatesGate } from './quality/duplicates.js';
@@ -82,11 +83,23 @@ for (const [gate, def] of Object.entries(GATES)) {
   if (process.argv.includes('--summary') && result.summary)
     console.log(`quality ${gate} biggest:\n${result.summary().join('\n')}`);
   if (update) {
+    // Bug (2026-11-11): a lane rebased onto other lanes' size growth, kept its old dist of those packages, and
+    // `--update` shrank their freshly raised budgets to the stale sizes (video/record 1,996 to 1,460), which failed
+    // main for everyone. Budgets of packages whose dist does not match the checked-out sources stay as recorded.
+    const stale = result.owner ? new Set(stalePackages(root)) : new Set();
+    const frozen = (key) => stale.has(result.owner(key));
     const { grown } = updateBaseline(root, gate, def.about, result.items, baseline, {
       allowance: result.allowance,
       reason,
+      frozen,
     });
-    console.log(`quality ${gate}: baseline written, ${count} items${grown.length ? `, ${grown.length} grown` : ''}`);
+    const kept = Object.keys(result.items).filter(frozen).length;
+    console.log(
+      `quality ${gate}: baseline written, ${count} items${grown.length ? `, ${grown.length} grown` : ''}` +
+        (kept
+          ? `; ${kept} items of ${stale.size} stale package build(s) kept as recorded (rebuild to update them)`
+          : ''),
+    );
     continue;
   }
   const sum = staleTotal(baseline);

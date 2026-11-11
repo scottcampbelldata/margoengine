@@ -52,13 +52,34 @@ function headCommit(root) {
   }
 }
 
-/** Writes the shrunk (and, with a reason, grown) baseline. Throws without a reason when anything would grow. */
-export function updateBaseline(root, gate, about, measured, baseline, { allowance = (v) => v, reason } = {}) {
+/**
+ * Writes the shrunk (and, with a reason, grown) baseline. Throws without a reason when anything would grow. A `frozen`
+ * key was measured from a stale build: it keeps its recorded limit (neither shrinks nor grows), and a frozen key with
+ * no limit throws, since a stale build cannot set one.
+ */
+export function updateBaseline(
+  root,
+  gate,
+  about,
+  measured,
+  baseline,
+  { allowance = (v) => v, reason, frozen = () => false } = {},
+) {
   const items = {};
   const grown = [];
+  const unmeasurable = Object.keys(measured).filter((k) => frozen(k) && baseline.items[k] === undefined);
+  if (unmeasurable.length)
+    throw new Error(
+      `${gate}: ${unmeasurable.length} new item(s) come from a stale build (${unmeasurable.slice(0, 5).join('; ')}); ` +
+        'rebuild those packages (npm run build:packages) and rerun the update',
+    );
   for (const key of Object.keys(measured).sort()) {
     const value = measured[key];
     const limit = baseline.items[key];
+    if (frozen(key)) {
+      items[key] = limit;
+      continue;
+    }
     if (limit === undefined || value > limit) grown.push(key);
     items[key] = limit === undefined || value > limit ? allowance(value, key) : Math.min(limit, allowance(value, key));
   }
