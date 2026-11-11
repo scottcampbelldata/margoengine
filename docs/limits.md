@@ -7195,3 +7195,5 @@ docs/upstream-reports/KB5700f/report.md. Opaque surfaces and translucent surface
 exactly everywhere (`packages/sciviz/tests/surface-repeat-browser.mjs`, WebGPU and the WebGL2 layer). For byte-exact
 captures of a folded translucent surface on NVIDIA, draw it at opacity 1 or capture at one sample (`exactSize`); the
 sciviz look (no depth pre-pass, no forced OIT) is unchanged.
+
+The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos GlassVaseFlowers at 4x differs in 4 of 5 rebuilds on the RTX A6000 (up to 28 pixels, up to 10 levels at 270 degrees) and repeats exactly on the AMD RDNA 2 iGPU of the same PC, at one sample everywhere, and on the A6000 with its BLEND glass made OPAQUE (`packages/oit/test/gpu/repeat-check.mjs`). For byte-exact captures of such a model on NVIDIA, capture at one sample.

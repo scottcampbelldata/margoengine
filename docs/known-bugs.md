@@ -2146,7 +2146,7 @@ occlusion, analytic circular-source angular measure, light kinds/masks/layers an
 Original d97d79d67 GI fails 21 of the first 37 new Node assertions and the new GPU value assertions.
 The byte ceilings above are approved; all normal checks are required before pushing.
 
-### Two identical runs of GlassVaseFlowers can differ on a few pixels
+### Closed: two identical runs of GlassVaseFlowers can differ on a few pixels (KB1824, NVIDIA limit)
 
 - **What:** the same model, camera and sorted path, built twice in one page, differed on fewer than 8 of 147,456 pixels
   by up to 9 of 255 at 4x MSAA, in one of six Khronos models tried (RTX A6000). Seen once on TransmissionTest too.
@@ -2164,6 +2164,8 @@ degrees (31 pixels, maximum 4); every 1x pair is exact. One changed pixel is
 localized, but the writing pass and deeper cause remain unisolated. No driver
 waiver or numerical tolerance applies. Private lane evidence: oit-focused
 PNGs/log; native WebGPU, RTX A6000, Edge 157.0.4341.42.
+
+Closed 2026-11-11 (bug sweep L3b, KB1824) as KB5700f's NVIDIA limit. Six rebuilds in one page, 384 x 384: on the RTX A6000 the 4x capture at 270 degrees differed in 4 of 5 repeats (up to 28 pixels, up to 10 levels), 180 degrees and every 1x capture repeated exactly; on the AMD RDNA 2 iGPU of the same PC (MARGO_GPU=amd) every capture repeated exactly, 5 of 5 at both angles and both sample counts. On the A6000 the model with its BLEND glass made OPAQUE repeated 5 of 5, and so did the model without KHR_materials_transmission (its transmission glass then hides the BLEND glass), so the blended glass seen through at 4x is the trigger, as on the raw-API page scripts/reference-rendering/fold-blend-repeat.html. The WebGL2 layer on the A6000 (ANGLE D3D11) repeated all four captures 3 of 3 in the check. No Margo pass is at fault; docs/limits.md has the row. Regression: packages/oit/test/gpu/repeat-check.mjs (in oit test:gpu; asserts 1x everywhere and 4x off NVIDIA).
 
 ### A blurred edge of DOF spreads to one side only
 
