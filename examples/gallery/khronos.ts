@@ -3,7 +3,7 @@
 // models named by the section buttons to gallery/models/ and nothing else, so the 250 MB set stays out of the site.
 import { engineRuntime } from '@margoengine/core/extension';
 import { createStage } from 'margoengine';
-import { applyGLTFLights, loadGLTF, viewGLTFCamera } from '@margoengine/gltf-pro';
+import type { loadGLTF } from '@margoengine/gltf-pro';
 import { ColorBackground, Environment, EnvironmentLighting } from '@margoengine/environment';
 import { OrbitControls } from '@margoengine/controls';
 import type { Clustered } from '@margoengine/clustered';
@@ -45,6 +45,10 @@ interface ModelEntry {
 }
 
 async function main() {
+  // The loader comes with the first model, not before the first frame (the gallery check's 120,000 B budget): its
+  // download starts here, beside the stage's, and show() waits for it (amd-gpu-hunt row 16).
+  const pro = import('@margoengine/gltf-pro');
+  pro.catch(() => {}); // a failed load is reported by show(), which awaits it
   const manifest: ModelEntry[] = (await (await fetch(new URL(`${BASE}manifest.json`, document.baseURI))).json()).models;
   const host = document.querySelector<HTMLElement>('#viewport')!,
     canvas = host.querySelector('canvas')!,
@@ -90,6 +94,7 @@ async function main() {
       decoders.meshopt = (await import('@margoengine/decoders')).MeshoptDecoder;
     if (used.some((name) => EXTENDED.has(name)))
       decoders.materials = (await import('@margoengine/gltf-pro/extended')).extendedMaterials;
+    const { applyGLTFLights, loadGLTF, viewGLTFCamera } = await pro;
     const next = await loadGLTF(engine, new URL(`${BASE}${id}/${entry.file}`, document.baseURI), {
       decoders,
       signal,
