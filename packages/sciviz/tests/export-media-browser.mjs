@@ -140,8 +140,42 @@ for (const compat of [false, true]) {
       } catch (error) {
         check(error.message === 'cancel-test', 'Abort preserved');
       }
+      // KB5700i: world-size splats under a perspective camera cover the same pixels in short tiles as in one
+      // whole-image tile (the point scale follows the cropped tile projection, not the full-view fov).
+      const { Figure } = await import('/packages/sciviz/dist/index.js');
+      const worldCanvas = Object.assign(document.createElement('canvas'), { width: 320, height: 240 });
+      worldCanvas.style.cssText = 'width:320px;height:240px';
+      document.body.append(worldCanvas);
+      const world = await Figure.create(worldCanvas, { axes: false });
+      let worldCoverage;
+      try {
+        const x = [],
+          y = [],
+          z = [];
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) x.push(i - 2), y.push(j - 1.5), z.push(0);
+        const layer = await world.scatter({ x, y, z }, { size: 0.2 });
+        layer.cloud.material.sizeUnits = 'world';
+        world.engine.stop();
+        const splatOptions = { size: { width: 320, height: 240, unit: 'px' }, overlays: false };
+        const short = await image(await exportImage(world, { ...splatOptions, tileSize: 64 })),
+          whole = await image(await exportImage(world, { ...splatOptions, tileSize: 512 }));
+        let differ = 0;
+        const background = Array.from(whole.pixels.slice(0, 3));
+        let covered = 0;
+        for (let i = 0; i < whole.pixels.length; i += 4) {
+          differ += +([0, 1, 2].some((k) => Math.abs(short.pixels[i + k] - whole.pixels[i + k]) > 8));
+          covered += +([0, 1, 2].some((k) => Math.abs(whole.pixels[i + k] - background[k]) > 8));
+        }
+        worldCoverage = { differ, covered };
+        check(covered > 1000, `A perspective tiled export draws its scatter: ${covered} pixels`);
+        check(differ <= covered * 0.01, `World-size splats keep their size in short tiles: ${differ} of ${covered}`);
+      } finally {
+        world.dispose();
+        worldCanvas.remove();
+      }
       figure.render();
       return {
+        worldCoverage,
         images: { width: 320, height: 240, tiled: Array.from(tiled.pixels), full: Array.from(full.pixels) },
         largest,
         changed,

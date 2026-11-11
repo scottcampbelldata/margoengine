@@ -76,7 +76,10 @@ It checks both backends on the actual NOAA timeline: whole-image versus tiled PN
 sizes, alpha, WebP decoding, provenance, ZIP contents, restored timeline and browser playback/seek
 of WebM and MP4. `test-results/sciviz-media/report.json` records the results. The retained run uses
 an 8209-pixel-wide image on an 8192-edge device, in 17 tiles no larger than 512 pixels. Tiled and
-whole-image wind pixels match exactly on both backends. These are correctness counts, not timings.
+whole-image wind pixels match exactly on both backends. A perspective 3D scatter with world-size splats (KB5700i) is captured
+in 64-pixel tiles and in one 512-pixel tile: covered and differing pixels are recorded as `worldCoverage`
+(1932 covered, 0 differ on both backends, A6000). Tile cameras use the core perspective (reversed depth) of the
+source fov, near and far, and points take their world-size scale from the cropped matrix. These are correctness counts, not timings.
 
 ## Clean-room basis
 

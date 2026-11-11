@@ -146,19 +146,8 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
     const runs = options.overlays === false ? [] : textRuns(layout.roots, origin),
       boxes = options.overlays === false ? [] : swatches(layout.roots, origin);
     const source = engine.camera,
-      aspect = cssWidth / cssHeight,
-      base = new Float64Array(16);
+      aspect = cssWidth / cssHeight;
     const { setLineCameraTile } = await import('@margoengine/lines/tiles');
-    if (source.project) source.project(base, aspect, true);
-    else {
-      const f = 1 / Math.tan((source.fov * Math.PI) / 360),
-        d = source.far - source.near;
-      base[0] = f / aspect;
-      base[5] = f;
-      base[10] = -source.near / d;
-      base[11] = -1;
-      base[14] = (-source.far * source.near) / d;
-    }
     const camera = new Camera({
       position: [...source.position],
       target: [...source.target],
@@ -167,7 +156,13 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
       fov: source.fov,
     });
     camera.up = [...source.up];
-    camera.project = (out) => out.set(base);
+    // A custom projection is kept as the source camera made it. Otherwise the tile camera projects with the core
+    // perspective of the same fov, near and far (reversed depth), so the whole-image matrix matches the view's own.
+    if (source.project) {
+      const base = new Float64Array(16);
+      source.project(base, aspect, true);
+      camera.project = (out) => out.set(base);
+    }
     const clip = engine.views?.find((v) => v.camera === source)?.scissor ?? [0, 0, 1, 1];
     const tint = options.transparent ? [0, 0, 0, 0] : [...clearColorValue(figure.theme.background)];
     const plugin = new TileClear(tint);

@@ -22,7 +22,14 @@ export function fillFrame(
   // Point sizes are pixels of the view being drawn: its camera projects onto its rectangle.
   f[16] = width;
   f[17] = height;
-  f[18] = orthographic ? 0.5 * height * Math.hypot(c[1], c[5], c[9]) : (0.5 * height) / Math.tan((camera.fov * Math.PI) / 360);
+  // Pixels per world unit at clip w 1, from the matrix so cropped and off-axis projections (tiled captures) keep
+  // their own scale: perspective takes the y row without its share along the w row (the crop offset), over |w row|.
+  if (orthographic) f[18] = 0.5 * height * Math.hypot(c[1], c[5], c[9]);
+  else {
+    const ww = c[3] * c[3] + c[7] * c[7] + c[11] * c[11],
+      k = (c[1] * c[3] + c[5] * c[7] + c[9] * c[11]) / ww;
+    f[18] = (0.5 * height * Math.hypot(c[1] - k * c[3], c[5] - k * c[7], c[9] - k * c[11])) / Math.sqrt(ww);
+  }
   f[19] = format.endsWith('-srgb') || format.includes('float') ? 0 : 1;
   if (orthographic) {
     f[20] = 0;
