@@ -731,7 +731,12 @@ export async function acquire({
   let ticket;
   let queued = false;
   const waitStart = Date.now();
+  // While this request waits it leaves a marker (its pid) in MARGO_GPU_WAIT_MARKERS, so a step limit around the command
+  // (scripts/gate-step.mjs) can stop its clock while the command only queues.
+  const marker = process.env.MARGO_GPU_WAIT_MARKERS ? join(process.env.MARGO_GPU_WAIT_MARKERS, token) : undefined;
+  const unmark = () => marker && rmSync(marker, { force: true });
   const take = (file) => {
+    unmark();
     startHeartbeat(file, token, Date.now() + maxMinutes * MIN);
     const release = () => {
       if (read(file)?.token === token) rmSync(file, { force: true });
@@ -752,6 +757,7 @@ export async function acquire({
     return release;
   };
   const giveUp = async (held) => {
+    unmark();
     // Withdrawal is a scheduler transition too. Publish it under the mutex so
     // the last waiter cannot leave a free-slot wait clock running indefinitely.
     await locked(() => {
@@ -799,6 +805,7 @@ export async function acquire({
           mkdirSync(waitingDir, { recursive: true });
           writeFileSync(join(waitingDir, ticket), entry(false));
           queued = true;
+          if (marker) writeFileSync(marker, String(process.pid));
           onQueued?.();
         }
         observeUsage(usageFile, snapshot(undefined), slots());

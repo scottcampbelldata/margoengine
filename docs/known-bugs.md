@@ -365,6 +365,10 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   setting it already overrides for the same reason. The root dev servers keep the root config. Regression:
   tests/dev-server-watch.test.js ("a suite dev server scans only its start page").
 
+### Fixed 2026-11-11: a gate step limit counted time queued for a GPU slot (bug sweep L6b)
+
+Fixed 2026-11-11 (bug sweep L6b): a gate step's time limit counted time queued for a GPU slot. `timeout 1500 npm run check:readme-run` ran out while every slot was busy and never ran a README. gpu-lock now leaves a marker (its pid) in `MARGO_GPU_WAIT_MARKERS` while a request waits, and `node scripts/gate-step.mjs --limit=<s> [--wait-max=<s>] -- <command>` counts only time when no request of the step waits. The wait keeps its own limit (`--wait-max`, handed to every request as `MARGO_GPU_WAIT_MAX_MIN`), and the whole step still ends at limit plus wait-max plus a minute. A marker left by a killed waiter does not stop the clock. Regression: tests/gate-step.test.js.
+
 ### Fixed 2026-11-11: `gpu-lock run` refused package GPU suites named test:<name>:browser (bug sweep L6b)
 
 `scripts/support/gpu-command.mjs` classed an npm script as a GPU leaf only when its name began `test:gpu`,
