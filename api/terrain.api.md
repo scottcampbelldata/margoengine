@@ -20,7 +20,9 @@ export class Terrain implements EnginePlugin {
     readonly name: string;
     shadowVersion: number;
     disposed: boolean;
+    readonly anchor?: readonly [number, number];
     constructor(options: TerrainOptions);
+    get shift(): ArrayLike<number>;
     static attach(instance: EngineKernel, options: TerrainOptions): Terrain;
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
@@ -132,6 +134,12 @@ export interface TerrainOptions {
     resolution?: number;
     levels?: number;
     roughness?: number;
+    floatingOrigin?: TerrainOrigin;
+}
+
+export interface TerrainOrigin {
+    readonly origin: ArrayLike<number>;
+    onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 
 export interface TerrainTextures {
@@ -150,6 +158,8 @@ export function clipmapGrid(resolution: number): {
 };
 
 export function heightfieldGeometry(height: HeightField, options: HeightfieldOptions): GeometryData;
+
+export function planRings(eye: ArrayLike<number>, shift: ArrayLike<number>, cell: number, levels: number, out?: Float64Array<ArrayBuffer>): Float64Array;
 
 // Not exported from this entry, but used by the exports above:
 

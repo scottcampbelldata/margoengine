@@ -23,6 +23,8 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Terrain, TerrainLighting } from './index.js';
 
 type DeformPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** The shift of a terrain without a floating origin. */
+const NO_SHIFT: readonly number[] = [0, 0, 0];
 const BINDING = 99,
   /** Prints pressed in one frame at most; more wait for the next frame. */
   BATCH = 1024,
@@ -51,7 +53,10 @@ export interface TerrainDeformationOptions {
   distance?: number;
   /** Most view-ray steps a pixel takes through the prints, 4 to 32. Default 12. */
   steps?: number;
-  /** World XZ the map centres on each frame (a player, a vehicle). Default the camera's position. */
+  /**
+   * World XZ the map centres on each frame (a player, a vehicle), float64 world coordinates also with the terrain's
+   * `floatingOrigin`. Default the camera's position.
+   */
   follow?: () => readonly [number, number];
 }
 /** A footprint: an ellipse pressed at a point. */
@@ -196,6 +201,8 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
   #entries: GPUBindGroupEntry[] = [];
   #remove?: () => void;
   #origin?: [number, number];
+  /** The shift the window centre was last written with (a floating origin's rebase rewrites it). */
+  readonly #shift = new Float64Array(3);
   #pending: number[][] = [];
   #clear = true;
   readonly #cache = new Map<string, string>();
@@ -233,7 +240,12 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
         'Invalid terrain deformation; give size 64..2048, texel, depth and distance above 0, rim, softness, darken and each layers entry 0..1 (at most one per terrain layer), fade 0 or more, steps 4..32 and follow as a function.',
       );
     this.size = o.size ?? 1024;
-    this.texel = o.texel ?? 0.025;
+    // With a floating origin the window's period (size times texel) must be the float32 the shader divides by, so the
+    // texel is snapped to it (a relative change below 1e-7): CPU texel indices and GPU coordinates then agree at any
+    // distance from zero.
+    this.texel = terrain.options.floatingOrigin
+      ? Math.fround(this.size * (o.texel ?? 0.025)) / this.size
+      : (o.texel ?? 0.025);
     this.depth = o.depth ?? 0.15;
   }
 
@@ -444,7 +456,14 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
   #run(c: DeformPassContext): void {
     if (this.disposed || !this.#pipelines) return;
     const n = this.size,
-      centre = this.options.follow?.() ?? [c.camera.position[0], c.camera.position[2]];
+      floating = !!this.terrain.options.floatingOrigin,
+      shift = floating ? this.terrain.shift : NO_SHIFT,
+      // `follow` gives world XZ; the camera is local to a floating origin.
+      centre =
+        this.options.follow?.() ??
+        (floating
+          ? [c.camera.position[0] + shift[0], c.camera.position[2] + shift[2]]
+          : [c.camera.position[0], c.camera.position[2]]);
     if (!Number.isFinite(centre[0]) || !Number.isFinite(centre[1])) return;
     const origin: [number, number] = [
         Math.floor(centre[0] / this.texel) - n / 2,
@@ -452,10 +471,24 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
       ],
       previous = this.#origin ?? origin,
       first = this.#clear,
+      rebased = floating && (this.#shift[0] !== shift[0] || this.#shift[2] !== shift[2]),
       moved = previous[0] !== origin[0] || previous[1] !== origin[1] || !this.#origin,
       fade = this.options.fade ?? 120,
       fill = fade > 0 ? (this.depth * Math.max(c.delta, 0)) / fade : 0,
       count = Math.min(this.#pending.length, BATCH);
+    if (rebased || (moved && floating)) {
+      // The window's centre as a local point, and the shift modulo the window's period: the shader reads the relief at
+      // (local + wrap) / period, the world texel's slot.
+      const period = n * this.texel,
+        wrap = (v: number) => v - Math.floor(v / period) * period;
+      c.device.queue.writeBuffer(
+        this.#frame!,
+        0,
+        new Float32Array([(origin[0] + n / 2) * this.texel - shift[0], (origin[1] + n / 2) * this.texel - shift[2]]),
+      );
+      c.device.queue.writeBuffer(this.#frame!, 40, new Float32Array([wrap(shift[0]), wrap(shift[2])]));
+      this.#shift.set([shift[0], shift[1], shift[2]]);
+    }
     if (!first && !moved && !fill && !count) return;
     const ints = new Int32Array(this.#windowData),
       floats = new Float32Array(this.#windowData),
@@ -468,14 +501,14 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
     floats[8] = this.options.rim ?? 0.25;
     words[9] = count;
     c.device.queue.writeBuffer(this.#window!, 0, this.#windowData);
-    if (moved) {
+    if (moved && !floating) {
       c.device.queue.writeBuffer(
         this.#frame!,
         0,
         new Float32Array([(origin[0] + n / 2) * this.texel, (origin[1] + n / 2) * this.texel]),
       );
-      this.#origin = origin;
     }
+    if (moved) this.#origin = origin;
     const pass = c.encoder.beginComputePass(),
       groups = Math.ceil(n / 8);
     pass.setBindGroup(0, this.#group!);
@@ -523,7 +556,9 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
     if (code.split(colorHead).length === 2)
       code = code.replace(colorHead, 'fn terrainColorUndeformed(position:vec3f,normal:vec3f)->vec3f {');
     code =
-      functions(group, painted) +
+      (this.terrain.options.floatingOrigin
+        ? functions(group, painted).replace('xz/f.z,0.0)', '(xz+terrainDeform.extra.zw)/f.z,0.0)')
+        : functions(group, painted)) +
       code +
       (code.includes('terrainColorUndeformed')
         ? `\n${colorHead}return terrainColorUndeformed(position,normal)*terrainDeformTint;}`

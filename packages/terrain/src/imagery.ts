@@ -7,6 +7,8 @@ import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Terrain, TerrainLighting } from './index.js';
 import type { PlanetTerrain } from './planet.js';
 import type { TerrainVirtualTexture } from './rvt.js';
+/** The shift of a terrain without a floating origin. */
+const NO_SHIFT: readonly number[] = [0, 0, 0];
 
 /** Rectangle [minimum X, minimum Z, maximum X, maximum Z], or planet [west,south,east,north] in degrees. */
 export type ImageryBounds = readonly [number, number, number, number];
@@ -414,14 +416,23 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
     this.#write();
     this.#virtual?.refreshSurfaces();
   }
+  /**
+   * With a terrain's `floatingOrigin`, its anchor (origin at construction): the shader's XZ are relative to it, so the
+   * bounds are written less it, in float64 first. Undefined otherwise (planets keep their own origin handling).
+   */
+  #anchor(): readonly [number, number] | undefined {
+    return this.#planet ? undefined : (this.terrain as Terrain).anchor;
+  }
   #write(): void {
     if (!this.#device || !this.#buffer) return;
     const stride = (2 + this.#options.maxTiles) * 4,
-      values = new Float32Array(stride * this.#options.maxLayers);
+      values = new Float32Array(stride * this.#options.maxLayers),
+      [ax, az] = this.#anchor() ?? [0, 0];
     this.#layers.forEach((l, i) => {
       const at = i * stride,
-        o = l.options;
-      values.set(o.bounds, at);
+        o = l.options,
+        b = o.bounds;
+      values.set(this.#anchor() ? [b[0] - ax, b[1] - az, b[2] - ax, b[3] - az] : b, at);
       values.set(
         [
           o.show ? o.alpha : 0,
@@ -638,10 +649,17 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
           'unsupported',
           'Imagery needs the terrain color call; attach after RVT and before a replacement shader.',
         );
-      patched = source.replace(match[0], `let base=terrainImagery(${match[1]}(i.position,${match[2]},i.position);`);
+      patched = source.replace(
+        match[0],
+        `let base=terrainImagery(${match[1]}(i.position,${match[2]},i.position${this.#anchor() ? '+vec3f(frame.anchor.x,0.0,frame.anchor.y)' : ''});`,
+      );
     }
-    const bounds = this.#options.bounds,
-      span = [bounds[2] - bounds[0], bounds[3] - bounds[1]];
+    const anchor = this.#anchor(),
+      whole = this.#options.bounds,
+      bounds = anchor
+        ? [whole[0] - anchor[0], whole[1] - anchor[1], whole[2] - anchor[0], whole[3] - anchor[1]]
+        : whole,
+      span = [whole[2] - whole[0], whole[3] - whole[1]];
     const coordinate = this.#planet
       ? 'let direction=normalize(position-planet.center.xyz);let geographic=vec2f(atan2(direction.z,direction.x)*57.295779513,asin(clamp(direction.y,-1.0,1.0))*57.295779513);let pyramid=vec2f((geographic.x+180.0)/360.0,(90.0-geographic.y)/180.0);'
       : `let geographic=position.xz;let pyramid=(geographic-vec2f(${bounds[0]},${bounds[1]}))/vec2f(${span[0]},${span[1]});`;
@@ -692,9 +710,12 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
           height = Math.max(1, length - this.terrain.radius);
           world = 2 * Math.PI * this.terrain.radius;
         } else {
-          u = (c.camera.position[0] - b[0]) / (b[2] - b[0]);
-          v = (c.camera.position[2] - b[1]) / (b[3] - b[1]);
-          height = Math.max(1, Math.abs(c.camera.position[1]));
+          // A floating origin's camera is local: the view is placed from its float64 world position.
+          const p = c.camera.position,
+            s = this.#anchor() ? (this.terrain as Terrain).shift : NO_SHIFT;
+          u = (p[0] + s[0] - b[0]) / (b[2] - b[0]);
+          v = (p[2] + s[2] - b[1]) / (b[3] - b[1]);
+          height = Math.max(1, Math.abs(p[1] + s[1]));
           world = b[2] - b[0];
         }
         const level = Math.max(0, Math.min(22, Math.floor(Math.log2((world / height) * 2))));

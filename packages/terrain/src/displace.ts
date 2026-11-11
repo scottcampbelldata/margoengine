@@ -348,8 +348,14 @@ export class TerrainDisplacement implements EnginePlugin, TerrainLighting {
         'Terrain displacement needs the terrain lit shader with TerrainMaterials; attach TerrainMaterials first',
       );
     const painted = [...source.matchAll(/var terrainWeights(\d):texture_2d<f32>;/g)].length,
+      added = functions(group, painted, this.options.shadows ?? true),
+      // A floating origin (originShader's `wrap:vec4f`): the relief repeats on the world phase, as the colours do.
       code =
-        functions(group, painted, this.options.shadows ?? true) +
+        (source.includes('wrap:vec4f')
+          ? added
+              .replace('fract(p.xz*s)', 'fract((p.xz+layerRules[layer].wrap.xz)*s)')
+              .replace('xz*s,i32(layer)', '(xz+layerRules[layer].wrap.xz)*s,i32(layer)')
+          : added) +
         source
           .replace(
             entry,

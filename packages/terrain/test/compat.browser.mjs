@@ -1,7 +1,7 @@
 // Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
 //   node packages/terrain/test/compat.browser.mjs
 // The clipmap terrain on the WebGL2 compatibility layer (`@margoengine/webgl2-compat`, install({force: true})): each
-// case (rules only; painted weights and a hole; a runtime virtual texture) draws the same scene natively and on the
+// case (rules only; painted weights and a hole; a runtime virtual texture; the same 1e5 m out under a FloatingOrigin) draws the same scene natively and on the
 // layer, in exact-pixel mode on the same GPU and browser, and the canvases are compared with the layer roadmap's
 // measure (decision 4: at most 0.1% of pixels with d > 2, mean d at most 0.25, d the largest RGB difference). Neither
 // side may report a page error, the layer no GL error. The cost on the layer is counted, not timed: a frame's GL calls
@@ -45,7 +45,11 @@ function compare(a, b) {
   const n = a.width * a.height;
   for (let i = 0; i < n; i++) {
     const o = i * 4,
-      d = Math.max(Math.abs(a.data[o] - b.data[o]), Math.abs(a.data[o + 1] - b.data[o + 1]), Math.abs(a.data[o + 2] - b.data[o + 2]));
+      d = Math.max(
+        Math.abs(a.data[o] - b.data[o]),
+        Math.abs(a.data[o + 1] - b.data[o + 1]),
+        Math.abs(a.data[o + 2] - b.data[o + 2]),
+      );
     if (d > 2) over++;
     sum += d;
     max = Math.max(max, d);
@@ -56,19 +60,29 @@ function compare(a, b) {
 await runSuite(
   async () => {
     const out = {};
-    for (const name of ['clipmap', 'weights', 'rvt']) {
+    for (const name of ['clipmap', 'weights', 'rvt', 'origin']) {
       const native = await render('native', name),
         compat = await render('compat', name),
         m = compare(native.image, compat.image);
       out[name] = { ...m, native: native.cost, compat: compat.cost };
       console.log(`terrain compat ${name}: ${JSON.stringify(out[name])}`);
       assert.ok(m.ground > 20000, `${name}: the terrain fills the view: ${m.ground}`);
-      assert.ok(m.share <= MAX_SHARE && m.mean <= MAX_MEAN, `${name}: the layer's pixels differ from native: ${JSON.stringify(m)}`);
+      assert.ok(
+        m.share <= MAX_SHARE && m.mean <= MAX_MEAN,
+        `${name}: the layer's pixels differ from native: ${JSON.stringify(m)}`,
+      );
       assert.equal(compat.cost.drawCalls, native.cost.drawCalls, `${name}: the same draws on both`);
-      assert.ok(compat.cost.glDraws >= compat.cost.drawCalls, `${name}: every draw reaches GL: ${JSON.stringify(compat.cost)}`);
+      assert.ok(
+        compat.cost.glDraws >= compat.cost.drawCalls,
+        `${name}: every draw reaches GL: ${JSON.stringify(compat.cost)}`,
+      );
       // The virtual texture baked its cache on the layer, as many texels as natively; the other cases have none.
       assert.equal(compat.cost.baked, native.cost.baked, `${name}: the same texels baked on both`);
-      assert.equal(compat.cost.baked > 0, name === 'rvt', `${name}: texels baked: ${compat.cost.baked}`);
+      assert.equal(
+        compat.cost.baked > 0,
+        name === 'rvt' || name === 'origin',
+        `${name}: texels baked: ${compat.cost.baked}`,
+      );
     }
     assert.deepEqual(pageErrors, []);
     await writeFile('test-results/terrain-compat.json', JSON.stringify({ hardware, out }, null, 1));

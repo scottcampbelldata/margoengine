@@ -132,6 +132,9 @@ origin.onRebase(() => { material.clippingPlanes = [origin.toLocalPlane(worldPlan
 - **Limits.** Only root positions are float64. Geometry vertices and child (node) translations that are themselves
   kilometres from their root are float32 when loaded: re-centre such assets (or load each far part as its own root).
   `dispose()` leaves the scene in local coordinates.
+- **Terrain.** Pass the origin to a clipmap terrain as `floatingOrigin` (`Terrain.attach(engine, {..., floatingOrigin:
+  origin})`) and its rings, layer textures, virtual texture, prints and streaming follow every rebase, the same picture
+  at 1e7 m as at zero; `PlanetTerrain` takes it as `origin`. See the terrain README, "Far from the origin".
 
 ## Render layers: `@margoengine/cameras/layers`
 

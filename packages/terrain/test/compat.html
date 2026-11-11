@@ -7,7 +7,7 @@
 <body style="margin:0">
 <canvas style="width:320px;height:240px"></canvas>
 <script type="module">
-// One terrain scene per page load, ?mode=native|compat&case=clipmap|weights|rvt, in exact-pixel mode (exactSize, one
+// One terrain scene per page load, ?mode=native|compat&case=clipmap|weights|rvt|origin, in exact-pixel mode (exactSize, one
 // sample). On the layer every GL call the page makes is counted (WebGL2RenderingContext's methods wrapped before
 // install), so the driver reads the frame's cost as GL calls and draws; the driver compares the canvas with the native
 // one (test/compat.browser.mjs).
@@ -99,6 +99,21 @@ const cases = {
     const { TerrainVirtualTexture } = await import('/packages/terrain/dist/rvt.js');
     return TerrainVirtualTexture.attach(engine, terrain, { texel: 0.1, size: 512, levels: 5 });
   },
+  // The rvt case 1e5 m out under a FloatingOrigin (ratio 10 rebases onto the camera): the layer runs the i32 bake
+  // windows, the local bake points and the wider frame and rules.
+  async origin(engine) {
+    const { FloatingOrigin } = await import('/packages/cameras/dist/origin.js');
+    const d = 49 * 2048,
+      origin = FloatingOrigin.attach(engine, { ratio: 10 }),
+      terrain = Terrain.attach(engine, {
+        ...base((gpu) => textures(gpu)),
+        origin: [-128 + d, -128 + d],
+        floatingOrigin: origin,
+      });
+    origin.lookAt([-60 + d, 45, -90 + d], [10 + d, 8, 20 + d]);
+    const { TerrainVirtualTexture } = await import('/packages/terrain/dist/rvt.js');
+    return TerrainVirtualTexture.attach(engine, terrain, { texel: 0.1, size: 512, levels: 5 });
+  },
 };
 function base(texturesOf) {
   return {
@@ -125,7 +140,7 @@ async function main() {
     camera: { position: [-60, 45, -90], target: [10, 8, 20], near: 0.5, far: 1000 },
   });
   engine.lighting.direction.set([0.4, 0.8, 0.3, 3]);
-  const rvt = name === 'rvt' ? await cases[name](engine) : (cases[name](engine), undefined);
+  const rvt = name === 'rvt' || name === 'origin' ? await cases[name](engine) : (cases[name](engine), undefined);
   const device = () => engine.gpu;
   // Texels the virtual texture baked over all frames, so the driver sees that the bake ran on both sides.
   let baked = 0,

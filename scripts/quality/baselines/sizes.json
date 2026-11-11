@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14768498,
+  "total": 14770932,
   "history": [
     {
       "date": "2026-10-24",
@@ -8279,6 +8279,12 @@
       "commit": "b7ce9f41a",
       "reason": "core bug fixes Scott approved 2026-11-10: camera validate-before-publish, outward-rounded bounds with the rebuilt kernel Wasm, restore budget; core/extension 21951 -> 22093 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "2d90bd4e1f",
+      "reason": "terrain floatingOrigin (TerrainOptions.floatingOrigin, closes known-bugs U6): float64 ring and cache planning, layer wrap and tone rules, the origin shader edits and the anchor uniform. Measured gzip before -> after: terrain 13318 -> 14003, terrain/stream 12468 -> 13209 (bundles the root), terrain/rvt 6339 -> 6870, terrain/deform 5026 -> 5232. A separate /origin entry was ruled out in the plan: the ring snap and layer sampling live in the root prepare and shader, so the root would keep the same hooks and users would wrap their origin twice",
+      "grew": 4
     }
   ],
   "items": {
@@ -9341,9 +9347,9 @@
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 7593,
     "@margoengine/taa/upscale-velocity": 19045,
-    "@margoengine/terrain": 13710,
+    "@margoengine/terrain": 14424,
     "@margoengine/terrain/blend": 3676,
-    "@margoengine/terrain/deform": 5192,
+    "@margoengine/terrain/deform": 5488,
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/imagery": 6506,
@@ -9351,9 +9357,9 @@
     "@margoengine/terrain/overlays": 4061,
     "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/query": 3420,
-    "@margoengine/terrain/rvt": 6595,
+    "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,
-    "@margoengine/terrain/stream": 12713,
+    "@margoengine/terrain/stream": 13606,
     "@margoengine/text": 17967,
     "@margoengine/text/animate": 12416,
     "@margoengine/text/curve": 11401,

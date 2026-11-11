@@ -183,8 +183,12 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
         "Terrain materials need the terrain's own lit shader; attach them before any effect that replaces it",
       );
     const resolve = 'i.material.x=terrainPbrRoughness(i.material.x);';
+    // A floating origin (originShader's `wrap:vec4f`): the maps repeat on the world phase, as the colours do.
+    const functions = materialFunctions(group);
     let code =
-      materialFunctions(group) +
+      (source.includes('wrap:vec4f')
+        ? functions.split('position*s,').join('(position+layerRules[layer].wrap.xyz)*s,')
+        : functions) +
       source
         .replace(head, 'fn terrainPbrShade(terrainIn:Output)->vec4f {var i=terrainIn;')
         .replace(

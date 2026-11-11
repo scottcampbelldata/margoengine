@@ -65,6 +65,27 @@ export const surfaceStruct = (code: string): string =>
     'struct Layer {heightSlope:vec4f,params:vec4f}',
     'struct Layer {heightSlope:vec4f,params:vec4f,surface:vec4f}',
   );
+/**
+ * `TerrainOptions.floatingOrigin`: positions reach the shaders local (world less the origin's shift), small enough for
+ * float32. Every layer sample that repeats with position (triplanar, macro, its 0.302 tone) adds the layer's `wrap`, the
+ * shift from the terrain's anchor less a whole number k of 24 / scale repeats per axis, and the tone adds
+ * `fract(k * 0.302)`: so each texture coordinate equals the terrain-relative one up to whole repeats, the same at any
+ * distance and across a rebase, and a terrain moved with its camera draws the same picture. `Frame.anchor` is
+ * (shift.x - origin.x, shift.z - origin.z, shift.y, 0): local + anchor.xy is the terrain-relative XZ that cache surfaces,
+ * overlays and imagery read. Applied once; the text without the option is unchanged.
+ */
+export const originShader = (code: string): string =>
+  code.includes('anchor:vec4f}')
+    ? code
+    : code
+        .replace('heights:vec4f}', 'heights:vec4f,anchor:vec4f}')
+        .replace(/struct Layer \{([^}]*)\}/, 'struct Layer {$1,wrap:vec4f,tone:vec4f}')
+        .split('let p=position*scale;')
+        .join('let p=(position+layerRules[layer].wrap.xyz)*scale;')
+        .replace(
+          'let p=position*m;let q=position*m*0.302;',
+          'let p=(position+layerRules[layer].wrap.xyz)*layerRules[layer].params.x/24.0;let q=p*0.302+layerRules[layer].tone.xyz;',
+        );
 const surfaceFunctions = /* wgsl */ `
 var<private> terrainRelief:f32;var<private> terrainRepeat:f32;
 fn terrainMacro(p:vec2f,q:vec2f,dx:vec2f,dy:vec2f,m:f32,layer:u32,top:f32,norm:f32)->f32 {

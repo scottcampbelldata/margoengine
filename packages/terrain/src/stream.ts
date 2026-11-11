@@ -74,6 +74,8 @@ interface Waiter {
   reject(reason: unknown): void;
 }
 
+/** The shift of a terrain without a floating origin. */
+const NO_SHIFT: readonly number[] = [0, 0, 0];
 let nextId = 0;
 const integer = (v: unknown, lo: number, hi: number): boolean =>
   Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi;
@@ -164,7 +166,10 @@ export class TerrainStream implements EnginePlugin {
     const texels = this.columns * this.columns;
     this.heights = new Float32Array(texels).fill(o.fill ?? 0);
     this.weights = Array.from({ length: o.weights ?? 0 }, () => new Uint8Array(texels * 4));
-    const at = engine.camera.position;
+    // With a floating origin the camera is local: the window is placed around its float64 world position.
+    const local = engine.camera.position,
+      shift = o.floatingOrigin?.origin,
+      at = shift ? [local[0] + shift[0], local[1] + shift[1], local[2] + shift[2]] : local;
     this.#place(
       Math.round((at[0] - origin[0]) / o.tileSize - this.#n / 2),
       Math.round((at[2] - origin[1]) / o.tileSize - this.#n / 2),
@@ -264,10 +269,11 @@ export class TerrainStream implements EnginePlugin {
   onPreUpdate(): void {
     if (this.disposed || !this.#engine || !this.#height) return;
     const p = this.#engine.camera.position,
+      shift = this.terrain.options.floatingOrigin ? this.terrain.shift : NO_SHIFT,
       [ox, oz] = this.#o.origin ?? [0, 0],
       half = this.#n / 2,
-      cx = (p[0] - ox) / this.#o.tileSize - this.#window[0] - half,
-      cz = (p[2] - oz) / this.#o.tileSize - this.#window[1] - half;
+      cx = (p[0] + shift[0] - ox) / this.#o.tileSize - this.#window[0] - half,
+      cz = (p[2] + shift[2] - oz) / this.#o.tileSize - this.#window[1] - half;
     if (Number.isFinite(cx) && Number.isFinite(cz)) {
       const dx = Math.abs(cx) > 0.75 ? Math.round(cx) : 0,
         dz = Math.abs(cz) > 0.75 ? Math.round(cz) : 0;

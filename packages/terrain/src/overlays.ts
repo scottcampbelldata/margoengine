@@ -358,13 +358,19 @@ export class TerrainOverlays implements EnginePlugin, TerrainLighting, Disposabl
     const values = new Float32Array((1 + shapes.length * 3 + segments) * 4);
     values.set([shapes.length, this.#options.antialias, 0, 0]);
     let segment = 1 + shapes.length * 3;
+    // With a floating origin the cache's surface hook passes XZ relative to the terrain's anchor (its origin at
+    // construction): positions are written less it, in float64 before float32, so they keep their precision far out.
+    const anchor = this.rvt.terrain?.anchor,
+      ax = anchor?.[0] ?? 0,
+      az = anchor?.[1] ?? 0,
+      relative = (v: readonly number[]) => (anchor ? [v[0] - ax, v[1] - az, v[2] - ax, v[3] - az] : v);
     shapes.forEach((s, i) => {
       const at = (1 + i * 3) * 4;
-      values.set(s.bounds, at);
+      values.set(relative(s.bounds), at);
       values.set(s.color, at + 4);
       values.set([segment, s.segments.length, s.polygon ? 1 : 0, s.width / 2], at + 8);
       for (const edge of s.segments) {
-        values.set(edge, segment * 4);
+        values.set(relative(edge), segment * 4);
         segment++;
       }
     });

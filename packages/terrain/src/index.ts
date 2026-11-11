@@ -20,6 +20,7 @@ import {
   terrainHole,
   terrainShading,
   weightedFragment,
+  originShader,
 } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
@@ -88,6 +89,36 @@ export interface TerrainLayer {
   /** Whether the layer takes `TerrainTextures.tint` (plant cover, not rock). Ignored without a tint. Default false. */
   tint?: boolean;
 }
+/**
+ * What `TerrainOptions.floatingOrigin` takes: the float64 world point at local zero and its rebase event. A
+ * `FloatingOrigin` from `@margoengine/cameras/origin` fits as is.
+ */
+export interface TerrainOrigin {
+  /** Float64 world position of local [0, 0, 0]. */
+  readonly origin: ArrayLike<number>;
+  /** Calls `listener` after each rebase with the new origin second; returns an unsubscribe. */
+  onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
+}
+/**
+ * The ring corners of a clipmap: for each level i, the eye's float64 world XZ snapped down to the level's spacing
+ * (`cell * 2^i`), less `shift` (the world point at local zero), as [x0, z0, x1, z1, ...]. Snapping the world point keeps
+ * the lattice, and so the vertices and the LOD, the same wherever the origin sits; only the small local result reaches
+ * float32. Exported for the tests.
+ */
+export function planRings(
+  eye: ArrayLike<number>,
+  shift: ArrayLike<number>,
+  cell: number,
+  levels: number,
+  out = new Float64Array(levels * 2),
+): Float64Array {
+  for (let i = 0; i < levels; i++) {
+    const spacing = cell * 2 ** i;
+    out[i * 2] = Math.floor(eye[0] / spacing) * spacing - shift[0];
+    out[i * 2 + 1] = Math.floor(eye[2] / spacing) * spacing - shift[2];
+  }
+  return out;
+}
 /** Clipmap terrain settings, fixed at construction. Invalid values throw RangeError. */
 export interface TerrainOptions {
   /** Creates the textures, at attach and again after device restoration (recreate them from retained data). */
@@ -111,6 +142,14 @@ export interface TerrainOptions {
   /** Surface roughness (GGX, 0-1), for the sun's highlight and screen-space reflections (`ssr.add(terrain)`). Default
    * 0.9; leaving it out keeps the shader as it was. */
   roughness?: number;
+  /**
+   * A floating origin (`FloatingOrigin` from `@margoengine/cameras/origin`) for terrain far from world zero: the camera
+   * is local to it and the terrain plans its rings, layer texture phases and cache windows in float64 world space, then
+   * sends the GPU only small local numbers. A terrain 10,000 km out then draws the same vertices, levels and texels as
+   * at zero, and a rebase moves nothing on screen. `origin`, `size` and every CPU call (`TerrainQuery`, holes, decals,
+   * overlays, sculpt) stay in world coordinates. Default: none (the shaders, uniforms and rules stay as they were).
+   */
+  floatingOrigin?: TerrainOrigin;
 }
 /** What `setCapture` takes: `@margoengine/post` SSR's material capture hook (its `SSRCapture`), declared here so terrain
  * does not import post. */
@@ -193,8 +232,33 @@ export class Terrain implements EnginePlugin {
   private capture?: TerrainCapture;
   private captureCode = new Map<string, string>();
   private readonly disposers = new Set<() => void>();
+  /** The float64 world point at local zero (zeros without `floatingOrigin`); `shift` reads it. */
+  private readonly shiftValues = new Float64Array(3);
+  /** The shift the layer rules were last written with, and the scratch eye and ring plan of `prepare`. */
+  private readonly rulesShift = new Float64Array(3);
+  private readonly eye = new Float64Array(3);
+  private plan = new Float64Array(0);
+  private unfollow?: () => void;
+  /**
+   * With `floatingOrigin`, `options.origin` as it was at construction (a stream moves its array): local + `Frame.anchor`
+   * is world XZ less this, the coordinate cache surfaces, overlays and imagery draw in. Undefined without the option.
+   */
+  readonly anchor?: readonly [number, number];
   constructor(readonly options: TerrainOptions) {
     this.validate();
+    const o = options.floatingOrigin;
+    if (o) {
+      this.anchor = [options.origin?.[0] ?? 0, options.origin?.[1] ?? 0];
+      this.shiftValues.set([o.origin[0], o.origin[1], o.origin[2]]);
+      this.unfollow = o.onRebase((_, at) => this.shiftValues.set([at[0], at[1], at[2]]));
+    }
+  }
+  /**
+   * The float64 world point at local zero: the floating origin's, or zeros without `floatingOrigin`. Every terrain entry
+   * reads it per frame and compares it with the last one to see a rebase. Read only.
+   */
+  get shift(): ArrayLike<number> {
+    return this.shiftValues;
   }
   static attach(instance: EngineKernel, options: TerrainOptions): Terrain {
     const terrain = new Terrain(options);
@@ -225,6 +289,10 @@ export class Terrain implements EnginePlugin {
         'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
       );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
+    const f = o.floatingOrigin;
+    if (f !== undefined && (typeof f?.onRebase !== 'function' || f.origin?.length !== 3))
+      throw new TypeError('Invalid terrain floatingOrigin; pass a FloatingOrigin from @margoengine/cameras/origin.');
+    if (f) finiteVector(f.origin, 3, 'Terrain floatingOrigin origin');
     finiteVector(o.size, 2, 'Terrain size');
     if (o.size.some((v) => v <= 0))
       throw new RangeError('Invalid terrain size; give a [width, depth] with both above 0.');
@@ -346,25 +414,8 @@ export class Terrain implements EnginePlugin {
     this.ring = upload(geometry.ring, GPUBufferUsage.INDEX);
     this.centerCount = geometry.center.length;
     this.ringCount = geometry.ring.length;
-    // 8 floats a layer; 12 with `bump` or `macro` (surfaceStruct: bump metres per unit of luma, macro, macro scale).
-    const stride = this.surface() ? 12 : 8,
-      data = new Float32Array(this.options.layers.length * stride);
-    this.options.layers.forEach((layer, i) =>
-      data.set(
-        [
-          ...layer.height,
-          ...layer.slope,
-          layer.scale,
-          Math.max(0.01, (layer.height[1] - layer.height[0]) * 0.05),
-          0.05,
-          // params.w: 1 for a layer that takes the tint (0 without a tint, as before).
-          +(!!tint && !!layer.tint),
-          ...(stride === 12 ? [((layer.bump ?? 0) * 0.5) / layer.scale, layer.macro ?? 0, layer.scale / 24, 0] : []),
-        ],
-        i * stride,
-      ),
-    );
-    this.rules = upload(data, GPUBufferUsage.STORAGE);
+    this.rules = upload(this.ruleData(), GPUBufferUsage.STORAGE);
+    this.rulesShift.set(this.shiftValues);
     this.sampler = this.device.createSampler({
       addressModeU: 'repeat',
       addressModeV: 'repeat',
@@ -408,23 +459,31 @@ export class Terrain implements EnginePlugin {
         ],
       });
     this.ringGroup = group;
+    // With `floatingOrigin` the frame grows by `anchor` (originShader), 176 to 192 bytes.
+    const floats = this.options.floatingOrigin ? 48 : 44;
     for (let i = 0; i < (this.options.levels ?? 6); i++) {
-      const uniform = this.device.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+      const uniform = this.device.createBuffer({
+          size: floats * 4,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        }),
         shadowUniforms: GPUBuffer[] = [];
       const r: Ring = {
         uniform,
         group: undefined!,
-        values: new Float32Array(44),
+        values: new Float32Array(floats),
         shadowUniforms,
         shadowGroups: [],
-        shadowValues: new Float32Array(44),
+        shadowValues: new Float32Array(floats),
         localUniforms: [],
         localGroups: [],
       };
       this.rings.push(r);
       r.group = group(uniform);
       for (let j = 0; j < 4; j++) {
-        const buffer = this.device.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const buffer = this.device.createBuffer({
+          size: floats * 4,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
         shadowUniforms.push(buffer);
         r.shadowGroups.push(group(buffer));
       }
@@ -445,6 +504,49 @@ export class Terrain implements EnginePlugin {
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
     });
     this.invalidate();
+  }
+  /**
+   * The layer rules: 8 floats a layer; 12 with `bump` or `macro` (surfaceStruct: bump metres per unit of luma, macro,
+   * macro scale); with `floatingOrigin` 8 more (originShader: `wrap` and `tone` per axis) and the height bounds less the
+   * shift's Y, as positions reach the shader local.
+   */
+  private ruleData(): Float32Array {
+    const tint = this.textures!.tint,
+      origin = !!this.options.floatingOrigin,
+      s = this.shiftValues,
+      surface = this.surface() ? 12 : 8,
+      stride = surface + (origin ? 8 : 0),
+      data = new Float32Array(this.options.layers.length * stride);
+    this.options.layers.forEach((layer, i) => {
+      data.set(
+        [
+          layer.height[0] - s[1],
+          layer.height[1] - s[1],
+          ...layer.slope,
+          layer.scale,
+          Math.max(0.01, (layer.height[1] - layer.height[0]) * 0.05),
+          0.05,
+          // params.w: 1 for a layer that takes the tint (0 without a tint, as before).
+          +(!!tint && !!layer.tint),
+          ...(surface === 12 ? [((layer.bump ?? 0) * 0.5) / layer.scale, layer.macro ?? 0, layer.scale / 24, 0] : []),
+        ],
+        i * stride,
+      );
+      if (!origin) return;
+      // The textures repeat on the terrain's own coordinates (world less `anchor`; Y as is), so moving a terrain and
+      // its camera together draws the same picture. k whole macro repeats (24 / scale, in the shader's float32 scale)
+      // per axis: wrap is the shift so measured less them, tone their phase in the 0.302 tone repeat (k times the
+      // shader's float32 0.302, exact in float64).
+      const scale = Math.fround(layer.scale),
+        relative = [s[0] - this.anchor![0], s[1], s[2] - this.anchor![1]];
+      for (let a = 0; a < 3; a++) {
+        const k = Math.floor((relative[a] * scale) / 24),
+          tone = k * Math.fround(0.302);
+        data[i * stride + surface + a] = relative[a] - (k * 24) / scale;
+        data[i * stride + surface + 4 + a] = tone - Math.floor(tone);
+      }
+    });
+    return data;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -471,15 +573,31 @@ export class Terrain implements EnginePlugin {
       layers = this.options.layers.length,
       cell = this.options.cellSize ?? 1,
       hdr = +(c.format === 'rgba16float'),
-      normal = +!!this.textures!.normalmap;
+      normal = +!!this.textures!.normalmap,
+      floating = this.options.floatingOrigin,
+      s = this.shiftValues;
+    // With a floating origin the eye is planned in float64 world space; without, the camera as given (adding a zero
+    // shift could only turn -0 into 0).
+    let eye: ArrayLike<number> = c.camera.position;
+    if (floating) {
+      for (let a = 0; a < 3; a++) this.eye[a] = eye[a] + s[a];
+      eye = this.eye;
+      const r = this.rulesShift;
+      if (r[0] !== s[0] || r[1] !== s[1] || r[2] !== s[2]) {
+        c.device.queue.writeBuffer(this.rules!, 0, this.ruleData() as Float32Array<ArrayBuffer>);
+        r.set(s);
+      }
+    }
+    if (this.plan.length !== this.rings.length * 2) this.plan = new Float64Array(this.rings.length * 2);
+    const plan = planRings(eye, s, cell, this.rings.length, this.plan);
     let previousX = 0,
       previousZ = 0,
       changed = false;
     for (let i = 0; i < this.rings.length; i++) {
       const values = this.rings[i].values,
         spacing = cell * 2 ** i,
-        x = Math.floor(c.camera.position[0] / spacing) * spacing,
-        z = Math.floor(c.camera.position[2] / spacing) * spacing;
+        x = plan[i * 2],
+        z = plan[i * 2 + 1];
       // The uniform holds float32: compare the rounded lattice, or a spacing not exact in float32 (0.1) reads as a
       // move every frame and redraws the shadow maps every frame.
       if (values[28] !== Math.fround(x) || values[29] !== Math.fround(z)) changed = true;
@@ -495,14 +613,20 @@ export class Terrain implements EnginePlugin {
       values[33] = i ? previousZ - z : 0;
       values[34] = i;
       values[35] = normal;
-      values[36] = origin?.[0] ?? 0;
-      values[37] = origin?.[1] ?? 0;
+      values[36] = (origin?.[0] ?? 0) - s[0];
+      values[37] = (origin?.[1] ?? 0) - s[2];
       values[38] = size[0];
       values[39] = size[1];
       values[40] = heightScale;
-      values[41] = heightOffset;
+      values[41] = heightOffset - s[1];
       values[42] = layers;
       values[43] = hdr;
+      if (floating) {
+        values[44] = s[0] - this.anchor![0];
+        values[45] = s[2] - this.anchor![1];
+        values[46] = s[1];
+        values[47] = 0;
+      }
       this.upload(c.device.queue, this.rings[i].uniform, values);
       previousX = x;
       previousZ = z;
@@ -536,7 +660,7 @@ export class Terrain implements EnginePlugin {
       (this.textures?.weights
         ? weightedFragment(this.textures.weights.length, surface, !!this.textures.tint)
         : terrainFragment(surface));
-    return this.clip(code);
+    return this.clip(this.options.floatingOrigin ? originShader(code) : code);
   }
   /** With `TerrainTextures.holes`: declares the mask after the weights and tint and adds its test to the edge test. */
   private clip(code: string): string {
@@ -826,7 +950,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       let buffer = r.localUniforms[layer];
       if (!buffer) {
         buffer = r.localUniforms[layer] = device.createBuffer({
-          size: 176,
+          size: r.values.length * 4,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
         r.localGroups[layer] = this.ringGroup(buffer);
@@ -892,6 +1016,8 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     this.disposed = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
+    this.unfollow?.();
+    this.unfollow = undefined;
     this.lighting.clear();
     this.capture = undefined;
     this.captureCode.clear();

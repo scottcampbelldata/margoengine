@@ -64,7 +64,9 @@ class Terrain implements EnginePlugin {
     readonly name: string;
     shadowVersion: number;
     disposed: boolean;
+    readonly anchor?: readonly [number, number];
     constructor(options: TerrainOptions);
+    get shift(): ArrayLike<number>;
     static attach(instance: EngineKernel, options: TerrainOptions): Terrain;
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
@@ -144,6 +146,12 @@ interface TerrainOptions {
     resolution?: number;
     levels?: number;
     roughness?: number;
+    floatingOrigin?: TerrainOrigin;
+}
+
+interface TerrainOrigin {
+    readonly origin: ArrayLike<number>;
+    onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 
 type TerrainPassContext = Extract<PassContext, {
@@ -160,6 +168,7 @@ interface TerrainTextures {
 }
 
 class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
+    readonly terrain: Terrain;
     readonly options: TerrainVirtualTextureOptions;
     readonly name: string;
     disposed: boolean;

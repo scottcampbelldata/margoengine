@@ -1917,6 +1917,25 @@ core's reversed z. Evidence: `packages/terrain/test/planet.browser.mjs`, the dis
 projection, the horizon dip within a pixel, no sky through the ground and the same picture with a `FloatingOrigin` at
 6,371 km from the world origin; Radeon 680M. Missing: frame cost, other GPUs, shadows and lighting effects on it.
 
+Clipmap terrain far from zero (`TerrainOptions.floatingOrigin`, 2026-11-11, large worlds). The camera is local to a
+`FloatingOrigin`; the terrain forms the float64 world eye (local plus `terrain.shift`) and plans in world space: the ring
+corners snap to the world lattice and only `corner - shift` is uploaded (`planRings`), the heightmap corner and height
+offset go up less the shift, and the virtual texture plans its windows in world texels on the float32 texel the GPU
+holds (`planWindows`), bakes each texel at `base + (w - o + 0.5) * e` with `base = o * s - shift` (float64, then
+float32), and reads at `(local + shift mod P) / period`, P the coarsest period, so a rebase keeps every cached page and
+bakes nothing. Layer samples that repeat with position add a per-layer `wrap` (the shift from the terrain's anchor less
+whole 24 / scale macro repeats) and the macro tone adds `fract(k * 0.302)`, so every texture coordinate equals the
+terrain-relative one at any distance. Cache surfaces, overlays and imagery read `local + Frame.anchor.xy`, XZ relative
+to the anchor; decal boxes and the deformation window are rewritten local on a rebase; blend reads the heightmap corner
+from the cache's frame. Without the option every shader, uniform and rule is unchanged (the uniform work-count digest
+pins it). Evidence: `packages/terrain/test/origin.test.js` (planners bit for bit at 0, 100,352 and 10,000,384 m, rules,
+rebase uploads, queries) and `origin.browser.mjs` on an RTX A6000, Edge 157, WebGPU and the WebGL2 layer (identical
+pictures at those offsets with the origin there; within 1 of 255 rebased onto the camera, in place and after a flight;
+overlays, layer materials with displacement, footprints and lit-path imagery identical at 1e7), plus a 1e5 case in
+`compat.browser.mjs`. A fix found on the way: the ring-move test compared the float32 uniform with the float64 corner,
+so a cell size not exact in float32 redrew the shadow maps every frame. Missing: other GPUs, blend and stream on the GPU
+under the option, frame cost.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the

@@ -11,19 +11,16 @@
   `LineExtension` hook, so the root's frame, shader and size return to what they were without it. The
   lines-perspective golden was recaptured past it on 2026-11-10 (claims.md) and moves back with that fix.
 
-### Terrain clipmaps and the virtual texture do not follow a FloatingOrigin (Rust finding U6, 2026-11-10, open)
+### Terrain footprints and lit-path imagery claim the same bindings (2026-11-11, open)
 
-- **Repro:** attach `FloatingOrigin` (`@margoengine/cameras/origin`) to an engine with a `Terrain` whose `origin` is
-  1e5 m out, and `origin.lookAt` a point above it: after the rebase the camera is near local zero while the terrain
-  stays at its engine coordinates, so the rings are planned around the local eye and sample the heightfield 1e5 m
-  away (nothing of the terrain is drawn where it should be).
-- **Cause:** `packages/terrain/src/index.ts` `prepare` snaps each ring to `camera.position` and passes `options.origin`
-  unchanged; `rvt.ts` `#run` plans the cache windows from `camera.position` and addresses the toroidal cache by the
-  fragment's local XZ. Only `planet.ts` takes a floating origin.
-- **Fix to build:** a terrain option naming the FloatingOrigin; plan rings and cache windows from the float64 world eye,
-  pass the ring centres and the terrain origin as world less origin, and offset the cache address by the origin modulo
-  the coarsest level's period, so tiles and levels at 1e5 equal those at the origin. Decals, overlays, holes and CPU
-  queries need the same offset. A GPU test at a 1e5 offset compares tiles, levels and pixels with the origin case.
+- **Repro:** on one `Terrain`, `TerrainDeformation.attach(engine, terrain)` and `TerrainImagery.attach(engine,
+  terrain, {automatic: false})` without a `virtualTexture`, one `imagery.add(...)`, then render: the lit shader fails to
+  compile with "entry point 'fragment' references multiple variables that use the same resource binding '@group(1)',
+  '@binding(99)'" (seen in `packages/terrain/test/origin.browser.mjs` while building its stacks).
+- **Cause:** `packages/terrain/src/deform.ts` takes group-1 bindings 99 and 100 (`BINDING = 99`) and
+  `packages/terrain/src/imagery.ts` takes 98, 99 and 100 + layer for its sampler, rules and layer textures.
+- **Fix to build:** move deform to a free pair (clear of shadows 1 to 31, effects from 40, clustered, layer materials
+  90 to 92, the virtual texture 94 to 96 and imagery 98 up) with a GPU test that attaches both.
 
 Batch 170 React harness (2026-11-10): when an external engine module fails to evaluate (seen with an R3F build whose React bundle read `process.env`), `bench/scenes/page.js` top-level `await import(...)` rejects without setting `window.result`, so `bench/lib/browser.mjs` waits its full 600 s before the case errors. Repro: an engines.json entry whose module throws on import, then `scripts/parity-smoke-browser.mjs --standard=react --engines=margo,<that engine>`. Cause: the engine import is outside the harness's error reporting. Fix in the fix phase: report the import error as the case result, with a test that loads a throwing module.
 

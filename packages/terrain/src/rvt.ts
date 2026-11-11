@@ -68,6 +68,7 @@ export interface TerrainDecal {
 }
 
 const MAX_DECALS = 4096;
+const NO_SHIFT = [0, 0, 0];
 // Terrain lighting group bindings 94 to 96: clear of shadows (1 to 31, effects from 40), clustered (4 to 30) and
 // layer materials (90 to 92).
 const BINDING = 94;
@@ -104,7 +105,8 @@ export function splitTerrainColor(code: string): string {
  * the camera's texel less half the size; a point is read from the level its footprint asks for, or the first whose
  * window holds it with a texel's margin, blended with the next.
  */
-const reader = (group: number, binding: number): string => /* wgsl */ `
+const reader = (group: number, binding: number, origin = false): string => {
+  const code = /* wgsl */ `
 struct TerrainVirtualFrame {eye:vec4f,params:vec4f}
 @group(${group}) @binding(${binding}) var terrainVirtualCache:texture_2d_array<f32>;
 @group(${group}) @binding(${binding + 1}) var terrainVirtualSampler:sampler;
@@ -118,6 +120,14 @@ fn terrainVirtualColor(position:vec3f,footprint:f32)->vec4f {
   if(t>0.0){c=mix(c,textureSampleLevel(terrainVirtualCache,terrainVirtualSampler,uv*0.5,i32(a)+1,0.0).rgb,t);}
   return vec4f(c,1.0-clamp((far-top)*2.0,0.0,1.0));
 }`;
+  // A floating origin: the frame adds `map` (the terrain's origin and height offset, local), and the level periods
+  // read the local position plus `params.zw`, the shift modulo the coarsest period, so texels stay world texels.
+  return origin
+    ? code
+        .replace('params:vec4f}', 'params:vec4f,map:vec4f}')
+        .replace('let uv=position.xz/', 'let uv=(position.xz+terrainVirtual.params.zw)/')
+    : code;
+};
 /** The terrain's ground through the cache, its own colour where the cache does not reach or the ground is steep. */
 const ground = /* wgsl */ `
 fn terrainVirtualGround(position:vec3f,normal:vec3f)->vec3f {
@@ -212,6 +222,35 @@ export function bakeRects(
   return out;
 }
 
+/**
+ * The window origins of a cache's levels in world texels, [x0, z0, x1, z1, ...]: level k's texel is `texel * 2^k`
+ * wide and its window of `size` texels starts at the eye's float64 world texel less half the size. With a floating
+ * origin, `base` gets each level's origin as a local point (origin * texel - shift, float64) and the function returns
+ * the wrap of the reader, `shift` modulo the coarsest level's period. Exported for the tests.
+ */
+export function planWindows(
+  eye: ArrayLike<number>,
+  shift: ArrayLike<number>,
+  texel: number,
+  size: number,
+  levels: number,
+  out = new Float64Array(levels * 2),
+  base?: Float64Array,
+): [number, number] {
+  for (let k = 0; k < levels; k++) {
+    const s = texel * 2 ** k;
+    out[k * 2] = Math.floor(eye[0] / s) - size / 2;
+    out[k * 2 + 1] = Math.floor(eye[2] / s) - size / 2;
+    if (base) {
+      base[k * 2] = out[k * 2] * s - shift[0];
+      base[k * 2 + 1] = out[k * 2 + 1] * s - shift[2];
+    }
+  }
+  const period = texel * size * 2 ** (levels - 1),
+    wrap = (v: number) => v - Math.floor(v / period) * period;
+  return [wrap(shift[0]), wrap(shift[2])];
+}
+
 let nextId = 0;
 /**
  * A runtime virtual texture for a `Terrain`: its blended ground colour, decals and roads baked into camera-centred
@@ -255,7 +294,14 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
   #decalsChanged = true;
   #nextDecal = 0;
   #remove?: () => void;
-  readonly #frameValues = new Float32Array(8);
+  /** Whether the terrain has `floatingOrigin`: the reader's frame grows by `map` and the bake works in local points. */
+  readonly #floating: boolean;
+  /** The shift the decal boxes were last written with (they hold local centres with a floating origin). */
+  readonly #decalShift = new Float64Array(3);
+  #windows = new Float64Array(0);
+  #bases = new Float64Array(0);
+  readonly #eye = new Float64Array(3);
+  readonly #frameValues: Float32Array;
   #uniform = new ArrayBuffer(0);
   #list = new Uint32Array(0);
   readonly #cacheCode = new Map<string, string>();
@@ -289,11 +335,14 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
   }
 
   private constructor(
-    private readonly terrain: Terrain,
+    /** The terrain whose ground the cache holds. */
+    readonly terrain: Terrain,
     readonly options: TerrainVirtualTextureOptions,
   ) {
     if (!terrain?.options?.layers || typeof terrain.addLighting !== 'function')
       throw new TypeError('Invalid terrain virtual texture; pass a Terrain');
+    this.#floating = !!terrain.options.floatingOrigin;
+    this.#frameValues = new Float32Array(this.#floating ? 12 : 8);
     const o = options ?? {};
     this.texel = o.texel ?? 0.05;
     this.size = o.size ?? 1024;
@@ -372,7 +421,10 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       magFilter: 'linear',
       minFilter: 'linear',
     });
-    this.#frame = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.#frame = device.createBuffer({
+      size: this.#frameValues.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.#bake = device.createBuffer({
       size: 256 * this.levels,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -439,7 +491,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
         'The terrain virtual texture needs the terrain lit shader without layer materials; attach it without TerrainMaterials',
       );
     let code =
-      reader(group, BINDING) +
+      reader(group, BINDING, this.#floating) +
       ground +
       splitTerrainColor(source).replace(groundCall, 'let base=terrainVirtualGround(i.position,');
     if (this.#surfaces.size) {
@@ -447,7 +499,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
         surface +
         code.replace(
           'terrainColorAt(position,normal),full)',
-          'terrainVirtualSurface(terrainColorAt(position,normal),position.xz,max(length(terrainDx.xz),length(terrainDy.xz))),full)',
+          `terrainVirtualSurface(terrainColorAt(position,normal),position.xz${this.#floating ? '+frame.anchor.xy' : ''},max(length(terrainDx.xz),length(terrainDy.xz))),full)`,
         );
       for (const effect of this.#surfaces) code = effect.shader(code, group);
     }
@@ -462,7 +514,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
    * at world `position` in rgb and in a its coverage (0 past the cache), for a pixel `footprint` world units wide.
    */
   declarations(group: number, binding: number): string {
-    return reader(group, binding);
+    return reader(group, binding, this.#floating);
   }
 
   /** The bind group entries `declarations(group, binding)` reads, while attached (else an empty list). */
@@ -588,17 +640,55 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     if (this.disposed || !source || !this.#cache) return;
     const device = c.device,
       n = this.size,
-      eye = c.camera.position;
-    this.#frameValues.set([eye[0], eye[2], this.texel, n, this.levels, this.#steep, 0, 0]);
+      local = c.camera.position,
+      floating = this.#floating,
+      shift = floating ? this.terrain.shift : NO_SHIFT,
+      levels = this.levels;
+    // With a floating origin the windows are planned from the float64 world eye, on the texel the GPU holds (float32),
+    // so the reader's period and the bake's texel are the same numbers; without, as before.
+    let eye: ArrayLike<number> = local;
+    if (floating) {
+      for (let a = 0; a < 3; a++) this.#eye[a] = local[a] + shift[a];
+      eye = this.#eye;
+    }
+    const texel = floating ? Math.fround(this.texel) : this.texel;
+    if (this.#windows.length !== levels * 2) {
+      this.#windows = new Float64Array(levels * 2);
+      this.#bases = new Float64Array(levels * 2);
+    }
+    const [wrapX, wrapZ] = planWindows(eye, shift, texel, n, levels, this.#windows, floating ? this.#bases : undefined);
+    this.#frameValues.set([
+      local[0],
+      local[2],
+      this.texel,
+      n,
+      levels,
+      this.#steep,
+      floating ? wrapX : 0,
+      floating ? wrapZ : 0,
+    ]);
+    if (floating) {
+      const o = this.terrain.options;
+      this.#frameValues.set(
+        [(o.origin?.[0] ?? 0) - shift[0], (o.origin?.[1] ?? 0) - shift[2], (o.heightOffset ?? 0) - shift[1], 0],
+        8,
+      );
+      const d = this.#decalShift;
+      if (d[0] !== shift[0] || d[2] !== shift[2]) {
+        d.set([shift[0], shift[1], shift[2]]);
+        this.#decalsChanged = true;
+      }
+    }
     device.queue.writeBuffer(this.#frame!, 0, this.#frameValues as Float32Array<ArrayBuffer>);
     if (this.#pipelineSource !== source.layout) {
       let code = splitTerrainColor(source.code) + bake;
+      if (floating) code = code.replace('let xz=(vec2f(w)+0.5)*e;', 'let xz=terrainBake.pad+(vec2f(w-o)+0.5)*e;');
       if (this.#surfaces.size)
         code =
           surface +
           code.replace(
             'var c=terrainColorAt(vec3f(xz.x,height(xz),xz.y),normal);',
-            'var c=terrainVirtualSurface(terrainColorAt(vec3f(xz.x,height(xz),xz.y),normal),xz,terrainBake.texel);',
+            `var c=terrainVirtualSurface(terrainColorAt(vec3f(xz.x,height(xz),xz.y),normal),xz${floating ? '+frame.anchor.xy' : ''},terrainBake.texel);`,
           );
       for (const effect of this.#surfaces) code = effect.shader(code, 2);
       const module = device.createShaderModule({ code });
@@ -624,10 +714,9 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     // Most frames move no level a texel and change nothing: they bake nothing and allocate nothing.
     this.baked = 0;
     let moved = this.#dirty.length > 0;
-    for (let k = 0; k < this.levels && !moved; k++) {
-      const s = this.texel * 2 ** k,
-        o = this.#origins[k];
-      moved = !o || o[0] !== Math.floor(eye[0] / s) - n / 2 || o[1] !== Math.floor(eye[2] / s) - n / 2;
+    for (let k = 0; k < levels && !moved; k++) {
+      const o = this.#origins[k];
+      moved = !o || o[0] !== this.#windows[k * 2] || o[1] !== this.#windows[k * 2 + 1];
     }
     if (!moved) return;
     const decals = [...this.#decals.values()];
@@ -636,8 +725,8 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       decals.forEach((d, i) =>
         data.set(
           [
-            d.center[0],
-            d.center[1],
+            d.center[0] - (floating ? shift[0] : 0),
+            d.center[1] - (floating ? shift[2] : 0),
             d.size[0] / 2,
             d.size[1] / 2,
             Math.cos(d.angle),
@@ -660,9 +749,9 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       work: [number, [number, number, number, number][]][] = [];
     this.#dirty = [];
     let listed = 0;
-    for (let k = 0; k < this.levels; k++) {
-      const s = this.texel * 2 ** k,
-        origin: [number, number] = [Math.floor(eye[0] / s) - n / 2, Math.floor(eye[2] / s) - n / 2],
+    for (let k = 0; k < levels; k++) {
+      const s = texel * 2 ** k,
+        origin: [number, number] = [this.#windows[k * 2], this.#windows[k * 2 + 1]],
         rects = bakeRects(
           this.#origins[k],
           origin,
@@ -691,6 +780,10 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       ints.set([origin[0], origin[1], n, listed - start], base);
       floats[base + 4] = s;
       ints[base + 5] = start;
+      if (floating) {
+        floats[base + 6] = this.#bases[k * 2];
+        floats[base + 7] = this.#bases[k * 2 + 1];
+      }
       work.push([k, rects]);
     }
     if (!work.length) return;

@@ -144,13 +144,16 @@ export class TerrainBlend implements EnginePlugin {
    * central differences, as the terrain's vertex normal.
    */
   private code(binding: number): string {
+    // With a floating origin the mesh positions are local: the heightmap's corner and offset come from the virtual
+    // texture's frame (`map`, the terrain's origin and height offset less the shift) instead of constants.
     const o = this.terrain.options,
-      x = num(o.origin?.[0] ?? 0),
-      z = num(o.origin?.[1] ?? 0),
+      floating = !!o.floatingOrigin,
+      x = floating ? 'terrainVirtual.map.x' : num(o.origin?.[0] ?? 0),
+      z = floating ? 'terrainVirtual.map.y' : num(o.origin?.[1] ?? 0),
       w = num(o.size[0]),
       d = num(o.size[1]),
       scale = num(o.heightScale ?? 100),
-      offset = num(o.heightOffset ?? 0);
+      offset = floating ? 'terrainVirtual.map.z' : num(o.heightOffset ?? 0);
     return `
 @group(0) @binding(${binding}) var terrainBlendHeights:texture_2d<f32>;
 @group(0) @binding(${binding + 1}) var<storage,read> terrainBlendMeshes:array<vec4f>;

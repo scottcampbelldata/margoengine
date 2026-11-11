@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Terrain under a floating origin</title>
+</head>
+<body style="margin:0">
+<canvas style="width:320px;height:240px"></canvas>
+<script type="module">
+// One terrain scene per page load, moved with its camera by ?offset= metres along X and Z, under a FloatingOrigin
+// (test/origin.browser.mjs compares the canvases). ?mode=exact: the origin sits at the offset (every number the GPU gets
+// is the zero case's); camera: ratio 10, the origin rebases onto the camera; flight: ratio 2, the camera flies 400 m to
+// the same pose and rebases on the way. The scene: rules with bump and macro over mipmapped layers, a hole, and a
+// runtime virtual texture with a decal and a road.
+import { Engine } from '/packages/core/dist/index.js';
+import { FloatingOrigin } from '/packages/cameras/dist/origin.js';
+import { Terrain } from '/packages/terrain/dist/index.js';
+import { TerrainVirtualTexture } from '/packages/terrain/dist/rvt.js';
+import { waitForPipelines } from '/scripts/support/gpu-ready.js';
+
+const q = new URLSearchParams(location.search);
+const offset = Number(q.get('offset') ?? 0),
+  mode = q.get('mode') ?? 'exact',
+  // rvt: the cache with a decal and a road; overlays: the cache with cached imagery and an overlay polygon; pbr: layer
+  // materials with displacement; deform: footprints; imagery: imagery on the lit path.
+  stack = q.get('stack') ?? 'rvt';
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+// Rolling hills and a ridge, 129 x 129 heights over 256 m (steep enough on the ridge for the cache's steep fallback).
+const n = 129,
+  heights = new Float32Array(n * n);
+for (let z = 0; z < n; z++)
+  for (let x = 0; x < n; x++)
+    heights[z * n + x] =
+      0.12 * Math.sin(x * 0.11) * Math.cos(z * 0.09) + 0.08 * Math.sin((x + z) * 0.05) + 0.25 * Math.exp(-(((x - 80) / 9) ** 2));
+// Four 32 x 32 layers with a full mip chain (the macro tone reads the top mip): two-tone checks with a diagonal stripe.
+function layerTexture(gpu) {
+  const tones = [
+      [[196, 170, 120], [150, 126, 84]],
+      [[86, 140, 60], [52, 98, 38]],
+      [[128, 120, 112], [84, 80, 74]],
+      [[236, 238, 242], [190, 196, 210]],
+    ],
+    levels = 6,
+    texture = gpu.createTexture({ size: [32, 32, 4], format: 'rgba8unorm-srgb', usage: 6, mipLevelCount: levels });
+  let side = 32,
+    data = new Float32Array(32 * 32 * 4 * 3);
+  tones.forEach((pair, l) => {
+    for (let y = 0; y < 32; y++)
+      for (let x = 0; x < 32; x++)
+        data.set(pair[((x >> 2) + (y >> 2) + ((x + y) % 11 === 0 ? 1 : 0)) % 2], ((l * 32 + y) * 32 + x) * 3);
+  });
+  for (let m = 0; m < levels; m++) {
+    const bytes = new Uint8Array(side * side * 4 * 4);
+    for (let i = 0; i < side * side * 4; i++) bytes.set([...data.subarray(i * 3, i * 3 + 3)].map(Math.round).concat(255), i * 4);
+    gpu.queue.writeTexture({ texture, mipLevel: m }, bytes, { bytesPerRow: side * 4, rowsPerImage: side }, [side, side, 4]);
+    const half = side / 2,
+      next = new Float32Array(half * half * 4 * 3);
+    for (let l = 0; l < 4; l++)
+      for (let y = 0; y < half; y++)
+        for (let x = 0; x < half; x++)
+          for (let c = 0; c < 3; c++) {
+            let sum = 0;
+            for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]])
+              sum += data[((l * side + y * 2 + dy) * side + x * 2 + dx) * 3 + c];
+            next[((l * half + y) * half + x) * 3 + c] = sum / 4;
+          }
+    data = next;
+    side = half;
+  }
+  return texture;
+}
+function holeTexture(gpu) {
+  const side = 32,
+    hole = new Uint8Array(side * side * 4);
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) hole.set([(x - 17) ** 2 + (y - 18) ** 2 < 3 ? 0 : 255, 0, 0, 255], (y * side + x) * 4);
+  const texture = gpu.createTexture({ size: [side, side], format: 'rgba8unorm', usage: 6 });
+  gpu.queue.writeTexture({ texture }, hole, { bytesPerRow: side * 4 }, [side, side]);
+  return texture;
+}
+function decalTexture(gpu) {
+  const side = 16,
+    data = new Uint8Array(side * side * 4);
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) data.set(y < 2 || y > 13 ? [250, 250, 240, 255] : [40, 38, 36, x % 8 < 4 ? 255 : 200], (y * side + x) * 4);
+  const texture = gpu.createTexture({ size: [side, side, 1], format: 'rgba8unorm-srgb', usage: 6 });
+  gpu.queue.writeTexture({ texture }, data, { bytesPerRow: side * 4, rowsPerImage: side }, [side, side, 1]);
+  return texture;
+}
+const d = offset,
+  world = (x, y, z) => [x + d, y, z + d],
+  pose = { position: world(-60, 45, -90), target: world(10, 8, 20) };
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [320, 240],
+    camera: { position: [-60, 45, -90], target: [10, 8, 20], near: 0.5, far: 1000 },
+  });
+  engine.lighting.direction.set([0.4, 0.8, 0.3, 3]);
+  const origin = FloatingOrigin.attach(engine, { ratio: mode === 'camera' ? 10 : mode === 'flight' ? 2 : 1e9 });
+  if (mode === 'exact') origin.rebase([d, 0, d]);
+  if (mode === 'flight') origin.rebase([d - 400, 0, d]);
+  const terrain = Terrain.attach(engine, {
+    origin: [-128 + d, -128 + d],
+    size: [256, 256],
+    heightScale: 100,
+    cellSize: 1,
+    resolution: 64,
+    levels: 6,
+    floatingOrigin: origin,
+    layers: [
+      { height: [-1e5, 1e5], slope: [0, 1], scale: 0.5, bump: 0.4, macro: 0.5 },
+      { height: [-1e5, 14], slope: [0, 0.3], scale: 0.4, macro: 0.6 },
+      { height: [-1e5, 1e5], slope: [0.35, 1], scale: 0.3, bump: 0.6 },
+      { height: [22, 1e5], slope: [0, 0.4], scale: 0.25 },
+    ],
+    textures: (gpu) => {
+      const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
+      gpu.queue.writeTexture({ texture: heightmap }, heights, { bytesPerRow: n * 4 }, [n, n]);
+      return { heightmap, layers: layerTexture(gpu), holes: holeTexture(gpu) };
+    },
+  });
+  const solid = (gpu, side, layers, texel) => {
+    const texture = gpu.createTexture({ size: [side, side, layers], format: 'rgba8unorm', usage: 6 }),
+      data = new Uint8Array(side * side * layers * 4);
+    for (let i = 0; i < side * side * layers; i++) data.set(texel(i % side, Math.floor(i / side) % side, Math.floor(i / side / side)), i * 4);
+    gpu.queue.writeTexture({ texture }, data, { bytesPerRow: side * 4, rowsPerImage: side }, [side, side, layers]);
+    return texture;
+  };
+  let rvt;
+  if (stack === 'rvt' || stack === 'overlays') {
+    rvt = TerrainVirtualTexture.attach(engine, terrain, { texel: 0.0625, size: 512, levels: 5, decals: decalTexture });
+    rvt.addDecal({ center: [10 + d, 20 + d], size: [24, 12], angle: 0.4 });
+    rvt.road([[-40 + d, -10 + d], [0 + d, 5 + d], [40 + d, 30 + d]], 6);
+  }
+  if (stack === 'overlays' || stack === 'imagery') {
+    const { TerrainImagery } = await import('/packages/terrain/dist/imagery.js');
+    const imagery = TerrainImagery.attach(engine, terrain, { maxLayers: 2, automatic: false, ...(rvt ? { virtualTexture: rvt } : {}) }),
+      photo = solid(engine.gpu, 16, 1, (x, y) => [x * 16, y * 16, 128, (x + y) % 3 ? 160 : 255]);
+    imagery.add({ source: { texture: () => photo }, bounds: [-100 + d, -100 + d, 60 + d, 40 + d], alpha: 0.6 });
+  }
+  if (stack === 'overlays') {
+    const { TerrainOverlays } = await import('/packages/terrain/dist/overlays.js');
+    TerrainOverlays.attach(engine, rvt).addPolygon([[world(-20, 0, -30), world(25, 0, -20), world(5, 0, 15)].map(([x, , z]) => [x, z])], {
+      color: [0.9, 0.2, 0.1, 0.8],
+    });
+  }
+  if (stack === 'pbr') {
+    const { TerrainMaterials } = await import('/packages/terrain/dist/layers-pbr.js'),
+      { TerrainDisplacement } = await import('/packages/terrain/dist/displace.js');
+    const materials = TerrainMaterials.attach(engine, terrain, {
+      textures: (gpu) => ({
+        normals: solid(gpu, 16, 4, (x, y) => [128 + 60 * Math.sin(x), 128 + 60 * Math.cos(y), 230, 255]),
+        surface: solid(gpu, 16, 4, (x, y, l) => [200, 120 + l * 20, 0, ((x * 7 + y * 3) % 16) * 16]),
+      }),
+    });
+    TerrainDisplacement.attach(engine, terrain, materials, { depth: 0.3 });
+  }
+  if (stack === 'deform') {
+    const { TerrainDeformation } = await import('/packages/terrain/dist/deform.js');
+    // The map centres on a world point in view (follow gives world XZ), with prints around it.
+    TerrainDeformation.attach(engine, terrain, { size: 512, texel: 0.03125, distance: 400, follow: () => [-30 + d, -45 + d] })
+      .footprint(-31 + d, -46 + d, { depth: 0.1, angle: 0.4 })
+      .track([-36 + d, -50 + d], [-24 + d, -40 + d], { width: 1.5, depth: 0.08 });
+  }
+  const device = () => engine.gpu;
+  let baked = 0,
+    last = 0,
+    draws = 0;
+  const frame = async () => {
+    engine.render({ delta: 0 });
+    last = rvt?.baked ?? 0;
+    baked += last;
+    draws = engine.stats.drawCalls;
+    await device().queue.onSubmittedWorkDone();
+  };
+  const flight = [];
+  if (mode === 'flight')
+    for (let k = 0; k <= 24; k++) {
+      const x = -400 + (400 * k) / 24,
+        before = origin.rebases;
+      origin.lookAt(world(-60 + x, 45, -90), world(10 + x, 8, 20));
+      await frame();
+      if (origin.rebases !== before) flight.push(k);
+    }
+  else origin.lookAt(pose.position, pose.target);
+  const settle = async () => {
+    await waitForPipelines(frame, { ready: () => !rvt || (baked > 0 && last === 0) });
+    return { baked, draws, rebases: origin.rebases, shift: origin.origin, flight };
+  };
+  window.check = {
+    info: () => ({ vendor: device().adapterInfo?.vendor ?? null, errors: errors.splice(0) }),
+    settle,
+    /** Rebases in place (the camera stays at its world pose) on the next frame; reports what that frame baked. */
+    async rebase() {
+      const before = origin.rebases;
+      origin.ratio = 0.01;
+      await frame();
+      origin.ratio = 1e9;
+      return { rebases: origin.rebases - before, baked: last, shift: origin.origin, local: [...engine.camera.position] };
+    },
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { info: () => ({ errors }) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

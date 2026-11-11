@@ -16,6 +16,7 @@ export interface TerrainDecal {
 }
 
 export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
+    readonly terrain: Terrain;
     readonly options: TerrainVirtualTextureOptions;
     readonly name: string;
     disposed: boolean;
@@ -55,6 +56,8 @@ export interface TerrainVirtualTextureOptions {
 
 export function bakeRects(from: readonly [number, number] | undefined, to: readonly [number, number], n: number, dirty?: readonly (readonly [number, number, number, number])[]): [number, number, number, number][];
 
+export function planWindows(eye: ArrayLike<number>, shift: ArrayLike<number>, texel: number, size: number, levels: number, out?: Float64Array<ArrayBuffer>, base?: Float64Array): [number, number];
+
 export function splitTerrainColor(code: string): string;
 
 // Not exported from this entry, but used by the exports above:
@@ -64,7 +67,9 @@ class Terrain implements EnginePlugin {
     readonly name: string;
     shadowVersion: number;
     disposed: boolean;
+    readonly anchor?: readonly [number, number];
     constructor(options: TerrainOptions);
+    get shift(): ArrayLike<number>;
     static attach(instance: EngineKernel, options: TerrainOptions): Terrain;
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
@@ -135,6 +140,12 @@ interface TerrainOptions {
     resolution?: number;
     levels?: number;
     roughness?: number;
+    floatingOrigin?: TerrainOrigin;
+}
+
+interface TerrainOrigin {
+    readonly origin: ArrayLike<number>;
+    onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 
 type TerrainPassContext = Extract<PassContext, {

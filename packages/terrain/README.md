@@ -879,6 +879,75 @@ patch limit, sea level and following an origin. Building a patch costs about 1.3
 resolution 32 with the default ground (Node, Beelink, busy machine: diagnostic); the 1,682 patches a view 100 m above
 the ground at 1280 x 720 needs took 2.2 s, which the `budget` spreads over frames. Frame cost not timed.
 
+## Far from the origin: `floatingOrigin`
+
+GPUs draw in float32, which holds about 7 digits: a terrain 10,000 km out has its vertices rounded to a metre and its
+textures swim. Give the terrain the scene's `FloatingOrigin` (`@margoengine/cameras/origin`) as `floatingOrigin` and it
+plans everything in float64 world space first: the ring lattice, the layer texture phases, the virtual texture's
+windows and decals, the deformation window, streamed tiles and imagery views. Only small local numbers (world less the
+origin) reach the GPU. A terrain 1e7 m out then draws the same vertices, levels, cache texels and pixels as the same
+terrain at zero, and a rebase moves nothing on screen and bakes nothing again.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {Terrain, type TerrainOptions} from 'margoengine/terrain';
+import {TerrainQuery} from 'margoengine/terrain/query';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// ratio 10: rebase once the camera is 10 times its target distance from local zero, so local numbers stay small.
+const origin = FloatingOrigin.attach(engine, {ratio: 10});
+const columns = 65, heights = new Float32Array(columns * columns).map((_, i) => Math.sin(i % columns / 6) * 0.1);
+const options: TerrainOptions = {
+  origin: [1e7 - 64, 1e7 - 64], // world XZ, float64, as without the option
+  size: [128, 128],
+  heightScale: 20,
+  floatingOrigin: origin,
+  layers: Array.from({length: 4}, () => ({height: [-100, 100] as const, slope: [0, 1] as const, scale: 0.25})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [columns, columns], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: columns * 4}, [columns, columns]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(128), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+};
+const terrain = Terrain.attach(engine, options);
+origin.lookAt([1e7 + 50, 80, 1e7 + 50], [1e7 + 60, 30, 1e7 + 90]); // world points; the camera becomes local
+engine.start();
+// CPU calls stay in world coordinates: convert the local camera ray with origin.toWorld.
+const query = new TerrainQuery(heights, columns, columns, options);
+console.log(query.height(1e7, 1e7), query.raycast(origin.toWorld(engine.camera.position), [0.2, -1, 0.8]));
+console.log(terrain.shift); // the float64 world point at local zero, which every terrain entry follows
+```
+
+- `floatingOrigin` takes any `{origin, onRebase}` (a `FloatingOrigin` as is). Without it the shaders, uniforms and
+  layer rules are byte for byte what they were. `terrain.shift` is the world point at local zero (zeros without the
+  option); `terrain.anchor` is `origin` at construction.
+- World in, world out: `origin`, `size`, `TerrainQuery`, holes, sculpt dabs, virtual texture decals, roads and
+  `invalidate` areas, overlays, imagery bounds and deformation prints (and its `follow`) take float64 world
+  coordinates, as without the option.
+- Why `ratio` 10: core rebases when the camera is `ratio` times its target distance from local zero, so local numbers
+  reach about `ratio` times the view distance before a rebase. float32 is clean to about 1e4 m (0.5 mm steps), so 10
+  keeps a view a few hundred metres across well inside it; `FloatingOrigin`'s default of 1000 lets positions grow to
+  kilometres first and shows float32 noise.
+- Layer textures repeat on terrain-relative coordinates (world less `anchor`), so moving a terrain and its camera
+  together draws the same picture; a terrain at zero draws as before. A streamed terrain (`/stream`) keeps the anchor
+  where it started, and its overlays and imagery read XZ relative to it in float32: precise within about 1e4 m of the
+  start, as at zero.
+- The virtual texture addresses its cache by world texel (`floor(world / texel)`, a 32-bit integer): up to 1e8 m from
+  zero at the default 5 cm texel. Its texel and the deformation's are taken as the float32 the GPU holds (a relative
+  change under 1e-7), so the CPU's texel indices and the GPU's coordinates agree at any distance.
+
+Checked on a real GPU by `test/origin.browser.mjs` (in `test:gpu`, RTX A6000, Edge 157, WebGPU and the WebGL2 layer,
+2026-11-11), a 320 x 240 scene of rules with bump and macro, a hole, and a virtual texture with a decal and a road,
+moved with its camera by 0, 100,352 and 10,000,384 m: with the origin at the offset every picture is the zero case's,
+pixel for pixel, with the same draw calls and 1,324,960 texels baked; rebased onto the camera at 1e7, rebased in place
+(which bakes nothing that frame) and after a 400 m flight that rebases on the way, every pixel is within 1 of 255 of it
+(99.93, 99.93 and 99.83 percent equal). Cached imagery with an overlay polygon, layer materials with displacement,
+footprints, and imagery on the lit path each draw the same picture at 1e7 as at zero. `test/origin.test.js` checks
+`planRings` and `planWindows` bit for bit at those offsets, the layer wrap and tone, a rebase rewriting the rules once
+and redrawing shadows once, and `TerrainQuery` at the offsets.
+
 ## On the WebGL2 compatibility layer
 
 Where the browser has no WebGPU, install the layer (`margoengine/webgl2-compat`) before `Engine.create` and the
