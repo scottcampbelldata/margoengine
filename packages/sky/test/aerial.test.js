@@ -89,7 +89,7 @@ test('aerial perspective builds its tables once, its volume every frame, and dra
   assert.equal(v[20], Math.fround(0.003996));
   // The medium reads Mie scattering and absorption per channel (48-50, 52-54); grey haze gives three equal values.
   assert.deepEqual([...v.subarray(48, 51)], [0.003996, 0.003996, 0.003996].map(Math.fround));
-  assert.deepEqual([...v.subarray(52, 55)], [0.00444, 0.00444, 0.00444].map(Math.fround));
+  assert.deepEqual([...v.subarray(52, 55)], [0.000444, 0.000444, 0.000444].map(Math.fround));
   assert.equal(v[34], 10);
   sky.options.turbidity = 5;
   sky.options.model = 'bruneton';

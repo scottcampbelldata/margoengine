@@ -18,7 +18,11 @@ export interface AtmosphereParameters {
   rayleighHeight?: number;
   /** Mie scattering per km at the ground: one number (grey, as Earth's haze) or RGB (coloured dust). Default 0.003996. */
   mie?: number | Vec3;
-  /** Mie absorption per km at the ground: one number or RGB. Default 0.00444. */
+  /**
+   * Mie absorption per km at the ground: one number or RGB. Default 0.000444: Hillaire 2020 Table 1 prints Mie
+   * absorption 4.40e-6 /m, but with Mie scattering 3.996e-6 /m and a 0.9 single-scattering albedo the absorption is
+   * 3.996e-6 / 0.9 - 3.996e-6 = 0.444e-6 /m (the printed figure is the extinction). Scott chose this, 2026-11-11.
+   */
   mieAbsorption?: number | Vec3;
   /** Mie scale height, km. Default 1.2. */
   mieHeight?: number;
@@ -39,7 +43,7 @@ const earth = {
   rayleigh: [0.005802, 0.013558, 0.0331] as Vec3,
   rayleighHeight: 8,
   mie: 0.003996,
-  mieAbsorption: 0.00444,
+  mieAbsorption: 0.000444,
   mieHeight: 1.2,
   mieG: 0.8,
   ozone: [0.00065, 0.001881, 0.000085] as Vec3,

@@ -15938,7 +15938,12 @@ as unsupported by the light loader.
   `VolumetricClouds`, `Weather` and `WeatherFX` called `engine.removePlugin(this.name)`, which acts on the active scene.
   Input: `engine.createScene('other').use(sky); sky.dispose()`. Wrong output: the plugin stayed in `other.plugins`.
   Regressions packages/sky/test/audit-132.test.js.
-- Open (source check, Scott's call): packages/sky/src/atmosphere-luts.ts:42 `mieAbsorption: 0.00444` /km, cited as
+- Fixed 2026-11-11 (Scott chose 0.000444 /km, the albedo-0.9 reading): `EARTH_ATMOSPHERE.mieAbsorption` is now
+  0.000444 /km, so Hillaire Mie extinction is 4.44e-6 /m, the same as the Bruneton model in atmosphere.ts.
+  test/aerial.test.js and test/features-check.mjs follow the new default; sky CPU 116/116 and test:gpu,
+  test:gpu:planet pass on the M6 (WebGPU), and under MARGO_COMPAT=1 test:gpu:planet passes while test:gpu keeps only
+  the separate ANGLE Metal 2 px meadow case. Every Hillaire sky and aerial picture is less hazy than before. History:
+  was `mieAbsorption: 0.00444` /km, cited as
   Hillaire 2020 Table 1, which prints sigma_ma = 4.40e-6 /m. With sigma_ms = 3.996 a single-scattering albedo of 0.9
   (Bruneton 2017) gives absorption 0.444e-6 /m and extinction 4.44e-6 /m, so the table's 4.40 looks like the extinction
   with a typo and the code's 4.44 like the extinction taken as absorption: Mie extinction comes out 8.436e-6 /m, about

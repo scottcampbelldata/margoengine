@@ -103,7 +103,7 @@ const checks = {
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) * dt,
           h = Math.sqrt(r0 * r0 + t * t + 2 * r0 * t * sin) - R,
-          mie = (0.003996 + 0.00444) * 0.5 * Math.exp(-h / 1.2),
+          mie = (0.003996 + 0.000444) * 0.5 * Math.exp(-h / 1.2),
           ozone = Math.max(0, 1 - Math.abs(h - 25) / 15);
         [0.005802, 0.013558, 0.0331].forEach(
           (b, c) => (out[c] += (b * Math.exp(-h / 8) + mie + [0.00065, 0.001881, 0.000085][c] * ozone) * dt),
