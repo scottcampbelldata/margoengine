@@ -5,10 +5,15 @@ import { Picking, Selection } from 'margoengine/selection';
 import { Shadows } from 'margoengine/shadows';
 
 const status = document.querySelector('#status')!;
-if (!('gpu' in navigator)) {
-  status.textContent = 'This browser has no WebGPU, which this scene needs. See "Browser support" in the README.';
-  throw new Error('WebGPU unavailable');
-}
+const fail = (error: Error): never => {
+  status.textContent = `Margo could not start: ${error.message}. See "Browser support" in the README.`;
+  throw error;
+};
+
+// No WebGPU here (an older browser, or one that blocks it)? Load the WebGL2 layer first: it runs this same scene, and
+// a browser with WebGPU never downloads it.
+const webgpu = 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('margoengine/webgl2-compat')).install().catch(fail);
 
 // A 64 x 64 checkerboard painted in code, so the example needs no image file.
 const pixels = new Uint8Array(64 * 64 * 4);
@@ -20,10 +25,7 @@ for (let y = 0; y < 64; y++)
 const checker = new Texture({ data: pixels, width: 64, height: 64 }, { wrapS: 'repeat', wrapT: 'repeat' });
 
 // The stage mounts a canvas in #scene, adds orbit/pan/zoom with the mouse and starts the render loop.
-const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } }).catch((error: Error) => {
-  status.textContent = `Margo could not start: ${error.message}. See "Browser support" in the README.`;
-  throw error;
-});
+const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } }).catch(fail);
 const engine = stage.engine;
 
 // Aim the sun from the left and above, so the shadows fall to the right, where the camera can see them.
