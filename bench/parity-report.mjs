@@ -301,6 +301,15 @@ const named = (key) => `\`${key}\`${LABELS[key] ? ` (${LABELS[key].replace(/\|/g
 const causes = existsSync(resolve(root, 'bench/parity-causes.json'))
   ? JSON.parse(readFileSync(resolve(root, 'bench/parity-causes.json'), 'utf8'))
   : {};
+// A three.js backend that threw on a case Margo completed (bench/parity-causes.json `rivalUnsupported`: scene, engine,
+// the measured error, its source) has no number for that case. When every three.js backend threw, the scene's current
+// verdict is "rival unsupported": the rival did less work or none, so no ratio is a like-for-like result. The first-run
+// verdict stays as measured (the ledger never rewrites a first result).
+const rivalRecords = Object.values(causes).flatMap((c) => (typeof c === 'object' && c.rivalUnsupported) || []);
+const rivalUnsupported = (key) =>
+  threes.length > 0 && threes.every((e) => rivalRecords.some((r) => r.scene === key && r.engine === e));
+/** Control characters in a measured error (a FourCC of four zero bytes) as \uXXXX escapes, so the page stays text. */
+const printable = (s) => s.replace(/[\u0000-\u001f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 /** A row's verdict from its scenes' verdicts: slower if any is slower, faster if one is and none is worse. */
 const combine = (v) =>
   !v.length
@@ -329,7 +338,9 @@ const rows = matrixRows().map((row) => {
     ...row,
     keys,
     first: combine(keys.map((k) => ledger.scenes[k]?.first?.verdict ?? 'not run')),
-    now: combine(keys.map((k) => latest(ledger.scenes[k])?.verdict ?? 'not run')),
+    now: combine(
+      keys.map((k) => (rivalUnsupported(k) ? 'rival unsupported' : (latest(ledger.scenes[k])?.verdict ?? 'not run'))),
+    ),
     owner: map.owner,
   };
 });
@@ -349,7 +360,7 @@ const worseOf = (snap) => {
 };
 const worst = Object.entries(ledger.scenes)
   .map(([key, slot]) => ({ key, snap: latest(slot) }))
-  .filter((x) => x.snap.verdict === 'slower')
+  .filter((x) => x.snap.verdict === 'slower' && !rivalUnsupported(x.key))
   .map((x) => ({ ...x, worse: worseOf(x.snap) }))
   .sort((a, b) => b.worse - a.worse);
 const cell = (snap, metrics, error) =>
@@ -374,7 +385,12 @@ const causeText = (id) => {
         `fixed in ${x.commit}${x.tradeoff ? ` (trade-off: ${x.tradeoff})` : ''}${x.rerun ? `, rerun \`${x.rerun}\`` : ''}`,
     )
     .join('; ');
-  return [c.cause, c.knownBug ? `[known bug](../known-bugs.md#${c.knownBug})` : '', fixes].filter(Boolean).join('. ');
+  const rival = (c.rivalUnsupported ?? [])
+    .map((r) => `Rival unsupported: ${r.engine} on \`${r.scene}\`: ${printable(r.error.trim())} (${r.source})`)
+    .join('; ');
+  return [c.cause, c.knownBug ? `[known bug](../known-bugs.md#${c.knownBug})` : '', fixes, rival]
+    .filter(Boolean)
+    .join('. ');
 };
 const firstRun = Object.values(ledger.scenes)
   .map((x) => x.first)

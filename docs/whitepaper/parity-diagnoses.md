@@ -48,9 +48,9 @@ The following failures remain for the next complete jobs:
 | Margo grading | The adapter rejects hue rotation although shader utilities and tonemap/hue now supply hue operations. Wire the matching grading arithmetic and verify output. |
 | Margo lens flare | The adapter needs a point position and four configurable screen-size elements; the existing sun-direction/fixed-ghost API does not satisfy that job. Build in post, never core. |
 | Margo meshopt | Fixed in round 2: the owning gltf-pro parser and async resolver now apply the fallback contract to EXT and KHR. See the regression and reproduction below. |
-| Reference depth material, WebGPU | The black-box adapter reports MeshDepthMaterial incompatible. Repair its supported material mapping without reading engine source. |
-| Reference USDZ, both | Both black-box calls fail reading `isVector3`. Establish the adapter's loader input/scene contract before measuring. |
-| Reference texture formats, both | The DDS parser rejects FourCC zero. Match the fixture contract while retaining coverage of the current uncompressed DDS case; do not remove work to get a ratio. |
+| Reference depth material, WebGPU | Closed in round 3 as rival unsupported (KB6250f): three.js 0.186.1 WebGPURenderer refuses MeshDepthMaterial. The WebGL comparison stands. |
+| Reference USDZ, both | Closed in round 3 as rival unsupported (KB6250d): three.js 0.186.1 USDZLoader throws reading `isVector3` on the shared fixture in both backends. |
+| Reference texture formats, both | Closed in round 3 as rival unsupported (KB6250e): three.js 0.186.1 DDSLoader refuses the uncompressed FourCC-zero DDS. The fixture keeps that case; no work was removed. |
 
 Rows owned by batches 161-166, 169 and 170 receive diagnosis only here. No code
 optimization is claimed. Batch 159 still owes the missing adapters/APIs, reference
@@ -100,3 +100,29 @@ https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html.
 Both extension specifications permit the same fallback layout, while KHR prohibits
 declaring both names on one object. The base specification still governs buffer-view
 bounds. These specifications, not companion code, informed the fix.
+
+## Round 3: rival-unsupported pairs
+
+Sweep L2, 2026-11-11 (KB6250d, KB6250e, KB6250f). The five rival errors in the
+one-call inventory are three.js failures on cases Margo completes, not Margo
+defects. They are recorded as **rival unsupported** with the measured error text.
+The shared scene, its fixtures and the three.js adapter are unchanged, so the
+rival keeps the same job and no work was removed from either side.
+
+| Case | Backend | Measured error (bp-159-preflight.json) | Margo in the same inventory |
+| --- | --- | --- | --- |
+| `p-depth-material` | three-webgpu-parity | `THREE.NodeBuilder: Material "MeshDepthMaterial" is not compatible.` | ok, 10,000 depth-material draws |
+| `p-usdz` | three-webgpu-parity, three-webgl-parity | `TypeError: Cannot read properties of undefined (reading 'isVector3')` | ok, 1 mesh, 3 vertices, 1 triangle |
+| `p-texture-formats` | three-webgpu-parity, three-webgl-parity | `THREE.DDSLoader.parse: Unsupported FourCC code`, then two spaces and four zero bytes | ok, five 64 x 64 images; three returns 0 x 0 for the DDS |
+
+What changes in the matrix ([perf-vs-threejs.md](perf-vs-threejs.md)):
+
+- Row 10.14 (USDZ) reads *rival unsupported* now. Its first-run verdict, *not run*, stays as measured.
+- Row 10.20 (texture loaders) stays *slower* through `p-ies`. The `p-texture-formats` ratio is not like for like,
+  since the rival did four of the five decodes, so it leaves the worst-gaps table and no replacement ratio is published.
+- Row 5.8 keeps its WebGL comparison; only the WebGPU backend has no number for `p-depth-material`.
+
+The records live in `bench/parity-causes.json` (`rivalUnsupported`: scene, backend, error, source) and
+`bench/parity-report.mjs` renders them. `tests/parity-diagnoses.test.js` fails when an inventory rival error has no
+record, when a record's text differs from the measurement, or when the rendered matrix or the committed matrix loses
+the verdict. A later three.js release that loads these cases has its records removed, and the measured ratio returns.

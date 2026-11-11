@@ -335,7 +335,21 @@
     "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The adapter parses 500 curved SVG paths, converts each to filled shapes, then calls shapeGeometry with 12 curve segments: 66,000 output vertices and 64,042 triangles. It includes triangulation after SVG parsing, so the source of work is loaders SVG plus geometry triangulation, not SVG XML parsing alone. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
   },
   "10.20": {
-    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The task runs TGA, DDS, KTX and TIFF parsers to produce five 64-square images, one with seven mip levels. Margo validates container headers and decodes typed pixel payloads without GPU upload. The preflight also finds the rival DDS adapter rejects the supplied FourCC-zero fixture; do not publish a replacement ratio until that black-box fixture contract is corrected. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+    "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): The task runs TGA, DDS, KTX and TIFF parsers to produce five 64-square images, one with seven mip levels. Margo validates container headers and decodes typed pixel payloads without GPU upload. Sweep L2 (KB6250e): rival unsupported on the DDS part. three.js 0.186.1 DDSLoader refuses the uncompressed FourCC-zero DDS in both backends and returns a 0x0 image, so the rival did four of the five decodes and the p-texture-formats ratio is not like for like; it leaves the worst-gaps table and no replacement ratio is published. p-ies keeps the row slower. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md#round-3-rival-unsupported-pairs)",
+    "rivalUnsupported": [
+      {
+        "scene": "p-texture-formats",
+        "engine": "three-webgpu-parity",
+        "error": "THREE.DDSLoader.parse: Unsupported FourCC code  \u0000\u0000\u0000\u0000",
+        "source": "bp-159-preflight.json, three.js 0.186.1, one call per pair"
+      },
+      {
+        "scene": "p-texture-formats",
+        "engine": "three-webgl-parity",
+        "error": "THREE.DDSLoader.parse: Unsupported FourCC code  \u0000\u0000\u0000\u0000",
+        "source": "bp-159-preflight.json, three.js 0.186.1, one call per pair"
+      }
+    ]
   },
   "11.2": {
     "cause": "2026-11-10 diagnosis (batch 165 owns follow-up): CPU samples identify exportOBJ string generation and garbage collection, followed by scene normalization/toWorld and float formatting. One task emits 14,130,060 OBJ characters, 410,882 vertex/normal/face lines, a 10,240,084-byte STL and a 5,135,650-byte PLY. Each public writer currently collects/validates the same input scene independently. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
@@ -415,5 +429,33 @@
   },
   "18.1": {
     "cause": "2026-11-10 diagnosis (batch 170 owns follow-up): For 64 sources over 1,000 steps, the task calls setPosition and setDirection 64,000 times each plus 1,000 listener poses. Both source setters call writePose, so 128,000 full panner-pose writes are requested before changed-value filtering. The rival task updates its scene graph once per step. Cause: two immediate pose updates per source versus one deferred graph update; keep final AudioParam values identical in the owning lane fix. Timing pending the quiet rerun. [Evidence and reproduction](parity-diagnoses.md)."
+  },
+  "5.8": {
+    "cause": "Sweep L2 (KB6250f): the verdict compares Margo with three-webgl-parity. Rival unsupported on WebGPU: three.js 0.186.1 WebGPURenderer refuses MeshDepthMaterial in the one-call inventory, so that backend has no number for the depth-material scene. [Evidence](parity-diagnoses.md#round-3-rival-unsupported-pairs)",
+    "rivalUnsupported": [
+      {
+        "scene": "p-depth-material",
+        "engine": "three-webgpu-parity",
+        "error": "THREE.NodeBuilder: Material \"MeshDepthMaterial\" is not compatible.",
+        "source": "bp-159-preflight.json, three.js 0.186.1, one call per pair"
+      }
+    ]
+  },
+  "10.14": {
+    "cause": "Sweep L2 (KB6250d): rival unsupported. three.js 0.186.1 USDZLoader throws on the shared USDZ fixture in both backends, so the row has no ratio; Margo parses it to one mesh, 3 vertices, 1 triangle. [Evidence](parity-diagnoses.md#round-3-rival-unsupported-pairs)",
+    "rivalUnsupported": [
+      {
+        "scene": "p-usdz",
+        "engine": "three-webgpu-parity",
+        "error": "TypeError: Cannot read properties of undefined (reading 'isVector3')",
+        "source": "bp-159-preflight.json, three.js 0.186.1, one call per pair"
+      },
+      {
+        "scene": "p-usdz",
+        "engine": "three-webgl-parity",
+        "error": "TypeError: Cannot read properties of undefined (reading 'isVector3')",
+        "source": "bp-159-preflight.json, three.js 0.186.1, one call per pair"
+      }
+    ]
   }
 }
