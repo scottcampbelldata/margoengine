@@ -3,6 +3,7 @@
 // pointBudget of 1,000,000 and with every point drawn.
 import { Engine } from '../../core/dist/index.js';
 import { PointsPlugin, PointCloud } from '../dist/index.js';
+import { waitForPipelines } from '../../../scripts/support/gpu-ready.js';
 
 const errors = [];
 let engine, plugin, cloud;
@@ -32,10 +33,11 @@ async function run(count, floatColors, pointBudget) {
     else colors.set([80, 230, 100], i * 3);
   }
   cloud = plugin.add(new PointCloud({ positions, colors, material: { size: 2 } }));
-  for (let i = 0; i < 3; i++) {
+  // Warm up until every pipeline is compiled and two frames in a row started none, not for a set number of frames.
+  await waitForPipelines(async () => {
     engine.render();
     await engine.gpu.queue.onSubmittedWorkDone();
-  }
+  });
   const wall = [];
   for (let i = 0; i < 9; i++) {
     const start = performance.now();

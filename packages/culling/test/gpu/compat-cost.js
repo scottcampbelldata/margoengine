@@ -5,6 +5,7 @@
 import { Engine, box, PbrMaterial } from '../../../core/dist/index.js';
 import { CulledMeshes } from '../../dist/index.js';
 import { WebGL2Culling } from '../../dist/webgl2.js';
+import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';
 
 const canvas = document.getElementById('a'),
   counts = { draws: 0, triangles: 0 };
@@ -57,11 +58,18 @@ async function run({ n, mode, frames }) {
     e.render({ culling: false });
     await e.gpu.queue.onSubmittedWorkDone();
   };
-  // Pipelines and the layer's compatibility routes load lazily: warm up over animation frames until they are in.
-  for (let i = 0; i < 16; i++) {
-    await frame();
-    await new Promise(requestAnimationFrame);
-  }
+  // Pipelines and the layer's compatibility route load lazily: draw over animation frames until every pipeline is
+  // compiled and, on the WebGL2 layer, CulledMeshes has its route (meshes.ts `route`, set when ./compat.js arrives).
+  await waitForPipelines(
+    async () => {
+      await frame();
+      await new Promise(requestAnimationFrame);
+    },
+    {
+      ready: () => !(culled instanceof CulledMeshes) || !globalThis.__margoCompat || culled.route !== undefined,
+      describe: () => `mode ${mode}, compat route ${culled?.route ? 'loaded' : 'missing'}`,
+    },
+  );
   const stalls0 = e.gpu.stalls ?? 0,
     tiers0 = { ...(e.gpu.dispatches ?? {}) };
   counts.draws = counts.triangles = 0;

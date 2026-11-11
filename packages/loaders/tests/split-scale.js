@@ -3,6 +3,7 @@
 // since loaders follow core's 11,184,810-vertex cap (before toGeometries a mesh past 1,000,000 vertices could not be drawn).
 import { Engine } from '../../core/dist/index.js';
 import { createMeshes } from '../dist/index.js';
+import { waitForPipelines } from '../../../scripts/support/gpu-ready.js';
 
 const errors = [],
   side = 2828;
@@ -53,10 +54,11 @@ async function setup() {
   };
 }
 async function frames() {
-  for (let i = 0; i < 3; i++) {
+  // Warm up until every pipeline is compiled and two frames in a row started none, not for a set number of frames.
+  await waitForPipelines(async () => {
     engine.render();
     await engine.gpu.queue.onSubmittedWorkDone();
-  }
+  });
   const wall = [];
   for (let i = 0; i < 9; i++) {
     const start = performance.now();

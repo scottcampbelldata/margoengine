@@ -18,6 +18,7 @@ import { createServer } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
+import { trackPipelines } from '../../../scripts/support/gpu-ready.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url)),
@@ -119,11 +120,20 @@ const cases = {
           .setPosition([(n % side) - side / 2, 0, Math.floor(n / side) - side / 2]);
       engines.push(engine);
     }
-    for (let i = 0; i < 3; i++)
-      for (const engine of engines) {
-        engine.render({ culling: false });
-        await engine.gpu.queue.onSubmittedWorkDone();
-      }
+    // Draw until every pipeline is compiled and a frame drew both fields in full, not for a set number of frames.
+    const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+    await waitForPipelines(
+      async () => {
+        for (const engine of engines) {
+          engine.render({ culling: false });
+          await engine.gpu.queue.onSubmittedWorkDone();
+        }
+      },
+      {
+        ready: () => engines.every((e) => e.stats.visible === count),
+        describe: () => `visible ${engines.map((e) => e.stats.visible)}`,
+      },
+    );
     for (const canvas of canvases) canvas.style.width = canvas.style.height = '256px';
     const buffers = engines.map((e, k) => (k ? halves : [one]).map((g) => e.geometryBuffers(g)?.instance.size ?? 0));
     return {
@@ -211,6 +221,7 @@ try {
       if (m.type() === 'error') errors.push(m.text());
     });
     if (compat) await page.addInitScript(compatShim);
+    await page.addInitScript(trackPipelines);
     await page.goto(server.resolvedUrls.local[0] + 'core-scale');
     const result = await page.evaluate(`(${run.toString().replace(/^async \w+\(/, 'async function (')})()`);
     await checks[name](result, page);

@@ -339,7 +339,8 @@ window.check={
   for(let i=0;i<fit;i++){w.addChunk((i%side)*2,0,Math.floor(i/side)*2,one());chunks.push(i);}
   await settle(fit);const fitted={...renderer.stats};
   w.addChunk((fit%side)*2,0,Math.floor(fit/side)*2,one());
-  for(let i=0;i<200;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,0));}
+  // Draw until the chunk past the pool has been meshed and waits for pages, flagged (20,000 frames at most).
+  for(let i=0;i<20000&&!(renderer.stats.poolFull&&renderer.stats.pending>0&&!w.dirty.size);i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,0));}
   const over={...renderer.stats};
   // Timestamps where the device has them (native); on the WebGL2 layer, wall time per frame until the GPU is done.
   const gpu=[],cpu=[],wall=[];

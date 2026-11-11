@@ -986,7 +986,13 @@ window.check={
   const mesh=second.createMesh();mesh.setGeometry(box());mesh.setScale([3,3,3]);
   const tracer=VoxelPathTracer.attach(second,{scene:scenes.materials()}),settled=tracer.ready.then(()=>'ready',(e)=>e.code??e.message);
   second.render({delta:0});
-  await new Promise((r)=>setTimeout(r,1000));
+  // Dispose while a program compiles: poll (20 s at most) until one is in flight, by the WebGL2 layer's link status or
+  // the native async pipelines still pending, unless the tracer is already past compiling.
+  const inFlight=()=>[...(second.gpu.linked?.values()??[])].some((p)=>!p.done())||(globalThis.__margoPipelines?.pending??0)>0;
+  for(const until=performance.now()+20000;tracer.status==='compiling'&&!inFlight();){
+   if(performance.now()>until)throw new Error('no program was compiling 20 s after the tracer was attached');
+   await new Promise((r)=>setTimeout(r,5));
+  }
   const statusAtDispose=tracer.status;
   let t0=performance.now();tracer.dispose();const tracerMs=performance.now()-t0;
   t0=performance.now();second.dispose();const engineMs=performance.now()-t0;

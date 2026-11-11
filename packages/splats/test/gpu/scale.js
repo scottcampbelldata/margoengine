@@ -2,6 +2,7 @@
 // degree-3 SH splats a default 128 MiB storage binding holds (699,050), drawn and sorted every frame.
 import { Engine } from '../../../core/dist/index.js';
 import { Splats } from '../../dist/index.js';
+import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';
 
 const errors = [];
 let engine, cloud;
@@ -30,10 +31,11 @@ async function run(count, shCoefficients) {
   }
   cloud?.dispose();
   cloud = Splats.attach(engine, cloudOf(count, shCoefficients));
-  for (let i = 0; i < 3; i++) {
+  // Warm up until every pipeline is compiled and two frames in a row started none, not for a set number of frames.
+  await waitForPipelines(async () => {
     engine.render();
     await engine.gpu.queue.onSubmittedWorkDone();
-  }
+  });
   const wall = [];
   for (let i = 0; i < 9; i++) {
     const start = performance.now();

@@ -78,9 +78,17 @@ try {
         await device.queue.onSubmittedWorkDone();
       }
       const steadyMs = (performance.now() - t1) / frames;
-      await new Promise((r) => setTimeout(r, 200));
-      engine.render({ delta: 1 / 60 });
-      await device.queue.onSubmittedWorkDone();
+      // The GPU time is read back asynchronously: draw until a timestamp sample has arrived (a device with no
+      // timestamp-query has none to wait for), failing after 10 s.
+      const timed = device.features.has('timestamp-query'),
+        deadline = performance.now() + 10000;
+      do {
+        engine.render({ delta: 1 / 60 });
+        await device.queue.onSubmittedWorkDone();
+        if (!timed || stats.gpuElapsedMilliseconds !== null) break;
+        if (performance.now() > deadline) throw new Error('no GPU timestamp sample arrived in 10 s');
+        await new Promise((r) => setTimeout(r, 10));
+      } while (true);
       const gpuMs = stats.gpuElapsedMilliseconds;
       const work = liquid ? { ...liquid.frameStats } : undefined;
       const error = await device.popErrorScope();
