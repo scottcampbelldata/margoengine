@@ -1,7 +1,42 @@
 // Positive classification of GPU leaves, never of aggregators that happen to contain one.
-import { basename } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 
-export function gpuCommand(words) {
+// The repository's browser launchers: a script that loads one (directly or through its own relative imports) opens a
+// real browser on the GPU. Bare playwright imports count too.
+const LAUNCHERS = ['scripts/browser.js', 'scripts/lib/browser.mjs', 'scripts/support/browser-host.mjs'];
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)(['"])([^'"\n]+)\1/g;
+
+/**
+ * Whether the node script at `file` opens a browser: it imports playwright, or one of the repository's launchers,
+ * itself or through relative imports up to `depth` files deep (KB-GL1: browser checks whose names carry no GPU word
+ * were refused by `run`, so helpers ran them outside the slot cap).
+ */
+export function opensBrowser(file, { read = (path) => readFileSync(path, 'utf8'), exists = existsSync, depth = 3 } = {}) {
+  const seen = new Set();
+  const visit = (path, left) => {
+    if (seen.has(path) || !exists(path)) return false;
+    seen.add(path);
+    let text;
+    try {
+      text = read(path);
+    } catch {
+      return false;
+    }
+    for (const [, , spec] of text.matchAll(SPECIFIER)) {
+      if (/^playwright(-core)?($|\/)/.test(spec)) return true;
+      if (!spec.startsWith('.')) continue;
+      const target = resolve(dirname(path), spec),
+        slashed = target.replaceAll('\\', '/');
+      if (LAUNCHERS.some((launcher) => slashed.endsWith('/' + launcher))) return true;
+      if (left > 0 && /\.[cm]?js$/.test(target) && visit(target, left - 1)) return true;
+    }
+    return false;
+  };
+  return visit(resolve(file), depth);
+}
+
+export function gpuCommand(words, { cwd = process.cwd(), opens = opensBrowser } = {}) {
   const program = basename((words[0] ?? '').replaceAll('\\', '/'))
     .replace(/\.(exe|cmd)$/i, '')
     .toLowerCase();
@@ -39,6 +74,7 @@ export function gpuCommand(words) {
       /^(run-readme-examples|gpu-package-tests)\./.test(name)
     )
       return 'gpu';
+    if (/\.[cm]?js$/.test(name) && opens(resolve(cwd, leaf))) return 'gpu';
   }
   return 'unknown';
 }

@@ -258,6 +258,18 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
+### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
+
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=lane-x -- node scripts/csp-check.mjs` exited 2 with
+  `ERR_GPU_COMMAND_NOT_GPU`. Helpers then started such checks directly, and 8 GPU users were seen at once against the
+  5-slot cap.
+- **Cause:** the admission check in `scripts/support/gpu-command.mjs` knew a node script as a GPU leaf only by a GPU
+  word in its file name (gpu, browser, pixel, capture, render, xr). Browser checks named for what they check carry none.
+- **Fix:** a node script that imports `playwright` or one of the repository's browser launchers, itself or through its
+  own relative imports up to three files deep, is a GPU leaf, so `run` admits it and it holds a slot. CPU commands are
+  classified as before. Not chosen: having the browser host take a slot itself, since one slot per lane and children
+  started without the nested marker could deadlock. Regression: tests/gpu-command.test.js.
+
 ### Fixed 2026-11-11: Playwright's headed Chromium and Firefox would not start from a packaged app's redirected %LOCALAPPDATA%
 
 - **Repro:** from a process of an MSIX-packaged app on Windows (the Claude desktop app), start

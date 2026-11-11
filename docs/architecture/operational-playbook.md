@@ -1096,7 +1096,14 @@ Job 6 admission applies to `run` and `enqueue` before any ticket or holder is
 created: CPU aggregators (verify, lint, hygiene, unit tests, builds, tsc and
 shell wrappers) fail with `ERR_GPU_COMMAND_NOT_GPU`. GPU npm leaves
 `test:gpu`, `test:browser`, `test:xr`, `check:readme-run`, and named GPU/browser/
-pixel/capture/render/XR scripts are recognized. An unclassified GPU leaf needs
+pixel/capture/render/XR scripts are recognized, and so is any node script that
+opens a browser: it imports `playwright`, `scripts/browser.js`,
+`scripts/lib/browser.mjs` or `scripts/support/browser-host.mjs`, itself or
+through its own relative imports up to three files deep
+(`opensBrowser` in `scripts/support/gpu-command.mjs`, KB-GL1, 2026-11-11:
+browser checks such as `csp-check.mjs` were refused and ran outside the slot cap;
+`tests/gpu-command.test.js` runs three such scripts on two slots and checks the
+third waits). An unclassified GPU leaf needs
 `--gpu=<reason>`, recorded in `gpu-lock-reasons.log`; that flag cannot override
 a known CPU command. Imported GPU suites keep calling `acquire` themselves.
 
