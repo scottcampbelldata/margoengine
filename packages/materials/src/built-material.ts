@@ -49,6 +49,7 @@ import {
   type TranscodedTexture,
 } from './texture-kinds.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
+import { copyExternal } from '../../shared/copy-external.js';
 import { clipStatement, markClipDistances, sectionShader } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export {
@@ -277,44 +278,6 @@ const dimensions = (s: ImageDimensions): [number, number] => [
   s.videoWidth ?? s.displayWidth ?? s.naturalWidth ?? s.width ?? 0,
   s.videoHeight ?? s.displayHeight ?? s.naturalHeight ?? s.height ?? 0,
 ];
-/** Queues whose browser refused a video as a copyExternalImageToTexture source (Firefox takes only images and canvases). */
-const noVideoCopies = new WeakSet<GPUQueue>();
-const frameCanvases = new WeakMap<object, { canvas: HTMLCanvasElement | OffscreenCanvas; w: number; h: number }>();
-const isVideoSource = (s: unknown): boolean =>
-  !!s && typeof s === 'object' && ('videoWidth' in s || 'displayWidth' in s);
-/**
- * queue.copyExternalImageToTexture. A browser that does not take a video or VideoFrame as the source (Firefox 157 throws
- * a TypeError from WebIDL conversion, not a validation error) gets the frame through a canvas it is drawn on instead:
- * the same pixels, one extra draw per upload. The queue is remembered, so the fallback is chosen once.
- */
-function copyExternal(
-  device: GPUDevice,
-  info: { source: ImageSource | HTMLCanvasElement | OffscreenCanvas; origin?: number[]; flipY?: boolean },
-  destination: { texture: GPUTexture; origin?: number[] },
-  size: number[],
-): void {
-  const queue = device.queue,
-    source = info.source;
-  const video = isVideoSource(source);
-  if (video && !noVideoCopies.has(queue))
-    try {
-      return queue.copyExternalImageToTexture(info as GPUCopyExternalImageSourceInfo, destination, size);
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error;
-      noVideoCopies.add(queue);
-    }
-  if (!video) return queue.copyExternalImageToTexture(info as GPUCopyExternalImageSourceInfo, destination, size);
-  const [w, h] = dimensions(source as ImageDimensions);
-  let frame = frameCanvases.get(source);
-  if (!frame || frame.w !== w || frame.h !== h) {
-    const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    frameCanvases.set(source, (frame = { canvas, w, h }));
-  }
-  (frame.canvas.getContext('2d') as CanvasRenderingContext2D).drawImage(source as CanvasImageSource, 0, 0);
-  queue.copyExternalImageToTexture({ ...info, source: frame.canvas } as GPUCopyExternalImageSourceInfo, destination, size);
-}
 const raw = (s: unknown): s is RawImage =>
   !!s && typeof s === 'object' && 'data' in s && (s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray);
 const gpuTexture = (s: unknown): s is GPUTexture =>

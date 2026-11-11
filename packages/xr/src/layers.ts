@@ -6,6 +6,7 @@
 // the Gamepad spec (vibrationActuator.playEffect 'dual-rumble') and the Gamepad Extensions draft (hapticActuators,
 // pulse(value, duration)).
 import { margoError } from '../../shared/errors.js';
+import { copyExternal } from '../../shared/copy-external.js';
 import type { XRController } from './controller.js';
 import type { XRFrameState, XRInputSource, XRNativeFrame, XRNativeSession, XRSpace } from './types.js';
 
@@ -412,8 +413,10 @@ export class XRLayers {
           } else {
             const { x, y, width, height } = image.viewport,
               size = imageSize(source);
-            host.device.queue.copyExternalImageToTexture(
-              { source: source as GPUCopyExternalImageSource },
+            // A video in a browser that refuses one as the source (Firefox) goes through a canvas.
+            copyExternal(
+              host.device,
+              { source },
               { texture: image.colorTexture, origin: [x, y, base + face] },
               [Math.min(width, size[0]), Math.min(height, size[1])],
             );

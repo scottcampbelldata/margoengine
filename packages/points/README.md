@@ -147,7 +147,7 @@ points.add(new PointCloud({positions: new Float32Array([0, 0, 0]), material: {ma
 points.add(new SpriteBatch({material: {map, mipmaps: true}})).add({position: [1, 0, 0], size: 0.1});
 ```
 
-A `GPUTexture` you pass keeps the mips it has, and they are used. A map with `alphaTest` tests the filtered alpha, so holes in a map soften as a point shrinks. Every upload, including `needsUpdate()` on a video or canvas, makes the chain again.
+A `GPUTexture` you pass keeps the mips it has, and they are used. A map with `alphaTest` tests the filtered alpha, so holes in a map soften as a point shrinks. Every upload, including `needsUpdate()` on a video or canvas, makes the chain again. A browser that takes no video as a copy source (Firefox) gets each frame through a canvas it is drawn on: the same pixels, one extra draw an upload.
 
 ## Selection masks
 

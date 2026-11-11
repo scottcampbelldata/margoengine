@@ -319,3 +319,46 @@ test('a teleport offsets the space so the feet land on the target turned by yaw,
   assert.ok(Math.abs(xr.referenceSpace.offsets.at(-1).position.y) < 1e-12, 'no climb on level ground');
   assert.throws(() => move.teleport([NaN, 0, 0]), /pass a floor point/);
 });
+
+// Bug sweep L3a (Firefox d): Firefox 157's copyExternalImageToTexture takes no video or VideoFrame (a TypeError), so a
+// layer showing a video threw every frame. The frame now goes through a canvas, chosen once per queue.
+test('a video a browser refuses as the copy source (Firefox) reaches the layer through a canvas', () => {
+  const { xr, copies } = host(),
+    drawn = [],
+    Original = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) {
+      Object.assign(this, { width, height, canvas: true });
+    }
+    getContext() {
+      return { drawImage: (source) => drawn.push(source) };
+    }
+  };
+  try {
+    const queue = xr.layerBinding.device.queue,
+      accept = queue.copyExternalImageToTexture;
+    let refused = 0;
+    queue.copyExternalImageToTexture = (info, destination, size) => {
+      if ('videoWidth' in info.source) {
+        refused++;
+        throw new TypeError("'source' member of GPUCopyExternalImageSourceInfo could not be converted");
+      }
+      accept(info, destination, size);
+    };
+    const video = { videoWidth: 64, videoHeight: 32, width: 64, height: 32 },
+      layers = XRLayers.attach(xr);
+    layers.quad({ pixels: [64, 32], size: [1, 0.5], position: [0, 1.6, -1], content: video });
+    xr.step();
+    xr.step();
+    xr.step();
+    assert.equal(refused, 1, 'the queue is asked once');
+    assert.equal(copies.length, 2);
+    for (const [source, origin, size] of copies) {
+      assert.equal(source.canvas, true);
+      assert.deepEqual([source.width, source.height, origin, size], [64, 32, [0, 0, 0], [64, 32]]);
+    }
+    assert.deepEqual(drawn, [video, video], 'every frame draws the current video frame');
+  } finally {
+    globalThis.OffscreenCanvas = Original;
+  }
+});

@@ -80,3 +80,41 @@ test('the shaders pick a level, and the linear sampler can reach it', () => {
   assert.match(code[0], /max\(log2\(max\(dims\.x,dims\.y\)\/\(2\.0\*r\)\),0\.0\)/);
   assert.match(code[1], /dpdx\(i\.uv\)\*dims/);
 });
+
+// Bug sweep L3a (Firefox d): Firefox 157's copyExternalImageToTexture takes no video or VideoFrame (a TypeError), so a
+// points map from a video threw. The frame now goes through a canvas, chosen once per queue.
+test('a video map a browser refuses as the copy source (Firefox) uploads through a canvas', () => {
+  const { plugin, frame, gpu } = rig(),
+    drawn = [],
+    copied = [],
+    Original = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) {
+      Object.assign(this, { width, height, canvas: true });
+    }
+    getContext() {
+      return { drawImage: (source) => drawn.push(source) };
+    }
+  };
+  try {
+    let refused = 0;
+    gpu.device.queue.copyExternalImageToTexture = (info, destination, size) => {
+      if ('videoWidth' in info.source) {
+        refused++;
+        throw new TypeError("'source' member of GPUCopyExternalImageSourceInfo could not be converted");
+      }
+      copied.push([info.source, size]);
+    };
+    const video = { videoWidth: 16, videoHeight: 8 },
+      cloud = plugin.add(new PointCloud({ positions: [0, 0, 0], material: { map: video } }));
+    frame();
+    assert.equal(refused, 1);
+    assert.equal(copied.length, 1);
+    assert.equal(copied[0][0].canvas, true);
+    assert.deepEqual([copied[0][0].width, copied[0][0].height, copied[0][1]], [16, 8, [16, 8]]);
+    assert.deepEqual(drawn, [video]);
+    assert.ok(owned(plugin, cloud.material), 'the map has its texture');
+  } finally {
+    globalThis.OffscreenCanvas = Original;
+  }
+});

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15130868,
+  "total": 15131279,
   "history": [
     {
       "date": "2026-10-24",
@@ -8609,6 +8609,12 @@
       "commit": "bfb492583d",
       "reason": "KB6434c CulledMeshes makes its frame, slot and occlusion buffers inside error scopes and uses each once the device confirms it: culling 14635 to 14797 B and culling/bounds 20401 to 20572 B gzip measured; it runs on the first frame, so a lazy import() would add a request there",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "6ffff14e09",
+      "reason": "xr/layers 3942 to 4353 B measured: Firefox video sources copy through a canvas (shared/copy-external.js); a lazy import would add a request on the first video frame",
+      "grew": 1
     }
   ],
   "items": {
@@ -9949,7 +9955,7 @@
     "@margoengine/xr/device-check": 2344,
     "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,
-    "@margoengine/xr/layers": 3942,
+    "@margoengine/xr/layers": 4353,
     "@margoengine/xr/locomotion": 3390,
     "@margoengine/xr/models": 3208,
     "@margoengine/xr/performance": 1582,

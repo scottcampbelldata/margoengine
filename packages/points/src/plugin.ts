@@ -36,6 +36,7 @@ import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { compatibilityLevel } from '../../shared/compat.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
+import { copyExternal } from '../../shared/copy-external.js';
 import { alphaBlend, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 import { orthographic as orthographicTerms } from '../../shared/projection.js';
 
@@ -636,10 +637,8 @@ export class PointsPlugin implements EnginePlugin {
       if (typeof ImageData !== 'undefined' && source instanceof ImageData)
         device.queue.writeTexture({ texture }, source.data, { bytesPerRow: width * 4 }, [width, height]);
       else
-        device.queue.copyExternalImageToTexture({ source: source as GPUCopyExternalImageSource }, { texture }, [
-          width,
-          height,
-        ]);
+        // A video in a browser that refuses one as the source (Firefox) goes through a canvas (shared/copy-external.js).
+        copyExternal(device, { source }, { texture }, [width, height]);
       generateMipmaps(device, texture, levels, this.mipCache);
       owned = {
         source,

@@ -43,6 +43,10 @@
   count smaller than the row stride` (142 calls of one 2048x12 `RGBA_INTEGER` upload from a 393,216-byte pixel buffer,
   alignment 1, in the lod page) and, in materials, `Tex image TEXTURE_2D level N is incurring lazy initialization`. Cause
   of (3) not found: the same call in a plain page (exact, larger or partly filled buffer, any usage) prints nothing.
+- **Fixed 2026-11-11, video uploads in points and xr:** the canvas fallback materials got for videos Firefox refuses as a
+  copy source is now `packages/shared/copy-external.js`, used by materials, points maps and xr layers. Regression:
+  `packages/points/tests/mipmaps.test.js`, `packages/xr/tests/layers.test.js` (both threw the TypeError on the old
+  source), `tests/shared-copy-external.test.js`.
 - **Fixed 2026-11-11, (1):** Firefox 157's `RENDERER` names the GPU (the same string as the extension, measured in a plain
   page under Playwright), so the layer asks for `WEBGL_debug_renderer_info` only where `RENDERER` is empty or the masked
   `WebKit WebGL` (Chromium, WebKit). Regression: `packages/webgl2-compat/test/capabilities.test.js`, "the unmasked
@@ -55,9 +59,22 @@
   not the layer's alignment. Minimal repro and Mozilla draft (not filed):
   [docs/upstream-reports/KBL3c](upstream-reports/KBL3c/report.md). The layer's buffer uploads stay; whether it uploads
   data textures from memory in Firefox, or the checks accept that exact line, is an open coordinator call.
-- **Next:** (2) the checks assert the deliberate `loseContext()` line exactly once (coordinator call); (3) initialise data
-  textures at creation, and test whether another unpack alignment stops the "final row" advisory, else an upstream
-  report draft. Owner: webgl2-compat (layer) and the two checks.
+- **Done 2026-11-11 (bug sweep L3a), (3) final row, coordinator call:** the checks accept that one exact line on Firefox
+  157 only (`acceptedAdvisory` in `scripts/support/browser-advisories.mjs`); every other line fails, and the layer keeps
+  its pixel-buffer uploads (no CPU copy path). `packages/webgl2-compat/test/pbo-upload-browser.mjs` (in `test:gpu`) runs
+  the KBL3c page and proves every texel exact at unpack alignment 1, 4 and 8. Firefox also capped WebGL warnings at 32 a
+  context ("After reporting 32, no further warnings will be reported"), which hid every later warning: the harness now
+  lifts the cap (`webgl.max-warnings-per-context`, `scripts/lib/browser.mjs`). Regression: `tests/browser-advisories.test.js`,
+  `tests/browser-selection.test.js`.
+- **Done 2026-11-11, (2):** Firefox's "WebGL context was lost." from the layer probe's deliberate `loseContext()` is
+  counted, and the lod and materials checks assert it exactly once on the layer (`watchConsole`,
+  `expectedContextLosses`); any other loss fails. With both, the lod check passes in Firefox on the layer.
+- **Still open, lazy initialisation:** with the cap lifted the imposter and materials checks show what was hidden:
+  "Tex image TEXTURE_2D level N is incurring lazy initialization" (texSubImage and draws, levels 0 to 4), "Texture has
+  not been initialized prior to a partial upload", the imposter check's "getSyncParameter ... called 100 times without
+  SYNC_FLUSH_COMMANDS_BIT", and materials' "Depth texture comparison requests (e.g. `LINEAR`) Filtering". Next:
+  initialise texture levels at creation in the layer, flush before polling a sync, and look at the comparison
+  sampler's filter. Owner: webgl2-compat.
 
 ### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
 
