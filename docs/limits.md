@@ -6941,3 +6941,23 @@ variant). `signedDistance` runs two floods and puts the zero set half a cell fro
 The CPU backend runs the same passes in JavaScript (about 0.5 s for 256^2 with four masks); use the exact transform there.
 Entry size 5187 B min+gzip (ceiling 5443 B); the plan's 3,500 B estimate left out the CPU-backend flood, the exact
 oracle shared with text and the signed and Voronoi code.
+
+## Audio offline spectrograms
+
+`@margoengine/audio/spectrogram` takes frame sizes that are powers of two from 32 to 65536, hops from 1 to the size, and
+refuses a result of more than 134,217,728 spectrum values (frames x bins) per array. Spectra are Float32; the transforms
+run in double precision on the CPU (radix-2, two real frames per complex FFT) and in f32 on the GPU path, which batches
+frames of at most 4,194,304 samples through `compute/fft`. Measured: STFT then ISTFT of 3 s of noise plus a chirp at
+48 kHz (size 2048) has a largest error of 2.98e-8 at hop 512 and 5.96e-8 at hop 1024 (bar 1e-6). GPU against CPU on 2,109,457 samples (4,121 frames): 1.75e-7 of the peak on WebGPU
+and on the WebGL2 layer, round trip through `istft` 1.8e-7. `istft` and `resynthesize` need the summed squared window to be even enough (smallest over largest
+at least 0.1, `overlapRatio`): Hann passes at hop size/4 and size/2 and fails at 3/4. Without centring the first and last
+window-length samples where the window is 0 cannot be recovered. Uses `Math.cos` for twiddles and window values, so the last bits can
+differ between JavaScript engines.
+
+Griffin-Lim (fast variant, random start, 1 s chirp at 48 kHz, 32 iterations), magnitude SNR of the returned signal: size
+2048 hop 256 reaches 21.6 dB with momentum 0.99 and 16.8 dB without; 75 percent overlap reaches 18.0 dB (size 1024 hop 256)
+or 19.0 dB (size 2048 hop 512), so the 20 dB bar needs 87.5 percent overlap or more than 32 iterations. Spectral
+convergence never worsens without momentum (tested); with momentum it can rise for an iteration. Memory is about 7 Float64
+arrays of frames x bins values. The phase vocoder (time stretch, pitch shift) is not built. A Rust/Wasm FFT was not
+built: the paired A/B is a timing run and timing runs wait for the speed phase (docs/work-lists/speed-phase.md); the
+TypeScript FFT does 11,264 butterflies per 2048-point frame and 4,121 frames took 132 ms on a busy machine.

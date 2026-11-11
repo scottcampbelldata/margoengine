@@ -8734,3 +8734,14 @@ Rong and Tan, "Variants of Jump Flooding Algorithm for Computing Discrete Vorono
 https://www.comp.nus.edu.sg/~tants/jfa-variants/jfa-variants.pdf ; Felzenszwalb and Huttenlocher, "Distance Transforms of
 Sampled Functions", Theory of Computing 8 (2012) 415-428 (the exact transform, now in packages/shared/distance-exact.js
 and used by text and compute/distance). Parallel banding (Cao, Tang, Mohamed and Tan, 2010) was considered and not built.
+
+## Audio offline spectrograms (2026-11-10)
+
+Written from the papers only, no other library's code read: J. B. Allen and L. R. Rabiner, "A Unified Approach to Short-Time
+Fourier Analysis and Synthesis", Proc. IEEE 65(11), 1977 (framing, weighted overlap-add); F. J. Harris, "On the Use of Windows for
+Harmonic Analysis with the Discrete Fourier Transform", Proc. IEEE 66(1), 1978 (windows); D. W. Griffin and J. S. Lim, "Signal
+Estimation from Modified Short-Time Fourier Transform", IEEE Trans. Acoust. Speech Signal Process. 32(2), 1984; N. Perraudin,
+P. Balazs and P. L. Sondergaard, "A Fast Griffin-Lim Algorithm", WASPAA 2013, https://arxiv.org/abs/1312.7547 ; J. W. Cooley and
+J. W. Tukey, "An Algorithm for the Machine Calculation of Complex Fourier Series", Math. Comput. 19(90), 1965. The two-for-one
+real transform is the standard identity for packing two real signals into one complex FFT. Laroche and Dolson (1999) phase
+vocoder time stretch and pitch shift were considered and not built.

@@ -4157,3 +4157,7 @@ Build packages, then `node scripts/gpu-lock.mjs run --owner=weather-lens -- node
 Compute distance fields: `npm run build:packages`, then `node --test packages/compute/tests/distance.test.js` (CPU) and
 `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/distance-browser.mjs` (WebGPU, then the WebGL2
 layer); the second prints the error-rate table quoted in docs/limits.md.
+
+Audio spectrograms: `npm run build:packages`, then `node --test packages/audio/tests/spectrogram.test.js` (CPU, includes the
+Griffin-Lim run, which prints the two SNR figures) and `node scripts/gpu-lock.mjs run --owner=<you> -- node
+packages/audio/tests/spectrogram-browser.mjs` (the GPU path on WebGPU, then the WebGL2 layer).

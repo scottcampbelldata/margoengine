@@ -4876,3 +4876,13 @@ flooding. Claim: with the default `jfa+1` pass list, at most 0.0024 percent of c
 backend. Proof: `packages/compute/tests/distance.test.js` (exact transform equal to brute force on 200 masks, CPU backend
 error rates) and `packages/compute/tests/distance-browser.mjs` (both GPU backends against the exact transform). No speed
 claim is made; the timing case is deferred to the speed phase.
+
+### Audio offline spectrogram, inverse and Griffin-Lim resynthesis
+
+`@margoengine/audio/spectrogram` computes the short-time Fourier transform of a whole sample array, inverts it by weighted
+overlap-add and estimates a signal from a magnitude spectrogram. Claims: STFT then ISTFT of 3 s of noise plus a chirp (Hann,
+size 2048) is exact to 6e-8 at hop size/4 and size/2; a hop of 3/4 of the size is refused with a coded error; a 1 kHz tone at
+48 kHz peaks in bin round(1000 x size / 48000); fast Griffin-Lim with momentum 0.99 reaches 21.6 dB magnitude SNR on a chirp in
+32 iterations at 87.5 percent overlap (16.8 dB without momentum; 18 to 19 dB at 75 percent overlap); the GPU path agrees with
+the CPU path to 1.75e-7 of the peak on WebGPU and the WebGL2 layer. Proof: `packages/audio/tests/spectrogram.test.js` and
+`packages/audio/tests/spectrogram-browser.mjs`. No speed claim.

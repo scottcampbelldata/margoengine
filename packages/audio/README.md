@@ -505,3 +505,47 @@ decoding/resampling and matrix output, not a microphone chain or recording prove
 Listening quality, other browsers/devices and performance remain unmeasured.
 
 Batch 110 PCM proofs use real browser Web Audio offline rendering, without output-device PCM or listening measurements. Live Doppler regressions use real AudioContext nodes/state changes with controlled 60 Hz frame times and a 10.667 ms quantized audio clock. Long-loop markers at 130 bpm cover one hour at 8 kHz and five minutes each at 44.1/48 kHz; loop endpoints keep fractional sample positions rather than accumulating sample-rounding drift. Other browsers/devices remain unmeasured.
+
+## Offline spectrograms
+
+`@margoengine/audio/spectrogram` analyses a whole array of samples, not the live frames an `AnalyserNode` gives. `stft`
+cuts it into windowed frames (Hann by default; also Hamming, Blackman, 4-term Blackman-Harris, Kaiser by `beta`, or
+your own coefficients from `windows`) and returns `real` and `imag` arrays of `frames x (size / 2 + 1)` bins. `istft`
+puts the frames back by weighted overlap-add (Allen and Rabiner 1977, with the window-squared normaliser), and
+`spectrogram` turns a spectrum into an image of bytes (or colours) for a texture. `resynthesize` estimates a signal
+from a magnitude spectrogram, which is how an edited or painted spectrogram becomes sound, by the fast Griffin-Lim
+algorithm (Griffin and Lim 1984; Perraudin, Balazs and Sondergaard 2013).
+
+- Sizes are powers of two from 32 to 65536 (default 2048); `hop` runs from 1 to `size` (default `size / 4`). Frame k is
+  centred on sample `k * hop` by default (`center: true`, reflect padding; `pad: 'zero'` and `'edge'` also work).
+- `istft` and `resynthesize` throw a coded `state` error when the window and hop do not overlap-add evenly: the smallest
+  over the largest summed squared window (`overlapRatio`) must be at least 0.1. Hann at hop `size / 4` gives 1, at
+  `size / 2` gives 0.5 and at 3/4 of `size` gives 0.04.
+- `resynthesize(target, { iterations: 32, momentum: 0.99, init: 'random' })` returns `samples`, the spectral
+  `convergence` after each iteration and the number of frame FFTs it ran. Momentum 0 is the original algorithm.
+- `stft(samples, { gpu })` (a compute context from `@margoengine/compute`, which loads then) transforms frames in
+  batches on the GPU and returns a promise; it agrees with the CPU path to 2e-7 of the peak. Pass an `AbortSignal` as
+  `signal` to stop between frames.
+
+```ts
+import { istft, resynthesize, spectrogram, stft } from '@margoengine/audio/spectrogram';
+
+// One second of a rising chirp, as a loaded file's channel data would be.
+const rate = 48000;
+const samples = Float32Array.from({ length: rate }, (_, i) => {
+  const t = i / rate;
+  return 0.8 * Math.sin(2 * Math.PI * (300 * t + 1500 * t * t));
+});
+const spec = stft(samples, { sampleRate: rate, size: 2048 });
+const image = spectrogram(spec, { colormap: 'heat', range: [-80, 0], origin: 'high' });
+// image.data is RGBA bytes, image.width x image.height: write it to an rgba8unorm texture with
+// device.queue.writeTexture({ texture }, image.data, { bytesPerRow: image.width * 4 }, [image.width, image.height]).
+const same = istft(spec); // the samples again, within 1e-6
+// Keep only the magnitudes, as a painted spectrogram would, and get a signal back.
+const magnitude = Float32Array.from(spec.real, (re, i) => Math.hypot(re, spec.imag[i]));
+const { samples: estimate, convergence } = resynthesize(
+  { magnitude, frames: spec.frames, size: 2048, hop: spec.hop, length: samples.length },
+  { iterations: 16 },
+);
+console.log(image.width, image.height, same.length, estimate.length, convergence.at(-1) < convergence[0]);
+```

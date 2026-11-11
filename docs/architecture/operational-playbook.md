@@ -7518,3 +7518,11 @@ workgroups, integer squared distances, ties to the lower index) with no core, st
 rates against the exact separable transform on WebGPU and the WebGL2 layer, nearest-seed buffers bit-identical to the CPU
 backend, 200 brute-force oracle masks (docs/limits.md, "Compute distance fields"). Missing: quiet-machine GPU timings
 (docs/work-lists/speed-phase.md) and the follow-up consumers (coast foam, outline widening).
+
+### 5. Audio offline spectrograms (2026-11-10)
+
+The optional audio/spectrogram entry is CPU code (radix-2 FFT in double precision, two real frames per transform) with a
+GPU path that loads compute/fft lazily and batches frames; no core, stage or backend change. Evidence: windows against Harris's
+formulas, FFT against a direct DFT, Parseval, round trip within 6e-8, Griffin-Lim SNR and convergence, GPU against CPU on both
+backends (docs/limits.md, "Audio offline spectrograms"). Missing: the Rust/Wasm FFT A/B and quiet-machine timings
+(docs/work-lists/speed-phase.md), the phase vocoder.

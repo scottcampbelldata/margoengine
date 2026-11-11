@@ -522,3 +522,18 @@ was 214 ms before the range kernels left the JavaScript compute tier. The WebGL2
   neighbour reads per cell per pass, two 64 MiB buffers, no readback. Target: each field under 16 ms of GPU time on the
   RTX A6000. Busy-machine diagnostic 2026-11-10: 11.9 ms for 4096^2 (16 timed passes), 20.6 ms for 256^3 (12 timed
   passes); the WebGL2 layer has no timestamps, time it by wall clock on the quiet machine.
+
+- Audio spectrogram scale cases: (1) the plan's Rust/Wasm FFT A/B: TypeScript radix-2 (two real frames per complex FFT,
+  11,264 butterflies per 2048-point frame) against a crate `audio-stft` (one .wasm, lazy `new URL(..., import.meta.url)`, SIMD),
+  paired and interleaved in one process over 2^21 samples at size 2048, hop 512 (4,121 frames, 46.4 million butterflies), per-round
+  minimums, identical output within 1e-6; keep Wasm only if it wins by more than the round spread. Not built in the build phase
+  (timing run). Busy-machine diagnostic 2026-11-10: TypeScript 132 ms. (2) GPU path: the same 2^21-sample file through
+  `stft(x, { gpu })`, two frame batches, with GPU timestamps natively; busy-machine wall time 146 ms native and 1,653 ms on the
+  WebGL2 layer, a speed bug to diagnose before release (compute emulation of the Stockham passes).
+
+- 60+ fps rule (Scott 2026-11-10) for the two compute/audio entries above: neither adds work to a steady frame (no draws, no
+  buffer writes, no bind groups, no allocations on the normal path; they run only when called). compute/distance default
+  scale: a 1024 x 1024 mask is 11 submitted passes in one command buffer (two u32 buffers, one 32 B uniform per pass, no
+  readback); target under 16.7 ms GPU on the A6000 and the mid laptop iGPU (Radeon 680M), so it can run every frame at that
+  size; 4096^2 and 256^3 are one-shot sizes with the targets above. Unmeasured on the iGPU. audio/spectrogram is offline:
+  the GPU path's WebGL2-layer time (1.7 s for 4,121 frames, busy machine) is a speed bug to diagnose before release.

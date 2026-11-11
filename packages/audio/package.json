@@ -28,6 +28,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:browser:listener-disposal": "node tests/listener-disposal-browser.mjs",
+    "test:browser:spectrogram": "cd ../.. && node packages/audio/tests/spectrogram-browser.mjs",
     "prepack": "npm run build"
   },
   "sideEffects": false,
@@ -75,6 +76,10 @@
     "./sprites": {
       "types": "./dist/sprites.d.ts",
       "import": "./dist/sprites.js"
+    },
+    "./spectrogram": {
+      "types": "./dist/spectrogram.d.ts",
+      "import": "./dist/spectrogram.js"
     }
   },
   "files": [
@@ -84,13 +89,17 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
-    "@margoengine/mixer": "^1.0.0"
+    "@margoengine/mixer": "^1.0.0",
+    "@margoengine/compute": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {
       "optional": true
     },
     "@margoengine/mixer": {
+      "optional": true
+    },
+    "@margoengine/compute": {
       "optional": true
     }
   }
