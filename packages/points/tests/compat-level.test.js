@@ -136,3 +136,77 @@ test('the eye-dome depth of the compatibility level is a second pass of the same
   const draws = log.filter((e) => e[0] === 'pass.draw').map((e) => e.slice(1, 5).join());
   assert.equal(draws[0], draws[1], 'the same points in both passes');
 });
+
+// Bug sweep L3a (red main after 34f9772d2a): on the WebGL2 layer's half-float tier the r32float front depth is stored as
+// r16float, whose rounding moved the blend window and changed 1.2% of the 4x surfel image. Below its full tier the layer
+// now takes the packed front depth (exact in rgba8unorm) and keeps the rgba16float sums the tier stores unchanged.
+function layer(plugin, tier, samples = 4) {
+  const gpu = mockGPU(),
+    camera = new Camera({ position: [0, 0, 8], target: [0, 0, 0] }),
+    view = gpu.device.createTexture({ size: [64, 64], format: 'rgba8unorm' }).createView();
+  gpu.device.features = new Set(['core-features-and-limits']);
+  gpu.device.adapterInfo = { vendor: 'margo-webgl2' };
+  gpu.device.adapter = { capabilities: { tier } };
+  camera.update(1, true);
+  gpu.record(() => plugin.setup({ backend: 'webgpu', gpu: gpu.device }));
+  plugin.add(new PointCloud({ positions: [0, 0, 0, 1, 1, 0, -1, 0, 1] }));
+  const run = passes(plugin);
+  return gpu.record(() =>
+    run({
+      backend: 'webgpu',
+      device: gpu.device,
+      encoder: gpu.encoder,
+      camera,
+      width: 64,
+      height: 64,
+      format: 'rgba8unorm',
+      color: view,
+      depth: view,
+      descriptor: { depthStencil: { format: 'depth24plus' }, multisample: { count: samples } },
+    }),
+  );
+}
+
+for (const samples of [1, 4]) {
+  test(`surfels at ${samples}x on the layer's half-float tier pack the front depth and keep rgba16float sums`, () => {
+    const log = layer(new SurfelPlugin(), 'half-float', samples);
+    assert.deepEqual(
+      textures(log)
+        .filter((t) => t.sampleCount === samples)
+        .map((t) => t.format),
+      ['rgba8unorm', 'rgba16float'],
+    );
+    const [depth, blend] = surfelPipelines(log);
+    assert.deepEqual(depth.fragment.targets.map((t) => t.format), ['rgba8unorm']);
+    assert.deepEqual(blend.fragment.targets.map((t) => t.format), ['rgba16float']);
+    const shaders = code(log).join();
+    assert.match(shaders, /packDepth\(-dot\(i\.world,frame\.back\.xyz\)\)/);
+    assert.match(shaders, /unpackDepth\(textureLoad\(front,vec2i\(i\.clip\.xy\),0\)\)/);
+    assert.match(shaders, /->@location\(0\) vec4f\{\n  if\(cut\(i\)\)\{discard;\}\n  let behind/, 'one rgba16float sum');
+    const clear = log.find((e) => e[0] === 'beginRenderPass')[1].colorAttachments[0].clearValue,
+      bytes = Uint8Array.from([clear.r, clear.g, clear.b, clear.a], (v) => Math.round(Math.fround(v) * 255));
+    assert.equal(new Float32Array(bytes.buffer)[0], Math.fround(3e38));
+    assert.deepEqual(masks(log), [], 'the layer has sample_index: one resolve');
+    assert.equal(log.filter((e) => e[0] === 'pass.draw' && e[1] === 3).length, 1);
+  });
+}
+
+test("surfels on the layer's full tier keep the r32float front depth", () => {
+  const log = layer(new SurfelPlugin(), 'full');
+  assert.deepEqual(
+    textures(log)
+      .filter((t) => t.sampleCount === 4)
+      .map((t) => t.format),
+    ['r32float', 'rgba16float'],
+  );
+});
+
+test("surfels refuse the layer's ldr tier, which would clamp their weight sums at 1", () => {
+  assert.throws(
+    () => layer(new SurfelPlugin(), 'ldr'),
+    (error) =>
+      error.name === 'MargoError' &&
+      error.code === 'unsupported' &&
+      /SurfelPlugin weighted sums requires the half-float compatibility tier; this device is ldr/.test(error.message),
+  );
+});

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15126779,
+  "total": 15127576,
   "history": [
     {
       "date": "2026-10-24",
@@ -8579,6 +8579,12 @@
       "commit": "ce781b6670",
       "reason": "post/ssao: SSAO and GTAO read an r32float view depth target, and the extractor edge rule takes a side that exists (KB1900); @margoengine/post/ssao 9,904 -> 10,103 B. The bytes are the new binding, the target and the derivative rule; a split would add a second module load for one shader input.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "746ee1ba68",
+      "reason": "bug sweep L3a: points/surfels 16742 to 17028 B; the half-float tier packs the surfel front depth (shader variant key) and the LDR tier is refused with a coded error (requireCompatTier and the shared errors module); a split would need a second entry for one tier check",
+      "grew": 1
     }
   ],
   "items": {
@@ -9278,7 +9284,7 @@
     "@margoengine/points/octree": 10704,
     "@margoengine/points/pick": 6024,
     "@margoengine/points/potree": 17694,
-    "@margoengine/points/surfels": 16742,
+    "@margoengine/points/surfels": 17539,
     "@margoengine/post": 43641,
     "@margoengine/post/afterimage": 6079,
     "@margoengine/post/anamorphic": 6742,

@@ -14,7 +14,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { alphaBlend } from '../../shared/pass.js';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
-import { compatibilityLevel } from '../../shared/compat.js';
+import { compatibilityLevel, compatTier, requireCompatTier } from '../../shared/compat.js';
 import { PointCloud } from './cloud.js';
 import { checkStorage } from './storage-limit.js';
 import { fillFrame } from './frame.js';
@@ -40,11 +40,12 @@ const NORMALS = 512,
   );
 
 /**
- * The surfel shader; `packed` for the compatibility level at 4x, where the front depth goes out as the four bytes of its
- * float (exact, as no blend touches it) and the sums as two rg16float targets, (r, g) and (b, weight): the same half
- * floats the full level adds in rgba16float.
+ * The surfel shader. `packed`: the front depth goes out as the four bytes of its float into rgba8unorm (exact, as no
+ * blend touches it), for the compatibility level at 4x and for the WebGL2 layer below its full tier. `split`: the sums go
+ * out as two rg16float targets, (r, g) and (b, weight), for the compatibility level at 4x: the same half floats the full
+ * level adds in rgba16float.
  */
-const surfelCode = (packed: boolean): string =>
+const surfelCode = (packed: boolean, split = packed): string =>
   frameWgsl +
   (packed ? depthPacking : '') +
   fogWgsl(3, 0) +
@@ -117,16 +118,25 @@ fn cut(i:VOut)->bool{
   if(cut(i)){discard;}
   return ${packed ? 'packDepth(-dot(i.world,frame.back.xyz))' : '-dot(i.world,frame.back.xyz)'};
 }
-${packed ? 'struct Sums{@location(0) rg:vec4f,@location(1) ba:vec4f}' : ''}
-@fragment fn fragmentBlend(i:VOut)->${packed ? 'Sums' : '@location(0) vec4f'}{
+${split ? 'struct Sums{@location(0) rg:vec4f,@location(1) ba:vec4f}' : ''}
+@fragment fn fragmentBlend(i:VOut)->${split ? 'Sums' : '@location(0) vec4f'}{
   if(cut(i)){discard;}
   let behind=max(-dot(i.world,frame.back.xyz)-${packed ? 'unpackDepth(textureLoad(front,vec2i(i.clip.xy),0))' : 'textureLoad(front,vec2i(i.clip.xy),0).r'},0.0);
   // Falls to about 0.14 at the rim, and to nothing at the far end of the blend window.
   let w=exp(-2.0*dot(i.quad,i.quad))*(1.0-smoothstep(0.0,max(i.reach,1e-20),behind))*i.color.a;
   let c=i.color.rgb*w;
-  return ${packed ? 'Sums(vec4f(c.rg,0.0,0.0),vec4f(c.b,w,0.0,0.0))' : 'vec4f(c,w)'};
+  return ${split ? 'Sums(vec4f(c.rg,0.0,0.0),vec4f(c.b,w,0.0,0.0))' : 'vec4f(c,w)'};
 }
 `;
+
+/**
+ * Whether the WebGL2 layer rounds this device's r32float targets: below its full tier it stores them as r16float, whose
+ * rounding of the front depth (about 0.004 at a depth of 4) moves the blend window and so the weights of nearby discs.
+ */
+function roundsFloatTargets(device: GPUDevice): boolean {
+  const tier = (device as { adapter?: { capabilities?: { tier?: string } } }).adapter?.capabilities?.tier;
+  return compatTier(device) === 'webgl2' && tier !== 'full';
+}
 
 /** Surfel shader: one disc per point, read from the same storage buffers as the point shader. */
 export const surfelShader: string = surfelCode(false);
@@ -191,8 +201,10 @@ interface Targets {
   width: number;
   height: number;
   samples: number;
-  /** The compatibility level at 4x: front depth packed into rgba8unorm, sums in two rg16float targets. */
+  /** The compatibility level at 4x: sums in two rg16float targets, resolved by a masked draw per sample. */
   split: boolean;
+  /** Front depth packed into rgba8unorm: when `split`, and on the WebGL2 layer below its full tier. */
+  packed: boolean;
   textures: GPUTexture[];
   frontView: GPUTextureView;
   /** The sum targets: one rgba16float, or rg16float (r, g) and rg16float (b, weight). */
@@ -303,6 +315,8 @@ export class SurfelPlugin implements EnginePlugin {
 
   setup(engine: Engine): void {
     requireWebGPU(engine, 'SurfelPlugin');
+    // The sums need float targets: the layer's ldr tier would store them in 8 bits, clamping every weight sum at 1.
+    requireCompatTier(engine.gpu, 'SurfelPlugin weighted sums', 'half-float');
     this.engine = engine;
     const device = (this.device = engine.gpu),
       VF = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
@@ -477,7 +491,8 @@ export class SurfelPlugin implements EnginePlugin {
     if (old && old.width === width && old.height === height && old.samples === samples) return old;
     const device = this.device!,
       // The level multisamples neither r32float nor rgba16float, but does rgba8unorm and rg16float.
-      split = samples > 1 && compatibilityLevel(device);
+      split = samples > 1 && compatibilityLevel(device),
+      packed = split || roundsFloatTargets(device);
     this.releaseTargets();
     const layout = this.textureLayout(samples),
       make = (format: GPUTextureFormat) =>
@@ -487,9 +502,10 @@ export class SurfelPlugin implements EnginePlugin {
           format,
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         }),
-      textures = split
-        ? [make('rgba8unorm'), make('rg16float'), make('rg16float')]
-        : [make('r32float'), make('rgba16float')],
+      textures = [
+        make(packed ? 'rgba8unorm' : 'r32float'),
+        ...(split ? [make('rg16float'), make('rg16float')] : [make('rgba16float')]),
+      ],
       [frontView, ...sumsViews] = textures.map((texture) => texture.createView()),
       group = (views: GPUTextureView[], target = layout) =>
         device.createBindGroup({
@@ -502,6 +518,7 @@ export class SurfelPlugin implements EnginePlugin {
       height,
       samples,
       split,
+      packed,
       textures,
       frontView,
       sumsViews,
@@ -513,9 +530,9 @@ export class SurfelPlugin implements EnginePlugin {
 
   /** The depth, blend and resolve pipelines of one target setup; at the level, one resolve per sample. */
   private passes(context: GpuContext, targets: Targets): [GPURenderPipeline, GPURenderPipeline, GPURenderPipeline[]] {
-    const { samples, split } = targets,
+    const { samples, split, packed } = targets,
       depthFormat = context.descriptor.depthStencil!.format,
-      key = `${samples}|${+split}|${context.format}|${depthFormat}`,
+      key = `${samples}|${+split}|${+packed}|${context.format}|${depthFormat}`,
       found = this.resolves.get(key);
     if (found) return [this.pipelines.get(`d${key}`)!, this.pipelines.get(`b${key}`)!, found];
     const device = this.device!,
@@ -525,10 +542,8 @@ export class SurfelPlugin implements EnginePlugin {
       }),
       multisample = context.descriptor.multisample,
       splatModule =
-        samples > 1
-          ? device.createShaderModule({
-              code: multisampled(split ? surfelCode(true) : surfelShader, samples, false),
-            })
+        samples > 1 || packed
+          ? device.createShaderModule({ code: multisampled(surfelCode(packed, split), samples, false) })
           : gpu.module,
       splat = (
         vertex: string,
@@ -544,7 +559,7 @@ export class SurfelPlugin implements EnginePlugin {
           multisample,
           depthStencil: { format: depthFormat, depthWriteEnabled, depthCompare: 'greater-equal' },
         }),
-      depth = splat('vertexDepth', 'fragmentDepth', [{ format: split ? 'rgba8unorm' : 'r32float' }], true),
+      depth = splat('vertexDepth', 'fragmentDepth', [{ format: packed ? 'rgba8unorm' : 'r32float' }], true),
       add: GPUBlendComponent = { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
       sum = (format: GPUTextureFormat): GPUColorTargetState => ({ format, blend: { color: add, alpha: add } }),
       blend = splat(
@@ -694,7 +709,7 @@ export class SurfelPlugin implements EnginePlugin {
           view: targets.frontView,
           loadOp: 'clear',
           storeOp: 'store',
-          clearValue: targets.split ? NOTHING_PACKED : { r: NOTHING, g: 0, b: 0, a: 0 },
+          clearValue: targets.packed ? NOTHING_PACKED : { r: NOTHING, g: 0, b: 0, a: 0 },
         },
       ],
       depthStencilAttachment: sceneDepth,

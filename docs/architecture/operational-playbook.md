@@ -1785,7 +1785,9 @@ frame within 2 of 255. Sky fog, the VolumetricFog composite and water spray also
 sample index and a one-sample mask (`perSample` in `packages/shared/msaa.js`, 2026-11-11), proved by the adapter check's
 4x cases and its fogged frame. Surfels at 4x (2026-11-11) pack their front depth into rgba8unorm and add their sums in
 two rg16float targets (r, g and b, weight: the full level's half floats), resolved by a masked draw per sample; the
-adapter check's surfel frame is within 4 of 255 of the full level's. A lone Bloom at 4x and the float-target test
+adapter check's surfel frame is within 4 of 255 of the full level's. On the WebGL2 layer below its full tier surfels pack
+the front depth the same way (that tier stores r32float as r16float) and refuse LDR; the tier check's half-float surfel
+frame equals the full tier's. A lone Bloom at 4x and the float-target test
 (`linearHdr`) were fixed the same day (known-bugs.md).
 
 `@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
