@@ -556,7 +556,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 ## Limits
 
 - Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
-- One cloud's positions must fit one storage binding: `maxStorageBufferBindingSize / 12` points (about 11 million at the default 128 MiB limit). Split bigger clouds into several `PointCloud`s.
+- Each per-point buffer of a cloud must fit one storage binding, so the widest bounds it: 12-byte positions (and surfel normals) give `maxStorageBufferBindingSize / 12` points (11,184,810 at the default 128 MiB limit); `colorFormat: 'float'` colours take 16 bytes, so 8,388,608. A bigger cloud throws a `RangeError` naming its ceiling before any buffer is made. Split bigger clouds into several `PointCloud`s, or keep RGBA8 colours.
 - `points.pick` is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it. `PointPicking` does both on the GPU, but answers later, through a promise.
 - Block bounds only grow on updates; call `rebuild()` to tighten them or to include points that turned finite. Non-finite points are never drawn. A `reorder`ed cloud cannot be rebuilt.
 - Per-point colors are stored as RGBA8 by default, so HDR vertex colors are clamped to 0..1; `colorFormat: 'float'` keeps them, at four times the color memory. A float color must be finite and 0 or more.

@@ -17,6 +17,7 @@ import { applyView, viewSize } from '../../shared/view-rect.js';
 import { compatibilityLevel } from '../../shared/compat.js';
 import { MargoError } from '@margoengine/math/errors';
 import { PointCloud } from './cloud.js';
+import { checkStorage } from './storage-limit.js';
 import { fillFrame } from './frame.js';
 import { allocateBudget, boxInFrustum, mergeRanges, screenArea, worldBox } from './math.js';
 import { FLAG, FRAME_BYTES, frameWgsl, pointColorWgsl } from './shaders.js';
@@ -339,12 +340,8 @@ export class SurfelPlugin implements EnginePlugin {
     if (r) this.release(cloud);
     const device = this.device!,
       gpu = this.gpu!,
-      n = cloud.count,
-      limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
-    if (n * 12 > limit)
-      throw new RangeError(
-        `Point cloud of ${n} points exceeds the device storage limit of ${Math.floor(limit / 12)} points; split it into several clouds.`,
-      );
+      n = cloud.count;
+    checkStorage(cloud, device.limits, cloud.normals ? 12 : 0);
     const upload = (data: ArrayBufferView | null | undefined, bytes: number): GPUBuffer | null => {
         if (!data) return null;
         const buffer = device.createBuffer({

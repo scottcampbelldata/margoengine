@@ -4,6 +4,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { PointCloud } from './cloud.js';
+import { checkStorage } from './storage-limit.js';
 import { fillFrame } from './frame.js';
 import { SpriteBatch, SPRITE_STRIDE } from './sprites.js';
 import type { PointsMaterial, SpriteMaterial, PointsTextureSource } from './material.js';
@@ -661,12 +662,8 @@ export class PointsPlugin implements EnginePlugin {
     let r = this.cloudGpu.get(cloud);
     if (r && r.structure === cloud.structure) return r;
     if (r) this.releaseCloud(cloud);
-    const device = this.device!,
-      limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
-    if (cloud.count * 12 > limit)
-      throw new RangeError(
-        `Point cloud of ${cloud.count} points exceeds the device storage limit of ${Math.floor(limit / 12)} points; split it into several clouds.`,
-      );
+    const device = this.device!;
+    checkStorage(cloud, device.limits, 0);
     const created: GPUBuffer[] = [];
     const make = (size: number, usage: number) => {
       const b = device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage });
@@ -1600,3 +1597,4 @@ export class PointsPlugin implements EnginePlugin {
     }
   };
 }
+
