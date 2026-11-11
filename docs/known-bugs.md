@@ -12,6 +12,23 @@
   the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
 
+### Firefox prints WebGL advisory warnings that the lod and materials browser checks count as errors (found 2026-11-11, open)
+
+- **Repro:** `MARGO_BROWSER=firefox node packages/lod/test/browser-check.mjs --compat` and
+  `MARGO_BROWSER=firefox node packages/materials/test/browser-check.mjs --compat` (Firefox 157, RTX A6000, WebGL2
+  layer): the pages draw correctly (every `ok` line passes) but the checks end on `assert.deepEqual(pageErrors, [])`
+  because they collect every console `warning`. Native WebGPU runs of both pass, and so do gltf-pro, postfx, lines and
+  points on the layer.
+- **What Firefox prints:** (1) `WEBGL_debug_renderer_info is deprecated ... Please use RENDERER`: the layer reads the
+  extension for the GPU name (`webgl2Capabilities`, reports and driver workarounds); Firefox's `RENDERER` answers the masked
+  `WebKit WebGL` here, so the advice does not give the same string. (2) `WebGL context was lost.`: the probe and
+  `device.destroy()` call `loseContext()` on purpose. (3) `texSubImage: Uploads from a buffer with a final row with a byte
+  count smaller than the row stride` (142 calls of one 2048x12 `RGBA_INTEGER` upload from a 393,216-byte pixel buffer,
+  alignment 1, in the lod page) and, in materials, `Tex image TEXTURE_2D level N is incurring lazy initialization`. Cause
+  of (3) not found: the same call in a plain page (exact, larger or partly filled buffer, any usage) prints nothing.
+- **Next:** decide whether the checks ignore Firefox's own advisory warnings (a test change, so not made here) or the layer
+  stops causing them; (3) needs a smaller repro first. Owner: webgl2-compat (layer) and the two checks.
+
 ### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
 
 - **Repro:** `MARGO_BROWSER=firefox node packages/voxel-pathtracer/tests/browser-check.mjs --compat --report=compat
@@ -260,6 +277,16 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `@margoengine/react` separate roughness map (`test/roughness-feature.test.js`). `packages/biomes/src/gpu.ts`,
   `packages/shader/src/compute.ts`, `packages/shared/frame-resources.js` and `packages/environment/src/environment.ts`
   already kept one reaction per device; `@margoengine/procedural` bakes hold only a `WeakRef` to their controller.
+
+### Fixed 2026-11-11: a video texture threw in Firefox (copyExternalImageToTexture refuses video sources)
+
+- **Repro:** `MARGO_BROWSER=firefox node packages/materials/test/browser-check.mjs` (WebGPU, Firefox 157): the `video`
+  scenario threw `GPUQueue.copyExternalImageToTexture: 'source' member of GPUCopyExternalImageSourceInfo could not be
+  converted to any of: ImageBitmap, HTMLImageElement, HTMLCanvasElement, OffscreenCanvas`.
+- **Cause:** Firefox's `copyExternalImageToTexture` takes no `HTMLVideoElement` or `VideoFrame`, which the spec and
+  `ImageSource` allow. **Fix:** materials copies the frame through a canvas when the queue throws that TypeError, once per
+  queue. Regression: packages/materials/test/texture-region.test.js. Other packages that pass a video to
+  `copyExternalImageToTexture` (points, voxel, xr, video) are not checked in Firefox yet.
 
 ### Fixed 2026-11-11: README examples stalled behind the previous example's shader compiles in a shared browser
 

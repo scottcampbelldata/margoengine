@@ -468,6 +468,8 @@ engine.onFrame(() => play(performance.now() / 1000));
 current source, in its top-left pixel coordinates, to the rows the full upload would use: `flipY` (default true)
 flips external sources, while raw data and ImageData rows are never flipped, exactly as in the full upload. The
 colour space and texture are unchanged. Rectangles updated between two frames upload as their bounding rectangle.
+A browser that refuses a video or `VideoFrame` as an upload source (Firefox) gets each frame through a canvas instead, with
+the same pixels and one extra draw per upload; nothing in your code changes.
 Without mipmaps nothing else runs; with mipmaps the whole chain regenerates on the GPU (one draw per level).
 
 ```ts

@@ -101,3 +101,49 @@ test('regions between uses merge, a full update supersedes them, and bounds are 
   assert.throws(() => texture.update(null), TypeError);
   assert.throws(() => texture.update(4), TypeError);
 });
+
+test('a video the browser refuses as an upload source (Firefox: TypeError) is copied through a canvas, whole and by region', () => {
+  const d = device(),
+    drawn = [],
+    OriginalCanvas = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) {
+      Object.assign(this, { width, height, canvas: true });
+    }
+    getContext() {
+      return { drawImage: (source, x, y) => drawn.push([source, x, y]) };
+    }
+  };
+  try {
+    const refused = [],
+      accepted = d.gpu.queue.copyExternalImageToTexture;
+    d.gpu.queue.copyExternalImageToTexture = (info, destination, size) => {
+      if ('videoWidth' in info.source) {
+        refused.push(info.source);
+        throw new TypeError("'source' member of GPUCopyExternalImageSourceInfo could not be converted");
+      }
+      accepted(info, destination, size);
+    };
+    const video = { videoWidth: 8, videoHeight: 4, readyState: 4, currentTime: 0 },
+      texture = new Texture(video);
+    texture.bind(d.gpu, true);
+    assert.equal(refused.length, 1, 'the browser is asked once');
+    assert.equal(d.uploads.length, 1);
+    assert.equal(d.uploads[0].source.source.canvas, true, 'the frame arrives as a canvas');
+    assert.deepEqual([d.uploads[0].source.source.width, d.uploads[0].source.source.height], [8, 4]);
+    assert.deepEqual(drawn, [[video, 0, 0]]);
+    texture.update({ x: 2, y: 0, width: 3, height: 1 });
+    texture.bind(d.gpu, true);
+    assert.equal(refused.length, 1, 'a queue that refused a video is not asked again');
+    assert.equal(drawn.length, 2, 'every upload draws the current frame');
+    assert.deepEqual(d.uploads.at(-1).source.origin, [2, 0]);
+    // A TypeError for anything but a video source is still an error.
+    const image = new Texture({ width: 4, height: 4, naturalWidth: 4, naturalHeight: 4 });
+    d.gpu.queue.copyExternalImageToTexture = () => {
+      throw new TypeError('bad');
+    };
+    assert.throws(() => image.bind(d.gpu, true), TypeError);
+  } finally {
+    globalThis.OffscreenCanvas = OriginalCanvas;
+  }
+});
