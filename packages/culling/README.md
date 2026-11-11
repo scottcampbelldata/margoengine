@@ -163,7 +163,9 @@ core's (`test/gpu/meshes-occlusion-check.mjs`).
   planes), as for `CulledInstances`. Batches a package has `claimed` are culled but do not occlude.
 - The first frame has no occluders; a hidden crowd starts to drop from the second.
 - It costs a depth pass and a pyramid, so it pays in dense or enclosed scenes. Only core's meshes occlude.
-- WebGL2 compatibility layer: frustum and screen size only, the same image with more drawn.
+- WebGL2 compatibility layer: frustum and screen size only, the same image with more drawn. The full Hi-Z route was
+  measured there and costs more than it saves (WebGL2 has no indirect draw, so every draw record is read back each
+  frame); [docs/limits.md](../../docs/limits.md) has the numbers and `test/gpu/compat-cost.mjs` reproduces them.
 
 ## Loaded models and materials meshes: `CulledModels`
 
