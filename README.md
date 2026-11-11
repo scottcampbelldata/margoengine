@@ -43,8 +43,8 @@ Open <http://127.0.0.1:5173/examples/quickstart/>. That page is the quickstart b
 [examples/quickstart/](examples/quickstart).
 
 **Route 2: use the packages in your own project from local tarballs.** `npm run pack:packages` builds every package and
-writes one `.tgz` file each to `test-results/`. Install them all, plus Vite, in a new folder (shown for a shell that
-expands `*.tgz`, such as Git Bash, macOS or Linux; in PowerShell list the files or use `Get-ChildItem`):
+writes one `.tgz` file each to `test-results/`. Install them all, plus Vite, in a new folder. In Git Bash, macOS or
+Linux:
 
 ```sh
 npm run pack:packages
@@ -52,6 +52,19 @@ mkdir ../my-scene && cd ../my-scene
 npm init -y
 npm install ../margoengine/test-results/*.tgz vite
 ```
+
+In PowerShell on Windows, which does not expand `*.tgz` for npm and (in version 5.1, the one Windows ships) does not
+accept `&&`:
+
+```powershell
+npm run pack:packages
+mkdir ../my-scene; cd ../my-scene
+npm init -y
+npm install (Get-ChildItem ../margoengine/test-results/*.tgz).FullName vite
+```
+
+If PowerShell says `npm.ps1 cannot be loaded because running scripts is disabled on this system`, type `npm.cmd` instead
+of `npm` and `npx.cmd` instead of `npx`; they run the same programs.
 
 On the machine used to write this page, `npm ci` took 15 seconds, packing 35 and the install 8; from the first command
 to a rendered, verified page took 76 seconds (`npm run check:quickstart` repeats the whole run and fails above 300).
@@ -181,6 +194,10 @@ The scene is about 60 lines. Three things to know about it:
 - `createMesh` (from `margoengine/materials`) draws a geometry with a `PbrMaterial`. That is how a mesh gets a
   texture. `stage.box()` and `stage.sphere()` make plain-colour meshes with no texture.
 - Shadows, picking and outlines are separate packages. You import them when you want them and pay nothing when you do not.
+
+To change it: the ball's size is the first number of `sphereGeometry` (its radius), so lift it by the same amount in
+`setPosition`. A new mesh, such as a second crate, casts a shadow once you pass it to `shadows.add`, and the click handler
+names it once you add it to `names`.
 
 **WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
 in. Without WebGPU the page shows a message and stops. The site's demos run on WebGL2 without WebGPU through the optional

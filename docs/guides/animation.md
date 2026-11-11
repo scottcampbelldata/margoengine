@@ -65,7 +65,8 @@ document.body.append(bar);
 
 ## 5. Pause and scrub
 
-`playing`, `time` and `clip` are plain fields. `seek(seconds)` jumps and poses the model at once, even while paused.
+`playing`, `time` and `clip` are plain fields. `time` is the number of seconds into the current clip and wraps at its
+end while the clip loops. `seek(seconds)` jumps and poses the model at once, even while paused.
 
 ```ts
 const pause = document.createElement('button');
@@ -74,6 +75,24 @@ pause.onclick = () => {
   animation.playing = !animation.playing;
 };
 bar.append(pause);
+```
+
+A slider scrubs the clip: dragging it pauses and seeks, and while the clip plays the slider follows it.
+
+```ts
+const scrub = document.createElement('input');
+scrub.type = 'range';
+scrub.min = '0';
+scrub.step = 'any';
+scrub.oninput = () => {
+  animation.playing = false;
+  animation.seek(Number(scrub.value));
+};
+stage.onTick(() => {
+  scrub.max = String(animation.clips[animation.clip].duration);
+  if (animation.playing) scrub.value = String(animation.time);
+});
+bar.append(scrub);
 ```
 
 ## Options you will use

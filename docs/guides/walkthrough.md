@@ -6,6 +6,9 @@ collides against the same CPU triangle trees the `@margoengine/bvh` Raycaster us
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js. -->
 
+Put your level in the Vite project's `public/assets/` folder as `house.glb`, so the page loads it from
+`/assets/house.glb`. Any `.glb` with its floor at y = 0 works; the camera below starts at x 2.5, z -2, looking toward +z.
+
 ## The page
 
 ```html

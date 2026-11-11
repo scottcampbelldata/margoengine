@@ -29,6 +29,28 @@ const stage = await createStage('#viewport');
 stage.box({color: '#84d6bd'});
 ```
 
+## A game in one import
+
+With a `<div id="viewport" style="height:400px"></div>` in the page, a crate falls onto a floor and casts a shadow:
+
+```ts
+import {createStage, Shadows} from '@margoengine/game';
+import {Physics} from '@margoengine/game/physics';
+
+await Physics.load(); // compiles the physics solver, once per page
+const stage = await createStage('#viewport', {camera: {position: [6, 4, 8], target: [0, 1, 0]}});
+const physics = new Physics(stage.engine); // steps itself every frame
+const shadows = Shadows.attach(stage.engine, {resolution: 2048});
+stage.engine.scene.lighting.direction.set([-4, 4, 2, 3]); // sun from the left and above, so the shadow is in view
+const floor = stage.box({size: [10, 1, 10], position: [0, -0.5, 0], color: '#d4d4cc'});
+const crate = stage.box({position: [0, 4, 0], color: '#c08040'});
+physics.addBody(floor, {type: 'fixed'});
+physics.addBody(crate, {colliders: {shape: 'box', restitution: 0.3}});
+shadows.add(floor);
+shadows.add(crate);
+window.addEventListener('pagehide', () => stage.dispose(), {once: true});
+```
+
 For a complete app, `npm create margo@latest my-app -- --template web`, then `cd my-app`, `npm install` and
 `npm run dev`. Choose `game`, `viz`, `react` or `next` for the other starters. Each template declares one domain
 profile; React and Next use `@margoengine/react-kit`. The full engine is never a template dependency.

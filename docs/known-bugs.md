@@ -19,6 +19,19 @@
   heavy memory load; nothing in the failing check navigates. Next: record the renderer's exit reason and memory when
   the context goes, so a repeat names the cause.
 
+### A model a few centimetres across casts no visible directional shadow (found in the school pilot, 2026-11-11, open)
+
+- **Repro:** the docs/guides/loading-gltf.md program with the Khronos BoomBox (`examples/assets/khronos/BoomBox/BoomBox.glb`,
+  about 2 cm across, loaded at its own scale) instead of the Flight Helmet: the model draws, framed at the camera's
+  near-plane limit, and the floor under it shows no shadow (WebGPU, Chrome 157, RTX A6000). Scaling `model.root` by 50
+  before step 3 gives the expected shadow, and so does the Flight Helmet at its own size.
+- **Cause:** not found yet. Ruled out on their own: `normalBias` (0.02 m default; 0.001 still shows nothing) and
+  `casterMargin` (100 m default, which makes the 0.0005 normalized `bias` about 0.1 m of depth; 1 still shows
+  nothing). Next suspects: the PCSS blocker search and filter width against a caster smaller than a few texels, and the
+  cascade near distance at a camera 13 cm from its target.
+- **Workaround in the guide:** scale a tiny model to a real size (loading-gltf.md, "The model is tiny or huge").
+
+
 ### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
 
 - **Repro:** more than 1,048,574 core meshes of one geometry on a device with WebGPU's default 128 MiB
