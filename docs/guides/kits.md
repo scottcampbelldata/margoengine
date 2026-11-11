@@ -82,9 +82,9 @@ They describe browser bundles, separately from npm install bytes. Lazy parts and
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games | 365,936 B |
-| `margoengine/viz` | Visualization | 264,713 B |
-| `margoengine/web` | Web scenes | 95,846 B |
+| `margoengine/game` | Games | 377,168 B |
+| `margoengine/viz` | Visualization | 266,957 B |
+| `margoengine/web` | Web scenes | 96,802 B |
 
 `node scripts/kit-install-check.mjs` packs the checkout, serves a read-only local registry, installs in new folders
 inside this lane's ignored test-results directory with an isolated cache, and compares every installed engine
