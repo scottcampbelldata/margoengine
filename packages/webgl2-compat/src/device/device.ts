@@ -510,7 +510,7 @@ export class CompatDevice extends EventTarget {
     for (const c of this.shown) c.keepFrame();
     this.shown.clear();
     this.lose('destroyed', 'The device was destroyed');
-    this.externals.destroy();
+    this.externals.dispose();
     this.objects.destroy();
     this.ext.lose?.loseContext();
   }

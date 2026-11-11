@@ -57,11 +57,20 @@ export class ExternalCopies<T extends Copy> {
   }
 
   /** Destroys every copy (the device is destroyed). */
-  destroy(): void {
+  dispose(): void {
     for (const copy of this.current.values()) copy.destroy();
     for (const copy of this.spares) copy.destroy();
     this.current.clear();
     this.spares.length = 0;
+  }
+
+  /** The same as {@link dispose}, under the name the layer's GPU objects use. */
+  destroy(): void {
+    this.dispose();
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
   }
 
   private spare(copy: T): void {

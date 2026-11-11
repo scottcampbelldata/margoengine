@@ -519,7 +519,9 @@ export class ExternalCopies<T extends Copy> {
     take(source: object, width: number, height: number): T;
     get size(): number;
     expire(): void;
+    dispose(): void;
     destroy(): void;
+    [Symbol.dispose](): void;
 }
 
 export interface ForStmt extends Span {

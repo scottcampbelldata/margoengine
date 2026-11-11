@@ -47,7 +47,21 @@ test('a size change and device destruction release the old copies', () => {
   assert.equal(made.length, 2);
   endTask();
   assert.equal(live(), 2, 'both are spares now');
-  pool.destroy();
+  pool.dispose();
   assert.equal(live(), 0);
+  assert.equal(pool.size, 0);
+});
+
+// tests/api-conventions.test.js: an exported class with an argument-less destroy() and no dispose() broke the engine's
+// dispose convention (1ffafc7bc9). The copies now dispose like every engine object, `using` included.
+test('the copies follow the dispose convention, so `using` releases them', () => {
+  const { pool, endTask, live } = copies();
+  {
+    using held = pool;
+    held.take({}, 8, 4);
+    endTask();
+    held.take({}, 4, 4);
+  }
+  assert.equal(live(), 0, 'leaving the block destroyed the current copy and the spare');
   assert.equal(pool.size, 0);
 });
